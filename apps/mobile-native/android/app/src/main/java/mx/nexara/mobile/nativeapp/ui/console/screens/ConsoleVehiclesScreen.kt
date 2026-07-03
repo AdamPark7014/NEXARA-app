@@ -1,9 +1,11 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
 import android.app.Application
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,13 +17,18 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -65,14 +72,71 @@ class ConsoleVehiclesViewModel(app: Application) : AndroidViewModel(app) {
 }
 
 @Composable
+private fun VehicleDetail(v: VehicleControlDto, context: android.content.Context, onBack: () -> Unit) {
+    val name   = v.vehiculo?.nombre ?: v.nombreVehiculo ?: "Vehículo"
+    val plates = v.placasVehiculo ?: v.vehiculo?.placas ?: "—"
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item { OutlinedButton(onClick = onBack) { Text("← Vehículos") } }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("$name ($plates)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    VRow("Estatus", v.estatusAprobacion)
+                    VRow("Responsable", v.solicitante?.nombre)
+                    VRow("Solicitud", v.fechaSolicitud)
+                    VRow("Inicio solicitado", v.fechaInicioSolicitada)
+                    VRow("Fin solicitado", v.fechaFinSolicitada)
+                    VRow("Inicio aprobado", v.fechaInicioAprobada)
+                    VRow("Fin aprobado", v.fechaFinAprobada)
+                    VRow("Entrega estatus", v.entregaEstatus)
+                    VRow("Observaciones", v.entregaObservaciones)
+                    v.penalizacionMonto?.let { VRow("Penalización", "$$it") }
+                }
+            }
+        }
+        if (!v.evidenciaEntregaUrl.isNullOrBlank() || !v.evidenciaDevolucionUrl.isNullOrBlank()) {
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Evidencias", fontWeight = FontWeight.SemiBold)
+                        if (!v.evidenciaEntregaUrl.isNullOrBlank()) {
+                            Button(onClick = { openExternalUrl(context, v.evidenciaEntregaUrl!!) }, Modifier.fillMaxWidth()) { Text("Abrir evidencia entrega") }
+                        }
+                        if (!v.evidenciaDevolucionUrl.isNullOrBlank()) {
+                            Button(onClick = { openExternalUrl(context, v.evidenciaDevolucionUrl!!) }, Modifier.fillMaxWidth()) { Text("Abrir evidencia devolución") }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VRow(label: String, value: String?) {
+    if (!value.isNullOrBlank()) {
+        Row(Modifier.fillMaxWidth()) {
+            Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1.2f))
+        }
+    }
+}
+@Composable
 fun ConsoleVehiclesScreen(
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
     val context = LocalContext.current
     val vm: ConsoleVehiclesViewModel = viewModel()
     val state by vm.state.collectAsState()
+    var selected by remember { mutableStateOf<VehicleControlDto?>(null) }
 
     if (state.vehicles.isEmpty() && state.isLoading && state.error == null) vm.refresh()
+
+    val sel = selected
+    if (sel != null) {
+        VehicleDetail(sel, context, onBack = { selected = null })
+        return
+    }
 
     val q = state.query.trim().lowercase()
     val filtered = if (q.isBlank()) state.vehicles else state.vehicles.filter { v ->
@@ -122,28 +186,18 @@ fun ConsoleVehiclesScreen(
             modifier = Modifier.fillMaxWidth(),
         ) {
             items(filtered.take(200)) { v ->
+                val name = v.vehiculo?.nombre ?: v.nombreVehiculo ?: "Vehículo"
+                val plates = v.placasVehiculo ?: v.vehiculo?.placas ?: "-"
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().clickable { selected = v },
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        val name = v.vehiculo?.nombre ?: v.nombreVehiculo ?: "Vehículo"
-                        val plates = v.placasVehiculo ?: v.vehiculo?.placas ?: "-"
-                        Text("$name ($plates)", style = MaterialTheme.typography.titleSmall)
+                        Text("$name ($plates)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                         Text("Estatus: ${v.estatusAprobacion}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                         val requester = v.solicitante?.nombre
                         if (!requester.isNullOrBlank()) {
                             Text("Responsable: $requester", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        val entrega = v.evidenciaEntregaUrl
-                        val devol = v.evidenciaDevolucionUrl
-                        if (!entrega.isNullOrBlank()) {
-                            Button(onClick = { openExternalUrl(context, entrega) }) { Text("Abrir evidencia entrega") }
-                        }
-                        if (!devol.isNullOrBlank()) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Button(onClick = { openExternalUrl(context, devol) }) { Text("Abrir evidencia devolución") }
                         }
                     }
                 }
@@ -152,3 +206,53 @@ fun ConsoleVehiclesScreen(
     }
 }
 
+@Composable
+private fun VehicleDetail(v: VehicleControlDto, context: android.content.Context, onBack: () -> Unit) {
+    val name   = v.vehiculo?.nombre ?: v.nombreVehiculo ?: "Vehículo"
+    val plates = v.placasVehiculo ?: v.vehiculo?.placas ?: "—"
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item { OutlinedButton(onClick = onBack) { Text("← Vehículos") } }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("$name ($plates)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    VRow("Estatus", v.estatusAprobacion)
+                    VRow("Responsable", v.solicitante?.nombre)
+                    VRow("Solicitud", v.fechaSolicitud)
+                    VRow("Inicio solicitado", v.fechaInicioSolicitada)
+                    VRow("Fin solicitado", v.fechaFinSolicitada)
+                    VRow("Inicio aprobado", v.fechaInicioAprobada)
+                    VRow("Fin aprobado", v.fechaFinAprobada)
+                    VRow("Entrega estatus", v.entregaEstatus)
+                    VRow("Observaciones", v.entregaObservaciones)
+                    v.penalizacionMonto?.let { VRow("Penalización", "$$it") }
+                }
+            }
+        }
+        if (!v.evidenciaEntregaUrl.isNullOrBlank() || !v.evidenciaDevolucionUrl.isNullOrBlank()) {
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Evidencias", fontWeight = FontWeight.SemiBold)
+                        if (!v.evidenciaEntregaUrl.isNullOrBlank()) {
+                            Button(onClick = { openExternalUrl(context, v.evidenciaEntregaUrl!!) }, Modifier.fillMaxWidth()) { Text("Abrir evidencia entrega") }
+                        }
+                        if (!v.evidenciaDevolucionUrl.isNullOrBlank()) {
+                            Button(onClick = { openExternalUrl(context, v.evidenciaDevolucionUrl!!) }, Modifier.fillMaxWidth()) { Text("Abrir evidencia devolución") }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VRow(label: String, value: String?) {
+    if (!value.isNullOrBlank()) {
+        Row(Modifier.fillMaxWidth()) {
+            Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1.2f))
+        }
+    }
+}

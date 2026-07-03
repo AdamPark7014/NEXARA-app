@@ -51,6 +51,16 @@ private func opsIdKey(_ m: [String: Any], _ prefix: String) -> String {
     return UUID().uuidString
 }
 
+@ViewBuilder private func oRow(_ label: String, _ value: String) -> some View {
+    if !value.isEmpty {
+        HStack {
+            Text(label).foregroundColor(.secondary)
+            Spacer()
+            Text(value).multilineTextAlignment(.trailing)
+        }
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MARK: – MaintenanceView (Órdenes de trabajo + activos)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -480,7 +490,26 @@ private struct ServiceSheetRow: View {
 struct StockView: View {
     var initialTab: Int = 0
     @StateObject private var vm = StockVM()
+    @State private var selectedStock: [String: Any]?
+    @State private var selectedWh: [String: Any]?
     var body: some View {
+        Group {
+            if let s = selectedStock { stockDetail(s) }
+            else if let w = selectedWh { whDetail(w) }
+            else { stockList }
+        }
+        .navigationTitle(selectedStock == nil && selectedWh == nil ? "Almacén · Bodega" : "")
+        .onAppear { vm.tab = initialTab }
+        .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+            if selectedStock == nil && selectedWh == nil {
+                Button { vm.load() } label: { Image(systemName:"arrow.clockwise") }
+            }
+        }}
+        .refreshable { if selectedStock == nil && selectedWh == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    private var stockList: some View {
         VStack(spacing: 0) {
             if !vm.stock.isEmpty || !vm.warehouse.isEmpty {
                 HStack(spacing: 0) {
@@ -503,25 +532,76 @@ struct StockView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.tab == 0 {
                 List(vm.filteredStock.prefix(60), id: { opsIdKey($0,"stk") }) { item in
-                    StockItemRow(item: item)
+                    Button { selectedStock = item } label: { StockItemRow(item: item) }
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
                         .listRowSeparator(.hidden)
                 }
                 .listStyle(.plain)
             } else {
                 List(vm.filteredWh.prefix(60), id: { opsIdKey($0,"wh") }) { item in
-                    WarehouseRow(item: item)
+                    Button { selectedWh = item } label: { WarehouseRow(item: item) }
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
                         .listRowSeparator(.hidden)
                 }
                 .listStyle(.plain)
             }
         }
-        .navigationTitle("Almacén · Bodega")
-        .onAppear { vm.tab = initialTab }
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+    }
+
+    @ViewBuilder private func stockDetail(_ item: [String: Any]) -> some View {
+        let name     = oStr(item,"name","nombre","productName")
+        let sku      = oStr(item,"sku","code","codigo")
+        let qty      = oInt(item,"quantity","cantidad") ?? 0
+        let minStock = oStr(item,"minStock","stockMinimo")
+        let location = oStr(item,"location","ubicacion","bodega")
+        let unit     = oStr(item,"unit","unidad")
+        let price    = oDouble(item,"price","precio","costo")
+        let category = oStr(item,"category","categoria")
+        let notes    = oStr(item,"notes","notas","descripcion")
+        List {
+            Section { Button("← Inventario") { selectedStock = nil } }
+            Section {
+                VStack(spacing: 4) {
+                    Text("Stock").font(.caption).foregroundColor(.secondary)
+                    Text("\(qty)").font(.system(size: 32, weight: .bold, design: .rounded)).foregroundColor(qty <= 5 ? .red : .primary)
+                    Text(unit.isEmpty ? "unidades" : unit).font(.caption2).foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity).padding(.vertical, 8)
+            }
+            Section("Producto") {
+                oRow("Nombre",    name)
+                oRow("SKU",       sku)
+                oRow("Categoría", category)
+                oRow("Mínimo",    minStock)
+                oRow("Ubicación", location)
+                if let p = price { oRow("Precio", fmtOps(p)) }
+            }
+            if !notes.isEmpty {
+                Section("Descripción") { Text(notes).font(.body) }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func whDetail(_ item: [String: Any]) -> some View {
+        let name     = oStr(item,"name","nombre")
+        let code     = oStr(item,"code","codigo")
+        let location = oStr(item,"location","ubicacion","address")
+        let manager  = oStr(item,"managerName","responsable","encargado")
+        let capacity = oStr(item,"capacity","capacidad")
+        List {
+            Section { Button("← Bodegas") { selectedWh = nil } }
+            Section("Bodega") {
+                oRow("Nombre",      name)
+                oRow("Código",      code)
+                oRow("Ubicación",   location)
+                oRow("Responsable", manager)
+                oRow("Capacidad",   capacity)
+            }
+        }
+        .listStyle(.insetGrouped)
     }
 }
 
@@ -598,7 +678,20 @@ private struct WarehouseRow: View {
 
 struct EmployeePaymentsView: View {
     @StateObject private var vm = EmployeePaymentsVM()
+    @State private var selected: [String: Any]?
     var body: some View {
+        Group {
+            if let s = selected { epDetail(s) } else { epList }
+        }
+        .navigationTitle(selected == nil ? "Pagos a empleados" : "")
+        .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+            if selected == nil { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } }
+        }}
+        .refreshable { if selected == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    private var epList: some View {
         VStack(spacing: 0) {
             if !vm.items.isEmpty {
                 HStack(spacing: 0) {
@@ -616,17 +709,47 @@ struct EmployeePaymentsView: View {
             else if vm.filtered.isEmpty { Spacer(); Text("Sin pagos").foregroundColor(.secondary); Spacer() }
             else {
                 List(vm.filtered.prefix(60), id: { opsIdKey($0,"ep") }) { item in
-                    PaymentRow(item: item)
+                    Button { selected = item } label: { PaymentRow(item: item) }
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
                         .listRowSeparator(.hidden)
                 }
                 .listStyle(.plain)
             }
         }
-        .navigationTitle("Pagos a empleados")
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+    }
+
+    @ViewBuilder private func epDetail(_ p: [String: Any]) -> some View {
+        let concept = oStr(p,"concept","concepto","descripcion")
+        let user    = oStr(p,"userName","empleado","nombre")
+        let amount  = oDouble(p,"amount","total","monto")
+        let date    = String(oStr(p,"paidAt","createdAt","fecha").prefix(10))
+        let method  = oStr(p,"method","metodoPago","paymentMethod")
+        let ref     = oStr(p,"reference","referencia")
+        let notes   = oStr(p,"notes","notas","comentarios")
+        List {
+            Section { Button("← Pagos") { selected = nil } }
+            if let a = amount {
+                Section {
+                    VStack(spacing: 4) {
+                        Text("Monto").font(.caption).foregroundColor(.secondary)
+                        Text(fmtOps(a)).font(.system(size: 28, weight: .bold, design: .rounded)).foregroundColor(.green)
+                    }
+                    .frame(maxWidth: .infinity).padding(.vertical, 8)
+                }
+            }
+            Section("Detalle") {
+                oRow("Concepto",  concept)
+                oRow("Empleado",  user)
+                oRow("Fecha",     date)
+                oRow("Método",    method)
+                oRow("Referencia",ref)
+            }
+            if !notes.isEmpty {
+                Section("Notas") { Text(notes).font(.body) }
+            }
+        }
+        .listStyle(.insetGrouped)
     }
 }
 
@@ -682,7 +805,20 @@ private struct PaymentRow: View {
 
 struct FinesView: View {
     @StateObject private var vm = FinesVM()
+    @State private var selected: [String: Any]?
     var body: some View {
+        Group {
+            if let s = selected { fineDetail(s) } else { fineList }
+        }
+        .navigationTitle(selected == nil ? "Multas" : "")
+        .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+            if selected == nil { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } }
+        }}
+        .refreshable { if selected == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    private var fineList: some View {
         VStack(spacing: 0) {
             if !vm.items.isEmpty {
                 HStack(spacing: 0) {
@@ -699,15 +835,45 @@ struct FinesView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin multas").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"fn") }) { item in FineRow(item: item)
+                List(vm.filtered.prefix(60), id: { opsIdKey($0,"fn") }) { item in
+                    Button { selected = item } label: { FineRow(item: item) }
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
-                        .listRowSeparator(.hidden) }.listStyle(.plain)
+                        .listRowSeparator(.hidden)
+                }.listStyle(.plain)
             }
         }
-        .navigationTitle("Multas")
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+    }
+
+    @ViewBuilder private func fineDetail(_ f: [String: Any]) -> some View {
+        let reason  = oStr(f,"reason","motivo","concepto")
+        let user    = oStr(f,"userName","empleado","nombre")
+        let amount  = oDouble(f,"amount","total","monto")
+        let date    = String(oStr(f,"createdAt","fecha").prefix(10))
+        let status  = oStr(f,"status","estado")
+        let notes   = oStr(f,"notes","notas","descripcion")
+        List {
+            Section { Button("← Multas") { selected = nil } }
+            if let a = amount {
+                Section {
+                    VStack(spacing: 4) {
+                        Text("Monto").font(.caption).foregroundColor(.secondary)
+                        Text(fmtOps(a)).font(.system(size: 28, weight: .bold, design: .rounded)).foregroundColor(.red)
+                    }
+                    .frame(maxWidth: .infinity).padding(.vertical, 8)
+                }
+            }
+            Section("Detalle") {
+                oRow("Motivo",   reason)
+                oRow("Empleado", user)
+                oRow("Estatus",  status)
+                oRow("Fecha",    date)
+            }
+            if !notes.isEmpty {
+                Section("Descripción") { Text(notes).font(.body) }
+            }
+        }
+        .listStyle(.insetGrouped)
     }
 }
 
@@ -762,7 +928,20 @@ private struct FineRow: View {
 
 struct AuditView: View {
     @StateObject private var vm = AuditVM()
+    @State private var selected: [String: Any]?
     var body: some View {
+        Group {
+            if let s = selected { auditDetail(s) } else { auditList }
+        }
+        .navigationTitle(selected == nil ? "Auditoría" : "")
+        .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+            if selected == nil { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } }
+        }}
+        .refreshable { if selected == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    private var auditList: some View {
         VStack(spacing: 0) {
             if !vm.items.isEmpty {
                 HStack(spacing: 0) {
@@ -782,15 +961,37 @@ struct AuditView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin registros").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(80), id: { opsIdKey($0,"au") }) { item in AuditRow(item: item)
+                List(vm.filtered.prefix(80), id: { opsIdKey($0,"au") }) { item in
+                    Button { selected = item } label: { AuditRow(item: item) }
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
-                        .listRowSeparator(.hidden) }.listStyle(.plain)
+                        .listRowSeparator(.hidden)
+                }.listStyle(.plain)
             }
         }
-        .navigationTitle("Auditoría")
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+    }
+
+    @ViewBuilder private func auditDetail(_ a: [String: Any]) -> some View {
+        let action   = oStr(a,"action","accion","description")
+        let user     = oStr(a,"userName","usuario")
+        let entity   = oStr(a,"entityType","modelo","entity")
+        let entityId = oStr(a,"entityId","recordId")
+        let date     = oStr(a,"createdAt","timestamp")
+        let details  = oStr(a,"details","metadata","changes")
+        List {
+            Section { Button("← Auditoría") { selected = nil } }
+            Section("Acción") {
+                Text(action.isEmpty ? "—" : action).font(.body)
+                oRow("Usuario",   user)
+                oRow("Entidad",   entity)
+                oRow("ID entidad",entityId)
+                oRow("Fecha",     String(date.prefix(19)))
+            }
+            if !details.isEmpty {
+                Section("Detalles") { Text(details).font(.caption).foregroundColor(.secondary) }
+            }
+        }
+        .listStyle(.insetGrouped)
     }
 }
 
@@ -838,21 +1039,60 @@ private struct AuditRow: View {
 
 struct DocumentsView: View {
     @StateObject private var vm = DocumentsVM()
+    @State private var selected: [String: Any]?
     var body: some View {
+        Group {
+            if let s = selected { docDetail(s) } else { docList }
+        }
+        .navigationTitle(selected == nil ? "Documentos" : "")
+        .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+            if selected == nil { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } }
+        }}
+        .refreshable { if selected == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    private var docList: some View {
         VStack(spacing: 0) {
             searchBar("Buscar documento…", text: $vm.query)
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin documentos").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"doc") }) { item in DocumentRow(item: item)
+                List(vm.filtered.prefix(60), id: { opsIdKey($0,"doc") }) { item in
+                    Button { selected = item } label: { DocumentRow(item: item) }
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
-                        .listRowSeparator(.hidden) }.listStyle(.plain)
+                        .listRowSeparator(.hidden)
+                }.listStyle(.plain)
             }
         }
-        .navigationTitle("Documentos")
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+    }
+
+    @ViewBuilder private func docDetail(_ d: [String: Any]) -> some View {
+        let name     = oStr(d,"name","title","fileName")
+        let category = oStr(d,"category","tipo","type")
+        let date     = String(oStr(d,"createdAt","updatedAt").prefix(10))
+        let url      = oStr(d,"url","fileUrl","path")
+        let size     = oStr(d,"size","fileSize")
+        let author   = oStr(d,"authorName","uploadedBy","createdBy")
+        List {
+            Section { Button("← Documentos") { selected = nil } }
+            Section("Documento") {
+                oRow("Nombre",     name)
+                oRow("Categoría",  category)
+                oRow("Fecha",      date)
+                oRow("Tamaño",     size)
+                oRow("Subido por", author)
+            }
+            if !url.isEmpty {
+                Section {
+                    Link(destination: URL(string: url) ?? URL(string:"https://nexara.com.mx")!) {
+                        Label("Abrir documento", systemImage: "arrow.up.right.square")
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
     }
 }
 
@@ -1255,7 +1495,20 @@ private struct NewsRow: View {
 
 struct AccountingView: View {
     @StateObject private var vm = AccountingVM()
+    @State private var selected: [String: Any]?
     var body: some View {
+        Group {
+            if let s = selected { acDetail(s) } else { acList }
+        }
+        .navigationTitle(selected == nil ? "Contabilidad" : "")
+        .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+            if selected == nil { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } }
+        }}
+        .refreshable { if selected == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    private var acList: some View {
         VStack(spacing: 0) {
             if !vm.items.isEmpty {
                 HStack(spacing: 0) {
@@ -1274,15 +1527,49 @@ struct AccountingView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin asientos").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"ac") }) { item in AccountingRow(item: item)
+                List(vm.filtered.prefix(60), id: { opsIdKey($0,"ac") }) { item in
+                    Button { selected = item } label: { AccountingRow(item: item) }
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
-                        .listRowSeparator(.hidden) }.listStyle(.plain)
+                        .listRowSeparator(.hidden)
+                }.listStyle(.plain)
             }
         }
-        .navigationTitle("Contabilidad")
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+    }
+
+    @ViewBuilder private func acDetail(_ e: [String: Any]) -> some View {
+        let desc    = oStr(e,"description","descripcion","concepto")
+        let account = oStr(e,"account","cuenta")
+        let debit   = oDouble(e,"debit","debe","totalDebit")
+        let credit  = oDouble(e,"credit","haber","totalCredit")
+        let date    = String(oStr(e,"date","createdAt").prefix(10))
+        let ref     = oStr(e,"reference","referencia","folio")
+        let status  = oStr(e,"status","estado")
+        List {
+            Section { Button("← Contabilidad") { selected = nil } }
+            Section {
+                HStack {
+                    VStack {
+                        Text("Debe").font(.caption).foregroundColor(.secondary)
+                        Text(debit.map { fmtOps($0) } ?? "—").font(.title3).bold().foregroundColor(.red)
+                    }
+                    Spacer()
+                    VStack {
+                        Text("Haber").font(.caption).foregroundColor(.secondary)
+                        Text(credit.map { fmtOps($0) } ?? "—").font(.title3).bold().foregroundColor(.green)
+                    }
+                }
+                .frame(maxWidth: .infinity).padding(.vertical, 6)
+            }
+            Section("Asiento") {
+                oRow("Descripción", desc)
+                oRow("Cuenta",      account)
+                oRow("Fecha",       date)
+                oRow("Referencia",  ref)
+                oRow("Estatus",     status)
+            }
+        }
+        .listStyle(.insetGrouped)
     }
 }
 
