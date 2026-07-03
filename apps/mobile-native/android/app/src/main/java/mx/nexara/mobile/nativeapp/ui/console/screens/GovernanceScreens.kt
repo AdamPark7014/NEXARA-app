@@ -581,6 +581,7 @@ fun RecruitingScreen() {
     var candidates by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
     var query by remember { mutableStateOf("") }
     var showRejected by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
 
     LaunchedEffect(Unit) {
         loading = true
@@ -605,6 +606,9 @@ fun RecruitingScreen() {
         val map = filtered.groupBy { govStr(it, "stage", "status").ifBlank { "INBOX" } }
         STAGE_ORDER.filter { map.containsKey(it) }.map { key -> key to map[key]!! }
     }
+
+    val sel = selected
+    if (sel != null) { CandidateDetail(sel, onBack = { selected = null }); return }
 
     Column(Modifier.fillMaxSize()) {
         // KPI strip
@@ -655,7 +659,7 @@ fun RecruitingScreen() {
                         }
                     }
                     items(list, key = { govStr(it, "id") }) { c ->
-                        RecruCandidateCard(c, color)
+                        RecruCandidateCard(c, color, onClick = { selected = c })
                     }
                 }
             }
@@ -672,7 +676,69 @@ private fun RecruKpiChip(label: String, value: String, color: Color = MaterialTh
 }
 
 @Composable
-private fun RecruCandidateCard(c: Map<String, Any?>, accent: Color) {
+private fun CandidateDetail(c: Map<String, Any?>, onBack: () -> Unit) {
+    val name     = govStr(c, "fullName", "nombre")
+    val email    = govStr(c, "email")
+    val phone    = govStr(c, "whatsapp", "phone", "telefono")
+    val position = govStr(c, "category", "position", "puesto")
+    val stage    = govStr(c, "stage", "status")
+    val cv       = govStr(c, "cvUrl", "fileUrl", "url")
+    val exp      = govStr(c, "experience", "experiencia")
+    val notes    = govStr(c, "notes", "notas", "comentarios")
+    val source   = govStr(c, "source", "fuente")
+    val salary   = govStr(c, "expectedSalary", "salario")
+
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item { OutlinedButton(onClick = onBack) { Text("← Candidatos") } }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(name.ifBlank { "Candidato" }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    if (stage.isNotBlank()) {
+                        Box(Modifier.background(stageColor(stage).copy(0.15f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
+                            Text(STAGE_LABELS[stage] ?: stage, style = MaterialTheme.typography.labelSmall, color = stageColor(stage))
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (position.isNotBlank()) CandLine("Posición", position)
+                    if (email.isNotBlank())    CandLine("Email", email)
+                    if (phone.isNotBlank())    CandLine("WhatsApp / Tel.", phone)
+                    if (exp.isNotBlank())      CandLine("Experiencia", exp)
+                    if (salary.isNotBlank())   CandLine("Salario esperado", salary)
+                    if (source.isNotBlank())   CandLine("Fuente", source)
+                    if (cv.isNotBlank())       CandLine("CV URL", cv.take(60))
+                }
+            }
+        }
+        if (notes.isNotBlank()) {
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("Notas", fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(6.dp))
+                        Text(notes, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CandLine(label: String, value: String) {
+    Row(Modifier.fillMaxWidth()) {
+        Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+        Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1.2f))
+    }
+}
+
+@Composable
+private fun RecruCandidateCard(c: Map<String, Any?>, accent: Color, onClick: () -> Unit = {}) {
     val name     = govStr(c, "fullName", "nombre")
     val email    = govStr(c, "email")
     val category = govStr(c, "category")
@@ -680,7 +746,7 @@ private fun RecruCandidateCard(c: Map<String, Any?>, accent: Color) {
     val initials = name.split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
 
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
