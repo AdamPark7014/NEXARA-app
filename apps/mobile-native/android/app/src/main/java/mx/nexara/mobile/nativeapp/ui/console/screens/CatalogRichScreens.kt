@@ -1,10 +1,13 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
 import android.app.Application
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -13,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +32,36 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
+
+private val skipDetailKeys = setOf("id", "uuid", "__type", "createdAt", "updatedAt")
+
+@Composable
+private fun CatalogItemDetail(item: Map<String, Any?>, onBack: () -> Unit) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item { OutlinedButton(onClick = onBack) { Text("← Volver") } }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item.forEach { (key, value) ->
+                        val v = when (value) {
+                            null -> return@forEach
+                            is String -> value.takeIf { it.isNotBlank() && it != "null" } ?: return@forEach
+                            is Number -> value.toString()
+                            is Boolean -> if (value) "Sí" else "No"
+                            else -> value.toString().takeIf { it.isNotBlank() && it != "null" } ?: return@forEach
+                        }
+                        val label = key.replace(Regex("([A-Z])"), " $1").trim().replaceFirstChar { it.uppercase() }
+                        Row(Modifier.fillMaxWidth()) {
+                            Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                            Spacer(Modifier.padding(4.dp))
+                            Text(v.take(100), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 private fun cStr(m: Map<String, Any?>, vararg keys: String): String {
     for (k in keys) {
@@ -56,11 +90,18 @@ private fun CatalogRichScreen(
     var loading by remember { mutableStateOf(true) }
     var query by remember { mutableStateOf("") }
     var items by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
 
     LaunchedEffect(Unit) {
         loading = true
         items = withContext(Dispatchers.IO) { load(repo) }
         loading = false
+    }
+
+    val sel = selected
+    if (sel != null) {
+        CatalogItemDetail(item = sel, onBack = { selected = null })
+        return
     }
 
     val filtered = if (query.isBlank()) items else {
@@ -98,7 +139,7 @@ private fun CatalogRichScreen(
         } else {
             LazyColumn(Modifier.padding(horizontal = 16.dp)) {
                 items(filtered.take(80), key = { cStr(it, "id", "uuid") + it.hashCode() }) { row ->
-                    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selected = row }) {
                         Column(Modifier.padding(12.dp)) {
                             Text(cStr(row, *titleKeys).ifBlank { "—" }, fontWeight = FontWeight.Bold)
                             val sub = subtitleKeys.mapNotNull { k -> cStr(row, k).takeIf { it.isNotBlank() } }.joinToString(" · ")
