@@ -8,6 +8,7 @@ struct WarehouseHubView: View {
     @State private var stock: [[String: Any]] = []
     @State private var query = ""
     @State private var isLoading = true
+    @State private var selected: [String: Any]?
 
     private var items: [[String: Any]] { tab == 0 ? warehouses : stock }
 
@@ -25,6 +26,49 @@ struct WarehouseHubView: View {
     }
 
     var body: some View {
+        Group {
+            if let s = selected { whDetail(s) } else { whList }
+        }
+        .navigationTitle(selected == nil ? (tab == 0 ? "Bodega" : "Almacén") : "")
+        .onAppear { tab = initialTab }
+        .task { await reload() }
+        .refreshable { if selected == nil { await reload() } }
+    }
+
+    @ViewBuilder private func whDetail(_ row: [String: Any]) -> some View {
+        List {
+            Section { Button(tab == 0 ? "← Bodega" : "← Almacén") { selected = nil } }
+            Section(tab == 0 ? "Bodega" : "Producto") {
+                whRow("Nombre",     whStr(row, "name", "nombre", "productName"))
+                whRow("Código",     whStr(row, "code", "sku", "codigo"))
+                whRow("Categoría",  whStr(row, "category", "categoria", "type"))
+                whRow("Ubicación",  whStr(row, "location", "ubicacion", "address"))
+                if tab == 0 {
+                    whRow("Responsable", whStr(row, "managerName", "responsable"))
+                    whRow("Capacidad",   whStr(row, "capacity", "capacidad"))
+                } else {
+                    if let q = whDouble(row, "quantity", "cantidad", "stock") {
+                        whRow("Cantidad", "\(Int(q)) uds")
+                    }
+                    if let min = whDouble(row, "minStock", "stockMinimo") {
+                        whRow("Stock mínimo", "\(Int(min))")
+                    }
+                    if let p = whDouble(row, "price", "precio") {
+                        whRow("Precio", "$\(Int(p))")
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func whRow(_ label: String, _ value: String) -> some View {
+        if !value.isEmpty {
+            HStack { Text(label).foregroundColor(.secondary); Spacer(); Text(value).multilineTextAlignment(.trailing) }
+        }
+    }
+
+    private var whList: some View {
         VStack(spacing: 0) {
             Picker("Sección", selection: $tab) {
                 Text("Bodegas").tag(0)
@@ -59,23 +103,22 @@ struct WarehouseHubView: View {
                 Spacer()
             } else {
                 List(filtered.prefix(100), id: \.whId) { row in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(whStr(row, "name", "nombre", "productName", "title")).font(.headline)
-                        Text(whStr(row, "code", "sku", "codigo", "location", "ubicacion"))
-                            .font(.caption).foregroundColor(.secondary)
-                        if tab == 1, let q = whDouble(row, "quantity", "cantidad", "stock") {
-                            Text("Cantidad: \(Int(q))").font(.caption2).foregroundColor(q < 5 ? .red : .secondary)
+                    Button { selected = row } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(whStr(row, "name", "nombre", "productName", "title")).font(.headline).foregroundColor(.primary)
+                            Text(whStr(row, "code", "sku", "codigo", "location", "ubicacion"))
+                                .font(.caption).foregroundColor(.secondary)
+                            if tab == 1, let q = whDouble(row, "quantity", "cantidad", "stock") {
+                                Text("Cantidad: \(Int(q))").font(.caption2).foregroundColor(q < 5 ? .red : .secondary)
+                            }
                         }
+                        .padding(.vertical, 4)
                     }
-                    .padding(.vertical, 4)
+                    .buttonStyle(.plain)
                 }
                 .listStyle(.plain)
             }
         }
-        .navigationTitle(tab == 0 ? "Bodega" : "Almacén")
-        .onAppear { tab = initialTab }
-        .task { await reload() }
-        .refreshable { await reload() }
     }
 
     private func reload() async {
