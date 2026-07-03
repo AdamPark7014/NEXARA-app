@@ -64,7 +64,11 @@ export class LabService {
     const t0 = Date.now();
     const isAnthropic = input.model.startsWith('claude');
     const provider = isAnthropic ? 'anthropic' : 'openai';
-    const apiKey = isAnthropic ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY;
+    const anthropicBaseUrl = (process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com/v1').replace(/\/+$/, '');
+    const anthropicToken = (process.env.ANTHROPIC_AUTH_TOKEN || '').trim();
+    const apiKey = isAnthropic
+      ? (process.env.ANTHROPIC_API_KEY || anthropicToken)
+      : process.env.OPENAI_API_KEY;
     const liveEnabled = await this.isEnabled('lab.ai.live');
 
     if (!apiKey || !liveEnabled) {
@@ -79,11 +83,12 @@ export class LabService {
 
     try {
       if (isAnthropic) {
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
+        const res = await fetch(`${anthropicBaseUrl}/messages`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'x-api-key': apiKey,
+            Authorization: `Bearer ${apiKey}`,
             'anthropic-version': '2023-06-01',
           },
           body: JSON.stringify({
