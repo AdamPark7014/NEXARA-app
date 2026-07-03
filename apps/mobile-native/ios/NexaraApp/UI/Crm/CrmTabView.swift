@@ -64,14 +64,26 @@ struct CrmTabView: View {
 
 struct CrmCotizacionesView: View {
     @StateObject private var vm = CrmCotizacionesVM()
+    @State private var selected: [String: Any]?
 
     var body: some View {
+        Group {
+            if let s = selected { cotDetail(s) } else { listBody }
+        }
+        .task { vm.load() }
+        .refreshable { if selected == nil { vm.load() } }
+    }
+
+    private var listBody: some View {
         VStack(spacing: 0) {
             if !vm.items.isEmpty && !vm.isLoading {
                 HStack(spacing: 0) {
                     crmKpi("Total", "\(vm.items.count)", .primary)
                     Divider().frame(height: 32)
-                    crmKpi("Monto", fmtMxn(vm.totalMxn), .green)
+                    let aprobadas = vm.items.filter { ["aprobada","completada","won"].contains(cStr($0, "status", "estatus", "estado").lowercased()) }.count
+                    crmKpi("Aprobadas", "\(aprobadas)", .green)
+                    Divider().frame(height: 32)
+                    crmKpi("Monto", fmtMxn(vm.totalMxn), .blue)
                 }
                 .padding(.horizontal).padding(.vertical, 6)
                 .background(Color(.secondarySystemGroupedBackground))
@@ -95,7 +107,6 @@ struct CrmCotizacionesView: View {
                 .padding(.horizontal).padding(.vertical, 8)
             }
 
-            // Search bar
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundColor(.secondary)
                 TextField("Buscar cotización…", text: $vm.query)
@@ -110,24 +121,77 @@ struct CrmCotizacionesView: View {
             .padding(.horizontal).padding(.top, 8)
 
             if vm.isLoading {
-                Spacer()
-                ProgressView()
-                Spacer()
+                Spacer(); ProgressView(); Spacer()
             } else if vm.filtered.isEmpty {
-                Spacer()
-                Text("Sin cotizaciones").foregroundColor(.secondary)
-                Spacer()
+                Spacer(); Text("Sin cotizaciones").foregroundColor(.secondary); Spacer()
             } else {
                 List(vm.filtered, id: \.cotId) { cot in
-                    CotizacionCard(item: cot)
-                        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-                        .listRowSeparator(.hidden)
+                    Button { selected = cot } label: {
+                        CotizacionCard(item: cot)
+                    }
+                    .buttonStyle(.plain)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                    .listRowSeparator(.hidden)
                 }
                 .listStyle(.plain)
             }
         }
-        .task { vm.load() }
-        .refreshable { vm.load() }
+    }
+
+    @ViewBuilder
+    private func cotDetail(_ cot: [String: Any]) -> some View {
+        let status = cStr(cot, "status", "estatus", "estado")
+        let color  = cotStatusColor(status)
+        List {
+            Section {
+                HStack {
+                    Button("← Cotizaciones") { selected = nil }
+                    Spacer()
+                    if !status.isEmpty {
+                        Text(status.capitalized).font(.caption).bold().foregroundColor(color)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(color.opacity(0.12)).clipShape(Capsule())
+                    }
+                }
+            }
+            Section("Cotización") {
+                cotRow("Folio", cStr(cot, "folio", "number"))
+                cotRow("Cliente", cStr(cot, "clientName", "cliente", "razonSocial"))
+                if let total = cDouble(cot, "total", "amount") {
+                    HStack { Text("Total"); Spacer(); Text(fmtMxn(total)).foregroundColor(.secondary) }
+                }
+                cotRow("Fecha", String(cStr(cot, "fecha", "createdAt", "date").prefix(10)))
+                cotRow("Responsable", cStr(cot, "ownerName", "responsable", "vendedor"))
+                cotRow("Vigencia", cStr(cot, "vigencia", "validUntil", "fechaVigencia"))
+                cotRow("Moneda", cStr(cot, "moneda", "currency"))
+                cotRow("Descuento", cStr(cot, "descuento", "discount"))
+            }
+            let notas = cStr(cot, "notas", "notes", "description", "observaciones")
+            if !notas.isEmpty {
+                Section("Notas") { Text(notas).font(.subheadline) }
+            }
+            let items = (cot["items"] as? [[String: Any]]) ?? (cot["conceptos"] as? [[String: Any]]) ?? []
+            if !items.isEmpty {
+                Section("Conceptos (\(items.count))") {
+                    ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                        let desc = cStr(item, "descripcion", "description", "nombre", "name")
+                        let qty  = cStr(item, "cantidad", "qty", "quantity")
+                        let pu   = cStr(item, "precioUnitario", "unitPrice", "precio")
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(desc.isEmpty ? "Concepto" : desc).font(.subheadline).bold()
+                            if !qty.isEmpty || !pu.isEmpty {
+                                Text("Cant: \(qty)  PU: \(pu)").font(.caption).foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func cotRow(_ k: String, _ v: String) -> some View {
+        if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary) } }
     }
 }
 

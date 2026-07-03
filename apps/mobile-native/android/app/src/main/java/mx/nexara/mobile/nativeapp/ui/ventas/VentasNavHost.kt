@@ -2,6 +2,7 @@ package mx.nexara.mobile.nativeapp.ui.ventas
 
 import android.app.Application
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -213,15 +214,22 @@ fun VentasCotizacionesScreen() {
     })
     val state by vm.state.collectAsState()
     val items by remember { derivedStateOf { vm.filtered } }
+    var selected by remember { mutableStateOf<CotizacionDto?>(null) }
+
+    val sel = selected
+    if (sel != null) {
+        CotizacionDetail(cot = sel, onBack = { selected = null })
+        return
+    }
 
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // KPI strip
         if (!state.isLoading && state.items.isNotEmpty()) {
             item {
-                val total     = state.items.size
-                val aprobadas = state.items.count { it.estatus?.lowercase() in listOf("aprobada","completada","won") }
+                val total      = state.items.size
+                val aprobadas  = state.items.count { it.estatus?.lowercase() in listOf("aprobada","completada","won") }
                 val pendientes = state.items.count { it.estatus?.lowercase() in listOf("pendiente","en proceso") }
-                val totalMxn  = state.items.sumOf { it.total ?: 0.0 }
+                val totalMxn   = state.items.sumOf { it.total ?: 0.0 }
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant).padding(12.dp),
@@ -257,9 +265,9 @@ fun VentasCotizacionesScreen() {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 CotStatuses.forEach { st ->
-                    val selected = state.statusFilter == st
+                    val isSelected = state.statusFilter == st
                     FilterChip(
-                        selected = selected,
+                        selected = isSelected,
                         onClick = { vm.setStatus(st) },
                         label = { Text(st.replaceFirstChar { it.uppercase() }, fontSize = 12.sp) }
                     )
@@ -273,18 +281,49 @@ fun VentasCotizacionesScreen() {
             item { Text("Sin cotizaciones", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(20.dp)) }
         } else {
             items(items, key = { it.id }) { cot ->
-                CotizacionRowCard(cot)
+                CotizacionRowCard(cot, onClick = { selected = cot })
             }
         }
     }
 }
 
 @Composable
-private fun CotizacionRowCard(cot: CotizacionDto) {
+private fun CotizacionDetail(cot: CotizacionDto, onBack: () -> Unit) {
+    val color = cotStatusColorAndroid(cot.estatus)
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(onClick = onBack) { Text("← Cotizaciones") }
+                Spacer(Modifier.weight(1f))
+                if (!cot.estatus.isNullOrBlank()) {
+                    Box(
+                        Modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.15f))
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                    ) { Text(cot.estatus.replaceFirstChar { it.uppercase() }, color = color, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                }
+            }
+        }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Cotización", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    CotDetailLine("Folio", cot.folio)
+                    CotDetailLine("Cliente", cot.cliente)
+                    CotDetailLine("Total", cot.total?.let { fmtMxnShort(it) })
+                    CotDetailLine("Fecha", (cot.fecha ?: cot.createdAt)?.take(10))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CotizacionRowCard(cot: CotizacionDto, onClick: () -> Unit = {}) {
     val color = cotStatusColorAndroid(cot.estatus)
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surface)
+            .clickable { onClick() }
     ) {
         Box(Modifier.width(4.dp).height(72.dp).background(color))
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).weight(1f)) {
@@ -302,6 +341,16 @@ private fun CotizacionRowCard(cot: CotizacionDto) {
                 Text((cot.fecha ?: cot.createdAt)?.take(10) ?: "", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+    }
+}
+
+@Composable
+private fun CotDetailLine(label: String, value: String?) {
+    if (value.isNullOrBlank()) return
+    Row(Modifier.fillMaxWidth()) {
+        Text(label, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.weight(1f))
+        Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
