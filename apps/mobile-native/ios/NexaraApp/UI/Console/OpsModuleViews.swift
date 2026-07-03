@@ -315,7 +315,20 @@ private func maintenanceStatusColor(_ s: String) -> Color {
 
 struct ServiceSheetsView: View {
     @StateObject private var vm = ServiceSheetsVM()
+    @State private var selected: [String: Any]?
     var body: some View {
+        Group {
+            if let s = selected { ssDetail(s) } else { listBody }
+        }
+        .navigationTitle(selected == nil ? "Hojas de servicio" : "")
+        .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+            if selected == nil { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } }
+        }}
+        .refreshable { if selected == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    private var listBody: some View {
         VStack(spacing: 0) {
             if !vm.items.isEmpty {
                 HStack(spacing: 0) {
@@ -334,17 +347,62 @@ struct ServiceSheetsView: View {
             else if vm.filtered.isEmpty { Spacer(); Text("Sin hojas de servicio").foregroundColor(.secondary); Spacer() }
             else {
                 List(vm.filtered.prefix(60), id: { opsIdKey($0,"ss") }) { item in
-                    ServiceSheetRow(item: item)
+                    Button { selected = item } label: { ServiceSheetRow(item: item) }
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
                         .listRowSeparator(.hidden)
                 }
                 .listStyle(.plain)
             }
         }
-        .navigationTitle("Hojas de servicio")
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+    }
+
+    @ViewBuilder
+    private func ssDetail(_ s: [String: Any]) -> some View {
+        let status = oStr(s,"status","estado")
+        let color: Color = status.lowercased().contains("firmada") ? .green : (status.lowercased().contains("pendiente") ? .orange : .secondary)
+        List {
+            Section {
+                HStack {
+                    Button("← Hojas") { selected = nil }
+                    Spacer()
+                    if !status.isEmpty {
+                        Text(status.capitalized).font(.caption).bold().foregroundColor(color)
+                            .padding(.horizontal,8).padding(.vertical,3)
+                            .background(color.opacity(0.12)).clipShape(Capsule())
+                    }
+                }
+            }
+            Section("Hoja de servicio") {
+                ssRow("Folio",       oStr(s,"folio","number"))
+                ssRow("Cliente",     oStr(s,"clientName","cliente","anNumber"))
+                ssRow("Técnico",     oStr(s,"technicianName","tecnico","assignedTo"))
+                ssRow("Fecha",       String(oStr(s,"createdAt","fecha").prefix(10)))
+                ssRow("Inicio",      String(oStr(s,"startDate","fechaInicio").prefix(10)))
+                ssRow("Fin",         String(oStr(s,"endDate","fechaFin").prefix(10)))
+                ssRow("Ubicación",   oStr(s,"location","ubicacion","address"))
+                ssRow("Tipo",        oStr(s,"type","tipo"))
+            }
+            let desc = oStr(s,"description","descripcion","notes","notas")
+            if !desc.isEmpty { Section("Descripción") { Text(desc).font(.subheadline) } }
+            let tasks = (s["tasks"] as? [[String: Any]]) ?? []
+            if !tasks.isEmpty {
+                Section("Tareas (\(tasks.count))") {
+                    ForEach(Array(tasks.enumerated()), id: \.offset) { _, t in
+                        HStack {
+                            Image(systemName: (t["completed"] as? Bool == true) ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor((t["completed"] as? Bool == true) ? .green : .secondary)
+                            Text(oStr(t,"description","name","tarea")).font(.caption)
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func ssRow(_ k: String, _ v: String) -> some View {
+        if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary) } }
     }
 }
 
@@ -927,7 +985,20 @@ private struct CvRow: View {
 
 struct ContactMessagesView: View {
     @StateObject private var vm = ContactMessagesVM()
+    @State private var selected: [String: Any]?
     var body: some View {
+        Group {
+            if let s = selected { msgDetail(s) } else { listBody }
+        }
+        .navigationTitle(selected == nil ? "Mensajes de contacto" : "")
+        .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+            if selected == nil { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } }
+        }}
+        .refreshable { if selected == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    private var listBody: some View {
         VStack(spacing: 0) {
             if !vm.items.isEmpty {
                 OpsKpi(label: "Mensajes", value: "\(vm.items.count)", color: .primary)
@@ -940,15 +1011,56 @@ struct ContactMessagesView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin mensajes").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"cm") }) { item in ContactMsgRow(item: item)
+                List(vm.filtered.prefix(60), id: { opsIdKey($0,"cm") }) { item in
+                    Button { selected = item } label: { ContactMsgRow(item: item) }
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
-                        .listRowSeparator(.hidden) }.listStyle(.plain)
+                        .listRowSeparator(.hidden)
+                }.listStyle(.plain)
             }
         }
-        .navigationTitle("Mensajes de contacto")
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+    }
+
+    @ViewBuilder
+    private func msgDetail(_ m: [String: Any]) -> some View {
+        let name    = oStr(m,"name","nombre")
+        let email   = oStr(m,"email","correo")
+        let phone   = oStr(m,"phone","telefono")
+        let subject = oStr(m,"subject","asunto")
+        let message = oStr(m,"message","mensaje","body")
+        let date    = String(oStr(m,"createdAt","fecha").prefix(10))
+        List {
+            Section {
+                Button("← Mensajes") { selected = nil }
+            }
+            Section("De") {
+                cmRow("Nombre",  name)
+                if !email.isEmpty {
+                    HStack {
+                        Text("Email")
+                        Spacer()
+                        Link(email, destination: URL(string: "mailto:\(email)")!)
+                            .font(.subheadline).foregroundColor(.blue)
+                    }
+                }
+                if !phone.isEmpty {
+                    HStack {
+                        Text("Teléfono")
+                        Spacer()
+                        Link(phone, destination: URL(string: "tel:\(phone)")!)
+                            .font(.subheadline).foregroundColor(.blue)
+                    }
+                }
+                cmRow("Fecha", date)
+            }
+            if !subject.isEmpty { Section("Asunto") { Text(subject).font(.subheadline) } }
+            if !message.isEmpty { Section("Mensaje") { Text(message).font(.subheadline) } }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func cmRow(_ k: String, _ v: String) -> some View {
+        if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary) } }
     }
 }
 

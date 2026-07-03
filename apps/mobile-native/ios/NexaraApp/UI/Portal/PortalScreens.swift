@@ -236,31 +236,74 @@ struct PortalRequestsView: View {
     let onNew: () -> Void
     @State private var items: [[String: Any]] = []
     @State private var isLoading = true
+    @State private var selected: [String: Any]?
 
     var body: some View {
+        Group {
+            if let s = selected { reqDetail(s) } else { listBody }
+        }
+        .navigationTitle(selected == nil ? "Solicitudes" : "")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if selected == nil { Button { onNew() } label: { Image(systemName: "plus") } }
+            }
+        }
+        .task { await reload() }
+        .refreshable { if selected == nil { await reload() } }
+    }
+
+    private var listBody: some View {
         List {
             if isLoading { ProgressView() }
             ForEach(items, id: \.reqKey) { r in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(ConsoleHelpers.mapStr(r, "description").prefix(80).description).font(.subheadline).bold()
-                    HStack {
-                        OpsStatusChip(text: ConsoleHelpers.mapStr(r, "status", "urgency"))
-                        Spacer()
-                        Text(String(ConsoleHelpers.mapStr(r, "createdAt").prefix(10)))
-                            .font(.caption2).foregroundColor(.secondary)
+                Button { selected = r } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ConsoleHelpers.mapStr(r, "description").prefix(80).description)
+                            .font(.subheadline).bold().foregroundColor(.primary)
+                        HStack {
+                            OpsStatusChip(text: ConsoleHelpers.mapStr(r, "status", "urgency"))
+                            Spacer()
+                            Text(String(ConsoleHelpers.mapStr(r, "createdAt").prefix(10)))
+                                .font(.caption2).foregroundColor(.secondary)
+                        }
                     }
-                    let status = ConsoleHelpers.mapStr(r, "status").uppercased()
-                    if status != "CLOSED", status != "CERRADA", let id = ConsoleHelpers.mapInt64(r, "id") {
-                        Button("Cerrar solicitud", role: .destructive) { Task { await close(id) } }
-                            .font(.caption)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func reqDetail(_ r: [String: Any]) -> some View {
+        let status = ConsoleHelpers.mapStr(r, "status").uppercased()
+        let reqId  = ConsoleHelpers.mapInt64(r, "id")
+        List {
+            Section {
+                Button("← Solicitudes") { selected = nil }
+            }
+            Section("Solicitud") {
+                let desc = ConsoleHelpers.mapStr(r, "description")
+                if !desc.isEmpty { Text(desc).font(.subheadline) }
+                rRow("Estado",    ConsoleHelpers.mapStr(r, "status"))
+                rRow("Urgencia",  ConsoleHelpers.mapStr(r, "urgency"))
+                rRow("Tipo",      ConsoleHelpers.mapStr(r, "requestType", "type"))
+                rRow("Sucursal",  ConsoleHelpers.mapStr(r, "branchName", "branch"))
+                rRow("Creada",    String(ConsoleHelpers.mapStr(r, "createdAt").prefix(10)))
+                rRow("Actualizada", String(ConsoleHelpers.mapStr(r, "updatedAt").prefix(10)))
+            }
+            if status != "CLOSED", status != "CERRADA", let id = reqId {
+                Section {
+                    Button("Cerrar solicitud", role: .destructive) {
+                        Task { await close(id); selected = nil }
                     }
                 }
             }
         }
-        .navigationTitle("Solicitudes")
-        .toolbar { ToolbarItem(placement: .primaryAction) { Button { onNew() } label: { Image(systemName: "plus") } } }
-        .task { await reload() }
-        .refreshable { await reload() }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func rRow(_ k: String, _ v: String) -> some View {
+        if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary) } }
     }
 
     private func reload() async {
