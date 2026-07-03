@@ -22,11 +22,25 @@ final class BankingVM: ObservableObject {
 
 struct BankingView: View {
     @StateObject private var vm = BankingVM()
+    @State private var selected: [String: Any]?
 
     var body: some View {
+        Group {
+            if let s = selected { bankDetail(s) } else { listBody }
+        }
+        .navigationTitle(selected == nil ? "Banca" : "")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if selected == nil { Button { vm.load() } label: { Image(systemName: "arrow.clockwise") } }
+            }
+        }
+        .refreshable { if selected == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    private var listBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // Total balance card
                 if !vm.accounts.isEmpty {
                     VStack(spacing: 6) {
                         Text("Saldo total").font(.caption).foregroundColor(.secondary)
@@ -42,8 +56,6 @@ struct BankingView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .padding(.horizontal)
                 }
-
-                // Accounts
                 if vm.isLoading {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                 } else if vm.accounts.isEmpty {
@@ -53,19 +65,53 @@ struct BankingView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Cuentas").font(.headline).padding(.horizontal)
                         ForEach(vm.accounts, id: \.bankId) { acc in
-                            BankAccountCard(item: acc).padding(.horizontal)
+                            Button { selected = acc } label: {
+                                BankAccountCard(item: acc).padding(.horizontal)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
-
                 Spacer(minLength: 24)
             }
             .padding(.vertical)
         }
-        .navigationTitle("Banca")
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName: "arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+    }
+
+    @ViewBuilder
+    private func bankDetail(_ acc: [String: Any]) -> some View {
+        let name    = bankStr(acc, "name", "nombre", "alias")
+        let balance = bankDouble(acc, "balance", "saldo")
+        let isNeg   = (balance ?? 0) < 0
+        List {
+            Section {
+                Button("← Banca") { selected = nil }
+            }
+            if let b = balance {
+                Section {
+                    VStack(spacing: 4) {
+                        Text("Saldo").font(.caption).foregroundColor(.secondary)
+                        Text(fmtBank(b)).font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(isNeg ? .red : .green)
+                    }
+                    .frame(maxWidth: .infinity).padding(.vertical, 8)
+                }
+            }
+            Section("Cuenta") {
+                bRow("Nombre",         name)
+                bRow("Banco",          bankStr(acc, "bank", "banco", "bankName"))
+                bRow("Número",         bankStr(acc, "accountNumber", "numeroCuenta"))
+                bRow("CLABE",          bankStr(acc, "clabe"))
+                bRow("Moneda",         bankStr(acc, "currency", "moneda"))
+                bRow("Tipo",           bankStr(acc, "type", "tipo"))
+                bRow("Responsable",    bankStr(acc, "ownerName", "responsable"))
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func bRow(_ k: String, _ v: String) -> some View {
+        if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary) } }
     }
 }
 

@@ -273,6 +273,26 @@ class BankingRichViewModel(app: Application) : AndroidViewModel(app) {
 @Composable
 fun BankingRichScreen(vm: BankingRichViewModel = viewModel()) {
     val s by vm.state.collectAsState()
+    var selected by remember { mutableStateOf<BankAccountDto?>(null) }
+    val sel = selected
+    if (sel != null) {
+        FinanceDetailScaffold(onBack = { selected = null }) {
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Saldo", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(fmtMoney(sel.balance), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium, color = Color(0xFF1565C0))
+                    }
+                }
+            }
+            item { Spacer(Modifier.height(8.dp)) }
+            item { FinanceRow("Nombre", sel.name) }
+            item { FinanceRow("Banco", sel.bank) }
+            item { FinanceRow("Número de cuenta", sel.accountNumber) }
+            item { FinanceRow("Moneda", sel.currency) }
+        }
+        return
+    }
     FinanceScaffold(
         kpis = listOf(
             Triple("Cuentas", "${s.items.size}", null),
@@ -286,7 +306,7 @@ fun BankingRichScreen(vm: BankingRichViewModel = viewModel()) {
         empty = "Sin cuentas",
     ) {
         items(vm.filtered().take(40), key = { it.id }) { acc ->
-            Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selected = acc }) {
                 Column(Modifier.padding(12.dp)) {
                     Text(acc.name ?: "Cuenta", fontWeight = FontWeight.Bold)
                     Text(acc.bank ?: "", style = MaterialTheme.typography.bodySmall)

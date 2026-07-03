@@ -42,11 +42,25 @@ final class InvoicesVM: ObservableObject {
 
 struct InvoicesView: View {
     @StateObject private var vm = InvoicesVM()
+    @State private var selected: [String: Any]?
 
     var body: some View {
+        Group {
+            if let s = selected { invDetail(s) } else { listBody }
+        }
+        .navigationTitle(selected == nil ? "Facturación" : "")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if selected == nil { Button { vm.load() } label: { Image(systemName: "arrow.clockwise") } }
+            }
+        }
+        .refreshable { if selected == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    private var listBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                // KPI strip
                 if !vm.items.isEmpty {
                     HStack(spacing: 0) {
                         InvKpi(label: "Total",    value: "\(vm.items.count)",          color: .primary)
@@ -60,8 +74,6 @@ struct InvoicesView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal)
                 }
-
-                // Search
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundColor(.secondary)
                     TextField("Buscar factura…", text: $vm.query).autocorrectionDisabled()
@@ -73,8 +85,6 @@ struct InvoicesView: View {
                 .background(Color(.secondarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal)
-
-                // Chips
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(vm.statuses, id: \.self) { s in
@@ -90,8 +100,6 @@ struct InvoicesView: View {
                     }
                     .padding(.horizontal)
                 }
-
-                // List
                 if vm.isLoading {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                 } else if vm.filtered.isEmpty {
@@ -99,7 +107,10 @@ struct InvoicesView: View {
                 } else {
                     VStack(spacing: 6) {
                         ForEach(vm.filtered.prefix(50), id: \.invId) { inv in
-                            InvoiceCard(item: inv).padding(.horizontal)
+                            Button { selected = inv } label: {
+                                InvoiceCard(item: inv).padding(.horizontal)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -107,10 +118,45 @@ struct InvoicesView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("Facturación")
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName: "arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+    }
+
+    @ViewBuilder
+    private func invDetail(_ inv: [String: Any]) -> some View {
+        let folio  = invStr(inv, "folio", "invoiceNumber", "number")
+        let status = invStr(inv, "status", "estatus")
+        let color  = invStatusColor(status)
+        List {
+            Section {
+                HStack {
+                    Button("← Facturas") { selected = nil }
+                    Spacer()
+                    if !status.isEmpty {
+                        Text(status.capitalized).font(.caption).bold().foregroundColor(color)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(color.opacity(0.12)).clipShape(Capsule())
+                    }
+                }
+            }
+            Section("Factura") {
+                iRow("Folio",    folio)
+                iRow("Cliente",  invStr(inv, "clientName", "cliente"))
+                if let t = invDouble(inv, "total", "amount") {
+                    HStack { Text("Total"); Spacer(); Text(fmtInv(t)).foregroundColor(.secondary) }
+                }
+                iRow("RFC",      invStr(inv, "rfc", "taxId"))
+                iRow("Fecha",    String(invStr(inv, "createdAt", "issuedAt", "fecha").prefix(10)))
+                iRow("Vence",    String(invStr(inv, "dueDate", "fechaVencimiento").prefix(10)))
+                iRow("Método",   invStr(inv, "paymentMethod", "metodoPago"))
+                iRow("CFDI",     invStr(inv, "cfdiUse", "usoCfdi"))
+            }
+            let notes = invStr(inv, "notes", "notas", "description")
+            if !notes.isEmpty { Section("Notas") { Text(notes).font(.subheadline) } }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func iRow(_ k: String, _ v: String) -> some View {
+        if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary) } }
     }
 }
 
