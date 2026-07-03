@@ -1124,7 +1124,20 @@ private struct ContactMsgRow: View {
 
 struct NewsView: View {
     @StateObject private var vm = NewsVM()
+    @State private var selected: [String: Any]?
     var body: some View {
+        Group {
+            if let s = selected { newsDetail(s) } else { listBody }
+        }
+        .navigationTitle(selected == nil ? "Noticias" : "")
+        .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+            if selected == nil { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } }
+        }}
+        .refreshable { if selected == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    private var listBody: some View {
         VStack(spacing: 0) {
             if !vm.items.isEmpty {
                 HStack(spacing: 0) {
@@ -1143,15 +1156,48 @@ struct NewsView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin noticias").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"nw") }) { item in NewsRow(item: item)
+                List(vm.filtered.prefix(60), id: { opsIdKey($0,"nw") }) { item in
+                    Button { selected = item } label: { NewsRow(item: item) }
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
-                        .listRowSeparator(.hidden) }.listStyle(.plain)
+                        .listRowSeparator(.hidden)
+                }.listStyle(.plain)
             }
         }
-        .navigationTitle("Noticias")
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+    }
+
+    @ViewBuilder
+    private func newsDetail(_ n: [String: Any]) -> some View {
+        let isDraft = (n["draft"] as? Bool) ?? false
+        List {
+            Section {
+                HStack {
+                    Button("← Noticias") { selected = nil }
+                    Spacer()
+                    Text(isDraft ? "Borrador" : "Publicada").font(.caption).bold()
+                        .foregroundColor(isDraft ? .orange : .green)
+                        .padding(.horizontal,8).padding(.vertical,3)
+                        .background((isDraft ? Color.orange : Color.green).opacity(0.12)).clipShape(Capsule())
+                }
+            }
+            Section("Noticia") {
+                let title = oStr(n,"title","titulo")
+                if !title.isEmpty { Text(title).font(.headline).bold() }
+                nwRow("Fecha", String(oStr(n,"publishedAt","createdAt").prefix(10)))
+                nwRow("Autor", oStr(n,"author","autor","authorName"))
+                nwRow("Slug",  oStr(n,"slug"))
+                nwRow("Tags",  oStr(n,"tags","categorias"))
+            }
+            let excerpt = oStr(n,"excerpt","summary","extracto")
+            if !excerpt.isEmpty { Section("Resumen") { Text(excerpt).font(.subheadline) } }
+            let content = oStr(n,"content","body","contenido")
+            if !content.isEmpty { Section("Contenido") { Text(content).font(.subheadline) } }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func nwRow(_ k: String, _ v: String) -> some View {
+        if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary) } }
     }
 }
 
@@ -1291,7 +1337,20 @@ private struct AccountingRow: View {
 
 struct WorkProjectsView: View {
     @StateObject private var vm = WorkProjectsVM()
+    @State private var selected: [String: Any]?
     var body: some View {
+        Group {
+            if let s = selected { wpDetail(s) } else { listBody }
+        }
+        .navigationTitle(selected == nil ? "Proyectos internos" : "")
+        .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+            if selected == nil { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } }
+        }}
+        .refreshable { if selected == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    private var listBody: some View {
         VStack(spacing: 0) {
             if !vm.items.isEmpty {
                 HStack(spacing: 0) {
@@ -1308,15 +1367,63 @@ struct WorkProjectsView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin proyectos").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"wp") }) { item in WorkProjectRow(item: item)
+                List(vm.filtered.prefix(60), id: { opsIdKey($0,"wp") }) { item in
+                    Button { selected = item } label: { WorkProjectRow(item: item) }
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
-                        .listRowSeparator(.hidden) }.listStyle(.plain)
+                        .listRowSeparator(.hidden)
+                }.listStyle(.plain)
             }
         }
-        .navigationTitle("Proyectos internos")
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+    }
+
+    @ViewBuilder
+    private func wpDetail(_ p: [String: Any]) -> some View {
+        let status = oStr(p,"status","estado")
+        let color: Color = status.lowercased().contains("activo") || status.lowercased() == "active" ? .green
+                         : status.lowercased().contains("terminado") || status.lowercased() == "done" ? .secondary
+                         : .orange
+        List {
+            Section {
+                HStack {
+                    Button("← Proyectos") { selected = nil }
+                    Spacer()
+                    if !status.isEmpty {
+                        Text(status.capitalized).font(.caption).bold().foregroundColor(color)
+                            .padding(.horizontal,8).padding(.vertical,3)
+                            .background(color.opacity(0.12)).clipShape(Capsule())
+                    }
+                }
+            }
+            Section("Proyecto") {
+                wpRow("Nombre",       oStr(p,"name","nombre","title"))
+                wpRow("Cliente",      oStr(p,"clientName","cliente"))
+                wpRow("Responsable",  oStr(p,"ownerName","responsable","manager"))
+                wpRow("Inicio",       String(oStr(p,"startDate","fechaInicio").prefix(10)))
+                wpRow("Fin esperado", String(oStr(p,"endDate","fechaFin").prefix(10)))
+                wpRow("Presupuesto",  oStr(p,"budget","presupuesto"))
+                wpRow("Ubicación",    oStr(p,"location","ubicacion"))
+            }
+            let desc = oStr(p,"description","descripcion","notes","notas")
+            if !desc.isEmpty { Section("Descripción") { Text(desc).font(.subheadline) } }
+            let tasks = (p["tasks"] as? [[String: Any]]) ?? []
+            if !tasks.isEmpty {
+                Section("Tareas (\(tasks.count))") {
+                    ForEach(Array(tasks.enumerated()), id: \.offset) { _, t in
+                        HStack {
+                            Image(systemName: (t["completed"] as? Bool == true) ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor((t["completed"] as? Bool == true) ? .green : .secondary)
+                            Text(oStr(t,"name","title","description")).font(.caption)
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func wpRow(_ k: String, _ v: String) -> some View {
+        if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary) } }
     }
 }
 
