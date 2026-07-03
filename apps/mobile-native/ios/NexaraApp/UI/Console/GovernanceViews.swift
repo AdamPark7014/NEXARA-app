@@ -10,22 +10,59 @@ import SwiftUI
 
 struct CompaniesView: View {
     @StateObject private var vm = CompaniesVM()
+    @State private var selected: [String: Any]?
     var body: some View {
+        Group {
+            if let s = selected { companyDetail(s) } else { companyList }
+        }
+        .navigationTitle(selected == nil ? "Multi-empresa" : "")
+        .task { vm.load() }
+        .refreshable { if selected == nil { vm.load() } }
+    }
+
+    private var companyList: some View {
         List {
             if vm.isLoading { ProgressView() }
             ForEach(vm.items, id: \.govId) { c in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(govStr(c, "legalName", "tradeName")).font(.headline)
-                    Text(govStr(c, "rfc")).font(.caption).foregroundColor(.secondary)
-                    if c["isPrimary"] as? Bool == true {
-                        Text("Principal").font(.caption2).foregroundColor(.green)
+                Button { selected = c } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(govStr(c, "legalName", "tradeName")).font(.headline).foregroundColor(.primary)
+                        Text(govStr(c, "rfc")).font(.caption).foregroundColor(.secondary)
+                        if c["isPrimary"] as? Bool == true {
+                            Text("Principal").font(.caption2).foregroundColor(.green)
+                        }
                     }
                 }
             }
         }
-        .navigationTitle("Multi-empresa")
-        .task { vm.load() }
-        .refreshable { vm.load() }
+    }
+
+    @ViewBuilder
+    private func companyDetail(_ c: [String: Any]) -> some View {
+        List {
+            Section { Button("← Empresas") { selected = nil } }
+            Section("Empresa") {
+                govRow("Razón social",  govStr(c, "legalName"))
+                govRow("Nombre comercial", govStr(c, "tradeName", "name"))
+                govRow("RFC",           govStr(c, "rfc"))
+                govRow("Régimen fiscal",govStr(c, "fiscalRegime", "regimenFiscal"))
+                govRow("Email",         govStr(c, "email"))
+                govRow("Teléfono",      govStr(c, "phone", "telefono"))
+                govRow("Dirección",     govStr(c, "address", "direccion"))
+                govRow("Ciudad",        govStr(c, "city", "ciudad"))
+                govRow("Estado",        govStr(c, "state", "estado"))
+                if c["isPrimary"] as? Bool == true {
+                    HStack { Text("Empresa principal").foregroundColor(.secondary); Spacer(); Image(systemName: "checkmark.circle.fill").foregroundColor(.green) }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func govRow(_ label: String, _ value: String) -> some View {
+        if !value.isEmpty {
+            HStack { Text(label).foregroundColor(.secondary); Spacer(); Text(value).multilineTextAlignment(.trailing) }
+        }
     }
 }
 

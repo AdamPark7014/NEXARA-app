@@ -61,6 +61,7 @@ struct RecruitingView: View {
     @State private var error: String?
     @State private var query = ""
     @State private var showRejected = false
+    @State private var selected: Candidate?
 
     private var filtered: [Candidate] {
         candidates.filter { c in
@@ -88,7 +89,9 @@ struct RecruitingView: View {
 
     var body: some View {
         Group {
-            if isLoading {
+            if let c = selected {
+                candidateDetail(c)
+            } else if isLoading {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let err = error {
                 VStack(spacing: 12) {
@@ -99,9 +102,55 @@ struct RecruitingView: View {
                 content
             }
         }
-        .navigationTitle("Reclutamiento")
+        .navigationTitle(selected == nil ? "Reclutamiento" : "")
         .task { await load() }
-        .refreshable { await load() }
+        .refreshable { if selected == nil { await load() } }
+    }
+
+    @ViewBuilder
+    private func candidateDetail(_ c: Candidate) -> some View {
+        let color = stageColor(c.stage ?? "")
+        List {
+            Section { Button("← Candidatos") { selected = nil } }
+            Section {
+                HStack {
+                    ZStack {
+                        Circle().fill(color.opacity(0.15)).frame(width: 56, height: 56)
+                        Text(String(c.fullName.prefix(1))).font(.title2).bold().foregroundColor(color)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(c.fullName).font(.headline)
+                        if let stage = c.stage {
+                            Text(STAGE_LABEL[stage] ?? stage).font(.caption).foregroundColor(color)
+                                .padding(.horizontal, 8).padding(.vertical, 2)
+                                .background(color.opacity(0.12)).clipShape(Capsule())
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            Section("Contacto") {
+                if let email = c.email, !email.isEmpty {
+                    Link(destination: URL(string: "mailto:\(email)")!) {
+                        Label(email, systemImage: "envelope")
+                    }
+                }
+                if let ws = c.whatsapp, !ws.isEmpty {
+                    Link(destination: URL(string: "https://wa.me/\(ws.filter(\.isNumber))")!) {
+                        Label(ws, systemImage: "phone.fill")
+                    }
+                }
+            }
+            Section("Perfil") {
+                if let cat = c.category, !cat.isEmpty {
+                    HStack { Text("Posición").foregroundColor(.secondary); Spacer(); Text(cat) }
+                }
+                if let emp = c.employmentStatus, !emp.isEmpty {
+                    HStack { Text("Situación laboral").foregroundColor(.secondary); Spacer(); Text(emp) }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
     }
 
     private var content: some View {
@@ -163,8 +212,11 @@ struct RecruitingView: View {
             .padding(.horizontal)
 
             ForEach(list) { c in
-                CandidateCard(candidate: c, stageColor: color)
-                    .padding(.horizontal)
+                Button { selected = c } label: {
+                    CandidateCard(candidate: c, stageColor: color)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal)
             }
         }
     }
