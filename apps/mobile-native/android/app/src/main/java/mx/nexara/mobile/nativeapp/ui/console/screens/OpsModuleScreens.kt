@@ -23,6 +23,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
@@ -400,12 +401,40 @@ fun WarehouseHubScreen(initialTab: Int = 0) {
     var warehouses by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
     var stock by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
     var query by remember { mutableStateOf("") }
+    var selectedItem by remember { mutableStateOf<Map<String, Any?>?>(null) }
 
     LaunchedEffect(Unit) {
         loading = true
         warehouses = withContext(Dispatchers.IO) { repo.warehouse() }
         stock = withContext(Dispatchers.IO) { repo.stock() }
         loading = false
+    }
+
+    val si = selectedItem
+    if (si != null) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item { OutlinedButton(onClick = { selectedItem = null }) { Text(if (tab == 0) "← Inventario" else "← Bodegas") } }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(str(si, "name", "nombre", "productName").ifBlank { "Producto" }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        if (tab == 0) {
+                            DetailLine("SKU", str(si, "sku", "code"))
+                            DetailLine("Categoría", str(si, "category", "categoria"))
+                            num(si, "quantity", "cantidad", "stock")?.let { DetailLine("Cantidad", "${it.toInt()} uds") }
+                            num(si, "minStock", "stockMinimo")?.let { DetailLine("Stock mínimo", "${it.toInt()}") }
+                            DetailLine("Ubicación", str(si, "location", "ubicacion", "bodega"))
+                            num(si, "price", "precio")?.let { DetailLine("Precio", "$$it") }
+                        } else {
+                            DetailLine("Código", str(si, "code", "codigo"))
+                            DetailLine("Ubicación", str(si, "location", "ubicacion", "address"))
+                            DetailLine("Responsable", str(si, "managerName", "responsable"))
+                        }
+                    }
+                }
+            }
+        }
+        return
     }
 
     val items = if (tab == 0) stock else warehouses
@@ -442,13 +471,18 @@ fun WarehouseHubScreen(initialTab: Int = 0) {
         } else {
             LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp)) {
                 items(filtered.take(100), key = { rowId(it) }) { row ->
-                    Column(Modifier.padding(vertical = 8.dp)) {
-                        Text(str(row, "name", "nombre", "productName"), fontWeight = FontWeight.Bold)
-                        Text(str(row, "code", "sku", "location"), style = MaterialTheme.typography.bodySmall)
-                        if (tab == 0) {
-                            num(row, "quantity", "cantidad", "stock")?.let { q ->
-                                Text("Cantidad: ${q.toInt()}", style = MaterialTheme.typography.labelSmall,
-                                    color = if (q < 5) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Card(
+                        onClick = { selectedItem = row },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(str(row, "name", "nombre", "productName"), fontWeight = FontWeight.Bold)
+                            Text(str(row, "code", "sku", "location"), style = MaterialTheme.typography.bodySmall)
+                            if (tab == 0) {
+                                num(row, "quantity", "cantidad", "stock")?.let { q ->
+                                    Text("Cantidad: ${q.toInt()}", style = MaterialTheme.typography.labelSmall,
+                                        color = if (q < 5) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
                         }
                     }
@@ -645,23 +679,56 @@ fun MaintenanceModuleScreen(
     LaunchedEffect(initialTab) { vm.setTab(initialTab) }
 
     val selected = s.selected
-    if (selected != null && s.tab == 0) {
-        val id = str(selected, "id").toLongOrNull()
-        val status = str(selected, "status", "estado").uppercase()
-        LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { Text("Orden de trabajo", style = MaterialTheme.typography.titleLarge) }
-            item { DetailLine("Título", str(selected, "title", "description")) }
-            item { DetailLine("Activo", str(selected, "assetName", "equipmentName")) }
-            item { DetailLine("Estado", str(selected, "status", "estado")) }
-            if (id != null) {
-                if (status.contains("PENDIENTE") || status == "OPEN") {
-                    item { ActionBtn("Iniciar orden", s.acting) { vm.startOrder(id) } }
+    if (selected != null) {
+        if (s.tab == 0) {
+            val id = str(selected, "id").toLongOrNull()
+            val status = str(selected, "status", "estado").uppercase()
+            LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { OutlinedButton(onClick = { vm.select(null) }) { Text("← Órdenes") } }
+                item { Text("Orden de trabajo", style = MaterialTheme.typography.titleLarge) }
+                item {
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            DetailLine("Título", str(selected, "title", "description"))
+                            DetailLine("Activo", str(selected, "assetName", "equipmentName"))
+                            DetailLine("Estado", str(selected, "status", "estado"))
+                            DetailLine("Técnico", str(selected, "technicianName", "responsable"))
+                            DetailLine("Prioridad", str(selected, "priority", "prioridad"))
+                            DetailLine("Fecha", str(selected, "scheduledDate", "createdAt").take(10))
+                        }
+                    }
                 }
-                if (status.contains("PROGRESO") || status.contains("IN_PROGRESS")) {
-                    item { ActionBtn("Completar orden", s.acting) { vm.completeOrder(id) } }
+                val notes = str(selected, "notes", "observaciones", "description")
+                if (notes.isNotBlank()) {
+                    item { Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp)) { Text("Notas", fontWeight = FontWeight.SemiBold); Text(notes, style = MaterialTheme.typography.bodyMedium) } } }
+                }
+                if (id != null) {
+                    if (status.contains("PENDIENTE") || status == "OPEN") {
+                        item { ActionBtn("Iniciar orden", s.acting) { vm.startOrder(id) } }
+                    }
+                    if (status.contains("PROGRESO") || status.contains("IN_PROGRESS")) {
+                        item { ActionBtn("Completar orden", s.acting) { vm.completeOrder(id) } }
+                    }
                 }
             }
-            item { TextButton(onClick = { vm.select(null) }) { Text("Volver") } }
+        } else {
+            LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { OutlinedButton(onClick = { vm.select(null) }) { Text("← Activos") } }
+                item { Text("Activo", style = MaterialTheme.typography.titleLarge) }
+                item {
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            DetailLine("Nombre", str(selected, "name", "nombre"))
+                            DetailLine("Código", str(selected, "code", "tag", "serial"))
+                            DetailLine("Tipo", str(selected, "type", "tipo", "category"))
+                            DetailLine("Estado", str(selected, "status", "estado"))
+                            DetailLine("Ubicación", str(selected, "location", "ubicacion"))
+                            DetailLine("Responsable", str(selected, "assignedTo", "responsable"))
+                            DetailLine("Última mantto.", str(selected, "lastMaintenanceDate", "lastService").take(10))
+                        }
+                    }
+                }
+            }
         }
         return
     }
@@ -692,8 +759,7 @@ fun MaintenanceModuleScreen(
             LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp)) {
                 items(list.take(80), key = { rowId(it) }) { row ->
                     Card(
-                        onClick = { if (s.tab == 0) vm.select(row) },
-                        enabled = s.tab == 0,
+                        onClick = { vm.select(row) },
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     ) {
                         Column(Modifier.padding(12.dp)) {
