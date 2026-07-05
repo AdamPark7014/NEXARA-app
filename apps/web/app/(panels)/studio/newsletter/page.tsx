@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import FilterToolbar from "@/components/FilterToolbar";
 
 interface Subscriber {
   id: number;
@@ -82,10 +83,7 @@ export default function StudioNewsletterPage() {
         title={cfg.title}
         subtitle={cfg.subtitle}
         actions={
-          <>
-            <Button variant="ghost" iconLeft="🔄" onClick={() => void load(search)}>Actualizar</Button>
-            <Button variant="primary" iconLeft="📥" onClick={exportCsv}>Exportar CSV</Button>
-          </>
+          <Button variant="ghost" iconLeft="🔄" onClick={() => void load(search)}>Actualizar</Button>
         }
       />
 
@@ -94,14 +92,14 @@ export default function StudioNewsletterPage() {
         {bySource.slice(0, 3).map(([source, count]) => <KpiCard key={source} label={`Vía ${source}`} value={count} />)}
       </div>
 
-      <div style={{ marginBottom: 12 }}>
-        <input
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); void load(e.target.value); }}
-          placeholder="Buscar por email o nombre…"
-          style={{ width: "100%", maxWidth: 360, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
-        />
-      </div>
+      <FilterToolbar
+        search={{ value: search, onChange: (v) => { setSearch(v); void load(v); }, placeholder: "Buscar por email o nombre…" }}
+        onClear={() => { setSearch(""); void load(); }}
+        resultCount={loading ? null : subs.length}
+        rightActions={subs.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={exportCsv}>CSV</Button>
+        ) : undefined}
+      />
 
       <Section title={loading ? "Cargando…" : `${subs.length} suscriptores`}>
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando suscriptores." />}
