@@ -5,12 +5,15 @@ import dynamic from "next/dynamic";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
+import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl, parseResponseJson } from "@/lib/api-base";
 import { getAttendanceSectionConfig } from "@/lib/user-access";
 import { attendanceMapUrl } from "@/lib/gps-map-links";
 import AttendanceGpsDayPanel from "@/components/AttendanceGpsDayPanel";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 const AttendanceForm = dynamic(() => import("@/components/AttendanceForm"), { ssr: false });
 
@@ -470,30 +473,38 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
         <KpiCard label="Ausentes"     value={ausentes} variant={ausentes > 0 ? "danger" : "positive"} icon="⚠️" hint={ausentes > 0 ? "Sin registro hoy" : "Todos presentes"} />
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
-        <input
-          type="search"
-          placeholder="Buscar empleado…"
-          value={searchMember}
-          onChange={(e) => setSearchMember(e.target.value)}
-          style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-primary)", fontSize: 12, minWidth: 160 }}
-        />
-        <select
-          value={filterEstado}
-          onChange={(e) => setFilterEstado(e.target.value as "" | "PRESENTE" | "COMPLETO" | "AUSENTE")}
-          style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-primary)", fontSize: 12 }}
-        >
-          <option value="">Todos · Estado</option>
-          <option value="PRESENTE">En jornada</option>
-          <option value="COMPLETO">Completaron</option>
-          <option value="AUSENTE">Ausentes</option>
-        </select>
-        <button style={btnStyle(view === "grid")}  onClick={() => setView("grid")}>Tarjetas</button>
-        <button style={btnStyle(view === "table")} onClick={() => setView("table")}>Tabla</button>
-        <button onClick={() => void load()} style={{ marginLeft: "auto", padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", cursor: "pointer", fontSize: 12, background: "var(--surface)", color: "var(--text-secondary)" }}>
-          ↺ Actualizar
-        </button>
-      </div>
+      <FilterToolbar
+        search={{ value: searchMember, onChange: setSearchMember, placeholder: "Buscar empleado…" }}
+        selects={[{
+          label: "Estado",
+          value: filterEstado,
+          onChange: (v) => setFilterEstado(v as "" | "PRESENTE" | "COMPLETO" | "AUSENTE"),
+          options: [
+            { value: "PRESENTE", label: "En jornada" },
+            { value: "COMPLETO", label: "Completaron" },
+            { value: "AUSENTE", label: "Ausentes" },
+          ],
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchMember(""); setFilterEstado(""); }}
+        resultCount={loading ? null : visibleMembers.length}
+        rightActions={
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {members.length > 0 && (
+              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleMembers, [
+                { key: "nombre", label: "Nombre" },
+                { key: "department", label: "Departamento" },
+                { key: "roleName", label: "Rol" },
+                { key: "estado", label: "Estado" },
+                { key: "checkIn", label: "Entrada", format: (v) => v ? String(v).slice(11, 16) : "—" },
+                { key: "checkOut", label: "Salida", format: (v) => v ? String(v).slice(11, 16) : "—" },
+              ], `asistencia-${dateFilter}`)}>CSV</Button>
+            )}
+            <button style={btnStyle(view === "grid")}  onClick={() => setView("grid")}>Tarjetas</button>
+            <button style={btnStyle(view === "table")} onClick={() => setView("table")}>Tabla</button>
+          </div>
+        }
+      />
 
       {loading ? (
         <div style={{ padding: 48, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>Cargando asistencia…</div>
