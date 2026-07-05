@@ -10,6 +10,8 @@ import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { filterRowsByScope, getCrmSalesSectionConfig } from "@/lib/section-views";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import {
   createSalesLead,
   createSalesClient,
@@ -70,16 +72,28 @@ export default function LeadsPage() {
     load();
   }, [load]);
 
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterSource, setFilterSource] = useState("");
+
   const visibleItems = useMemo(() => {
     let rows = filterRowsByScope(items, user, cfg.defaultScope);
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((l) =>
+        (l.name ?? "").toLowerCase().includes(q) ||
+        (l.company ?? "").toLowerCase().includes(q) ||
+        (l.email ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterStatus) rows = rows.filter((l) => l.status === filterStatus);
+    if (filterSource) rows = rows.filter((l) => l.source === filterSource);
     if (highlightId) {
       const id = Number(highlightId);
-      if (!Number.isNaN(id)) {
-        rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
-      }
+      if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
     }
     return rows;
-  }, [items, user, cfg.defaultScope, highlightId]);
+  }, [items, user, cfg.defaultScope, highlightId, searchQ, filterStatus, filterSource]);
 
   const openNew = () => {
     setEditing(null);
@@ -331,6 +345,39 @@ export default function LeadsPage() {
           </div>
         </div>
       )}
+
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por nombre, empresa o email…" }}
+        selects={[
+          {
+            label: "Estado",
+            value: filterStatus,
+            onChange: setFilterStatus,
+            options: STATUSES.map((s) => ({ value: s, label: formatLeadStatus(s) })),
+            allowAll: true,
+          },
+          {
+            label: "Fuente",
+            value: filterSource,
+            onChange: setFilterSource,
+            options: FUENTES.map((f) => ({ value: f, label: f })),
+            allowAll: true,
+          },
+        ]}
+        onClear={() => { setSearchQ(""); setFilterStatus(""); setFilterSource(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "name", label: "Nombre" },
+            { key: "company", label: "Empresa" },
+            { key: "email", label: "Email" },
+            { key: "phone", label: "Teléfono" },
+            { key: "status", label: "Estado", format: (v) => formatLeadStatus(String(v ?? "")) },
+            { key: "source", label: "Fuente" },
+            { key: "score", label: "Score" },
+          ], "leads")}>CSV</Button>
+        ) : undefined}
+      />
 
       <Section title={loading ? "Cargando…" : `${visibleItems.length} leads`}>
         {highlightId && (

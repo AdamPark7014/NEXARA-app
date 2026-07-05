@@ -8,6 +8,8 @@ import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { getHrSectionConfig } from "@/lib/section-views";
@@ -73,6 +75,8 @@ export default function HrPage() {
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [filterDept, setFilterDept] = useState("");
+  const [filterEstado, setFilterEstado] = useState("");
 
   const [roles, setRoles] = useState<ApiRole[]>([]);
   const [depts, setDepts] = useState<ApiDept[]>([]);
@@ -109,16 +113,22 @@ export default function HrPage() {
 
   const filtered = useMemo(() => {
     if (state.kind !== "ready") return [];
+    let rows = state.items;
     const q = filter.trim().toLowerCase();
-    if (!q) return state.items;
-    return state.items.filter(
-      (e) =>
-        e.nombre.toLowerCase().includes(q) ||
-        e.email.toLowerCase().includes(q) ||
-        (e.puesto ?? "").toLowerCase().includes(q) ||
-        (e.department?.nombre ?? "").toLowerCase().includes(q),
+    if (q) rows = rows.filter((e) =>
+      e.nombre.toLowerCase().includes(q) ||
+      e.email.toLowerCase().includes(q) ||
+      (e.puesto ?? "").toLowerCase().includes(q) ||
+      (e.department?.nombre ?? "").toLowerCase().includes(q)
     );
-  }, [state, filter]);
+    if (filterDept) rows = rows.filter((e) => String(e.department?.id ?? "") === filterDept);
+    if (filterEstado) {
+      if (filterEstado === "activo") rows = rows.filter((e) => e.isActive !== false && e.estadoRRHH !== "Baja");
+      else if (filterEstado === "baja") rows = rows.filter((e) => e.estadoRRHH === "Baja");
+      else rows = rows.filter((e) => e.estadoRRHH === filterEstado);
+    }
+    return rows;
+  }, [state, filter, filterDept, filterEstado]);
 
   const activos = state.kind === "ready" ? state.items.filter((e) => e.isActive !== false && e.estadoRRHH !== "Baja").length : 0;
   const vac     = state.kind === "ready" ? state.items.filter((e) => e.estadoRRHH === "Vacaciones").length : 0;
@@ -341,16 +351,41 @@ export default function HrPage() {
         </div>
       )}
 
-      {state.kind === "ready" && (
-        <div style={{ marginBottom: 12 }}>
-          <input
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder="Buscar por nombre, puesto, área…"
-            style={{ width: "100%", maxWidth: 400, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
-          />
-        </div>
-      )}
+      <FilterToolbar
+        search={{ value: filter, onChange: setFilter, placeholder: "Buscar por nombre, puesto, área…" }}
+        selects={[
+          ...(depts.length > 0 ? [{
+            label: "Área",
+            value: filterDept,
+            onChange: setFilterDept,
+            options: depts.map((d) => ({ value: String(d.id), label: d.nombre })),
+            allowAll: true,
+          }] : []),
+          {
+            label: "Estado",
+            value: filterEstado,
+            onChange: setFilterEstado,
+            options: [
+              { value: "activo", label: "Activos" },
+              { value: "Vacaciones", label: "Vacaciones" },
+              { value: "Baja", label: "Baja" },
+            ],
+            allowAll: true,
+          },
+        ]}
+        onClear={() => { setFilter(""); setFilterDept(""); setFilterEstado(""); }}
+        resultCount={state.kind === "ready" ? filtered.length : null}
+        rightActions={state.kind === "ready" && filtered.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(filtered, [
+            { key: "nombre", label: "Nombre" },
+            { key: "email", label: "Email" },
+            { key: "puesto", label: "Puesto" },
+            { key: "department", label: "Área", format: (v) => (v as HrEmpleado["department"])?.nombre ?? "—" },
+            { key: "estadoRRHH", label: "Estado" },
+            { key: "tipoContrato", label: "Contrato" },
+          ], "plantilla")}>CSV</Button>
+        ) : undefined}
+      />
 
       {actionErr && (
         <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
