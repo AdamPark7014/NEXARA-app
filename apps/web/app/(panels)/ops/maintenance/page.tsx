@@ -12,6 +12,8 @@ import { useUser } from "@/components/UserContext";
 import { canAccessMaintenanceContracts, getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface WorkOrder {
   id: number;
@@ -49,6 +51,9 @@ export default function MaintenancePage() {
   const [items, setItems] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterPriority, setFilterPriority] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<WorkOrder | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
@@ -107,6 +112,17 @@ export default function MaintenancePage() {
       setItems(prev => prev.map(w => w.id === id ? { ...w, ...updated } : w));
     } catch (e) { setActionErr(e instanceof Error ? e.message : "Error al actualizar estado"); }
   };
+
+  const visibleItems = useMemo(() => {
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((w) => ((w.title ?? "") + " " + (w.asset?.name ?? "") + " " + (w.description ?? "")).toLowerCase().includes(q));
+    }
+    if (filterStatus) rows = rows.filter((w) => w.status === filterStatus);
+    if (filterPriority) rows = rows.filter((w) => w.priority === filterPriority);
+    return rows;
+  }, [items, searchQ, filterStatus, filterPriority]);
 
   const statusVariant = (s?: string): "accent" | "warning" | "neutral" | "danger" =>
     s === "COMPLETADA" ? "neutral" : s === "EN_PROGRESO" ? "accent" : s === "CANCELADA" ? "danger" : "warning";
@@ -207,13 +223,45 @@ export default function MaintenancePage() {
         </div>
       )}
 
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por título, activo o descripción…" }}
+        selects={[
+          {
+            label: "Estado",
+            value: filterStatus,
+            onChange: setFilterStatus,
+            options: STATUSES.map((s) => ({ value: s, label: s.replace(/_/g, " ") })),
+            allowAll: true,
+          },
+          {
+            label: "Prioridad",
+            value: filterPriority,
+            onChange: setFilterPriority,
+            options: PRIORITIES.map((p) => ({ value: p, label: p })),
+            allowAll: true,
+          },
+        ]}
+        onClear={() => { setSearchQ(""); setFilterStatus(""); setFilterPriority(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "id", label: "ID" },
+            { key: "title", label: "Trabajo" },
+            { key: "priority", label: "Prioridad" },
+            { key: "status", label: "Estado" },
+            { key: "estimatedCost", label: "Costo est." },
+            { key: "scheduledAt", label: "Programada", format: (v) => v ? String(v).slice(0, 10) : "" },
+          ], "mantenimiento-ots")}>CSV</Button>
+        ) : undefined}
+      />
+
       <Section title={loading ? "Cargando…" : `${items.length} ordenes`}>
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando ordenes de mantenimiento." />}
         {!loading && error && (
           <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
         )}
         {!loading && !error && (
-          <DataTable columns={columns} rows={items} rowKey={w => w.id} emptyTitle="Sin ordenes de mantenimiento" emptyDescription="Crea la primera orden de trabajo." />
+          <DataTable columns={columns} rows={visibleItems} rowKey={w => w.id} emptyTitle="Sin ordenes de mantenimiento" emptyDescription="Crea la primera orden de trabajo." />
         )}
       </Section>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
