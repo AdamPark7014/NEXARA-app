@@ -10,6 +10,8 @@ import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { filterRowsByScope, getErpViaticsAdminSectionConfig } from "@/lib/section-views";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import { buildApiUrl } from "@/lib/api-base";
 import { approveViatico, markViaticoPagado } from "@/lib/viatics-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
@@ -71,6 +73,7 @@ export default function ViaticosPage() {
   const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<"todos" | "contabilidad">("contabilidad");
   const [filter, setFilter] = useState("");
+  const [filterEstatus, setFilterEstatus] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -106,6 +109,7 @@ export default function ViaticosPage() {
       const id = Number(highlightId);
       if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
     }
+    if (filterEstatus) rows = rows.filter((v) => v.estatus === filterEstatus);
     const q = filter.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter(
@@ -116,7 +120,7 @@ export default function ViaticosPage() {
         (v.estatus ?? "").toLowerCase().includes(q) ||
         (v.contabilidadRef ?? "").toLowerCase().includes(q),
     );
-  }, [visibleItems, filter, highlightId, tab]);
+  }, [visibleItems, filter, filterEstatus, highlightId, tab]);
 
   const pendientes = visibleItems.filter((v) => v.estatus === "Pendiente").length;
   const contabilidadItems = visibleItems.filter((v) => v.estatus === "Aprobado" || v.estatus === "Pagado");
@@ -324,16 +328,32 @@ export default function ViaticosPage() {
         )}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
         <Button size="sm" variant={tab === "contabilidad" ? "primary" : "secondary"} onClick={() => setTab("contabilidad")}>Contabilidad (aprobados)</Button>
         <Button size="sm" variant={tab === "todos" ? "primary" : "secondary"} onClick={() => setTab("todos")}>Todos</Button>
-        <input
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder="Buscar por concepto, solicitante, folio…"
-          style={{ flex: 1, minWidth: 220, maxWidth: 400, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
-        />
       </div>
+      <FilterToolbar
+        search={{ value: filter, onChange: setFilter, placeholder: "Buscar por concepto, solicitante, folio…" }}
+        selects={tab === "todos" ? [{
+          label: "Estatus",
+          value: filterEstatus,
+          onChange: setFilterEstatus,
+          options: ESTATUS.map((s) => ({ value: s, label: s.replace("_", " ") })),
+          allowAll: true,
+        }] : []}
+        onClear={() => { setFilter(""); setFilterEstatus(""); }}
+        resultCount={loading ? null : filtered.length}
+        rightActions={filtered.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(filtered, [
+            { key: "id", label: "ID" },
+            { key: "concepto", label: "Concepto" },
+            { key: "usuario", label: "Solicitante", format: (v) => (v as Viatico["usuario"])?.nombre ?? "—" },
+            { key: "montoSolicitado", label: "Monto" },
+            { key: "estatus", label: "Estatus" },
+            { key: "fechaSolicitud", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
+          ], "viaticos")}>CSV</Button>
+        ) : undefined}
+      />
 
       <Section title={loading ? "Cargando…" : `${filtered.length} viáticos`}>
         {highlightId && (
