@@ -13,6 +13,8 @@ import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface Vehicle {
   id: number;
@@ -211,12 +213,22 @@ export default function VehiclesPage() {
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box" };
 
+  const [searchQ, setSearchQ] = useState("");
+  const [filterEstado, setFilterEstado] = useState("");
+
   const visibleVehicles = useMemo(() => {
-    if (!highlightId) return items;
-    const id = Number(highlightId);
-    if (Number.isNaN(id)) return items;
-    return [...items].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
-  }, [items, highlightId]);
+    let result = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      result = result.filter((v) => (v.nombre ?? "").toLowerCase().includes(q) || (v.placas ?? "").toLowerCase().includes(q));
+    }
+    if (filterEstado) result = result.filter((v) => v.estatus === filterEstado);
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) result = [...result].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
+    return result;
+  }, [items, highlightId, searchQ, filterEstado]);
 
   const columns: Column<Vehicle>[] = [
     { key: "nombre", label: "Vehículo", render: v => <span style={{ fontWeight: 700, fontSize: 13 }}>{v.nombre ?? "—"}</span> },
@@ -331,6 +343,27 @@ export default function VehiclesPage() {
           <KpiCard label="En mantenimiento" value={items.filter(v => v.estatus === "En_mantenimiento" || v.estatus === "Fuera_de_servicio").length} variant={items.filter(v => v.estatus === "En_mantenimiento" || v.estatus === "Fuera_de_servicio").length > 0 ? "danger" : "positive"} icon="🔧" />
         </div>
       )}
+
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por vehículo o placas…" }}
+        selects={[{
+          label: "Estado",
+          value: filterEstado,
+          onChange: setFilterEstado,
+          options: ESTADOS.map((e) => ({ value: e, label: e.replace(/_/g, " ") })),
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setFilterEstado(""); }}
+        resultCount={loading ? null : visibleVehicles.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleVehicles, [
+            { key: "nombre", label: "Vehículo" },
+            { key: "placas", label: "Placas" },
+            { key: "estatus", label: "Estado" },
+            { key: "notas", label: "Notas" },
+          ], "vehiculos")}>CSV</Button>
+        ) : undefined}
+      />
 
       <Section title={loading ? "Cargando…" : `${visibleVehicles.length} unidades`}>
         {loadError && (
