@@ -12,6 +12,8 @@ import { useUser } from "@/components/UserContext";
 import { getErpInventorySectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 type ProcTab = "orders" | "requisitions" | "receipts";
 
@@ -136,6 +138,9 @@ export default function ProcurementPage() {
   const [requisitions, setRequisitions] = useState<Requisition[]>([]);
   const [receipts, setReceipts] = useState<GoodsReceipt[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterPoStatus, setFilterPoStatus] = useState("");
+  const [filterReqStatus, setFilterReqStatus] = useState("");
 
   // ── Create Requisición ──────────────────────────────────────────────────
   const [showReqForm, setShowReqForm] = useState(false);
@@ -199,16 +204,50 @@ export default function ProcurementPage() {
     void load();
   }, [load]);
 
-  const visibleOrders = useMemo(() => sortHighlight(orders, highlightId), [orders, highlightId]);
-  const visibleReqs = useMemo(() => sortHighlight(requisitions, highlightId), [requisitions, highlightId]);
+  const visibleOrders = useMemo(() => {
+    let rows = orders;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((o) =>
+        (o.poNumber ?? "").toLowerCase().includes(q) ||
+        (o.supplier?.name ?? "").toLowerCase().includes(q) ||
+        (o.createdBy?.nombre ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterPoStatus) rows = rows.filter((o) => o.status === filterPoStatus);
+    return sortHighlight(rows, highlightId);
+  }, [orders, highlightId, searchQ, filterPoStatus]);
+
+  const visibleReqs = useMemo(() => {
+    let rows = requisitions;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((r) =>
+        (r.reqNumber ?? "").toLowerCase().includes(q) ||
+        (r.title ?? "").toLowerCase().includes(q) ||
+        (r.requestedBy?.nombre ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterReqStatus) rows = rows.filter((r) => r.status === filterReqStatus);
+    return sortHighlight(rows, highlightId);
+  }, [requisitions, highlightId, searchQ, filterReqStatus]);
+
   const visibleReceipts = useMemo(() => {
     let rows = receipts;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((r) =>
+        (r.receiptNumber ?? "").toLowerCase().includes(q) ||
+        (r.purchaseOrder?.poNumber ?? "").toLowerCase().includes(q) ||
+        (r.receivedBy?.nombre ?? "").toLowerCase().includes(q)
+      );
+    }
     if (highlightId) {
       const id = Number(highlightId);
       if (!Number.isNaN(id)) rows = rows.filter((r) => r.id === id);
     }
     return rows;
-  }, [receipts, highlightId]);
+  }, [receipts, highlightId, searchQ]);
 
   const saveReq = async () => {
     if (!token || !reqForm.title.trim()) return;
@@ -636,6 +675,42 @@ export default function ProcurementPage() {
           Recepciones
         </button>
       </div>
+
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: tab === "orders" ? "Buscar OC, proveedor…" : tab === "requisitions" ? "Buscar requisición, título…" : "Buscar recepción, OC…" }}
+        selects={tab === "orders" ? [{
+          label: "Estado",
+          value: filterPoStatus,
+          onChange: setFilterPoStatus,
+          options: Object.entries(PO_STATUS).map(([value, label]) => ({ value, label })),
+          allowAll: true,
+        }] : tab === "requisitions" ? [{
+          label: "Estado",
+          value: filterReqStatus,
+          onChange: setFilterReqStatus,
+          options: Object.entries(REQ_STATUS).map(([value, label]) => ({ value, label })),
+          allowAll: true,
+        }] : []}
+        onClear={() => { setSearchQ(""); setFilterPoStatus(""); setFilterReqStatus(""); }}
+        resultCount={loading ? null : tab === "orders" ? visibleOrders.length : tab === "requisitions" ? visibleReqs.length : visibleReceipts.length}
+        rightActions={tab === "orders" && orders.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleOrders, [
+            { key: "poNumber", label: "OC" },
+            { key: "supplier", label: "Proveedor", format: (v) => (v as PurchaseOrder["supplier"])?.name ?? "—" },
+            { key: "totalAmount", label: "Monto" },
+            { key: "status", label: "Estado", format: (v) => PO_STATUS[String(v ?? "")] ?? String(v ?? "") },
+            { key: "expectedDate", label: "Entrega est.", format: (v) => v ? String(v).slice(0, 10) : "" },
+          ], "ordenes-compra")}>CSV</Button>
+        ) : tab === "requisitions" && requisitions.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleReqs, [
+            { key: "reqNumber", label: "Folio" },
+            { key: "title", label: "Título" },
+            { key: "priority", label: "Prioridad" },
+            { key: "status", label: "Estado", format: (v) => REQ_STATUS[String(v ?? "")] ?? String(v ?? "") },
+            { key: "requestedBy", label: "Solicitó", format: (v) => (v as Requisition["requestedBy"])?.nombre ?? "—" },
+          ], "requisiciones")}>CSV</Button>
+        ) : undefined}
+      />
 
       {highlightId && tab !== "receipts" && (
         <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
