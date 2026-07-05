@@ -11,6 +11,8 @@ import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface ContactMsg {
   id: number;
@@ -65,6 +67,8 @@ export default function StudioContactsPage() {
   const token = user?.token ?? "";
 
   const [items, setItems]     = useState<ContactMsg[]>([]);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [error, setError]     = useState<string | null>(null);
@@ -109,6 +113,21 @@ export default function StudioContactsPage() {
     }
   } });
   };
+
+  const visibleItems = useMemo(() => {
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((c) =>
+        (c.name ?? "").toLowerCase().includes(q) ||
+        (c.email ?? "").toLowerCase().includes(q) ||
+        (c.company ?? "").toLowerCase().includes(q) ||
+        (c.message ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterStatus) rows = rows.filter((c) => c.status === filterStatus);
+    return rows;
+  }, [items, searchQ, filterStatus]);
 
   const columns: Column<ContactMsg>[] = [
     {
@@ -206,13 +225,36 @@ export default function StudioContactsPage() {
         </div>
       )}
 
-      <Section title={loading ? "Cargando…" : `${items.length} mensajes`}>
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por nombre, empresa o mensaje…" }}
+        selects={[{
+          label: "Estado",
+          value: filterStatus,
+          onChange: setFilterStatus,
+          options: Object.entries(STATUS_LABEL).map(([v, l]) => ({ value: v, label: l })),
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setFilterStatus(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "name", label: "Nombre" },
+            { key: "email", label: "Email" },
+            { key: "company", label: "Empresa" },
+            { key: "source", label: "Canal" },
+            { key: "status", label: "Estado", format: (v) => STATUS_LABEL[String(v ?? "")] ?? String(v ?? "") },
+            { key: "createdAt", label: "Recibido", format: (v) => v ? String(v).slice(0, 10) : "" },
+          ], "mensajes-contacto")}>CSV</Button>
+        ) : undefined}
+      />
+
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} mensajes`}>
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
         ) : (
           <DataTable
             columns={columns}
-            rows={items}
+            rows={visibleItems}
             rowKey={c => c.id}
             emptyTitle="Sin mensajes"
             emptyDescription="No hay mensajes de contacto aún."
