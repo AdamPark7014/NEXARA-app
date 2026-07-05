@@ -50,8 +50,71 @@ final class CrmReportsVM: ObservableObject {
 struct CrmReportsView: View {
     let mode: CrmReportMode
     @StateObject private var vm = CrmReportsVM()
+    @State private var selectedVendor: [String: Any]?
 
     var body: some View {
+        Group {
+            if let v = selectedVendor { vendorDetail(v) } else { reportList }
+        }
+        .navigationTitle(mode.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task { vm.load() }
+        .refreshable { if selectedVendor == nil { vm.load() } }
+    }
+
+    @ViewBuilder
+    private func vendorDetail(_ v: [String: Any]) -> some View {
+        let name   = crmStr(v, "userName", "nombre", "name").ifBlank("Vendedor")
+        let status = crmStr(v, "status")
+        let statusColor = vendorStatusColor(status)
+        let revenue = crmDouble(v, "revenue")
+        let target  = crmDouble(v, "targetRevenue")
+        let att     = crmDouble(v, "attainmentRevenue")
+        List {
+            Section { Button("← Reportes") { selectedVendor = nil } }
+            Section {
+                HStack {
+                    Text(name).font(.headline)
+                    Spacer()
+                    if !status.isEmpty {
+                        Text(status.replacingOccurrences(of: "-", with: " ").capitalized)
+                            .font(.caption2.bold()).foregroundColor(statusColor)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(statusColor.opacity(0.12)).clipShape(Capsule())
+                    }
+                }
+            }
+            Section("Ventas") {
+                vrRow("Ingresos",       crmFmtMxn(revenue))
+                vrRow("Meta",           crmFmtMxn(target))
+                if target > 0 { vrRow("Cumplimiento", crmFmtPct(att)) }
+                vrRow("Oportunidades",  "\(crmInt(v, "opportunities"))")
+                vrRow("Proyectos",      "\(crmInt(v, "projects"))")
+                vrRow("Leads",          "\(crmInt(v, "leads"))")
+                vrRow("Actividades",    "\(crmInt(v, "activities"))")
+                if let perf = crmOptionalDouble(v, "performance") { vrRow("Performance", crmFmtPct(perf)) }
+                vrRow("Email",          crmStr(v, "email"))
+                vrRow("Rol",            crmStr(v, "role", "rol"))
+            }
+            if target > 0 {
+                Section("Cuota") {
+                    ProgressView(value: min(att / 100, 1)).tint(statusColor)
+                    Text("\(crmFmtPct(att)) de \(crmFmtMxn(target))")
+                        .font(.caption).foregroundColor(statusColor)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func vrRow(_ label: String, _ value: String) -> some View {
+        let nonZero = value != "0" && value != "$0" && !value.contains("$0.") && !value.isEmpty
+        if nonZero {
+            HStack { Text(label).foregroundColor(.secondary); Spacer(); Text(value).multilineTextAlignment(.trailing) }
+        }
+    }
+
+    private var reportList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -72,10 +135,6 @@ struct CrmReportsView: View {
             }
             .padding()
         }
-        .navigationTitle(mode.title)
-        .navigationBarTitleDisplayMode(.inline)
-        .task { vm.load() }
-        .refreshable { vm.load() }
     }
 
     private var periodChips: some View {
@@ -103,7 +162,9 @@ struct CrmReportsView: View {
             metricsGrid(full: true)
             if !vm.vendors.isEmpty {
                 sectionHeader("Equipo de ventas", "\(vm.vendors.count) vendedores")
-                ForEach(vm.vendors, id: \.vendorId) { v in VendorCardView(vendor: v) }
+                ForEach(vm.vendors, id: \.vendorId) { v in
+                    Button { selectedVendor = v } label: { VendorCardView(vendor: v) }.buttonStyle(.plain)
+                }
             }
         case .crecimiento:
             growthHighlight
@@ -114,7 +175,7 @@ struct CrmReportsView: View {
             } else {
                 sectionHeader("Ranking", periodLabel(vm.period))
                 ForEach(vm.vendors.sorted { crmDouble($0, "revenue") > crmDouble($1, "revenue") }, id: \.vendorId) { v in
-                    VendorCardView(vendor: v, showQuota: true)
+                    Button { selectedVendor = v } label: { VendorCardView(vendor: v, showQuota: true) }.buttonStyle(.plain)
                 }
             }
         }
