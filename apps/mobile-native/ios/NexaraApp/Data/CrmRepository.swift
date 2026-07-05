@@ -103,6 +103,33 @@ final class CrmRepository {
             mimeType: mimeType
         )
     }
+
+    func createOpportunity(_ fields: [String: String]) async throws -> [String: Any] {
+        let data = try await api.postJSON("ventas/oportunidades", body: fields)
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
+    func updateOpportunity(id: Int, fields: [String: String]) async throws -> [String: Any] {
+        let data = try await api.patchJSON("ventas/oportunidades/\(id)", body: fields)
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
+    func deleteOpportunity(id: Int) async throws {
+        try await api.delete("ventas/oportunidades/\(id)")
+    }
+
+    func downloadAssetBytes(_ relativeOrAbsoluteUrl: String) async throws -> Data {
+        let url = ApiUrls.absoluteAsset(relativeOrAbsoluteUrl)
+        var req = URLRequest(url: url)
+        if let token = SessionStore.shared.token {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw ApiError.http((resp as? HTTPURLResponse)?.statusCode ?? 0, nil)
+        }
+        return data
+    }
 }
 
 private struct EmptyBody: Encodable {}

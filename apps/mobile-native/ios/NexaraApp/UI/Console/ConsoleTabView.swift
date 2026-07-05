@@ -1,67 +1,83 @@
 import SwiftUI
 
-/// Console (ERP/OPS) portal con TabView inferior — paridad con ConsoleNavHost de Android.
-/// Tabs: Inicio · Actividades · Asistencia · GPS · Más
+/// Console (ERP/OPS) portal con TabView inferior — paridad con `ConsoleNavHost` de Android.
+/// Tabs dinámicos según rol: admin ve Operación/Evidencias; campo ve Mis act./Mis evid.
 struct ConsoleTabView: View {
-    let panel: PanelId   // .erp o .ops
+    let panel: PanelId
     let onExit: () -> Void
-    @State private var selectedTab: ConsoleTab = .dashboard
+    @State private var selectedTab: String = "dashboard"
     @State private var deepLinkModuleKey: String?
     @EnvironmentObject var session: SessionStore
     @ObservedObject private var deepLink = DeepLinkCoordinator.shared
 
     private var user: SessionUser? { session.currentUser }
-    private var isAdmin: Bool {
-        guard let u = user else { return false }
-        return u.isSuperAdmin || u.permissions.contains("console.admin")
+
+    private var bottomTabs: [ConsoleBottomTabItem] {
+        ConsoleAccessRules.consoleBottomTabs(user: user, panel: panel)
     }
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            // ── Inicio / Dashboard
-            NavigationStack {
-                ConsoleDashboardView(isOps: panel == .ops)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button("Paneles", action: onExit)
-                        }
-                    }
+            ForEach(bottomTabs) { tab in
+                NavigationStack {
+                    consoleTabContent(tab)
+                }
+                .tabItem { Label(tab.label, systemImage: tab.systemImage) }
+                .tag(tab.id)
             }
-            .tabItem { Label("Inicio", systemImage: "house") }
-            .tag(ConsoleTab.dashboard)
-
-            // ── Actividades
-            NavigationStack {
-                ActivitiesView()
-            }
-            .tabItem { Label("Actividades", systemImage: "list.clipboard") }
-            .tag(ConsoleTab.activities)
-
-            // ── Asistencia
-            NavigationStack {
-                AttendanceView()
-            }
-            .tabItem { Label("Asistencia", systemImage: "clock") }
-            .tag(ConsoleTab.attendance)
-
-            // ── GPS
-            NavigationStack {
-                GpsMapView()
-            }
-            .tabItem { Label("GPS", systemImage: "map") }
-            .tag(ConsoleTab.gps)
-
-            // ── Más módulos
-            NavigationStack {
-                ConsoleMoreView(panel: panel, onExit: onExit)
-                    .navigationTitle("Más módulos")
-            }
-            .tabItem { Label("Más", systemImage: "ellipsis.circle") }
-            .tag(ConsoleTab.more)
         }
         .deepLinkModulePresenter(panel: panel, presentedKey: $deepLinkModuleKey)
-        .onAppear { applyDeepLinkIfNeeded() }
+        .onAppear {
+            syncSelectedTab()
+            applyDeepLinkIfNeeded()
+        }
+        .onChange(of: user?.id) { _, _ in syncSelectedTab() }
+        .onChange(of: bottomTabs.map(\.id)) { _, _ in syncSelectedTab() }
         .onChange(of: deepLink.pending) { _, _ in applyDeepLinkIfNeeded() }
+    }
+
+    @ViewBuilder
+    private func consoleTabContent(_ tab: ConsoleBottomTabItem) -> some View {
+        switch tab.moduleKey {
+        case "dashboard":
+            ConsoleDashboardView(isOps: panel == .ops, panel: panel)
+                .navigationTitle("Inicio")
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Paneles", action: onExit)
+                    }
+                }
+        case "activities":
+            ActivitiesView()
+                .navigationTitle("Operación")
+        case "my-activities":
+            ActivitiesView(filterForUserId: user?.id)
+                .navigationTitle("Mis actividades")
+        case "evidences":
+            EvidencesView(reviewMode: true)
+                .navigationTitle("Evidencias")
+        case "my-evidences":
+            EvidencesView(reviewMode: false)
+                .navigationTitle("Mis evidencias")
+        case "attendance":
+            AttendanceView()
+                .navigationTitle("Asistencia")
+        case "gps":
+            GpsMapView()
+                .navigationTitle("GPS")
+        case nil:
+            ConsoleMoreView(panel: panel, onExit: onExit)
+                .navigationTitle("Más módulos")
+        default:
+            EmptyView()
+        }
+    }
+
+    private func syncSelectedTab() {
+        let ids = bottomTabs.map(\.id)
+        if !ids.contains(selectedTab) {
+            selectedTab = ids.first(where: { $0 != "more" }) ?? ids.first ?? "more"
+        }
     }
 
     private func applyDeepLinkIfNeeded() {
@@ -76,14 +92,8 @@ struct ConsoleTabView: View {
 private struct ConsoleMoreView: View {
     let panel: PanelId
     let onExit: () -> Void
-    @State private var navPath: [String] = []
     @State private var showContabilidad = false
     @EnvironmentObject var session: SessionStore
-
-    private var isAdmin: Bool {
-        guard let u = session.currentUser else { return false }
-        return u.isSuperAdmin || u.permissions.contains("console.admin")
-    }
 
     private var canFinance: Bool {
         guard let u = session.currentUser else { return false }
@@ -147,10 +157,4 @@ private struct ConsoleMoreView: View {
             ContabilidadTabView(onExit: { showContabilidad = false })
         }
     }
-}
-
-// MARK: – Tab enum
-
-private enum ConsoleTab: Hashable {
-    case dashboard, activities, attendance, gps, more
 }

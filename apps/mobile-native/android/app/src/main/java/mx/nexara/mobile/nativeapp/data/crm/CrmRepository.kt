@@ -10,8 +10,11 @@ import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDto
 import mx.nexara.mobile.nativeapp.data.api.CrmApi
 import mx.nexara.mobile.nativeapp.data.api.ExtraApi
+import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import java.lang.reflect.ParameterizedType
@@ -68,6 +71,29 @@ class CrmRepository(private val context: Context) {
         val parts = uris.mapNotNull { filePart(it) }
         if (parts.isEmpty()) return emptyList()
         return parseMaps(crmApi.addOpportunityEvidencesRaw(id, parts).string())
+    }
+
+    suspend fun createOpportunity(fields: Map<String, Any?>): Map<String, Any?> =
+        parseObject(crmApi.createOpportunityRaw(fields).string())
+
+    suspend fun updateOpportunity(id: Long, fields: Map<String, Any?>): Map<String, Any?> =
+        parseObject(crmApi.updateOpportunityRaw(id, fields).string())
+
+    suspend fun deleteOpportunity(id: Long) {
+        crmApi.deleteOpportunityRaw(id)
+    }
+
+    suspend fun downloadAssetBytes(relativeOrAbsoluteUrl: String): ByteArray {
+        val url = toAbsoluteAssetUrl(relativeOrAbsoluteUrl)
+        val token = authRepo.token()
+        val client = OkHttpClient()
+        val req = Request.Builder().url(url).apply {
+            if (!token.isNullOrBlank()) header("Authorization", "Bearer $token")
+        }.build()
+        client.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) throw IllegalStateException("HTTP ${resp.code}")
+            return resp.body?.bytes() ?: throw IllegalStateException("Respuesta vacía")
+        }
     }
 
     private fun filePart(uri: Uri): MultipartBody.Part? {

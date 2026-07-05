@@ -1,14 +1,15 @@
 package mx.nexara.mobile.nativeapp.data.api
 
-import okhttp3.MultipartBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Multipart
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import okhttp3.MultipartBody
 
 /**
  * Endpoints CRM / Ventas — paridad con web CRM vía API ventas.
@@ -35,6 +36,20 @@ interface CrmApi {
         @Path("id") id: Long,
         @Part files: List<MultipartBody.Part>,
     ): okhttp3.ResponseBody
+
+    @POST("ventas/oportunidades")
+    suspend fun createOpportunityRaw(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+    ): okhttp3.ResponseBody
+
+    @PATCH("ventas/oportunidades/{id}")
+    suspend fun updateOpportunityRaw(
+        @Path("id") id: Long,
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+    ): okhttp3.ResponseBody
+
+    @DELETE("ventas/oportunidades/{id}")
+    suspend fun deleteOpportunityRaw(@Path("id") id: Long): okhttp3.ResponseBody
 
     @GET("ventas/clientes")
     suspend fun listClientesRaw(): okhttp3.ResponseBody
