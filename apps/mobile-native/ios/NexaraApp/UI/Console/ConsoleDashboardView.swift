@@ -38,6 +38,7 @@ final class ConsoleDashboardVM: ObservableObject {
 
 struct ConsoleDashboardView: View {
     var isOps: Bool = false
+    var panel: PanelId = .erp
 
     @StateObject private var vm = ConsoleDashboardVM()
     @EnvironmentObject var session: SessionStore
@@ -45,6 +46,7 @@ struct ConsoleDashboardView: View {
     private var user: SessionUser? { session.currentUser }
     private var isAdmin: Bool { user?.isSuperAdmin == true || user?.permissions.contains("erp.admin") == true }
     private var canFinance: Bool { user?.permissions.contains("finance.view") == true || isAdmin }
+    private var isAdministrativo: Bool { ConsoleAccessRules.isAdministrativoRole(user) }
 
     var body: some View {
         Group {
@@ -68,23 +70,60 @@ struct ConsoleDashboardView: View {
         }
         .refreshable { vm.load(isOps: isOps) }
         .task { vm.load(isOps: isOps) }
+        .navigationDestination(for: String.self) { key in
+            ModuleRouter.view(for: panel, key: key)
+        }
     }
 
     private var dashContent: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
                 headerSection
+                if isAdministrativo { administrativoShortcuts }
                 if isOps && !vm.nocAlerts.isEmpty { nocAlertsSection }
-                if !vm.executive.isEmpty || isAdmin { executiveKpiSection }
+                if !vm.executive.isEmpty && (isAdmin || isAdministrativo) { executiveKpiSection }
                 if !vm.approvals.isEmpty { approvalsSection }
-                operationsKpiSection
-                if !vm.activities.isEmpty { statusBreakdownSection }
-                recentActivitiesSection
-                if !vm.viatics.isEmpty { recentViaticsSection }
+                if !isAdministrativo {
+                    operationsKpiSection
+                    if !vm.activities.isEmpty { statusBreakdownSection }
+                    recentActivitiesSection
+                    if !vm.viatics.isEmpty { recentViaticsSection }
+                }
                 Spacer(minLength: 24)
             }
             .padding(.vertical)
         }
+    }
+
+    private var administrativoShortcuts: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            DashSectionHeader(title: "Atajos", detail: "Acceso rápido").padding(.horizontal)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                adminShortcut("approvals", "🛡️", "Aprobaciones", "Firma y autorización")
+                adminShortcut("documents", "📂", "Documentos", "Archivos corporativos")
+                adminShortcut("viatics", "✈️", "Viáticos", "Solicitudes y reembolsos")
+                adminShortcut("expenses", "💳", "Gastos", "Gastos corporativos")
+                adminShortcut("calendar", "📅", "Calendario", "Agenda corporativa")
+                adminShortcut("companies", "🏛️", "Empresas", "Grupo empresarial")
+            }
+            .padding(.horizontal)
+        }
+    }
+
+    @ViewBuilder
+    private func adminShortcut(_ key: String, _ icon: String, _ title: String, _ subtitle: String) -> some View {
+        NavigationLink(value: key) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(icon).font(.title2)
+                Text(title).font(.subheadline).bold()
+                Text(subtitle).font(.caption2).foregroundColor(.secondary).lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
     }
 
     // ── NOC Alerts (OPS panel only)

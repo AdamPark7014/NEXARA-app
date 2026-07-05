@@ -127,6 +127,7 @@ fun ConsoleNavHost(
     val isSuperAdmin = user?.isSuperAdmin == true
     val isAdmin = !isSuperAdmin && (user?.permissions ?: emptyList()).contains("console.admin")
     val isIngeniero = !isSuperAdmin && !isAdmin && roleLower.contains("ingenier")
+    val isAdministrativo = user?.isAdministrativoRole() == true
     val canFinance = isSuperAdmin
         || (user?.permissions ?: emptyList()).any { it.contains("contabilidad", ignoreCase = true) }
         || roleLower.contains("contab")
@@ -159,7 +160,7 @@ fun ConsoleNavHost(
     val panelTitle = panelId.displayName
 
     // Máximo 5 tabs: módulos principales visibles + "Más".
-    val items = remember(isIngeniero, isSuperAdmin, isAdmin, visibleRoutes) {
+    val items = remember(isIngeniero, isAdministrativo, isSuperAdmin, isAdmin, visibleRoutes) {
         fun isVisible(route: String) = visibleRoutes.contains(route)
 
         buildList {
@@ -167,7 +168,11 @@ fun ConsoleNavHost(
                 add(ConsoleNavItem(ConsoleRoutes.Dashboard, "Inicio", "📊"))
             }
 
-            if (isSuperAdmin || isAdmin) {
+            if (isAdministrativo) {
+                if (isVisible(ConsoleRoutes.Attendance)) {
+                    add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", "🕒"))
+                }
+            } else if (isSuperAdmin || isAdmin) {
                 if (isVisible(ConsoleRoutes.Activities)) add(ConsoleNavItem(ConsoleRoutes.Activities, "Operación", "🗂️"))
                 if (isVisible(ConsoleRoutes.Evidences)) add(ConsoleNavItem(ConsoleRoutes.Evidences, "Evidencias", "📸"))
                 if (isVisible(ConsoleRoutes.Attendance)) add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", "🕒"))
@@ -270,7 +275,12 @@ fun ConsoleNavHost(
             modifier = Modifier.padding(inner),
         ) {
             composable(ConsoleRoutes.Dashboard) {
-                ConsoleDashboardScreen(isOps = panelId == PanelId.OPS)
+                ConsoleDashboardScreen(
+                    isOps = panelId == PanelId.OPS,
+                    onOpenModule = { key ->
+                        navController.navigate(ConsoleRoutes.module(key)) { launchSingleTop = true }
+                    },
+                )
             }
             composable(ConsoleRoutes.Activities) {
                 // Combined view: admins see team + personal; normal users see only personal

@@ -215,10 +215,19 @@ final class ActivitiesVM: ObservableObject {
             .mapValues(\.count)
     }
 
-    func load() {
+    func load(personalOnly: Bool = false) {
         isLoading = true
         Task {
-            items     = await ExtraRepository.shared.activities()
+            if personalOnly {
+                items = (try? await ConsoleRepository.shared.activities(scope: "mine")) ?? []
+                if items.isEmpty, let uid = SessionStore.shared.currentUser?.id {
+                    let all = await ExtraRepository.shared.activities()
+                    items = all.filter { actStr($0, "assignedToId", "userId", "responsableId") == uid
+                        || actStr($0, "assignedTo", "responsable").lowercased().contains(SessionStore.shared.currentUser?.nombre.lowercased() ?? "") }
+                }
+            } else {
+                items = await ExtraRepository.shared.activities()
+            }
             isLoading = false
         }
     }
@@ -239,7 +248,7 @@ struct ActivitiesView: View {
                 listBody
             }
         }
-        .navigationTitle(selected == nil ? "Actividades" : "")
+        .navigationTitle(selected == nil ? (filterForUserId == nil ? "Actividades" : "Mis actividades") : "")
     }
 
     private var listBody: some View {
@@ -305,15 +314,15 @@ struct ActivitiesView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("Actividades")
+        .navigationTitle(filterForUserId == nil ? "Actividades" : "Mis actividades")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button { vm.load() } label: { Image(systemName: "arrow.clockwise") }
+                Button { vm.load(personalOnly: filterForUserId != nil) } label: { Image(systemName: "arrow.clockwise") }
             }
         }
-        .refreshable { vm.load() }
+        .refreshable { vm.load(personalOnly: filterForUserId != nil) }
         .task {
-            vm.load()
+            vm.load(personalOnly: filterForUserId != nil)
         }
     }
 

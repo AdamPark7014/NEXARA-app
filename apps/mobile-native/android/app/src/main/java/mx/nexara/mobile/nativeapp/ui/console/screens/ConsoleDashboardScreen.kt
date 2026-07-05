@@ -2,6 +2,7 @@ package mx.nexara.mobile.nativeapp.ui.console.screens
 
 import android.app.Application
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -14,9 +15,12 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +44,7 @@ import mx.nexara.mobile.nativeapp.data.api.AttendanceRangeDto
 import mx.nexara.mobile.nativeapp.data.api.ViaticDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
+import mx.nexara.mobile.nativeapp.ui.console.isAdministrativoRole
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -120,11 +125,13 @@ private val SubText = Color(0xFF64748B)
 fun ConsoleDashboardScreen(
     contentPadding: PaddingValues = PaddingValues(16.dp),
     isOps: Boolean = false,
+    onOpenModule: ((String) -> Unit)? = null,
 ) {
     val vm: ConsoleDashboardViewModel = viewModel()
     val state by vm.state.collectAsState()
     val context = LocalContext.current
     val user = remember { AuthRepository(context).loadSession() }
+    val isAdministrativo = user?.isAdministrativoRole() == true
     var nocAlerts by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
 
     if (isOps) {
@@ -184,8 +191,8 @@ fun ConsoleDashboardScreen(
             return@LazyColumn
         }
 
-        // ── Executive KPIs (solo admins/finance) ────────────────────────────
-        if (state.executive.isNotEmpty()) {
+        // ── Executive KPIs (admins + administrativo con datos ejecutivos) ───
+        if (state.executive.isNotEmpty() && (isAdministrativo || user?.isSuperAdmin == true || user?.permissions?.contains("console.admin") == true)) {
             item {
                 SectionHeader(title = "Resumen ejecutivo", subtitle = "Este período")
             }
@@ -237,7 +244,45 @@ fun ConsoleDashboardScreen(
             }
         }
 
-        // ── KPI Row ──────────────────────────────────────────────────────────
+        // ── Atajos administrativo ───────────────────────────────────────────
+        if (isAdministrativo && onOpenModule != null) {
+            item { SectionHeader(title = "Atajos", subtitle = "Acceso rápido") }
+            item {
+                val shortcuts = listOf(
+                    Triple("approvals", "🛡️", "Aprobaciones"),
+                    Triple("documents", "📂", "Documentos"),
+                    Triple("viatics", "✈️", "Viáticos"),
+                    Triple("expenses", "💳", "Gastos"),
+                    Triple("calendar", "📅", "Calendario"),
+                    Triple("companies", "🏛️", "Empresas"),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    shortcuts.chunked(2).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            row.forEach { (key, icon, label) ->
+                                Card(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { onOpenModule(key) },
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                                    elevation = CardDefaults.cardElevation(2.dp),
+                                ) {
+                                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(icon, fontSize = 22.sp)
+                                        Text(label, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold))
+                                    }
+                                }
+                            }
+                            if (row.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── KPI Row (operaciones — oculto para administrativo) ──────────────
+        if (!isAdministrativo) {
         item {
             val actTotal = state.activities.size
             val actPending = state.activities.count {
@@ -293,9 +338,10 @@ fun ConsoleDashboardScreen(
                 )
             }
         }
+        }
 
         // ── Estado de actividades ────────────────────────────────────────────
-        if (state.activities.isNotEmpty()) {
+        if (!isAdministrativo && state.activities.isNotEmpty()) {
             item {
                 SectionHeader(title = "Estado de actividades", subtitle = "${state.activities.size} total")
             }
@@ -354,6 +400,7 @@ fun ConsoleDashboardScreen(
         }
 
         // ── Actividades recientes ────────────────────────────────────────────
+        if (!isAdministrativo) {
         item {
             SectionHeader(title = "Actividades recientes", subtitle = "Últimas 8")
         }
@@ -422,6 +469,7 @@ fun ConsoleDashboardScreen(
                     }
                 }
             }
+        }
         }
 
         // ── OPS: NOC Alerts ────────────────────────────────────────────────

@@ -27,6 +27,8 @@ Esta matriz es el checklist de **paridad** para poder eliminar `apps/mobile` (Ne
 | Screen / capability | Mobile route | Android native | iOS native |
 |---|---|---|---|
 | Dashboard | `/console/dashboard` | ✅ `ConsoleDashboardScreen` | ✅ `ConsoleDashboardView` |
+| Tabs inferiores por rol (admin vs campo) | sidebar web | ✅ `ConsoleNavHost` dinámico | ✅ `ConsoleTabView` dinámico + RBAC |
+| Rol **Administrativo** (solo ERP, módulos limitados) | `page-matrix` administrativo | ✅ RBAC + tabs Inicio/Asistencia/Más + atajos dashboard | ✅ idem |
 | Activities (admin) | `/console/activities` | ✅ | ✅ `ActivitiesView` |
 | My activities | `/console/my-activities` | ✅ | ✅ `ActivitiesView` |
 | Evidences (admin/user) | `/console/evidences`, `/console/my-evidences` | ✅ workflow completo | ✅ `EvidencesView` (flujo 5 pasos) |
@@ -76,7 +78,7 @@ Esta matriz es el checklist de **paridad** para poder eliminar `apps/mobile` (Ne
 |---|---|---|---|
 | Dashboard | `/ventas/dashboard` | ✅ | ✅ `CrmDashboardView` |
 | Leads | `/ventas/leads` | ✅ | ✅ `CrmLeadsView` |
-| Oportunidades | `/ventas/oportunidades` | ✅ `VentasOportunidadesScreen` | ✅ `CrmOpportunitiesView` |
+| Oportunidades | `/ventas/oportunidades` | ✅ `VentasOportunidadesScreen` + FAB crear | ✅ `CrmOpportunitiesView` + FAB crear |
 | Clientes | `/ventas/clientes` | ✅ `VentasClientesScreen` | ✅ `CrmCommercialClientsView` |
 | Cotizaciones (view/pdf) | `/ventas/cotizaciones` | ✅ | ✅ KPI + filtros |
 | Productos | `/crm/products` | ✅ `VentasProductsScreen` | ✅ `CrmProductsView` |
@@ -85,12 +87,13 @@ Esta matriz es el checklist de **paridad** para poder eliminar `apps/mobile` (Ne
 | Agenda | `/crm/agenda` | ✅ `VentasAgendaScreen` | ✅ `CrmAgendaView` |
 | Licitaciones | `/crm/tenders` | ✅ `VentasTendersScreen` | ✅ `CrmTendersView` |
 | Metas comerciales | `/crm/targets` | ✅ `VentasTargetsScreen` | ✅ `CrmTargetsView` |
-| Oportunidades (detalle: notas, adjuntos, cotizaciones) | `/crm/opportunities` | ✅ `VentasOpportunityDetailScreen` | ✅ `CrmOpportunityDetailView` |
+| Oportunidades (detalle: notas, adjuntos, cotizaciones, historial, CRUD, PDF) | `/crm/opportunities` | ✅ `VentasOpportunityDetailScreen` | ✅ `CrmOpportunityDetailView` |
 | Plantillas cotización PDF | `/crm/templates` | ✅ `VentasTemplatesScreen` (`ventas/order-templates`) | ✅ `CrmTemplatesView` |
 | Clientes de servicio (OPS) | `/ops/service-clients` | ✅ `ConsoleClientsScreen` vía `service-clients` | ✅ `ServiceClientsView` |
 | Reportes + crecimiento + comparativa | `/ventas/reportes`, `/ventas/crecimiento`, `/ventas/equipo-comparativa` | ✅ `CrmReportsScreen` (KPIs `ventas/reportes/metricas` + vendedores) | ✅ `CrmReportsView` |
 | Notificaciones ventas | `/ventas/notificaciones` | ✅ `NotificationsScreen` | ✅ `NotificationsCenterView` |
 | Dashboard CRM (métricas mes) | `/ventas` inicio | ✅ `VentasDashboardScreen` + pipeline API | ✅ `CrmDashboardView` + pipeline API |
+| Menú «Más» sin duplicar tabs | sidebar web | ✅ `consoleSidebarGroupsForMore` / `ventasSidebarGroups` | ✅ `ConsoleAccessRules` (mismo filtro) |
 | ERP BI / analítica | `/erp/analytics/bi`, `/console/analytics` | ✅ `ErpBiScreen` (KPIs + margen + ingenieros + ROI) | ✅ `ErpBiView` |
 | Vista ejecutiva | `/erp/executive` | ✅ `ExecutiveScreen` (`executive/c-level`) | ✅ `ExecutiveView` |
 | Aprobaciones | `/erp/approvals` | ✅ `ApprovalsScreen` (workflow my-pending) | ✅ `ApprovalsView` |
