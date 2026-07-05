@@ -10,6 +10,8 @@ import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import {
   createSalesClient,
   listSalesClients,
@@ -40,6 +42,9 @@ export default function ClientsPage() {
 
   const [items, setItems] = useState<SalesClient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterIndustry, setFilterIndustry] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<SalesClient | null>(null);
@@ -62,6 +67,21 @@ export default function ClientsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const visibleItems = useMemo(() => {
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((c) =>
+        (c.name ?? "").toLowerCase().includes(q) ||
+        (c.legalName ?? "").toLowerCase().includes(q) ||
+        (c.taxId ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterStatus) rows = rows.filter((c) => c.status === filterStatus);
+    if (filterIndustry) rows = rows.filter((c) => c.industry === filterIndustry);
+    return rows;
+  }, [items, searchQ, filterStatus, filterIndustry]);
 
   const openNew = () => {
     setEditing(null);
@@ -265,13 +285,33 @@ export default function ClientsPage() {
         </div>
       )}
 
-      <Section title={loading ? "Cargando…" : `${items.length} clientes`}>
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por nombre, RFC o razón social…" }}
+        selects={[
+          { label: "Estado", value: filterStatus, onChange: setFilterStatus, options: ESTADOS.map((s) => ({ value: s, label: s })), allowAll: true },
+          { label: "Industria", value: filterIndustry, onChange: setFilterIndustry, options: INDUSTRIES.map((i) => ({ value: i, label: i })), allowAll: true },
+        ]}
+        onClear={() => { setSearchQ(""); setFilterStatus(""); setFilterIndustry(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "name", label: "Nombre" },
+            { key: "legalName", label: "Razón social" },
+            { key: "taxId", label: "RFC" },
+            { key: "industry", label: "Industria" },
+            { key: "status", label: "Estado" },
+            { key: "billingEmail", label: "Email" },
+          ], "clientes")}>CSV</Button>
+        ) : undefined}
+      />
+
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} clientes`}>
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
         ) : (
           <DataTable
             columns={columns}
-            rows={items}
+            rows={visibleItems}
             rowKey={(c) => c.id}
             emptyTitle={loadError ? `⚠ ${loadError}` : "Sin clientes"}
             emptyDescription="Agrega el primer cliente a la cartera comercial."

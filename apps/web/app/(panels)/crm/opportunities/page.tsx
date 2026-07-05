@@ -12,6 +12,8 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { filterRowsByScope, getCrmSalesSectionConfig } from "@/lib/section-views";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import {
   ALL_OPPORTUNITY_STAGES,
   createSalesOpportunity,
@@ -44,6 +46,8 @@ export default function OpportunitiesPage() {
 
   const [items, setItems] = useState<SalesOpportunity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStage, setFilterStage] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<SalesOpportunity | null>(null);
@@ -75,10 +79,20 @@ export default function OpportunitiesPage() {
     load();
   }, [load]);
 
-  const visibleItems = useMemo(
-    () => filterRowsByScope(items, user, cfg.defaultScope),
-    [items, user, cfg.defaultScope],
-  );
+  const visibleItems = useMemo(() => {
+    let rows = filterRowsByScope(items, user, cfg.defaultScope);
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((o) =>
+        (o.title ?? "").toLowerCase().includes(q) ||
+        (o.clientName ?? "").toLowerCase().includes(q) ||
+        (o.client?.name ?? "").toLowerCase().includes(q) ||
+        (o.owner?.nombre ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterStage) rows = rows.filter((o) => o.stage === filterStage);
+    return rows;
+  }, [items, user, cfg.defaultScope, searchQ, filterStage]);
 
   const openNew = () => {
     setEditing(null);
@@ -289,6 +303,30 @@ export default function OpportunitiesPage() {
           </div>
         </div>
       )}
+
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por título, cliente o responsable…" }}
+        selects={[{
+          label: "Etapa",
+          value: filterStage,
+          onChange: setFilterStage,
+          options: ALL_OPPORTUNITY_STAGES.map((s) => ({ value: s.id, label: s.label })),
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setFilterStage(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "title", label: "Título" },
+            { key: "clientName", label: "Cliente" },
+            { key: "stage", label: "Etapa", format: (v) => formatOpportunityStage(String(v ?? "")) },
+            { key: "value", label: "Valor ($)" },
+            { key: "probability", label: "Probabilidad (%)" },
+            { key: "owner", label: "Responsable", format: (v) => (v as SalesOpportunity["owner"])?.nombre ?? "—" },
+            { key: "expectedCloseDate", label: "Cierre esperado", format: (v) => v ? String(v).slice(0, 10) : "" },
+          ], "oportunidades")}>CSV</Button>
+        ) : undefined}
+      />
 
       <Section title={loading ? "Cargando…" : `${visibleItems.length} oportunidades`}>
         {loading ? (
