@@ -17,10 +17,15 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -87,8 +92,17 @@ fun ConsoleToolMyKitScreen(
 ) {
     val vm: ConsoleToolMyKitViewModel = viewModel()
     val state by vm.state.collectAsState()
+    var selected by remember { mutableStateOf<ToolKitAssignmentDto?>(null) }
 
     if (state.items.isEmpty() && state.isLoading && state.error == null) vm.refresh()
+
+    val sel = selected
+    if (sel != null) {
+        MyKitDetail(sel, reportText = state.reportText, reportingId = state.reportingId,
+            onReport = { vm.report(sel.id) }, onChangeText = vm::setReportText,
+            onBack = { selected = null })
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -121,23 +135,101 @@ fun ConsoleToolMyKitScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            items(state.items) { it ->
+            items(state.items) { item ->
                 Card(
+                    onClick = { selected = item },
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        Text("${it.inventoryItem.toolName} · ${it.inventoryItem.model}", style = MaterialTheme.typography.titleSmall)
-                        Text("Serie: ${it.inventoryItem.serialNumber}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        Text("Tipo: ${it.assignmentType}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(
-                            onClick = { vm.report(it.id) },
-                            enabled = state.reportingId == null,
-                        ) { Text(if (state.reportingId == it.id) "Enviando..." else "Reportar incidente") }
+                        Text("${item.inventoryItem.toolName} · ${item.inventoryItem.model}", style = MaterialTheme.typography.titleSmall)
+                        Text("Serie: ${item.inventoryItem.serialNumber}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                        Text("Tipo: ${item.assignmentType}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MyKitDetail(
+    item: ToolKitAssignmentDto,
+    reportText: String,
+    reportingId: Long?,
+    onReport: () -> Unit,
+    onChangeText: (String) -> Unit,
+    onBack: () -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item { Button(onClick = onBack) { Text("← Mi Kit") } }
+        item {
+            Text("${item.inventoryItem.toolName} · ${item.inventoryItem.model}",
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
+        }
+        item {
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Equipo", style = MaterialTheme.typography.titleSmall)
+                    mkRow("Número de serie", item.inventoryItem.serialNumber)
+                    mkRow("Estatus",         item.inventoryItem.status)
+                    mkRow("Tipo de asignación", item.assignmentType)
+                    mkRow("Asignado el",     item.assignedAt.take(10))
+                    item.dueReturnDate?.let { mkRow("Fecha de devolución", it.take(10)) }
+                    item.replacementCount?.let { mkRow("Reemplazos", it.toString()) }
+                }
+            }
+        }
+        if (item.events.isNotEmpty()) {
+            item {
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Historial de incidentes", style = MaterialTheme.typography.titleSmall)
+                        item.events.forEach { ev ->
+                            Column(Modifier.padding(vertical = 4.dp)) {
+                                Text(ev.description, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium))
+                                if (ev.resolution.isNotBlank()) {
+                                    Text("Resolución: ${ev.resolution}", style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Text(ev.reportedAt.take(10), style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Reportar incidente", style = MaterialTheme.typography.titleSmall)
+                    OutlinedTextField(
+                        value = reportText,
+                        onValueChange = onChangeText,
+                        label = { Text("Descripción del problema") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Button(onClick = onReport, enabled = reportingId == null && reportText.isNotBlank()) {
+                        Text(if (reportingId == item.id) "Enviando..." else "Enviar reporte")
+                    }
+                }
+            }
+        }
+        item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun mkRow(label: String, value: String) {
+    if (value.isNotBlank() && value != "null") {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium))
         }
     }
 }
