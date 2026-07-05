@@ -13,6 +13,7 @@ import { getHrSubmoduleConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
 
 interface HrStaff {
   id: number;
@@ -87,6 +88,10 @@ export default function FinesPage() {
 
   const [items, setItems] = useState<Fine[]>([]);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterMotivo, setFilterMotivo] = useState("");
+  const [filterPago, setFilterPago] = useState("");
+  const [filterAprobacion, setFilterAprobacion] = useState("");
   const [staff, setStaff] = useState<HrStaff[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -215,11 +220,27 @@ export default function FinesPage() {
   };
 
   const visibleItems = useMemo(() => {
-    if (!highlightId) return items;
-    const id = Number(highlightId);
-    if (Number.isNaN(id)) return items;
-    return [...items].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
-  }, [items, highlightId]);
+    let result = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      result = result.filter((f) =>
+        (f.usuario?.nombre ?? "").toLowerCase().includes(q) ||
+        (f.usuario?.email ?? "").toLowerCase().includes(q) ||
+        (f.descripcion ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterMotivo) {
+      const m = MOTIVOS.find((x) => x.key === filterMotivo);
+      if (m) result = result.filter((f) => f.razon === m.razon && f.tipo === m.tipo);
+    }
+    if (filterPago) result = result.filter((f) => f.estatusPago === filterPago);
+    if (filterAprobacion) result = result.filter((f) => (f.estatusAprobacion ?? "Pendiente") === filterAprobacion);
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) result = [...result].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
+    return result;
+  }, [items, highlightId, searchQ, filterMotivo, filterPago, filterAprobacion]);
 
   const columns: Column<Fine>[] = [
     { key: "id", label: "ID", render: (f) => <Tag variant="danger">#{f.id}</Tag>, width: 70 },
@@ -378,6 +399,39 @@ export default function FinesPage() {
           <KpiCard label="Monto total" value={<Money value={items.reduce((s, f) => s + Number(f.monto ?? 0), 0)} compact />} icon="💰" hint="Sanciones registradas" />
         </div>
       )}
+
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por empleado o descripción…" }}
+        selects={[
+          {
+            label: "Tipo de sanción",
+            value: filterMotivo,
+            onChange: setFilterMotivo,
+            options: MOTIVOS.map((m) => ({ value: m.key, label: m.label })),
+            allowAll: true,
+          },
+          {
+            label: "Estado pago",
+            value: filterPago,
+            onChange: setFilterPago,
+            options: ESTATUS_PAGO,
+            allowAll: true,
+          },
+          {
+            label: "Autorización",
+            value: filterAprobacion,
+            onChange: setFilterAprobacion,
+            options: [
+              { value: "Pendiente", label: "Pendiente" },
+              { value: "Aprobado", label: "Aprobado" },
+              { value: "Rechazado", label: "Rechazado" },
+            ],
+            allowAll: true,
+          },
+        ]}
+        onClear={() => { setSearchQ(""); setFilterMotivo(""); setFilterPago(""); setFilterAprobacion(""); }}
+        resultCount={loading ? null : visibleItems.length}
+      />
 
       <Section title={loading ? "Cargando…" : `${visibleItems.length} sanciones`}>
         {highlightId && (
