@@ -10,6 +10,7 @@ import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import FilterToolbar from "@/components/FilterToolbar";
 import StudioFileInput from "@/components/studio/StudioFileInput";
 import { STUDIO_IMAGE_SPECS, studioImageHintLine } from "@/lib/studio-image-specs";
 import { toast } from "@/components/Toast";
@@ -66,6 +67,8 @@ export default function StudioCasesPage() {
   const [items, setItems]     = useState<CaseStudy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterPublicado, setFilterPublicado] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing]   = useState<CaseStudy | null>(null);
   const [form, setForm]         = useState({ ...EMPTY_FORM });
@@ -242,6 +245,24 @@ export default function StudioCasesPage() {
         </div>
       )}
 
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por título, cliente o vertical…" }}
+        selects={[{
+          label: "Estado",
+          value: filterPublicado,
+          onChange: setFilterPublicado,
+          options: [{ value: "publicado", label: "Publicados" }, { value: "borrador", label: "Borradores" }],
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setFilterPublicado(""); }}
+        resultCount={loading ? null : items.filter((c) => {
+          if (searchQ.trim()) { const q = searchQ.toLowerCase(); if (!((c.titulo + " " + c.cliente + " " + c.vertical).toLowerCase().includes(q))) return false; }
+          if (filterPublicado === "publicado" && !c.publicado) return false;
+          if (filterPublicado === "borrador" && c.publicado) return false;
+          return true;
+        }).length}
+      />
+
       <Section title={loading ? "Cargando…" : `${items.length} casos`}>
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
@@ -252,7 +273,12 @@ export default function StudioCasesPage() {
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
-            {items.map(c => {
+            {items.filter((c) => {
+              if (searchQ.trim()) { const q = searchQ.toLowerCase(); if (!((c.titulo + " " + c.cliente + " " + c.vertical).toLowerCase().includes(q))) return false; }
+              if (filterPublicado === "publicado" && !c.publicado) return false;
+              if (filterPublicado === "borrador" && c.publicado) return false;
+              return true;
+            }).map(c => {
               const coverSrc = resolveCaseStudyImageUrl(c.imageUrl);
               return (
               <article key={c.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
