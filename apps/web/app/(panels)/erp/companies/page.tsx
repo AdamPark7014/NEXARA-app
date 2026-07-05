@@ -10,6 +10,8 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface CompanyProfile {
   id: number;
@@ -42,6 +44,8 @@ export default function CompaniesPage() {
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<CompanyProfile[]>([]);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterActive, setFilterActive] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -104,6 +108,21 @@ export default function CompaniesPage() {
     } catch (e) { setActionErr(e instanceof Error ? e.message : "Error en la operación"); }
   };
 
+  const visibleItems = useMemo(() => {
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((c) =>
+        (c.legalName ?? "").toLowerCase().includes(q) ||
+        (c.tradeName ?? "").toLowerCase().includes(q) ||
+        (c.rfc ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterActive === "active") rows = rows.filter((c) => c.isActive);
+    if (filterActive === "inactive") rows = rows.filter((c) => !c.isActive);
+    return rows;
+  }, [items, searchQ, filterActive]);
+
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
 
   const columns: Column<CompanyProfile>[] = [
@@ -159,10 +178,34 @@ export default function CompaniesPage() {
           <button type="button" onClick={() => setActionErr(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
         </div>
       )}
-      <Section title={loading ? "Cargando…" : `${items.length} empresas`}>
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por razón social, nombre comercial o RFC…" }}
+        selects={[{
+          label: "Estado",
+          value: filterActive,
+          onChange: setFilterActive,
+          options: [
+            { value: "active", label: "Activa" },
+            { value: "inactive", label: "Inactiva" },
+          ],
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setFilterActive(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "legalName", label: "Razón social" },
+            { key: "tradeName", label: "Nombre comercial" },
+            { key: "rfc", label: "RFC" },
+            { key: "contactEmail", label: "Email" },
+            { key: "isActive", label: "Estado", format: (v) => v ? "Activa" : "Inactiva" },
+          ], "empresas")}>CSV</Button>
+        ) : undefined}
+      />
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} empresas`}>
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando empresas registradas." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && <DataTable columns={columns} rows={items} rowKey={(c) => c.id} emptyTitle="Sin empresas" emptyDescription="Registra la primera razón social." />}
+        {!loading && !error && <DataTable columns={columns} rows={visibleItems} rowKey={(c) => c.id} emptyTitle="Sin empresas" emptyDescription="Registra la primera razón social." />}
       </Section>
 
       {showForm && (

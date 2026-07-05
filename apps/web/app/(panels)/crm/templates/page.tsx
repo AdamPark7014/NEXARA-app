@@ -11,6 +11,8 @@ import { buildApiUrl } from "@/lib/api-base";
 import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface OrderTemplate {
   id: number;
@@ -58,6 +60,7 @@ export default function TemplatesPage() {
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<OrderTemplate[]>([]);
+  const [searchQ, setSearchQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -185,6 +188,16 @@ export default function TemplatesPage() {
     }] : []),
   ];
 
+  const visibleItems = useMemo(() => {
+    if (!searchQ.trim()) return items;
+    const q = searchQ.toLowerCase();
+    return items.filter((t) =>
+      (t.name ?? "").toLowerCase().includes(q) ||
+      (t.companyName ?? "").toLowerCase().includes(q) ||
+      (t.description ?? "").toLowerCase().includes(q)
+    );
+  }, [items, searchQ]);
+
   if (!cfg.canAccess) return null;
 
   return (
@@ -209,14 +222,28 @@ export default function TemplatesPage() {
           <button type="button" onClick={() => setActionErr(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
         </div>
       )}
-      <Section title={loading ? "Cargando…" : `${items.length} plantilla${items.length === 1 ? "" : "s"}`}>
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar plantilla o empresa…" }}
+        onClear={() => setSearchQ("")}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "name", label: "Plantilla" },
+            { key: "companyName", label: "Empresa" },
+            { key: "companyEmail", label: "Email" },
+            { key: "companyRfc", label: "RFC" },
+            { key: "isDefault", label: "Predeterminada", format: (v) => v ? "Sí" : "No" },
+          ], "plantillas-cotizacion")}>CSV</Button>
+        ) : undefined}
+      />
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} plantilla${visibleItems.length === 1 ? "" : "s"}`}>
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando plantillas de cotización." />}
         {!loading && error && (
           <EmptyState icon="⚠️" title="No se pudo cargar" description={error}
             action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
         )}
         {!loading && !error && (
-          <DataTable columns={columns} rows={items} rowKey={(t) => t.id}
+          <DataTable columns={columns} rows={visibleItems} rowKey={(t) => t.id}
             emptyTitle="Sin plantillas" emptyDescription="Crea la primera plantilla de cotización para PDF." />
         )}
       </Section>
