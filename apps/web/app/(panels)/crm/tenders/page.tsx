@@ -13,6 +13,8 @@ import { buildApiUrl } from "@/lib/api-base";
 import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface Tender {
   id: number;
@@ -62,6 +64,8 @@ export default function TendersPage() {
 
   const [items, setItems] = useState<Tender[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
@@ -175,10 +179,22 @@ export default function TendersPage() {
     .reduce((s, t) => s + Number(t.ourBidAmount || t.budgetCeiling), 0);
 
   const visibleItems = useMemo(() => {
-    if (!highlightId) return items;
-    const id = Number(highlightId);
-    return Number.isNaN(id) ? items : [...items].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
-  }, [items, highlightId]);
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((t) =>
+        (t.title ?? "").toLowerCase().includes(q) ||
+        (t.conveningEntity ?? "").toLowerCase().includes(q) ||
+        (t.tenderNumber ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterStatus) rows = rows.filter((t) => t.status === filterStatus);
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
+    return rows;
+  }, [items, highlightId, searchQ, filterStatus]);
 
   const columns: Column<Tender>[] = [
     { key: "tenderNumber", label: "Folio", render: (t) => <code style={{ fontSize: 11.5 }}>{t.tenderNumber}</code>, width: 120 },
@@ -253,6 +269,30 @@ export default function TendersPage() {
           <button type="button" onClick={() => setActionErr(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
         </div>
       )}
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por título, convocante o folio…" }}
+        selects={[{
+          label: "Estado",
+          value: filterStatus,
+          onChange: setFilterStatus,
+          options: STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] ?? s })),
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setFilterStatus(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "tenderNumber", label: "Folio" },
+            { key: "title", label: "Título" },
+            { key: "conveningEntity", label: "Convocante" },
+            { key: "status", label: "Estado", format: (v) => STATUS_LABELS[String(v ?? "")] ?? String(v ?? "") },
+            { key: "ourBidAmount", label: "Propuesta" },
+            { key: "budgetCeiling", label: "Presupuesto base" },
+            { key: "submissionDeadline", label: "Cierre", format: (v) => v ? String(v).slice(0, 10) : "" },
+          ], "licitaciones")}>CSV</Button>
+        ) : undefined}
+      />
+
       <Section title={loading ? "Cargando…" : `${visibleItems.length} licitaciones`}>
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando licitaciones." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
