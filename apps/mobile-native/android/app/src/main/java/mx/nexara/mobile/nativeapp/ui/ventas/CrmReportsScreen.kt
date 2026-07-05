@@ -73,9 +73,16 @@ class CrmReportsViewModel(app: Application) : AndroidViewModel(app) {
 fun CrmReportsScreen(mode: CrmReportMode) {
     val vm: CrmReportsViewModel = viewModel()
     val state by vm.state.collectAsState()
+    var selectedVendor by remember { mutableStateOf<Map<String, Any?>?>(null) }
 
     LaunchedEffect(Unit) {
         if (state.metrics.isEmpty() && state.loading) vm.load()
+    }
+
+    val sel = selectedVendor
+    if (sel != null) {
+        VendorDetail(sel, onBack = { selectedVendor = null })
+        return
     }
 
     LazyColumn(
@@ -116,7 +123,7 @@ fun CrmReportsScreen(mode: CrmReportMode) {
                 if (state.vendors.isNotEmpty()) {
                     item { SectionTitle("Equipo de ventas", "${state.vendors.size} vendedores") }
                     items(state.vendors, key = { mapStr(it, "userId", "id") }) { v ->
-                        VendorCard(v)
+                        VendorCard(v, onClick = { selectedVendor = v })
                     }
                 }
             }
@@ -130,13 +137,89 @@ fun CrmReportsScreen(mode: CrmReportMode) {
                 } else {
                     item { SectionTitle("Ranking", periodLabel(state.period)) }
                     items(state.vendors.sortedByDescending { mapDouble(it, "revenue") ?: 0.0 }) { v ->
-                        VendorCard(v, showQuota = true)
+                        VendorCard(v, showQuota = true, onClick = { selectedVendor = v })
                     }
                 }
             }
         }
 
         item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun VendorDetail(v: Map<String, Any?>, onBack: () -> Unit) {
+    val name    = mapStr(v, "userName", "nombre", "name").ifBlank { "Vendedor" }
+    val revenue = mapDouble(v, "revenue") ?: 0.0
+    val target  = mapDouble(v, "targetRevenue") ?: 0.0
+    val att     = mapDouble(v, "attainmentRevenue") ?: 0.0
+    val status  = mapStr(v, "status")
+    val statusColor = when (status) {
+        "on-track" -> Color(0xFF059669); "risk" -> Color(0xFFF59E0B); "off-track" -> Color(0xFFEF4444)
+        else -> Color(0xFF64748B)
+    }
+    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item {
+            TextButton(onClick = onBack) { Text("← Reportes") }
+        }
+        item {
+            Text(name, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
+            if (status.isNotBlank()) {
+                Text(
+                    status.replace("-", " ").replaceFirstChar { it.uppercase() },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = statusColor,
+                    modifier = Modifier.background(statusColor.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
+        }
+        item {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(1.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Ventas", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold))
+                    vRow("Ingresos",     fmtMxn(revenue))
+                    vRow("Meta",         fmtMxn(target))
+                    if (target > 0) vRow("Cumplimiento", fmtPct(att))
+                    vRow("Oportunidades", "${mapInt(v, "opportunities")}")
+                    vRow("Proyectos",    "${mapInt(v, "projects")}")
+                    vRow("Leads",        "${mapInt(v, "leads")}")
+                    vRow("Actividades",  "${mapInt(v, "activities")}")
+                    mapDouble(v, "performance")?.let { vRow("Performance",   fmtPct(it)) }
+                    vRow("Email",        mapStr(v, "email"))
+                    vRow("Rol",          mapStr(v, "role", "rol"))
+                }
+            }
+        }
+        if (target > 0) {
+            item {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(1.dp)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Cuota", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold))
+                        LinearProgressIndicator(
+                            progress = { (att / 100.0).toFloat().coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth(),
+                            color = statusColor,
+                        )
+                        Text("${fmtPct(att)} de ${fmtMxn(target)}", style = MaterialTheme.typography.bodySmall, color = statusColor)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun vRow(label: String, value: String) {
+    if (value.isNotBlank() && value != "0" && value != "MXN$0") {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+            Text(value, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium))
+        }
     }
 }
 
@@ -246,7 +329,7 @@ private fun MetricCard(modifier: Modifier, label: String, value: String, accent:
 }
 
 @Composable
-private fun VendorCard(vendor: Map<String, Any?>, showQuota: Boolean = false) {
+private fun VendorCard(vendor: Map<String, Any?>, showQuota: Boolean = false, onClick: () -> Unit = {}) {
     val name = mapStr(vendor, "userName", "nombre", "name").ifBlank { "Vendedor" }
     val revenue = mapDouble(vendor, "revenue") ?: 0.0
     val status = mapStr(vendor, "status")
@@ -260,6 +343,7 @@ private fun VendorCard(vendor: Map<String, Any?>, showQuota: Boolean = false) {
     }
 
     Card(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
