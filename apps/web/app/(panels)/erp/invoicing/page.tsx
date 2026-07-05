@@ -8,6 +8,8 @@ import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import { useUser } from "@/components/UserContext";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
@@ -110,8 +112,20 @@ export default function InvoicingPage() {
       .catch(() => setPacInfo(null));
   }, [token]);
 
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+
   const visibleItems = useMemo(() => {
     let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((f) =>
+        (f.invoiceNumber ?? "").toLowerCase().includes(q) ||
+        (f.receptorName ?? "").toLowerCase().includes(q) ||
+        (f.emisorName ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterStatus) rows = rows.filter((f) => f.status === filterStatus);
     if (highlightId) {
       const id = Number(highlightId);
       if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
@@ -121,7 +135,7 @@ export default function InvoicingPage() {
       rows = rows.filter((f) => f.invoiceNumber.toLowerCase().includes(ref));
     }
     return rows;
-  }, [items, highlightId, invoiceRef]);
+  }, [items, highlightId, invoiceRef, searchQ, filterStatus]);
 
   useEffect(() => {
     if (!showForm || !token) return;
@@ -348,11 +362,6 @@ export default function InvoicingPage() {
               <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva factura</Button>
             )}
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}>
-              <option value="">Todos los tipos</option>
-              <option value="INCOME">Ingresos</option>
-              <option value="EXPENSE">Egresos</option>
-            </select>
           </>
         }
       />
@@ -463,6 +472,44 @@ export default function InvoicingPage() {
           </div>
         </div>
       )}
+
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por folio o cliente…" }}
+        selects={[
+          {
+            label: "Tipo",
+            value: filter,
+            onChange: (v) => setFilter(v as typeof filter),
+            options: [{ value: "INCOME", label: "Ingresos" }, { value: "EXPENSE", label: "Egresos" }],
+            allowAll: true, allLabel: "Todos los tipos",
+          },
+          {
+            label: "Estado",
+            value: filterStatus,
+            onChange: setFilterStatus,
+            options: [
+              { value: "DRAFT", label: "Borrador" },
+              { value: "SENT", label: "Enviada" },
+              { value: "PARTIALLY_PAID", label: "Pago parcial" },
+              { value: "PAID", label: "Pagada" },
+              { value: "OVERDUE", label: "Vencida" },
+              { value: "CANCELLED", label: "Cancelada" },
+            ],
+            allowAll: true,
+          },
+        ]}
+        onClear={() => { setSearchQ(""); setFilter(""); setFilterStatus(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "invoiceNumber", label: "Folio" },
+            { key: "receptorName", label: "Cliente/Receptor", format: (v) => v ? String(v) : "—" },
+            { key: "totalAmount", label: "Total" },
+            { key: "status", label: "Estado" },
+            { key: "issueDate", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
+          ], "facturas")}>CSV</Button>
+        ) : undefined}
+      />
 
       <Section title={loading ? "Cargando…" : `${visibleItems.length} CFDI`}>
         {(highlightId || invoiceRef) && (

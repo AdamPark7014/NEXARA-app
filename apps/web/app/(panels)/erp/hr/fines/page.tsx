@@ -14,6 +14,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface HrStaff {
   id: number;
@@ -322,7 +323,23 @@ export default function FinesPage() {
         eyebrow="ERP · Personas"
         title={viewCfg.title}
         subtitle={viewCfg.subtitle}
-        actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva sanción</Button> : undefined}
+        actions={
+          <div style={{ display: "flex", gap: 8 }}>
+            {visibleItems.length > 0 && (
+              <Button variant="ghost" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+                { key: "id", label: "ID" },
+                { key: "usuario", label: "Empleado", format: (v) => (v as Fine["usuario"])?.nombre ?? "—" },
+                { key: "razon", label: "Motivo" },
+                { key: "descripcion", label: "Descripción" },
+                { key: "monto", label: "Monto ($)" },
+                { key: "estatusPago", label: "Estado pago" },
+                { key: "estatusAprobacion", label: "Autorización" },
+                { key: "fechaCreacion", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
+              ], "sanciones")}>Exportar CSV</Button>
+            )}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva sanción</Button>}
+          </div>
+        }
       />
 
       {showForm && (
