@@ -13,6 +13,8 @@ import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface JournalEntry {
   id: number;
@@ -57,6 +59,8 @@ export default function AccountingPage() {
   const highlightId = searchParams.get("highlight");
 
   const [items, setItems] = useState<JournalEntry[]>([]);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterTipo, setFilterTipo] = useState("");
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -185,11 +189,22 @@ export default function AccountingPage() {
   const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box" };
 
   const visibleItems = useMemo(() => {
-    if (!highlightId) return items;
-    const id = Number(highlightId);
-    if (Number.isNaN(id)) return items;
-    return [...items].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
-  }, [items, highlightId]);
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((e) =>
+        (e.description ?? "").toLowerCase().includes(q) ||
+        (e.reference ?? "").toLowerCase().includes(q) ||
+        (e.createdBy?.nombre ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterTipo) rows = rows.filter((e) => e.type === filterTipo);
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
+    return rows;
+  }, [items, highlightId, searchQ, filterTipo]);
 
   const columns: Column<JournalEntry>[] = [
     { key: "reference", label: "Referencia", render: e => <code style={{ fontSize: 11.5 }}>{e.reference ?? `P-${e.id}`}</code>, width: 130 },
@@ -290,6 +305,30 @@ export default function AccountingPage() {
           </div>
         </div>
       )}
+
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por concepto, referencia o usuario…" }}
+        selects={[{
+          label: "Tipo",
+          value: filterTipo,
+          onChange: setFilterTipo,
+          options: TIPOS.map((t) => ({ value: t, label: t })),
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setFilterTipo(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "reference", label: "Referencia", format: (v, e) => String(v ?? `P-${e.id}`) },
+            { key: "description", label: "Concepto" },
+            { key: "type", label: "Tipo" },
+            { key: "totalDebit", label: "Cargo" },
+            { key: "totalCredit", label: "Abono" },
+            { key: "status", label: "Estado" },
+            { key: "date", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
+          ], "polizas-contables")}>CSV</Button>
+        ) : undefined}
+      />
 
       <Section title={loading ? "Cargando…" : `${visibleItems.length} pólizas`}>
         {highlightId && (

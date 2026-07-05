@@ -12,6 +12,8 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface Performance {
   targetId: number;
@@ -39,6 +41,7 @@ export default function TeamPage() {
   const token = user?.token ?? "";
 
   const [rows, setRows] = useState<Performance[]>([]);
+  const [searchQ, setSearchQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,6 +67,12 @@ export default function TeamPage() {
     withBonus: rows.filter((r) => r.reachedBonus).length,
     avgAttainment: rows.length > 0 ? Math.round(rows.reduce((s, r) => s + r.attainmentPct, 0) / rows.length) : 0,
   }), [rows]);
+
+  const visibleRows = useMemo(() => {
+    if (!searchQ.trim()) return rows;
+    const q = searchQ.toLowerCase();
+    return rows.filter((r) => (r.ownerName ?? "").toLowerCase().includes(q));
+  }, [rows, searchQ]);
 
   const columns: Column<Performance>[] = [
     {
@@ -106,10 +115,25 @@ export default function TeamPage() {
         </div>
       )}
 
-      <Section title={loading ? "Cargando…" : `${rows.length} ejecutivos`}>
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar ejecutivo…" }}
+        onClear={() => setSearchQ("")}
+        resultCount={loading ? null : visibleRows.length}
+        rightActions={rows.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleRows, [
+            { key: "ownerName", label: "Ejecutivo" },
+            { key: "opportunitiesCreated", label: "Oportunidades" },
+            { key: "newClientsAchieved", label: "Clientes nuevos" },
+            { key: "revenueAchieved", label: "Vendido" },
+            { key: "attainmentPct", label: "% Cuota", format: (v) => `${v}%` },
+            { key: "reachedBonus", label: "Bono", format: (v) => v ? "Sí" : "No" },
+          ], "equipo-ventas")}>CSV</Button>
+        ) : undefined}
+      />
+      <Section title={loading ? "Cargando…" : `${visibleRows.length} ejecutivos`}>
         {loading && <EmptyState icon="⏳" title="Cargando ranking…" description="Calculando desempeño del equipo." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && <DataTable columns={columns} rows={rows} rowKey={(p) => p.ownerId} emptyTitle="Sin ejecutivos de ventas" emptyDescription="Asigna el rol vendedor o acceso al panel de ventas, y opcionalmente cuotas en Cuotas y metas." />}
+        {!loading && !error && <DataTable columns={columns} rows={visibleRows} rowKey={(p) => p.ownerId} emptyTitle="Sin ejecutivos de ventas" emptyDescription="Asigna el rol vendedor o acceso al panel de ventas, y opcionalmente cuotas en Cuotas y metas." />}
       </Section>
     </>
   );

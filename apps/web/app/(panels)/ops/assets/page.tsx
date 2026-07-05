@@ -14,6 +14,8 @@ import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { getActivitiesCanonicalPath, resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface Snapshot {
   id: number;
@@ -61,6 +63,8 @@ export default function AssetsPage() {
   }, [user, router]);
 
   const [items, setItems] = useState<Snapshot[]>([]);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -159,6 +163,20 @@ export default function AssetsPage() {
       toast.error(e instanceof Error ? e.message : "No se pudo registrar el inventario");
     } finally { setSaving(false); }
   };
+
+  const visibleItems = useMemo(() => {
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((s) =>
+        (s.client?.name ?? "").toLowerCase().includes(q) ||
+        (s.title ?? "").toLowerCase().includes(q) ||
+        (s.branch?.name ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterStatus) rows = rows.filter((s) => s.status === filterStatus);
+    return rows;
+  }, [items, searchQ, filterStatus]);
 
   const pendientes = items.filter((i) => i.status === "PENDING").length;
   const conDiferencia = items.filter((i) => (i.deltaCount ?? 0) !== 0).length;
@@ -275,10 +293,36 @@ export default function AssetsPage() {
         <KpiCard label="Con diferencia detectada" value={conDiferencia} variant={conDiferencia > 0 ? "danger" : "positive"} icon="⚠️" />
       </div>
 
-      <Section title={loading ? "Cargando…" : `${items.length} inventarios`}>
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por cliente, sucursal o título…" }}
+        selects={[{
+          label: "Estado",
+          value: filterStatus,
+          onChange: setFilterStatus,
+          options: [
+            { value: "PENDING", label: "Pendiente" },
+            { value: "COMPLETED", label: "Completado" },
+          ],
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setFilterStatus(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "client", label: "Cliente", format: (v) => (v as Snapshot["client"])?.name ?? "—" },
+            { key: "branch", label: "Sucursal", format: (v) => (v as Snapshot["branch"])?.name ?? "—" },
+            { key: "title", label: "Título" },
+            { key: "currentCount", label: "Equipo actual" },
+            { key: "deltaCount", label: "Diferencia" },
+            { key: "status", label: "Estado" },
+            { key: "updatedAt", label: "Actualizado", format: (v) => v ? String(v).slice(0, 10) : "" },
+          ], "inventarios-campo")}>CSV</Button>
+        ) : undefined}
+      />
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} inventarios`}>
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando inventarios de campo." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && <DataTable columns={columns} rows={items} rowKey={(s) => s.id} emptyTitle="Sin inventarios" emptyDescription={cfg.canCreate ? "Registra el primer inventario con el botón de arriba." : "Los inventarios se generan desde visitas de mantenimiento."} />}
+        {!loading && !error && <DataTable columns={columns} rows={visibleItems} rowKey={(s) => s.id} emptyTitle="Sin inventarios" emptyDescription={cfg.canCreate ? "Registra el primer inventario con el botón de arriba." : "Los inventarios se generan desde visitas de mantenimiento."} />}
       </Section>
     </>
   );
