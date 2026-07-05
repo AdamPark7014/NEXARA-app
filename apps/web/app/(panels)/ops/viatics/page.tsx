@@ -22,6 +22,8 @@ import {
   viaticoEstatusVariant,
   type ViaticoRow,
 } from "@/lib/viatics-display";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 async function apiFetch(path: string, token: string, opts?: RequestInit) {
   const res = await fetch(buildApiUrl(path), {
@@ -43,6 +45,8 @@ export default function OpsViaticsPage() {
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<ViaticoRow[]>([]);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterEstatus, setFilterEstatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ViaticoRow | null>(null);
@@ -102,11 +106,21 @@ export default function OpsViaticsPage() {
     .reduce((s, v) => s + (v.montoSolicitado ?? 0), 0);
 
   const visibleItems = useMemo(() => {
-    if (!highlightId) return items;
-    const id = Number(highlightId);
-    if (Number.isNaN(id)) return items;
-    return [...items].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
-  }, [items, highlightId]);
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((v) =>
+        (v.concepto ?? "").toLowerCase().includes(q) ||
+        (v.usuario?.nombre ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterEstatus) rows = rows.filter((v) => v.estatus === filterEstatus);
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
+    return rows;
+  }, [items, highlightId, searchQ, filterEstatus]);
 
   const columns: Column<ViaticoRow>[] = [
     { key: "id", label: "ID", render: (v) => <Tag variant="accent">V-{v.id}</Tag>, width: 80 },
@@ -186,6 +200,35 @@ export default function OpsViaticsPage() {
           {actionErr}
         </div>
       )}
+
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por concepto o ingeniero…" }}
+        selects={[{
+          label: "Estado",
+          value: filterEstatus,
+          onChange: setFilterEstatus,
+          options: [
+            { value: "Pendiente", label: "Pendiente" },
+            { value: "Pre-aprobado", label: "Pre-aprobado" },
+            { value: "Aprobado", label: "Aprobado" },
+            { value: "Rechazado", label: "Rechazado" },
+            { value: "Pagado", label: "Pagado" },
+          ],
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setFilterEstatus(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "id", label: "ID" },
+            { key: "concepto", label: "Concepto" },
+            { key: "usuario", label: "Ingeniero", format: (v) => (v as ViaticoRow["usuario"])?.nombre ?? "—" },
+            { key: "montoSolicitado", label: "Monto" },
+            { key: "estatus", label: "Estado" },
+            { key: "fechaSolicitud", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
+          ], "viaticos-campo")}>CSV</Button>
+        ) : undefined}
+      />
 
       <Section title={loading ? "Cargando…" : `${visibleItems.length} viáticos`}>
         {highlightId && (

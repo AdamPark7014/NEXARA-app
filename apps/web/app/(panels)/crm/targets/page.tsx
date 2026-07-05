@@ -12,6 +12,8 @@ import { buildApiUrl } from "@/lib/api-base";
 import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface Performance {
   targetId: number;
@@ -57,6 +59,7 @@ export default function TargetsPage() {
   const [users, setUsers] = useState<ApiUserLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
@@ -106,6 +109,13 @@ export default function TargetsPage() {
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
 
+  const visiblePerf = useMemo(() => {
+    if (!perf) return [];
+    if (!searchQ.trim()) return perf.performance;
+    const q = searchQ.toLowerCase();
+    return perf.performance.filter((p) => (p.ownerName ?? "").toLowerCase().includes(q));
+  }, [perf, searchQ]);
+
   const columns: Column<Performance>[] = [
     { key: "ownerName", label: "Ejecutivo" },
     { key: "revenueTarget", label: "Meta", render: (p) => <Money value={p.revenueTarget} />, width: 120 },
@@ -144,8 +154,22 @@ export default function TargetsPage() {
             <KpiCard label="Cumplimiento promedio" value={`${perf.totals.avgAttainmentPct}%`} variant={perf.totals.avgAttainmentPct >= 100 ? "positive" : perf.totals.avgAttainmentPct >= 60 ? "warning" : "danger"} icon="📊" />
             <KpiCard label="Comisiones del mes" value={<Money value={perf.totals.totalCommissions} compact />} icon="💰" variant="accent" hint="Comisiones generadas" />
           </div>
+          <FilterToolbar
+            search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar ejecutivo…" }}
+            onClear={() => setSearchQ("")}
+            resultCount={visiblePerf.length}
+            rightActions={perf.performance.length > 0 ? (
+              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visiblePerf, [
+                { key: "ownerName", label: "Ejecutivo" },
+                { key: "revenueTarget", label: "Meta" },
+                { key: "revenueAchieved", label: "Logrado" },
+                { key: "attainmentPct", label: "% Cumplimiento", format: (v) => `${v}%` },
+                { key: "commission", label: "Comisión" },
+              ], "cuotas-equipo")}>CSV</Button>
+            ) : undefined}
+          />
           <Section title={`Cuotas · ${perf.year}-${String(perf.performance[0]?.month ?? now.getMonth() + 1).padStart(2, "0")}`}>
-            <DataTable columns={columns} rows={perf.performance} rowKey={(p) => p.targetId} emptyTitle="Sin cuotas asignadas" emptyDescription="Crea la primera cuota del mes para tu equipo." />
+            <DataTable columns={columns} rows={visiblePerf} rowKey={(p) => p.targetId} emptyTitle="Sin cuotas asignadas" emptyDescription="Crea la primera cuota del mes para tu equipo." />
           </Section>
         </>
       )}
