@@ -13,6 +13,8 @@ import { getErpInventorySectionConfig } from "@/lib/section-views";
 import { listStockLevels, mapStockLevelToRow, updateStockLevelConfig, listWarehouses, listCatalogProducts, createStockMovement } from "@/lib/stock-api";
 import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 type StockRow = ReturnType<typeof mapStockLevelToRow>;
 
@@ -26,6 +28,8 @@ export default function WarehousePage() {
 
   const [items, setItems] = useState<StockRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterEstado, setFilterEstado] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showMovementForm, setShowMovementForm] = useState(false);
@@ -142,11 +146,24 @@ export default function WarehousePage() {
     s.existencia === 0 ? "danger" : s.existencia < s.minimo ? "warning" : "neutral";
 
   const visibleItems = useMemo(() => {
-    if (!productFilter) return items;
-    const pid = Number(productFilter);
-    if (Number.isNaN(pid)) return items;
-    return items.filter((s) => s.productId === pid);
-  }, [items, productFilter]);
+    let rows = items;
+    if (productFilter) {
+      const pid = Number(productFilter);
+      if (!Number.isNaN(pid)) rows = rows.filter((s) => s.productId === pid);
+    }
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((s) =>
+        (s.nombre ?? "").toLowerCase().includes(q) ||
+        (s.sku ?? "").toLowerCase().includes(q) ||
+        (s.categoria ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterEstado === "sin_stock") rows = rows.filter((s) => s.existencia === 0);
+    else if (filterEstado === "bajo_minimo") rows = rows.filter((s) => s.existencia > 0 && s.existencia < s.minimo);
+    else if (filterEstado === "ok") rows = rows.filter((s) => s.existencia >= s.minimo);
+    return rows;
+  }, [items, productFilter, searchQ, filterEstado]);
 
   const inp: React.CSSProperties = {
     width: "100%",
@@ -330,6 +347,34 @@ export default function WarehousePage() {
           </div>
         </div>
       )}
+
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por SKU, nombre o categoría…" }}
+        selects={[{
+          label: "Estado",
+          value: filterEstado,
+          onChange: setFilterEstado,
+          options: [
+            { value: "sin_stock", label: "Sin stock" },
+            { value: "bajo_minimo", label: "Bajo mínimo" },
+            { value: "ok", label: "Stock OK" },
+          ],
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setFilterEstado(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "sku", label: "SKU" },
+            { key: "nombre", label: "Producto" },
+            { key: "categoria", label: "Categoría" },
+            { key: "existencia", label: "Stock" },
+            { key: "minimo", label: "Mínimo" },
+            { key: "costo", label: "Precio ref." },
+            { key: "ubicacion", label: "Ubicación" },
+          ], "inventario")}>CSV</Button>
+        ) : undefined}
+      />
 
       <Section title={loading ? "Cargando…" : `${visibleItems.length} registros de stock`}>
         {productFilter && (

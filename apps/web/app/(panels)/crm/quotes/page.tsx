@@ -12,6 +12,8 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
 import { formatQuoteStatus, listSalesQuotes, createSalesQuote, listSalesClients, type SalesQuote, type SalesClient } from "@/lib/sales-api";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 // ─── Inline styles ────────────────────────────────────────────────────────────
 
@@ -55,6 +57,8 @@ export default function QuotesPage() {
   const [items, setItems] = useState<SalesQuote[]>([]);
   const [clients, setClients] = useState<SalesClient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -145,10 +149,23 @@ export default function QuotesPage() {
   };
 
   const highlighted = useMemo(() => {
-    if (!highlightId) return items;
-    const id = Number(highlightId);
-    return [...items].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
-  }, [items, highlightId]);
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((qt) =>
+        (qt.quoteNumber ?? "").toLowerCase().includes(q) ||
+        (qt.clientCompany ?? "").toLowerCase().includes(q) ||
+        (qt.clientName ?? "").toLowerCase().includes(q) ||
+        (qt.projectName ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterStatus) rows = rows.filter((qt) => qt.status === filterStatus);
+    if (highlightId) {
+      const id = Number(highlightId);
+      rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
+    return rows;
+  }, [items, highlightId, searchQ, filterStatus]);
 
   const fmtMXN = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -326,7 +343,37 @@ export default function QuotesPage() {
         </div>
       )}
 
-      <Section title={loading ? "Cargando…" : `${items.length} cotización${items.length === 1 ? "" : "es"}`}>
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por folio, cliente o proyecto…" }}
+        selects={[{
+          label: "Estado",
+          value: filterStatus,
+          onChange: setFilterStatus,
+          options: [
+            { value: "DRAFT", label: "Borrador" },
+            { value: "SENT", label: "Enviada" },
+            { value: "APPROVED", label: "Aprobada" },
+            { value: "REJECTED", label: "Rechazada" },
+            { value: "EXPIRED", label: "Vencida" },
+          ],
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setFilterStatus(""); }}
+        resultCount={loading ? null : highlighted.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(highlighted, [
+            { key: "quoteNumber", label: "Folio" },
+            { key: "clientCompany", label: "Cliente" },
+            { key: "projectName", label: "Proyecto" },
+            { key: "total", label: "Total" },
+            { key: "status", label: "Estado", format: (v) => formatStatus(String(v ?? "")) },
+            { key: "issueDate", label: "Emisión", format: (v) => v ? String(v).slice(0, 10) : "" },
+            { key: "validUntil", label: "Vigencia", format: (v) => v ? String(v).slice(0, 10) : "" },
+          ], "cotizaciones")}>CSV</Button>
+        ) : undefined}
+      />
+
+      <Section title={loading ? "Cargando…" : `${highlighted.length} cotización${highlighted.length === 1 ? "" : "es"}`}>
         {loading && <EmptyState icon="⏳" title="Cargando cotizaciones…" description="Consultando documentos." />}
         {!loading && loadError && (
           <EmptyState icon="⚠️" title="No se pudo cargar" description={loadError} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
