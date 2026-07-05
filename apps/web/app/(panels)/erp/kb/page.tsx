@@ -11,6 +11,8 @@ import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface KbCategory { id: number; name: string; slug: string }
 interface KbArticle {
@@ -56,6 +58,8 @@ export default function KbPage() {
   const [loadingEdit, setLoadingEdit] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterVisibility, setFilterVisibility] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -75,10 +79,15 @@ export default function KbPage() {
   useEffect(() => { void load(); }, [load]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return articles;
-    return articles.filter((a) => a.title.toLowerCase().includes(q) || (a.tags ?? "").toLowerCase().includes(q));
-  }, [articles, search]);
+    let rows = articles;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      rows = rows.filter((a) => a.title.toLowerCase().includes(q) || (a.tags ?? "").toLowerCase().includes(q));
+    }
+    if (filterStatus) rows = rows.filter((a) => a.status === filterStatus);
+    if (filterVisibility) rows = rows.filter((a) => a.visibility === filterVisibility);
+    return rows;
+  }, [articles, search, filterStatus, filterVisibility]);
 
   const openNew = () => {
     setEditing(null);
@@ -210,9 +219,44 @@ export default function KbPage() {
         }
       />
 
-      <div style={{ marginBottom: 12 }}>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por título o tag…" style={{ width: "100%", maxWidth: 400, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }} />
-      </div>
+      <FilterToolbar
+        search={{ value: search, onChange: setSearch, placeholder: "Buscar por título o tag…" }}
+        selects={[
+          {
+            label: "Estado",
+            value: filterStatus,
+            onChange: setFilterStatus,
+            options: [
+              { value: "PUBLISHED", label: "Publicado" },
+              { value: "DRAFT", label: "Borrador" },
+            ],
+            allowAll: true,
+          },
+          {
+            label: "Visibilidad",
+            value: filterVisibility,
+            onChange: setFilterVisibility,
+            options: [
+              { value: "INTERNAL", label: "Interno" },
+              { value: "RESTRICTED", label: "Dirección" },
+              { value: "PUBLIC", label: "Público" },
+            ],
+            allowAll: true,
+          },
+        ]}
+        onClear={() => { setSearch(""); setFilterStatus(""); setFilterVisibility(""); }}
+        resultCount={loading ? null : filtered.length}
+        rightActions={articles.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(filtered, [
+            { key: "title", label: "Título" },
+            { key: "category", label: "Categoría", format: (v) => (v as KbArticle["category"])?.name ?? "—" },
+            { key: "status", label: "Estado" },
+            { key: "visibility", label: "Visibilidad" },
+            { key: "viewCount", label: "Vistas" },
+            { key: "tags", label: "Tags" },
+          ], "knowledge-base")}>CSV</Button>
+        ) : undefined}
+      />
 
       <Section title={loading ? "Cargando…" : `${filtered.length} artículos`}>
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando la base de conocimiento." />}

@@ -14,6 +14,8 @@ import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
 import { isViaticoPending, normalizeViaticoRow, viaticoEstatusVariant, type ViaticoRow } from "@/lib/viatics-display";
 import { patchViatico, postViatico } from "@/lib/viatics-api";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import FileDropzone from "@/components/ui/FileDropzone";
 
 async function apiFetch(path: string, token: string) {
@@ -32,6 +34,8 @@ export default function MyViaticsPage() {
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<ViaticoRow[]>([]);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterEstatus, setFilterEstatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
@@ -57,6 +61,16 @@ export default function MyViaticsPage() {
   }, [token]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const visibleItems = useMemo(() => {
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((v) => (v.concepto ?? "").toLowerCase().includes(q));
+    }
+    if (filterEstatus) rows = rows.filter((v) => v.estatus === filterEstatus);
+    return rows;
+  }, [items, searchQ, filterEstatus]);
 
   const pendiente = items.filter((v) => v.estatus !== "Rechazado" && v.estatus !== "Pagado").reduce((s, v) => s + (v.montoSolicitado ?? 0), 0);
   const pagado = items.filter((v) => v.estatus === "Pagado").reduce((s, v) => s + (v.montoSolicitado ?? 0), 0);
@@ -153,10 +167,36 @@ export default function MyViaticsPage() {
 
       {actionErr && <InlineAlert message={actionErr} onDismiss={() => setActionErr(null)} />}
 
-      <Section title={loading ? "Cargando…" : `${items.length} solicitudes`}>
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por concepto…" }}
+        selects={[{
+          label: "Estado",
+          value: filterEstatus,
+          onChange: setFilterEstatus,
+          options: [
+            { value: "Pendiente", label: "Pendiente" },
+            { value: "Pre-aprobado", label: "Pre-aprobado" },
+            { value: "Aprobado", label: "Aprobado" },
+            { value: "Rechazado", label: "Rechazado" },
+            { value: "Pagado", label: "Pagado" },
+          ],
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setFilterEstatus(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "concepto", label: "Concepto" },
+            { key: "montoSolicitado", label: "Monto" },
+            { key: "estatus", label: "Estado" },
+            { key: "fechaSolicitud", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
+          ], "mis-viaticos")}>CSV</Button>
+        ) : undefined}
+      />
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} solicitudes`}>
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando tus viáticos." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && <DataTable columns={columns} rows={items} rowKey={(v) => v.id} emptyTitle="Sin solicitudes" emptyDescription="Solicita tu primer viático con el botón de arriba." />}
+        {!loading && !error && <DataTable columns={columns} rows={visibleItems} rowKey={(v) => v.id} emptyTitle="Sin solicitudes" emptyDescription="Solicita tu primer viático con el botón de arriba." />}
       </Section>
 
       {showForm && (

@@ -12,6 +12,8 @@ import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface DocCategory { id: number; name: string }
 interface ManagedDoc {
@@ -56,6 +58,8 @@ export default function DocumentsPage() {
   const [formErr, setFormErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -75,10 +79,15 @@ export default function DocumentsPage() {
   useEffect(() => { void load(); }, [load]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return docs;
-    return docs.filter((d) => d.title.toLowerCase().includes(q) || d.documentNumber.toLowerCase().includes(q));
-  }, [docs, search]);
+    let rows = docs;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      rows = rows.filter((d) => d.title.toLowerCase().includes(q) || d.documentNumber.toLowerCase().includes(q));
+    }
+    if (filterStatus) rows = rows.filter((d) => d.status === filterStatus);
+    if (filterCategory) rows = rows.filter((d) => String(d.categoryId ?? "") === filterCategory);
+    return rows;
+  }, [docs, search, filterStatus, filterCategory]);
 
   const pendientes = docs.filter((d) => d.status === "PENDING_APPROVAL").length;
   const aprobados = docs.filter((d) => d.status === "APPROVED").length;
@@ -218,9 +227,41 @@ export default function DocumentsPage() {
         <KpiCard label="Aprobados" value={aprobados} variant="positive" icon="✅" />
       </div>
 
-      <div style={{ marginBottom: 12 }}>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por título o folio…" style={{ width: "100%", maxWidth: 400, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }} />
-      </div>
+      <FilterToolbar
+        search={{ value: search, onChange: setSearch, placeholder: "Buscar por título o folio…" }}
+        selects={[
+          {
+            label: "Estado",
+            value: filterStatus,
+            onChange: setFilterStatus,
+            options: [
+              { value: "DRAFT", label: "Borrador" },
+              { value: "PENDING_APPROVAL", label: "Pendiente aprobación" },
+              { value: "APPROVED", label: "Aprobado" },
+              { value: "ARCHIVED", label: "Archivado" },
+            ],
+            allowAll: true,
+          },
+          ...(cats.length > 0 ? [{
+            label: "Categoría",
+            value: filterCategory,
+            onChange: setFilterCategory,
+            options: cats.map((c) => ({ value: String(c.id), label: c.name })),
+            allowAll: true,
+          }] : []),
+        ]}
+        onClear={() => { setSearch(""); setFilterStatus(""); setFilterCategory(""); }}
+        resultCount={loading ? null : filtered.length}
+        rightActions={docs.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(filtered, [
+            { key: "documentNumber", label: "Folio" },
+            { key: "title", label: "Título" },
+            { key: "category", label: "Categoría", format: (v) => (v as ManagedDoc["category"])?.name ?? "—" },
+            { key: "status", label: "Estado", format: (v) => String(v ?? "").replace(/_/g, " ") },
+            { key: "createdAt", label: "Creado", format: (v) => v ? String(v).slice(0, 10) : "" },
+          ], "documentos")}>CSV</Button>
+        ) : undefined}
+      />
 
       <Section title={loading ? "Cargando…" : `${filtered.length} documentos`}>
         {loading && <EmptyState icon="⏳" title="Cargando documentos…" description="Consultando el repositorio." />}

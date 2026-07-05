@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import FilterToolbar from "@/components/FilterToolbar";
 
 interface Candidate {
   id: number;
@@ -75,6 +76,7 @@ export default function RecruitingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showRejected, setShowRejected] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
   // drag state
   const dragging = useRef<Candidate | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
@@ -135,12 +137,21 @@ export default function RecruitingPage() {
 
   // columns = active stages only; rejected shown separately if toggled
   const rejected = useMemo(() => items.filter(c => c.stage.endsWith("REJECTED")), [items]);
+  const filteredItems = useMemo(() => {
+    if (!searchQ.trim()) return items;
+    const q = searchQ.toLowerCase();
+    return items.filter((c) =>
+      (c.fullName ?? "").toLowerCase().includes(q) ||
+      (c.email ?? "").toLowerCase().includes(q) ||
+      (c.category ?? "").toLowerCase().includes(q)
+    );
+  }, [items, searchQ]);
   const byStage = useMemo(() => {
     const m: Record<string, Candidate[]> = {};
     for (const s of STAGES) m[s.key] = [];
-    for (const c of items) if (!c.stage.endsWith("REJECTED") && m[c.stage]) m[c.stage].push(c);
+    for (const c of filteredItems) if (!c.stage.endsWith("REJECTED") && m[c.stage]) m[c.stage].push(c);
     return m;
-  }, [items]);
+  }, [filteredItems]);
 
   const inp: React.CSSProperties = {
     width: "100%", padding: "8px 12px", borderRadius: 8,
@@ -182,6 +193,14 @@ export default function RecruitingPage() {
       {!loading && error && (
         <EmptyState icon="⚠️" title="No se pudo cargar" description={error}
           action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
+      )}
+
+      {!loading && !error && (
+        <FilterToolbar
+          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar candidato, email o categoría…" }}
+          onClear={() => setSearchQ("")}
+          resultCount={filteredItems.filter(c => !c.stage.endsWith("REJECTED")).length}
+        />
       )}
 
       {/* ── Kanban board ── */}
