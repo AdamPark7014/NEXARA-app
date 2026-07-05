@@ -367,6 +367,8 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
   const [loading, setLoading] = useState(true);
   const [teamErr, setTeamErr] = useState<string | null>(null);
   const [view, setView] = useState<"grid" | "table">("grid");
+  const [searchMember, setSearchMember] = useState("");
+  const [filterEstado, setFilterEstado] = useState<"" | "PRESENTE" | "COMPLETO" | "AUSENTE">("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -393,6 +395,16 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
   const presentes = members.filter(m => m.estado === "PRESENTE").length;
   const completos = members.filter(m => m.estado === "COMPLETO").length;
   const ausentes  = members.filter(m => m.estado === "AUSENTE").length;
+
+  const visibleMembers = useMemo(() => {
+    let result = members;
+    if (searchMember.trim()) {
+      const q = searchMember.toLowerCase();
+      result = result.filter((m) => m.nombre.toLowerCase().includes(q) || (m.department ?? "").toLowerCase().includes(q));
+    }
+    if (filterEstado) result = result.filter((m) => m.estado === filterEstado);
+    return result;
+  }, [members, searchMember, filterEstado]);
 
   const cols: Column<TeamMember>[] = [
     {
@@ -459,6 +471,23 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+        <input
+          type="search"
+          placeholder="Buscar empleado…"
+          value={searchMember}
+          onChange={(e) => setSearchMember(e.target.value)}
+          style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-primary)", fontSize: 12, minWidth: 160 }}
+        />
+        <select
+          value={filterEstado}
+          onChange={(e) => setFilterEstado(e.target.value as "" | "PRESENTE" | "COMPLETO" | "AUSENTE")}
+          style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-primary)", fontSize: 12 }}
+        >
+          <option value="">Todos · Estado</option>
+          <option value="PRESENTE">En jornada</option>
+          <option value="COMPLETO">Completaron</option>
+          <option value="AUSENTE">Ausentes</option>
+        </select>
         <button style={btnStyle(view === "grid")}  onClick={() => setView("grid")}>Tarjetas</button>
         <button style={btnStyle(view === "table")} onClick={() => setView("table")}>Tabla</button>
         <button onClick={() => void load()} style={{ marginLeft: "auto", padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", cursor: "pointer", fontSize: 12, background: "var(--surface)", color: "var(--text-secondary)" }}>
@@ -472,12 +501,12 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
         <div style={{ padding: 48, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>Sin registros para esta fecha.</div>
       ) : view === "grid" ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 12 }}>
-          {members.map((m) => <TeamCard key={m.userId} member={m} token={token} dateFilter={dateFilter} />)}
+          {visibleMembers.map((m) => <TeamCard key={m.userId} member={m} token={token} dateFilter={dateFilter} />)}
         </div>
       ) : (
         <DataTable<TeamMember>
           columns={cols}
-          rows={members}
+          rows={visibleMembers}
           rowKey={(m) => m.userId}
           density="compact"
           emptyTitle="Sin registros"

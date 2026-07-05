@@ -11,6 +11,7 @@ import { useUser } from "@/components/UserContext";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
+import FilterToolbar from "@/components/FilterToolbar";
 
 interface Payment {
   id: number;
@@ -50,10 +51,13 @@ export default function EmployeePaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Payment | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterUser, setFilterUser] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -74,31 +78,74 @@ export default function EmployeePaymentsPage() {
 
   const total = useMemo(() => items.reduce((s, p) => s + Number(p.amount), 0), [items]);
 
+  const visibleItems = useMemo(() => {
+    let result = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      result = result.filter((p) =>
+        (p.user?.nombre ?? "").toLowerCase().includes(q) ||
+        (p.note ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterUser) result = result.filter((p) => String(p.userId) === filterUser);
+    return result;
+  }, [items, searchQ, filterUser]);
+
+  const openNew = () => { setEditing(null); setForm({ ...emptyForm }); setSaveErr(null); setEvidenceFiles([]); setShowForm(true); };
+  const openEdit = (p: Payment) => {
+    setEditing(p);
+    setForm({ userId: String(p.userId), periodFrom: p.periodFrom.slice(0, 10), periodTo: p.periodTo.slice(0, 10), amount: Number(p.amount), note: p.note ?? "" });
+    setSaveErr(null);
+    setEvidenceFiles([]);
+    setShowForm(true);
+  };
+
   const submit = async () => {
     if (!token || !form.userId || !form.periodFrom || !form.periodTo || !form.amount) return;
     setSaving(true);
     setSaveErr(null);
     try {
-      const fd = new FormData();
-      fd.append("userId", form.userId);
-      fd.append("periodFrom", form.periodFrom);
-      fd.append("periodTo", form.periodTo);
-      fd.append("amount", String(form.amount));
-      if (form.note.trim()) fd.append("note", form.note.trim());
-      evidenceFiles.forEach((file) => fd.append("files", file));
-      const res = await fetch(buildApiUrl("employee-payments"), {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
-      setShowForm(false);
-      setForm({ ...emptyForm });
-      setEvidenceFiles([]);
-      void load();
+      if (editing) {
+        const updated = await apiFetch(`employee-payments/${editing.id}`, token, {
+          method: "PATCH",
+          body: JSON.stringify({ periodFrom: form.periodFrom, periodTo: form.periodTo, amount: form.amount, note: form.note.trim() || undefined }),
+        });
+        setItems((prev) => prev.map((p) => (p.id === editing.id ? { ...p, ...updated } : p)));
+        setShowForm(false);
+        setEditing(null);
+        setForm({ ...emptyForm });
+      } else {
+        const fd = new FormData();
+        fd.append("userId", form.userId);
+        fd.append("periodFrom", form.periodFrom);
+        fd.append("periodTo", form.periodTo);
+        fd.append("amount", String(form.amount));
+        if (form.note.trim()) fd.append("note", form.note.trim());
+        evidenceFiles.forEach((file) => fd.append("files", file));
+        const res = await fetch(buildApiUrl("employee-payments"), {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+        if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+        setShowForm(false);
+        setForm({ ...emptyForm });
+        setEvidenceFiles([]);
+        void load();
+      }
     } catch (e) {
-      setSaveErr(formatApiError(e, "No se pudo registrar el pago"));
+      setSaveErr(formatApiError(e, "No se pudo guardar el pago"));
     } finally { setSaving(false); }
+  };
+
+  const remove = async (p: Payment) => {
+    if (!token || !confirm(`¿Eliminar pago a ${p.user?.nombre ?? "empleado"}?`)) return;
+    try {
+      await apiFetch(`employee-payments/${p.id}`, token, { method: "DELETE" });
+      setItems((prev) => prev.filter((x) => x.id !== p.id));
+    } catch (e) {
+      alert(formatApiError(e, "No se pudo eliminar"));
+    }
   };
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
@@ -108,6 +155,17 @@ export default function EmployeePaymentsPage() {
     { key: "periodFrom", label: "Periodo", render: (p) => <span style={{ fontSize: 12 }}>{new Date(p.periodFrom).toLocaleDateString("es-MX")} – {new Date(p.periodTo).toLocaleDateString("es-MX")}</span>, width: 200 },
     { key: "amount", label: "Monto", align: "right" as const, render: (p) => <Money value={Number(p.amount)} />, width: 130 },
     { key: "note", label: "Concepto", accessor: (p) => p.note ?? "—" },
+    ...(cfg.canEdit ? [{
+      key: "acciones" as keyof Payment,
+      label: "",
+      width: 72,
+      render: (p: Payment) => (
+        <div style={{ display: "flex", gap: 4 }}>
+          <button onClick={() => openEdit(p)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>
+          <button onClick={() => void remove(p)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>
+        </div>
+      ),
+    }] : []),
   ];
 
   return (
@@ -119,7 +177,7 @@ export default function EmployeePaymentsPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Registrar pago</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={openNew}>Registrar pago</Button>}
           </>
         }
       />
@@ -129,23 +187,43 @@ export default function EmployeePaymentsPage() {
         <KpiCard label="Registros" value={items.length} icon="📋" />
       </div>
 
-      <Section title={loading ? "Cargando…" : `${items.length} pagos`}>
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por empleado o concepto…" }}
+        selects={users.length > 0 ? [{
+          label: "Empleado",
+          value: filterUser,
+          onChange: setFilterUser,
+          options: users.map((u) => ({ value: String(u.id), label: u.nombre })),
+          allowAll: true,
+        }] : []}
+        onClear={() => { setSearchQ(""); setFilterUser(""); }}
+        resultCount={loading ? null : visibleItems.length}
+      />
+
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} pagos`}>
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando pagos a personal." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && <DataTable columns={columns} rows={items} rowKey={(p) => p.id} emptyTitle="Sin pagos registrados" emptyDescription="Registra el primer pago a personal." />}
+        {!loading && !error && <DataTable columns={columns} rows={visibleItems} rowKey={(p) => p.id} emptyTitle="Sin pagos registrados" emptyDescription="Registra el primer pago a personal." />}
       </Section>
 
       {showForm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowForm(false)}>
           <div style={{ background: "var(--surface)", borderRadius: 16, padding: 28, width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Registrar pago a personal</div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>{editing ? "Editar pago a personal" : "Registrar pago a personal"}</div>
             <div style={{ display: "grid", gap: 14 }}>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Empleado</span>
-                <select value={form.userId} onChange={(e) => setForm((f) => ({ ...f, userId: e.target.value }))} style={inp}>
-                  <option value="">— Seleccionar —</option>
-                  {users.map((u) => <option key={u.id} value={String(u.id)}>{u.nombre}</option>)}
-                </select></label>
-              {usersErr && <p style={{ fontSize: 12, color: "var(--danger)", margin: 0 }}>{usersErr}</p>}
+              {editing ? (
+                <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Empleado</span>
+                  <input value={editing.user?.nombre ?? `#${editing.userId}`} disabled style={{ ...inp, opacity: 0.7 }} /></label>
+              ) : (
+                <>
+                  <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Empleado</span>
+                    <select value={form.userId} onChange={(e) => setForm((f) => ({ ...f, userId: e.target.value }))} style={inp}>
+                      <option value="">— Seleccionar —</option>
+                      {users.map((u) => <option key={u.id} value={String(u.id)}>{u.nombre}</option>)}
+                    </select></label>
+                  {usersErr && <p style={{ fontSize: 12, color: "var(--danger)", margin: 0 }}>{usersErr}</p>}
+                </>
+              )}
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Periodo desde</span>
                 <input type="date" value={form.periodFrom} onChange={(e) => setForm((f) => ({ ...f, periodFrom: e.target.value }))} style={inp} /></label>
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Periodo hasta</span>
@@ -154,13 +232,15 @@ export default function EmployeePaymentsPage() {
                 <input type="number" min={0} value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: Number(e.target.value) }))} style={inp} /></label>
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Concepto / nota</span>
                 <input value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} placeholder="Nómina quincenal, bono proyecto UDLA…" style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Comprobantes (PDF/imagen)</span>
-                <input type="file" accept=".pdf,image/*" multiple onChange={(e) => setEvidenceFiles(Array.from(e.target.files ?? []))} style={inp} /></label>
+              {!editing && (
+                <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Comprobantes (PDF/imagen)</span>
+                  <input type="file" accept=".pdf,image/*" multiple onChange={(e) => setEvidenceFiles(Array.from(e.target.files ?? []))} style={inp} /></label>
+              )}
               {saveErr && <p role="alert" style={{ fontSize: 12, color: "var(--danger)", margin: 0 }}>{saveErr}</p>}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => { setShowForm(false); setSaveErr(null); setEvidenceFiles([]); }}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void submit()} disabled={saving || !form.userId || !form.amount}>{saving ? "Guardando…" : "Registrar"}</Button>
+              <Button variant="secondary" onClick={() => { setShowForm(false); setSaveErr(null); setEditing(null); setEvidenceFiles([]); }}>Cancelar</Button>
+              <Button variant="primary" onClick={() => void submit()} disabled={saving || !form.userId || !form.amount}>{saving ? "Guardando…" : editing ? "Guardar cambios" : "Registrar"}</Button>
             </div>
           </div>
         </div>

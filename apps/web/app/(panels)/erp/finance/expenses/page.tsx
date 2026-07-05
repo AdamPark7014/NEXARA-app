@@ -12,6 +12,7 @@ import { formatApiError } from "@/lib/erp-api";
 import { filterRowsByScope, getErpExpensesSectionConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
 
 interface Expense {
   id: number;
@@ -95,10 +96,20 @@ export default function ExpensesPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const visibleItems = useMemo(
-    () => filterRowsByScope(items, user, cfg.defaultScope),
-    [items, user, cfg.defaultScope],
-  );
+  const [searchQ, setSearchQ] = useState("");
+  const [filterCat, setFilterCat] = useState("");
+  const [filterEstado, setFilterEstado] = useState("");
+
+  const visibleItems = useMemo(() => {
+    let result = filterRowsByScope(items, user, cfg.defaultScope);
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      result = result.filter((e) => (e.concepto ?? "").toLowerCase().includes(q));
+    }
+    if (filterCat) result = result.filter((e) => e.categoria === filterCat);
+    if (filterEstado) result = result.filter((e) => e.estado === filterEstado);
+    return result;
+  }, [items, user, cfg.defaultScope, searchQ, filterCat, filterEstado]);
 
   const openNew = () => { setEditing(null); setForm({ ...emptyForm }); setSaveErr(null); setShowForm(true); };
   const openEdit = async (e: Expense) => {
@@ -225,6 +236,16 @@ export default function ExpensesPage() {
           </div>
         </div>
       )}
+
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por concepto…" }}
+        selects={[
+          { label: "Categoría", value: filterCat, onChange: setFilterCat, options: CATEGORIAS.map((c) => ({ value: c, label: c })), allowAll: true },
+          { label: "Estado", value: filterEstado, onChange: setFilterEstado, options: ESTADOS.map((s) => ({ value: s, label: s.replace(/_/g, " ") })), allowAll: true },
+        ]}
+        onClear={() => { setSearchQ(""); setFilterCat(""); setFilterEstado(""); }}
+        resultCount={loading ? null : visibleItems.length}
+      />
 
       <Section title={loading ? "Cargando…" : `${visibleItems.length} gastos`}>
         {error && (

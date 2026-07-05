@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
+import FilterToolbar from "@/components/FilterToolbar";
 import { useUser } from "@/components/UserContext";
 import { getCrmCatalogSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
@@ -37,6 +38,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [filterCat, setFilterCat] = useState("");
 
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
@@ -101,12 +103,12 @@ export default function ProductsPage() {
   };
 
   const filtered = useMemo(() => {
+    let result = items;
     const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (p) => (p.name ?? "").toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q),
-    );
-  }, [items, search]);
+    if (q) result = result.filter((p) => (p.name ?? "").toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q));
+    if (filterCat) result = result.filter((p) => p.category === filterCat);
+    return result;
+  }, [items, search, filterCat]);
 
   const inp: React.CSSProperties = {
     width: "100%", padding: "8px 10px", border: "1px solid var(--border)",
@@ -319,14 +321,18 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* ── Search ─────────────────────────────────────────────────────────── */}
-      <div style={{ marginBottom: 12 }}>
-        <input
-          value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por SKU o nombre…"
-          style={{ width: "100%", maxWidth: 360, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
-        />
-      </div>
+      <FilterToolbar
+        search={{ value: search, onChange: setSearch, placeholder: "Buscar por SKU o nombre…" }}
+        selects={categories.length > 0 ? [{
+          label: "Categoría",
+          value: filterCat,
+          onChange: setFilterCat,
+          options: categories.map((c) => ({ value: c, label: c })),
+          allowAll: true,
+        }] : []}
+        onClear={() => { setSearch(""); setFilterCat(""); }}
+        resultCount={loading ? null : filtered.length}
+      />
 
       <Section title={loading ? "Cargando…" : `${filtered.length} SKU${filtered.length === 1 ? "" : "s"}`}>
         {loading && <EmptyState icon="⏳" title="Cargando catálogo…" description="Consultando productos." />}
