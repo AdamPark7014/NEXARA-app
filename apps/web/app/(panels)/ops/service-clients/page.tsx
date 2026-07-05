@@ -10,6 +10,8 @@ import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface ServiceClient {
   id: number;
@@ -55,6 +57,8 @@ export default function ServiceClientsPage() {
 
   const [items, setItems] = useState<ServiceClient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterEstado, setFilterEstado] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<ServiceClient | null>(null);
@@ -153,6 +157,18 @@ export default function ServiceClientsPage() {
   } });
   };
 
+  const visibleItems = useMemo(() => {
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((c) =>
+        (c.nombre + " " + (c.contacto ?? "") + " " + (c.direccion ?? "")).toLowerCase().includes(q)
+      );
+    }
+    if (filterEstado) rows = rows.filter((c) => c.estado === filterEstado);
+    return rows;
+  }, [items, searchQ, filterEstado]);
+
   const inp: React.CSSProperties = {
     width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8,
     background: "var(--surface)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box",
@@ -244,13 +260,35 @@ export default function ServiceClientsPage() {
           <button type="button" onClick={() => setActionErr(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
         </div>
       )}
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por nombre, contacto o dirección…" }}
+        selects={[{
+          label: "Estado",
+          value: filterEstado,
+          onChange: setFilterEstado,
+          options: ESTADOS.map((s) => ({ value: s, label: s })),
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setFilterEstado(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "nombre", label: "Cliente" },
+            { key: "contacto", label: "Contacto" },
+            { key: "telefono", label: "Teléfono" },
+            { key: "direccion", label: "Dirección" },
+            { key: "estado", label: "Estado" },
+          ], "clientes-servicio")}>CSV</Button>
+        ) : undefined}
+      />
+
       <Section title={`${items.length} cliente${items.length !== 1 ? "s" : ""}`}>
         {loadError && (
           <p style={{ color: "var(--danger, #ef4444)", fontSize: 13, marginBottom: 12 }}>{loadError}</p>
         )}
         <DataTable
           columns={columns}
-          rows={items}
+          rows={visibleItems}
           rowKey={(c) => c.id}
           emptyTitle={loading ? "Cargando…" : "Sin clientes registrados"}
           emptyDescription={loadError ?? "Agrega el primer cliente con contrato de servicio continuo."}

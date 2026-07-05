@@ -12,6 +12,7 @@ import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
 
 interface TicketRequest {
   id: number;
@@ -50,6 +51,7 @@ export default function SupportInboxPage() {
   const [items, setItems] = useState<TicketRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
 
   const load = useCallback(async () => {
@@ -68,6 +70,16 @@ export default function SupportInboxPage() {
   }, [token, statusFilter]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const visibleItems = useMemo(() => {
+    if (!searchQ.trim()) return items;
+    const q = searchQ.toLowerCase();
+    return items.filter((t) =>
+      (t.client?.name ?? "").toLowerCase().includes(q) ||
+      (t.description ?? "").toLowerCase().includes(q) ||
+      (t.address ?? "").toLowerCase().includes(q)
+    );
+  }, [items, searchQ]);
 
   const nuevos = items.filter((t) => t.status === "NEW").length;
   const asignados = items.filter((t) => t.status === "ASSIGNED").length;
@@ -151,34 +163,39 @@ export default function SupportInboxPage() {
         eyebrow="OPS · Soporte"
         title="Bandeja de soporte"
         subtitle={canViewAll ? "Solicitudes de tickets de clientes con contrato vigente." : "Tickets asignados a tu equipo."}
-        actions={
-          <>
-            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
-            >
-              <option value="">Todos los estados</option>
-              <option value="NEW">Nuevos</option>
-              <option value="ASSIGNED">Asignados</option>
-              <option value="CLOSED">Cerrados</option>
-            </select>
-          </>
-        }
+        actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 18 }}>
         <KpiCard label="Nuevos" value={nuevos} variant={nuevos > 0 ? "warning" : "positive"} icon="📥" hint="Sin atender" />
         <KpiCard label="Asignados" value={asignados} variant="accent" icon="🔧" hint="En proceso" />
         <KpiCard label="Vencidos" value={vencidos} variant={vencidos > 0 ? "danger" : "positive"} icon="⚠️" hint={vencidos > 0 ? "Requieren atención inmediata" : "Sin tickets vencidos"} />
       </div>
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por cliente, descripción o dirección…" }}
+        selects={[{
+          label: "Estado",
+          value: statusFilter,
+          onChange: setStatusFilter,
+          options: [
+            { value: "NEW", label: "Nuevos" },
+            { value: "ASSIGNED", label: "Asignados" },
+            { value: "APPROVED", label: "Aprobados" },
+            { value: "CLOSED", label: "Cerrados" },
+            { value: "REJECTED", label: "Rechazados" },
+          ],
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setStatusFilter(""); }}
+        resultCount={loading ? null : visibleItems.length}
+      />
+
       <Section title={loading ? "Cargando…" : `${items.length} tickets`}>
         {loading && <EmptyState icon="⏳" title="Cargando tickets…" description="Consultando solicitudes desde la API." />}
         {!loading && error && (
           <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
         )}
         {!loading && !error && (
-          <DataTable columns={columns} rows={items} rowKey={(t) => t.id} emptyTitle="Sin tickets" emptyDescription="No hay solicitudes de soporte registradas." />
+          <DataTable columns={columns} rows={visibleItems} rowKey={(t) => t.id} emptyTitle="Sin tickets" emptyDescription="No hay solicitudes de soporte registradas." />
         )}
       </Section>
     </>
