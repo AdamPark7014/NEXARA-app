@@ -82,8 +82,51 @@ final class AttendanceVM: ObservableObject {
 
 struct AttendanceView: View {
     @StateObject private var vm = AttendanceVM()
+    @State private var selected: [String: Any]?
 
     var body: some View {
+        Group {
+            if let s = selected { attDetail(s) } else { attList }
+        }
+        .navigationTitle(selected == nil ? "Asistencia" : "")
+        .task { vm.load() }
+        .onChange(of: vm.checkInMessage) { msg in
+            if msg != nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { vm.checkInMessage = nil }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func attDetail(_ rec: [String: Any]) -> some View {
+        let name  = attStr(rec, "userName", "usuario", "nombre")
+        let type_ = attStr(rec, "type", "tipo")
+        List {
+            Section { Button("← Asistencia") { selected = nil } }
+            Section("Registro") {
+                attRow("Empleado",  name)
+                attRow("Tipo",      type_.capitalized)
+                attRow("Fecha",     String(attStr(rec, "createdAt", "date", "timestamp").prefix(19)))
+                attRow("Ubicación", attStr(rec, "location", "ubicacion", "address"))
+                attRow("Dispositivo", attStr(rec, "device", "dispositivo"))
+                if rec["isLate"] as? Bool == true {
+                    Label("Registro tarde", systemImage: "exclamationmark.triangle.fill").foregroundColor(.red)
+                }
+                attRow("Observaciones", attStr(rec, "notes", "notas", "observaciones"))
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle(name.isEmpty ? "Registro" : name)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder private func attRow(_ label: String, _ value: String) -> some View {
+        if !value.isEmpty {
+            HStack { Text(label).foregroundColor(.secondary); Spacer(); Text(value).multilineTextAlignment(.trailing) }
+        }
+    }
+
+    private var attList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 // Check-in card
@@ -136,8 +179,11 @@ struct AttendanceView: View {
                 } else {
                     VStack(spacing: 6) {
                         ForEach(vm.filtered.prefix(50), id: \.attId) { rec in
-                            AttendanceRow(item: rec)
-                                .padding(.horizontal)
+                            Button { selected = rec } label: {
+                                AttendanceRow(item: rec)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal)
                         }
                     }
                 }
@@ -146,19 +192,12 @@ struct AttendanceView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("Asistencia")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button { vm.load() } label: { Image(systemName: "arrow.clockwise") }
             }
         }
         .refreshable { vm.load() }
-        .task { vm.load() }
-        .onChange(of: vm.checkInMessage) { msg in
-            if msg != nil {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { vm.checkInMessage = nil }
-            }
-        }
     }
 
     private var checkInCard: some View {
