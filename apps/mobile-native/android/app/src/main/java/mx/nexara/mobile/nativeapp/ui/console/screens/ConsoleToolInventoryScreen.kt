@@ -21,6 +21,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
@@ -77,8 +80,15 @@ fun ConsoleToolInventoryScreen(
 ) {
     val vm: ConsoleToolInventoryViewModel = viewModel()
     val state by vm.state.collectAsState()
+    var selected by remember { mutableStateOf<ToolInventoryItemDto?>(null) }
 
     if (state.items.isEmpty() && state.isLoading && state.error == null) vm.refresh()
+
+    val sel = selected
+    if (sel != null) {
+        ToolInventoryDetail(sel, onBack = { selected = null })
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -124,18 +134,57 @@ fun ConsoleToolInventoryScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            items(state.items.take(300)) { it ->
+            items(state.items.take(300)) { item ->
                 Card(
+                    onClick = { selected = item },
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        Text(it.toolName, style = MaterialTheme.typography.titleSmall)
-                        Text("${it.model} · ${it.serialNumber}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        Text("Status: ${it.status}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                        Text(item.toolName, style = MaterialTheme.typography.titleSmall)
+                        Text("${item.model} · ${item.serialNumber}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                        Text("Status: ${item.status}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ToolInventoryDetail(item: ToolInventoryItemDto, onBack: () -> Unit) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item { Button(onClick = onBack) { Text("← Inventario") } }
+        item {
+            Text(item.toolName, style = MaterialTheme.typography.headlineSmall)
+        }
+        item {
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Datos del equipo", style = MaterialTheme.typography.titleSmall)
+                    tiRow("Modelo", item.model)
+                    tiRow("Número de serie", item.serialNumber)
+                    tiRow("Estatus", item.status)
+                    tiRow("ID", item.id.toString())
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun tiRow(label: String, value: String) {
+    if (value.isNotBlank() && value != "null") {
+        androidx.compose.foundation.layout.Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

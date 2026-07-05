@@ -122,8 +122,15 @@ fun ConsoleAttendanceScreen(
 
     val vm: ConsoleAttendanceViewModel = viewModel()
     val state by vm.state.collectAsState()
+    var selectedUser by remember { mutableStateOf<mx.nexara.mobile.nativeapp.data.api.AttendanceRangeUserDto?>(null) }
 
     if (state.payload == null && state.isLoading && state.error == null) vm.refresh()
+
+    val selUser = selectedUser
+    if (selUser != null) {
+        AttendanceUserDetail(selUser, onBack = { selectedUser = null })
+        return
+    }
 
     val current = state.current
     val isCheckedIn = current?.isOpen == true
@@ -312,6 +319,7 @@ fun ConsoleAttendanceScreen(
                 val hours = String.format("%.1f", (u.totalMinutes ?: 0) / 60.0)
                 val daysCount = u.days?.size ?: 0
                 Card(
+                    onClick = { selectedUser = u },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -351,6 +359,68 @@ fun ConsoleAttendanceScreen(
             }
         }
 
+        item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun AttendanceUserDetail(
+    u: mx.nexara.mobile.nativeapp.data.api.AttendanceRangeUserDto,
+    onBack: () -> Unit,
+) {
+    val hours = String.format("%.1f", (u.totalMinutes ?: 0) / 60.0)
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item { Button(onClick = onBack) { Text("← Asistencia") } }
+        item {
+            Text(u.userName ?: "Usuario ${u.userId}", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
+            Text("${hours}h · ${u.days?.size ?: 0} días", style = MaterialTheme.typography.bodySmall, color = SubText)
+        }
+        val days = u.days
+        if (!days.isNullOrEmpty()) {
+            item {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(1.dp)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Días registrados", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold))
+                        days.forEach { day ->
+                            val dayHours = String.format("%.1f", day.totalMinutes / 60.0)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(day.date.take(10), style = MaterialTheme.typography.bodySmall, color = SubText)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    if (day.isOpen == true) {
+                                        Text("Abierta", style = MaterialTheme.typography.labelSmall, color = TealColor)
+                                    }
+                                    Text("${dayHours}h", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        val events = u.attendances
+        if (!events.isNullOrEmpty()) {
+            item {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(1.dp)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Eventos", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold))
+                        events.forEach { ev ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(ev.type.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall)
+                                Text(ev.timestamp.take(16), style = MaterialTheme.typography.bodySmall, color = SubText)
+                            }
+                        }
+                    }
+                }
+            }
+        }
         item { Spacer(Modifier.height(24.dp)) }
     }
 }
