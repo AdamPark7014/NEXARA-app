@@ -12,6 +12,8 @@ import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface BankAccount {
   id: number;
@@ -66,6 +68,8 @@ export default function BankingPage() {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [selected, setSelected] = useState<BankAccount | null>(null);
   const [txs, setTxs] = useState<BankTransaction[]>([]);
+  const [txSearch, setTxSearch] = useState("");
+  const [txFilterType, setTxFilterType] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingTx, setLoadingTx] = useState(false);
   const [txError, setTxError] = useState<string | null>(null);
@@ -105,6 +109,21 @@ export default function BankingPage() {
       })
       .finally(() => setLoadingTx(false));
   }, [token, selected]);
+
+  const visibleTxs = useMemo(() => {
+    let rows = txs;
+    if (txSearch.trim()) {
+      const q = txSearch.toLowerCase();
+      rows = rows.filter((t) =>
+        (t.description ?? "").toLowerCase().includes(q) ||
+        (t.counterpartyName ?? "").toLowerCase().includes(q) ||
+        (t.concept ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (txFilterType === "debit") rows = rows.filter((t) => t.isDebit);
+    if (txFilterType === "credit") rows = rows.filter((t) => !t.isDebit);
+    return rows;
+  }, [txs, txSearch, txFilterType]);
 
   const totalBalance = accounts.reduce((s, a) => s + Number(a.currentBalance), 0);
 
@@ -243,11 +262,36 @@ export default function BankingPage() {
                 <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowTxForm(true)}>Registrar movimiento</Button>
               ) : undefined}
             >
+              <FilterToolbar
+                search={{ value: txSearch, onChange: setTxSearch, placeholder: "Buscar por descripción o contraparte…" }}
+                selects={[{
+                  label: "Tipo",
+                  value: txFilterType,
+                  onChange: setTxFilterType,
+                  options: [
+                    { value: "debit", label: "Cargo" },
+                    { value: "credit", label: "Abono" },
+                  ],
+                  allowAll: true,
+                }]}
+                onClear={() => { setTxSearch(""); setTxFilterType(""); }}
+                resultCount={loadingTx ? null : visibleTxs.length}
+                rightActions={txs.length > 0 ? (
+                  <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleTxs, [
+                    { key: "transactionDate", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
+                    { key: "description", label: "Descripción" },
+                    { key: "counterpartyName", label: "Contraparte" },
+                    { key: "amount", label: "Monto" },
+                    { key: "isDebit", label: "Tipo", format: (v) => v ? "Cargo" : "Abono" },
+                    { key: "reconciliationStatus", label: "Estado" },
+                  ], `movimientos-${selected.name.toLowerCase().replace(/\s+/g, "-")}`)}>CSV</Button>
+                ) : undefined}
+              />
               {loadingTx
                 ? <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
                 : txError
                   ? <EmptyState icon="⚠️" title="Error al cargar movimientos" description={txError} action={<Button size="sm" variant="secondary" onClick={() => setSelected({ ...selected! })}>Reintentar</Button>} />
-                  : <DataTable columns={txColumns} rows={txs} rowKey={(t) => t.id} emptyTitle="Sin movimientos" emptyDescription="No hay transacciones registradas para esta cuenta." />
+                  : <DataTable columns={txColumns} rows={visibleTxs} rowKey={(t) => t.id} emptyTitle="Sin movimientos" emptyDescription="No hay transacciones registradas para esta cuenta." />
               }
             </Section>
           )}
