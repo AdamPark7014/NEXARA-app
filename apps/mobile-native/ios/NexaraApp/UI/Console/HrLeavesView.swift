@@ -45,8 +45,61 @@ final class HrLeavesVM: ObservableObject {
 
 struct HrLeavesView: View {
     @StateObject private var vm = HrLeavesVM()
+    @State private var selected: [String: Any]?
 
     var body: some View {
+        Group {
+            if let s = selected { leaveDetail(s) } else { leaveList }
+        }
+        .navigationTitle(selected == nil ? "RR. HH. · Permisos" : "")
+        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName: "arrow.clockwise") } } }
+        .refreshable { if selected == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    @ViewBuilder
+    private func leaveDetail(_ leave: [String: Any]) -> some View {
+        let reason = hrStr(leave, "reason", "motivo", "type")
+        let user   = hrStr(leave, "userName", "employeeName", "nombre")
+        let status = hrStr(leave, "status", "estado")
+        let color  = hrStatusColor(status)
+        List {
+            Section { Button("← Permisos") { selected = nil } }
+            Section {
+                HStack {
+                    Text(reason.isEmpty ? hrStr(leave, "type", "tipo").capitalized : reason)
+                        .font(.headline)
+                    Spacer()
+                    Text(status.capitalized).font(.caption).bold().foregroundColor(color)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(color.opacity(0.12)).clipShape(Capsule())
+                }
+            }
+            Section("Detalles") {
+                hrRow("Empleado",    user)
+                hrRow("Tipo",        hrStr(leave, "type", "tipo").capitalized)
+                hrRow("Inicio",      String(hrStr(leave, "startDate", "startAt").prefix(10)))
+                hrRow("Fin",         String(hrStr(leave, "endDate", "endAt").prefix(10)))
+                hrRow("Días",        hrStr(leave, "days", "diasSolicitados", "totalDays"))
+                hrRow("Aprobado por", hrStr(leave, "approvedBy", "approverName", "aprobadoPor"))
+            }
+            let notes = hrStr(leave, "notes", "notas", "comments", "comentarios")
+            if !notes.isEmpty {
+                Section("Notas") { Text(notes).font(.footnote) }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle(user.isEmpty ? "Permiso" : user)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder private func hrRow(_ label: String, _ value: String) -> some View {
+        if !value.isEmpty {
+            HStack { Text(label).foregroundColor(.secondary); Spacer(); Text(value).multilineTextAlignment(.trailing) }
+        }
+    }
+
+    private var leaveList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 // KPI strip
@@ -104,7 +157,11 @@ struct HrLeavesView: View {
                 } else {
                     VStack(spacing: 6) {
                         ForEach(vm.filtered.prefix(50), id: \.hrId) { leave in
-                            HrLeaveCard(item: leave).padding(.horizontal)
+                            Button { selected = leave } label: {
+                                HrLeaveCard(item: leave)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal)
                         }
                     }
                 }
@@ -112,10 +169,6 @@ struct HrLeavesView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("RR. HH. · Permisos")
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName: "arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
     }
 }
 

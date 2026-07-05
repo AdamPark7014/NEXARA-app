@@ -58,16 +58,18 @@ private struct ToolRequestsView: View {
     @State private var mine: [[String: Any]] = []
     @State private var isLoading = true
     @State private var query = ""
+    @State private var selected: [String: Any]?
 
     var body: some View {
-        toolList(
-            items: filtered(mine),
-            isLoading: isLoading,
-            query: $query,
-            empty: "Sin solicitudes de herramientas"
-        )
+        Group {
+            if let s = selected { toolDetail(s, backLabel: "← Solicitudes", onBack: { selected = nil }) }
+            else {
+                toolList(items: filtered(mine), isLoading: isLoading, query: $query,
+                         empty: "Sin solicitudes de herramientas", onSelect: { selected = $0 })
+            }
+        }
         .task { await load() }
-        .refreshable { await load() }
+        .refreshable { if selected == nil { await load() } }
     }
 
     private func load() async {
@@ -89,11 +91,18 @@ private struct ToolRequestsView: View {
 private struct ToolMyKitView: View {
     @State private var items: [[String: Any]] = []
     @State private var isLoading = true
+    @State private var selected: [String: Any]?
 
     var body: some View {
-        toolList(items: items, isLoading: isLoading, query: .constant(""), showSearch: false, empty: "Sin herramientas asignadas")
-            .task { await load() }
-            .refreshable { await load() }
+        Group {
+            if let s = selected { toolDetail(s, backLabel: "← Mi kit", onBack: { selected = nil }) }
+            else {
+                toolList(items: items, isLoading: isLoading, query: .constant(""), showSearch: false,
+                         empty: "Sin herramientas asignadas", onSelect: { selected = $0 })
+            }
+        }
+        .task { await load() }
+        .refreshable { if selected == nil { await load() } }
     }
 
     private func load() async {
@@ -107,10 +116,16 @@ private struct ToolInventoryView: View {
     @State private var items: [[String: Any]] = []
     @State private var isLoading = true
     @State private var query = ""
+    @State private var selected: [String: Any]?
 
     var body: some View {
-        toolList(items: items.filter { query.isEmpty || ConsoleHelpers.mapStr($0, "name", "nombre").lowercased().contains(query.lowercased()) },
-                 isLoading: isLoading, query: $query, empty: "Inventario vacío")
+        Group {
+            if let s = selected { toolDetail(s, backLabel: "← Inventario", onBack: { selected = nil }) }
+            else {
+                toolList(items: items.filter { query.isEmpty || ConsoleHelpers.mapStr($0, "name", "nombre").lowercased().contains(query.lowercased()) },
+                         isLoading: isLoading, query: $query, empty: "Inventario vacío", onSelect: { selected = $0 })
+            }
+        }
         .task { await load() }
         .onChange(of: query) { _ in Task { await load() } }
     }
@@ -242,11 +257,18 @@ private struct ToolRenewalsView: View {
 private struct ToolKitsUsersView: View {
     @State private var items: [[String: Any]] = []
     @State private var isLoading = true
+    @State private var selected: [String: Any]?
 
     var body: some View {
-        toolList(items: items, isLoading: isLoading, query: .constant(""), showSearch: false, empty: "Sin asignaciones")
-            .task { await load() }
-            .refreshable { await load() }
+        Group {
+            if let s = selected { toolDetail(s, backLabel: "← Usuarios", onBack: { selected = nil }) }
+            else {
+                toolList(items: items, isLoading: isLoading, query: .constant(""), showSearch: false,
+                         empty: "Sin asignaciones", onSelect: { selected = $0 })
+            }
+        }
+        .task { await load() }
+        .refreshable { if selected == nil { await load() } }
     }
 
     private func load() async {
@@ -262,7 +284,8 @@ private func toolList(
     isLoading: Bool,
     query: Binding<String>,
     showSearch: Bool = true,
-    empty: String
+    empty: String,
+    onSelect: (([String: Any]) -> Void)? = nil
 ) -> some View {
     ScrollView {
         VStack(spacing: 10) {
@@ -281,7 +304,7 @@ private func toolList(
                 Text(empty).foregroundColor(.secondary).padding(.top, 40)
             } else {
                 ForEach(items.prefix(80), id: \.toolKey) { item in
-                    VStack(alignment: .leading, spacing: 4) {
+                    let card = VStack(alignment: .leading, spacing: 4) {
                         Text(ConsoleHelpers.mapStr(item, "toolName", "name", "nombre", "userName"))
                             .font(.subheadline).bold()
                         Text(ConsoleHelpers.mapStr(item, "status", "estado", "code", "sku"))
@@ -292,10 +315,50 @@ private func toolList(
                     .background(Color(.secondarySystemGroupedBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal)
+
+                    if let onSelect {
+                        Button { onSelect(item) } label: { card }.buttonStyle(.plain)
+                    } else {
+                        card
+                    }
                 }
             }
         }
         .padding(.vertical)
+    }
+}
+
+@ViewBuilder
+private func toolDetail(_ item: [String: Any], backLabel: String, onBack: @escaping () -> Void) -> some View {
+    let name = ConsoleHelpers.mapStr(item, "toolName", "name", "nombre", "userName")
+    List {
+        Section { Button(backLabel, action: onBack) }
+        Section("Herramienta") {
+            tRow("Nombre",       ConsoleHelpers.mapStr(item, "toolName", "name", "nombre"))
+            tRow("Código",       ConsoleHelpers.mapStr(item, "code", "sku", "codigo"))
+            tRow("Categoría",    ConsoleHelpers.mapStr(item, "category", "categoria", "type", "tipo"))
+            tRow("Estado",       ConsoleHelpers.mapStr(item, "status", "estado", "condition", "condicion"))
+            tRow("Ubicación",    ConsoleHelpers.mapStr(item, "location", "ubicacion"))
+            tRow("Usuario",      ConsoleHelpers.mapStr(item, "userName", "usuario"))
+            tRow("Fecha inicio", ConsoleHelpers.mapStr(item, "startDate", "fechaInicio", "assignedDate"))
+            tRow("Fecha fin",    ConsoleHelpers.mapStr(item, "endDate", "returnDate", "fechaFin"))
+            tRow("Marca",        ConsoleHelpers.mapStr(item, "brand", "marca"))
+            tRow("Modelo",       ConsoleHelpers.mapStr(item, "model", "modelo"))
+            tRow("Serial",       ConsoleHelpers.mapStr(item, "serialNumber", "serial"))
+        }
+        let notes = ConsoleHelpers.mapStr(item, "notes", "notas", "description", "descripcion", "reason", "motivo")
+        if !notes.isEmpty {
+            Section("Notas") { Text(notes).font(.footnote) }
+        }
+    }
+    .listStyle(.insetGrouped)
+    .navigationTitle(name.isEmpty ? "Herramienta" : name)
+    .navigationBarTitleDisplayMode(.inline)
+}
+
+@ViewBuilder private func tRow(_ label: String, _ value: String) -> some View {
+    if !value.isEmpty {
+        HStack { Text(label).foregroundColor(.secondary); Spacer(); Text(value).multilineTextAlignment(.trailing) }
     }
 }
 

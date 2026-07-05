@@ -5,6 +5,7 @@ struct LunchBreaksAdminView: View {
     @State private var items: [[String: Any]] = []
     @State private var query = ""
     @State private var isLoading = true
+    @State private var selected: [String: Any]?
 
     private var filtered: [[String: Any]] {
         guard !query.isEmpty else { return items }
@@ -29,6 +30,16 @@ struct LunchBreaksAdminView: View {
     }
 
     var body: some View {
+        Group {
+            if let s = selected { lunchDetail(s) } else { lunchList }
+        }
+        .navigationTitle(selected == nil ? "Comidas (equipo)" : "")
+        .task { await reload() }
+        .refreshable { if selected == nil { await reload() } }
+        .refreshOnModels(["LunchBreak", "Attendance"], refresh: { await reload() })
+    }
+
+    private var lunchList: some View {
         List {
             Section {
                 HStack(spacing: 10) {
@@ -42,39 +53,80 @@ struct LunchBreaksAdminView: View {
             if isLoading { ProgressView() }
 
             ForEach(filtered, id: \.lbKey) { row in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(ConsoleHelpers.mapStr(row, "userName", "usuario")).font(.headline)
-                    let checkin = ConsoleHelpers.mapStr(row, "checkinTime", "startedAt")
-                    let checkout = ConsoleHelpers.mapStr(row, "checkoutTime", "endedAt")
-                    if !checkin.isEmpty || !checkout.isEmpty {
-                        Text([checkin, checkout].filter { !$0.isEmpty }.joined(separator: " → "))
-                            .font(.caption).foregroundColor(.secondary)
-                    }
-                    HStack(spacing: 8) {
-                        OpsStatusChip(text: ConsoleHelpers.mapStr(row, "status", "estatus"))
-                        if row["isCheckinLate"] as? Bool == true {
-                            Text("Entrada tarde").font(.caption2).foregroundColor(.red)
-                                .padding(.horizontal, 6).padding(.vertical, 2)
-                                .background(Color.red.opacity(0.1)).clipShape(Capsule())
+                Button { selected = row } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ConsoleHelpers.mapStr(row, "userName", "usuario")).font(.headline).foregroundColor(.primary)
+                        let checkin = ConsoleHelpers.mapStr(row, "checkinTime", "startedAt")
+                        let checkout = ConsoleHelpers.mapStr(row, "checkoutTime", "endedAt")
+                        if !checkin.isEmpty || !checkout.isEmpty {
+                            Text([checkin, checkout].filter { !$0.isEmpty }.joined(separator: " → "))
+                                .font(.caption).foregroundColor(.secondary)
                         }
-                        if row["isCheckoutLate"] as? Bool == true {
-                            Text("Salida tarde").font(.caption2).foregroundColor(.red)
-                                .padding(.horizontal, 6).padding(.vertical, 2)
-                                .background(Color.red.opacity(0.1)).clipShape(Capsule())
+                        HStack(spacing: 8) {
+                            OpsStatusChip(text: ConsoleHelpers.mapStr(row, "status", "estatus"))
+                            if row["isCheckinLate"] as? Bool == true {
+                                Text("Entrada tarde").font(.caption2).foregroundColor(.red)
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(Color.red.opacity(0.1)).clipShape(Capsule())
+                            }
+                            if row["isCheckoutLate"] as? Bool == true {
+                                Text("Salida tarde").font(.caption2).foregroundColor(.red)
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(Color.red.opacity(0.1)).clipShape(Capsule())
+                            }
+                            Spacer()
+                            Text(String(ConsoleHelpers.mapStr(row, "date", "startedAt", "createdAt").prefix(16)))
+                                .font(.caption2).foregroundColor(.secondary)
                         }
-                        Spacer()
-                        Text(String(ConsoleHelpers.mapStr(row, "date", "startedAt", "createdAt").prefix(16)))
-                            .font(.caption2).foregroundColor(.secondary)
                     }
+                    .padding(.vertical, 2)
                 }
-                .padding(.vertical, 2)
+                .buttonStyle(.plain)
             }
         }
         .searchable(text: $query, prompt: "Buscar empleado…")
-        .navigationTitle("Comidas (equipo)")
-        .task { await reload() }
-        .refreshable { await reload() }
-        .refreshOnModels(["LunchBreak", "Attendance"], refresh: { await reload() })
+    }
+
+    @ViewBuilder
+    private func lunchDetail(_ row: [String: Any]) -> some View {
+        let userName = ConsoleHelpers.mapStr(row, "userName", "usuario")
+        List {
+            Section { Button("← Comidas") { selected = nil } }
+            Section("Empleado") {
+                lbRow("Nombre",     userName)
+                lbRow("Estatus",    ConsoleHelpers.mapStr(row, "status", "estatus"))
+                lbRow("Fecha",      String(ConsoleHelpers.mapStr(row, "date", "startedAt", "createdAt").prefix(16)))
+            }
+            Section("Horario") {
+                lbRow("Entrada",    ConsoleHelpers.mapStr(row, "checkinTime", "startedAt"))
+                lbRow("Salida",     ConsoleHelpers.mapStr(row, "checkoutTime", "endedAt"))
+                lbRow("Duración",   ConsoleHelpers.mapStr(row, "duration", "duracion"))
+                lbRow("Supervisor", ConsoleHelpers.mapStr(row, "supervisorName", "supervisor", "approvedBy"))
+            }
+            if row["isCheckinLate"] as? Bool == true || row["isCheckoutLate"] as? Bool == true {
+                Section("Alertas") {
+                    if row["isCheckinLate"] as? Bool == true {
+                        Label("Entrada tarde", systemImage: "exclamationmark.triangle.fill").foregroundColor(.red)
+                    }
+                    if row["isCheckoutLate"] as? Bool == true {
+                        Label("Salida tarde", systemImage: "exclamationmark.triangle.fill").foregroundColor(.red)
+                    }
+                }
+            }
+            let notes = ConsoleHelpers.mapStr(row, "notes", "reason", "motivo", "observaciones")
+            if !notes.isEmpty {
+                Section("Notas") { Text(notes).font(.footnote) }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle(userName.isEmpty ? "Comida" : userName)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder private func lbRow(_ label: String, _ value: String) -> some View {
+        if !value.isEmpty {
+            HStack { Text(label).foregroundColor(.secondary); Spacer(); Text(value).multilineTextAlignment(.trailing) }
+        }
     }
 
     private func reload() async {
