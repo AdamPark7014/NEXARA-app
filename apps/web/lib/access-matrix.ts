@@ -258,6 +258,17 @@ const ADMIN_TIER: OrgRoleKey[] = [R.CEO, R.DIRECTOR_ADMIN];
 const ADMIN_PLUS: OrgRoleKey[] = [R.CEO, R.DIRECTOR_ADMIN, R.HR_SPECIALIST];
 const FINANCE_TEAM: OrgRoleKey[] = [R.CEO, R.DIRECTOR_ADMIN, R.ACCOUNTANT];
 const HR_TEAM: OrgRoleKey[] = [R.CEO, R.DIRECTOR_ADMIN, R.HR_SPECIALIST, R.ADMIN_STAFF];
+/** Personal que registra su propia asistencia/comida (legado org roles). */
+const SELF_ATTENDANCE_TEAM: OrgRoleKey[] = [
+  ...HR_TEAM,
+  R.SENIOR_ENGINEER,
+  R.FIELD_ENGINEER,
+  R.SUPPORT_AGENT,
+  R.PROJECT_MANAGER,
+  R.SALES_REP,
+  R.SALES_MANAGER,
+  R.DESIGNER,
+];
 const SALES_TEAM: OrgRoleKey[] = [R.CEO, R.DIRECTOR_COMMERCIAL, R.DIRECTOR_ADMIN, R.SALES_MANAGER, R.SALES_REP];
 const SALES_LEADS: OrgRoleKey[] = [R.CEO, R.DIRECTOR_COMMERCIAL, R.DIRECTOR_ADMIN, R.SALES_MANAGER];
 const OPS_TEAM: OrgRoleKey[] = [
@@ -387,13 +398,13 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   attendance: {
     id: "attendance", panel: PANELS.ERP, path: "/hr/attendance",
     label: "Asistencia", description: "Check-in y jornadas",
-    icon: "⏰", allowedRoles: HR_TEAM,
+    icon: "⏰", allowedRoles: SELF_ATTENDANCE_TEAM,
     group: "Personas", visible: true,
   },
   "lunch-breaks": {
     id: "lunch-breaks", panel: PANELS.ERP, path: "/hr/lunch-breaks",
     label: "Comidas y descansos", description: "Registro y control de pausas",
-    icon: "🥪", allowedRoles: HR_TEAM,
+    icon: "🥪", allowedRoles: SELF_ATTENDANCE_TEAM,
     group: "Personas", visible: true,
   },
   fines: {

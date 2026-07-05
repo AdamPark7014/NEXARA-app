@@ -5,6 +5,7 @@
  * cada sección según el rol (solo ejecutar, solo administrar, o ambos).
  */
 import type { ModuleEntry, ModuleId } from '@/lib/access-matrix';
+import { canOpenPage } from '@/lib/rbac/page-matrix';
 import { ROLES, ROLE_TIER, type RoleKey } from '@/lib/rbac/roles';
 import { resolveV2RoleKey, type UserAccessInput } from '@/lib/rbac/role-mapping';
 
@@ -250,7 +251,8 @@ export function shouldShowModuleInSidebar(
     case 'attendance':
       return v2 !== ROLES.CLIENTE;
     case 'lunch-breaks':
-      return HR_ONLY.has(v2) || HR_MANAGERS.has(v2) || isFieldRole(v2);
+      // Alineado con PAGE_MATRIX / SELF_ATTENDANCE_PATHS (no solo ing. de campo).
+      return canOpenPage(v2, '/erp/hr/lunch-breaks');
     case 'viatics-admin':
       return resolveViaticsSidebarHome(user) === 'erp-finance';
     case 'expenses-admin':
@@ -1944,10 +1946,10 @@ export function getLunchBreaksSectionConfig(user: UserAccessInput | null | undef
     canDelete: false,
     canAssign: false,
     canApprove: false,
-    title: 'Comidas y descansos',
+    title: isManager ? 'Comidas y descansos' : 'Mis comidas y descansos',
     subtitle: isManager
       ? 'Supervisión del horario de comida del personal.'
-      : 'Tu historial de comidas y estado del día.',
+      : 'Registra tu comida y consulta tu historial del día.',
   };
 }
 
