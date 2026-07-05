@@ -13,6 +13,8 @@ import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { createOperationalProject, formatOperationalProjectStatus, listOperationalProjects, type OperationalProject } from "@/lib/ops-operational-api";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface ServiceClient { id: number; name: string }
 
@@ -32,6 +34,8 @@ export default function OpsProjectsPage() {
   const [clients, setClients] = useState<ServiceClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -82,11 +86,22 @@ export default function OpsProjectsPage() {
   };
 
   const displayItems = useMemo(() => {
-    if (!highlightId) return items;
-    const id = Number(highlightId);
-    if (Number.isNaN(id)) return items;
-    return [...items].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
-  }, [items, highlightId]);
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((p) =>
+        (p.title ?? "").toLowerCase().includes(q) ||
+        (p.client?.name ?? "").toLowerCase().includes(q) ||
+        (p.vendor?.nombre ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (filterStatus) rows = rows.filter((p) => p.status === filterStatus);
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
+    return rows;
+  }, [items, highlightId, searchQ, filterStatus]);
 
   const kpis = useMemo(() => ({
     activos: items.filter((p) => p.status === "ACTIVE").length,
@@ -188,6 +203,33 @@ export default function OpsProjectsPage() {
           <KpiCard label="OTs registradas" value={kpis.totalOTs} icon="📋" hint="Actividades en todos los proyectos" />
         </div>
       )}
+
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por título, cliente o responsable…" }}
+        selects={[{
+          label: "Estado",
+          value: filterStatus,
+          onChange: setFilterStatus,
+          options: [
+            { value: "ACTIVE", label: "Activo" },
+            { value: "ON_HOLD", label: "En pausa" },
+            { value: "COMPLETED", label: "Completado" },
+            { value: "CANCELLED", label: "Cancelado" },
+          ],
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setFilterStatus(""); }}
+        resultCount={loading ? null : displayItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(displayItems, [
+            { key: "title", label: "Proyecto" },
+            { key: "client", label: "Cliente", format: (v) => (v as OperationalProject["client"])?.name ?? "—" },
+            { key: "vendor", label: "Responsable", format: (v) => (v as OperationalProject["vendor"])?.nombre ?? "—" },
+            { key: "status", label: "Estado", format: (v) => formatOperationalProjectStatus(String(v ?? "")) },
+            { key: "startDate", label: "Inicio", format: (v) => v ? String(v).slice(0, 10) : "" },
+          ], "proyectos-operativos")}>CSV</Button>
+        ) : undefined}
+      />
 
       <Section title={loading ? "Cargando…" : `${displayItems.length} proyectos`}>
         {highlightId && (

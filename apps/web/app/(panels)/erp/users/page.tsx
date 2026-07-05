@@ -22,6 +22,8 @@ import { formatApiError } from "@/lib/erp-api";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 /* ─── tipos ─────────────────────────────────────────────────────────── */
 interface ApiUser {
@@ -314,6 +316,7 @@ export default function UsersPage() {
   }, [users]);
 
   const [userSearch, setUserSearch] = useState("");
+  const [filterActive, setFilterActive] = useState("");
 
   const visibleUsers = useMemo(() => {
     let list = users;
@@ -321,6 +324,8 @@ export default function UsersPage() {
       const id = Number(highlightId);
       if (!Number.isNaN(id)) list = [...list].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
     }
+    if (filterActive === "active") list = list.filter((u) => u.isActive);
+    else if (filterActive === "inactive") list = list.filter((u) => !u.isActive);
     const q = userSearch.trim().toLowerCase();
     if (q) {
       list = list.filter((u) =>
@@ -331,7 +336,7 @@ export default function UsersPage() {
       );
     }
     return list;
-  }, [users, highlightId, userSearch]);
+  }, [users, highlightId, userSearch, filterActive]);
 
   /* ── columnas ────────────────────────────────────────────────────── */
   const columns: Column<ApiUser>[] = [
@@ -418,13 +423,30 @@ export default function UsersPage() {
         </div>
       )}
 
+      <FilterToolbar
+        search={{ value: userSearch, onChange: setUserSearch, placeholder: "Buscar por nombre, email, rol o área…" }}
+        selects={[{
+          label: "Estado",
+          value: filterActive,
+          onChange: setFilterActive,
+          options: [{ value: "active", label: "Activos" }, { value: "inactive", label: "Inactivos" }],
+          allowAll: true,
+        }]}
+        onClear={() => { setUserSearch(""); setFilterActive(""); }}
+        resultCount={loading ? null : visibleUsers.length}
+        rightActions={users.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleUsers, [
+            { key: "nombre", label: "Nombre" },
+            { key: "email", label: "Email" },
+            { key: "role", label: "Rol", format: (v) => (v as ApiUser["role"])?.nombre ?? "—" },
+            { key: "department", label: "Área", format: (v) => (v as ApiUser["department"])?.nombre ?? "—" },
+            { key: "isActive", label: "Estado", format: (v) => v ? "Activo" : "Inactivo" },
+            { key: "lastLoginAt", label: "Último acceso", format: (v) => v ? new Date(String(v)).toLocaleDateString("es-MX") : "Nunca" },
+          ], "usuarios")}>CSV</Button>
+        ) : undefined}
+      />
+
       <Section title={loading ? "Cargando…" : `${visibleUsers.length} usuarios`}>
-        <input
-          value={userSearch}
-          onChange={(e) => setUserSearch(e.target.value)}
-          placeholder="Buscar por nombre, email, rol o área…"
-          style={{ width: "100%", maxWidth: 400, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13, marginBottom: 16, boxSizing: "border-box" }}
-        />
         {highlightId && (
           <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
             Mostrando usuario <strong>#{highlightId}</strong> desde enlace directo.
