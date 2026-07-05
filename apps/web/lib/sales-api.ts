@@ -141,6 +141,7 @@ export type SalesQuote = {
   total: string;
   status: string;
   issueDate: string;
+  validUntil?: string | null;
   items: Array<{ id: number; name: string; qty: number }>;
 };
 

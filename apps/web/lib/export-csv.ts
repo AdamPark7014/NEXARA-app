@@ -7,7 +7,7 @@ import { triggerBlobDownload } from "./file-download";
  * @param columns - Definición de columnas: { key, label, format? }
  * @param filename - Nombre del archivo sin extensión (se añade .csv)
  */
-export function exportToCsv<T extends Record<string, unknown>>(
+export function exportToCsv<T extends object>(
   rows: T[],
   columns: { key: keyof T; label: string; format?: (val: T[keyof T], row: T) => string }[],
   filename: string,
