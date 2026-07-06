@@ -174,6 +174,27 @@ export default function BiPage() {
           </div>
 
           <Section eyebrow="Finanzas" title="Margen por línea de negocio" subtitle={periodLabel}>
+            {margin.length > 0 && (() => {
+              const maxBudget = Math.max(...margin.map((r) => r.budget), 1);
+              return (
+                <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
+                  {margin.map((r) => (
+                    <div key={r.projectType} style={{ display: "grid", gridTemplateColumns: "160px 1fr 80px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.projectType}</span>
+                      <div style={{ position: "relative", height: 20, background: "var(--surface-2)", borderRadius: 4, overflow: "hidden" }}>
+                        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(r.budget / maxBudget) * 100}%`, background: "color-mix(in srgb, var(--primary) 20%, transparent)", borderRadius: 4 }} />
+                        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(0, (r.margin / maxBudget) * 100)}%`, background: r.margin >= 0 ? "var(--success)" : "var(--danger)", borderRadius: 4, opacity: 0.7 }} />
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 700, textAlign: "right", color: r.marginPercent >= 0 ? "var(--success)" : "var(--danger)" }}>{r.marginPercent}%</span>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: 10.5, color: "var(--text-tertiary)", display: "flex", gap: 14, marginTop: 4 }}>
+                    <span>█ Presupuesto</span>
+                    <span style={{ color: "var(--success)" }}>█ Margen</span>
+                  </div>
+                </div>
+              );
+            })()}
             <FilterToolbar
               onClear={() => {}}
               resultCount={margin.length}
@@ -192,6 +213,19 @@ export default function BiPage() {
           </Section>
 
           <Section eyebrow="Operaciones" title="Eficiencia operativa · Top ingenieros" subtitle="Últimos 90 días">
+            {engineers.length > 0 && (
+              <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
+                {engineers.slice(0, 10).map((r) => (
+                  <div key={r.engineerId} style={{ display: "grid", gridTemplateColumns: "140px 1fr 56px", gap: 10, alignItems: "center" }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.engineerName}</span>
+                    <div style={{ position: "relative", height: 16, background: "var(--surface-2)", borderRadius: 4, overflow: "hidden" }}>
+                      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${r.completionRate}%`, background: r.completionRate >= 80 ? "var(--success)" : r.completionRate >= 60 ? "var(--warning)" : "var(--danger)", borderRadius: 4, opacity: 0.75, transition: "width 0.3s" }} />
+                    </div>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, textAlign: "right" }}>{r.completionRate}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <FilterToolbar
               search={{ value: engSearch, onChange: setEngSearch, placeholder: "Buscar ingeniero…" }}
               onClear={() => setEngSearch("")}
