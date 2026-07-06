@@ -10,6 +10,8 @@ import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import { toast } from "@/components/Toast";
 
 type Tab = "comunicados" | "newsletter";
@@ -93,6 +95,9 @@ export default function ComunicacionesInternasPage() {
   const [subsLoading, setSubsLoading] = useState(false);
   const [subsErr, setSubsErr] = useState<string | null>(null);
   const [subSearch, setSubSearch]     = useState("");
+  const [comSearch, setComSearch] = useState("");
+  const [comEstado, setComEstado] = useState("");
+  const [comPrioridad, setComPrioridad] = useState("");
 
   const loadSubs = useCallback(async (q?: string) => {
     if (!token) return;
@@ -205,6 +210,17 @@ export default function ComunicacionesInternasPage() {
     background: "var(--surface)", color: "var(--foreground)", boxSizing: "border-box",
   };
 
+  const visibleComunicados = useMemo(() => {
+    let rows = items;
+    if (comSearch.trim()) {
+      const q = comSearch.toLowerCase();
+      rows = rows.filter((c) => c.titulo.toLowerCase().includes(q) || (c.audiencia ?? "").toLowerCase().includes(q) || (c.autor?.nombre ?? "").toLowerCase().includes(q));
+    }
+    if (comEstado) rows = rows.filter((c) => c.estado === comEstado);
+    if (comPrioridad) rows = rows.filter((c) => c.prioridad === comPrioridad);
+    return rows;
+  }, [items, comSearch, comEstado, comPrioridad]);
+
   const enviados  = items.filter(c => c.estado === "Enviado");
   const borradores= items.filter(c => c.estado === "Borrador");
   const progr     = items.filter(c => c.estado === "Programado");
@@ -308,13 +324,46 @@ export default function ComunicacionesInternasPage() {
       )}
 
       {tab === "comunicados" ? (
-        <Section title="Comunicados internos" subtitle="Avisos puntuales al equipo. Haz clic en Enviar para despachar inmediatamente.">
+        <Section title={`Comunicados internos (${visibleComunicados.length})`} subtitle="Avisos puntuales al equipo. Haz clic en Enviar para despachar inmediatamente.">
+          <FilterToolbar
+            search={{ value: comSearch, onChange: setComSearch, placeholder: "Buscar por título, audiencia o autor…" }}
+            selects={[
+              {
+                label: "Estado",
+                value: comEstado,
+                onChange: setComEstado,
+                options: ["Borrador", "Programado", "Enviado"].map((v) => ({ value: v, label: v })),
+                allowAll: true,
+              },
+              {
+                label: "Prioridad",
+                value: comPrioridad,
+                onChange: setComPrioridad,
+                options: ["Normal", "Alta", "Crítica"].map((v) => ({ value: v, label: v })),
+                allowAll: true,
+              },
+            ]}
+            onClear={() => { setComSearch(""); setComEstado(""); setComPrioridad(""); }}
+            resultCount={loading ? null : visibleComunicados.length}
+            rightActions={items.length > 0 ? (
+              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleComunicados, [
+                { key: "id", label: "ID" },
+                { key: "titulo", label: "Título" },
+                { key: "audiencia", label: "Audiencia" },
+                { key: "prioridad", label: "Prioridad" },
+                { key: "estado", label: "Estado" },
+                { key: "lecturas", label: "Lecturas" },
+                { key: "autor", label: "Autor", format: (v) => (v as Comunicado["autor"])?.nombre ?? "—" },
+                { key: "sentAt", label: "Enviado", format: (v) => v ? String(v).slice(0, 10) : "—" },
+              ], "comunicados-internos")}>CSV</Button>
+            ) : undefined}
+          />
           {loading ? (
             <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
           ) : (
             <DataTable
               columns={columns}
-              rows={items}
+              rows={visibleComunicados}
               rowKey={c => c.id}
               emptyTitle="Sin comunicados"
               emptyDescription="Crea el primero con el botón superior."
