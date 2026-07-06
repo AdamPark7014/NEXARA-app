@@ -10,6 +10,7 @@ import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import FilterToolbar from "@/components/FilterToolbar";
 import { toast } from "@/components/Toast";
 
 interface SettingRow {
@@ -46,6 +47,7 @@ export default function SettingsPage() {
   const [form, setForm] = useState({ ...emptyForm });
   const [formErr, setFormErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -61,13 +63,17 @@ export default function SettingsPage() {
   useEffect(() => { void load(); }, [load]);
 
   const grouped = useMemo(() => {
+    const q = searchQ.trim().toLowerCase();
+    const filtered = q
+      ? settings.filter((s) => s.key.toLowerCase().includes(q) || (s.label ?? "").toLowerCase().includes(q) || s.value.toLowerCase().includes(q))
+      : settings;
     const map = new Map<string, SettingRow[]>();
-    for (const s of settings) {
+    for (const s of filtered) {
       if (!map.has(s.category)) map.set(s.category, []);
       map.get(s.category)!.push(s);
     }
     return Array.from(map.entries());
-  }, [settings]);
+  }, [settings, searchQ]);
 
   const openNew = () => { setEditingSetting(null); setForm({ ...emptyForm }); setFormErr(null); setShowForm(true); };
   const openEdit = (s: SettingRow) => {
@@ -118,9 +124,14 @@ export default function SettingsPage() {
         }
       />
 
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por clave, etiqueta o valor…" }}
+        onClear={() => setSearchQ("")}
+        resultCount={loading ? null : settings.length}
+      />
       {loading && <EmptyState icon="⏳" title="Cargando configuración…" description="Consultando parámetros del sistema." />}
       {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-      {!loading && !error && grouped.length === 0 && <EmptyState icon="⚙️" title="Sin configuraciones" description="Agrega el primer parámetro del sistema." />}
+      {!loading && !error && grouped.length === 0 && <EmptyState icon="⚙️" title="Sin configuraciones" description={searchQ ? "Sin resultados para ese filtro." : "Agrega el primer parámetro del sistema."} />}
 
       {!loading && !error && grouped.map(([category, rows]) => (
         <Section key={category} title={category.charAt(0).toUpperCase() + category.slice(1)}>
