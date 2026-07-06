@@ -7,6 +7,8 @@ import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import { useUser } from "@/components/UserContext";
 import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
 import { getHrSubmoduleConfig } from "@/lib/section-views";
@@ -46,6 +48,7 @@ export default function HrKpisPage() {
   const [engineers, setEngineers] = useState<EngineerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -98,6 +101,12 @@ export default function HrKpisPage() {
 
   const avgCompletion = engineers.length ? Math.round(engineers.reduce((s, e) => s + e.completionRate, 0) / engineers.length) : 0;
 
+  const visibleEngineers = useMemo(() => {
+    if (!searchQ.trim()) return engineers;
+    const q = searchQ.toLowerCase();
+    return engineers.filter((e) => e.engineerName.toLowerCase().includes(q));
+  }, [engineers, searchQ]);
+
   const columns: Column<EngineerRow>[] = [
     { key: "engineerName", label: "Ingeniero" },
     { key: "totalActivities", label: "OT (90d)", width: 90 },
@@ -127,7 +136,21 @@ export default function HrKpisPage() {
           </div>
 
           <Section title="Productividad operativa · últimos 90 días">
-            <DataTable columns={columns} rows={engineers} rowKey={(r) => r.engineerId} emptyTitle="Sin datos" emptyDescription="No hay actividades cerradas en los últimos 90 días." />
+            <FilterToolbar
+              search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por ingeniero…" }}
+              onClear={() => setSearchQ("")}
+              resultCount={visibleEngineers.length}
+              rightActions={engineers.length > 0 ? (
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleEngineers, [
+                  { key: "engineerName", label: "Ingeniero" },
+                  { key: "totalActivities", label: "OT (90d)" },
+                  { key: "completed", label: "Cerradas" },
+                  { key: "completionRate", label: "% Cierre", format: (v) => `${String(v)}%` },
+                  { key: "avgDurationMin", label: "Duración promedio (min)" },
+                ], "kpis-ingenieros")}>CSV</Button>
+              ) : undefined}
+            />
+            <DataTable columns={columns} rows={visibleEngineers} rowKey={(r) => r.engineerId} emptyTitle="Sin datos" emptyDescription="No hay actividades cerradas en los últimos 90 días." />
           </Section>
 
           <Section title="eNPS y capacitación" subtitle="Estos indicadores aún no tienen un módulo de captura en NEXARA.">

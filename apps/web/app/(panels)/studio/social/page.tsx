@@ -13,6 +13,8 @@ import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog"
 import StudioImageHint from "@/components/studio/StudioImageHint";
 import { getSocialImageSpec, studioImageHintLine } from "@/lib/studio-image-specs";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface SocialPost {
   id: number;
@@ -58,6 +60,9 @@ export default function StudioSocialPage() {
   const [items, setItems]     = useState<SocialPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterRed, setFilterRed] = useState("");
+  const [filterEstado, setFilterEstado] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing]   = useState<SocialPost | null>(null);
   const [form, setForm]         = useState({ ...EMPTY_FORM });
@@ -146,9 +151,20 @@ export default function StudioSocialPage() {
     background: "var(--surface)", color: "var(--foreground)", boxSizing: "border-box",
   };
 
-  const scheduled = items.filter(p => p.estado === "Programado");
-  const published  = items.filter(p => p.estado === "Publicado");
-  const drafts     = items.filter(p => p.estado === "Borrador");
+  const scheduled = items.filter((p) => p.estado === "Programado");
+  const published  = items.filter((p) => p.estado === "Publicado");
+  const drafts     = items.filter((p) => p.estado === "Borrador");
+
+  const visibleItems = useMemo(() => {
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((p) => (p.titulo ?? "").toLowerCase().includes(q) || (p.contenido ?? "").toLowerCase().includes(q));
+    }
+    if (filterRed) rows = rows.filter((p) => p.red === filterRed);
+    if (filterEstado) rows = rows.filter((p) => p.estado === filterEstado);
+    return rows;
+  }, [items, searchQ, filterRed, filterEstado]);
 
   return (
     <>
@@ -229,7 +245,38 @@ export default function StudioSocialPage() {
         </div>
       )}
 
-      <Section title={loading ? "Cargando…" : `${items.length} posts`}>
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por título o contenido…" }}
+        selects={[
+          {
+            label: "Red",
+            value: filterRed,
+            onChange: setFilterRed,
+            options: ["Instagram", "LinkedIn", "Facebook", "Twitter", "TikTok"].map((r) => ({ value: r, label: r })),
+            allowAll: true,
+          },
+          {
+            label: "Estado",
+            value: filterEstado,
+            onChange: setFilterEstado,
+            options: ["Borrador", "Programado", "Publicado", "Cancelado"].map((s) => ({ value: s, label: s })),
+            allowAll: true,
+          },
+        ]}
+        onClear={() => { setSearchQ(""); setFilterRed(""); setFilterEstado(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "id", label: "ID" },
+            { key: "red", label: "Red" },
+            { key: "titulo", label: "Título" },
+            { key: "estado", label: "Estado" },
+            { key: "cuando", label: "Publicación", format: (v) => v ? String(v).slice(0, 16).replace("T", " ") : "" },
+          ], "social-posts")}>CSV</Button>
+        ) : undefined}
+      />
+
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} posts`}>
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
         ) : items.length === 0 ? (
@@ -239,7 +286,7 @@ export default function StudioSocialPage() {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {items.map(p => (
+            {visibleItems.map(p => (
               <article key={p.id} style={{
                 display: "grid", gridTemplateColumns: "auto 1fr auto auto auto", gap: 14, alignItems: "center",
                 padding: 14, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12,
