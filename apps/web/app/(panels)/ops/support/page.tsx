@@ -13,6 +13,7 @@ import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface TicketRequest {
   id: number;
@@ -53,6 +54,7 @@ export default function SupportInboxPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQ, setSearchQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [urgencyFilter, setUrgencyFilter] = useState<string>("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -72,14 +74,18 @@ export default function SupportInboxPage() {
   useEffect(() => { void load(); }, [load]);
 
   const visibleItems = useMemo(() => {
-    if (!searchQ.trim()) return items;
-    const q = searchQ.toLowerCase();
-    return items.filter((t) =>
-      (t.client?.name ?? "").toLowerCase().includes(q) ||
-      (t.description ?? "").toLowerCase().includes(q) ||
-      (t.address ?? "").toLowerCase().includes(q)
-    );
-  }, [items, searchQ]);
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((t) =>
+        (t.client?.name ?? "").toLowerCase().includes(q) ||
+        (t.description ?? "").toLowerCase().includes(q) ||
+        (t.address ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (urgencyFilter) rows = rows.filter((t) => t.urgency === urgencyFilter);
+    return rows;
+  }, [items, searchQ, urgencyFilter]);
 
   const nuevos = items.filter((t) => t.status === "NEW").length;
   const asignados = items.filter((t) => t.status === "ASSIGNED").length;
@@ -172,24 +178,48 @@ export default function SupportInboxPage() {
       </div>
       <FilterToolbar
         search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por cliente, descripción o dirección…" }}
-        selects={[{
-          label: "Estado",
-          value: statusFilter,
-          onChange: setStatusFilter,
-          options: [
-            { value: "NEW", label: "Nuevos" },
-            { value: "ASSIGNED", label: "Asignados" },
-            { value: "APPROVED", label: "Aprobados" },
-            { value: "CLOSED", label: "Cerrados" },
-            { value: "REJECTED", label: "Rechazados" },
-          ],
-          allowAll: true,
-        }]}
-        onClear={() => { setSearchQ(""); setStatusFilter(""); }}
+        selects={[
+          {
+            label: "Estado",
+            value: statusFilter,
+            onChange: setStatusFilter,
+            options: [
+              { value: "NEW", label: "Nuevos" },
+              { value: "ASSIGNED", label: "Asignados" },
+              { value: "APPROVED", label: "Aprobados" },
+              { value: "CLOSED", label: "Cerrados" },
+              { value: "REJECTED", label: "Rechazados" },
+            ],
+            allowAll: true,
+          },
+          {
+            label: "Urgencia",
+            value: urgencyFilter,
+            onChange: setUrgencyFilter,
+            options: [
+              { value: "HIGH", label: "Alta" },
+              { value: "MEDIUM", label: "Media" },
+              { value: "LOW", label: "Baja" },
+            ],
+            allowAll: true,
+          },
+        ]}
+        onClear={() => { setSearchQ(""); setStatusFilter(""); setUrgencyFilter(""); }}
         resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "id", label: "Ticket", format: (v) => `T-${String(v)}` },
+            { key: "client", label: "Cliente", format: (v) => (v as TicketRequest["client"])?.name ?? "—" },
+            { key: "description", label: "Descripción" },
+            { key: "urgency", label: "Urgencia" },
+            { key: "status", label: "Estado" },
+            { key: "createdAt", label: "Abierto", format: (v) => v ? String(v).slice(0, 10) : "" },
+            { key: "dueAt", label: "Vence", format: (v) => v ? String(v).slice(0, 10) : "" },
+          ], "tickets-soporte")}>CSV</Button>
+        ) : undefined}
       />
 
-      <Section title={loading ? "Cargando…" : `${items.length} tickets`}>
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} tickets`}>
         {loading && <EmptyState icon="⏳" title="Cargando tickets…" description="Consultando solicitudes desde la API." />}
         {!loading && error && (
           <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
