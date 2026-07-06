@@ -11,6 +11,8 @@ import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import StudioFileInput from "@/components/studio/StudioFileInput";
 import StudioImageHint from "@/components/studio/StudioImageHint";
 import {
@@ -57,6 +59,8 @@ export default function StudioNewsPage() {
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -111,6 +115,16 @@ export default function StudioNewsPage() {
       setItems((prev) => prev.map((i) => (i.id === n.id ? { ...i, status: nextStatus, publishedAt: nextStatus === "PUBLISHED" ? new Date().toISOString() : i.publishedAt } : i)));
     } catch (e) { setActionErr(e instanceof Error ? e.message : "Error al eliminar"); }
   };
+
+  const visibleItems = useMemo(() => {
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((n) => n.title.toLowerCase().includes(q) || (n.summary ?? "").toLowerCase().includes(q) || n.slug.toLowerCase().includes(q));
+    }
+    if (filterStatus) rows = rows.filter((n) => n.status === filterStatus);
+    return rows;
+  }, [items, searchQ, filterStatus]);
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
 
@@ -168,10 +182,36 @@ export default function StudioNewsPage() {
           <button type="button" onClick={() => setActionErr(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
         </div>
       )}
-      <Section title={loading ? "Cargando…" : `${items.length} publicaciones`}>
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} publicaciones`}>
+        <FilterToolbar
+          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por título, resumen o slug…" }}
+          selects={[{
+            label: "Estado",
+            value: filterStatus,
+            onChange: setFilterStatus,
+            options: [
+              { value: "PUBLISHED", label: "Publicadas" },
+              { value: "DRAFT", label: "Borradores" },
+              { value: "ARCHIVED", label: "Archivadas" },
+            ],
+            allowAll: true,
+          }]}
+          onClear={() => { setSearchQ(""); setFilterStatus(""); }}
+          resultCount={loading ? null : visibleItems.length}
+          rightActions={items.length > 0 ? (
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+              { key: "id", label: "ID" },
+              { key: "title", label: "Título" },
+              { key: "slug", label: "Slug" },
+              { key: "status", label: "Estado" },
+              { key: "publishedAt", label: "Publicado", format: (v) => v ? String(v).slice(0, 10) : "—" },
+              { key: "createdAt", label: "Creado", format: (v) => v ? String(v).slice(0, 10) : "" },
+            ], "blog-noticias")}>CSV</Button>
+          ) : undefined}
+        />
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando el blog público." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && <DataTable columns={columns} rows={items} rowKey={(n) => n.id} emptyTitle="Sin publicaciones" emptyDescription="Escribe la primera entrada del blog." />}
+        {!loading && !error && <DataTable columns={columns} rows={visibleItems} rowKey={(n) => n.id} emptyTitle="Sin publicaciones" emptyDescription="Escribe la primera entrada del blog." />}
       </Section>
 
       {showForm && (
