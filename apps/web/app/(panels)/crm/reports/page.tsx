@@ -7,6 +7,8 @@ import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
@@ -21,6 +23,10 @@ interface Metrics {
   pipelineValue: number;
   closedProjects: number;
   activeClients: number;
+  wonCount?: number;
+  lostCount?: number;
+  avgDealSize?: number;
+  avgDaysToClose?: number;
 }
 
 interface VendorStat {
@@ -53,6 +59,8 @@ export default function ReportsPage() {
   const [vendors, setVendors] = useState<VendorStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -76,13 +84,31 @@ export default function ReportsPage() {
   const statusVariant = (s: string): "positive" | "warning" | "danger" =>
     s === "on-track" ? "positive" : s === "risk" ? "warning" : "danger";
 
+  const visibleVendors = useMemo(() => {
+    let rows = vendors;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((v) => v.userName.toLowerCase().includes(q));
+    }
+    if (filterStatus) rows = rows.filter((v) => v.status === filterStatus);
+    return rows;
+  }, [vendors, searchQ, filterStatus]);
+
   const columns: Column<VendorStat>[] = [
     { key: "userName", label: "Ejecutivo" },
     { key: "revenue", label: "Ingreso", render: (v) => <Money value={v.revenue} />, width: 120 },
     { key: "opportunities", label: "Oportunidades", width: 110 },
     { key: "conversionRate", label: "Conversión", render: (v) => `${v.conversionRate}%`, width: 100 },
     { key: "attainmentRevenue", label: "% cuota", render: (v) => <Tag variant={statusVariant(v.status)}>{v.attainmentRevenue.toFixed(0)}%</Tag>, width: 100 },
+    { key: "status", label: "Semáforo", render: (v) => <Tag variant={statusVariant(v.status)}>{v.status === "on-track" ? "En meta" : v.status === "risk" ? "En riesgo" : "Fuera de meta"}</Tag>, width: 130 },
   ];
+
+  const wonCount = metrics?.wonCount ?? 0;
+  const lostCount = metrics?.lostCount ?? 0;
+  const totalClosed = wonCount + lostCount;
+  const winRate = totalClosed > 0 ? +((wonCount / totalClosed) * 100).toFixed(1) : metrics?.conversionRate ?? 0;
+
+  const periodLabel = period === "month" ? "Este mes" : period === "week" ? "Esta semana" : "Este año";
 
   return (
     <>
@@ -92,7 +118,11 @@ export default function ReportsPage() {
         subtitle={viewCfg.subtitle}
         actions={
           <>
-            <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}>
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value as Period)}
+              style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
+            >
               <option value="week">Esta semana</option>
               <option value="month">Este mes</option>
               <option value="year">Este año</option>
@@ -107,17 +137,75 @@ export default function ReportsPage() {
 
       {!loading && !error && metrics && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-            <KpiCard label="Ingreso cerrado" value={<Money value={metrics.totalRevenue} compact />} hint={period === "month" ? "Este mes" : period === "week" ? "Esta semana" : "Este año"} variant="positive" icon="💰" />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(175px, 1fr))", gap: 12, marginBottom: 20 }}>
+            <KpiCard label="Ingreso cerrado" value={<Money value={metrics.totalRevenue} compact />} hint={periodLabel} variant="positive" icon="💰" />
             <KpiCard label="Pipeline abierto" value={<Money value={metrics.pipelineValue} compact />} hint={`${metrics.opportunityCount} oportunidades activas`} icon="📊" variant="accent" />
-            <KpiCard label="Conversión" value={`${metrics.conversionRate}%`} variant={metrics.conversionRate >= 30 ? "positive" : metrics.conversionRate >= 15 ? "warning" : "danger"} icon="🎯" />
+            <KpiCard label="Win rate" value={`${winRate}%`} variant={winRate >= 30 ? "positive" : winRate >= 15 ? "warning" : "danger"} icon="🎯" hint={totalClosed > 0 ? `${wonCount} ganadas / ${lostCount} perdidas` : "Tasa de cierre"} />
             <KpiCard label="Margen promedio" value={<Money value={metrics.averageMargin} compact />} icon="📈" />
             <KpiCard label="Clientes activos" value={metrics.activeClients} icon="🤝" variant={metrics.activeClients > 0 ? "accent" : "default"} />
-            <KpiCard label="Proyectos cerrados" value={metrics.closedProjects} variant={metrics.closedProjects > 0 ? "positive" : "default"} icon="✅" />
+            <KpiCard label="Proyectos cerrados" value={metrics.closedProjects} variant={metrics.closedProjects > 0 ? "positive" : "default"} icon="✅" hint={periodLabel} />
+            {metrics.avgDealSize !== undefined && (
+              <KpiCard label="Ticket promedio" value={<Money value={metrics.avgDealSize} compact />} icon="🏷️" hint="Por oportunidad ganada" />
+            )}
+            {metrics.avgDaysToClose !== undefined && (
+              <KpiCard label="Días promedio cierre" value={metrics.avgDaysToClose} icon="⏱️" hint="Desde creación a cerrado" />
+            )}
           </div>
 
+          {/* Won/lost funnel */}
+          {totalClosed > 0 && (
+            <Section eyebrow="Embudo" title="Ganadas vs. Perdidas" subtitle={periodLabel}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ padding: "14px 18px", borderRadius: 10, background: "color-mix(in srgb, var(--success) 10%, transparent)", border: "1px solid color-mix(in srgb, var(--success) 30%, var(--border))" }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--success)", textTransform: "uppercase", marginBottom: 4 }}>Ganadas</div>
+                  <div style={{ fontFamily: "var(--nx-font-display)", fontSize: 28, fontWeight: 700 }}>{wonCount}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{winRate}% del total cerrado</div>
+                </div>
+                <div style={{ padding: "14px 18px", borderRadius: 10, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 25%, var(--border))" }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "var(--danger)", textTransform: "uppercase", marginBottom: 4 }}>Perdidas</div>
+                  <div style={{ fontFamily: "var(--nx-font-display)", fontSize: 28, fontWeight: 700 }}>{lostCount}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{(100 - winRate).toFixed(1)}% del total cerrado</div>
+                </div>
+              </div>
+            </Section>
+          )}
+
           <Section title="Desempeño por ejecutivo">
-            <DataTable columns={columns} rows={vendors} rowKey={(v) => v.userId} emptyTitle="Sin datos" emptyDescription="No hay actividad comercial registrada en este periodo." />
+            <FilterToolbar
+              search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por ejecutivo…" }}
+              selects={[
+                {
+                  label: "Semáforo",
+                  value: filterStatus,
+                  onChange: setFilterStatus,
+                  options: [
+                    { value: "on-track", label: "En meta" },
+                    { value: "risk", label: "En riesgo" },
+                    { value: "off-track", label: "Fuera de meta" },
+                  ],
+                  allowAll: true,
+                },
+              ]}
+              onClear={() => { setSearchQ(""); setFilterStatus(""); }}
+              resultCount={loading ? null : visibleVendors.length}
+              rightActions={vendors.length > 0 ? (
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleVendors, [
+                  { key: "userName", label: "Ejecutivo" },
+                  { key: "revenue", label: "Ingreso (MXN)" },
+                  { key: "opportunities", label: "Oportunidades" },
+                  { key: "conversionRate", label: "Conversión (%)", format: (v) => `${String(v)}%` },
+                  { key: "attainmentRevenue", label: "% Cuota", format: (v) => `${Number(v).toFixed(1)}%` },
+                  { key: "status", label: "Semáforo" },
+                ], `reporte-ejecutivos-${period}`)}>CSV</Button>
+              ) : undefined}
+            />
+            <DataTable
+              columns={columns}
+              rows={visibleVendors}
+              rowKey={(v) => v.userId}
+              emptyTitle="Sin datos"
+              emptyDescription="No hay actividad comercial registrada en este periodo."
+            />
           </Section>
         </>
       )}
