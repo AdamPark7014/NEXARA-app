@@ -11,6 +11,8 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import { toast } from "@/components/Toast";
 
 interface Contract {
@@ -73,6 +75,8 @@ export default function MaintenanceContractsPage() {
   const [visitsErr, setVisitsErr] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ title: "", monthlyFee: "", slaResponseHours: "", slaResolutionHours: "" });
   const [editSaving, setEditSaving] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -205,6 +209,20 @@ export default function MaintenanceContractsPage() {
       toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
     } finally { setSaving(false); }
   };
+
+  const visibleContracts = useMemo(() => {
+    let rows = items;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((c) =>
+        c.title.toLowerCase().includes(q) ||
+        (c.client?.name ?? "").toLowerCase().includes(q) ||
+        c.contractNumber.toLowerCase().includes(q)
+      );
+    }
+    if (filterStatus) rows = rows.filter((c) => c.status === filterStatus);
+    return rows;
+  }, [items, searchQ, filterStatus]);
 
   const activos = items.filter((c) => c.status === "ACTIVE").length;
   const mrr = items.filter((c) => c.status === "ACTIVE").reduce((s, c) => s + Number(c.monthlyFee), 0);
@@ -340,10 +358,39 @@ export default function MaintenanceContractsPage() {
         <KpiCard label="Visitas próx. 7 días" value={proximaSemana} icon="📅" />
       </div>
 
-      <Section title={loading ? "Cargando…" : `${items.length} contratos`}>
+      <Section title={loading ? "Cargando…" : `${visibleContracts.length} contratos`}>
+        <FilterToolbar
+          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por cliente, título o folio…" }}
+          selects={[{
+            label: "Estado",
+            value: filterStatus,
+            onChange: setFilterStatus,
+            options: [
+              { value: "ACTIVE", label: "Activo" },
+              { value: "DRAFT", label: "Borrador" },
+              { value: "PAUSED", label: "Pausado" },
+              { value: "EXPIRED", label: "Expirado" },
+              { value: "CANCELLED", label: "Cancelado" },
+            ],
+            allowAll: true,
+          }]}
+          onClear={() => { setSearchQ(""); setFilterStatus(""); }}
+          resultCount={loading ? null : visibleContracts.length}
+          rightActions={items.length > 0 ? (
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleContracts, [
+              { key: "contractNumber", label: "Folio" },
+              { key: "title", label: "Contrato" },
+              { key: "client", label: "Cliente", format: (v) => (v as Contract["client"])?.name ?? "—" },
+              { key: "frequency", label: "Frecuencia" },
+              { key: "monthlyFee", label: "Cuota mensual (MXN)" },
+              { key: "status", label: "Estado" },
+              { key: "nextVisitDate", label: "Próx. visita", format: (v) => v ? String(v).slice(0, 10) : "—" },
+            ], "contratos-mantenimiento")}>CSV</Button>
+          ) : undefined}
+        />
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando contratos de mantenimiento." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && <DataTable columns={columns} rows={items} rowKey={(c) => c.id} emptyTitle="Sin contratos" emptyDescription={cfg.canCreate ? "Crea el primer contrato con el botón de arriba." : "Sin contratos de mantenimiento registrados."} />}
+        {!loading && !error && <DataTable columns={columns} rows={visibleContracts} rowKey={(c) => c.id} emptyTitle="Sin contratos" emptyDescription={cfg.canCreate ? "Crea el primer contrato con el botón de arriba." : "Sin contratos de mantenimiento registrados."} />}
       </Section>
 
       {selected && (
