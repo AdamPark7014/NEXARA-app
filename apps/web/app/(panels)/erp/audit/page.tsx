@@ -8,6 +8,8 @@ import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { resolveV2RoleKey } from "@/lib/user-access";
@@ -65,8 +67,6 @@ const SEVERITY_META: Record<Severity, { label: string; icon: string; bg: string;
   critical: { label: "CRITICAL", icon: "!", bg: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "color-mix(in srgb, var(--danger) 45%, var(--border))", text: "var(--danger)" },
 };
 
-type SevFilter = "all" | Severity;
-
 const ERP_AUDIT_ROLES = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.DIR_OPERACIONES]);
 
 export default function AuditPage() {
@@ -74,7 +74,6 @@ export default function AuditPage() {
   const router = useRouter();
   const token = user?.token ?? "";
 
-  // Log de auditoría — solo administración y dirección.
   useEffect(() => {
     if (!user) return;
     if (user.isSuperAdmin) return;
@@ -85,7 +84,8 @@ export default function AuditPage() {
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sevFilter, setSevFilter] = useState<SevFilter>("all");
+  const [sevFilter, setSevFilter] = useState("");
+  const [panelFilter, setPanelFilter] = useState("");
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<number | null>(null);
 
@@ -94,7 +94,7 @@ export default function AuditPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch("audit?limit=100", token);
+      const data = await apiFetch("audit?limit=200", token);
       setRows(Array.isArray(data) ? data : (data?.data ?? []));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar el log de auditoría");
@@ -109,14 +109,16 @@ export default function AuditPage() {
     const q = query.trim().toLowerCase();
     return rows.filter((r) => {
       const sev = deriveSeverity(r.action);
-      if (sevFilter !== "all" && sev !== sevFilter) return false;
+      if (sevFilter && sev !== sevFilter) return false;
+      const panel = ENTITY_PANEL[r.entityType] ?? r.entityType;
+      if (panelFilter && panel !== panelFilter) return false;
       if (q) {
         const hay = `${r.user?.nombre ?? "Sistema"} ${r.action} ${r.entityType} ${r.entityId}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [rows, sevFilter, query]);
+  }, [rows, sevFilter, panelFilter, query]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, AuditRow[]>();
@@ -129,10 +131,9 @@ export default function AuditPage() {
   }, [filtered]);
 
   const stats = useMemo(() => {
-    const todayRows = rows.filter((r) => dayLabel(r.createdAt) === "Hoy");
     const last24h = rows.filter((r) => Date.now() - new Date(r.createdAt).getTime() < 86400000);
     return {
-      today: todayRows.length,
+      today: rows.filter((r) => dayLabel(r.createdAt) === "Hoy").length,
       criticals24h: last24h.filter((r) => deriveSeverity(r.action) === "critical").length,
       warnings24h: last24h.filter((r) => deriveSeverity(r.action) === "warning").length,
       uniqueActors: new Set(rows.map((r) => r.user?.id ?? "system")).size,
@@ -155,33 +156,42 @@ export default function AuditPage() {
         <KpiCard label="Actores únicos" value={stats.uniqueActors} icon="👥" hint="Personas + sistema" />
       </div>
 
-      <Section title="Filtros" subtitle="Cruza severidad y búsqueda libre">
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 12 }}>
-          <div style={{ display: "flex", gap: 6 }}>
-            {(["all", "info", "warning", "critical"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setSevFilter(s)}
-                style={{
-                  padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 999,
-                  border: `1px solid ${sevFilter === s ? "var(--primary)" : "var(--border)"}`,
-                  background: sevFilter === s ? "color-mix(in srgb, var(--primary) 12%, transparent)" : "var(--surface)",
-                  color: sevFilter === s ? "var(--primary)" : "var(--text-secondary)",
-                  cursor: "pointer", textTransform: "capitalize",
-                }}
-              >
-                {s === "all" ? "Todas las severidades" : s}
-              </button>
-            ))}
-          </div>
-        </div>
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por usuario, acción, entidad…"
-          style={{ width: "100%", maxWidth: 420, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
-        />
-      </Section>
+      <FilterToolbar
+        search={{ value: query, onChange: setQuery, placeholder: "Buscar por usuario, acción, entidad…" }}
+        selects={[
+          {
+            label: "Severidad",
+            value: sevFilter,
+            onChange: setSevFilter,
+            options: [
+              { value: "info", label: "Info" },
+              { value: "warning", label: "Warning" },
+              { value: "critical", label: "Critical" },
+            ],
+            allowAll: true,
+          },
+          {
+            label: "Panel",
+            value: panelFilter,
+            onChange: setPanelFilter,
+            options: ["ERP", "CRM", "OPS"].map((p) => ({ value: p, label: p })),
+            allowAll: true,
+          },
+        ]}
+        onClear={() => { setQuery(""); setSevFilter(""); setPanelFilter(""); }}
+        resultCount={loading ? null : filtered.length}
+        rightActions={rows.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(filtered, [
+            { key: "id", label: "ID" },
+            { key: "user", label: "Usuario", format: (v) => (v as AuditRow["user"])?.nombre ?? "Sistema" },
+            { key: "action", label: "Acción" },
+            { key: "entityType", label: "Entidad" },
+            { key: "entityId", label: "ID Entidad" },
+            { key: "ipAddress", label: "IP" },
+            { key: "createdAt", label: "Fecha", format: (v) => v ? String(v).slice(0, 19).replace("T", " ") : "" },
+          ], "audit-log")}>CSV</Button>
+        ) : undefined}
+      />
 
       <Section title={loading ? "Cargando…" : `${filtered.length} eventos`}>
         {loading && <EmptyState icon="⏳" title="Cargando bitácora…" description="Consultando el log de auditoría." />}
@@ -199,6 +209,7 @@ export default function AuditPage() {
                 const sev = deriveSeverity(e.action);
                 const meta = SEVERITY_META[sev];
                 const isExpanded = expanded === e.id;
+                const panel = ENTITY_PANEL[e.entityType] ?? e.entityType;
                 return (
                   <div
                     key={e.id}
@@ -209,9 +220,9 @@ export default function AuditPage() {
                     }}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flexWrap: "wrap" }}>
                         <span style={{ color: meta.text, fontWeight: 700, fontSize: 12 }}>{meta.icon} {meta.label}</span>
-                        <Tag variant="default">{ENTITY_PANEL[e.entityType] ?? e.entityType}</Tag>
+                        <Tag variant="default">{panel}</Tag>
                         <span style={{ fontSize: 13, fontWeight: 600 }}>{e.user?.nombre ?? "Sistema"}</span>
                         <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
                           {e.action} {e.entityType} #{e.entityId}
@@ -223,8 +234,16 @@ export default function AuditPage() {
                     </div>
                     {isExpanded && (
                       <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border)", fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                        {e.ipAddress && <div>IP: {e.ipAddress}</div>}
-                        {!!e.changes && <div>Cambios: <code>{JSON.stringify(e.changes).slice(0, 300)}</code></div>}
+                        {e.ipAddress && <div style={{ marginBottom: 4 }}>IP: <code>{e.ipAddress}</code></div>}
+                        {e.user?.email && <div style={{ marginBottom: 4 }}>Email: <code>{e.user.email}</code></div>}
+                        {!!e.changes && (
+                          <div>
+                            <div style={{ fontWeight: 600, marginBottom: 2 }}>Cambios:</div>
+                            <pre style={{ fontSize: 11, background: "var(--surface-2)", padding: "6px 10px", borderRadius: 6, overflowX: "auto", margin: 0 }}>
+                              {JSON.stringify(e.changes, null, 2).slice(0, 600)}
+                            </pre>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
