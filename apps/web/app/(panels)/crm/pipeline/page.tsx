@@ -9,6 +9,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import { Money, Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
+import FilterToolbar from "@/components/FilterToolbar";
 import { filterRowsByScope, getCrmSalesSectionConfig } from "@/lib/section-views";
 import {
   PIPELINE_STAGES,
@@ -34,6 +35,7 @@ export default function PipelinePage() {
   const [error, setError] = useState<string | null>(null);
   const [dragId, setDragId] = useState<number | null>(null);
   const [moveErr, setMoveErr] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -57,16 +59,26 @@ export default function PipelinePage() {
     [items, user, cfg.defaultScope],
   );
 
+  const filteredItems = useMemo(() => {
+    if (!searchQ.trim()) return scopedItems;
+    const q = searchQ.toLowerCase();
+    return scopedItems.filter((o) =>
+      (o.title ?? "").toLowerCase().includes(q) ||
+      (o.client?.name ?? o.clientName ?? "").toLowerCase().includes(q) ||
+      (o.owner?.nombre ?? "").toLowerCase().includes(q)
+    );
+  }, [scopedItems, searchQ]);
+
   const byStage = useMemo(() => {
     const map = new Map<string, SalesOpportunity[]>();
     for (const s of PIPELINE_STAGES) map.set(s.id, []);
-    for (const o of scopedItems) {
+    for (const o of filteredItems) {
       if (isClosedOpportunityStage(o.stage)) continue;
       const key = PIPELINE_STAGES.some((s) => s.id === o.stage) ? o.stage : "DISCOVERY";
       map.get(key)!.push(o);
     }
     return map;
-  }, [scopedItems]);
+  }, [filteredItems]);
 
   const moveStage = async (id: number, stage: string) => {
     if (!token || !cfg.canEdit) return;
@@ -118,6 +130,14 @@ export default function PipelinePage() {
       )}
       {loading && <EmptyState icon="⏳" title="Cargando pipeline…" description="Consultando oportunidades." />}
       {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
+
+      {!loading && !error && (
+        <FilterToolbar
+          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por cliente, título o ejecutivo…" }}
+          onClear={() => setSearchQ("")}
+          resultCount={filteredItems.filter((o) => !isClosedOpportunityStage(o.stage)).length}
+        />
+      )}
 
       {!loading && !error && (
         <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 12 }}>
