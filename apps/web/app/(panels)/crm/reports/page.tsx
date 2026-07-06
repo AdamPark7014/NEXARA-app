@@ -171,6 +171,22 @@ export default function ReportsPage() {
           )}
 
           <Section title="Desempeño por ejecutivo">
+            {vendors.length > 0 && (
+              <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
+                {vendors.slice(0, 8).map((v) => (
+                  <div key={v.userId} style={{ display: "grid", gridTemplateColumns: "140px 1fr 60px 64px", gap: 10, alignItems: "center" }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.userName}</span>
+                    <div style={{ position: "relative", height: 16, background: "var(--surface-2)", borderRadius: 4, overflow: "hidden" }}>
+                      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.min(100, v.attainmentRevenue)}%`, background: v.status === "on-track" ? "var(--success)" : v.status === "risk" ? "var(--warning)" : "var(--danger)", borderRadius: 4, opacity: 0.7 }} />
+                    </div>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, textAlign: "right" }}>{v.attainmentRevenue.toFixed(0)}%</span>
+                    <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, textAlign: "center", background: v.status === "on-track" ? "color-mix(in srgb, var(--success) 15%, transparent)" : v.status === "risk" ? "color-mix(in srgb, var(--warning) 15%, transparent)" : "color-mix(in srgb, var(--danger) 12%, transparent)", color: v.status === "on-track" ? "var(--success)" : v.status === "risk" ? "var(--warning)" : "var(--danger)", fontWeight: 600 }}>
+                      {v.status === "on-track" ? "✓" : v.status === "risk" ? "!" : "✗"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
             <FilterToolbar
               search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por ejecutivo…" }}
               selects={[
