@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
@@ -54,6 +56,9 @@ export default function SupportSlaPage() {
   const [stats, setStats] = useState<SlaStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterPriority, setFilterPriority] = useState("");
+  const [filterType, setFilterType] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -70,6 +75,21 @@ export default function SupportSlaPage() {
   useEffect(() => { void load(); }, [load]);
 
   const typeLabel: Record<string, string> = { response: "Respuesta", response_open: "Respuesta (abierto)", resolution: "Resolución" };
+
+  const visibleBreaches = useMemo(() => {
+    if (!stats) return [];
+    let rows = stats.breaches;
+    if (filterPriority) rows = rows.filter((b) => b.priority === filterPriority);
+    if (filterType) rows = rows.filter((b) => b.type === filterType);
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((b) =>
+        (b.anNumber ?? "").toLowerCase().includes(q) ||
+        (b.titulo ?? "").toLowerCase().includes(q)
+      );
+    }
+    return rows;
+  }, [stats, searchQ, filterPriority, filterType]);
 
   const columns: Column<Breach>[] = [
     { key: "anNumber", label: "Ticket", render: (b) => <Tag variant="accent">{b.anNumber ?? `#${b.id}`}</Tag>, width: 100 },
@@ -100,14 +120,70 @@ export default function SupportSlaPage() {
             <KpiCard label="Tickets abiertos" value={stats.stillOpen} icon="⏳" />
           </div>
 
-          <Section title={`${stats.breaches.length} incumplimientos recientes`} subtitle="Ordenados por horas de retraso, los más críticos primero.">
+          {/* SLA compliance visual bars */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+            {[
+              { label: "Respuesta", pct: stats.responseSla.compliancePct, avg: `${stats.responseSla.avgHours}h prom.`, late: stats.responseSla.late },
+              { label: "Resolución", pct: stats.resolutionSla.compliancePct, avg: `${stats.resolutionSla.avgHours}h prom.`, late: stats.resolutionSla.late },
+            ].map((item) => (
+              <div key={item.label} style={{ padding: "14px 16px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700 }}>SLA {item.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: item.pct >= 90 ? "var(--success)" : "var(--warning)" }}>{item.pct}%</span>
+                </div>
+                <div style={{ position: "relative", height: 10, background: "var(--surface-2)", borderRadius: 5, overflow: "hidden", marginBottom: 6 }}>
+                  <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${item.pct}%`, background: item.pct >= 90 ? "var(--success)" : item.pct >= 70 ? "var(--warning)" : "var(--danger)", borderRadius: 5 }} />
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-tertiary)", display: "flex", gap: 12 }}>
+                  <span>{item.avg}</span>
+                  <span style={{ color: "var(--danger)" }}>{item.late} incumplimientos</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <Section title={`${visibleBreaches.length} incumplimientos recientes`} subtitle="Ordenados por horas de retraso, los más críticos primero.">
+            <FilterToolbar
+              search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por ticket o título…" }}
+              selects={[
+                {
+                  label: "Prioridad",
+                  value: filterPriority,
+                  onChange: setFilterPriority,
+                  options: [{ value: "Alta", label: "Alta" }, { value: "Media", label: "Media" }, { value: "Baja", label: "Baja" }],
+                  allowAll: true,
+                },
+                {
+                  label: "Tipo SLA",
+                  value: filterType,
+                  onChange: setFilterType,
+                  options: [
+                    { value: "response", label: "Respuesta" },
+                    { value: "response_open", label: "Respuesta (abierto)" },
+                    { value: "resolution", label: "Resolución" },
+                  ],
+                  allowAll: true,
+                },
+              ]}
+              onClear={() => { setSearchQ(""); setFilterPriority(""); setFilterType(""); }}
+              resultCount={visibleBreaches.length}
+              rightActions={stats.breaches.length > 0 ? (
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleBreaches, [
+                  { key: "anNumber", label: "Ticket" },
+                  { key: "titulo", label: "Título" },
+                  { key: "priority", label: "Prioridad" },
+                  { key: "type", label: "Tipo SLA", format: (v) => typeLabel[String(v)] ?? String(v) },
+                  { key: "hoursLate", label: "Horas retraso" },
+                ], "sla-incumplimientos")}>CSV</Button>
+              ) : undefined}
+            />
             <DataTable
               columns={columns}
-              rows={stats.breaches}
+              rows={visibleBreaches}
               rowKey={(b) => `${b.id}-${b.type}`}
               onRowClick={(b) => router.push(`/ops/activities/${b.id}`)}
               emptyTitle="Sin incumplimientos"
-              emptyDescription="Ningún ticket rompió su SLA en los últimos 30 días. 🎉"
+              emptyDescription={searchQ || filterPriority || filterType ? "Sin resultados para ese filtro." : "Ningún ticket rompió su SLA en los últimos 30 días. 🎉"}
             />
           </Section>
         </>

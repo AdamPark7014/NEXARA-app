@@ -140,7 +140,11 @@ export default function ActivityDetailPage() {
         {!editing ? (
           <>
             <DetailFieldGrid>
-              <DetailField label="Cliente" value={activity.client?.name} />
+              <DetailField label="Cliente" value={activity.client?.id ? (
+                <Link href={`/crm/clients/${activity.client.id}`} style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+                  {activity.client.name} →
+                </Link>
+              ) : (activity.client?.name ?? "—")} />
               <DetailField label="Sucursal" value={branch || activity.branchAddress} />
               <DetailField label="Responsable" value={activity.responsable?.nombre} />
               <DetailField label="Creador" value={activity.creador?.nombre} />
