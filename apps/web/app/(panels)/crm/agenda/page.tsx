@@ -11,6 +11,8 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface CrmActivity {
   id: number;
@@ -74,6 +76,8 @@ export default function AgendaPage() {
   const [opps, setOpps] = useState<OppLite[]>([]);
   const [formOptionsErr, setFormOptionsErr] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterType, setFilterType] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -87,6 +91,30 @@ export default function AgendaPage() {
   }, [token]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const filterActivity = useCallback((a: CrmActivity): boolean => {
+    if (filterType && a.activityType !== filterType) return false;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      return (
+        a.subject.toLowerCase().includes(q) ||
+        (a.description ?? "").toLowerCase().includes(q) ||
+        (a.lead?.name ?? "").toLowerCase().includes(q) ||
+        (a.opportunity?.title ?? "").toLowerCase().includes(q)
+      );
+    }
+    return true;
+  }, [searchQ, filterType]);
+
+  const filteredAgenda = useMemo(() => {
+    if (!agenda) return null;
+    return {
+      pendingToday: agenda.pendingToday.filter(filterActivity),
+      overdue: agenda.overdue.filter(filterActivity),
+      upcoming: agenda.upcoming.filter(filterActivity),
+      recentlyCompleted: agenda.recentlyCompleted.filter(filterActivity),
+    };
+  }, [agenda, filterActivity]);
 
   // Load leads+opps when form opens
   useEffect(() => {
@@ -224,7 +252,7 @@ export default function AgendaPage() {
       {loading && <EmptyState icon="⏳" title="Cargando agenda…" description="Consultando tus actividades." />}
       {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
 
-      {!loading && !error && agenda && (
+      {!loading && !error && agenda && filteredAgenda && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
             <KpiCard label="Hoy" value={agenda.pendingToday.length} icon="📅" />
@@ -233,18 +261,42 @@ export default function AgendaPage() {
             <KpiCard label="Completadas recientes" value={agenda.recentlyCompleted.length} variant="positive" icon="✅" />
           </div>
 
-          {agenda.overdue.length > 0 && (
-            <Section title="Vencidas" tone="accent">{agenda.overdue.map((a) => renderItem(a, true))}</Section>
+          <FilterToolbar
+            search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por asunto, descripción o contacto…" }}
+            selects={[{
+              label: "Tipo",
+              value: filterType,
+              onChange: setFilterType,
+              options: TYPES.map((t) => ({ value: t, label: `${TYPE_ICON[t]} ${t}` })),
+              allowAll: true,
+            }]}
+            onClear={() => { setSearchQ(""); setFilterType(""); }}
+            resultCount={filteredAgenda.pendingToday.length + filteredAgenda.overdue.length + filteredAgenda.upcoming.length}
+            rightActions={
+              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => {
+                const all = [...agenda.overdue, ...agenda.pendingToday, ...agenda.upcoming, ...agenda.recentlyCompleted];
+                exportToCsv(all, [
+                  { key: "activityType", label: "Tipo" },
+                  { key: "subject", label: "Asunto" },
+                  { key: "status", label: "Estado" },
+                  { key: "dueDate", label: "Fecha", format: (v) => new Date(String(v)).toLocaleString("es-MX") },
+                ], "agenda-crm");
+              }}>CSV</Button>
+            }
+          />
+
+          {filteredAgenda.overdue.length > 0 && (
+            <Section title={`Vencidas (${filteredAgenda.overdue.length})`} tone="accent">{filteredAgenda.overdue.map((a) => renderItem(a, true))}</Section>
           )}
-          <Section title="Hoy">
-            {agenda.pendingToday.length === 0
-              ? <EmptyState icon="🎉" title="Nada para hoy" description="No tienes actividades pendientes para hoy." />
-              : agenda.pendingToday.map((a) => renderItem(a))}
+          <Section title={`Hoy (${filteredAgenda.pendingToday.length})`}>
+            {filteredAgenda.pendingToday.length === 0
+              ? <EmptyState icon="🎉" title={searchQ || filterType ? "Sin resultados" : "Nada para hoy"} description={searchQ || filterType ? "Prueba con otros filtros." : "No tienes actividades pendientes para hoy."} />
+              : filteredAgenda.pendingToday.map((a) => renderItem(a))}
           </Section>
-          <Section title="Próximos 7 días">
-            {agenda.upcoming.length === 0
-              ? <EmptyState icon="📭" title="Sin próximas actividades" description="Agenda tu siguiente seguimiento." />
-              : agenda.upcoming.map((a) => renderItem(a))}
+          <Section title={`Próximos 7 días (${filteredAgenda.upcoming.length})`}>
+            {filteredAgenda.upcoming.length === 0
+              ? <EmptyState icon="📭" title={searchQ || filterType ? "Sin resultados" : "Sin próximas actividades"} description={searchQ || filterType ? "Prueba con otros filtros." : "Agenda tu siguiente seguimiento."} />
+              : filteredAgenda.upcoming.map((a) => renderItem(a))}
           </Section>
         </>
       )}

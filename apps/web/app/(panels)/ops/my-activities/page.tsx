@@ -14,6 +14,8 @@ import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
 import { activityStatusVariant, isActivityCompleted, isActivityInProgress } from "@/lib/activity-status";
 import { toast } from "@/components/Toast";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import {
   canStartActivity,
   fieldActionLabel,
@@ -118,6 +120,7 @@ export default function MyActivitiesPage() {
 
   const viewTab: ViewTab = searchParams.get("tab") === "evidencias" ? "evidencias" : "actividades";
   const [rangeTab, setRangeTab] = useState<RangeTab>("hoy");
+  const [searchQ, setSearchQ] = useState("");
   const [items, setItems] = useState<ActivityRow[]>([]);
   const [evidences, setEvidences] = useState<EvidenceRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -156,10 +159,22 @@ export default function MyActivitiesPage() {
     return items;
   }, [items, rangeTab]);
 
+  const visibleItems = useMemo(() => {
+    if (!searchQ.trim()) return filtered;
+    const q = searchQ.toLowerCase();
+    return filtered.filter((a) =>
+      a.anNumber.toLowerCase().includes(q) ||
+      a.titulo.toLowerCase().includes(q) ||
+      (a.client?.name ?? "").toLowerCase().includes(q) ||
+      (a.branchName ?? "").toLowerCase().includes(q) ||
+      (a.branchAddress ?? "").toLowerCase().includes(q)
+    );
+  }, [filtered, searchQ]);
+
   const counts = {
-    completadas: filtered.filter((a) => isActivityCompleted(a.estatus) || isEvidenceApproved(a.activityEvidence)).length,
-    enCurso: filtered.filter((a) => isActivityInProgress(a.estatus) && !isEvidenceLocked(a.activityEvidence)).length,
-    pendientes: filtered.filter((a) => !isActivityCompleted(a.estatus) && !isActivityInProgress(a.estatus) && !isEvidenceLocked(a.activityEvidence)).length,
+    completadas: visibleItems.filter((a) => isActivityCompleted(a.estatus) || isEvidenceApproved(a.activityEvidence)).length,
+    enCurso: visibleItems.filter((a) => isActivityInProgress(a.estatus) && !isEvidenceLocked(a.activityEvidence)).length,
+    pendientes: visibleItems.filter((a) => !isActivityCompleted(a.estatus) && !isActivityInProgress(a.estatus) && !isEvidenceLocked(a.activityEvidence)).length,
   };
 
   const updateStatus = async (a: ActivityRow, estatus: string) => {
@@ -193,7 +208,7 @@ export default function MyActivitiesPage() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 18 }}>
         {[
-          { label: "OT en esta vista", value: filtered.length, color: "var(--primary)", icon: "📋" },
+          { label: "OT en esta vista", value: visibleItems.length, color: "var(--primary)", icon: "📋" },
           { label: "Completadas", value: counts.completadas, color: "var(--success)", icon: "✓" },
           { label: "En curso", value: counts.enCurso, color: "var(--warning)", icon: "⏳" },
           { label: "Pendientes", value: counts.pendientes, color: "var(--text-secondary)", icon: "○" },
@@ -228,6 +243,21 @@ export default function MyActivitiesPage() {
 
       {viewTab === "actividades" && (
       <>
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por OT, título, cliente o dirección…" }}
+        onClear={() => setSearchQ("")}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "anNumber", label: "OT" },
+            { key: "titulo", label: "Título" },
+            { key: "estatus", label: "Estado" },
+            { key: "client", label: "Cliente", format: (v) => (v as { name: string } | null)?.name ?? "" },
+            { key: "branchAddress", label: "Dirección" },
+            { key: "fechaEntregaEsperada", label: "Fecha esperada", format: (v) => v ? new Date(String(v)).toLocaleDateString("es-MX") : "" },
+          ], `mis-actividades-${rangeTab}`)}>CSV</Button>
+        }
+      />
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         {(["hoy", "semana", "todas"] as const).map((t) => (
           <button key={t} type="button" onClick={() => setRangeTab(t)} style={{
@@ -243,11 +273,11 @@ export default function MyActivitiesPage() {
 
       {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando tus actividades asignadas." />}
       {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-      {!loading && !error && filtered.length === 0 && <EmptyState icon="📅" title="Sin actividades" description="No tienes OT asignadas en este rango." />}
+      {!loading && !error && visibleItems.length === 0 && <EmptyState icon="📅" title="Sin actividades" description={searchQ ? "Sin resultados para tu búsqueda." : "No tienes OT asignadas en este rango."} />}
 
-      {!loading && !error && filtered.length > 0 && (
+      {!loading && !error && visibleItems.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {filtered.map((a) => (
+          {visibleItems.map((a) => (
             <article key={a.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 16, alignItems: "center" }}>
               <div style={{
                 width: 64, height: 64, borderRadius: 14,
