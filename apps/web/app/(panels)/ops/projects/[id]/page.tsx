@@ -85,7 +85,11 @@ export default function OpsProjectSummaryPage() {
         {!editing ? (
           <>
             <DetailFieldGrid>
-              <DetailField label="Cliente" value={project.client?.name} />
+              <DetailField label="Cliente" value={project.client?.id ? (
+                <Link href={`/crm/clients/${project.client.id}`} style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+                  {project.client.name} →
+                </Link>
+              ) : (project.client?.name ?? "—")} />
               <DetailField label="Responsable" value={project.vendor?.nombre} />
               <DetailField label="Inicio" value={formatDate(project.startDate)} />
               <DetailField label="Fin planeado" value={formatDate(project.endDate)} />
