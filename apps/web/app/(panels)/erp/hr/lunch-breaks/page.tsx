@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import dynamic from "next/dynamic";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -341,6 +343,8 @@ function TeamLunchView({ token, dateFilter }: { token: string; dateFilter: strin
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewType, setViewType] = useState<"cards" | "table">("cards");
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -368,6 +372,19 @@ function TeamLunchView({ token, dateFilter }: { token: string; dateFilter: strin
   }, [token, dateFilter]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const visibleItems = useMemo(() => {
+    let rows = items;
+    if (filterStatus) rows = rows.filter((b) => b.status === filterStatus);
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((b) =>
+        (b.user?.nombre ?? "").toLowerCase().includes(q) ||
+        (b.user?.department?.nombre ?? "").toLowerCase().includes(q)
+      );
+    }
+    return rows;
+  }, [items, searchQ, filterStatus]);
 
   const stats = useMemo(() => {
     const durs = items.map((b) => durationMinutes(b.checkinTime, b.checkoutTime)).filter((d): d is number => d !== null);
@@ -459,8 +476,42 @@ function TeamLunchView({ token, dateFilter }: { token: string; dateFilter: strin
         <KpiCard label="Tardanzas" value={stats.lateCount} variant={stats.lateCount > 0 ? "danger" : "positive"} icon="⚠️" />
       </div>
 
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por nombre o departamento…" }}
+        selects={[{
+          label: "Estado",
+          value: filterStatus,
+          onChange: setFilterStatus,
+          options: [
+            { value: "IN_PROGRESS", label: "En comida" },
+            { value: "COMPLETED", label: "Completada" },
+          ],
+          allowAll: true,
+        }]}
+        onClear={() => { setSearchQ(""); setFilterStatus(""); }}
+        resultCount={loading ? null : visibleItems.length}
+        rightActions={items.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems.map((b) => ({
+            nombre: b.user?.nombre ?? "",
+            departamento: b.user?.department?.nombre ?? "",
+            estado: b.status === "IN_PROGRESS" ? "En comida" : "Completada",
+            entrada: fmtTime(b.checkinTime),
+            salida: b.checkoutTime ? fmtTime(b.checkoutTime) : "",
+            duracion: durationMinutes(b.checkinTime, b.checkoutTime) ?? "",
+            tardanza: b.isCheckinLate || b.isCheckoutLate ? "Sí" : "No",
+          })), [
+            { key: "nombre", label: "Nombre" },
+            { key: "departamento", label: "Departamento" },
+            { key: "estado", label: "Estado" },
+            { key: "entrada", label: "Entrada" },
+            { key: "salida", label: "Salida" },
+            { key: "duracion", label: "Duración (min)" },
+            { key: "tardanza", label: "Tardanza" },
+          ], `comidas-${dateFilter}`)}>CSV</Button>
+        ) : undefined}
+      />
       <Section
-        title={loading ? "Cargando equipo…" : `${items.length} registros`}
+        title={loading ? "Cargando equipo…" : `${visibleItems.length} registros`}
         actions={
           <div style={{ display: "flex", gap: 8 }}>
             <Button
@@ -498,14 +549,14 @@ function TeamLunchView({ token, dateFilter }: { token: string; dateFilter: strin
             }
           />
         )}
-        {!loading && !error && items.length === 0 && (
+        {!loading && !error && visibleItems.length === 0 && (
           <EmptyState
             icon="🍽️"
             title="Sin registros"
-            description="Nadie ha registrado comida para esta fecha."
+            description={searchQ || filterStatus ? "Sin resultados para ese filtro." : "Nadie ha registrado comida para esta fecha."}
           />
         )}
-        {!loading && !error && items.length > 0 && viewType === "cards" && (
+        {!loading && !error && visibleItems.length > 0 && viewType === "cards" && (
           <div
             style={{
               display: "grid",
@@ -513,15 +564,15 @@ function TeamLunchView({ token, dateFilter }: { token: string; dateFilter: strin
               gap: 12,
             }}
           >
-            {items.map((m) => (
+            {visibleItems.map((m) => (
               <TeamBreakCard key={m.id} member={m} />
             ))}
           </div>
         )}
-        {!loading && !error && items.length > 0 && viewType === "table" && (
+        {!loading && !error && visibleItems.length > 0 && viewType === "table" && (
           <DataTable<LunchBreak>
             columns={cols}
-            rows={items}
+            rows={visibleItems}
             rowKey={(b) => b.id}
             emptyTitle="Sin registros"
             emptyDescription="No hay comidas registradas para esta fecha."
