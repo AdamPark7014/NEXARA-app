@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
 import { Tag } from "@/components/ui/DataTable";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import { useClientDetail } from "@/components/crm/ClientDetailShell";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -53,6 +55,9 @@ export default function ClientTicketsPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterUrgency, setFilterUrgency] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ description: "", branchId: "", urgency: "MEDIUM", requestType: "ISSUE" });
   const [saving, setSaving] = useState(false);
@@ -122,6 +127,20 @@ export default function ClientTicketsPage() {
     );
   }
 
+  const visibleTickets = useMemo(() => {
+    let rows = tickets;
+    if (filterStatus) rows = rows.filter((t) => t.status === filterStatus);
+    if (filterUrgency) rows = rows.filter((t) => t.urgency === filterUrgency);
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((t) =>
+        t.description.toLowerCase().includes(q) ||
+        (t.branch?.name ?? "").toLowerCase().includes(q)
+      );
+    }
+    return rows;
+  }, [tickets, searchQ, filterStatus, filterUrgency]);
+
   const urgencyVariant = (u?: string | null): "danger" | "warning" | "default" =>
     u === "HIGH" ? "danger" : u === "MEDIUM" ? "warning" : "default";
 
@@ -134,7 +153,7 @@ export default function ClientTicketsPage() {
 
   return (
     <DetailSection title="Tickets de soporte">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
         <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
           {tickets.filter((t) => t.status === "NEW").length} nuevo(s) · {tickets.length} total
         </span>
@@ -147,6 +166,50 @@ export default function ClientTicketsPage() {
         </div>
       </div>
 
+      {tickets.length > 0 && (
+        <FilterToolbar
+          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por descripción o sucursal…" }}
+          selects={[
+            {
+              label: "Estado",
+              value: filterStatus,
+              onChange: setFilterStatus,
+              options: [
+                { value: "NEW", label: "Nuevo" },
+                { value: "ASSIGNED", label: "Asignado" },
+                { value: "APPROVED", label: "Aprobado" },
+                { value: "CLOSED", label: "Cerrado" },
+                { value: "REJECTED", label: "Rechazado" },
+              ],
+              allowAll: true,
+            },
+            {
+              label: "Urgencia",
+              value: filterUrgency,
+              onChange: setFilterUrgency,
+              options: [
+                { value: "HIGH", label: "Alta" },
+                { value: "MEDIUM", label: "Media" },
+                { value: "LOW", label: "Baja" },
+              ],
+              allowAll: true,
+            },
+          ]}
+          onClear={() => { setSearchQ(""); setFilterStatus(""); setFilterUrgency(""); }}
+          resultCount={visibleTickets.length}
+          rightActions={
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleTickets, [
+              { key: "id", label: "ID" },
+              { key: "description", label: "Descripción" },
+              { key: "status", label: "Estado" },
+              { key: "urgency", label: "Urgencia" },
+              { key: "requestType", label: "Tipo" },
+              { key: "createdAt", label: "Fecha", format: (v) => v ? new Date(String(v)).toLocaleDateString("es-MX") : "" },
+            ], "tickets-cliente")}>CSV</Button>
+          }
+        />
+      )}
+
       {saveErr && !showForm && <InlineAlert message={saveErr} onDismiss={() => setSaveErr(null)} />}
 
       {loading && <EmptyState icon="⏳" title="Cargando tickets…" description="Consultando tickets de soporte." />}
@@ -154,7 +217,10 @@ export default function ClientTicketsPage() {
       {!loading && !error && tickets.length === 0 && <EmptyState icon="🎫" title="Sin tickets" description="No hay solicitudes registradas para este cliente." />}
       {!loading && !error && tickets.length > 0 && (
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
-          {tickets.map((t) => (
+          {visibleTickets.length === 0 && (
+            <EmptyState icon="🔍" title="Sin resultados" description="Ajusta los filtros de búsqueda." />
+          )}
+          {visibleTickets.map((t) => (
             <li key={t.id} style={{ padding: "10px 14px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--surface)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>

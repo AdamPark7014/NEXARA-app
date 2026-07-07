@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import { useClientDetail } from "@/components/crm/ClientDetailShell";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -46,6 +48,25 @@ export default function ClientBranchesPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterActive, setFilterActive] = useState("");
+
+  const visibleBranches = useMemo(() => {
+    let rows = branches;
+    if (filterActive === "active") rows = rows.filter((b) => b.isActive);
+    if (filterActive === "inactive") rows = rows.filter((b) => !b.isActive);
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((b) =>
+        b.name.toLowerCase().includes(q) ||
+        (b.city ?? "").toLowerCase().includes(q) ||
+        (b.state ?? "").toLowerCase().includes(q) ||
+        (b.address ?? "").toLowerCase().includes(q) ||
+        (b.branchNumber ?? "").toLowerCase().includes(q)
+      );
+    }
+    return rows;
+  }, [branches, searchQ, filterActive]);
 
   // ── Create form ────────────────────────────────────────────────────────
   const [showForm, setShowForm] = useState(false);
@@ -147,6 +168,31 @@ export default function ClientBranchesPage() {
         </div>
       )}
 
+      {branches.length > 0 && (
+        <FilterToolbar
+          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por nombre, ciudad o dirección…" }}
+          selects={[{
+            label: "Estado",
+            value: filterActive,
+            onChange: setFilterActive,
+            options: [{ value: "active", label: "Activas" }, { value: "inactive", label: "Inactivas" }],
+            allowAll: true,
+          }]}
+          onClear={() => { setSearchQ(""); setFilterActive(""); }}
+          resultCount={visibleBranches.length}
+          rightActions={
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleBranches, [
+              { key: "branchNumber", label: "Número" },
+              { key: "name", label: "Nombre" },
+              { key: "address", label: "Dirección" },
+              { key: "city", label: "Ciudad" },
+              { key: "state", label: "Estado" },
+              { key: "isActive", label: "Activa", format: (v) => v ? "Sí" : "No" },
+            ], "sucursales-cliente")}>CSV</Button>
+          }
+        />
+      )}
+
       {loading && <EmptyState icon="⏳" title="Cargando sucursales…" description="" />}
       {!loading && error && <EmptyState icon="⚠️" title="Error al cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
 
@@ -160,7 +206,8 @@ export default function ClientBranchesPage() {
 
       {!loading && !error && branches.length > 0 && (
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
-          {branches.map((b) => (
+          {visibleBranches.length === 0 && <EmptyState icon="🔍" title="Sin resultados" description="Ajusta los filtros." />}
+          {visibleBranches.map((b) => (
             <li key={b.id} style={{ padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 10, display: "grid", gridTemplateColumns: "1fr auto", gap: 4 }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 13 }}>
