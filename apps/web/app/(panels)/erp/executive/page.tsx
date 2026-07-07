@@ -302,22 +302,27 @@ export default function ExecutivePage() {
       )}
 
       {/* ── Top vendedores ────────────────────────────────────────── */}
-      {!loading && !error && data && data.topSellers.length > 0 && (
-        <Section eyebrow="Ventas" title="Top vendedores del mes" subtitle="Por ingresos de oportunidades cerradas">
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {data.topSellers.map((s, i) => (
-              <div key={s.ownerId} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-tertiary)", width: 20, textAlign: "center" }}>#{i + 1}</span>
-                <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{s.ownerName}</span>
-                <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{s.wonCount} opp.</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--primary)" }}>
-                  {new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" }).format(s.revenue)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
+      {!loading && !error && data && data.topSellers.length > 0 && (() => {
+        const maxRev = Math.max(...data.topSellers.map((s) => s.revenue), 1);
+        const fmt = (v: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" }).format(v);
+        return (
+          <Section eyebrow="Ventas" title="Top vendedores del mes" subtitle="Por ingresos de oportunidades cerradas">
+            <div style={{ display: "grid", gap: 10 }}>
+              {data.topSellers.map((s, i) => (
+                <div key={s.ownerId} style={{ display: "grid", gridTemplateColumns: "24px 140px 1fr 70px 80px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-tertiary)", textAlign: "center" }}>#{i + 1}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.ownerName}</span>
+                  <div style={{ position: "relative", height: 16, background: "var(--surface-2)", borderRadius: 4, overflow: "hidden" }}>
+                    <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(s.revenue / maxRev) * 100}%`, background: i === 0 ? "var(--warning)" : "color-mix(in srgb, var(--primary) 60%, transparent)", borderRadius: 4 }} />
+                  </div>
+                  <span style={{ fontSize: 11, color: "var(--text-secondary)", textAlign: "right" }}>{s.wonCount} opp.</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--primary)", textAlign: "right" }}>{fmt(s.revenue)}</span>
+                </div>
+              ))}
+            </div>
+          </Section>
+        );
+      })()}
 
       {/* ── Equipo y clientes ─────────────────────────────────────── */}
       {!loading && !error && data && (
