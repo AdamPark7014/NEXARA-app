@@ -154,6 +154,22 @@ export default function TargetsPage() {
             <KpiCard label="Cumplimiento promedio" value={`${perf.totals.avgAttainmentPct}%`} variant={perf.totals.avgAttainmentPct >= 100 ? "positive" : perf.totals.avgAttainmentPct >= 60 ? "warning" : "danger"} icon="📊" />
             <KpiCard label="Comisiones del mes" value={<Money value={perf.totals.totalCommissions} compact />} icon="💰" variant="accent" hint="Comisiones generadas" />
           </div>
+          {perf.performance.length > 0 && (
+            <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
+              {perf.performance.map((p) => (
+                <div key={p.targetId} style={{ display: "grid", gridTemplateColumns: "140px 1fr 56px 80px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.ownerName}</span>
+                  <div style={{ position: "relative", height: 16, background: "var(--surface-2)", borderRadius: 4, overflow: "hidden" }}>
+                    <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.min(100, p.attainmentPct)}%`, background: p.attainmentPct >= 100 ? "var(--success)" : p.attainmentPct >= 60 ? "var(--warning)" : "var(--danger)", borderRadius: 4, opacity: 0.75 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, textAlign: "right" }}>{p.attainmentPct}%</span>
+                  <span style={{ fontSize: 10.5, padding: "2px 6px", borderRadius: 5, textAlign: "center", fontWeight: 600, background: p.reachedBonus ? "color-mix(in srgb, var(--success) 14%, transparent)" : "color-mix(in srgb, var(--warning) 12%, transparent)", color: p.reachedBonus ? "var(--success)" : "var(--warning)" }}>
+                    {p.reachedBonus ? "🏆 Bono" : "Sin bono"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
           <FilterToolbar
             search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar ejecutivo…" }}
             onClear={() => setSearchQ("")}
