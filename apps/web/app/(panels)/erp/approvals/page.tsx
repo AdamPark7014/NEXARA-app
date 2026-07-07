@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
@@ -9,6 +9,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { getApprovalsSectionConfig } from "@/lib/section-views";
+import FilterToolbar from "@/components/FilterToolbar";
 import {
   listMyPendingApprovals,
   decideApproval,
@@ -80,6 +81,7 @@ export default function ApprovalsPage() {
   const [infoModal, setInfoModal] = useState<ApprovalRow | null>(null);
   const [infoMessage, setInfoMessage] = useState("");
   const [decidingErr, setDecidingErr] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
 
   const fetchPending = async () => {
     if (!user?.token) {
@@ -107,6 +109,14 @@ export default function ApprovalsPage() {
 
   const list = useMemo(() => {
     let rows = filter === "all" ? data : data.filter((a) => a.prioridad === filter);
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((a) =>
+        a.titulo.toLowerCase().includes(q) ||
+        a.type.toLowerCase().includes(q) ||
+        a.solicita.toLowerCase().includes(q)
+      );
+    }
     if (highlightId) {
       const id = Number(highlightId);
       if (!Number.isNaN(id)) {
@@ -228,6 +238,12 @@ export default function ApprovalsPage() {
           <KpiCard label="Prioridad baja" value={counts.Baja} icon="🟢" />
         </div>
       )}
+
+      <FilterToolbar
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por tipo, título o solicitante…" }}
+        onClear={() => { setSearchQ(""); setFilter("all"); }}
+        resultCount={loading ? null : list.length}
+      />
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         {(["all", "Alta", "Media", "Baja"] as const).map((p) => (
