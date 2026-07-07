@@ -6,6 +6,8 @@ import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
 import { Tag, Money } from "@/components/ui/DataTable";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import { useClientDetail } from "@/components/crm/ClientDetailShell";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -53,6 +55,23 @@ export default function ClientServicesPage() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+
+  const visibleContracts = useMemo(() => {
+    let rows = contracts;
+    if (filterStatus) rows = rows.filter((c) => c.status === filterStatus);
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((c) =>
+        c.title.toLowerCase().includes(q) ||
+        c.contractNumber.toLowerCase().includes(q) ||
+        (c.branch?.name ?? "").toLowerCase().includes(q)
+      );
+    }
+    return rows;
+  }, [contracts, searchQ, filterStatus]);
+
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
@@ -161,6 +180,30 @@ export default function ClientServicesPage() {
         </div>
       )}
 
+      {contracts.length > 0 && (
+        <FilterToolbar
+          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar contrato, número o sucursal…" }}
+          selects={[{
+            label: "Estado",
+            value: filterStatus,
+            onChange: setFilterStatus,
+            options: Object.entries(STATUS_LABEL).map(([v, l]) => ({ value: v, label: l })),
+            allowAll: true,
+          }]}
+          onClear={() => { setSearchQ(""); setFilterStatus(""); }}
+          resultCount={visibleContracts.length}
+          rightActions={
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleContracts, [
+              { key: "contractNumber", label: "Número" },
+              { key: "title", label: "Nombre" },
+              { key: "frequency", label: "Frecuencia", format: (v) => FREQ_LABEL[String(v)] ?? String(v) },
+              { key: "monthlyFee", label: "Cuota mensual" },
+              { key: "status", label: "Estado", format: (v) => STATUS_LABEL[String(v)] ?? String(v) },
+            ], "contratos-servicio")}>CSV</Button>
+          }
+        />
+      )}
+
       {loading && <EmptyState icon="⏳" title="Cargando contratos…" description="" />}
       {!loading && error && <EmptyState icon="⚠️" title="Error al cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
 
@@ -179,7 +222,8 @@ export default function ClientServicesPage() {
 
       {!loading && !error && contracts.length > 0 && (
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
-          {contracts.map((c) => (
+          {visibleContracts.length === 0 && <EmptyState icon="🔍" title="Sin resultados" description="Ajusta los filtros." />}
+          {visibleContracts.map((c) => (
             <li key={c.id} style={{ padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                 <div>
