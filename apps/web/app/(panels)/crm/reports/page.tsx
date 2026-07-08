@@ -98,8 +98,19 @@ export default function ReportsPage() {
     { key: "userName", label: "Ejecutivo" },
     { key: "revenue", label: "Ingreso", render: (v) => <Money value={v.revenue} />, width: 120 },
     { key: "opportunities", label: "Oportunidades", width: 110 },
-    { key: "conversionRate", label: "Conversión", render: (v) => `${v.conversionRate}%`, width: 100 },
-    { key: "attainmentRevenue", label: "% cuota", render: (v) => <Tag variant={statusVariant(v.status)}>{v.attainmentRevenue.toFixed(0)}%</Tag>, width: 100 },
+    { key: "conversionRate", label: "Conversión", render: (v) => <Tag variant={v.conversionRate >= 30 ? "positive" : v.conversionRate >= 15 ? "warning" : "danger"}>{v.conversionRate}%</Tag>, width: 110 },
+    {
+      key: "attainmentRevenue", label: "% cuota",
+      render: (v) => (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 130 }}>
+          <div style={{ flex: 1, height: 6, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${Math.min(100, v.attainmentRevenue)}%`, background: v.status === "on-track" ? "var(--success)" : v.status === "risk" ? "var(--primary)" : "var(--warning)", borderRadius: 3 }} />
+          </div>
+          <Tag variant={statusVariant(v.status)}>{v.attainmentRevenue.toFixed(0)}%</Tag>
+        </div>
+      ),
+      width: 180,
+    },
     { key: "status", label: "Semáforo", render: (v) => <Tag variant={statusVariant(v.status)}>{v.status === "on-track" ? "En meta" : v.status === "risk" ? "En riesgo" : "Fuera de meta"}</Tag>, width: 130 },
   ];
 
