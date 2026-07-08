@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -177,7 +178,7 @@ export default function ServiceClientsPage() {
   const columns: Column<ServiceClient>[] = [
     { key: "nombre", label: "Cliente", render: c => (
       <div>
-        <div style={{ fontWeight: 700, fontSize: 13 }}>{c.nombre || "—"}</div>
+        <Link href={`/ops/service-clients/${c.id}`} style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{c.nombre || "—"}</Link>
         <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{c.direccion}</div>
       </div>
     )},
