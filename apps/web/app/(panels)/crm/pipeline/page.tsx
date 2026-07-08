@@ -184,6 +184,9 @@ export default function PipelinePage() {
                             {o.probability ?? 0}%
                           </Tag>
                         </div>
+                        <div style={{ marginTop: 6, height: 3, borderRadius: 2, background: "var(--surface-2)", overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${o.probability ?? 0}%`, background: (o.probability ?? 0) >= 70 ? "var(--success)" : (o.probability ?? 0) >= 40 ? "var(--primary)" : "var(--warning)", borderRadius: 2 }} />
+                        </div>
                         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 11, color: "var(--text-tertiary)" }}>
                           <span>{o.owner?.nombre ?? "—"}</span>
                           <span>{daysAgo(o.createdAt)}</span>

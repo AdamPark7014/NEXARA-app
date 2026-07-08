@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -101,35 +102,52 @@ export default function BiPage() {
     {
       key: "marginPercent", label: "% margen",
       render: (r) => (
-        <Tag variant={r.marginPercent >= 20 ? "positive" : r.marginPercent >= 10 ? "warning" : "danger"}>
-          {r.marginPercent}%
-        </Tag>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 110 }}>
+          <div style={{ flex: 1, height: 5, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${Math.min(100, r.marginPercent)}%`, background: r.marginPercent >= 20 ? "var(--success)" : r.marginPercent >= 10 ? "var(--warning)" : "var(--danger)", borderRadius: 3 }} />
+          </div>
+          <Tag variant={r.marginPercent >= 20 ? "positive" : r.marginPercent >= 10 ? "warning" : "danger"}>{r.marginPercent}%</Tag>
+        </div>
       ),
-      width: 100,
+      width: 160,
     },
   ];
 
   const engCols: Column<EngineerRow>[] = [
-    { key: "engineerName", label: "Ingeniero" },
+    { key: "engineerName", label: "Ingeniero", render: (r) => <Link href={`/erp/hr/${r.engineerId}`} style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{r.engineerName}</Link> },
     { key: "totalActivities", label: "OT (90d)", width: 90 },
     { key: "completed", label: "Cerradas", width: 90 },
     {
       key: "completionRate", label: "% cierre",
-      render: (r) => <Tag variant={r.completionRate >= 80 ? "positive" : r.completionRate >= 60 ? "warning" : "danger"}>{r.completionRate}%</Tag>,
-      width: 90,
+      render: (r) => (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 110 }}>
+          <div style={{ flex: 1, height: 5, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${r.completionRate}%`, background: r.completionRate >= 80 ? "var(--success)" : r.completionRate >= 60 ? "var(--primary)" : "var(--warning)", borderRadius: 3 }} />
+          </div>
+          <Tag variant={r.completionRate >= 80 ? "positive" : r.completionRate >= 60 ? "warning" : "danger"}>{r.completionRate}%</Tag>
+        </div>
+      ),
+      width: 160,
     },
     { key: "avgDurationMin", label: "Min/OT prom.", render: (r) => r.avgDurationMin != null ? String(r.avgDurationMin) : "—", width: 110 },
   ];
 
   const clientCols: Column<ClientRoiRow>[] = [
-    { key: "clientName", label: "Cliente" },
+    { key: "clientName", label: "Cliente", render: (r) => <Link href={`/ops/service-clients/${r.clientId}`} style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{r.clientName}</Link> },
     { key: "projects", label: "Proyectos", width: 90 },
     { key: "revenue", label: "Ingreso", render: (r) => <Money value={r.revenue} />, width: 130 },
     { key: "cost", label: "Costo", render: (r) => <Money value={r.cost} />, width: 130 },
     {
       key: "roi", label: "ROI",
-      render: (r) => <Tag variant={r.roi >= 20 ? "positive" : r.roi >= 0 ? "warning" : "danger"}>{r.roi}%</Tag>,
-      width: 90,
+      render: (r) => (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 90 }}>
+          <div style={{ flex: 1, height: 5, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, r.roi))}%`, background: r.roi >= 20 ? "var(--success)" : r.roi >= 0 ? "var(--warning)" : "var(--danger)", borderRadius: 3 }} />
+          </div>
+          <Tag variant={r.roi >= 20 ? "positive" : r.roi >= 0 ? "warning" : "danger"}>{r.roi}%</Tag>
+        </div>
+      ),
+      width: 150,
     },
   ];
 
