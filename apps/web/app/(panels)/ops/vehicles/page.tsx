@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -231,7 +232,9 @@ export default function VehiclesPage() {
   }, [items, highlightId, searchQ, filterEstado]);
 
   const columns: Column<Vehicle>[] = [
-    { key: "nombre", label: "Vehículo", render: v => <span style={{ fontWeight: 700, fontSize: 13 }}>{v.nombre ?? "—"}</span> },
+    { key: "nombre", label: "Vehículo", render: v => (
+      <Link href={`/ops/vehicles/${v.id}`} style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{v.nombre ?? "—"}</Link>
+    ) },
     { key: "placas", label: "Placas", render: v => <Tag variant="accent">{v.placas ?? "—"}</Tag>, width: 120 },
     { key: "estatus", label: "Estado", render: v => <Tag variant={v.estatus === "Asignado" ? "warning" : v.estatus === "Fuera_de_servicio" || v.estatus === "En_mantenimiento" ? "danger" : "positive"}>{(v.estatus ?? "Disponible").replace(/_/g, " ")}</Tag>, width: 150 },
     { key: "notas", label: "Notas", accessor: v => v.notas ?? "—" },

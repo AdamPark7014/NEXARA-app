@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -302,7 +303,7 @@ export default function StudioCasesPage() {
                 </div>
                 <div style={{ padding: 14 }}>
                   <Tag variant={c.vertical === "Servicios" ? "accent" : "neutral"}>{c.vertical}</Tag>
-                  <div style={{ fontWeight: 700, fontSize: 14, marginTop: 8 }}>{c.titulo}</div>
+                  <Link href={`/studio/cases/${c.id}`} style={{ fontWeight: 700, fontSize: 14, marginTop: 8, display: "block", color: "var(--primary)", textDecoration: "none" }}>{c.titulo}</Link>
                   <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>{c.cliente}</div>
                   <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 6, lineHeight: 1.5 }}>{c.impacto}</div>
                   <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
