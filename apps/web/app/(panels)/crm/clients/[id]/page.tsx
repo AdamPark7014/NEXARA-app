@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import Button from "@/components/ui/Button";
-import { Tag } from "@/components/ui/DataTable";
+import { Tag, Money } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { provisionSalesServiceClient, updateSalesClient } from "@/lib/sales-api";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection } from "@/components/detail/DetailFrame";
@@ -153,24 +153,29 @@ export default function ClientDetailPage() {
           <Button variant="secondary" onClick={() => void provision()}>Activar en operación</Button>
         )}
         {client.serviceClientId && (
-          <Link href={`/ops/service-clients`} style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", alignSelf: "center" }}>
-            Ver en clientes de servicio →
+          <Link href={`/ops/service-clients/${client.serviceClientId}`} style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", alignSelf: "center" }}>
+            Ver cliente en OPS →
           </Link>
         )}
       </div>
       {(client.opportunities?.length ?? 0) > 0 && (
         <div style={{ marginTop: 24 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>Oportunidades activas</h3>
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+            Oportunidades ({client.opportunities!.length})
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {client.opportunities!.map((o) => (
-              <li key={o.id}>
-                <Link href={`/crm/opportunities/${o.id}`} style={{ color: "var(--primary)", fontWeight: 600, fontSize: 13 }}>
-                  {o.title}
-                </Link>
-                <span style={{ color: "var(--text-tertiary)", fontSize: 12, marginLeft: 8 }}>{o.stage}</span>
-              </li>
+              <Link key={o.id} href={`/crm/opportunities/${o.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)" }}>{o.title}</div>
+                    <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 2 }}>{o.stage?.replace(/_/g, " ")}</div>
+                  </div>
+                  {o.value != null && <Money value={o.value} currency={o.currency ?? "MXN"} />}
+                </div>
+              </Link>
             ))}
-          </ul>
+          </div>
         </div>
       )}
     </DetailSection>
