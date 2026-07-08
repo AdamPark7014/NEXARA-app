@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -45,6 +45,7 @@ interface InvoiceDetail {
   satPaymentMethod?: string | null;
   isCancelled?: boolean;
   cfdiRelationType?: string | null;
+  pdfUrl?: string | null;
   receptorName?: string | null;
   receptorRfc?: string | null;
   emisorName?: string | null;
@@ -87,6 +88,7 @@ const inp: React.CSSProperties = {
 
 export default function InvoiceDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const id = params.id;
   const { user } = useUser();
   const token = user?.token ?? "";
@@ -95,8 +97,16 @@ export default function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pacInfo, setPacInfo] = useState<{ provider?: string; configured?: boolean; productionWarning?: string | null; env?: string; csd?: { configured?: boolean } } | null>(null);
   const [showPayment, setShowPayment] = useState(false);
-  const [payForm, setPayForm] = useState({ amount: "", paymentDate: new Date().toISOString().slice(0, 10), method: "SPEI", reference: "", notes: "" });
+  const [payForm, setPayForm] = useState({
+    amount: "",
+    paymentDate: new Date().toISOString().slice(0, 10),
+    method: "SPEI",
+    reference: "",
+    notes: "",
+    stampComplement: true,
+  });
   const [paying, setPaying] = useState(false);
   const [payErr, setPayErr] = useState<string | null>(null);
   const [stamping, setStamping] = useState(false);
@@ -104,6 +114,7 @@ export default function InvoiceDetailPage() {
   const [checkingSat, setCheckingSat] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState("02");
+  const [substitutionUuid, setSubstitutionUuid] = useState("");
   const [cancelling, setCancelling] = useState(false);
 
   const load = useCallback(async () => {
@@ -120,6 +131,32 @@ export default function InvoiceDetailPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (!token) return;
+    void apiFetch("accounting/invoices/pac-info", token)
+      .then((data) => setPacInfo(data))
+      .catch(() => setPacInfo(null));
+  }, [token]);
+
+  const downloadXml = async () => {
+    if (!token || !id) return;
+    try {
+      const res = await fetch(buildApiUrl(`accounting/invoices/${id}/xml`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${invoice?.invoiceNumber ?? id}.xml`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo descargar XML");
+    }
+  };
+
   const submitPayment = async () => {
     if (!token || !id) return;
     const amt = parseFloat(payForm.amount);
@@ -127,12 +164,25 @@ export default function InvoiceDetailPage() {
     setPaying(true);
     setPayErr(null);
     try {
-      await apiFetch(`accounting/invoices/${id}/payments`, token, {
+      const result = await apiFetch(`accounting/invoices/${id}/payments`, token, {
         method: "POST",
-        body: JSON.stringify({ amount: amt, paymentDate: payForm.paymentDate, method: payForm.method, reference: payForm.reference || undefined, notes: payForm.notes || undefined }),
+        body: JSON.stringify({
+          amount: amt,
+          paymentDate: payForm.paymentDate,
+          method: payForm.method,
+          reference: payForm.reference || undefined,
+          notes: payForm.notes || undefined,
+          stampComplement: invoice?.satPaymentMethod === "PPD" ? payForm.stampComplement : undefined,
+        }),
       });
       setShowPayment(false);
-      toast.success("Pago registrado");
+      if (result?.complement?.cfdiPaymentUuid) {
+        toast.success(`Pago y complemento timbrados (${result.complement.cfdiPaymentUuid.slice(0, 8)}…)`);
+      } else if (result?.complementStampWarning) {
+        toast.warning(`Pago registrado; complemento no timbrado: ${result.complementStampWarning}`);
+      } else {
+        toast.success("Pago registrado");
+      }
       void load();
     } catch (e) {
       setPayErr(e instanceof Error ? e.message : "Error al registrar pago");
@@ -164,11 +214,18 @@ export default function InvoiceDetailPage() {
 
   const cancelInvoice = async () => {
     if (!token || !id) return;
+    if (cancelReason === "01" && !substitutionUuid.trim()) {
+      toast.error("Motivo 01 requiere UUID del CFDI sustituto");
+      return;
+    }
     setCancelling(true);
     try {
       await apiFetch(`accounting/invoices/${id}/cancel`, token, {
         method: "PATCH",
-        body: JSON.stringify({ cancelReason }),
+        body: JSON.stringify({
+          cancelReason,
+          substitutionUuid: cancelReason === "01" ? substitutionUuid.trim() : undefined,
+        }),
       });
       toast.success("Factura cancelada ante el SAT");
       setShowCancel(false);
@@ -183,7 +240,7 @@ export default function InvoiceDetailPage() {
     try {
       const nc = await apiFetch(`accounting/invoices/${id}/credit-note`, token, { method: "POST", body: JSON.stringify({}) });
       toast.success(`Nota de crédito ${nc.invoiceNumber} creada en borrador`);
-      void load();
+      router.push(`/erp/invoicing/${nc.id}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al crear nota de crédito");
     }
@@ -229,6 +286,16 @@ export default function InvoiceDetailPage() {
             <Link href="/erp/invoicing" style={{ textDecoration: "none" }}>
               <Button variant="ghost">← Facturación</Button>
             </Link>
+            {invoice.cfdiUuid && (
+              <>
+                <Button variant="ghost" onClick={() => void downloadXml()}>⬇ XML</Button>
+                {invoice.pdfUrl && (
+                  <a href={invoice.pdfUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                    <Button variant="ghost">📄 PDF</Button>
+                  </a>
+                )}
+              </>
+            )}
             {canEdit && invoice.status === "DRAFT" && !invoice.cfdiUuid && (
               <Button variant="primary" onClick={() => void stampInvoice()} disabled={stamping}>
                 {stamping ? "Timbrando…" : "🧾 Timbrar CFDI"}
@@ -246,7 +313,15 @@ export default function InvoiceDetailPage() {
               </Button>
             )}
             {canEdit && invoice.status !== "PAID" && invoice.status !== "CANCELLED" && (
-              <Button variant="secondary" onClick={() => { setShowPayment(true); setPayErr(null); setPayForm((f) => ({ ...f, amount: String(pendingAmount) })); }}>
+              <Button variant="secondary" onClick={() => {
+                setShowPayment(true);
+                setPayErr(null);
+                setPayForm((f) => ({
+                  ...f,
+                  amount: String(pendingAmount),
+                  stampComplement: invoice.satPaymentMethod === "PPD",
+                }));
+              }}>
                 💳 Registrar pago
               </Button>
             )}
@@ -254,13 +329,34 @@ export default function InvoiceDetailPage() {
         }
       />
 
+      {pacInfo && (
+        <div
+          style={{
+            marginBottom: 18,
+            padding: "12px 14px",
+            borderRadius: 10,
+            border: `1px solid ${pacInfo.productionWarning ? "color-mix(in srgb, var(--danger) 35%, var(--border))" : "var(--border)"}`,
+            background: pacInfo.productionWarning ? "color-mix(in srgb, var(--danger) 8%, var(--surface))" : "var(--surface-2)",
+            fontSize: 13,
+            color: "var(--text-secondary)",
+          }}
+        >
+          <strong style={{ color: "var(--foreground)" }}>PAC / timbrado:</strong>{" "}
+          {pacInfo.provider?.toUpperCase() ?? "—"}
+          {pacInfo.configured ? " · credenciales OK" : " · sin credenciales"}
+          {invoice.satPaymentMethod === "PPD" && " · PPD (complementos de pago requeridos)"}
+          {pacInfo.productionWarning && (
+            <div style={{ marginTop: 6, color: "var(--danger)" }}>{pacInfo.productionWarning}</div>
+          )}
+        </div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
         <KpiCard label="Total" value={<Money value={invoice.totalAmount} />} icon="💰" />
         <KpiCard label="Pagado" value={<Money value={invoice.paidAmount ?? 0} />} icon="✅" variant={paidPct === 100 ? "positive" : "default"} />
         <KpiCard label="Pendiente" value={<Money value={pendingAmount} />} icon="⏳" variant={pendingAmount > 0 ? "warning" : "positive"} />
       </div>
 
-      {/* Payment progress bar */}
       {invoice.totalAmount > 0 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
@@ -278,6 +374,7 @@ export default function InvoiceDetailPage() {
             { label: "Folio", value: invoice.invoiceNumber },
             { label: isIncome ? "Cliente / Receptor" : "Proveedor", value: counterparty },
             { label: "RFC receptor", value: invoice.receptorRfc },
+            { label: "Método pago SAT", value: invoice.satPaymentMethod ?? "PUE" },
             { label: "Tipo", value: isIncome ? "Ingreso (CxC)" : "Egreso (CxP)" },
             { label: "Fecha de emisión", value: new Date(invoice.issueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) },
             { label: "Fecha de vencimiento", value: invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) : null },
@@ -351,7 +448,6 @@ export default function InvoiceDetailPage() {
         </Section>
       )}
 
-      {/* Cancel modal */}
       {showCancel && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowCancel(false)}>
           <div style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 420, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
@@ -365,6 +461,12 @@ export default function InvoiceDetailPage() {
                 <option value="04">04 — Operación nominativa en factura global</option>
               </select>
             </label>
+            {cancelReason === "01" && (
+              <label style={{ display: "grid", gap: 4, marginTop: 12 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>UUID sustituto *</span>
+                <input value={substitutionUuid} onChange={(e) => setSubstitutionUuid(e.target.value)} placeholder="UUID del CFDI que sustituye" style={inp} />
+              </label>
+            )}
             <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
               <Button variant="secondary" onClick={() => setShowCancel(false)}>Cerrar</Button>
               <Button variant="primary" onClick={() => void cancelInvoice()} disabled={cancelling}>
@@ -375,7 +477,6 @@ export default function InvoiceDetailPage() {
         </div>
       )}
 
-      {/* Payment modal */}
       {showPayment && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowPayment(false)}>
           <div style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 420, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
@@ -392,13 +493,26 @@ export default function InvoiceDetailPage() {
               <label style={{ display: "grid", gap: 4 }}>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Método</span>
                 <select value={payForm.method} onChange={(e) => setPayForm((f) => ({ ...f, method: e.target.value }))} style={inp}>
-                  {["SPEI", "Efectivo", "Cheque", "Tarjeta", "Otro"].map((m) => <option key={m}>{m}</option>)}
+                  <option value="SPEI">SPEI / Transferencia</option>
+                  <option value="CASH">Efectivo</option>
+                  <option value="CHECK">Cheque</option>
+                  <option value="CARD">Tarjeta</option>
                 </select>
               </label>
               <label style={{ display: "grid", gap: 4 }}>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Referencia</span>
                 <input value={payForm.reference} onChange={(e) => setPayForm((f) => ({ ...f, reference: e.target.value }))} placeholder="Número de transferencia" style={inp} />
               </label>
+              {invoice.satPaymentMethod === "PPD" && (
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text-secondary)" }}>
+                  <input
+                    type="checkbox"
+                    checked={payForm.stampComplement}
+                    onChange={(e) => setPayForm((f) => ({ ...f, stampComplement: e.target.checked }))}
+                  />
+                  Timbrar complemento de pago al registrar
+                </label>
+              )}
               {payErr && <p style={{ color: "var(--danger)", fontSize: 12, margin: 0 }}>{payErr}</p>}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>

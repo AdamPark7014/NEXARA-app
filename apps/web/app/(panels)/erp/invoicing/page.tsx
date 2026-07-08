@@ -26,6 +26,7 @@ interface InvoiceRow {
   totalAmount: number | string;
   paidAmount?: number | string;
   cfdiUuid?: string | null;
+  satPaymentMethod?: string | null;
   receptorName?: string | null;
   emisorName?: string | null;
 }
@@ -69,10 +70,12 @@ export default function InvoicingPage() {
   const [formErr, setFormErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [paymentTarget, setPaymentTarget] = useState<InvoiceRow | null>(null);
-  const [paymentForm, setPaymentForm] = useState({ amount: "", paymentDate: new Date().toISOString().slice(0, 10), method: "SPEI", reference: "", notes: "" });
+  const [paymentForm, setPaymentForm] = useState({ amount: "", paymentDate: new Date().toISOString().slice(0, 10), method: "SPEI", reference: "", notes: "", stampComplement: true });
   const [paymentErr, setPaymentErr] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
-  const [pacInfo, setPacInfo] = useState<{ provider?: string; configured?: boolean; productionWarning?: string | null; env?: string } | null>(null);
+  const [pacInfo, setPacInfo] = useState<{ provider?: string; configured?: boolean; productionWarning?: string | null; env?: string; csd?: { configured?: boolean } } | null>(null);
+  const [issuerProfile, setIssuerProfile] = useState<{ emisorRfc?: string | null; emisorName?: string | null; emisorZipCode?: string | null; source?: string } | null>(null);
+  const [rfcValidation, setRfcValidation] = useState<{ valid?: boolean; message?: string } | null>(null);
   const [form, setForm] = useState({
     type: "INCOME" as "INCOME" | "EXPENSE",
     receptorName: "",
@@ -80,6 +83,8 @@ export default function InvoicingPage() {
     receptorZipCode: "",
     receptorRegime: "601",
     cfdiUsage: "G03",
+    satPaymentMethod: "PUE" as "PUE" | "PPD",
+    satPaymentForm: "03",
     issueDate: new Date().toISOString().slice(0, 10),
     dueDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
     description: "",
@@ -140,8 +145,20 @@ export default function InvoicingPage() {
 
   useEffect(() => {
     if (!showForm || !token) return;
-    apiFetch("accounting/invoices/issuer-profile", token).catch(() => null);
+    void apiFetch("accounting/invoices/issuer-profile", token)
+      .then((data) => setIssuerProfile(data))
+      .catch(() => setIssuerProfile(null));
   }, [showForm, token]);
+
+  const validateRfc = async (rfc: string) => {
+    if (!token || !rfc.trim()) { setRfcValidation(null); return; }
+    try {
+      const data = await apiFetch(`accounting/invoices/sat/validate-rfc/${encodeURIComponent(rfc.trim())}`, token);
+      setRfcValidation({ valid: data.valid, message: data.valid ? "RFC válido" : data.reason || "RFC inválido" });
+    } catch {
+      setRfcValidation(null);
+    }
+  };
 
   const facturadoMes = items.filter((f) => displayInvoiceType(f.type) === "INCOME" && f.status !== "CANCELLED").reduce((s, f) => s + Number(f.totalAmount), 0);
   const porTimbrar = items.filter((f) => f.status === "DRAFT").length;
@@ -177,6 +194,7 @@ export default function InvoicingPage() {
       method: "SPEI",
       reference: "",
       notes: "",
+      stampComplement: inv.satPaymentMethod === "PPD",
     });
     setPaymentErr(null);
   };
@@ -188,7 +206,7 @@ export default function InvoicingPage() {
     setPaying(true);
     setPaymentErr(null);
     try {
-      await apiFetch(`accounting/invoices/${paymentTarget.id}/payments`, token, {
+      const result = await apiFetch(`accounting/invoices/${paymentTarget.id}/payments`, token, {
         method: "POST",
         body: JSON.stringify({
           amount,
@@ -196,8 +214,14 @@ export default function InvoicingPage() {
           method: paymentForm.method,
           reference: paymentForm.reference.trim() || undefined,
           notes: paymentForm.notes.trim() || undefined,
+          stampComplement: paymentTarget.satPaymentMethod === "PPD" ? paymentForm.stampComplement : undefined,
         }),
       });
+      if (result?.complement?.cfdiPaymentUuid) {
+        toast.success(`Complemento de pago timbrado: ${result.complement.cfdiPaymentUuid.slice(0, 8)}…`);
+      } else if (result?.complementStampWarning) {
+        toast.warning(`Pago registrado, pero el complemento no se timbró: ${result.complementStampWarning}`);
+      }
       setPaymentTarget(null);
       void load();
     } catch (e) {
@@ -217,6 +241,8 @@ export default function InvoicingPage() {
       receptorZipCode: "",
       receptorRegime: "601",
       cfdiUsage: "G03",
+      satPaymentMethod: "PUE",
+      satPaymentForm: "03",
       issueDate: new Date().toISOString().slice(0, 10),
       dueDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
       description: "",
@@ -246,9 +272,12 @@ export default function InvoicingPage() {
         receptorZipCode?: string;
         receptorRegime?: string;
         cfdiUsage?: string;
+        satPaymentMethod?: string;
+        satPaymentForm?: string;
         items?: Array<{ description?: string; quantity?: number | string; unitPrice?: number | string; satProductKey?: string; satUnitKey?: string }>;
       };
       const item = full.items?.[0];
+      const satForm = full.satPaymentForm?.replace(/^FP/, "") ?? "03";
       setForm({
         type: full.type === "ACCOUNTS_PAYABLE" ? "EXPENSE" : "INCOME",
         receptorName: full.receptorName ?? "",
@@ -256,6 +285,8 @@ export default function InvoicingPage() {
         receptorZipCode: full.receptorZipCode ?? "",
         receptorRegime: full.receptorRegime ?? "601",
         cfdiUsage: full.cfdiUsage ?? "G03",
+        satPaymentMethod: full.satPaymentMethod === "PPD" ? "PPD" : "PUE",
+        satPaymentForm: satForm,
         issueDate: full.issueDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
         dueDate: full.dueDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
         description: item?.description ?? "",
@@ -299,8 +330,8 @@ export default function InvoicingPage() {
           method: "POST",
           body: JSON.stringify({
             type: form.type === "INCOME" ? "ACCOUNTS_RECEIVABLE" : "ACCOUNTS_PAYABLE",
-            satPaymentForm: "03",
-            satPaymentMethod: "PUE",
+            satPaymentForm: form.satPaymentForm,
+            satPaymentMethod: form.satPaymentMethod,
             ...body,
           }),
         });
@@ -424,12 +455,24 @@ export default function InvoicingPage() {
           {pacInfo.productionWarning && (
             <div style={{ marginTop: 6, color: "var(--danger)" }}>{pacInfo.productionWarning}</div>
           )}
+          {pacInfo.csd?.configured === false && pacInfo.provider !== "facturama" && (
+            <div style={{ marginTop: 6, color: "var(--warning)" }}>CSD del emisor no configurado — requerido para sellado local (Finkok/SW).</div>
+          )}
         </div>
       )}
 
       {showForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
           <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>{editingInvoice ? `Editar borrador ${editingInvoice.invoiceNumber}` : "Nueva factura (borrador CFDI)"}</p>
+          {issuerProfile && (
+            <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--border)", fontSize: 12, color: "var(--text-secondary)" }}>
+              <strong style={{ color: "var(--foreground)" }}>Emisor:</strong>{" "}
+              {issuerProfile.emisorName ?? "—"} · RFC {issuerProfile.emisorRfc ?? "—"} · CP {issuerProfile.emisorZipCode ?? "⚠ sin CP"}
+              {!issuerProfile.emisorZipCode && (
+                <span style={{ color: "var(--danger)", marginLeft: 6 }}>Configura CP fiscal en perfil de empresa antes de timbrar.</span>
+              )}
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Tipo</span>
@@ -440,7 +483,16 @@ export default function InvoicingPage() {
             </label>
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>RFC receptor</span>
-              <input value={form.receptorRfc} onChange={(e) => setForm((f) => ({ ...f, receptorRfc: e.target.value }))} placeholder="XAXX010101000" style={inp} />
+              <input
+                value={form.receptorRfc}
+                onChange={(e) => { setForm((f) => ({ ...f, receptorRfc: e.target.value })); setRfcValidation(null); }}
+                onBlur={() => void validateRfc(form.receptorRfc)}
+                placeholder="XAXX010101000"
+                style={inp}
+              />
+              {rfcValidation && (
+                <span style={{ fontSize: 11, color: rfcValidation.valid ? "var(--success)" : "var(--danger)" }}>{rfcValidation.message}</span>
+              )}
             </label>
             <label style={{ gridColumn: "1 / -1", display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Nombre cliente / proveedor *</span>
@@ -460,6 +512,22 @@ export default function InvoicingPage() {
                 <option value="G03">G03 — Gastos en general</option>
                 <option value="I04">I04 — Equipo de cómputo</option>
                 <option value="P01">P01 — Por definir</option>
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Método de pago SAT</span>
+              <select value={form.satPaymentMethod} onChange={(e) => setForm((f) => ({ ...f, satPaymentMethod: e.target.value as "PUE" | "PPD" }))} style={inp}>
+                <option value="PUE">PUE — Pago en una sola exhibición</option>
+                <option value="PPD">PPD — Pago en parcialidades (requiere complemento)</option>
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Forma de pago</span>
+              <select value={form.satPaymentForm} onChange={(e) => setForm((f) => ({ ...f, satPaymentForm: e.target.value }))} style={inp}>
+                <option value="03">03 — Transferencia</option>
+                <option value="01">01 — Efectivo</option>
+                <option value="04">04 — Tarjeta</option>
+                <option value="99">99 — Por definir</option>
               </select>
             </label>
             <label style={{ display: "grid", gap: 4 }}>
@@ -592,6 +660,16 @@ export default function InvoicingPage() {
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Notas</span>
                 <input value={paymentForm.notes} onChange={(e) => setPaymentForm((f) => ({ ...f, notes: e.target.value }))} style={inp} />
               </label>
+              {paymentTarget.satPaymentMethod === "PPD" && (
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text-secondary)" }}>
+                  <input
+                    type="checkbox"
+                    checked={paymentForm.stampComplement}
+                    onChange={(e) => setPaymentForm((f) => ({ ...f, stampComplement: e.target.checked }))}
+                  />
+                  Timbrar complemento de pago (Pagos 2.0) al registrar
+                </label>
+              )}
             </div>
             {paymentErr && (
               <div role="alert" style={{ marginTop: 12, padding: "8px 12px", background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
