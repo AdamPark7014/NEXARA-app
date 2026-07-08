@@ -88,9 +88,27 @@ export default function StudioNewsletterPage() {
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 18 }}>
-        <KpiCard label="Suscriptores totales" value={subs.length} icon="✉️" />
-        {bySource.slice(0, 3).map(([source, count]) => <KpiCard key={source} label={`Vía ${source}`} value={count} />)}
+        <KpiCard label="Suscriptores totales" value={subs.length} icon="✉️" variant="positive" />
+        {bySource.slice(0, 3).map(([source, count]) => (
+          <KpiCard key={source} label={`Vía ${source}`} value={count} hint={subs.length > 0 ? `${((count / subs.length) * 100).toFixed(0)}% del total` : undefined} />
+        ))}
       </div>
+      {bySource.length > 0 && subs.length > 0 && (
+        <div style={{ marginBottom: 18, padding: "14px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por canal</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {bySource.map(([source, count]) => (
+              <div key={source} style={{ display: "grid", gridTemplateColumns: "120px 1fr 48px", gap: 10, alignItems: "center" }}>
+                <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{source}</span>
+                <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${(count / subs.length) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
+                </div>
+                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <FilterToolbar
         search={{ value: search, onChange: (v) => { setSearch(v); void load(v); }, placeholder: "Buscar por email o nombre…" }}
