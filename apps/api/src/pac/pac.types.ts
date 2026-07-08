@@ -20,10 +20,17 @@ export interface PacStampInput {
   paymentForm?: string | null;
   paymentMethod?: string | null;
   cfdiUsage?: string | null;
+  /** Tipo de comprobante: I = Ingreso (factura), E = Egreso (nota de crédito). */
+  tipoComprobante?: 'I' | 'E';
+  /** UUIDs relacionados (para notas de crédito / sustituciones). */
+  relatedUuids?: string[];
+  /** Tipo de relación SAT (01 = nota de crédito, 04 = sustitución, etc.). */
+  relationType?: string;
   emisor: {
     rfc: string;
     name: string;
     regime?: string | null;
+    zipCode?: string | null;
   };
   receptor: {
     rfc: string;
@@ -40,6 +47,37 @@ export interface PacStampInput {
     satProductKey?: string | null;
     satUnitKey?: string | null;
     unitName?: string | null;
+    ivaRetAmount?: number;
+    isrRetAmount?: number;
+  }>;
+}
+
+/** Entrada para timbrar un Complemento de Pago (CFDI tipo P, Pagos 2.0). */
+export interface PacPaymentComplementInput {
+  invoiceNumber: string;
+  serie?: string | null;
+  folio?: string | null;
+  emisor: { rfc: string; name: string; regime?: string | null; zipCode?: string | null };
+  receptor: { rfc: string; name: string; zipCode?: string | null; regime?: string | null };
+  payment: {
+    date: string; // ISO
+    paymentForm: string; // FP01, FP03...
+    amount: number;
+    currency: string;
+    exchangeRate?: number | null;
+    operationNumber?: string | null;
+  };
+  /** Documentos relacionados que este pago liquida. */
+  relatedDocs: Array<{
+    uuid: string;
+    serie?: string | null;
+    folio?: string | null;
+    currency: string;
+    paymentMethod: string; // PPD
+    partialityNumber: number; // NumParcialidad
+    previousBalance: number; // ImpSaldoAnt
+    amountPaid: number; // ImpPagado
+    remainingBalance: number; // ImpSaldoInsoluto
   }>;
 }
 
@@ -80,4 +118,6 @@ export interface IPacAdapter {
   readonly provider: PacProvider;
   stamp(input: PacStampInput): Promise<PacStampResult>;
   cancel(input: PacCancelInput): Promise<PacCancelResult>;
+  /** Timbra un Complemento de Pago (CFDI tipo P). Opcional por adapter. */
+  stampPayment?(input: PacPaymentComplementInput): Promise<PacStampResult>;
 }

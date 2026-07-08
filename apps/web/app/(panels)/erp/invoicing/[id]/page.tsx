@@ -29,6 +29,7 @@ interface PaymentRecord {
   method?: string;
   reference?: string;
   notes?: string;
+  cfdiPaymentUuid?: string | null;
 }
 
 interface InvoiceDetail {
@@ -41,6 +42,9 @@ interface InvoiceDetail {
   totalAmount: number;
   paidAmount?: number;
   cfdiUuid?: string | null;
+  satPaymentMethod?: string | null;
+  isCancelled?: boolean;
+  cfdiRelationType?: string | null;
   receptorName?: string | null;
   receptorRfc?: string | null;
   emisorName?: string | null;
@@ -95,6 +99,12 @@ export default function InvoiceDetailPage() {
   const [payForm, setPayForm] = useState({ amount: "", paymentDate: new Date().toISOString().slice(0, 10), method: "SPEI", reference: "", notes: "" });
   const [paying, setPaying] = useState(false);
   const [payErr, setPayErr] = useState<string | null>(null);
+  const [stamping, setStamping] = useState(false);
+  const [satStatus, setSatStatus] = useState<{ estado?: string; esCancelable?: string } | null>(null);
+  const [checkingSat, setCheckingSat] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
+  const [cancelReason, setCancelReason] = useState("02");
+  const [cancelling, setCancelling] = useState(false);
 
   const load = useCallback(async () => {
     if (!token || !id) return;
@@ -129,6 +139,67 @@ export default function InvoiceDetailPage() {
     } finally { setPaying(false); }
   };
 
+  const stampInvoice = async () => {
+    if (!token || !id) return;
+    setStamping(true);
+    try {
+      await apiFetch(`accounting/invoices/${id}/stamp`, token, { method: "POST" });
+      toast.success("Factura timbrada ante el PAC");
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al timbrar");
+    } finally { setStamping(false); }
+  };
+
+  const checkSatStatus = async () => {
+    if (!token || !id) return;
+    setCheckingSat(true);
+    try {
+      const data = await apiFetch(`accounting/invoices/${id}/sat-status`, token);
+      setSatStatus(data);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al consultar SAT");
+    } finally { setCheckingSat(false); }
+  };
+
+  const cancelInvoice = async () => {
+    if (!token || !id) return;
+    setCancelling(true);
+    try {
+      await apiFetch(`accounting/invoices/${id}/cancel`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ cancelReason }),
+      });
+      toast.success("Factura cancelada ante el SAT");
+      setShowCancel(false);
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al cancelar");
+    } finally { setCancelling(false); }
+  };
+
+  const createCreditNote = async () => {
+    if (!token || !id) return;
+    try {
+      const nc = await apiFetch(`accounting/invoices/${id}/credit-note`, token, { method: "POST", body: JSON.stringify({}) });
+      toast.success(`Nota de crédito ${nc.invoiceNumber} creada en borrador`);
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al crear nota de crédito");
+    }
+  };
+
+  const stampComplement = async (paymentId: number) => {
+    if (!token) return;
+    try {
+      const data = await apiFetch(`accounting/invoices/payments/${paymentId}/stamp-complement`, token, { method: "POST" });
+      toast.success(`Complemento timbrado: ${data.cfdiPaymentUuid}`);
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al timbrar complemento");
+    }
+  };
+
   const pendingAmount = useMemo(() => {
     if (!invoice) return 0;
     return Math.max(0, invoice.totalAmount - (invoice.paidAmount ?? 0));
@@ -158,8 +229,24 @@ export default function InvoiceDetailPage() {
             <Link href="/erp/invoicing" style={{ textDecoration: "none" }}>
               <Button variant="ghost">← Facturación</Button>
             </Link>
+            {canEdit && invoice.status === "DRAFT" && !invoice.cfdiUuid && (
+              <Button variant="primary" onClick={() => void stampInvoice()} disabled={stamping}>
+                {stamping ? "Timbrando…" : "🧾 Timbrar CFDI"}
+              </Button>
+            )}
+            {canEdit && invoice.cfdiUuid && !invoice.isCancelled && invoice.cfdiRelationType !== "01" && (
+              <Button variant="secondary" onClick={() => void createCreditNote()}>📋 Nota de crédito</Button>
+            )}
+            {canEdit && invoice.cfdiUuid && !invoice.isCancelled && (
+              <Button variant="ghost" onClick={() => setShowCancel(true)}>✕ Cancelar CFDI</Button>
+            )}
+            {invoice.cfdiUuid && (
+              <Button variant="ghost" onClick={() => void checkSatStatus()} disabled={checkingSat}>
+                {checkingSat ? "Consultando…" : "🔍 Estatus SAT"}
+              </Button>
+            )}
             {canEdit && invoice.status !== "PAID" && invoice.status !== "CANCELLED" && (
-              <Button variant="primary" onClick={() => { setShowPayment(true); setPayErr(null); setPayForm((f) => ({ ...f, amount: String(pendingAmount) })); }}>
+              <Button variant="secondary" onClick={() => { setShowPayment(true); setPayErr(null); setPayForm((f) => ({ ...f, amount: String(pendingAmount) })); }}>
                 💳 Registrar pago
               </Button>
             )}
@@ -204,6 +291,12 @@ export default function InvoiceDetailPage() {
             <div style={{ gridColumn: "1 / -1" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>UUID CFDI</div>
               <code style={{ fontSize: 11.5, color: "var(--text-secondary)", letterSpacing: "0.02em" }}>{invoice.cfdiUuid}</code>
+              {satStatus && (
+                <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-secondary)" }}>
+                  Estatus SAT: <strong>{satStatus.estado}</strong>
+                  {satStatus.esCancelable ? ` · Cancelable: ${satStatus.esCancelable}` : ""}
+                </div>
+              )}
             </div>
           )}
           {invoice.description && (
@@ -241,17 +334,45 @@ export default function InvoiceDetailPage() {
         <Section eyebrow="Historial" title="Pagos registrados">
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {invoice.payments!.map((p) => (
-              <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 10, alignItems: "center", padding: "10px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}>
+              <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 10, alignItems: "center", padding: "10px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{p.method ?? "Transferencia"}{p.reference ? ` · Ref: ${p.reference}` : ""}</div>
                   {p.notes && <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{p.notes}</div>}
+                  {p.cfdiPaymentUuid && <code style={{ fontSize: 10.5, color: "var(--text-tertiary)" }}>Comp: {p.cfdiPaymentUuid.slice(0, 8)}…</code>}
                 </div>
                 <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{new Date(p.paymentDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
                 <span style={{ fontWeight: 700, fontSize: 13, color: "var(--success)" }}>+<Money value={p.amount} /></span>
+                {canEdit && invoice.satPaymentMethod === "PPD" && invoice.cfdiUuid && !p.cfdiPaymentUuid && (
+                  <Button size="sm" variant="ghost" onClick={() => void stampComplement(p.id)}>Timbrar comp.</Button>
+                )}
               </div>
             ))}
           </div>
         </Section>
+      )}
+
+      {/* Cancel modal */}
+      {showCancel && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowCancel(false)}>
+          <div style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 420, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Cancelar CFDI ante el SAT</div>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo SAT</span>
+              <select value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} style={inp}>
+                <option value="01">01 — Comprobante emitido con errores (con relación)</option>
+                <option value="02">02 — Comprobante emitido con errores (sin relación)</option>
+                <option value="03">03 — No se llevó a cabo la operación</option>
+                <option value="04">04 — Operación nominativa en factura global</option>
+              </select>
+            </label>
+            <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
+              <Button variant="secondary" onClick={() => setShowCancel(false)}>Cerrar</Button>
+              <Button variant="primary" onClick={() => void cancelInvoice()} disabled={cancelling}>
+                {cancelling ? "Cancelando…" : "Confirmar cancelación"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Payment modal */}

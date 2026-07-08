@@ -1,4 +1,11 @@
-import type { IPacAdapter, PacCancelInput, PacCancelResult, PacStampInput, PacStampResult } from '../pac.types.js';
+import type {
+  IPacAdapter,
+  PacCancelInput,
+  PacCancelResult,
+  PacPaymentComplementInput,
+  PacStampInput,
+  PacStampResult,
+} from '../pac.types.js';
 
 /**
  * Adapter mock — sin llamada externa, genera UUID estilo CFDI 4.0 y XML placeholder.
@@ -25,6 +32,19 @@ export class MockPacAdapter implements IPacAdapter {
       accepted: true,
       acuse: `<Acuse motivo="${input.cancelReason}" uuid="${input.uuid}" mock="true"/>`,
       cancelledAt: new Date(),
+      provider: 'mock',
+    };
+  }
+
+  async stampPayment(input: PacPaymentComplementInput): Promise<PacStampResult> {
+    const uuid = this.generateUuid();
+    return {
+      uuid,
+      stampedAt: new Date(),
+      satCertNumber: '00001000000000000000',
+      satSignature: this.randomHex(64),
+      xml: `<?xml version="1.0" encoding="UTF-8"?><cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" Version="4.0" TipoDeComprobante="P" mock="true"><cfdi:Complemento><pago20:Pagos xmlns:pago20="http://www.sat.gob.mx/Pagos20"><pago20:Pago Monto="${input.payment.amount.toFixed(2)}"/></pago20:Pagos></cfdi:Complemento><tfd:TimbreFiscalDigital xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital" Version="1.1" UUID="${uuid}" SelloCFD="MOCK_SELLO"/></cfdi:Comprobante>`,
+      pdfUrl: null,
       provider: 'mock',
     };
   }

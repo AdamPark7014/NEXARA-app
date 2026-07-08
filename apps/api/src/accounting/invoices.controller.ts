@@ -75,6 +75,27 @@ export class InvoicesController {
     return this.service.createInvoiceFromSalesProject(+projectId, user.id, body);
   }
 
+  @Get('sat/descarga-masiva')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
+  descargaMasivaStatus() {
+    return this.service.descargaMasivaStatus();
+  }
+
+  @Get('sat/validate-rfc/:rfc')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
+  validateRfc(@Param('rfc') rfc: string) {
+    return this.service.validateRfc(rfc);
+  }
+
+  @Post('payments/:paymentId/stamp-complement')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
+  stampPaymentComplement(@Param('paymentId') paymentId: string, @CurrentUser() user: any) {
+    return this.service.stampPaymentComplement(+paymentId, user.id);
+  }
+
   @Get(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
@@ -101,6 +122,20 @@ export class InvoicesController {
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
   stamp(@Param('id') id: string, @CurrentUser() user: any) {
     return this.service.stampInvoice(+id, user.id);
+  }
+
+  @Post(':id/credit-note')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
+  createCreditNote(@Param('id') id: string, @CurrentUser() user: any, @Body() dto: any) {
+    return this.service.createCreditNote(+id, dto, user.id);
+  }
+
+  @Get(':id/sat-status')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
+  satStatus(@Param('id') id: string) {
+    return this.service.queryCfdiStatus(+id);
   }
 
   @Patch(':id/cancel')
