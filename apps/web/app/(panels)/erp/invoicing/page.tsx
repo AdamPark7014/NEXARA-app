@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -322,7 +323,7 @@ export default function InvoicingPage() {
   };
 
   const columns: Column<InvoiceRow>[] = [
-    { key: "invoiceNumber", label: "Folio", render: (f) => <Tag variant="accent">{f.invoiceNumber}</Tag>, width: 130 },
+    { key: "invoiceNumber", label: "Folio", render: (f) => <Link href={`/erp/invoicing/${f.id}`} style={{ textDecoration: "none" }}><Tag variant="accent">{f.invoiceNumber}</Tag></Link>, width: 130 },
     { key: "cfdiUuid", label: "UUID", render: (f) => <code style={{ fontSize: 11 }}>{f.cfdiUuid ? `${f.cfdiUuid.slice(0, 8)}…` : "—"}</code>, width: 110 },
     { key: "receptorName", label: "Cliente / Proveedor", accessor: (f) => f.receptorName ?? f.emisorName ?? "—" },
     { key: "type", label: "Tipo", render: (f) => {
