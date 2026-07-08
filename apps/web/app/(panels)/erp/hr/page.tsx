@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -241,7 +242,7 @@ export default function HrPage() {
       key: "nombre", label: "Persona",
       render: (e) => (
         <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{e.nombre}</div>
+          <Link href={`/erp/hr/${e.id}`} style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{e.nombre}</Link>
           <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{e.puesto || e.role?.nombre || "Sin puesto asignado"}</div>
           <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{e.email}</div>
         </div>
