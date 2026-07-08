@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -152,7 +153,7 @@ export default function EmployeePaymentsPage() {
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
 
   const columns: Column<Payment>[] = [
-    { key: "user", label: "Empleado", accessor: (p) => p.user?.nombre ?? `#${p.userId}`, width: 180 },
+    { key: "user", label: "Empleado", render: (p) => <Link href={`/erp/hr/${p.userId}`} style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{p.user?.nombre ?? `#${p.userId}`}</Link>, width: 180 },
     { key: "periodFrom", label: "Periodo", render: (p) => <span style={{ fontSize: 12 }}>{new Date(p.periodFrom).toLocaleDateString("es-MX")} – {new Date(p.periodTo).toLocaleDateString("es-MX")}</span>, width: 200 },
     { key: "amount", label: "Monto", align: "right" as const, render: (p) => <Money value={Number(p.amount)} />, width: 130 },
     { key: "note", label: "Concepto", accessor: (p) => p.note ?? "—" },

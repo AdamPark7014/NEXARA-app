@@ -668,7 +668,7 @@ export const createSalesOpportunity = async (
   token: string,
   payload: {
     title: string;
-    description: string;
+    description?: string;
     stage: string;
     value: number;
     probability: number;
@@ -871,14 +871,14 @@ export const createSalesClient = async (
   payload: {
     name: string;
     legalName: string;
-    taxId: string;
-    fiscalAddress: string;
+    taxId?: string;
+    fiscalAddress?: string;
     billingEmail: string;
     billingPhone: string;
     industry: string;
     website: string;
-    status: string;
-    notes: string;
+    status?: string;
+    notes?: string;
   },
 ) => {
   return apiRequest<SalesClient>(

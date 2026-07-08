@@ -180,7 +180,7 @@ export default function OpsDashboardPage() {
               eyebrow="Urgente"
               title={`${overdueOts.length} OTs vencidas`}
               subtitle="Estas órdenes de trabajo superaron su fecha de entrega esperada"
-              tone="danger"
+              tone="accent"
             >
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {overdueOts.slice(0, 5).map((a) => (

@@ -100,12 +100,12 @@ export default function CrmDashboardPage() {
   const stageBreakdown = useMemo(() => {
     const active = visibleOpps.filter((o) => !isClosedOpportunityStage(o.stage));
     return PIPELINE_STAGES
-      .filter((s) => !isClosedOpportunityStage(s))
+      .filter((s) => !isClosedOpportunityStage(s.id))
       .map((stage) => {
-        const inStage = active.filter((o) => o.stage === stage);
+        const inStage = active.filter((o) => o.stage === stage.id);
         return {
-          stage,
-          label: formatOpportunityStage(stage),
+          stage: stage.id,
+          label: formatOpportunityStage(stage.id),
           count: inStage.length,
           value: inStage.reduce((s, o) => s + Number(o.value ?? 0), 0),
         };
