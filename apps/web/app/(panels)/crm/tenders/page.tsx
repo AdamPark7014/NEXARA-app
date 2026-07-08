@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -197,12 +198,12 @@ export default function TendersPage() {
   }, [items, highlightId, searchQ, filterStatus]);
 
   const columns: Column<Tender>[] = [
-    { key: "tenderNumber", label: "Folio", render: (t) => <code style={{ fontSize: 11.5 }}>{t.tenderNumber}</code>, width: 120 },
+    { key: "tenderNumber", label: "Folio", render: (t) => <Link href={`/crm/tenders/${t.id}`} style={{ textDecoration: "none" }}><code style={{ fontSize: 11.5, color: "var(--primary)" }}>{t.tenderNumber}</code></Link>, width: 120 },
     {
       key: "title", label: "Licitación",
       render: (t) => (
         <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{t.title}</div>
+          <Link href={`/crm/tenders/${t.id}`} style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{t.title}</Link>
           <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
             {t.conveningEntity} · {t.tenderType === "PUBLIC_GOV" ? "Gobierno" : "Privada"}
             {t.contactName && ` · ${t.contactName}`}
