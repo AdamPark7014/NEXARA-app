@@ -252,11 +252,40 @@ export default function TendersPage() {
         }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Abiertas" value={abiertas} icon="📜" />
-        <KpiCard label="Adjudicadas" value={ganadas} variant="positive" icon="🏆" />
-        <KpiCard label="Pipeline (propuestas)" value={<Money value={pipelineValue} compact />} icon="💰" variant="accent" hint="Valor total de propuestas en proceso" />
-      </div>
+      {!loading && items.length > 0 && (() => {
+        const cerradas = items.filter((t) => ["AWARDED", "LOST", "CANCELLED", "DISQUALIFIED"].includes(t.status)).length;
+        const winRate = cerradas > 0 ? Math.round((ganadas / cerradas) * 100) : 0;
+        const byStatus = STATUSES
+          .map((s) => ({ label: STATUS_LABELS[s] ?? s, count: items.filter((t) => t.status === s).length }))
+          .filter((x) => x.count > 0)
+          .sort((a, b) => b.count - a.count);
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 14 }}>
+              <KpiCard label="Abiertas" value={abiertas} icon="📜" />
+              <KpiCard label="Adjudicadas" value={ganadas} variant="positive" icon="🏆" />
+              <KpiCard label="Tasa de éxito" value={`${winRate}%`} variant={winRate >= 50 ? "positive" : winRate >= 25 ? "warning" : "danger"} icon="🎯" hint="Adjudicadas / cerradas" />
+              <KpiCard label="Pipeline (propuestas)" value={<Money value={pipelineValue} compact />} icon="💰" variant="accent" hint="Valor total de propuestas en proceso" />
+            </div>
+            {byStatus.length > 0 && (
+              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por estado</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {byStatus.map(({ label, count }) => (
+                    <div key={label} style={{ display: "grid", gridTemplateColumns: "140px 1fr 32px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{label}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(count / items.length) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {successMsg && (
         <div role="status" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--positive)", color: "var(--positive,#16a34a)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
