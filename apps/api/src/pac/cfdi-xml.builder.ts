@@ -94,6 +94,7 @@ export function buildSealedCfdi(
   const formaPago = (input.paymentForm || 'FP99').replace(/^FP/, '').padStart(2, '0');
   const metodoPago = input.paymentMethod || 'PUE';
   const lugarExpedicion = (input.emisor.zipCode || input.receptor.zipCode || '00000').slice(0, 5);
+  const receptorZip = (input.receptor.zipCode || input.emisor.zipCode || '00000').slice(0, 5);
   const emisorRegime = (input.emisor.regime || 'R601').replace(/^R/, '');
   const receptorRegime = (input.receptor.regime || 'R616').replace(/^R/, '');
   const usoCfdi = input.cfdiUsage || (tipo === 'E' ? 'G02' : 'G03');
@@ -109,6 +110,8 @@ export function buildSealedCfdi(
     const ivaAmount = base * ivaRate;
     const ivaRetAmount = it.ivaRetAmount ?? 0;
     const isrRetAmount = it.isrRetAmount ?? 0;
+    const iepsRate = it.iepsRate != null ? it.iepsRate / 100 : 0;
+    const iepsAmount = it.iepsAmount ?? base * iepsRate;
     return {
       claveProdServ: it.satProductKey || '01010101',
       claveUnidad: it.satUnitKey || 'E48',
@@ -222,7 +225,7 @@ export function buildSealedCfdi(
   cadenaParts.push(
     input.receptor.rfc,
     input.receptor.name,
-    lugarExpedicion, // DomicilioFiscalReceptor = CP receptor
+    receptorZip,
     receptorRegime,
     usoCfdi,
   );
@@ -245,7 +248,7 @@ export function buildSealedCfdi(
   const sello = csd.sign(cadenaOriginal);
 
   const emisorXml = `<cfdi:Emisor Rfc="${esc(input.emisor.rfc)}" Nombre="${esc(input.emisor.name)}" RegimenFiscal="${emisorRegime}"/>`;
-  const receptorXml = `<cfdi:Receptor Rfc="${esc(input.receptor.rfc)}" Nombre="${esc(input.receptor.name)}" DomicilioFiscalReceptor="${lugarExpedicion}" RegimenFiscalReceptor="${receptorRegime}" UsoCFDI="${usoCfdi}"/>`;
+  const receptorXml = `<cfdi:Receptor Rfc="${esc(input.receptor.rfc)}" Nombre="${esc(input.receptor.name)}" DomicilioFiscalReceptor="${receptorZip}" RegimenFiscalReceptor="${receptorRegime}" UsoCFDI="${usoCfdi}"/>`;
 
   const xml =
     `<?xml version="1.0" encoding="UTF-8"?>` +
@@ -255,6 +258,78 @@ export function buildSealedCfdi(
     receptorXml +
     `<cfdi:Conceptos>${conceptosXml}</cfdi:Conceptos>` +
     impuestosTotalesNode +
+    `</cfdi:Comprobante>`;
+
+  return { xml, cadenaOriginal, sello, noCertificado };
+}
+
+/** CFDI tipo P — Complemento de Pago (Pagos 2.0) sellado con CSD. */
+export function buildSealedPaymentCfdi(
+  input: import('./pac.types.js').PacPaymentComplementInput,
+  csd: CsdService,
+): SealedCfdi {
+  if (!csd.isConfigured()) {
+    throw new Error('CSD no configurado: no se puede sellar complemento de pago');
+  }
+
+  const fecha = cfdiDate(new Date());
+  const noCertificado = csd.noCertificado;
+  const certificado = csd.certificadoBase64;
+  const serie = input.serie || 'P';
+  const folio = (input.folio || input.invoiceNumber.replace(/[^0-9]/g, '') || '1').slice(0, 40);
+  const lugarExpedicion = (input.emisor.zipCode || input.receptor.zipCode || '00000').slice(0, 5);
+  const receptorZip = (input.receptor.zipCode || input.emisor.zipCode || '00000').slice(0, 5);
+  const emisorRegime = (input.emisor.regime || 'R601').replace(/^R/, '');
+  const receptorRegime = (input.receptor.regime || 'R616').replace(/^R/, '');
+  const moneda = input.payment.currency || 'MXN';
+  const monto = input.payment.amount;
+  const formaPago = (input.payment.paymentForm || 'FP03').replace(/^FP/, '').padStart(2, '0');
+  const fechaPago = input.payment.date.replace('Z', '').slice(0, 19);
+
+  const doc = input.relatedDocs[0];
+  const doctoRelacionado = doc
+    ? `<pago20:DoctoRelacionado IdDocumento="${esc(doc.uuid)}"` +
+      `${doc.serie ? ` Serie="${esc(doc.serie)}"` : ''}` +
+      `${doc.folio ? ` Folio="${esc(doc.folio)}"` : ''}` +
+      ` MonedaDR="${doc.currency || 'MXN'}" EquivalenciaDR="1" NumParcialidad="${doc.partialityNumber}"` +
+      ` ImpSaldoAnt="${m(doc.previousBalance)}" ImpPagado="${m(doc.amountPaid)}" ImpSaldoInsoluto="${m(doc.remainingBalance)}" ObjetoImpDR="02">` +
+      `<pago20:ImpuestosDR><pago20:TrasladosDR><pago20:TrasladoDR BaseDR="${m(doc.amountPaid / 1.16)}" ImpuestoDR="002" TipoFactorDR="Tasa" TasaOCuotaDR="0.160000" ImporteDR="${m(doc.amountPaid - doc.amountPaid / 1.16)}"/></pago20:TrasladosDR></pago20:ImpuestosDR>` +
+      `</pago20:DoctoRelacionado>`
+    : '';
+
+  const pagosXml =
+    `<pago20:Pago FechaPago="${fechaPago}" FormaDePagoP="${formaPago}" MonedaP="${moneda}" Monto="${m(monto)}"` +
+    `${input.payment.operationNumber ? ` NumOperacion="${esc(input.payment.operationNumber)}"` : ''}>` +
+    doctoRelacionado +
+    `</pago20:Pago>`;
+
+  const complementoXml =
+    `<cfdi:Complemento><pago20:Pagos Version="2.0" xmlns:pago20="http://www.sat.gob.mx/Pagos20">${pagosXml}</pago20:Pagos></cfdi:Complemento>`;
+
+  const conceptoXml =
+    `<cfdi:Concepto ClaveProdServ="84111506" Cantidad="1" ClaveUnidad="ACT" Descripcion="Pago" ValorUnitario="0" Importe="0" ObjetoImp="01"/>`;
+
+  const cadenaOriginal = `||4.0|${serie}|${folio}|${fecha}|${noCertificado}|0.00|XXX|0.00|P|01|${lugarExpedicion}|${input.emisor.rfc}|${input.emisor.name}|${emisorRegime}|${input.receptor.rfc}|${input.receptor.name}|${receptorZip}|${receptorRegime}|CP01|84111506|1|ACT|Pago|0.00|0.00|01||`;
+
+  const sello = csd.sign(cadenaOriginal);
+
+  const comprobanteAttrs =
+    `xmlns:cfdi="${CFDI_NS}" xmlns:xsi="${XSI_NS}" xmlns:pago20="http://www.sat.gob.mx/Pagos20"` +
+    ` xsi:schemaLocation="${SCHEMA_LOCATION} http://www.sat.gob.mx/Pagos20 http://www.sat.gob.mx/sitio_internet/cfd/Pagos/Pagos20.xsd"` +
+    ` Version="4.0" Serie="${esc(serie)}" Folio="${esc(folio)}" Fecha="${fecha}"` +
+    ` Sello="${sello}" NoCertificado="${noCertificado}" Certificado="${certificado}"` +
+    ` SubTotal="0" Moneda="XXX" Total="0" TipoDeComprobante="P" Exportacion="01" LugarExpedicion="${lugarExpedicion}"`;
+
+  const emisorXml = `<cfdi:Emisor Rfc="${esc(input.emisor.rfc)}" Nombre="${esc(input.emisor.name)}" RegimenFiscal="${emisorRegime}"/>`;
+  const receptorXml = `<cfdi:Receptor Rfc="${esc(input.receptor.rfc)}" Nombre="${esc(input.receptor.name)}" DomicilioFiscalReceptor="${receptorZip}" RegimenFiscalReceptor="${receptorRegime}" UsoCFDI="CP01"/>`;
+
+  const xml =
+    `<?xml version="1.0" encoding="UTF-8"?>` +
+    `<cfdi:Comprobante ${comprobanteAttrs}>` +
+    emisorXml +
+    receptorXml +
+    `<cfdi:Conceptos>${conceptoXml}</cfdi:Conceptos>` +
+    complementoXml +
     `</cfdi:Comprobante>`;
 
   return { xml, cadenaOriginal, sello, noCertificado };

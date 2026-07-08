@@ -1,6 +1,6 @@
-import type { IPacAdapter, PacCancelInput, PacCancelResult, PacStampInput, PacStampResult } from '../pac.types.js';
+import type { IPacAdapter, PacCancelInput, PacCancelResult, PacPaymentComplementInput, PacStampInput, PacStampResult } from '../pac.types.js';
 import type { CsdService } from '../csd.service.js';
-import { buildSealedCfdi } from '../cfdi-xml.builder.js';
+import { buildSealedCfdi, buildSealedPaymentCfdi } from '../cfdi-xml.builder.js';
 
 /**
  * Adapter Finkok (SOAP API). Requiere FINKOK_USER + FINKOK_PASSWORD + CSD del emisor.
@@ -52,6 +52,52 @@ export class FinkokAdapter implements IPacAdapter {
     if (!response.ok) {
       const body = await response.text();
       throw new Error(`Finkok timbrado falló (${response.status}): ${body.slice(0, 400)}`);
+    }
+
+    const text = await response.text();
+    const uuid = this.extractXmlTag(text, 'UUID') || this.extractXmlTag(text, 'uuid') || '';
+    const stampedAt = this.extractXmlTag(text, 'Fecha') || new Date().toISOString();
+    const certNumber = this.extractXmlTag(text, 'noCertificadoSAT') || '00001000000000000000';
+    const cfdiXml = this.extractXmlTag(text, 'xml') || '';
+
+    return {
+      uuid,
+      stampedAt: new Date(stampedAt),
+      satCertNumber: certNumber,
+      satSignature: this.extractXmlTag(text, 'selloSAT') || null,
+      xml: cfdiXml,
+      pdfUrl: null,
+      provider: 'finkok',
+    };
+  }
+
+  async stampPayment(input: PacPaymentComplementInput): Promise<PacStampResult> {
+    if (!this.csd || !this.csd.isConfigured()) {
+      throw new Error('Finkok: CSD del emisor no configurado para complemento de pago');
+    }
+    const xml = buildSealedPaymentCfdi(input, this.csd).xml;
+    const xmlBase64 = Buffer.from(xml, 'utf8').toString('base64');
+
+    const soapBody = `<?xml version="1.0" encoding="utf-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:apps="apps.services.soap.core.views">
+  <soapenv:Body>
+    <apps:stamp>
+      <apps:xml>${xmlBase64}</apps:xml>
+      <apps:username>${this.opts.user}</apps:username>
+      <apps:password>${this.opts.password}</apps:password>
+    </apps:stamp>
+  </soapenv:Body>
+</soapenv:Envelope>`;
+
+    const response = await fetch(`${this.base}/servicios/soap/stamp.wsdl`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/xml', SOAPAction: 'stamp' },
+      body: soapBody,
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Finkok complemento de pago falló (${response.status}): ${body.slice(0, 400)}`);
     }
 
     const text = await response.text();

@@ -1,6 +1,6 @@
-import type { IPacAdapter, PacCancelInput, PacCancelResult, PacStampInput, PacStampResult } from '../pac.types.js';
+import type { IPacAdapter, PacCancelInput, PacCancelResult, PacPaymentComplementInput, PacStampInput, PacStampResult } from '../pac.types.js';
 import type { CsdService } from '../csd.service.js';
-import { buildSealedCfdi } from '../cfdi-xml.builder.js';
+import { buildSealedCfdi, buildSealedPaymentCfdi } from '../cfdi-xml.builder.js';
 
 /**
  * Adapter SW Sapien (https://services.sw.com.mx). Modalidad CFDI 4.0 / Issuer
@@ -54,8 +54,19 @@ export class SwSapienAdapter implements IPacAdapter {
 
     if (useJson) {
       const payload = {
-        info: { invoiceNumber: input.invoiceNumber },
-        receiver: { rfc: input.receptor.rfc, name: input.receptor.name, cfdiUse: input.cfdiUsage || 'G03' },
+        info: {
+          invoiceNumber: input.invoiceNumber,
+          cfdiType: input.tipoComprobante || 'I',
+          paymentForm: input.paymentForm?.replace(/^FP/, '') || '99',
+          paymentMethod: input.paymentMethod || 'PUE',
+        },
+        receiver: {
+          rfc: input.receptor.rfc,
+          name: input.receptor.name,
+          cfdiUse: input.cfdiUsage || 'G03',
+          fiscalRegime: input.receptor.regime?.replace(/^R/, '') || '616',
+          taxZipCode: input.receptor.zipCode,
+        },
         items: input.items.map((it) => ({
           quantity: it.quantity,
           unitValue: it.unitPrice,
@@ -65,6 +76,9 @@ export class SwSapienAdapter implements IPacAdapter {
           unit: it.unitName || 'Servicio',
           taxRate: (it.taxRate || 0) / 100,
         })),
+        relations: input.relatedUuids?.length
+          ? { type: input.relationType || '01', uuids: input.relatedUuids }
+          : undefined,
       };
       const response = await fetch(`${this.base}/v4/cfdi33/issue/json/v4`, {
         method: 'POST',
@@ -79,19 +93,17 @@ export class SwSapienAdapter implements IPacAdapter {
       return this.mapStampResponse(data);
     }
 
-    // Modo XML pre-sellado: el caller debe pasar el XML firmado por CSD.
     const xml = await this.buildSealedXml(input);
-    const response = await fetch(`${this.base}/v3/cfdi33/stamp/v4`, {
-      method: 'POST',
-      headers: { Authorization: `bearer ${token}`, 'Content-Type': 'text/xml' },
-      body: xml,
-    });
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`SW timbrado XML falló (${response.status}): ${body.slice(0, 400)}`);
+    return this.stampXml(token, xml);
+  }
+
+  async stampPayment(input: PacPaymentComplementInput): Promise<PacStampResult> {
+    if (!this.csd || !this.csd.isConfigured()) {
+      throw new Error('SW: CSD del emisor no configurado para complemento de pago');
     }
-    const data: any = await response.json();
-    return this.mapStampResponse(data);
+    const token = await this.getToken();
+    const xml = buildSealedPaymentCfdi(input, this.csd).xml;
+    return this.stampXml(token, xml);
   }
 
   async cancel(input: PacCancelInput): Promise<PacCancelResult> {
@@ -119,7 +131,6 @@ export class SwSapienAdapter implements IPacAdapter {
     };
   }
 
-  /** Construye XML CFDI 4.0 pre-sellado con el CSD del emisor. */
   protected async buildSealedXml(input: PacStampInput): Promise<string> {
     if (!this.csd || !this.csd.isConfigured()) {
       throw new Error('SW: CSD del emisor no configurado. Configura CSD_* o usa SW_USE_ISSUE_JSON=1');
@@ -129,6 +140,20 @@ export class SwSapienAdapter implements IPacAdapter {
       relatedUuids: input.relatedUuids,
       relationType: input.relationType,
     }).xml;
+  }
+
+  private async stampXml(token: string, xml: string): Promise<PacStampResult> {
+    const response = await fetch(`${this.base}/v3/cfdi33/stamp/v4`, {
+      method: 'POST',
+      headers: { Authorization: `bearer ${token}`, 'Content-Type': 'text/xml' },
+      body: xml,
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`SW timbrado XML falló (${response.status}): ${body.slice(0, 400)}`);
+    }
+    const data: any = await response.json();
+    return this.mapStampResponse(data);
   }
 
   private mapStampResponse(data: any): PacStampResult {

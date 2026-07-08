@@ -48,6 +48,16 @@ export class AccountingService {
     return normalized;
   }
 
+  /** Mapea método de pago interno (SPEI, CASH…) a forma de pago SAT (FPxx). */
+  private methodToSatPaymentForm(method?: string): string {
+    const m = String(method || 'SPEI').trim().toUpperCase();
+    if (m === 'SPEI' || m === 'TRANSFER' || m === 'BANK_TRANSFER') return 'FP03';
+    if (m === 'CASH' || m === 'EFECTIVO') return 'FP01';
+    if (m === 'CHECK' || m === 'CHEQUE') return 'FP02';
+    if (m === 'CARD' || m === 'CREDIT_CARD' || m === 'TARJETA') return 'FP04';
+    return 'FP99';
+  }
+
   private normalizeSatPaymentMethod(value?: string) {
     if (!value) return undefined;
     const normalized = String(value).trim().toUpperCase();
@@ -883,6 +893,9 @@ export class AccountingService {
     const emisorRfc = invoice.emisorRfc as string;
     const receptorRfc = invoice.receptorRfc as string;
     const issuerProfile = await this.getInvoiceIssuerProfile();
+    if (!issuerProfile.emisorZipCode) {
+      cfdiErrors.push('CP fiscal del emisor (LugarExpedicion — configurar en perfil de empresa o ajustes fiscales)');
+    }
 
     const stamp = await this.pacService.stamp({
       invoiceNumber: invoice.invoiceNumber,
@@ -922,6 +935,8 @@ export class AccountingService {
         unitName: item.unitName,
         ivaRetAmount: item.ivaRetAmount ? Number(item.ivaRetAmount) : undefined,
         isrRetAmount: item.isrRetAmount ? Number(item.isrRetAmount) : undefined,
+        iepsAmount: item.iepsAmount ? Number(item.iepsAmount) : undefined,
+        iepsRate: item.iepsRate ? Number(item.iepsRate) : undefined,
       })),
     });
 
@@ -1085,6 +1100,20 @@ export class AccountingService {
       };
     }
 
+    const company = await this.prisma.companyProfile.findFirst({
+      where: { isPrimary: true, isActive: true },
+      select: { rfc: true, legalName: true, fiscalRegime: true, fiscalPostalCode: true },
+    });
+    if (company) {
+      return {
+        emisorRfc: company.rfc || null,
+        emisorName: company.legalName || null,
+        emisorRegime: company.fiscalRegime || null,
+        emisorZipCode: company.fiscalPostalCode || null,
+        source: 'company_profile',
+      };
+    }
+
     const latestInvoiceWithIssuer = await this.prisma.invoice.findFirst({
       where: {
         deletedAt: null,
@@ -1152,6 +1181,7 @@ export class AccountingService {
     speiTrackingKey?: string;
     exchangeRate?: number;
     operationNumber?: string;
+    stampComplement?: boolean;
   }, userId: number) {
     const invoice = await this.prisma.invoice.findUnique({ where: { id: dto.invoiceId } });
     if (!invoice) throw new NotFoundException('Factura no encontrada');
@@ -1178,7 +1208,9 @@ export class AccountingService {
           bankAccountId: dto.bankAccountId ?? null,
           notes: dto.notes?.trim() || null,
           createdById: userId,
-          satPaymentForm: this.normalizeSatPaymentForm(dto.satPaymentForm) as any,
+          satPaymentForm: this.normalizeSatPaymentForm(
+            dto.satPaymentForm || this.methodToSatPaymentForm(dto.method),
+          ) as any,
           speiTrackingKey: dto.speiTrackingKey?.trim() || null,
           exchangeRate: dto.exchangeRate ? new Prisma.Decimal(dto.exchangeRate) : null,
           operationNumber: dto.operationNumber?.trim() || null,
@@ -1228,7 +1260,43 @@ export class AccountingService {
       .notifyPaymentRegistered(userId, payment.id, invoice.invoiceNumber, amountLabel)
       .catch(() => undefined);
     void this.autoJournalForPayment(payment, invoice, userId).catch(() => undefined);
+
+    const shouldStampComplement =
+      Boolean(dto.stampComplement) ||
+      (invoice.satPaymentMethod === 'PPD' && invoice.cfdiUuid && !invoice.isCancelled);
+
+    if (shouldStampComplement) {
+      try {
+        const complement = await this.stampPaymentComplement(payment.id, userId);
+        return { ...payment, complement };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Error al timbrar complemento';
+        return { ...payment, complementStampWarning: message };
+      }
+    }
+
     return payment;
+  }
+
+  async getInvoiceXml(id: number) {
+    const invoice = await this.getInvoice(id);
+    if (!invoice.cfdiUuid || !invoice.cfdiXml) {
+      throw new BadRequestException('La factura no tiene XML CFDI timbrado');
+    }
+    const safeName = invoice.invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
+    return {
+      filename: `${safeName}.xml`,
+      contentType: 'application/xml',
+      body: invoice.cfdiXml,
+    };
+  }
+
+  async getInvoicePdf(id: number) {
+    const invoice = await this.getInvoice(id);
+    if (!invoice.pdfUrl) {
+      throw new BadRequestException('PDF no disponible para esta factura (el PAC no generó representación impresa)');
+    }
+    return { url: invoice.pdfUrl, filename: `${invoice.invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf` };
   }
 
   // ── Banking ───────────────────────────────────────────────────────
@@ -1543,6 +1611,10 @@ export class AccountingService {
           satProductKey: it.satProductKey,
           satUnitKey: it.satUnitKey,
           unitName: it.unitName,
+          ivaRetAmount: it.ivaRetAmount ? Number(it.ivaRetAmount) : undefined,
+          isrRetAmount: it.isrRetAmount ? Number(it.isrRetAmount) : undefined,
+          iepsAmount: it.iepsAmount ? Number(it.iepsAmount) : undefined,
+          iepsRate: it.iepsRate ? Number(it.iepsRate) : undefined,
         }));
 
     const subtotal = items.reduce((s, it) => s + it.quantity * it.unitPrice, 0);
@@ -1587,6 +1659,10 @@ export class AccountingService {
             satProductKey: (it as any).satProductKey || '84111506',
             satUnitKey: (it as any).satUnitKey || 'E48',
             unitName: (it as any).unitName || 'Servicio',
+            ivaRetAmount: (it as any).ivaRetAmount != null ? new Prisma.Decimal((it as any).ivaRetAmount) : null,
+            isrRetAmount: (it as any).isrRetAmount != null ? new Prisma.Decimal((it as any).isrRetAmount) : null,
+            iepsAmount: (it as any).iepsAmount != null ? new Prisma.Decimal((it as any).iepsAmount) : null,
+            iepsRate: (it as any).iepsRate != null ? new Prisma.Decimal((it as any).iepsRate) : null,
           })),
         },
       },

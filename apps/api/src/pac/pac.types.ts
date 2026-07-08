@@ -46,9 +46,12 @@ export interface PacStampInput {
     taxRate?: number;
     satProductKey?: string | null;
     satUnitKey?: string | null;
+    zipCode?: string | null;
     unitName?: string | null;
     ivaRetAmount?: number;
     isrRetAmount?: number;
+    iepsAmount?: number;
+    iepsRate?: number;
   }>;
 }
 

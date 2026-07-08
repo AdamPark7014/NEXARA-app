@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Param, Body, Query, UseGuards, Patch, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query, UseGuards, Patch, Delete, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { AccountingService } from './accounting.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -94,6 +95,24 @@ export class InvoicesController {
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
   stampPaymentComplement(@Param('paymentId') paymentId: string, @CurrentUser() user: any) {
     return this.service.stampPaymentComplement(+paymentId, user.id);
+  }
+
+  @Get(':id/xml')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
+  async getXml(@Param('id') id: string, @Res() res: Response) {
+    const xml = await this.service.getInvoiceXml(+id);
+    res.setHeader('Content-Type', xml.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${xml.filename}"`);
+    res.send(xml.body);
+  }
+
+  @Get(':id/pdf')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
+  async getPdf(@Param('id') id: string, @Res() res: Response) {
+    const pdf = await this.service.getInvoicePdf(+id);
+    res.redirect(pdf.url);
   }
 
   @Get(':id')

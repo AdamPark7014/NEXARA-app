@@ -246,3 +246,14 @@ http:
       loadBalancer:
         servers:
           - url: 'http://localhost'
+
+# TLS 1.2+ (requisito SAT para timbrado vía internet)
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: true
+    sat-compliant:
+      minVersion: VersionTLS12
+      maxVersion: VersionTLS13
+      sniStrict: true
