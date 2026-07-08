@@ -243,9 +243,20 @@ export default function BankingPage() {
                   border: `1px solid ${selected?.id === a.id ? "var(--primary)" : "var(--border)"}`,
                   background: selected?.id === a.id ? "color-mix(in srgb, var(--primary) 6%, var(--surface))" : "var(--surface)",
                 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>{a.name}</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{a.name}</div>
+                    <Tag variant={a.isActive ? "positive" : "neutral"}>{a.currency}</Tag>
+                  </div>
                   <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginBottom: 8 }}>{a.bankName} · {a.clabe ?? a.accountNumber}</div>
-                  <div style={{ fontSize: 18, fontWeight: 800 }}><Money value={Number(a.currentBalance)} /></div>
+                  <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}><Money value={Number(a.currentBalance)} /></div>
+                  {totalBalance > 0 && (
+                    <div>
+                      <div style={{ height: 4, borderRadius: 2, background: "var(--surface-2)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${Math.max(2, (Number(a.currentBalance) / totalBalance) * 100)}%`, background: "var(--primary)", borderRadius: 2 }} />
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 3 }}>{((Number(a.currentBalance) / totalBalance) * 100).toFixed(0)}% del total</div>
+                    </div>
+                  )}
                 </button>
                 {cfg.canCreate && (
                   <button onClick={() => openEditAccount(a)} title="Editar cuenta" style={{ position: "absolute", top: 8, right: 8, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, cursor: "pointer", fontSize: 12, padding: "2px 6px" }}>✎</button>
