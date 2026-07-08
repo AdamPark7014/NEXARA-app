@@ -250,7 +250,10 @@ export default function MaintenanceContractsPage() {
       render: (c) => (
         <div>
           <div style={{ fontWeight: 700, fontSize: 13 }}>{c.title}</div>
-          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{c.client?.name ?? "—"} · {c.branch?.name ?? "Todas las sucursales"}</div>
+          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+            {c.client?.id ? <Link href={`/ops/service-clients/${c.client.id}`} style={{ color: "var(--primary)", textDecoration: "none" }}>{c.client.name}</Link> : "—"}
+            {" · "}{c.branch?.name ?? "Todas las sucursales"}
+          </div>
         </div>
       ),
     },
