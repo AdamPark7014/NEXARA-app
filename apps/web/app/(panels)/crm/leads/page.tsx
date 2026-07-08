@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -224,9 +225,9 @@ export default function LeadsPage() {
       label: "Empresa / Contacto",
       render: (l) => (
         <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{l.company ?? "—"}</div>
+          <Link href={`/crm/leads/${l.id}`} style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{l.company ?? l.name ?? "—"}</Link>
           <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-            {l.name} · {l.phone}
+            {l.name}{l.phone ? ` · ${l.phone}` : ""}
           </div>
         </div>
       ),
