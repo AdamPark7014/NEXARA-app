@@ -190,7 +190,21 @@ export default function OpportunitiesPage() {
       ),
     },
     { key: "value", label: "Monto", render: (o) => <Money value={Number(o.value ?? 0)} />, width: 120 },
-    { key: "probability", label: "Prob.", accessor: (o) => `${o.probability ?? 0}%`, width: 70 },
+    {
+      key: "probability", label: "Prob.",
+      render: (o) => {
+        const p = o.probability ?? 0;
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 90 }}>
+            <div style={{ flex: 1, height: 5, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${p}%`, background: p >= 70 ? "var(--success)" : p >= 40 ? "var(--primary)" : "var(--warning)", borderRadius: 3 }} />
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 600, minWidth: 32 }}>{p}%</span>
+          </div>
+        );
+      },
+      width: 110,
+    },
     {
       key: "stage",
       label: "Etapa",
