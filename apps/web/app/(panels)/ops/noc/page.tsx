@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -160,9 +161,12 @@ export default function NocPage() {
                         {d.lastSeen ? new Date(d.lastSeen).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
                       </div>
                     </div>
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ textAlign: "right", flexShrink: 0, minWidth: 100 }}>
                       <div style={{ fontFamily: "var(--nx-font-display)", fontWeight: 700, fontSize: 15 }}>{d.uptimePct30d.toFixed(2)}%</div>
-                      <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Uptime 30d</div>
+                      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 4 }}>Uptime 30d</div>
+                      <div style={{ height: 5, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${d.uptimePct30d}%`, background: d.uptimePct30d >= 99 ? "var(--success)" : d.uptimePct30d >= 95 ? "var(--warning)" : "var(--danger)", borderRadius: 3 }} />
+                      </div>
                     </div>
                     <Tag variant={statusVariant(d.status)}>{statusLabel[d.status]}</Tag>
                   </article>

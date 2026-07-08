@@ -508,7 +508,7 @@ export default function ProcurementPage() {
         </div>
       ),
     },
-    { key: "priority", label: "Prioridad", render: (r) => <Tag variant="neutral">{r.priority ?? "NORMAL"}</Tag>, width: 100 },
+    { key: "priority", label: "Prioridad", render: (r) => <Tag variant={r.priority === "HIGH" || r.priority === "URGENT" ? "danger" : r.priority === "MEDIUM" ? "warning" : "neutral"}>{r.priority ?? "NORMAL"}</Tag>, width: 100 },
     {
       key: "status",
       label: "Estado",
