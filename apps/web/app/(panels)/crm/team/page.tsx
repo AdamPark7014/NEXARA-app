@@ -92,7 +92,18 @@ export default function TeamPage() {
     { key: "opportunitiesCreated", label: "Oportunidades", width: 120 },
     { key: "newClientsAchieved", label: "Clientes nuevos", width: 120 },
     { key: "revenueAchieved", label: "Vendido (mes)", render: (p) => <Money value={p.revenueAchieved} />, width: 130 },
-    { key: "attainmentPct", label: "% cuota", render: (p) => <Tag variant={p.attainmentPct >= 100 ? "positive" : p.attainmentPct >= 60 ? "warning" : "danger"}>{p.attainmentPct}%</Tag>, width: 100 },
+    {
+      key: "attainmentPct", label: "% cuota",
+      render: (p) => (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 130 }}>
+          <div style={{ flex: 1, height: 6, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${Math.min(100, p.attainmentPct)}%`, background: p.attainmentPct >= 100 ? "var(--success)" : p.attainmentPct >= 60 ? "var(--primary)" : "var(--warning)", borderRadius: 3, transition: "width .3s" }} />
+          </div>
+          <Tag variant={p.attainmentPct >= 100 ? "positive" : p.attainmentPct >= 60 ? "warning" : "danger"}>{p.attainmentPct}%</Tag>
+        </div>
+      ),
+      width: 180,
+    },
     { key: "reachedBonus", label: "Bono", render: (p) => p.reachedBonus ? <Tag variant="positive">🏆 Alcanzado</Tag> : <Tag variant="default">—</Tag>, width: 120 },
   ];
 
