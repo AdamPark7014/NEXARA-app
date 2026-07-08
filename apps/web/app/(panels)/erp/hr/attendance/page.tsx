@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import Link from "next/link";
 import dynamic from "next/dynamic";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -414,7 +415,7 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
       key: "nombre", label: "Empleado",
       render: m => (
         <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{m.nombre}</div>
+          <Link href={`/erp/hr/${m.userId}`} style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{m.nombre}</Link>
           <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
             {[m.roleName, m.department].filter(Boolean).join(" · ") || m.email || "—"}
           </div>

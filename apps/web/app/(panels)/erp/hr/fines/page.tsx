@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -250,7 +251,11 @@ export default function FinesPage() {
       label: "Empleado",
       render: (f) => (
         <div>
-          <div style={{ fontWeight: 600, fontSize: 13 }}>{f.usuario?.nombre ?? "—"}</div>
+          {f.usuario?.id ? (
+            <Link href={`/erp/hr/${f.usuario.id}`} style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{f.usuario.nombre ?? "—"}</Link>
+          ) : (
+            <div style={{ fontWeight: 600, fontSize: 13 }}>{f.usuario?.nombre ?? "—"}</div>
+          )}
           {f.usuario?.email && <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{f.usuario.email}</div>}
         </div>
       ),
