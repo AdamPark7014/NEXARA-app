@@ -171,7 +171,7 @@ export default function ClientDetailPage() {
                     <div style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)" }}>{o.title}</div>
                     <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 2 }}>{o.stage?.replace(/_/g, " ")}</div>
                   </div>
-                  {o.value != null && <Money value={o.value} currency={o.currency ?? "MXN"} />}
+                  {o.value != null && <Money value={Number(o.value)} currency="MXN" />}
                 </div>
               </Link>
             ))}

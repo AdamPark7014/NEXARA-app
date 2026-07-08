@@ -86,7 +86,7 @@ export default function InvoiceDetailPage() {
   const id = params.id;
   const { user } = useUser();
   const token = user?.token ?? "";
-  const canEdit = user?.isSuperAdmin || ["ceo", "super_admin", "dir_admin", "contabilidad", "administrativo"].includes(user?.v2RoleKey ?? "");
+  const canEdit = user?.isSuperAdmin || ["ceo", "super_admin", "dir_admin", "contabilidad", "administrativo"].includes(user?.roleKey ?? "");
 
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);

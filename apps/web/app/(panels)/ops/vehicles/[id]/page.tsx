@@ -64,7 +64,7 @@ export default function VehicleDetailPage() {
   const id = params.id;
   const { user } = useUser();
   const token = user?.token ?? "";
-  const canEdit = user?.isSuperAdmin || ["ceo", "super_admin", "dir_admin", "coord_admin", "dir_operaciones", "coord_operaciones"].includes(user?.v2RoleKey ?? "");
+  const canEdit = user?.isSuperAdmin || ["ceo", "super_admin", "dir_admin", "coord_admin", "dir_operaciones", "coord_operaciones"].includes(user?.roleKey ?? "");
 
   const [vehicle, setVehicle] = useState<VehicleDetail | null>(null);
   const [logs, setLogs] = useState<VehicleLog[]>([]);
