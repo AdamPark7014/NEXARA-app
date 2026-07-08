@@ -184,11 +184,33 @@ export default function StudioSocialPage() {
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 18 }}>
-        <KpiCard label="Programados" value={scheduled.length} hint="Próximas publicaciones" variant="default" icon="📅" />
+        <KpiCard label="Programados" value={scheduled.length} hint="Próximas publicaciones" variant="warning" icon="📅" />
         <KpiCard label="Publicados" value={published.length} hint="Total histórico" variant="positive" icon="✅" />
         <KpiCard label="Borradores" value={drafts.length} hint="Sin programar aún" variant="default" icon="📝" />
         <KpiCard label="Total posts" value={items.length} hint="En todas las redes" variant="accent" icon="📊" />
       </div>
+
+      {items.length > 0 && (() => {
+        const byRed = Object.entries(
+          items.reduce<Record<string, number>>((acc, p) => { acc[p.red] = (acc[p.red] ?? 0) + 1; return acc; }, {})
+        ).sort((a, b) => b[1] - a[1]);
+        return (
+          <div style={{ marginBottom: 18, padding: "14px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por red social</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {byRed.map(([red, count]) => (
+                <div key={red} style={{ display: "grid", gridTemplateColumns: "120px 1fr 56px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>{RED_EMOJI[red] ?? "🌐"} {red}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(count / items.length) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count} · {((count / items.length) * 100).toFixed(0)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {showForm && (
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: 20, marginBottom: 18 }}>

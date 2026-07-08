@@ -180,11 +180,35 @@ export default function StudioCasesPage() {
       )}
 
       {!loading && items.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 18 }}>
-          <KpiCard label="Casos totales" value={items.length} icon="🏆" />
-          <KpiCard label="Publicados" value={items.filter(c => c.publicado).length} variant="positive" icon="✅" hint="Visibles en el sitio" />
-          <KpiCard label="Borradores" value={items.filter(c => !c.publicado).length} variant={items.filter(c => !c.publicado).length > 0 ? "warning" : "default"} icon="📝" hint="Pendientes de publicar" />
-        </div>
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
+            <KpiCard label="Casos totales" value={items.length} icon="🏆" />
+            <KpiCard label="Publicados" value={items.filter(c => c.publicado).length} variant="positive" icon="✅" hint="Visibles en el sitio" />
+            <KpiCard label="Borradores" value={items.filter(c => !c.publicado).length} variant={items.filter(c => !c.publicado).length > 0 ? "warning" : "default"} icon="📝" hint="Pendientes de publicar" />
+            <KpiCard label="Tasa de publicación" value={`${Math.round((items.filter(c => c.publicado).length / items.length) * 100)}%`} variant={items.filter(c => c.publicado).length / items.length >= 0.7 ? "positive" : "warning"} icon="📊" />
+          </div>
+          {(() => {
+            const byVertical = Object.entries(
+              items.reduce<Record<string, number>>((acc, c) => { acc[c.vertical] = (acc[c.vertical] ?? 0) + 1; return acc; }, {})
+            ).sort((a, b) => b[1] - a[1]);
+            return (
+              <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Casos por vertical</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {byVertical.map(([vertical, count]) => (
+                    <div key={vertical} style={{ display: "grid", gridTemplateColumns: "130px 1fr 36px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{vertical}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(count / items.length) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </>
       )}
 
       {showForm && (

@@ -252,6 +252,13 @@ export default function ServiceClientsPage() {
           <KpiCard label="Clientes totales" value={items.length} icon="🏢" />
           <KpiCard label="Activos" value={items.filter(c => c.estado === "Activo").length} variant="positive" icon="✅" hint="Con contrato vigente" />
           <KpiCard label="Inactivos" value={items.filter(c => c.estado !== "Activo").length} variant={items.filter(c => c.estado !== "Activo").length > 0 ? "warning" : "default"} icon="⛔" />
+          <KpiCard
+            label="Tasa de actividad"
+            value={`${Math.round((items.filter(c => c.estado === "Activo").length / items.length) * 100)}%`}
+            variant={items.filter(c => c.estado === "Activo").length / items.length >= 0.8 ? "positive" : "warning"}
+            icon="📊"
+            hint="Activos vs total"
+          />
         </div>
       )}
 

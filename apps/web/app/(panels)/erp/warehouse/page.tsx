@@ -193,12 +193,21 @@ export default function WarehousePage() {
     {
       key: "existencia",
       label: "Stock",
-      render: (s) => (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontWeight: 700 }}>{s.existencia}</span>
-          <Tag variant={stockEstado(s)}>{s.existencia === 0 ? "Sin stock" : s.existencia < s.minimo ? "Bajo mínimo" : "OK"}</Tag>
-        </div>
-      ),
+      render: (s) => {
+        const pct = s.minimo > 0 ? Math.min(100, (s.existencia / (s.minimo * 2)) * 100) : (s.existencia > 0 ? 50 : 0);
+        const color = s.existencia === 0 ? "var(--danger)" : s.existencia < s.minimo ? "var(--warning)" : "var(--success)";
+        return (
+          <div style={{ minWidth: 130 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+              <span style={{ fontWeight: 700, fontSize: 13 }}>{s.existencia}</span>
+              <Tag variant={stockEstado(s)}>{s.existencia === 0 ? "Sin stock" : s.existencia < s.minimo ? "Bajo mín." : "OK"}</Tag>
+            </div>
+            <div style={{ height: 4, borderRadius: 2, background: "var(--surface-2)", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 2, transition: "width .3s" }} />
+            </div>
+          </div>
+        );
+      },
       width: 160,
     },
     { key: "minimo", label: "Mínimo", accessor: (s) => s.minimo, width: 80 },

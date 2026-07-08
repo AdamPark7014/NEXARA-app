@@ -88,14 +88,29 @@ export default function LabHealthPage() {
 
           <Section title="Servicios" subtitle="Ping en vivo contra /health del backend">
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {checks.map((s) => (
-                <article key={s.name} style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto", gap: 16, alignItems: "center", padding: 14, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
-                  <span style={{ width: 12, height: 12, borderRadius: 999, background: s.ok ? "var(--success)" : "var(--danger)", boxShadow: `0 0 12px ${s.ok ? "var(--success)" : "var(--danger)"}` }} />
-                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{s.name}</div>
-                  <div style={{ textAlign: "right", fontWeight: 700, color: s.ms > 1000 ? "var(--warning)" : "var(--text-primary)" }}>{s.ms}ms</div>
-                  <Tag variant={s.ok ? "positive" : "danger"}>{s.ok ? "OK" : "Down"}</Tag>
-                </article>
-              ))}
+              {checks.map((s) => {
+                const maxMs = Math.max(...checks.map((c) => c.ms), 1);
+                const latencyPct = Math.min(100, (s.ms / maxMs) * 100);
+                const latencyColor = s.ms > 1000 ? "var(--danger)" : s.ms > 400 ? "var(--warning)" : "var(--success)";
+                return (
+                  <article key={s.name} style={{ padding: 14, background: "var(--surface)", border: `1px solid ${s.ok ? "var(--border)" : "color-mix(in srgb, var(--danger) 40%, var(--border))"}`, borderRadius: 12 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto", gap: 16, alignItems: "center", marginBottom: 8 }}>
+                      <span style={{ width: 12, height: 12, borderRadius: 999, background: s.ok ? "var(--success)" : "var(--danger)", boxShadow: `0 0 10px ${s.ok ? "var(--success)" : "var(--danger)"}`, flexShrink: 0 }} />
+                      <div style={{ fontWeight: 700, fontSize: 13.5 }}>{s.name}</div>
+                      <div style={{ textAlign: "right", fontWeight: 700, fontSize: 13, color: latencyColor }}>{s.ms}ms</div>
+                      <Tag variant={s.ok ? "positive" : "danger"}>{s.ok ? "OK" : "Down"}</Tag>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center" }}>
+                      <div style={{ height: 4, borderRadius: 2, background: "var(--surface-2)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${latencyPct}%`, background: latencyColor, borderRadius: 2, transition: "width .4s" }} />
+                      </div>
+                      <span style={{ fontSize: 10, color: "var(--text-tertiary)", minWidth: 70, textAlign: "right" }}>
+                        {s.ms <= 200 ? "Excelente" : s.ms <= 500 ? "Aceptable" : s.ms <= 1000 ? "Lento" : "Crítico"}
+                      </span>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </Section>
         </>

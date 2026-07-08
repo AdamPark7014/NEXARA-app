@@ -239,12 +239,35 @@ export default function AccountingPage() {
         actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={() => { setForm({ ...emptyForm }); setShowForm(true); }}>Nueva póliza</Button> : undefined}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 14 }}>
         <KpiCard label="Ingresos registrados" value={<Money value={ingresos} compact />} hint={`${items.filter(e => e.type === "INGRESOS").length} pólizas de ingreso`} variant="positive" icon="📈" />
         <KpiCard label="Egresos registrados" value={<Money value={egresos} compact />} hint={`${items.filter(e => e.type === "EGRESOS").length} pólizas de egreso`} variant={egresos > ingresos ? "danger" : "default"} icon="📉" />
+        <KpiCard label="Balance neto" value={<Money value={ingresos - egresos} compact />} variant={ingresos >= egresos ? "positive" : "danger"} icon={ingresos >= egresos ? "✅" : "⚠️"} hint="Ingresos menos egresos" />
         <KpiCard label="Borradores" value={borradores} hint="Pendientes de contabilizar" variant={borradores > 0 ? "warning" : "positive"} icon="📝" />
-        <KpiCard label="Total pólizas" value={items.length} hint="En el periodo cargado" icon="📒" />
       </div>
+
+      {(ingresos > 0 || egresos > 0) && (
+        <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Ingresos vs Egresos</div>
+          {[
+            { label: "Ingresos", value: ingresos, color: "var(--success)" },
+            { label: "Egresos", value: egresos, color: "var(--danger)" },
+          ].map(({ label, value, color }) => {
+            const total = Math.max(ingresos, egresos, 1);
+            return (
+              <div key={label} style={{ display: "grid", gridTemplateColumns: "80px 1fr 110px", gap: 10, alignItems: "center", marginBottom: 8 }}>
+                <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>{label}</span>
+                <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${(value / total) * 100}%`, background: color, borderRadius: 3 }} />
+                </div>
+                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>
+                  {new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" }).format(value)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {showForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
