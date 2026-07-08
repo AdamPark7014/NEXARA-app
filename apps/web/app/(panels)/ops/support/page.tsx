@@ -112,7 +112,7 @@ export default function SupportInboxPage() {
   };
 
   const columns: Column<TicketRequest>[] = useMemo(() => [
-    { key: "id", label: "Ticket", render: (t) => <Tag variant="accent">T-{t.id}</Tag>, width: 90 },
+    { key: "id", label: "Ticket", render: (t) => <Link href={`/ops/support/${t.id}`} style={{ textDecoration: "none" }}><Tag variant="accent">T-{t.id}</Tag></Link>, width: 90 },
     {
       key: "cliente", label: "Cliente / Solicitud",
       render: (t) => (
