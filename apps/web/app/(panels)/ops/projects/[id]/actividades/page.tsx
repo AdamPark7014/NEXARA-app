@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import { Tag } from "@/components/ui/DataTable";
 import { DetailError } from "@/components/detail/DetailFrame";
+import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import { useOpsProjectDetail } from "@/components/ops/OpsProjectDetailShell";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -31,6 +33,8 @@ export default function OpsProjectActivitiesPage() {
   const [showForm, setShowForm] = useState(false);
   const [engineers, setEngineers] = useState<AssignableUser[]>([]);
   const [saving, setSaving] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [form, setForm] = useState({ titulo: "", descripcion: "", responsableId: "", branchName: "" });
 
   const [engineerError, setEngineerError] = useState<string | null>(null);
@@ -54,6 +58,19 @@ export default function OpsProjectActivitiesPage() {
   if (!project) return null;
 
   const activities = project.activities ?? [];
+
+  const visibleActivities = useMemo(() => {
+    let rows = activities;
+    if (filterStatus) rows = rows.filter((a) => a.estatus === filterStatus);
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((a) =>
+        (a.anNumber ?? "").toLowerCase().includes(q) ||
+        (a.titulo ?? "").toLowerCase().includes(q)
+      );
+    }
+    return rows;
+  }, [activities, searchQ, filterStatus]);
 
   const submit = async () => {
     if (!token || !form.titulo.trim() || !form.responsableId) return;
@@ -166,6 +183,27 @@ export default function OpsProjectActivitiesPage() {
       )}
 
       {/* Activities list */}
+      {activities.length > 0 && (
+        <FilterToolbar
+          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por OT# o título…" }}
+          selects={[{
+            label: "Estado",
+            value: filterStatus,
+            onChange: setFilterStatus,
+            options: Object.entries(STATUS_VARIANT).map(([v]) => ({ value: v, label: v.replace(/_/g, " ") })),
+            allowAll: true,
+          }]}
+          onClear={() => { setSearchQ(""); setFilterStatus(""); }}
+          resultCount={visibleActivities.length}
+          rightActions={
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleActivities, [
+              { key: "anNumber", label: "OT#" },
+              { key: "titulo", label: "Título" },
+              { key: "estatus", label: "Estado" },
+            ], "actividades-proyecto")}>CSV</Button>
+          }
+        />
+      )}
       {activities.length === 0 ? (
         <EmptyState
           icon="🧰"
@@ -175,7 +213,8 @@ export default function OpsProjectActivitiesPage() {
         />
       ) : (
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
-          {activities.map((a) => (
+          {visibleActivities.length === 0 && <EmptyState icon="🔍" title="Sin resultados" description="Ajusta los filtros." />}
+          {visibleActivities.map((a) => (
             <li
               key={a.id}
               style={{
