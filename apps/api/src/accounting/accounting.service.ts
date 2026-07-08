@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { PacService } from '../pac/pac.service.js';
+import { SatService } from '../pac/sat.service.js';
 
 @Injectable()
 export class AccountingService {
@@ -11,6 +12,7 @@ export class AccountingService {
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly pacService: PacService,
+    private readonly satService: SatService,
   ) {}
 
   private readonly satPaymentFormValues = new Set([
@@ -880,6 +882,7 @@ export class AccountingService {
     // (Prisma optional), pero el flujo asegura que existen. Casteo explícito.
     const emisorRfc = invoice.emisorRfc as string;
     const receptorRfc = invoice.receptorRfc as string;
+    const issuerProfile = await this.getInvoiceIssuerProfile();
 
     const stamp = await this.pacService.stamp({
       invoiceNumber: invoice.invoiceNumber,
@@ -893,10 +896,14 @@ export class AccountingService {
       paymentForm: invoice.satPaymentForm || 'FP99',
       paymentMethod: invoice.satPaymentMethod || 'PUE',
       cfdiUsage: invoice.cfdiUsage || 'G03',
+      tipoComprobante: invoice.cfdiRelatedUuids && invoice.cfdiRelationType === '01' ? 'E' : 'I',
+      relatedUuids: invoice.cfdiRelatedUuids?.split(',').map((u) => u.trim()).filter(Boolean),
+      relationType: invoice.cfdiRelationType || undefined,
       emisor: {
         rfc: emisorRfc,
         name: invoice.emisorName || 'Emisor',
         regime: invoice.emisorRegime || 'R601',
+        zipCode: issuerProfile.emisorZipCode,
       },
       receptor: {
         rfc: receptorRfc,
@@ -913,6 +920,8 @@ export class AccountingService {
         satProductKey: item.satProductKey,
         satUnitKey: item.satUnitKey,
         unitName: item.unitName,
+        ivaRetAmount: item.ivaRetAmount ? Number(item.ivaRetAmount) : undefined,
+        isrRetAmount: item.isrRetAmount ? Number(item.isrRetAmount) : undefined,
       })),
     });
 
@@ -1448,18 +1457,220 @@ export class AccountingService {
     } else {
       configured = true;
     }
+    const csd = this.pacService.csdInfo();
+    const efirma = this.satService.isEfirmaConfigured();
     const productionWarning =
       env === 'production' && (provider === 'mock' || (this.pacService.fallbackToMock && !configured))
         ? 'PAC en modo mock o sin credenciales en producción. Configura PAC_PROVIDER y credenciales reales.'
-        : null;
+        : env === 'production' && !csd.configured && provider !== 'facturama'
+          ? 'CSD del emisor no configurado. Requerido para sellado local (Finkok/SW XML). Facturama sella con CSD en su bóveda.'
+          : null;
     return {
       provider,
       fallback: this.pacService.fallbackToMock,
       fallbackToMock: this.pacService.fallbackToMock,
       configured,
+      csd,
+      efirmaConfigured: efirma,
       env,
       productionWarning,
+      tlsRequirement: 'TLS 1.2+ obligatorio (SAT). Verificar traefik-main static config.',
     };
+  }
+
+  /** Valida formato y checksum de un RFC mexicano. */
+  validateRfc(rfc: string) {
+    return this.satService.validateRfc(rfc);
+  }
+
+  /** Consulta estatus de un CFDI en el SAT (API REST pública). */
+  async queryCfdiStatus(invoiceId: number) {
+    const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
+    if (!invoice?.cfdiUuid) throw new BadRequestException('La factura no tiene UUID CFDI');
+    if (!invoice.emisorRfc || !invoice.receptorRfc) {
+      throw new BadRequestException('Faltan RFC emisor/receptor');
+    }
+    return this.satService.queryCfdiStatus({
+      uuid: invoice.cfdiUuid,
+      rfcEmisor: invoice.emisorRfc,
+      rfcReceptor: invoice.receptorRfc,
+      total: Number(invoice.totalAmount),
+    });
+  }
+
+  /** Estado de configuración Descarga Masiva (requiere e.firma). */
+  descargaMasivaStatus() {
+    return this.satService.descargaMasivaStatus();
+  }
+
+  /**
+   * Crea una nota de crédito (CFDI Egreso tipo E) vinculada a una factura timbrada.
+   * La nota se crea en borrador; hay que timbrarla con stampInvoice().
+   */
+  async createCreditNote(
+    originalInvoiceId: number,
+    dto: { reason?: string; amount?: number; items?: Array<{ description: string; quantity: number; unitPrice: number; taxRate?: number }> },
+    userId: number,
+  ) {
+    const original = await this.prisma.invoice.findUnique({
+      where: { id: originalInvoiceId },
+      include: { items: true },
+    });
+    if (!original?.cfdiUuid) {
+      throw new BadRequestException('Solo se pueden emitir notas de crédito contra facturas timbradas');
+    }
+    if (original.isCancelled) throw new BadRequestException('La factura original está cancelada');
+
+    const creditAmount = dto.amount ?? Number(original.totalAmount);
+    const creditNumber = `NC-${original.invoiceNumber}-${Date.now().toString().slice(-6)}`;
+
+    const items = dto.items?.length
+      ? dto.items.map((it) => ({
+          description: it.description,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          taxRate: it.taxRate ?? 16,
+          discount: 0,
+          total: it.quantity * it.unitPrice * (1 + (it.taxRate ?? 16) / 100),
+        }))
+      : original.items.map((it) => ({
+          description: `Nota de crédito: ${it.description}`,
+          quantity: Number(it.quantity),
+          unitPrice: Number(it.unitPrice),
+          taxRate: Number(it.taxRate),
+          discount: 0,
+          total: Number(it.total),
+          satProductKey: it.satProductKey,
+          satUnitKey: it.satUnitKey,
+          unitName: it.unitName,
+        }));
+
+    const subtotal = items.reduce((s, it) => s + it.quantity * it.unitPrice, 0);
+    const taxAmount = items.reduce((s, it) => s + it.quantity * it.unitPrice * ((it.taxRate ?? 16) / 100), 0);
+    const totalAmount = Math.min(creditAmount, subtotal + taxAmount);
+
+    const creditNote = await this.prisma.invoice.create({
+      data: {
+        invoiceNumber: creditNumber,
+        type: 'ACCOUNTS_RECEIVABLE',
+        status: 'DRAFT',
+        issueDate: new Date(),
+        dueDate: new Date(),
+        clientId: original.clientId,
+        subtotal: new Prisma.Decimal(subtotal),
+        taxAmount: new Prisma.Decimal(taxAmount),
+        totalAmount: new Prisma.Decimal(totalAmount),
+        currency: original.currency,
+        notes: dto.reason || `Nota de crédito de ${original.invoiceNumber}`,
+        cfdiUsage: 'G02',
+        satPaymentForm: original.satPaymentForm,
+        satPaymentMethod: original.satPaymentMethod,
+        emisorRfc: original.emisorRfc,
+        emisorName: original.emisorName,
+        emisorRegime: original.emisorRegime,
+        receptorRfc: original.receptorRfc,
+        receptorName: original.receptorName,
+        receptorRegime: original.receptorRegime,
+        receptorZipCode: original.receptorZipCode,
+        cfdiRelationType: '01',
+        cfdiRelatedUuids: original.cfdiUuid,
+        cfdiSerie: original.cfdiSerie,
+        createdById: userId,
+        items: {
+          create: items.map((it) => ({
+            description: it.description,
+            quantity: new Prisma.Decimal(it.quantity),
+            unitPrice: new Prisma.Decimal(it.unitPrice),
+            taxRate: new Prisma.Decimal(it.taxRate ?? 16),
+            discount: new Prisma.Decimal(0),
+            total: new Prisma.Decimal(it.total),
+            satProductKey: (it as any).satProductKey || '84111506',
+            satUnitKey: (it as any).satUnitKey || 'E48',
+            unitName: (it as any).unitName || 'Servicio',
+          })),
+        },
+      },
+      include: { items: true, client: true },
+    });
+
+    await this.prisma.invoice.update({
+      where: { id: originalInvoiceId },
+      data: { status: 'CREDITED' },
+    });
+
+    return creditNote;
+  }
+
+  /**
+   * Timbra un Complemento de Pago (CFDI tipo P, Pagos 2.0) para un pago registrado
+   * contra una factura PPD timbrada.
+   */
+  async stampPaymentComplement(paymentId: number, userId: number) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: { invoice: { include: { items: true, payments: true } } },
+    });
+    if (!payment) throw new NotFoundException('Pago no encontrado');
+    if (payment.cfdiPaymentUuid) throw new BadRequestException('Este pago ya tiene complemento timbrado');
+    const invoice = payment.invoice;
+    if (!invoice?.cfdiUuid) throw new BadRequestException('La factura no está timbrada');
+    if (invoice.satPaymentMethod !== 'PPD') {
+      throw new BadRequestException('Complemento de pago solo aplica a facturas PPD (pago en parcialidades)');
+    }
+    if (!invoice.emisorRfc || !invoice.receptorRfc) {
+      throw new BadRequestException('Faltan RFC emisor/receptor');
+    }
+
+    const issuerProfile = await this.getInvoiceIssuerProfile();
+    const previousPayments = invoice.payments.filter((p) => p.id !== payment.id && p.cfdiPaymentUuid);
+    const previousPaid = previousPayments.reduce((s, p) => s + Number(p.amount), 0);
+    const previousBalance = Number(invoice.totalAmount) - previousPaid;
+    const amountPaid = Number(payment.amount);
+    const remainingBalance = Math.max(0, previousBalance - amountPaid);
+
+    const stamp = await this.pacService.stampPayment({
+      invoiceNumber: `PAGO-${invoice.invoiceNumber}-${payment.id}`,
+      serie: 'P',
+      folio: String(payment.id),
+      emisor: {
+        rfc: invoice.emisorRfc,
+        name: invoice.emisorName || 'Emisor',
+        regime: invoice.emisorRegime || 'R601',
+        zipCode: issuerProfile.emisorZipCode,
+      },
+      receptor: {
+        rfc: invoice.receptorRfc,
+        name: invoice.receptorName || 'Receptor',
+        zipCode: invoice.receptorZipCode,
+        regime: invoice.receptorRegime,
+      },
+      payment: {
+        date: payment.paymentDate.toISOString(),
+        paymentForm: payment.satPaymentForm || 'FP03',
+        amount: amountPaid,
+        currency: invoice.currency || 'MXN',
+        exchangeRate: payment.exchangeRate ? Number(payment.exchangeRate) : null,
+        operationNumber: payment.operationNumber || payment.reference,
+      },
+      relatedDocs: [{
+        uuid: invoice.cfdiUuid,
+        serie: invoice.cfdiSerie,
+        folio: invoice.cfdiFolio,
+        currency: invoice.currency || 'MXN',
+        paymentMethod: 'PPD',
+        partialityNumber: previousPayments.length + 1,
+        previousBalance,
+        amountPaid,
+        remainingBalance,
+      }],
+    });
+
+    await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: { cfdiPaymentUuid: stamp.uuid },
+    });
+
+    return { paymentId, cfdiPaymentUuid: stamp.uuid, xml: stamp.xml, provider: stamp.provider };
   }
 
   // ── Overdue invoices ──────────────────────────────────────────────

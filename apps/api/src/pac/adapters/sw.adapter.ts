@@ -1,12 +1,14 @@
 import type { IPacAdapter, PacCancelInput, PacCancelResult, PacStampInput, PacStampResult } from '../pac.types.js';
+import type { CsdService } from '../csd.service.js';
+import { buildSealedCfdi } from '../cfdi-xml.builder.js';
 
 /**
  * Adapter SW Sapien (https://services.sw.com.mx). Modalidad CFDI 4.0 / Issuer
  * Requiere SW_TOKEN o (SW_USER + SW_PASSWORD).
  *
- * NOTA: SW recibe el XML ya sellado. Esta implementación deja un *seam* (`buildSealedXml`)
- * que se debe completar con un firmador XML CFDI 4.0 cuando estén CSD + llave privada.
- * En staging se puede usar el endpoint /v1/cfdi33/issue/json (objeto JSON) — habilitado vía SW_USE_ISSUE_JSON=1.
+ * Dos modos:
+ *  - XML pre-sellado (default): sella localmente con CSD (`buildSealedCfdi`) y envía a /stamp.
+ *  - issue-JSON (SW_USE_ISSUE_JSON=1): SW sella con el CSD cargado en su bóveda.
  */
 export class SwSapienAdapter implements IPacAdapter {
   readonly provider = 'sw' as const;
@@ -19,6 +21,7 @@ export class SwSapienAdapter implements IPacAdapter {
       password?: string;
       useIssueJson?: boolean;
     },
+    private readonly csd?: CsdService,
   ) {
     if (!opts.token && !(opts.user && opts.password)) {
       throw new Error('SW: SW_TOKEN o (SW_USER + SW_PASSWORD) requeridos');
@@ -116,12 +119,16 @@ export class SwSapienAdapter implements IPacAdapter {
     };
   }
 
-  /**
-   * Stub para construir XML CFDI 4.0 pre-sellado con CSD del emisor.
-   * Reemplazar por libxmljs2 + node-forge cuando se tengan las llaves del SAT.
-   */
-  protected async buildSealedXml(_input: PacStampInput): Promise<string> {
-    throw new Error('SW: implementar buildSealedXml() con firmador CSD o usar SW_USE_ISSUE_JSON=1');
+  /** Construye XML CFDI 4.0 pre-sellado con el CSD del emisor. */
+  protected async buildSealedXml(input: PacStampInput): Promise<string> {
+    if (!this.csd || !this.csd.isConfigured()) {
+      throw new Error('SW: CSD del emisor no configurado. Configura CSD_* o usa SW_USE_ISSUE_JSON=1');
+    }
+    return buildSealedCfdi(input, this.csd, {
+      tipoComprobante: input.tipoComprobante || 'I',
+      relatedUuids: input.relatedUuids,
+      relationType: input.relationType,
+    }).xml;
   }
 
   private mapStampResponse(data: any): PacStampResult {

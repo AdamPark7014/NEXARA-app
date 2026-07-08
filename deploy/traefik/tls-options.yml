@@ -1,0 +1,24 @@
+# Traefik TLS options — cumplimiento SAT (TLS 1.2+ obligatorio).
+# Montar en el contenedor traefik-main como /etc/traefik/dynamic/tls-options.yml
+# o incluir en la configuración dinámica del proxy global.
+#
+# Referencia SAT: "exigiendo de forma obligatoria el uso de TLS 1.2 o superior.
+# Cualquier petición con protocolos obsoletos (TLS 1.0 o 1.1) es rechazada."
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      cipherSuites:
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+      sniStrict: true
+    sat-compliant:
+      minVersion: VersionTLS12
+      maxVersion: VersionTLS13
+      cipherSuites:
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+      sniStrict: true

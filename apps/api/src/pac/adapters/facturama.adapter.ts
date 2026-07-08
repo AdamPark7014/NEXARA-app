@@ -1,4 +1,11 @@
-import type { IPacAdapter, PacCancelInput, PacCancelResult, PacStampInput, PacStampResult } from '../pac.types.js';
+import type {
+  IPacAdapter,
+  PacCancelInput,
+  PacCancelResult,
+  PacPaymentComplementInput,
+  PacStampInput,
+  PacStampResult,
+} from '../pac.types.js';
 
 /**
  * Adapter Facturama (https://api.facturama.mx).
@@ -24,15 +31,17 @@ export class FacturamaAdapter implements IPacAdapter {
   }
 
   async stamp(input: PacStampInput): Promise<PacStampResult> {
-    const payload = {
+    const zip = input.emisor.zipCode || input.receptor.zipCode || '00000';
+    const payload: Record<string, unknown> = {
       Serie: input.serie || 'A',
       Folio: input.folio || input.invoiceNumber.replace(/[^0-9]/g, '') || '1',
-      CfdiType: 'I', // Ingreso (factura cliente)
+      CfdiType: input.tipoComprobante || 'I', // I = Ingreso, E = Egreso (nota de crédito)
       PaymentForm: (input.paymentForm || 'FP99').replace(/^FP/, ''),
       PaymentMethod: input.paymentMethod || 'PUE',
       Currency: input.currency || 'MXN',
       ExchangeRate: input.exchangeRate || 1,
-      ExpeditionPlace: input.emisor.regime || '64000',
+      ExpeditionPlace: zip,
+      Exportation: '01',
       Issuer: {
         Rfc: input.emisor.rfc,
         Name: input.emisor.name,
@@ -41,35 +50,103 @@ export class FacturamaAdapter implements IPacAdapter {
       Receiver: {
         Rfc: input.receptor.rfc,
         Name: input.receptor.name,
-        CfdiUse: input.cfdiUsage || 'G03',
-        FiscalRegime: (input.receptor.regime || '612').replace(/^R/, ''),
-        TaxZipCode: input.receptor.zipCode || '64000',
+        CfdiUse: input.cfdiUsage || (input.tipoComprobante === 'E' ? 'G02' : 'G03'),
+        FiscalRegime: (input.receptor.regime || '616').replace(/^R/, ''),
+        TaxZipCode: input.receptor.zipCode || zip,
       },
-      Items: input.items.map((item) => ({
-        ProductCode: item.satProductKey || '01010101',
-        IdentificationNumber: '',
-        Description: item.description,
-        Unit: item.unitName || 'Servicio',
-        UnitCode: item.satUnitKey || 'E48',
-        UnitPrice: item.unitPrice,
-        Quantity: item.quantity,
-        Subtotal: item.unitPrice * item.quantity,
-        Discount: item.discount || 0,
-        Taxes: item.taxRate
-          ? [
-              {
-                Total: item.unitPrice * item.quantity * (item.taxRate / 100),
-                Name: 'IVA',
-                Base: item.unitPrice * item.quantity,
-                Rate: item.taxRate / 100,
-                IsRetention: false,
-              },
-            ]
-          : [],
-        Total: item.unitPrice * item.quantity * (1 + (item.taxRate || 0) / 100),
-      })),
+      Items: input.items.map((item) => {
+        const base = item.unitPrice * item.quantity - (item.discount || 0);
+        const ivaRate = item.taxRate != null ? item.taxRate / 100 : 0.16;
+        const taxes: any[] = [
+          {
+            Total: base * ivaRate,
+            Name: 'IVA',
+            Base: base,
+            Rate: ivaRate,
+            IsRetention: false,
+          },
+        ];
+        if (item.ivaRetAmount && item.ivaRetAmount > 0) {
+          taxes.push({ Total: item.ivaRetAmount, Name: 'IVA', Base: base, Rate: base > 0 ? item.ivaRetAmount / base : 0, IsRetention: true });
+        }
+        if (item.isrRetAmount && item.isrRetAmount > 0) {
+          taxes.push({ Total: item.isrRetAmount, Name: 'ISR', Base: base, Rate: base > 0 ? item.isrRetAmount / base : 0, IsRetention: true });
+        }
+        return {
+          ProductCode: item.satProductKey || '01010101',
+          IdentificationNumber: '',
+          Description: item.description,
+          Unit: item.unitName || 'Servicio',
+          UnitCode: item.satUnitKey || 'E48',
+          UnitPrice: item.unitPrice,
+          Quantity: item.quantity,
+          Subtotal: item.unitPrice * item.quantity,
+          Discount: item.discount || 0,
+          TaxObject: '02',
+          Taxes: taxes,
+          Total: base * (1 + ivaRate) - (item.ivaRetAmount || 0) - (item.isrRetAmount || 0),
+        };
+      }),
     };
+    if (input.relatedUuids && input.relatedUuids.length) {
+      payload['Relations'] = {
+        Type: input.relationType || '01',
+        Cfdis: input.relatedUuids.map((u) => ({ Uuid: u })),
+      };
+    }
 
+    const data = await this.postCfdi(payload, 'timbrado');
+    return this.mapStamp(data);
+  }
+
+  async stampPayment(input: PacPaymentComplementInput): Promise<PacStampResult> {
+    const zip = input.emisor.zipCode || input.receptor.zipCode || '00000';
+    const payload: Record<string, unknown> = {
+      CfdiType: 'P',
+      Serie: input.serie || 'P',
+      Folio: input.folio || input.invoiceNumber.replace(/[^0-9]/g, '') || '1',
+      ExpeditionPlace: zip,
+      Issuer: {
+        Rfc: input.emisor.rfc,
+        Name: input.emisor.name,
+        FiscalRegime: (input.emisor.regime || '601').replace(/^R/, ''),
+      },
+      Receiver: {
+        Rfc: input.receptor.rfc,
+        Name: input.receptor.name,
+        CfdiUse: 'CP01',
+        FiscalRegime: (input.receptor.regime || '616').replace(/^R/, ''),
+        TaxZipCode: input.receptor.zipCode || zip,
+      },
+      Complemento: {
+        Payments: [
+          {
+            Date: input.payment.date,
+            PaymentForm: (input.payment.paymentForm || 'FP03').replace(/^FP/, ''),
+            Amount: input.payment.amount,
+            Currency: input.payment.currency || 'MXN',
+            ExchangeRate: input.payment.exchangeRate || 1,
+            OperationNumber: input.payment.operationNumber || undefined,
+            RelatedDocuments: input.relatedDocs.map((d) => ({
+              Uuid: d.uuid,
+              Serie: d.serie || undefined,
+              Folio: d.folio || undefined,
+              Currency: d.currency || 'MXN',
+              PaymentMethod: d.paymentMethod || 'PPD',
+              PartialityNumber: d.partialityNumber,
+              PreviousBalanceAmount: d.previousBalance,
+              AmountPaid: d.amountPaid,
+              ImpSaldoInsoluto: d.remainingBalance,
+            })),
+          },
+        ],
+      },
+    };
+    const data = await this.postCfdi(payload, 'complemento de pago');
+    return this.mapStamp(data);
+  }
+
+  private async postCfdi(payload: Record<string, unknown>, label: string): Promise<any> {
     const response = await fetch(`${this.baseUrl}/3/cfdis`, {
       method: 'POST',
       headers: {
@@ -78,13 +155,14 @@ export class FacturamaAdapter implements IPacAdapter {
       },
       body: JSON.stringify(payload),
     });
-
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`Facturama timbrado falló (${response.status}): ${body.slice(0, 400)}`);
+      throw new Error(`Facturama ${label} falló (${response.status}): ${body.slice(0, 400)}`);
     }
+    return response.json();
+  }
 
-    const data: any = await response.json();
+  private mapStamp(data: any): PacStampResult {
     return {
       uuid: data?.Complement?.TaxStamp?.Uuid || data?.Uuid || data?.uuid,
       stampedAt: new Date(data?.Complement?.TaxStamp?.Date || data?.Date || Date.now()),

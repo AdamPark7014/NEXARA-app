@@ -1,11 +1,12 @@
 import type { IPacAdapter, PacCancelInput, PacCancelResult, PacStampInput, PacStampResult } from '../pac.types.js';
+import type { CsdService } from '../csd.service.js';
+import { buildSealedCfdi } from '../cfdi-xml.builder.js';
 
 /**
- * Adapter Finkok (SOAP API). Requiere FINKOK_USER + FINKOK_PASSWORD.
+ * Adapter Finkok (SOAP API). Requiere FINKOK_USER + FINKOK_PASSWORD + CSD del emisor.
  *
- * Finkok expone WSDL SOAP — esta implementación construye el payload SOAP a mano,
- * lo cual evita una dependencia adicional. En producción se recomienda envolver con
- * un cliente SOAP dedicado o un firmador CSD nativo.
+ * Finkok recibe el XML CFDI 4.0 ya sellado con el CSD del emisor. El sellado local se
+ * realiza con `CsdService` + `buildSealedCfdi`. Finkok agrega el timbre (UUID + SelloSAT).
  */
 export class FinkokAdapter implements IPacAdapter {
   readonly provider = 'finkok' as const;
@@ -16,6 +17,7 @@ export class FinkokAdapter implements IPacAdapter {
       user: string;
       password: string;
     },
+    private readonly csd?: CsdService,
   ) {
     if (!opts.user || !opts.password) {
       throw new Error('Finkok: FINKOK_USER y FINKOK_PASSWORD requeridos');
@@ -107,8 +109,15 @@ export class FinkokAdapter implements IPacAdapter {
     };
   }
 
-  protected async buildSealedXml(_input: PacStampInput): Promise<string> {
-    throw new Error('Finkok: implementar buildSealedXml() con firmador CSD del emisor');
+  protected async buildSealedXml(input: PacStampInput): Promise<string> {
+    if (!this.csd || !this.csd.isConfigured()) {
+      throw new Error('Finkok: CSD del emisor no configurado (CSD_CER_* / CSD_KEY_* / CSD_KEY_PASSWORD)');
+    }
+    return buildSealedCfdi(input, this.csd, {
+      tipoComprobante: input.tipoComprobante || 'I',
+      relatedUuids: input.relatedUuids,
+      relationType: input.relationType,
+    }).xml;
   }
 
   private extractXmlTag(xml: string, tag: string): string | null {
