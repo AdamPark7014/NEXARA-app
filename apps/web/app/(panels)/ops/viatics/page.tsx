@@ -189,11 +189,43 @@ export default function OpsViaticsPage() {
         actions={<Button variant="ghost" onClick={() => void load()}>Actualizar</Button>}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 20 }}>
-        <KpiCard label="Pendientes" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" hint="Esperando aprobación" />
-        <KpiCard label="Por aprobar" value={<Money value={totalPendiente} compact />} variant={totalPendiente > 0 ? "warning" : "default"} icon="📋" />
-        <KpiCard label="Aprobado" value={<Money value={totalAprobado} compact />} variant="positive" icon="✅" />
-      </div>
+      {!loading && items.length > 0 && (() => {
+        const pagados = items.filter((v) => v.estatus === "Pagado").length;
+        const rechazados = items.filter((v) => v.estatus === "Rechazado").length;
+        const byEstatus = [
+          { label: "Pendiente", count: items.filter((v) => v.estatus === "Pendiente").length, color: "var(--warning)" },
+          { label: "Pre-aprobado", count: items.filter((v) => v.estatus === "Pre-aprobado").length, color: "var(--primary)" },
+          { label: "Aprobado", count: items.filter((v) => v.estatus === "Aprobado").length, color: "var(--success)" },
+          { label: "Pagado", count: pagados, color: "var(--success)" },
+          { label: "Rechazado", count: rechazados, color: "var(--danger)" },
+        ].filter((x) => x.count > 0);
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 14 }}>
+              <KpiCard label="Total viáticos" value={items.length} icon="🧾" />
+              <KpiCard label="Pendientes" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" hint="Esperando aprobación" />
+              <KpiCard label="Por aprobar" value={<Money value={totalPendiente} compact />} variant={totalPendiente > 0 ? "warning" : "default"} icon="📋" />
+              <KpiCard label="Aprobado" value={<Money value={totalAprobado} compact />} variant="positive" icon="✅" />
+            </div>
+            {byEstatus.length > 0 && (
+              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Estado de viáticos</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {byEstatus.map(({ label, count, color }) => (
+                    <div key={label} style={{ display: "grid", gridTemplateColumns: "110px 1fr 36px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{label}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(count / items.length) * 100}%`, background: color, borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {actionErr && (
         <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13 }}>

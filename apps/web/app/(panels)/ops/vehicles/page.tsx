@@ -338,14 +338,43 @@ export default function VehiclesPage() {
         </div>
       )}
 
-      {!loading && items.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 18 }}>
-          <KpiCard label="Flotilla total" value={items.length} icon="🚗" hint="Unidades registradas" />
-          <KpiCard label="Disponibles" value={items.filter(v => v.estatus === "Disponible").length} variant="positive" icon="✅" />
-          <KpiCard label="Asignados" value={items.filter(v => v.estatus === "Asignado").length} variant="accent" icon="🔑" hint="En uso activo" />
-          <KpiCard label="En mantenimiento" value={items.filter(v => v.estatus === "En_mantenimiento" || v.estatus === "Fuera_de_servicio").length} variant={items.filter(v => v.estatus === "En_mantenimiento" || v.estatus === "Fuera_de_servicio").length > 0 ? "danger" : "positive"} icon="🔧" />
-        </div>
-      )}
+      {!loading && items.length > 0 && (() => {
+        const disponibles = items.filter(v => v.estatus === "Disponible").length;
+        const disponiblePct = Math.round((disponibles / items.length) * 100);
+        const byEstado = ESTADOS
+          .map((e) => ({ label: e.replace(/_/g, " "), count: items.filter(v => v.estatus === e).length }))
+          .filter((x) => x.count > 0)
+          .sort((a, b) => b.count - a.count);
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
+              <KpiCard label="Flotilla total" value={items.length} icon="🚗" hint="Unidades registradas" />
+              <KpiCard label="Disponibles" value={disponibles} variant="positive" icon="✅" hint={`${disponiblePct}% disponible`} />
+              <KpiCard label="Asignados" value={items.filter(v => v.estatus === "Asignado").length} variant="accent" icon="🔑" hint="En uso activo" />
+              <KpiCard label="En mantenimiento" value={items.filter(v => v.estatus === "En_mantenimiento" || v.estatus === "Fuera_de_servicio").length} variant={items.filter(v => v.estatus === "En_mantenimiento" || v.estatus === "Fuera_de_servicio").length > 0 ? "danger" : "positive"} icon="🔧" />
+            </div>
+            {byEstado.length > 0 && (
+              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Estado de la flotilla</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: disponiblePct >= 60 ? "var(--success)" : "var(--warning)" }}>{disponiblePct}% disponible</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {byEstado.map(({ label, count }) => (
+                    <div key={label} style={{ display: "grid", gridTemplateColumns: "140px 1fr 32px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{label}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(count / items.length) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <FilterToolbar
         search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por vehículo o placas…" }}
