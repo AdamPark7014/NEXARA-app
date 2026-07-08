@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -348,7 +349,7 @@ export default function UsersPage() {
             {u.nombre.charAt(0).toUpperCase()}
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 13 }}>{u.nombre}</div>
+            <Link href={`/erp/hr/${u.id}`} style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{u.nombre}</Link>
             <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{u.email}</div>
           </div>
         </div>
