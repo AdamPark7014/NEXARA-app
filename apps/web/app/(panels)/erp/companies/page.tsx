@@ -170,6 +170,7 @@ export default function CompaniesPage() {
           <KpiCard label="Empresas totales" value={items.length} icon="🏢" />
           <KpiCard label="Activas" value={items.filter(c => c.isActive).length} variant="positive" icon="✅" />
           <KpiCard label="Inactivas" value={items.filter(c => !c.isActive).length} variant={items.filter(c => !c.isActive).length > 0 ? "warning" : "default"} icon="⛔" />
+          <KpiCard label="Empresa primaria" value={items.filter(c => c.isPrimary).length > 0 ? "Configurada" : "Sin definir"} variant={items.some(c => c.isPrimary) ? "positive" : "warning"} icon="🏛️" hint="Razón social principal" />
         </div>
       )}
       {actionErr && (

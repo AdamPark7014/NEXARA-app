@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
@@ -218,6 +219,41 @@ export default function KbPage() {
           </>
         }
       />
+
+      {!loading && articles.length > 0 && (() => {
+        const publicados = articles.filter((a) => a.status === "PUBLISHED").length;
+        const borradores = articles.filter((a) => a.status === "DRAFT").length;
+        const totalVistas = articles.reduce((s, a) => s + (a.viewCount ?? 0), 0);
+        const byCat = Object.entries(
+          articles.reduce<Record<string, number>>((acc, a) => { const k = a.category?.name ?? "Sin categoría"; acc[k] = (acc[k] ?? 0) + 1; return acc; }, {})
+        ).sort((a, b) => b[1] - a[1]);
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
+              <KpiCard label="Artículos total" value={articles.length} icon="📚" />
+              <KpiCard label="Publicados" value={publicados} variant="positive" icon="✅" hint="Visibles para usuarios" />
+              <KpiCard label="Borradores" value={borradores} variant={borradores > 0 ? "warning" : "default"} icon="📝" hint="Pendientes de revisar" />
+              <KpiCard label="Vistas totales" value={totalVistas} variant="accent" icon="👁️" hint="Lecturas acumuladas" />
+            </div>
+            {byCat.length > 0 && (
+              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Artículos por categoría</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {byCat.map(([cat, count]) => (
+                    <div key={cat} style={{ display: "grid", gridTemplateColumns: "140px 1fr 32px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{cat}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(count / articles.length) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <FilterToolbar
         search={{ value: search, onChange: setSearch, placeholder: "Buscar por título o tag…" }}
