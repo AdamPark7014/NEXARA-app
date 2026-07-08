@@ -130,9 +130,20 @@ export default function StudioLeadsPage() {
 
   const sourceCols: Column<SourceRow>[] = [
     { key: "source", label: "Fuente" },
-    { key: "total", label: "Leads", width: 90 },
+    { key: "total", label: "Leads", width: 80 },
     { key: "responded", label: "Atendidos", width: 90 },
-    { key: "conversionPct", label: "% atención", render: (r) => <Tag variant={r.conversionPct >= 70 ? "positive" : r.conversionPct >= 40 ? "warning" : "danger"}>{r.conversionPct}%</Tag>, width: 100 },
+    {
+      key: "conversionPct", label: "% atención",
+      render: (r) => (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 130 }}>
+          <div style={{ flex: 1, height: 6, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${r.conversionPct}%`, background: r.conversionPct >= 70 ? "var(--success)" : r.conversionPct >= 40 ? "var(--primary)" : "var(--warning)", borderRadius: 3, transition: "width .3s" }} />
+          </div>
+          <Tag variant={r.conversionPct >= 70 ? "positive" : r.conversionPct >= 40 ? "warning" : "danger"}>{r.conversionPct}%</Tag>
+        </div>
+      ),
+      width: 170,
+    },
   ];
 
   return (

@@ -139,12 +139,17 @@ export default function ProductsPage() {
     { key: "price", label: "Precio costo", align: "right", render: (p) => <Money value={Number(p.price ?? 0)} />, width: 120 },
     { key: "suggested", label: "P. sugerido", align: "right", render: (p) => <Money value={Number(p.price ?? 0) * MARGIN} />, width: 120 },
     {
-      key: "stock", label: "Stock", align: "center",
+      key: "stock", label: "Stock",
       render: (p) => {
         const s = stockTotal(p);
-        return <Tag variant={s === 0 ? "danger" : s < 5 ? "warning" : "positive"}>{s}</Tag>;
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Tag variant={s === 0 ? "danger" : s < 5 ? "warning" : "positive"}>{s}</Tag>
+            <Link href={`/erp/warehouse?productId=${p.id}`} style={{ fontSize: 11, color: "var(--text-tertiary)", textDecoration: "none" }} title="Ver en inventario">📦</Link>
+          </div>
+        );
       },
-      width: 80,
+      width: 110,
     },
   ];
 
