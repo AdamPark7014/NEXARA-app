@@ -141,10 +141,32 @@ export default function OpsProjectsPage() {
       width: 110,
     },
     {
+      key: "client",
+      label: "Cliente",
+      render: (p) => p.client ? (
+        <Link href={`/ops/service-clients/${p.client.id}`} style={{ fontSize: 12, color: "var(--primary)", textDecoration: "none", fontWeight: 600 }}>
+          {p.client.name}
+        </Link>
+      ) : <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>—</span>,
+      width: 140,
+    },
+    {
       key: "activities",
       label: "OTs",
-      accessor: (p) => String(p.activities?.length ?? 0),
-      width: 60,
+      render: (p) => {
+        const total = p.activities?.length ?? 0;
+        const done = p.activities?.filter((a) => a.estatus === "COMPLETADA" || a.estatus === "COMPLETED" || a.estatus === "DONE").length ?? 0;
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+        return (
+          <div style={{ minWidth: 80 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 3 }}>{done}/{total}</div>
+            <div style={{ height: 4, borderRadius: 2, background: "var(--surface-2)", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${pct}%`, background: pct >= 100 ? "var(--success)" : pct >= 50 ? "var(--primary)" : "var(--warning)", borderRadius: 2 }} />
+            </div>
+          </div>
+        );
+      },
+      width: 100,
     },
   ];
 
