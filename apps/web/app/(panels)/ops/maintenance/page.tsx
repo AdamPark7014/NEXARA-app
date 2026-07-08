@@ -215,12 +215,38 @@ export default function MaintenancePage() {
       )}
 
       {!loading && !error && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
-          <KpiCard label="Pendientes" value={items.filter(w => w.status === "PENDIENTE").length} variant="warning" icon="⏳" />
-          <KpiCard label="En progreso" value={items.filter(w => w.status === "EN_PROGRESO").length} variant="accent" icon="🔧" />
-          <KpiCard label="Completadas" value={items.filter(w => w.status === "COMPLETADA").length} icon="✅" />
-          <KpiCard label="Criticas" value={items.filter(w => w.priority === "CRITICA").length} variant={items.filter(w => w.priority === "CRITICA").length > 0 ? "danger" : "default"} icon="🚨" />
-        </div>
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
+            <KpiCard label="Pendientes" value={items.filter(w => w.status === "PENDIENTE").length} variant="warning" icon="⏳" />
+            <KpiCard label="En progreso" value={items.filter(w => w.status === "EN_PROGRESO").length} variant="accent" icon="🔧" />
+            <KpiCard label="Completadas" value={items.filter(w => w.status === "COMPLETADA").length} icon="✅" />
+            <KpiCard label="Criticas" value={items.filter(w => w.priority === "CRITICA").length} variant={items.filter(w => w.priority === "CRITICA").length > 0 ? "danger" : "default"} icon="🚨" />
+            <KpiCard label="Costo estimado total" value={new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" }).format(items.reduce((s, w) => s + (w.estimatedCost ?? 0), 0))} icon="💰" />
+          </div>
+          {items.length > 0 && (() => {
+            const total = items.filter(w => w.status !== "CANCELADA").length;
+            const completadas = items.filter(w => w.status === "COMPLETADA").length;
+            const enProg = items.filter(w => w.status === "EN_PROGRESO").length;
+            const pct = total > 0 ? Math.round((completadas / total) * 100) : 0;
+            return (
+              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Avance general de OTs</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: pct >= 80 ? "var(--success)" : "var(--text-secondary)" }}>{pct}% completado</span>
+                </div>
+                <div style={{ height: 8, borderRadius: 4, background: "var(--surface)", overflow: "hidden", position: "relative" }}>
+                  <div style={{ position: "absolute", height: "100%", width: `${total > 0 ? ((completadas + enProg) / total) * 100 : 0}%`, background: "color-mix(in srgb, var(--primary) 40%, transparent)", borderRadius: 4 }} />
+                  <div style={{ position: "absolute", height: "100%", width: `${pct}%`, background: pct >= 80 ? "var(--success)" : "var(--primary)", borderRadius: 4 }} />
+                </div>
+                <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
+                  <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>✅ {completadas} completadas</span>
+                  <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>🔧 {enProg} en progreso</span>
+                  <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>⏳ {items.filter(w => w.status === "PENDIENTE").length} pendientes</span>
+                </div>
+              </div>
+            );
+          })()}
+        </>
       )}
 
       <FilterToolbar
