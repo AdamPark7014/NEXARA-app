@@ -367,12 +367,41 @@ export default function InvoicingPage() {
         }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 18 }}>
-        <KpiCard label="Facturado (ingresos)" value={<Money value={facturadoMes} compact />} hint={`${items.filter((f) => displayInvoiceType(f.type) === "INCOME").length} CFDI`} variant="positive" icon="🧾" />
-        <KpiCard label="Por timbrar" value={porTimbrar} hint="En borrador" variant={porTimbrar > 0 ? "warning" : "positive"} icon="⏳" />
-        <KpiCard label="Canceladas" value={canceladas} variant={canceladas > 0 ? "danger" : "default"} icon="✗" />
-        <KpiCard label="Vencidas" value={vencidas} variant={vencidas > 0 ? "danger" : "positive"} icon="🛡️" />
-      </div>
+      {(() => {
+        const incomeInvoices = items.filter((f) => displayInvoiceType(f.type) === "INCOME" && f.status !== "CANCELLED");
+        const cobrado = incomeInvoices.filter((f) => f.status === "PAID").reduce((s, f) => s + Number(f.totalAmount), 0);
+        const pendiente = incomeInvoices.filter((f) => f.status !== "PAID").reduce((s, f) => s + Number(f.totalAmount), 0);
+        const cobranzaPct = facturadoMes > 0 ? Math.round((cobrado / facturadoMes) * 100) : 0;
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 14 }}>
+              <KpiCard label="Facturado (ingresos)" value={<Money value={facturadoMes} compact />} hint={`${incomeInvoices.length} CFDI de ingreso`} variant="positive" icon="🧾" />
+              <KpiCard label="Cobrado" value={<Money value={cobrado} compact />} hint={`${cobranzaPct}% del facturado`} variant={cobranzaPct >= 80 ? "positive" : "warning"} icon="💰" />
+              <KpiCard label="Por timbrar" value={porTimbrar} hint="En borrador" variant={porTimbrar > 0 ? "warning" : "positive"} icon="⏳" />
+              <KpiCard label="Vencidas" value={vencidas} variant={vencidas > 0 ? "danger" : "positive"} icon="🛡️" />
+            </div>
+            {facturadoMes > 0 && (
+              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Estado de cobranza</div>
+                {[
+                  { label: "Cobrado", value: cobrado, color: "var(--success)" },
+                  { label: "Pendiente", value: pendiente, color: pendiente > 0 ? "var(--warning)" : "var(--success)" },
+                ].map(({ label, value, color }) => (
+                  <div key={label} style={{ display: "grid", gridTemplateColumns: "90px 1fr 120px", gap: 10, alignItems: "center", marginBottom: 7 }}>
+                    <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>{label}</span>
+                    <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${facturadoMes > 0 ? (value / facturadoMes) * 100 : 0}%`, background: color, borderRadius: 3 }} />
+                    </div>
+                    <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>
+                      {new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" }).format(value)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {pacInfo && (
         <div
