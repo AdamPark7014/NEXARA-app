@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import { useUser } from "@/components/UserContext";
 import { getActivitiesSectionConfig, getActivitiesCanonicalPath } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
+import { buildApiUrl } from "@/lib/api-base";
 
 /** Formulario completo de OT (asignar ingeniero, cliente, AN, etc.) */
 const ActivitiesTable = dynamic(() => import("@/components/ActivitiesTable"), { ssr: false });
@@ -21,16 +23,36 @@ function useActivitiesConfig() {
 
 type TabId = "actividades" | "evidencias";
 
+interface ActivitySummary {
+  abiertas?: number;
+  enProceso?: number;
+  completadas?: number;
+  vencidas?: number;
+  total?: number;
+}
+
 export default function ActivitiesPage() {
   const { user } = useUser();
   const router = useRouter();
   const searchParams = useSearchParams();
   const cfg = useActivitiesConfig();
   useOpsCanonicalRoute(user, "activities");
+  const token = user?.token ?? "";
 
   const [tab, setTab] = useState<TabId>(
     searchParams.get("tab") === "evidencias" ? "evidencias" : "actividades",
   );
+  const [summary, setSummary] = useState<ActivitySummary | null>(null);
+
+  const loadSummary = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(buildApiUrl("activities/summary"), { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setSummary(await res.json());
+    } catch { /* summary is non-critical */ }
+  }, [token]);
+
+  useEffect(() => { void loadSummary(); }, [loadSummary]);
 
   useEffect(() => {
     if (searchParams.get("tab") === "evidencias") setTab("evidencias");
@@ -57,6 +79,17 @@ export default function ActivitiesPage() {
         title={cfg.title}
         subtitle={cfg.subtitle}
       />
+
+      {summary && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
+          {summary.abiertas != null && <KpiCard label="Abiertas" value={summary.abiertas} icon="📋" />}
+          {summary.enProceso != null && <KpiCard label="En proceso" value={summary.enProceso} icon="⚙️" variant="accent" />}
+          {summary.completadas != null && <KpiCard label="Completadas (30d)" value={summary.completadas} icon="✅" variant="positive" />}
+          {summary.vencidas != null && summary.vencidas > 0 && (
+            <KpiCard label="Vencidas" value={summary.vencidas} icon="⚠️" variant="danger" hint="Requieren atención urgente" />
+          )}
+        </div>
+      )}
 
       <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--border)", marginBottom: 20 }}>
         <button style={tabStyle(tab === "actividades")} onClick={() => setTab("actividades")}>
