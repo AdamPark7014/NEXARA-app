@@ -221,11 +221,38 @@ export default function DocumentsPage() {
         }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 14 }}>
         <KpiCard label="Total documentos" value={docs.length} icon="📂" />
         <KpiCard label="Pendientes de aprobar" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" />
         <KpiCard label="Aprobados" value={aprobados} variant="positive" icon="✅" />
+        <KpiCard label="Tasa de aprobación" value={docs.length > 0 ? `${Math.round((aprobados / docs.length) * 100)}%` : "—"} variant={docs.length > 0 && aprobados / docs.length >= 0.8 ? "positive" : "default"} icon="📈" hint="Aprobados vs total" />
       </div>
+
+      {docs.length > 0 && (() => {
+        const byCat = Object.entries(
+          docs.reduce<Record<string, number>>((acc, d) => {
+            const k = d.category?.name ?? "Sin categoría";
+            acc[k] = (acc[k] ?? 0) + 1;
+            return acc;
+          }, {})
+        ).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        return (
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Documentos por categoría</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {byCat.map(([cat, count]) => (
+                <div key={cat} style={{ display: "grid", gridTemplateColumns: "150px 1fr 36px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(count / docs.length) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       <FilterToolbar
         search={{ value: search, onChange: setSearch, placeholder: "Buscar por título o folio…" }}
