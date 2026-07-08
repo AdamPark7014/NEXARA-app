@@ -241,15 +241,22 @@ export default function OpsDashboardPage() {
 
               {byMember.length > 0 && (
                 <Section eyebrow="Equipo" title="Carga por integrante" subtitle="OTs asignadas a cada miembro del equipo">
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {byMember.map((m) => (
-                      <div key={m.nombre} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{m.nombre}</span>
-                        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{m.total} OT</span>
-                        {m.enCurso > 0 && <Tag variant="warning">{m.enCurso} en curso</Tag>}
-                        {m.completadas > 0 && <Tag variant="positive">{m.completadas} ✓</Tag>}
-                      </div>
-                    ))}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {byMember.map((m) => {
+                      const pct = m.total > 0 ? Math.round((m.completadas / m.total) * 100) : 0;
+                      return (
+                        <div key={m.nombre} style={{ display: "grid", gridTemplateColumns: "140px 1fr 56px", gap: 10, alignItems: "center" }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.nombre}</span>
+                          <div style={{ position: "relative", height: 14, background: "var(--surface-2)", borderRadius: 4, overflow: "hidden" }}>
+                            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${pct}%`, background: pct >= 80 ? "var(--success)" : pct >= 40 ? "var(--primary)" : "var(--warning)", borderRadius: 4, opacity: 0.8 }} />
+                            {m.enCurso > 0 && (
+                              <div style={{ position: "absolute", left: `${pct}%`, top: 0, bottom: 0, width: `${Math.round((m.enCurso / m.total) * 100)}%`, background: "var(--warning)", opacity: 0.5 }} />
+                            )}
+                          </div>
+                          <span style={{ fontSize: 11.5, color: "var(--text-secondary)", textAlign: "right" }}>{m.completadas}/{m.total}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </Section>
               )}
