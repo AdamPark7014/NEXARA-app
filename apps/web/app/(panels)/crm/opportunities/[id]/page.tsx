@@ -156,12 +156,22 @@ export default function OpportunityDetailPage() {
       {/* Probability bar */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ height: 6, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${opportunity.probability}%`, background: "var(--primary)", borderRadius: 3, transition: "width .3s" }} />
+          <div style={{
+            height: "100%",
+            width: `${opportunity.probability}%`,
+            background: opportunity.probability >= 70 ? "var(--success)" : opportunity.probability >= 40 ? "var(--primary)" : "var(--warning)",
+            borderRadius: 3,
+            transition: "width .3s",
+          }} />
         </div>
       </div>
 
       <DetailFieldGrid>
-        <DetailField label="Cliente" value={clientName} />
+        <DetailField label="Cliente" value={opportunity.clientId ? (
+          <Link href={`/crm/clients/${opportunity.clientId}`} style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+            {clientName} →
+          </Link>
+        ) : clientName} />
         <DetailField label="Monto" value={formatMoney(opportunity.value)} />
         <DetailField label="Cierre esperado" value={formatDate(opportunity.expectedCloseDate)} />
         <DetailField label="Ejecutivo" value={opportunity.owner?.nombre ?? "—"} />
