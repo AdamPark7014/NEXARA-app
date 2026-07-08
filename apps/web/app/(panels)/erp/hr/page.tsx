@@ -332,24 +332,49 @@ export default function HrPage() {
       />
 
       {state.kind === "ready" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 18 }}>
-          <KpiCard label="Plantilla total" value={total} hint={`${activos} activos`} variant="default" icon="🧑‍💼" />
-          <KpiCard label="En vacaciones" value={vac} hint="Esta semana" variant="accent" icon="🏖️" />
-          <KpiCard
-            label="Incidencias"
-            value={state.items.filter((e) => e.estadoRRHH === "Incidencia").length}
-            hint="Abiertas"
-            variant={state.items.some((e) => e.estadoRRHH === "Incidencia") ? "warning" : "positive"}
-            icon="🛡️"
-          />
-          <KpiCard
-            label="Honorarios"
-            value={state.items.filter((e) => e.tipoContrato === "Honorarios").length}
-            hint="Sin prestaciones"
-            variant="default"
-            icon="📋"
-          />
-        </div>
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 14 }}>
+            <KpiCard label="Plantilla total" value={total} hint={`${activos} activos`} variant="default" icon="🧑‍💼" />
+            <KpiCard label="En vacaciones" value={vac} hint="Esta semana" variant="accent" icon="🏖️" />
+            <KpiCard
+              label="Incidencias"
+              value={state.items.filter((e) => e.estadoRRHH === "Incidencia").length}
+              hint="Abiertas"
+              variant={state.items.some((e) => e.estadoRRHH === "Incidencia") ? "warning" : "positive"}
+              icon="🛡️"
+            />
+            <KpiCard
+              label="Honorarios"
+              value={state.items.filter((e) => e.tipoContrato === "Honorarios").length}
+              hint="Sin prestaciones"
+              variant="default"
+              icon="📋"
+            />
+          </div>
+          {total > 0 && depts.length > 0 && (() => {
+            const byDept = depts
+              .map((d) => ({ nombre: d.nombre, count: state.items.filter((e) => e.department?.id === d.id).length }))
+              .filter((d) => d.count > 0)
+              .sort((a, b) => b.count - a.count);
+            if (byDept.length === 0) return null;
+            return (
+              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Headcount por departamento</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {byDept.map(({ nombre, count }) => (
+                    <div key={nombre} style={{ display: "grid", gridTemplateColumns: "140px 1fr 32px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nombre}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </>
       )}
 
       <FilterToolbar
