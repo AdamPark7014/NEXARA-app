@@ -5,7 +5,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
-import DataTable, { type Column } from "@/components/ui/DataTable";
+import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToCsv } from "@/lib/export-csv";
@@ -109,9 +109,23 @@ export default function HrKpisPage() {
 
   const columns: Column<EngineerRow>[] = [
     { key: "engineerName", label: "Ingeniero" },
-    { key: "totalActivities", label: "OT (90d)", width: 90 },
-    { key: "completed", label: "Cerradas", width: 90 },
-    { key: "completionRate", label: "% cierre", render: (r) => `${r.completionRate}%`, width: 90 },
+    { key: "totalActivities", label: "OT (90d)", width: 80 },
+    { key: "completed", label: "Cerradas", width: 80 },
+    {
+      key: "completionRate", label: "% cierre",
+      render: (r) => (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 120 }}>
+          <div style={{ flex: 1, height: 6, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${r.completionRate}%`, background: r.completionRate >= 80 ? "var(--success)" : r.completionRate >= 60 ? "var(--primary)" : "var(--warning)", borderRadius: 3, transition: "width .3s" }} />
+          </div>
+          <Tag variant={r.completionRate >= 80 ? "positive" : r.completionRate >= 60 ? "accent" : "warning"}>
+            {r.completionRate}%
+          </Tag>
+        </div>
+      ),
+      width: 180,
+    },
+    { key: "avgDurationMin", label: "Min/OT", render: (r) => r.avgDurationMin != null ? `${r.avgDurationMin}m` : "—", width: 70 },
   ];
 
   return (
