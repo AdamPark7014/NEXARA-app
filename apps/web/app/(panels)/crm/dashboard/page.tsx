@@ -275,7 +275,7 @@ export default function CrmDashboardPage() {
                 <Section eyebrow="Leads" title="Recientes" subtitle="Últimos leads capturados">
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {recentLeads.map((l) => (
-                      <Link key={l.id} href="/crm/leads" style={{ textDecoration: "none", color: "inherit" }}>
+                      <Link key={l.id} href={`/crm/leads/${l.id}`} style={{ textDecoration: "none", color: "inherit" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 12.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</div>
