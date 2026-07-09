@@ -168,13 +168,31 @@ export default function StudioNewsPage() {
         }
       />
 
-      {!loading && items.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 16 }}>
-          <KpiCard label="Total publicaciones" value={items.length} icon="📰" />
-          <KpiCard label="Publicadas" value={items.filter(n => n.status === "PUBLISHED").length} variant="positive" icon="✅" hint="Visibles en el sitio" />
-          <KpiCard label="Borradores" value={items.filter(n => n.status !== "PUBLISHED").length} variant={items.filter(n => n.status !== "PUBLISHED").length > 0 ? "warning" : "default"} icon="📝" hint="Pendientes de publicar" />
-        </div>
-      )}
+      {!loading && items.length > 0 && (() => {
+        const publicadas = items.filter(n => n.status === "PUBLISHED").length;
+        const borradores = items.filter(n => n.status === "DRAFT").length;
+        const archivadas = items.filter(n => n.status === "ARCHIVED").length;
+        const tasaPublicacion = items.length > 0 ? Math.round((publicadas / items.length) * 100) : 0;
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
+              <KpiCard label="Total publicaciones" value={items.length} icon="📰" />
+              <KpiCard label="Publicadas" value={publicadas} variant="positive" icon="✅" hint={`${tasaPublicacion}% del total`} />
+              <KpiCard label="Borradores" value={borradores} variant={borradores > 0 ? "warning" : "default"} icon="📝" hint="Pendientes de publicar" />
+              <KpiCard label="Archivadas" value={archivadas} variant={archivadas > 0 ? "default" : "default"} icon="📦" hint="Fuera de línea" />
+            </div>
+            <div style={{ marginBottom: 14, padding: "10px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Tasa de publicación</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: tasaPublicacion >= 70 ? "var(--success)" : "var(--warning)" }}>{tasaPublicacion}% publicado</span>
+              </div>
+              <div style={{ height: 8, borderRadius: 4, background: "var(--surface)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${tasaPublicacion}%`, background: tasaPublicacion >= 70 ? "var(--success)" : "var(--primary)", borderRadius: 4, transition: "width .4s" }} />
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {actionErr && (
         <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>

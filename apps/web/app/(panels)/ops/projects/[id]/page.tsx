@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import { DetailError, DetailField, DetailFieldGrid, formatDate } from "@/components/detail/DetailFrame";
 import { useOpsProjectDetail } from "@/components/ops/OpsProjectDetailShell";
 import { useUser } from "@/components/UserContext";
@@ -73,8 +74,32 @@ export default function OpsProjectSummaryPage() {
     color: "var(--foreground)", fontSize: 13,
   };
 
+  const activities = project.activities ?? [];
+  const completedOTs = activities.filter(a => a.estatus === "COMPLETADA" || a.estatus === "COMPLETED" || a.estatus === "DONE").length;
+  const activeOTs = activities.filter(a => a.estatus === "EN_CURSO" || a.estatus === "PROGRAMADA").length;
+  const otPct = activities.length > 0 ? Math.round((completedOTs / activities.length) * 100) : 0;
+
   return (
     <>
+      {activities.length > 0 && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
+            <KpiCard label="OTs completadas" value={`${completedOTs}/${activities.length}`} variant={otPct >= 100 ? "positive" : otPct >= 50 ? "accent" : "default"} icon="✅" hint={`${otPct}% completado`} />
+            <KpiCard label="En curso" value={activeOTs} variant={activeOTs > 0 ? "accent" : "default"} icon="⚙️" />
+            <KpiCard label="Estado" value={formatOperationalProjectStatus(project.status)} variant={project.status === "COMPLETED" ? "positive" : project.status === "ACTIVE" ? "accent" : "warning"} icon="📋" />
+            <KpiCard label="Sitios" value={project.siteCount ?? "—"} icon="📍" hint="Ubicaciones de campo" />
+          </div>
+          <div style={{ marginBottom: 16, padding: "10px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Avance del proyecto</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: otPct >= 80 ? "var(--success)" : "var(--primary)" }}>{otPct}%</span>
+            </div>
+            <div style={{ height: 8, borderRadius: 4, background: "var(--surface)", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${otPct}%`, background: otPct >= 100 ? "var(--success)" : "var(--primary)", borderRadius: 4, transition: "width .4s" }} />
+            </div>
+          </div>
+        </>
+      )}
       <Section title="Datos generales"
         actions={
           canEdit && !editing
