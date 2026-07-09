@@ -405,12 +405,37 @@ export default function UsersPage() {
         ) : undefined}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24 }}>
-        <KpiCard label="Total" value={kpis.total} icon="👥" />
-        <KpiCard label="Activos" value={kpis.activos} icon="✅" variant="positive" />
-        <KpiCard label="Inactivos" value={kpis.inact} icon="⛔" variant={kpis.inact > 0 ? "danger" : "default"} />
-        <KpiCard label="Nuevos hoy" value={kpis.nuevos} icon="🆕" variant="accent" />
-      </div>
+      {!loading && users.length > 0 && (() => {
+        const byDept = Object.entries(
+          users.reduce<Record<string, number>>((acc, u) => { const k = u.department?.nombre ?? "Sin depto."; acc[k] = (acc[k] ?? 0) + 1; return acc; }, {})
+        ).sort((a, b) => b[1] - a[1]).slice(0, 6);
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 14 }}>
+              <KpiCard label="Total" value={kpis.total} icon="👥" />
+              <KpiCard label="Activos" value={kpis.activos} icon="✅" variant="positive" />
+              <KpiCard label="Inactivos" value={kpis.inact} icon="⛔" variant={kpis.inact > 0 ? "danger" : "default"} />
+              <KpiCard label="Nuevos hoy" value={kpis.nuevos} icon="🆕" variant="accent" />
+            </div>
+            {byDept.length > 0 && (
+              <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Usuarios por departamento</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {byDept.map(([dept, count]) => (
+                    <div key={dept} style={{ display: "grid", gridTemplateColumns: "140px 1fr 32px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{dept}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(count / users.length) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {metaError && (
         <div style={{ padding: "10px 14px", background: "var(--state-warning-bg)", border: "1px solid var(--state-warning-border)", borderRadius: 10, marginBottom: 16, fontSize: 13, color: "var(--state-warning-text)" }}>

@@ -226,6 +226,8 @@ export default function BankingPage() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
         <KpiCard label="Saldo total" value={<Money value={totalBalance} compact />} icon="🏦" variant={totalBalance > 0 ? "positive" : "danger"} hint={`${accounts.length} cuentas registradas`} />
         <KpiCard label="Cuentas activas" value={accounts.filter((a) => a.isActive).length} icon="💳" variant="accent" hint={`${accounts.filter((a) => !a.isActive).length} inactivas`} />
+        <KpiCard label="En negativo" value={accounts.filter((a) => Number(a.currentBalance) < 0).length} icon="🔴" variant={accounts.some((a) => Number(a.currentBalance) < 0) ? "danger" : "positive"} hint={accounts.some((a) => Number(a.currentBalance) < 0) ? "Cuentas con saldo negativo" : "Sin cuentas negativas"} />
+        <KpiCard label="Más líquida" value={accounts.length > 0 ? (accounts.reduce((max, a) => Number(a.currentBalance) > Number(max.currentBalance) ? a : max, accounts[0])?.name ?? "—") : "—"} icon="💧" hint="Mayor saldo disponible" />
       </div>
 
       {loading && <EmptyState icon="⏳" title="Cargando cuentas…" description="Consultando cuentas bancarias." />}
