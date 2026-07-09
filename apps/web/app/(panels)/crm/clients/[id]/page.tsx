@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import { Tag, Money } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { provisionSalesServiceClient, updateSalesClient } from "@/lib/sales-api";
@@ -121,8 +122,18 @@ export default function ClientDetailPage() {
     );
   }
 
+  const opps = client.opportunities ?? [];
+  const pipeline = opps.filter((o) => !["WON", "LOST"].includes(o.stage ?? ""));
+  const pipelineValue = pipeline.reduce((s, o) => s + Number(o.value ?? 0), 0);
+
   return (
     <DetailSection title="Datos generales">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 18 }}>
+        <KpiCard label="Estado" value={client.status || "Prospecto"} variant={client.status === "Activo" ? "positive" : client.status === "Prospecto" ? "warning" : "default"} icon="🏢" />
+        <KpiCard label="Oportunidades" value={opps.length} icon="🎯" hint={`${pipeline.length} activas`} />
+        <KpiCard label="Pipeline activo" value={<Money value={pipelineValue} compact />} variant={pipelineValue > 0 ? "accent" : "default"} icon="💰" />
+        <KpiCard label="Industria" value={client.industry || "—"} icon="🏭" />
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <Tag variant={client.status === "Activo" ? "positive" : client.status === "Prospecto" ? "warning" : "neutral"}>
           {client.status || "Prospecto"}

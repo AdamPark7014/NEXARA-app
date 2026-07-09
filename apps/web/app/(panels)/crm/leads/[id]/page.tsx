@@ -7,6 +7,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
+import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -156,6 +157,13 @@ export default function LeadDetailPage() {
           <Link href="/crm/pipeline" style={{ color: "var(--primary)" }}>Ver pipeline →</Link>
         </div>
       )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 16 }}>
+        <KpiCard label="Estado" value={formatLeadStatus(lead.status)} variant={STATUS_VARIANT[lead.status] ?? "default"} icon="🎯" />
+        <KpiCard label="Score" value={lead.score > 0 ? `${lead.score}/100` : "—"} variant={lead.score >= 70 ? "positive" : lead.score >= 40 ? "accent" : "warning"} icon="⭐" />
+        <KpiCard label="Fuente" value={lead.source || "—"} icon="🌐" />
+        <KpiCard label="Empresa" value={lead.company || "—"} icon="🏢" />
+      </div>
 
       {/* Score bar */}
       {lead.score > 0 && (
