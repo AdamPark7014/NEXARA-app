@@ -272,12 +272,37 @@ export default function OpportunitiesPage() {
         actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva oportunidad</Button> : undefined}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 20 }}>
-        <KpiCard label="Pipeline total" value={<Money value={pipelineTotal} compact />} variant="accent" icon="📊" hint={`${active.length} oportunidades activas`} />
-        <KpiCard label="Valor ponderado" value={<Money value={weighted} compact />} icon="🎯" hint="Ajustado por probabilidad" />
-        <KpiCard label="En cierre" value={enCierre} variant={enCierre > 0 ? "positive" : "default"} icon="🔥" hint="Etapa caliente" />
-        <KpiCard label="Ganadas" value={visibleItems.filter((o) => o.stage === "WON").length} variant="positive" icon="🏆" />
-      </div>
+      {!loading && visibleItems.length > 0 && (() => {
+        const byStage = ALL_OPPORTUNITY_STAGES
+          .map((s) => ({ label: formatOpportunityStage(s.id), count: visibleItems.filter((o) => o.stage === s.id).length }))
+          .filter((x) => x.count > 0);
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 14 }}>
+              <KpiCard label="Pipeline total" value={<Money value={pipelineTotal} compact />} variant="accent" icon="📊" hint={`${active.length} oportunidades activas`} />
+              <KpiCard label="Valor ponderado" value={<Money value={weighted} compact />} icon="🎯" hint="Ajustado por probabilidad" />
+              <KpiCard label="En cierre" value={enCierre} variant={enCierre > 0 ? "positive" : "default"} icon="🔥" hint="Etapa caliente" />
+              <KpiCard label="Ganadas" value={visibleItems.filter((o) => o.stage === "WON").length} variant="positive" icon="🏆" />
+            </div>
+            {byStage.length > 0 && (
+              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Pipeline por etapa</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {byStage.map(({ label, count }) => (
+                    <div key={label} style={{ display: "grid", gridTemplateColumns: "140px 1fr 32px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{label}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(count / visibleItems.length) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {showForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
