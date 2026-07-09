@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import { buildApiUrl } from "@/lib/api-base";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection, formatDate, formatDateTime } from "@/components/detail/DetailFrame";
@@ -123,8 +124,16 @@ export default function ActivityDetailPage() {
     color: "var(--foreground)", fontSize: 13,
   };
 
+  const evidenceCount = countEvidenceFiles(activity.evidencias);
+
   return (
     <>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 16 }}>
+        <KpiCard label="Estado" value={activity.estatus.replace(/_/g, " ")} variant={activityStatusVariant(activity.estatus)} icon="📋" />
+        <KpiCard label="Prioridad" value={activity.prioridad || "—"} variant={activity.prioridad === "URGENTE" ? "danger" : activity.prioridad === "ALTA" ? "warning" : "default"} icon="⚡" />
+        <KpiCard label="Evidencias" value={evidenceCount} icon="📎" hint="Archivos adjuntos" />
+        <KpiCard label="Responsable" value={activity.responsable?.nombre ?? "—"} icon="👷" />
+      </div>
       <DetailSection title="Información general">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
