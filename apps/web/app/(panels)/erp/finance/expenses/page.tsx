@@ -193,11 +193,38 @@ export default function ExpensesPage() {
         actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo gasto</Button> : undefined}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 20 }}>
-        <KpiCard label="Total aprobado / pagado" value={<Money value={totalMes} compact />} variant="positive" icon="✅" hint="Gastos autorizados" />
-        <KpiCard label="Pendientes de aprobar" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" hint="Esperando autorización" />
-        <KpiCard label="Recurrentes activos" value={recurrentes} variant={recurrentes > 0 ? "accent" : "default"} icon="🔄" hint="Gastos mensuales fijos" />
-      </div>
+      {!loading && visibleItems.length > 0 && (() => {
+        const totalGastos = visibleItems.reduce((s, e) => s + (e.monto ?? 0), 0);
+        const byCat = Object.entries(
+          visibleItems.reduce<Record<string, number>>((acc, e) => { const k = e.categoria ?? "Sin categoría"; acc[k] = (acc[k] ?? 0) + (e.monto ?? 0); return acc; }, {})
+        ).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 14 }}>
+              <KpiCard label="Total aprobado / pagado" value={<Money value={totalMes} compact />} variant="positive" icon="✅" hint="Gastos autorizados" />
+              <KpiCard label="Pendientes de aprobar" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" hint="Esperando autorización" />
+              <KpiCard label="Recurrentes activos" value={recurrentes} variant={recurrentes > 0 ? "accent" : "default"} icon="🔄" hint="Gastos mensuales fijos" />
+              <KpiCard label="Total registrado" value={<Money value={totalGastos} compact />} icon="📊" hint="Todos los estados" />
+            </div>
+            {byCat.length > 0 && (
+              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Gasto por categoría</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {byCat.map(([cat, amount]) => (
+                    <div key={cat} style={{ display: "grid", gridTemplateColumns: "120px 1fr 90px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{cat}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(amount / totalGastos) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" }).format(amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {showForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

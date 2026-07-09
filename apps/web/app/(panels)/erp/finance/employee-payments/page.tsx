@@ -193,10 +193,19 @@ export default function EmployeePaymentsPage() {
         }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Total pagado" value={<Money value={total} compact />} icon="💼" variant="positive" hint="Nómina y bonos registrados" />
-        <KpiCard label="Registros" value={items.length} icon="📋" />
-      </div>
+      {!loading && items.length > 0 && (() => {
+        const totalMinutes = items.reduce((s, p) => s + (p.totalMinutes ?? 0), 0);
+        const empleadosDistintos = new Set(items.map((p) => p.userId)).size;
+        const avgPayment = items.length > 0 ? total / items.length : 0;
+        return (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
+            <KpiCard label="Total pagado" value={<Money value={total} compact />} icon="💼" variant="positive" hint="Nómina y bonos registrados" />
+            <KpiCard label="Registros" value={items.length} icon="📋" />
+            <KpiCard label="Empleados" value={empleadosDistintos} icon="👥" hint="Personas con pagos" />
+            <KpiCard label="Pago promedio" value={<Money value={avgPayment} compact />} icon="📊" hint="Por registro" />
+          </div>
+        );
+      })()}
 
       <FilterToolbar
         search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por empleado o concepto…" }}
