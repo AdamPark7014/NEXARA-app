@@ -188,8 +188,9 @@ export default function AiSandboxPage() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
         <KpiCard label="Ejecuciones" value={totalRuns} icon="💬" />
-        <KpiCard label="Latencia promedio" value={totalRuns > 0 ? `${avgMs} ms` : "—"} icon="⚡" />
-        <KpiCard label="Respuestas mock" value={mockRuns} variant={mockRuns > 0 ? "warning" : "positive"} icon="🎭" hint={isLive ? "Modo live activo" : "Activa lab.ai.live"} />
+        <KpiCard label="Latencia promedio" value={totalRuns > 0 ? `${avgMs} ms` : "—"} icon="⚡" variant={avgMs > 2000 ? "warning" : avgMs > 0 ? "positive" : "default"} />
+        <KpiCard label="Live vs Mock" value={totalRuns > 0 ? `${totalRuns - mockRuns}/${totalRuns}` : "—"} variant={mockRuns === 0 && totalRuns > 0 ? "positive" : "warning"} icon={isLive ? "🟢" : "🎭"} hint={isLive ? "Modo live activo" : "Activa lab.ai.live"} />
+        <KpiCard label="Modelos distintos" value={new Set(runs.map((r) => r.model)).size} icon="🧠" hint="Modelos usados esta sesión" />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, alignItems: "start" }}>
