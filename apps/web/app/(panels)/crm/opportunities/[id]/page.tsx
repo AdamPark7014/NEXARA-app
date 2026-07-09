@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import Button from "@/components/ui/Button";
-import { Tag } from "@/components/ui/DataTable";
+import KpiCard from "@/components/ui/KpiCard";
+import { Tag, Money } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { updateSalesOpportunity, ALL_OPPORTUNITY_STAGES, formatOpportunityStage, createSalesProject } from "@/lib/sales-api";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection, formatDate, formatMoney } from "@/components/detail/DetailFrame";
@@ -144,6 +145,12 @@ export default function OpportunityDetailPage() {
 
   return (
     <DetailSection title="Resumen del negocio">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 16 }}>
+        <KpiCard label="Valor" value={<Money value={Number(opportunity.value ?? 0)} compact />} variant="accent" icon="💰" />
+        <KpiCard label="Probabilidad" value={`${opportunity.probability ?? 0}%`} variant={(opportunity.probability ?? 0) >= 70 ? "positive" : (opportunity.probability ?? 0) >= 40 ? "warning" : "danger"} icon="🎯" />
+        <KpiCard label="Etapa" value={formatOpportunityStage(opportunity.stage)} variant={STAGE_VARIANT[opportunity.stage] ?? "default"} icon="📋" />
+        <KpiCard label="Cotizaciones" value={opportunity.quotes?.length ?? 0} icon="📄" hint="Asociadas" />
+      </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "center" }}>
         <Tag variant={STAGE_VARIANT[opportunity.stage] ?? "neutral"}>
           {formatOpportunityStage(opportunity.stage)}
