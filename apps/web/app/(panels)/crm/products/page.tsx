@@ -317,14 +317,37 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {!loading && items.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 16 }}>
-          <KpiCard label="Productos en catálogo" value={items.length} icon="📦" />
-          <KpiCard label="Sin stock" value={items.filter(p => stockTotal(p) === 0).length} variant={items.filter(p => stockTotal(p) === 0).length > 0 ? "danger" : "positive"} icon="⚠️" hint="Requieren reposición" />
-          <KpiCard label="Stock bajo" value={items.filter(p => stockTotal(p) > 0 && stockTotal(p) < 5).length} variant={items.filter(p => stockTotal(p) > 0 && stockTotal(p) < 5).length > 0 ? "warning" : "positive"} icon="📉" hint="Menos de 5 unidades" />
-          <KpiCard label="Precio promedio" value={<Money value={items.length > 0 ? items.reduce((s, p) => s + Number(p.price ?? 0), 0) / items.length : 0} />} icon="💰" />
-        </div>
-      )}
+      {!loading && items.length > 0 && (() => {
+        const byCat = Object.entries(
+          items.reduce<Record<string, number>>((acc, p) => { const k = p.category ?? "Sin categoría"; acc[k] = (acc[k] ?? 0) + 1; return acc; }, {})
+        ).sort((a, b) => b[1] - a[1]).slice(0, 6);
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
+              <KpiCard label="Productos en catálogo" value={items.length} icon="📦" />
+              <KpiCard label="Sin stock" value={items.filter(p => stockTotal(p) === 0).length} variant={items.filter(p => stockTotal(p) === 0).length > 0 ? "danger" : "positive"} icon="⚠️" hint="Requieren reposición" />
+              <KpiCard label="Stock bajo" value={items.filter(p => stockTotal(p) > 0 && stockTotal(p) < 5).length} variant={items.filter(p => stockTotal(p) > 0 && stockTotal(p) < 5).length > 0 ? "warning" : "positive"} icon="📉" hint="Menos de 5 unidades" />
+              <KpiCard label="Precio promedio" value={<Money value={items.length > 0 ? items.reduce((s, p) => s + Number(p.price ?? 0), 0) / items.length : 0} />} icon="💰" />
+            </div>
+            {byCat.length > 0 && (
+              <div style={{ marginBottom: 14, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Productos por categoría</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {byCat.map(([cat, count]) => (
+                    <div key={cat} style={{ display: "grid", gridTemplateColumns: "140px 1fr 32px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{cat}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(count / items.length) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <FilterToolbar
         search={{ value: search, onChange: setSearch, placeholder: "Buscar por SKU o nombre…" }}

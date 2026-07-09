@@ -220,14 +220,44 @@ export default function QuotesPage() {
       />
 
       {/* ── KPIs ─────────────────────────────────────────────────────────── */}
-      {!loading && items.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
-          <KpiCard label="Total" value={items.length} icon="📋" />
-          <KpiCard label="Aprobadas" value={items.filter((q) => q.status === "APPROVED").length} variant="positive" icon="✅" />
-          <KpiCard label="Pendientes" value={items.filter((q) => ["DRAFT", "SENT"].includes(q.status)).length} icon="⏳" />
-          <KpiCard label="Rechazadas" value={items.filter((q) => q.status === "REJECTED").length} variant="danger" icon="❌" />
-        </div>
-      )}
+      {!loading && items.length > 0 && (() => {
+        const aprobadas = items.filter((q) => q.status === "APPROVED");
+        const valorAprobado = aprobadas.reduce((s, q) => s + Number(q.total ?? 0), 0);
+        const valorTotal = items.reduce((s, q) => s + Number(q.total ?? 0), 0);
+        const tasaAprobacion = items.length > 0 ? Math.round((aprobadas.length / items.length) * 100) : 0;
+        const byStatus = [
+          { label: "Borrador", count: items.filter((q) => q.status === "DRAFT").length, color: "var(--text-tertiary)" },
+          { label: "Enviada", count: items.filter((q) => q.status === "SENT").length, color: "var(--primary)" },
+          { label: "Aprobada", count: aprobadas.length, color: "var(--success)" },
+          { label: "Rechazada", count: items.filter((q) => q.status === "REJECTED").length, color: "var(--danger)" },
+        ].filter((x) => x.count > 0);
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 14 }}>
+              <KpiCard label="Total" value={items.length} icon="📋" />
+              <KpiCard label="Aprobadas" value={aprobadas.length} variant="positive" icon="✅" hint={`${tasaAprobacion}% aprobación`} />
+              <KpiCard label="Valor aprobado" value={<Money value={valorAprobado} compact />} variant="positive" icon="💰" hint={`de ${new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" }).format(valorTotal)} total`} />
+              <KpiCard label="Rechazadas" value={items.filter((q) => q.status === "REJECTED").length} variant="danger" icon="❌" />
+            </div>
+            {byStatus.length > 0 && (
+              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Estado de cotizaciones</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {byStatus.map(({ label, count, color }) => (
+                    <div key={label} style={{ display: "grid", gridTemplateColumns: "90px 1fr 36px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{label}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(count / items.length) * 100}%`, background: color, borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {/* ── Modal: Nueva cotización ───────────────────────────────────────── */}
       {showForm && (
