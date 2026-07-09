@@ -80,16 +80,32 @@ export default function ActivitiesPage() {
         subtitle={cfg.subtitle}
       />
 
-      {summary && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
-          {summary.abiertas != null && <KpiCard label="Abiertas" value={summary.abiertas} icon="📋" />}
-          {summary.enProceso != null && <KpiCard label="En proceso" value={summary.enProceso} icon="⚙️" variant="accent" />}
-          {summary.completadas != null && <KpiCard label="Completadas (30d)" value={summary.completadas} icon="✅" variant="positive" />}
-          {summary.vencidas != null && summary.vencidas > 0 && (
-            <KpiCard label="Vencidas" value={summary.vencidas} icon="⚠️" variant="danger" hint="Requieren atención urgente" />
-          )}
-        </div>
-      )}
+      {summary && (() => {
+        const total = (summary.abiertas ?? 0) + (summary.enProceso ?? 0) + (summary.completadas ?? 0);
+        const completadoPct = total > 0 ? Math.round(((summary.completadas ?? 0) / total) * 100) : 0;
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 14 }}>
+              {summary.abiertas != null && <KpiCard label="Abiertas" value={summary.abiertas} icon="📋" />}
+              {summary.enProceso != null && <KpiCard label="En proceso" value={summary.enProceso} icon="⚙️" variant="accent" />}
+              {summary.completadas != null && <KpiCard label="Completadas (30d)" value={summary.completadas} icon="✅" variant="positive" />}
+              <KpiCard label="Vencidas" value={summary.vencidas ?? 0} icon="⚠️" variant={(summary.vencidas ?? 0) > 0 ? "danger" : "positive"} hint={(summary.vencidas ?? 0) > 0 ? "Requieren atención urgente" : "Sin OTs vencidas"} />
+            </div>
+            {total > 0 && (
+              <div style={{ marginBottom: 20, padding: "10px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Avance de OTs (30 días)</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: completadoPct >= 80 ? "var(--success)" : "var(--primary)" }}>{completadoPct}% completado</span>
+                </div>
+                <div style={{ height: 8, borderRadius: 4, background: "var(--surface)", overflow: "hidden", position: "relative" }}>
+                  <div style={{ position: "absolute", height: "100%", width: `${((( summary.completadas ?? 0) + (summary.enProceso ?? 0)) / total) * 100}%`, background: "color-mix(in srgb, var(--primary) 35%, transparent)", borderRadius: 4 }} />
+                  <div style={{ position: "absolute", height: "100%", width: `${completadoPct}%`, background: completadoPct >= 80 ? "var(--success)" : "var(--primary)", borderRadius: 4, transition: "width .4s" }} />
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--border)", marginBottom: 20 }}>
         <button style={tabStyle(tab === "actividades")} onClick={() => setTab("actividades")}>
