@@ -287,11 +287,29 @@ export default function AssetsPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Inventarios totales" value={items.length} icon="📡" />
-        <KpiCard label="Pendientes" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" />
-        <KpiCard label="Con diferencia detectada" value={conDiferencia} variant={conDiferencia > 0 ? "danger" : "positive"} icon="⚠️" />
-      </div>
+      {!loading && items.length > 0 && (() => {
+        const completados = items.filter((i) => i.status === "COMPLETED").length;
+        const completadoPct = items.length > 0 ? Math.round((completados / items.length) * 100) : 0;
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 14 }}>
+              <KpiCard label="Inventarios totales" value={items.length} icon="📡" />
+              <KpiCard label="Completados" value={completados} variant={completados === items.length ? "positive" : "accent"} icon="✅" hint={`${completadoPct}% del total`} />
+              <KpiCard label="Pendientes" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" />
+              <KpiCard label="Con diferencia detectada" value={conDiferencia} variant={conDiferencia > 0 ? "danger" : "positive"} icon="⚠️" />
+            </div>
+            <div style={{ marginBottom: 16, padding: "10px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Avance de inventarios</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: completadoPct >= 80 ? "var(--success)" : "var(--warning)" }}>{completadoPct}% completado</span>
+              </div>
+              <div style={{ height: 8, borderRadius: 4, background: "var(--surface)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${completadoPct}%`, background: completadoPct >= 80 ? "var(--success)" : "var(--primary)", borderRadius: 4, transition: "width .4s" }} />
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       <FilterToolbar
         search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por cliente, sucursal o título…" }}

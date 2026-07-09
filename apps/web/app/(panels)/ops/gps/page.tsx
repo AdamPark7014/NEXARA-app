@@ -370,11 +370,30 @@ function TeamGpsView({ token }: { token: string }) {
 
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Unidades visibles" value={items.length} icon="👥" hint="Con jornada abierta" />
-        <KpiCard label="Compartiendo GPS"  value={active} variant={active > 0 ? "positive" : "default"} icon="📍" hint="Ubicación activa" />
-        <KpiCard label="Sin GPS activo"    value={inactive} variant={inactive > 0 ? "warning" : "positive"} icon="📵" hint={inactive > 0 ? "Sin señal GPS" : "Todos con GPS"} />
-      </div>
+      {(() => {
+        const coberturaPct = items.length > 0 ? Math.round((active / items.length) * 100) : 0;
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
+              <KpiCard label="Unidades visibles" value={items.length} icon="👥" hint="Con jornada abierta" />
+              <KpiCard label="Compartiendo GPS" value={active} variant={active > 0 ? "positive" : "default"} icon="📍" hint="Ubicación activa" />
+              <KpiCard label="Sin GPS activo" value={inactive} variant={inactive > 0 ? "warning" : "positive"} icon="📵" hint={inactive > 0 ? "Sin señal GPS" : "Todos con GPS"} />
+              <KpiCard label="Cobertura GPS" value={`${coberturaPct}%`} variant={coberturaPct >= 80 ? "positive" : coberturaPct >= 50 ? "warning" : "danger"} icon="📊" hint="% con GPS activo" />
+            </div>
+            {items.length > 0 && (
+              <div style={{ marginBottom: 16, padding: "10px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Cobertura GPS en tiempo real</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: coberturaPct >= 80 ? "var(--success)" : "var(--warning)" }}>{active} / {items.length}</span>
+                </div>
+                <div style={{ height: 8, borderRadius: 4, background: "var(--surface)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${coberturaPct}%`, background: coberturaPct >= 80 ? "var(--success)" : coberturaPct >= 50 ? "var(--primary)" : "var(--danger)", borderRadius: 4, transition: "width .4s" }} />
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <Section
         title={loading ? "Cargando..." : `${active} unidades activas ahora`}
