@@ -474,6 +474,27 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
         <KpiCard label="Ausentes"     value={ausentes} variant={ausentes > 0 ? "danger" : "positive"} icon="⚠️" hint={ausentes > 0 ? "Sin registro hoy" : "Todos presentes"} />
       </div>
 
+      {members.length > 0 && (() => {
+        const presentePct = Math.round(((presentes + completos) / members.length) * 100);
+        return (
+          <div style={{ marginBottom: 14, padding: "10px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Cobertura de asistencia</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: presentePct >= 80 ? "var(--success)" : presentePct >= 50 ? "var(--primary)" : "var(--danger)" }}>{presentePct}%</span>
+            </div>
+            <div style={{ height: 8, borderRadius: 4, background: "var(--surface)", overflow: "hidden", position: "relative" }}>
+              <div style={{ height: "100%", width: `${Math.round((completos / members.length) * 100)}%`, background: "var(--success)", borderRadius: 4, position: "absolute", left: 0, transition: "width .4s" }} />
+              <div style={{ height: "100%", width: `${presentePct}%`, background: "var(--primary)", borderRadius: 4, position: "absolute", left: 0, opacity: 0.5, transition: "width .4s" }} />
+            </div>
+            <div style={{ display: "flex", gap: 16, marginTop: 6, fontSize: 11, color: "var(--text-tertiary)" }}>
+              <span><span style={{ color: "var(--success)", fontWeight: 700 }}>■</span> Completaron ({completos})</span>
+              <span><span style={{ color: "var(--primary)", fontWeight: 700 }}>■</span> En jornada ({presentes})</span>
+              <span><span style={{ color: "var(--danger)", fontWeight: 700 }}>■</span> Ausentes ({ausentes})</span>
+            </div>
+          </div>
+        );
+      })()}
+
       <FilterToolbar
         search={{ value: searchMember, onChange: setSearchMember, placeholder: "Buscar empleado…" }}
         selects={[{

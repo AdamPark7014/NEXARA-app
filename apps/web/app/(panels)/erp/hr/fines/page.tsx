@@ -422,6 +422,30 @@ export default function FinesPage() {
         </div>
       )}
 
+      {!loading && items.length > 0 && (() => {
+        const byTipo = MOTIVOS
+          .map((m) => ({ label: m.label, count: items.filter((f) => f.razon === m.razon).length }))
+          .filter((x) => x.count > 0)
+          .sort((a, b) => b.count - a.count);
+        if (!byTipo.length) return null;
+        return (
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Motivos de sanción</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {byTipo.map((row) => (
+                <div key={row.label} style={{ display: "grid", gridTemplateColumns: "160px 1fr 36px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{row.label}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(row.count / items.length) * 100}%`, background: "var(--danger)", borderRadius: 3, transition: "width .4s" }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{row.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       <FilterToolbar
         search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por empleado o descripción…" }}
         selects={[

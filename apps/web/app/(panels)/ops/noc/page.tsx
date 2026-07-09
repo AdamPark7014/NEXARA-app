@@ -114,6 +114,33 @@ export default function NocPage() {
             <KpiCard label="Uptime promedio" value={`${summary.avgUptime?.toFixed(1) ?? "—"}%`} variant={(summary.avgUptime ?? 100) >= 99 ? "positive" : (summary.avgUptime ?? 100) >= 95 ? "warning" : "danger"} icon="📈" hint="30 días de ventana" />
           </div>
 
+          {(() => {
+            const total = summary.total;
+            if (!total) return null;
+            const statuses = [
+              { label: "Operativos", count: summary.byStatus.ONLINE ?? 0, color: "var(--success)" },
+              { label: "Degradados", count: summary.byStatus.DEGRADED ?? 0, color: "var(--warning)" },
+              { label: "Caídos", count: summary.byStatus.OFFLINE ?? 0, color: "var(--danger)" },
+              { label: "Alertas", count: summary.byStatus.ALERT ?? 0, color: "var(--danger)" },
+            ].filter((s) => s.count > 0);
+            return (
+              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por estado</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {statuses.map((s) => (
+                    <div key={s.label} style={{ display: "grid", gridTemplateColumns: "100px 1fr 36px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 600 }}>{s.label}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(s.count / total) * 100}%`, background: s.color, borderRadius: 3, transition: "width .4s" }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{s.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           <FilterToolbar
             search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por cliente, dispositivo o sucursal…" }}
             selects={[{
