@@ -293,11 +293,39 @@ export default function LeadsPage() {
         actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo lead</Button> : undefined}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
-        <KpiCard label="Nuevos" value={nuevos} variant={nuevos > 0 ? "accent" : "default"} icon="✨" />
-        <KpiCard label="Calificados" value={calificados} variant={calificados > 0 ? "positive" : "default"} icon="⭐" />
-        <KpiCard label="Score promedio" value={`${avgScore}/100`} hint={`${activeLeads.length} leads activos`} variant={avgScore >= 70 ? "positive" : avgScore >= 40 ? "warning" : "default"} icon="📊" />
-      </div>
+      {!loading && visibleItems.length > 0 && (() => {
+        const descartados = visibleItems.filter((l) => l.status === "LOST").length;
+        const convertidos = visibleItems.filter((l) => l.status === "CONVERTED").length;
+        const bySource = Object.entries(
+          visibleItems.reduce<Record<string, number>>((acc, l) => { const k = l.source ?? "Desconocido"; acc[k] = (acc[k] ?? 0) + 1; return acc; }, {})
+        ).sort((a, b) => b[1] - a[1]);
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 14, marginBottom: 14 }}>
+              <KpiCard label="Nuevos" value={nuevos} variant={nuevos > 0 ? "accent" : "default"} icon="✨" />
+              <KpiCard label="Calificados" value={calificados} variant={calificados > 0 ? "positive" : "default"} icon="⭐" />
+              <KpiCard label="Convertidos" value={convertidos} variant={convertidos > 0 ? "positive" : "default"} icon="🎯" hint="Volvieron cliente" />
+              <KpiCard label="Score promedio" value={`${avgScore}/100`} hint={`${activeLeads.length} activos`} variant={avgScore >= 70 ? "positive" : avgScore >= 40 ? "warning" : "default"} icon="📊" />
+            </div>
+            {bySource.length > 0 && (
+              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Leads por fuente de captación</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {bySource.map(([source, count]) => (
+                    <div key={source} style={{ display: "grid", gridTemplateColumns: "100px 1fr 36px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{source}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(count / visibleItems.length) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {showForm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowForm(false)}>
