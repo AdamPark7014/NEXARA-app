@@ -262,6 +262,22 @@ export default function ServiceClientsPage() {
         </div>
       )}
 
+      {!loading && items.length > 0 && (() => {
+        const activos = items.filter(c => c.estado === "Activo").length;
+        const pct = Math.round((activos / items.length) * 100);
+        return (
+          <div style={{ marginBottom: 16, padding: "10px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Clientes activos</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: pct >= 80 ? "var(--success)" : pct >= 50 ? "var(--primary)" : "var(--warning)" }}>{pct}%</span>
+            </div>
+            <div style={{ height: 8, borderRadius: 4, background: "var(--surface)", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${pct}%`, background: pct >= 80 ? "var(--success)" : "var(--primary)", borderRadius: 4, transition: "width .4s" }} />
+            </div>
+          </div>
+        );
+      })()}
+
       {actionErr && (
         <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>{actionErr}</span>
