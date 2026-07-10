@@ -3,6 +3,7 @@
 import { DetailError, DetailField, DetailFieldGrid, DetailSection, formatDateTime } from "@/components/detail/DetailFrame";
 import { useOpportunityDetail } from "@/components/crm/OpportunityDetailShell";
 import { formatOpportunityStage } from "@/lib/sales-api";
+import KpiCard from "@/components/ui/KpiCard";
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -43,7 +44,16 @@ export default function OpportunityHistoryPage() {
     note: { emoji: "💬", color: "var(--warning)" },
   };
 
+  const noteCount = notes.length;
+
   return (
+    <>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+      <KpiCard label="Total eventos" value={events.length} icon="📅" />
+      <KpiCard label="Notas" value={noteCount} icon="💬" variant={noteCount > 0 ? "accent" : "default"} />
+      <KpiCard label="Etapa" value={formatOpportunityStage(opportunity.stage)} icon="🎯" />
+      <KpiCard label="Probabilidad" value={`${opportunity.probability ?? 0}%`} icon="📊" variant={opportunity.probability >= 70 ? "positive" : opportunity.probability >= 40 ? "accent" : "warning"} />
+    </div>
     <DetailSection title="Línea de tiempo">
       <div style={{ marginBottom: 16 }}>
       <DetailFieldGrid>
@@ -88,5 +98,6 @@ export default function OpportunityHistoryPage() {
         </div>
       )}
     </DetailSection>
+    </>
   );
 }
