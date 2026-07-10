@@ -11,6 +11,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
+import KpiCard from "@/components/ui/KpiCard";
 import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { toast } from "@/components/Toast";
@@ -133,6 +134,13 @@ export default function StudioPagesPage() {
           </>
         }
       />
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 16 }}>
+        <KpiCard label="Secciones del sitio" value={TABS.length} icon="📄" variant="accent" hint="Secciones editables" />
+        <KpiCard label="Métricas" value={metricas.length} icon="📊" hint="Números bajo el hero" />
+        <KpiCard label="Servicios" value={servicios.length} icon="⚙️" hint="Tarjetas de servicios" />
+        <KpiCard label="Pasos del proceso" value={proceso.length} icon="🔢" hint="Flujo de trabajo" />
+      </div>
 
       <div style={{ display: "flex", gap: 8, padding: "0 24px 4px", flexWrap: "wrap" }}>
         {TABS.map((tab) => (
