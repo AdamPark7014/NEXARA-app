@@ -3,7 +3,8 @@
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
-import { Tag } from "@/components/ui/DataTable";
+import KpiCard from "@/components/ui/KpiCard";
+import { Tag, Money } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import {
   DetailError,
@@ -122,8 +123,16 @@ export default function CrmProjectDetailPage() {
     <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>{text}</span>
   );
 
+  const marginPct = c.budget > 0 ? Math.round((c.margin / c.budget) * 100) : 0;
+
   return (
     <DetailSection title="Resumen del proyecto">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 16 }}>
+        <KpiCard label="Presupuesto" value={<Money value={Number(c.budget ?? 0)} compact />} icon="💰" variant="accent" />
+        <KpiCard label="Margen" value={<Money value={Number(c.margin ?? 0)} compact />} variant={marginPct >= 20 ? "positive" : marginPct >= 10 ? "accent" : "warning"} icon="📊" hint={`${marginPct}% sobre presupuesto`} />
+        <KpiCard label="Estado" value={formatSalesProjectStatus(p.status)} variant={p.status === "CLOSED" ? "default" : p.status === "IN_PROGRESS" ? "accent" : "warning"} icon="📋" />
+        <KpiCard label="Sitios" value={p.siteCount ?? "—"} icon="📍" hint="Ubicaciones de campo" />
+      </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
         <Tag variant={p.status === "CLOSED" ? "neutral" : p.status === "IN_PROGRESS" ? "accent" : "warning"}>
           {formatSalesProjectStatus(p.status)}
