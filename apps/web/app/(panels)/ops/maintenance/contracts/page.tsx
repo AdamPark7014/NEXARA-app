@@ -355,11 +355,40 @@ export default function MaintenanceContractsPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Contratos activos" value={activos} icon="📑" />
-        <KpiCard label="Ingreso recurrente (MRR)" value={<Money value={mrr} compact />} variant="positive" icon="💰" hint="Mensual recurrente" />
-        <KpiCard label="Visitas próx. 7 días" value={proximaSemana} icon="📅" />
-      </div>
+      {!loading && items.length > 0 && (() => {
+        const byStatus = [
+          { label: "Activos", count: activos, color: "var(--success)" },
+          { label: "Borradores", count: items.filter(c => c.status === "DRAFT").length, color: "var(--warning)" },
+          { label: "Pausados", count: items.filter(c => c.status === "PAUSED").length, color: "var(--text-tertiary)" },
+          { label: "Vencidos/Cancelados", count: items.filter(c => c.status === "EXPIRED" || c.status === "CANCELLED").length, color: "var(--danger)" },
+        ].filter(s => s.count > 0);
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 14 }}>
+              <KpiCard label="Total contratos" value={items.length} icon="📋" />
+              <KpiCard label="Contratos activos" value={activos} variant={activos > 0 ? "positive" : "default"} icon="📑" />
+              <KpiCard label="Ingreso recurrente (MRR)" value={<Money value={mrr} compact />} variant="accent" icon="💰" hint="Mensual recurrente" />
+              <KpiCard label="Visitas próx. 7 días" value={proximaSemana} variant={proximaSemana > 0 ? "warning" : "default"} icon="📅" />
+            </div>
+            {byStatus.length > 1 && (
+              <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por estado</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {byStatus.map(s => (
+                    <div key={s.label} style={{ display: "grid", gridTemplateColumns: "140px 1fr 36px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{s.label}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(s.count / items.length) * 100}%`, background: s.color, borderRadius: 3, transition: "width .4s" }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{s.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <Section title={loading ? "Cargando…" : `${visibleContracts.length} contratos`}>
         <FilterToolbar
