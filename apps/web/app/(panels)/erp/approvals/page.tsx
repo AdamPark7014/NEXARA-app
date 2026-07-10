@@ -10,6 +10,7 @@ import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { getApprovalsSectionConfig } from "@/lib/section-views";
 import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 import {
   listMyPendingApprovals,
   decideApproval,
@@ -243,6 +244,14 @@ export default function ApprovalsPage() {
         search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por tipo, título o solicitante…" }}
         onClear={() => { setSearchQ(""); setFilter("all"); }}
         resultCount={loading ? null : list.length}
+        rightActions={list.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(list, [
+            { key: "type", label: "Tipo" },
+            { key: "titulo", label: "Título" },
+            { key: "urgencia", label: "Urgencia" },
+            { key: "monto", label: "Monto" },
+          ], "aprobaciones-pendientes")}>CSV</Button>
+        ) : undefined}
       />
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
