@@ -8,6 +8,7 @@ import { useUser } from "@/components/UserContext";
 import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
 import { getHrSubmoduleConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import KpiCard from "@/components/ui/KpiCard";
 
 interface OrgNode {
   id: number;
@@ -254,6 +255,23 @@ export default function OrgChartPage() {
           ? `${viewCfg.subtitle} Haz clic en ✎ en cualquier nodo para reasignar su manager.`
           : `${viewCfg.subtitle} Solo Dirección puede reasignar managers.`}
       />
+
+      {!loading && allUsers.length > 0 && (() => {
+        const withManager = allUsers.filter((u) => !!u.managerId).length;
+        const rootCount = roots.length;
+        const maxDepth = (function calcDepth(nodes: OrgNode[], d: number): number {
+          if (!nodes.length) return d;
+          return Math.max(...nodes.map((n) => calcDepth(n.children ?? [], d + 1)));
+        })(roots, 0);
+        return (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 18 }}>
+            <KpiCard label="Total personas" value={allUsers.length} icon="👥" />
+            <KpiCard label="Con manager" value={withManager} icon="🔗" variant={withManager === allUsers.length - rootCount ? "positive" : "warning"} />
+            <KpiCard label="Sin manager" value={rootCount} icon="🏛️" variant="accent" hint="Raíces del org" />
+            <KpiCard label="Niveles" value={maxDepth} icon="📊" />
+          </div>
+        );
+      })()}
 
       {error && (
         <div style={{
