@@ -5,6 +5,7 @@ import Link from "next/link";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
+import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import FilterToolbar from "@/components/FilterToolbar";
@@ -151,7 +152,19 @@ export default function ClientTicketsPage() {
     return "warning";
   };
 
+  const cerrados = tickets.filter((t) => t.status === "CLOSED" || t.status === "APPROVED").length;
+  const urgentes = tickets.filter((t) => t.urgency === "HIGH").length;
+
   return (
+    <>
+    {tickets.length > 0 && (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <KpiCard label="Total tickets" value={tickets.length} icon="🎫" />
+        <KpiCard label="Cerrados" value={cerrados} variant={cerrados === tickets.length ? "positive" : "default"} icon="✅" />
+        <KpiCard label="Urgentes" value={urgentes} variant={urgentes > 0 ? "danger" : "positive"} icon="🚨" />
+        <KpiCard label="Abiertos" value={tickets.length - cerrados} variant={tickets.length - cerrados > 0 ? "warning" : "positive"} icon="📋" />
+      </div>
+    )}
     <DetailSection title="Tickets de soporte">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
         <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
@@ -288,5 +301,6 @@ export default function ClientTicketsPage() {
         </div>
       )}
     </DetailSection>
+    </>
   );
 }
