@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { buildApiUrl } from "@/lib/api-base";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import { DetailError, DetailSection, formatDate } from "@/components/detail/DetailFrame";
 import FilterToolbar from "@/components/FilterToolbar";
@@ -65,8 +66,19 @@ export default function ClientInvoicesPage() {
 
   const docs = (client.documents ?? []).filter((d) => /factura|invoice|cfdi/i.test(d.type));
 
+  const totalFacturado = invoices.reduce((s, inv) => s + Number(inv.totalAmount ?? 0), 0);
+  const pagadas = invoices.filter((inv) => inv.status === "PAID" || inv.status === "SENT").length;
+
   return (
     <>
+      {!loading && invoices.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+          <KpiCard label="Total facturas" value={invoices.length} icon="📄" />
+          <KpiCard label="Pagadas" value={pagadas} variant={pagadas === invoices.length ? "positive" : "accent"} icon="✅" />
+          <KpiCard label="Total facturado" value={money(totalFacturado)} variant="accent" icon="💰" />
+          <KpiCard label="Tasa de cobro" value={`${invoices.length > 0 ? Math.round((pagadas / invoices.length) * 100) : 0}%`} variant={pagadas === invoices.length ? "positive" : "warning"} icon="📊" />
+        </div>
+      )}
       <DetailSection title="Facturas CFDI (contabilidad)">
         {loadErr && <p style={{ color: "var(--danger)", fontSize: 13 }}>{loadErr}</p>}
         {loading && invoices.length === 0 ? (

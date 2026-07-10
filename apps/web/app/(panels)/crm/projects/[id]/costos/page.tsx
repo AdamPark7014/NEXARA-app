@@ -1,5 +1,7 @@
 "use client";
 
+import KpiCard from "@/components/ui/KpiCard";
+import { Money } from "@/components/ui/DataTable";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection, formatMoney } from "@/components/detail/DetailFrame";
 import { useProjectDetail } from "@/components/crm/ProjectDetailShell";
 
@@ -12,8 +14,16 @@ export default function ProjectCostsPage() {
   const c = summary.costs;
   const actual = c.actual;
 
+  const marginPct = c.marginPercent ?? 0;
+
   return (
     <DetailSection title="Costos y margen">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 18 }}>
+        <KpiCard label="Presupuesto" value={<Money value={Number(c.budget ?? 0)} compact />} icon="💰" variant="accent" />
+        <KpiCard label="Costo total" value={<Money value={Number(c.totalCost ?? 0)} compact />} variant={c.isOverBudget ? "danger" : "default"} icon="📊" />
+        <KpiCard label="Margen" value={<Money value={Number(c.margin ?? 0)} compact />} variant={marginPct >= 20 ? "positive" : marginPct >= 10 ? "accent" : "warning"} icon="📈" hint={`${marginPct.toFixed(1)}%`} />
+        <KpiCard label="Estado" value={c.isOverBudget ? "Sobre presupuesto" : "Dentro del rango"} variant={c.isOverBudget ? "danger" : "positive"} icon={c.isOverBudget ? "⚠️" : "✅"} />
+      </div>
       <DetailFieldGrid>
         <DetailField label="Presupuesto" value={formatMoney(c.budget)} />
         <DetailField label="Productos" value={formatMoney(c.costProducts)} />
