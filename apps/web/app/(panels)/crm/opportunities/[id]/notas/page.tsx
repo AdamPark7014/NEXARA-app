@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
+import KpiCard from "@/components/ui/KpiCard";
 import { useUser } from "@/components/UserContext";
 import { addSalesOpportunityNote } from "@/lib/sales-api";
 import { DetailError, DetailSection, formatDateTime } from "@/components/detail/DetailFrame";
@@ -36,7 +37,18 @@ export default function OpportunityNotesPage() {
     }
   };
 
+  const lastNote = notes.length > 0 ? notes[notes.length - 1] : null;
+
   return (
+    <>
+    {notes.length > 0 && (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <KpiCard label="Total notas" value={notes.length} icon="📝" variant="accent" />
+        <KpiCard label="Última nota" value={lastNote ? new Date(lastNote.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—"} icon="🕐" />
+        <KpiCard label="Este mes" value={notes.filter((n) => { const d = new Date(n.createdAt); const now = new Date(); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).length} icon="📅" variant="positive" />
+        <KpiCard label="Actividad" value={notes.length >= 5 ? "Alta" : notes.length >= 2 ? "Media" : "Baja"} icon="📊" variant={notes.length >= 5 ? "positive" : notes.length >= 2 ? "accent" : "warning"} />
+      </div>
+    )}
     <DetailSection title="Notas de seguimiento">
       {saveError && <p role="alert" style={{ color: "var(--danger)", fontSize: 12, marginBottom: 8 }}>{saveError}</p>}
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
@@ -81,5 +93,6 @@ export default function OpportunityNotesPage() {
         </ul>
       )}
     </DetailSection>
+    </>
   );
 }

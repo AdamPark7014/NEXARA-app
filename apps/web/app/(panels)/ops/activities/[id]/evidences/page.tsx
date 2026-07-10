@@ -11,6 +11,7 @@ import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac";
+import KpiCard from "@/components/ui/KpiCard";
 
 const ActivityEvidenceFlow = dynamic(() => import("@/components/ActivityEvidenceFlow"), { ssr: false });
 
@@ -35,8 +36,17 @@ export default function ActivityEvidencesPage() {
   const files = activity.evidencias ?? [];
   const review = activity.activityEvidence;
 
+  const reviewStatus = review?.reviewStatus ?? null;
+  const reviewVariant = reviewStatus === "APROBADA" || reviewStatus === "APPROVED" ? "positive" : reviewStatus === "RECHAZADA" || reviewStatus === "REJECTED" ? "danger" : review ? "warning" : "default";
+
   return (
     <>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <KpiCard label="Archivos" value={files.length} icon="📎" variant={files.length > 0 ? "accent" : "default"} />
+        <KpiCard label="Paquete" value={review ? "Enviado" : "Sin enviar"} icon={review ? "📦" : "⏳"} variant={review ? "accent" : "default"} />
+        <KpiCard label="Revisión" value={(reviewStatus ?? "Pendiente").replace(/_/g, " ")} icon="🔍" variant={reviewVariant} />
+        <KpiCard label="Puede cargar" value={canUpload ? "Sí" : "No"} icon="⬆️" variant={canUpload ? "positive" : "default"} />
+      </div>
       {review && (
         <ActivityEvidenceReviewPanel activity={activity} showHeader={false} />
       )}
