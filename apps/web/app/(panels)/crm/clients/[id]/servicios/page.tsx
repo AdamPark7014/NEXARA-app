@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import { Tag, Money } from "@/components/ui/DataTable";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import FilterToolbar from "@/components/FilterToolbar";
@@ -130,7 +131,18 @@ export default function ClientServicesPage() {
 
   const mrr = contracts.filter((c) => c.status === "ACTIVE").reduce((s, c) => s + Number(c.monthlyFee ?? 0), 0);
 
+  const activos = contracts.filter((c) => c.status === "ACTIVE").length;
+
   return (
+    <>
+    {contracts.length > 0 && (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <KpiCard label="Contratos" value={contracts.length} icon="📋" />
+        <KpiCard label="Activos" value={activos} variant={activos > 0 ? "positive" : "default"} icon="✅" />
+        <KpiCard label="MRR" value={<Money value={mrr} compact />} variant={mrr > 0 ? "accent" : "default"} icon="💰" hint="Renta mensual activa" />
+        <KpiCard label="Visitas pendientes" value={contracts.filter((c) => c.status === "ACTIVE" && c.nextVisitDate && new Date(c.nextVisitDate) > new Date()).length} icon="📅" />
+      </div>
+    )}
     <DetailSection title="Contratos de servicio">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
@@ -250,5 +262,6 @@ export default function ClientServicesPage() {
         </ul>
       )}
     </DetailSection>
+    </>
   );
 }

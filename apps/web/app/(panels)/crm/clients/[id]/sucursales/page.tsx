@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToCsv } from "@/lib/export-csv";
@@ -122,7 +123,18 @@ export default function ClientBranchesPage() {
     );
   }
 
+  const activas = branches.filter((b) => b.isActive).length;
+
   return (
+    <>
+    {branches.length > 0 && (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <KpiCard label="Sucursales" value={branches.length} icon="📍" />
+        <KpiCard label="Activas" value={activas} variant={activas === branches.length ? "positive" : "accent"} icon="✅" />
+        <KpiCard label="Inactivas" value={branches.length - activas} variant={branches.length - activas > 0 ? "warning" : "default"} icon="⛔" />
+        <KpiCard label="Tasa de actividad" value={`${branches.length > 0 ? Math.round((activas / branches.length) * 100) : 0}%`} variant={activas === branches.length ? "positive" : "warning"} icon="📊" />
+      </div>
+    )}
     <DetailSection title={`Sucursales · ${client.serviceClient.name}`}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
@@ -228,5 +240,6 @@ export default function ClientBranchesPage() {
         </ul>
       )}
     </DetailSection>
+    </>
   );
 }
