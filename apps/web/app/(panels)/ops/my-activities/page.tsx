@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
+import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
@@ -206,22 +207,37 @@ export default function MyActivitiesPage() {
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 18 }}>
-        {[
-          { label: "OT en esta vista", value: visibleItems.length, color: "var(--primary)", icon: "📋" },
-          { label: "Completadas", value: counts.completadas, color: "var(--success)", icon: "✓" },
-          { label: "En curso", value: counts.enCurso, color: "var(--warning)", icon: "⏳" },
-          { label: "Pendientes", value: counts.pendientes, color: "var(--text-secondary)", icon: "○" },
-        ].map((k) => (
-          <div key={k.label} style={{ padding: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>{k.label}</div>
-              <div style={{ marginTop: 4, fontFamily: "var(--nx-font-display)", fontSize: 28, fontWeight: 700, color: k.color, lineHeight: 1 }}>{k.value}</div>
-            </div>
-            <span style={{ fontSize: 24 }}>{k.icon}</span>
-          </div>
-        ))}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
+        <KpiCard label="OT en esta vista" value={visibleItems.length} icon="📋" />
+        <KpiCard label="Completadas" value={counts.completadas} icon="✅" variant={counts.completadas > 0 ? "positive" : "default"} />
+        <KpiCard label="En curso" value={counts.enCurso} icon="⏳" variant={counts.enCurso > 0 ? "accent" : "default"} />
+        <KpiCard label="Pendientes" value={counts.pendientes} icon="⏱️" variant={counts.pendientes > 0 ? "warning" : "positive"} />
       </div>
+
+      {visibleItems.length > 0 && (() => {
+        const total = visibleItems.length;
+        const bars = [
+          { label: "Completadas", count: counts.completadas, color: "var(--success)" },
+          { label: "En curso", count: counts.enCurso, color: "var(--warning)" },
+          { label: "Pendientes", count: counts.pendientes, color: "var(--text-tertiary)" },
+        ].filter(b => b.count > 0);
+        return (
+          <div style={{ marginBottom: 14, padding: "10px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Progreso de mis OTs</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {bars.map(b => (
+                <div key={b.label} style={{ display: "grid", gridTemplateColumns: "90px 1fr 36px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{b.label}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(b.count / total) * 100}%`, background: b.color, borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{b.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--border)", marginBottom: 16, gap: 4 }}>
         {(["actividades", "evidencias"] as const).map((t) => (
