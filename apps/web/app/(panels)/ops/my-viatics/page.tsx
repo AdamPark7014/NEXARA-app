@@ -160,9 +160,11 @@ export default function MyViaticsPage() {
         }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
+        <KpiCard label="Total solicitudes" value={items.length} icon="📋" />
         <KpiCard label="Pendiente de cobro" value={<Money value={pendiente} compact />} variant="warning" icon="⏳" />
         <KpiCard label="Pagado" value={<Money value={pagado} compact />} variant="positive" icon="💳" />
+        <KpiCard label="Aprobadas" value={items.filter((v) => v.estatus === "Aprobado" || v.estatus === "APROBADO").length} variant="accent" icon="✅" />
       </div>
 
       {actionErr && <InlineAlert message={actionErr} onDismiss={() => setActionErr(null)} />}
