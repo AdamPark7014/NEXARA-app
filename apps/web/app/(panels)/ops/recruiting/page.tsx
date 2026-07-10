@@ -11,6 +11,7 @@ import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface Candidate {
   id: number;
@@ -225,6 +226,14 @@ export default function RecruitingPage() {
           search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar candidato, email o categoría…" }}
           onClear={() => setSearchQ("")}
           resultCount={filteredItems.filter(c => !c.stage.endsWith("REJECTED")).length}
+          rightActions={items.length > 0 ? (
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(items, [
+              { key: "fullName", label: "Nombre" },
+              { key: "email", label: "Email" },
+              { key: "category", label: "Categoría" },
+              { key: "stage", label: "Etapa" },
+            ], "candidatos-reclutamiento")}>CSV</Button>
+          ) : undefined}
         />
       )}
 
