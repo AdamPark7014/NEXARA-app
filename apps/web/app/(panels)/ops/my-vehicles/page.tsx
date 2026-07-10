@@ -5,6 +5,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
+import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
 import VehicleRequestForm from "@/components/VehicleRequestForm";
 import VehicleCheckoutForm from "@/components/VehicleCheckoutForm";
@@ -129,6 +130,15 @@ export default function MyVehiclesPage() {
           </>
         }
       />
+
+      {!loading && items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 18 }}>
+          <KpiCard label="Total solicitudes" value={items.length} icon="🚗" />
+          <KpiCard label="Aprobadas" value={items.filter((v) => v.estatusAprobacion === "Aprobado").length} variant="positive" icon="✅" />
+          <KpiCard label="En uso" value={items.filter((v) => v.entregaEstatus === "En uso").length} variant="accent" icon="🔑" />
+          <KpiCard label="Pendientes" value={items.filter((v) => v.estatusAprobacion !== "Aprobado" && v.estatusAprobacion !== "Rechazado").length} variant="warning" icon="⏳" />
+        </div>
+      )}
 
       {showRequest && cfg.canCreate && (
         <Section title="Nueva solicitud">

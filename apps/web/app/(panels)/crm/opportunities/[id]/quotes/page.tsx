@@ -9,6 +9,7 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { createSalesQuote, linkSalesQuoteToOpportunity } from "@/lib/sales-api";
 import { DetailError, DetailSection, formatDateTime } from "@/components/detail/DetailFrame";
+import KpiCard from "@/components/ui/KpiCard";
 import { useOpportunityDetail } from "@/components/crm/OpportunityDetailShell";
 import { toast } from "@/components/Toast";
 
@@ -81,6 +82,15 @@ export default function OpportunityQuotesPage() {
   const clientName = opportunity.client?.name ?? opportunity.clientName ?? "—";
 
   return (
+    <>
+    {quotes.length > 0 && (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <KpiCard label="Cotizaciones" value={quotes.length} icon="📄" />
+        <KpiCard label="Con documento" value={quotes.filter((q) => !!q.cotizacionId).length} icon="📋" variant="accent" />
+        <KpiCard label="Con PDF" value={quotes.filter((q) => !!q.pdfUrl).length} icon="📑" variant="positive" />
+        <KpiCard label="Pendientes PDF" value={quotes.filter((q) => !q.pdfUrl).length} icon="⏳" variant={quotes.some((q) => !q.pdfUrl) ? "warning" : "default"} />
+      </div>
+    )}
     <DetailSection title="Cotizaciones vinculadas">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
@@ -180,5 +190,6 @@ export default function OpportunityQuotesPage() {
         </div>
       )}
     </DetailSection>
+    </>
   );
 }
