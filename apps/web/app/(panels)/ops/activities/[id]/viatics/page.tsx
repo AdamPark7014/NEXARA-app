@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
+import KpiCard from "@/components/ui/KpiCard";
 import { Tag, Money } from "@/components/ui/DataTable";
 import { listViaticsForActivity, type ViaticoRow } from "@/lib/ops-activities-api";
 import { DetailError, DetailSection, formatDateTime } from "@/components/detail/DetailFrame";
@@ -95,8 +96,19 @@ export default function ActivityViaticsPage() {
 
   const totalMonto = viatics.reduce((s, v) => s + (Number(v.montoSolicitado) || 0), 0);
 
+  const aprobados = viatics.filter((v) => v.estatus === "APROBADO").length;
+  const pendientes = viatics.filter((v) => v.estatus === "PENDIENTE" || !v.estatus).length;
+
   return (
     <>
+      {viatics.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+          <KpiCard label="Total viáticos" value={<Money value={totalMonto} compact />} variant="accent" icon="💰" />
+          <KpiCard label="Registros" value={viatics.length} icon="📋" />
+          <KpiCard label="Aprobados" value={aprobados} variant={aprobados > 0 ? "positive" : "default"} icon="✅" />
+          <KpiCard label="Pendientes" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" />
+        </div>
+      )}
       <DetailSection title="Viáticos vinculados">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           {viatics.length > 0 && (
