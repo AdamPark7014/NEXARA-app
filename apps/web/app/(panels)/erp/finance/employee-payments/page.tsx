@@ -207,6 +207,32 @@ export default function EmployeePaymentsPage() {
         );
       })()}
 
+      {!loading && items.length > 0 && (() => {
+        const byEmployee: Record<string, number> = {};
+        for (const p of items) {
+          const name = p.user?.nombre ?? `#${p.userId}`;
+          byEmployee[name] = (byEmployee[name] ?? 0) + Number(p.amount ?? 0);
+        }
+        const sorted = Object.entries(byEmployee).sort((a, b) => b[1] - a[1]).slice(0, 6);
+        const maxAmt = sorted[0]?.[1] ?? 1;
+        return (
+          <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Top empleados por monto pagado</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {sorted.map(([name, amt]) => (
+                <div key={name} style={{ display: "grid", gridTemplateColumns: "130px 1fr 90px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(amt / maxAmt) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>${amt.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       <FilterToolbar
         search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por empleado o concepto…" }}
         selects={users.length > 0 ? [{

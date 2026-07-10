@@ -476,6 +476,34 @@ function TeamLunchView({ token, dateFilter }: { token: string; dateFilter: strin
         <KpiCard label="Tardanzas" value={stats.lateCount} variant={stats.lateCount > 0 ? "danger" : "positive"} icon="⚠️" />
       </div>
 
+      {items.length > 0 && (() => {
+        const inProgress = items.filter(b => b.status === "IN_PROGRESS").length;
+        const completed = items.filter(b => b.status === "COMPLETED").length;
+        const over60 = items.filter(b => { const d = durationMinutes(b.checkinTime, b.checkoutTime); return d !== null && d > 60; }).length;
+        const total = items.length;
+        const rows = [
+          { label: "En comida", count: inProgress, color: "var(--warning)" },
+          { label: "Completadas", count: completed, color: "var(--success)" },
+          { label: "> 60 min", count: over60, color: "var(--danger)" },
+        ].filter(r => r.count > 0);
+        return (
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución de pausas</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {rows.map(r => (
+                <div key={r.label} style={{ display: "grid", gridTemplateColumns: "90px 1fr 36px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{r.label}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(r.count / total) * 100}%`, background: r.color, borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{r.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       <FilterToolbar
         search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por nombre o departamento…" }}
         selects={[{
