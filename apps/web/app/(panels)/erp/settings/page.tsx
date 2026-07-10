@@ -12,6 +12,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
 import { toast } from "@/components/Toast";
+import KpiCard from "@/components/ui/KpiCard";
 
 interface SettingRow {
   key: string;
@@ -123,6 +124,15 @@ export default function SettingsPage() {
           </>
         }
       />
+
+      {!loading && settings.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 18 }}>
+          <KpiCard label="Total parámetros" value={settings.length} icon="⚙️" />
+          <KpiCard label="Categorías" value={new Set(settings.map((s) => s.category)).size} icon="🏷️" variant="accent" />
+          <KpiCard label="Con etiqueta" value={settings.filter((s) => !!s.label).length} icon="📝" variant="positive" />
+          <KpiCard label="Sin etiqueta" value={settings.filter((s) => !s.label).length} icon="⚠️" variant={settings.some((s) => !s.label) ? "warning" : "default"} />
+        </div>
+      )}
 
       <FilterToolbar
         search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por clave, etiqueta o valor…" }}
