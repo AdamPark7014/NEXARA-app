@@ -188,10 +188,40 @@ export default function CrmProjectsPage() {
         actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo proyecto</Button> : undefined}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 20 }}>
-        <KpiCard label="Proyectos activos" value={activos} variant={activos > 0 ? "accent" : "default"} icon="🏗️" />
-        <KpiCard label="Valor total presupuesto" value={<Money value={totalContrato} compact />} variant="positive" icon="💰" hint="Suma de contratos activos" />
-      </div>
+      {!loading && visibleItems.length > 0 && (() => {
+        const cerrados = visibleItems.filter((p) => p.status === "CLOSED" || p.status === "CANCELLED").length;
+        const byStatus = [
+          { label: "Activo / planeado", count: activos, color: "var(--primary)" },
+          { label: "Cerrado", count: cerrados, color: "var(--success)" },
+          { label: "Cancelado", count: visibleItems.filter((p) => p.status === "CANCELLED").length, color: "var(--danger)" },
+        ].filter((s) => s.count > 0);
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
+              <KpiCard label="Total proyectos" value={visibleItems.length} icon="📋" />
+              <KpiCard label="Proyectos activos" value={activos} variant={activos > 0 ? "accent" : "default"} icon="🏗️" />
+              <KpiCard label="Cerrados" value={cerrados} variant={cerrados > 0 ? "positive" : "default"} icon="✅" />
+              <KpiCard label="Presupuesto total" value={<Money value={totalContrato} compact />} variant="positive" icon="💰" hint="Suma de contratos" />
+            </div>
+            {byStatus.length > 1 && (
+              <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por estado</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {byStatus.map((s) => (
+                    <div key={s.label} style={{ display: "grid", gridTemplateColumns: "140px 1fr 36px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{s.label}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(s.count / visibleItems.length) * 100}%`, background: s.color, borderRadius: 3, transition: "width .4s" }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{s.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {actionErr && (
         <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13 }}>
