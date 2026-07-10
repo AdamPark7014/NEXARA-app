@@ -7,6 +7,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
+import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -148,6 +149,13 @@ export default function CaseStudyDetailPage() {
           </>
         }
       />
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
+        <KpiCard label="Estado" value={caseStudy.publicado ? "Publicado" : "Borrador"} variant={caseStudy.publicado ? "positive" : "default"} icon="📢" />
+        <KpiCard label="Cliente" value={caseStudy.cliente} icon="🏢" />
+        <KpiCard label="Vertical" value={caseStudy.vertical} icon="🏭" />
+        <KpiCard label="Creado" value={new Date(caseStudy.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })} icon="📅" />
+      </div>
 
       {imageUrl && (
         <div style={{ marginBottom: 20, borderRadius: 12, overflow: "hidden", maxHeight: 280, border: "1px solid var(--border)" }}>

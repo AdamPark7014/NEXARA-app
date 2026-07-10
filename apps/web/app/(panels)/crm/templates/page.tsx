@@ -5,6 +5,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
+import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -215,6 +216,15 @@ export default function TemplatesPage() {
           </>
         }
       />
+
+      {!loading && items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
+          <KpiCard label="Total plantillas" value={items.length} icon="📄" />
+          <KpiCard label="Predeterminada" value={items.find((t) => t.isDefault)?.name ?? "—"} icon="⭐" variant="accent" />
+          <KpiCard label="Con empresa" value={items.filter((t) => !!t.companyName).length} icon="🏢" variant="positive" />
+          <KpiCard label="Con RFC" value={items.filter((t) => !!t.companyRfc).length} icon="📋" />
+        </div>
+      )}
 
       {actionErr && (
         <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
