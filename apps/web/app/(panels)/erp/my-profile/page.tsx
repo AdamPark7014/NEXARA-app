@@ -8,6 +8,7 @@ import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import KpiCard from "@/components/ui/KpiCard";
 
 interface Profile {
   telefono?: string | null;
@@ -115,6 +116,19 @@ export default function MyProfilePage() {
 
       {loading && <EmptyState icon="⏳" title="Cargando perfil…" description="Consultando tus datos." />}
       {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
+
+      {!loading && !error && profile && (() => {
+        const filled = [form.telefono, form.curp, form.rfc, form.nss, form.fechaNacimiento, form.ciudad, form.estado].filter(Boolean).length;
+        const completeness = Math.round((filled / 7) * 100);
+        return (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 18 }}>
+            <KpiCard label="Departamento" value={profile.department?.nombre ?? "—"} icon="🏢" />
+            <KpiCard label="Rol" value={profile.role?.nombre ?? "—"} icon="🎭" variant="accent" />
+            <KpiCard label="Perfil completo" value={`${completeness}%`} icon="📋" variant={completeness >= 80 ? "positive" : completeness >= 50 ? "warning" : "danger"} hint="Campos personales" />
+            <KpiCard label="Email" value={profile.email} icon="✉️" />
+          </div>
+        );
+      })()}
 
       {!loading && !error && profile && (
         <>
