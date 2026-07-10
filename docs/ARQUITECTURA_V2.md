@@ -82,13 +82,18 @@ Todo el RBAC se concentra en:
 | [apps/api/src/common/rbac/approval-policy.ts](apps/api/src/common/rbac/approval-policy.ts) | Cadenas de aprobación con umbrales |
 | [apps/api/src/common/rbac/url-access.guard.ts](apps/api/src/common/rbac/url-access.guard.ts) | Guard NestJS que aplica la matriz |
 | [apps/web/lib/rbac/roles.ts](apps/web/lib/rbac/roles.ts) | Espejo frontend |
-| [apps/web/lib/rbac/page-matrix.ts](apps/web/lib/rbac/page-matrix.ts) | Matriz de páginas para middleware |
-| [apps/web/lib/rbac/navigation.ts](apps/web/lib/rbac/navigation.ts) | Sidebar dinámico por rol |
-| [apps/web/components/rbac/DynamicSidebar.tsx](apps/web/components/rbac/DynamicSidebar.tsx) | Componente único de navegación |
-| [apps/web/components/rbac/useCanAccess.ts](apps/web/components/rbac/useCanAccess.ts) | Hook UI: mostrar/esconder botones |
+| [apps/web/lib/rbac/page-matrix.ts](apps/web/lib/rbac/page-matrix.ts) | Matriz de páginas, expone `canOpenPage()` |
+| [apps/web/lib/rbac/role-mapping.ts](apps/web/lib/rbac/role-mapping.ts) | Mapeo legacy → v2 en el frontend |
+| [apps/web/lib/user-access.ts](apps/web/lib/user-access.ts) | Envuelve `canOpenPage()` para páginas/redirects |
+| [apps/web/components/app-shell/AppShell.tsx](apps/web/components/app-shell/AppShell.tsx) | Layout + navegación por rol (reemplaza al `DynamicSidebar` planeado) |
 
 **Regla de oro:** si quieres cambiar quién accede a qué, modificas
 SOLO `url-matrix.ts` y `page-matrix.ts`. Nada más.
+
+> Nota: `navigation.ts`, `DynamicSidebar.tsx` y `useCanAccess.ts` (hook
+> dedicado) nunca se crearon como archivos separados — la implementación real
+> quedó dentro de `AppShell.tsx` / `user-access.ts`. Los ejemplos de código
+> de la sección 10 usan los nombres reales, no los planeados originalmente.
 
 ---
 
@@ -156,12 +161,36 @@ UI:
 - [x] `<DynamicSidebar>` + `useCanAccess`
 - [x] Documento maestro (este archivo) + `PURGE_LIST.md`
 
-### Fase 2 — Wiring (próximo PR)
-- [ ] Agregar columna `role` v2 en `User` (Prisma migration)
-- [ ] Script de migración legacy → v2 (`migrate-roles.ts`)
-- [ ] Cambiar `middleware.ts` para usar `canOpenPage()`
-- [ ] Aplicar `UrlAccessGuard` a controllers críticos (auth, viaticos, cotizaciones, users)
-- [ ] Sustituir sidebars hardcoded por `<DynamicSidebar>`
+### Fase 2 — Wiring
+- [x] Agregar columna `role` v2 en `User` (Prisma migration) — columna real es
+      `User.roleKey` (`String?`), no `role`. Ver `schema.prisma`.
+- [x] ~~Script de migración legacy → v2 (`migrate-roles.ts`)~~ — **no se
+      necesita**: `resolveEffectiveRoleKey()` en
+      [auth.service.ts](apps/api/src/auth/auth.service.ts) resuelve el
+      `roleKey` v2 en cada login (desde `orgRoleKey` vía `LEGACY_TO_V2` si la
+      columna está vacía) y lo mete al JWT. Es más robusto que un backfill de
+      una sola vez porque cubre altas nuevas sin volver a correr el script.
+- [x] Página web respeta el rol v2 — no vía `middleware.ts` (el middleware
+      solo resuelve subdominio→prefijo, no lee sesión) sino vía
+      `canOpenPage()` en [page-matrix.ts](apps/web/lib/rbac/page-matrix.ts),
+      consumido por [user-access.ts](apps/web/lib/user-access.ts) y
+      [section-views.ts](apps/web/lib/section-views.ts) en cada página.
+- [ ] Aplicar `UrlAccessGuard` a controllers críticos (auth, viaticos,
+      cotizaciones, users) — **parcial**: `viaticos` y `cotizaciones` ya lo
+      usan. `auth` no lo necesita (rutas públicas de login). `users` sigue en
+      `RbacGuard` legacy **a propósito**: sus endpoints dependen de
+      `@RBAC({ permissions / anyPermissions })` (combinaciones finas tipo
+      `USERS_MANAGE | CONSOLE_ADMIN | HR_VIEW`) que `url-matrix.ts` todavía no
+      cubre ruta por ruta. `UrlAccessGuard` no lee `@RBAC()` — si se migrara
+      users.controller.ts hoy, cualquier URL sin regla explícita en la matriz
+      quedaría abierta a cualquier rol autenticado. Migrar solo después de
+      escribir las reglas equivalentes en `url-matrix.ts` para cada endpoint.
+- [x] Sustituir sidebars hardcoded — no existe `<DynamicSidebar>` como
+      componente separado (el archivo histórico `Sidebar.tsx` quedó vacío);
+      la navegación por rol vive dentro de
+      [AppShell.tsx](apps/web/components/app-shell/AppShell.tsx), que sí
+      consume la matriz de roles. Funcionalmente cumple el objetivo con otro
+      nombre de archivo.
 
 ### Fase 3 — Consolidación
 - [ ] Fusionar `activity-evidence` en `activities` (rutas + Prisma)
@@ -219,16 +248,20 @@ const steps = getRequiredApprovers('viaticos', 35_000);
 
 ### Frontend: esconder UI según rol
 ```tsx
-const can = useCanAccess();
-{can('/core/usuarios') && <Button>Gestionar usuarios</Button>}
+import { canUserAccessPath } from '@/lib/user-access';
+
+const { user } = useUser();
+{canUserAccessPath(user, '/erp/users') && <Button>Gestionar usuarios</Button>}
 ```
 
-### Frontend: sidebar
-```tsx
-import { DynamicSidebar } from '@/components/rbac/DynamicSidebar';
-<DynamicSidebar panel="core" />
-```
+### Frontend: navegación por rol
+No hay un componente `<DynamicSidebar>` aparte — la navegación vive dentro de
+`AppShell.tsx`, que ya envuelve cada panel y calcula qué items mostrar con
+`buildUserSidebar()` / `getUserAllowedModules()` de `lib/user-access.ts`. No
+crear sidebars locales nuevas; si falta un link, agrégalo ahí.
 
 ---
 
-**Última actualización**: rama `refactor/roles-purge-v2`.
+**Última actualización**: 2026-07-09, rama `refactor/roles-purge-v2` —
+Fase 2 auditada contra el código real (ver notas inline arriba); Fases 3-5
+siguen sin empezar.

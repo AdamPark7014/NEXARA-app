@@ -240,6 +240,23 @@ export default function ApprovalsPage() {
         </div>
       )}
 
+      {!loading && counts.all > 0 && (
+        <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por prioridad</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {(["Alta", "Media", "Baja"] as const).filter(p => counts[p] > 0).map((p) => (
+              <div key={p} style={{ display: "grid", gridTemplateColumns: "60px 1fr 36px", gap: 10, alignItems: "center" }}>
+                <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{p}</span>
+                <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${(counts[p] / counts.all) * 100}%`, background: p === "Alta" ? "var(--danger)" : p === "Media" ? "var(--warning)" : "var(--success)", borderRadius: 3 }} />
+                </div>
+                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{counts[p]}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <FilterToolbar
         search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por tipo, título o solicitante…" }}
         onClear={() => { setSearchQ(""); setFilter("all"); }}
