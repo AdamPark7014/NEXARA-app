@@ -5,6 +5,7 @@ import Link from "next/link";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
+import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import { DetailError } from "@/components/detail/DetailFrame";
 import FilterToolbar from "@/components/FilterToolbar";
@@ -95,7 +96,31 @@ export default function OpsProjectActivitiesPage() {
     } finally { setSaving(false); }
   };
 
+  const completadas = activities.filter((a) => a.estatus === "COMPLETADA" || a.estatus === "COMPLETED" || a.estatus === "DONE").length;
+  const enCurso = activities.filter((a) => a.estatus === "EN_CURSO").length;
+  const otPct = activities.length > 0 ? Math.round((completadas / activities.length) * 100) : 0;
+
   return (
+    <>
+      {activities.length > 0 && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 12 }}>
+            <KpiCard label="Completadas" value={completadas} variant={completadas === activities.length ? "positive" : "default"} icon="✅" hint={`${otPct}% del total`} />
+            <KpiCard label="En curso" value={enCurso} variant={enCurso > 0 ? "accent" : "default"} icon="⚙️" />
+            <KpiCard label="Pendientes" value={activities.filter((a) => a.estatus === "PROGRAMADA").length} icon="📋" />
+            <KpiCard label="Total OTs" value={activities.length} icon="📊" />
+          </div>
+          <div style={{ marginBottom: 16, padding: "8px 14px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Avance</span>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: otPct >= 80 ? "var(--success)" : "var(--primary)" }}>{otPct}%</span>
+            </div>
+            <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${otPct}%`, background: otPct >= 100 ? "var(--success)" : "var(--primary)", borderRadius: 3, transition: "width .4s" }} />
+            </div>
+          </div>
+        </>
+      )}
     <Section
       title={`${activities.length} actividades vinculadas`}
       actions={
@@ -241,5 +266,6 @@ export default function OpsProjectActivitiesPage() {
         </ul>
       )}
     </Section>
+    </>
   );
 }

@@ -6,6 +6,7 @@ import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import { Tag, Money } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
@@ -200,6 +201,13 @@ export default function QuoteDetailPage() {
           </div>
         }
       />
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <KpiCard label="Total" value={<Money value={Number(quote.total)} compact />} variant="accent" icon="💰" />
+        <KpiCard label="Subtotal" value={<Money value={Number(quote.subtotal)} compact />} icon="📋" />
+        <KpiCard label="Anticipo" value={quote.depositPercent ? `${quote.depositPercent}%` : "—"} icon="💳" hint={quote.depositPercent ? `MXN ${(Number(quote.total) * quote.depositPercent / 100).toFixed(0)}` : undefined} />
+        <KpiCard label="Estado" value={STATUS_LABEL[quote.status] ?? quote.status} variant={STATUS_VARIANT[quote.status] ?? "default"} icon="📄" />
+      </div>
 
       {/* Status bar */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 18, alignItems: "center" }}>
