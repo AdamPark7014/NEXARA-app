@@ -14,6 +14,7 @@ import {
   type SalesProjectOrder,
 } from "@/lib/sales-api";
 import { DetailError, DetailSection, formatDateTime } from "@/components/detail/DetailFrame";
+import KpiCard from "@/components/ui/KpiCard";
 import { useProjectDetail } from "@/components/crm/ProjectDetailShell";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
@@ -117,7 +118,20 @@ export default function ProjectOrderPage() {
   const activeOrder = order ?? orderSummary;
   const invoices = order?.invoices ?? orderSummary?.invoices ?? [];
 
+  const orderLines = order?.lines ?? [];
+  const pendingLines = orderLines.filter((l) => !l.invoiceItem).length;
+  const invoicedLines = orderLines.filter((l) => Boolean(l.invoiceItem)).length;
+
   return (
+    <>
+    {!loading && activeOrder && (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <KpiCard label="Estado" value={ORDER_STATUS_LABEL[activeOrder.status] ?? activeOrder.status} variant={activeOrder.status === "CLOSED" ? "positive" : "accent"} icon="📋" />
+        <KpiCard label="Partidas" value={orderLines.length} icon="📝" />
+        <KpiCard label="Facturadas" value={invoicedLines} variant={invoicedLines > 0 ? "positive" : "default"} icon="✅" />
+        <KpiCard label="Pendientes" value={pendingLines} variant={pendingLines > 0 ? "warning" : "positive"} icon="⏳" />
+      </div>
+    )}
     <DetailSection title="Orden de venta">
       {summary.project.status !== "CLOSED" && activeOrder && (
         <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 12, lineHeight: 1.5 }}>
@@ -220,5 +234,6 @@ export default function ProjectOrderPage() {
       )}
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} danger={false} />
     </DetailSection>
+    </>
   );
 }

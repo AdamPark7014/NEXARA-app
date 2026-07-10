@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import { buildApiUrl } from "@/lib/api-base";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
+import KpiCard from "@/components/ui/KpiCard";
 import { useOpportunityDetail } from "@/components/crm/OpportunityDetailShell";
 import { useUser } from "@/components/UserContext";
 
@@ -50,6 +51,15 @@ export default function OpportunityAttachmentsPage() {
   };
 
   return (
+    <>
+    {files.length > 0 && (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <KpiCard label="Total archivos" value={files.length} icon="📎" />
+        <KpiCard label="PDFs" value={files.filter((f) => f.kind === "pdf").length} icon="📑" variant={files.some((f) => f.kind === "pdf") ? "accent" : "default"} />
+        <KpiCard label="Imágenes" value={files.filter((f) => f.kind === "image").length} icon="🖼️" variant={files.some((f) => f.kind === "image") ? "positive" : "default"} />
+        <KpiCard label="Otros" value={files.filter((f) => f.kind !== "pdf" && f.kind !== "image").length} icon="📄" />
+      </div>
+    )}
     <DetailSection title="Adjuntos y evidencias">
       {/* Upload area */}
       <div
@@ -124,5 +134,6 @@ export default function OpportunityAttachmentsPage() {
         </ul>
       )}
     </DetailSection>
+    </>
   );
 }
