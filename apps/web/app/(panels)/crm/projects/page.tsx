@@ -9,6 +9,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { filterRowsByScope, getCrmSalesSectionConfig } from "@/lib/section-views";
+import { exportToCsv } from "@/lib/export-csv";
 import {
   createSalesProject,
   formatSalesProjectStatus,
@@ -288,7 +289,19 @@ export default function CrmProjectsPage() {
         </div>
       )}
 
-      <Section title={loading ? "Cargando…" : `${visibleItems.length} proyectos`}>
+      <Section
+        title={loading ? "Cargando…" : `${visibleItems.length} proyectos`}
+        actions={visibleItems.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "name", label: "Proyecto" },
+            { key: "budget", label: "Presupuesto", format: (v) => `${Number(v).toFixed(2)}` },
+            { key: "margin", label: "Margen", format: (v) => `${Number(v).toFixed(2)}` },
+            { key: "status", label: "Estado" },
+            { key: "startDate", label: "Inicio", format: (v) => v ? new Date(String(v)).toLocaleDateString("es-MX") : "" },
+            { key: "endDate", label: "Fin", format: (v) => v ? new Date(String(v)).toLocaleDateString("es-MX") : "" },
+          ], "proyectos-crm")}>CSV</Button>
+        ) : undefined}
+      >
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
         ) : (

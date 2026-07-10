@@ -13,6 +13,7 @@ import { useUser } from "@/components/UserContext";
 import { getCrmCatalogSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { createCatalogProduct, listCatalogProducts, listCatalogCategories, type CatalogProduct } from "@/lib/catalog-api";
+import { exportToCsv } from "@/lib/export-csv";
 
 const MARGIN = 1.35;
 
@@ -360,6 +361,16 @@ export default function ProductsPage() {
         }] : []}
         onClear={() => { setSearch(""); setFilterCat(""); }}
         resultCount={loading ? null : filtered.length}
+        rightActions={filtered.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(filtered, [
+            { key: "sku", label: "SKU" },
+            { key: "name", label: "Nombre" },
+            { key: "category", label: "Categoría" },
+            { key: "price", label: "Precio", format: (v) => `${Number(v).toFixed(2)}` },
+            { key: "unit", label: "Unidad" },
+            { key: "isActive", label: "Activo", format: (v) => v ? "Sí" : "No" },
+          ], "catalogo-productos")}>CSV</Button>
+        ) : undefined}
       />
 
       <Section title={loading ? "Cargando…" : `${filtered.length} SKU${filtered.length === 1 ? "" : "s"}`}>
