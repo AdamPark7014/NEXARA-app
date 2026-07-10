@@ -156,6 +156,29 @@ export default function AuditPage() {
         <KpiCard label="Actores únicos" value={stats.uniqueActors} icon="👥" hint="Personas + sistema" />
       </div>
 
+      {rows.length > 0 && (() => {
+        const bySev: Record<string, number> = {};
+        for (const r of rows) { const s = deriveSeverity(r.action); bySev[s] = (bySev[s] ?? 0) + 1; }
+        const sevColors: Record<string, string> = { critical: "var(--danger)", warning: "var(--warning)", info: "var(--primary)" };
+        const total = rows.length;
+        return (
+          <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por severidad</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {Object.entries(bySev).sort((a, b) => b[1] - a[1]).map(([sev, count]) => (
+                <div key={sev} style={{ display: "grid", gridTemplateColumns: "80px 1fr 48px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500, textTransform: "capitalize" }}>{sev}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: sevColors[sev] ?? "var(--primary)", borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       <FilterToolbar
         search={{ value: query, onChange: setQuery, placeholder: "Buscar por usuario, acción, entidad…" }}
         selects={[
