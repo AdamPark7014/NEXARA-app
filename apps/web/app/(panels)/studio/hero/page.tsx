@@ -24,6 +24,7 @@ import { toast } from "@/components/Toast";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import StudioFileInput from "@/components/studio/StudioFileInput";
+import KpiCard from "@/components/ui/KpiCard";
 import {
   STUDIO_IMAGE_SPECS,
   studioImageHintLine,
@@ -177,6 +178,15 @@ export default function StudioHeroPage() {
           </>
         }
       />
+
+      {slides.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 18 }}>
+          <KpiCard label="Total slides" value={slides.length} icon="🖼️" />
+          <KpiCard label="Visibles" value={activeCount} icon="✅" variant={activeCount > 0 ? "positive" : "warning"} hint="En producción" />
+          <KpiCard label="Ocultos" value={slides.length - activeCount} icon="🙈" variant={slides.length - activeCount > 0 ? "warning" : "default"} />
+          <KpiCard label="Estado" value={activeCount > 0 ? "Carrusel activo" : "Sin slides visibles"} icon="📡" variant={activeCount > 0 ? "positive" : "danger"} />
+        </div>
+      )}
 
       <Section
         eyebrow="Nuevo slide"
