@@ -3,6 +3,7 @@ import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
+import KpiCard from './ui/KpiCard';
 import styles from './ToolRenewalsTable.module.css';
 
 interface ToolRenewal {
@@ -181,8 +182,22 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
 
   if (loading) return <div className={styles.loading}>Cargando renovaciones...</div>;
 
+  const renewalCounts = {
+    total: renewals.length,
+    pending: renewals.filter((r) => r.status === 'PENDING').length,
+    urgent: renewals.filter((r) => r.status === 'PENDING' && getDaysUntilExpiry(r.previousReturnDate) <= 1).length,
+    approved: renewals.filter((r) => r.status === 'APPROVED').length,
+  };
+
   return (
     <div className={styles.root}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 16 }}>
+        <KpiCard label="Total" value={renewalCounts.total} icon="🔁" />
+        <KpiCard label="Pendientes" value={renewalCounts.pending} icon="⏳" variant={renewalCounts.pending > 0 ? "warning" : "default"} />
+        <KpiCard label="Urgentes (≤1 día)" value={renewalCounts.urgent} icon="⚠️" variant={renewalCounts.urgent > 0 ? "danger" : "positive"} />
+        <KpiCard label="Aprobadas" value={renewalCounts.approved} icon="✅" variant="positive" />
+      </div>
+
       <div className={`card ${styles.panel}`}>
         <div className={styles.header}>
           <h3 className={styles.title}>Renovaciones de Herramientas</h3>

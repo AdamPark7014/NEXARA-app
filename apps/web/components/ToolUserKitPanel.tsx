@@ -3,6 +3,7 @@ import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import { resolveAssetUrl } from "@/lib/evidence-display";
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
+import KpiCard from './ui/KpiCard';
 import styles from './ToolUserKitPanel.module.css';
 import { io, Socket } from 'socket.io-client';
 
@@ -284,8 +285,28 @@ const ToolUserKitPanel: React.FC = () => {
     }
   };
 
+  const pendingEvents = rows.reduce(
+    (acc, row) => acc + (row.events?.filter((e) => e.resolution === 'PENDING').length ?? 0),
+    0,
+  );
+  const kitCounts = {
+    activeAssignments: rows.filter((r) => r.isActive).length,
+    usersWithKit: groupedByUser.length,
+    loans: rows.filter((r) => r.isActive && r.assignmentType === 'LOAN').length,
+    pendingEvents,
+  };
+
   return (
     <div className={styles.root}>
+      {!loading && rows.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 16 }}>
+          <KpiCard label="Asignaciones activas" value={kitCounts.activeAssignments} icon="🧰" />
+          <KpiCard label="Usuarios con kit" value={kitCounts.usersWithKit} icon="👥" variant="accent" />
+          <KpiCard label="Préstamos activos" value={kitCounts.loans} icon="🔁" />
+          <KpiCard label="Incidentes pendientes" value={kitCounts.pendingEvents} icon="⚠️" variant={kitCounts.pendingEvents > 0 ? "danger" : "positive"} />
+        </div>
+      )}
+
       <form className={`card ${styles.formCard}`} onSubmit={assign}>
         <h3 className={styles.title}>👥 Gestión de Herramientas por Usuario</h3>
 

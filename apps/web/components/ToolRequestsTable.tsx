@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import FinesTable from './FinesTable';
+import KpiCard from './ui/KpiCard';
 import styles from './ToolRequestsTable.module.css';
 
 interface ToolRequest {
@@ -199,8 +200,23 @@ const ToolRequestsTable: React.FC = () => {
 
   if (loading) return <div className={styles.loading}>Cargando solicitudes...</div>;
 
+  const now = Date.now();
+  const counts = {
+    total: tools.length,
+    pending: tools.filter((t) => t.status === 'PENDING').length,
+    inUse: tools.filter((t) => t.status === 'IN_USE').length,
+    overdue: tools.filter((t) => t.status === 'IN_USE' && new Date(t.expectedReturnDate).getTime() < now).length,
+  };
+
   return (
     <div className={styles.root}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 16 }}>
+        <KpiCard label="Total" value={counts.total} icon="🧰" />
+        <KpiCard label="Pendientes" value={counts.pending} icon="⏳" variant={counts.pending > 0 ? "warning" : "default"} />
+        <KpiCard label="En uso" value={counts.inUse} icon="👤" variant="accent" />
+        <KpiCard label="Vencidas" value={counts.overdue} icon="⚠️" variant={counts.overdue > 0 ? "danger" : "positive"} />
+      </div>
+
       <div className={`card ${styles.panel}`}>
         <h3 className={styles.title}>Solicitudes de Herramientas</h3>
         

@@ -3,6 +3,7 @@ import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
+import KpiCard from './ui/KpiCard';
 import styles from './ToolInventoryPanel.module.css';
 
 interface InventoryItem {
@@ -319,8 +320,26 @@ const ToolInventoryPanel: React.FC = () => {
     }
   };
 
+  const counts = {
+    total: items.length,
+    available: items.filter((i) => i.status === 'AVAILABLE').length,
+    assigned: items.filter((i) => i.status === 'ASSIGNED').length,
+    inRepair: items.filter((i) => i.status === 'IN_REPAIR').length,
+    retired: items.filter((i) => i.status === 'RETIRED').length,
+  };
+
   return (
     <div className={styles.wrapper}>
+      {!loading && items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+          <KpiCard label="Total" value={counts.total} icon="🧰" />
+          <KpiCard label="Disponibles" value={counts.available} icon="✅" variant="positive" />
+          <KpiCard label="Asignadas" value={counts.assigned} icon="👤" variant="accent" />
+          <KpiCard label="En reparación" value={counts.inRepair} icon="🔧" variant={counts.inRepair > 0 ? "warning" : "default"} />
+          <KpiCard label="Retiradas" value={counts.retired} icon="🗑️" />
+        </div>
+      )}
+
       <form className={`card ${styles.formCard}`} onSubmit={createItem}>
         <h3 className={styles.title}>🏭 Inventario de Herramientas</h3>
         <div className={`${styles.fieldsGrid} ${isMobile ? styles.fieldsGridMobile : ''}`}>
