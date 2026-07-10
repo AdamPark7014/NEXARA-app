@@ -13,6 +13,7 @@ import { filterRowsByScope, getErpExpensesSectionConfig } from "@/lib/section-vi
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
+import { exportToCsv } from "@/lib/export-csv";
 
 interface Expense {
   id: number;
@@ -272,6 +273,15 @@ export default function ExpensesPage() {
         ]}
         onClear={() => { setSearchQ(""); setFilterCat(""); setFilterEstado(""); }}
         resultCount={loading ? null : visibleItems.length}
+        rightActions={visibleItems.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            { key: "concepto", label: "Concepto" },
+            { key: "monto", label: "Monto", format: (v) => `${Number(v).toFixed(2)}` },
+            { key: "categoria", label: "Categoría" },
+            { key: "estado", label: "Estado" },
+            { key: "fecha", label: "Fecha" },
+          ], "gastos")}>CSV</Button>
+        ) : undefined}
       />
 
       <Section title={loading ? "Cargando…" : `${visibleItems.length} gastos`}>
