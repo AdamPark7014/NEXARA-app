@@ -17,6 +17,7 @@ import { ORG_ROLE_META, type OrgRoleKey } from "@/lib/org-roles";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES, type RoleKey } from "@/lib/rbac";
+import KpiCard from "@/components/ui/KpiCard";
 
 const ERP_ADMIN_ROLES = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.DIR_OPERACIONES]);
 
@@ -64,6 +65,13 @@ export default function ArchitecturePage() {
           </Link>
         }
       />
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 20 }}>
+        <KpiCard label="Paneles" value={Object.keys(PANELS).length} icon="🏛️" variant="accent" />
+        <KpiCard label="Módulos" value={Object.keys(MODULES).length} icon="🧩" />
+        <KpiCard label="Roles" value={Object.keys(ORG_ROLE_META).length} icon="🎭" variant="positive" />
+        <KpiCard label="Vista actual" value={selectedPanel === "all" ? "Todos" : (PANEL_META[selectedPanel as PanelId]?.name ?? selectedPanel)} icon="📋" variant="default" />
+      </div>
 
       {/* SELECTOR DE PANEL */}
       <div
