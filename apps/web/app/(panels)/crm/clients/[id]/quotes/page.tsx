@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import { buildApiUrl } from "@/lib/api-base";
 import EmptyState from "@/components/ui/EmptyState";
@@ -67,8 +68,19 @@ export default function ClientQuotesPage() {
 
   const pdfDocs = (client.documents ?? []).filter((d) => /cotiz|quote|propuesta/i.test(d.type));
 
+  const aprobadas = quotes.filter((q) => q.status === "APPROVED").length;
+  const totalAprobado = quotes.filter((q) => q.status === "APPROVED").reduce((s, q) => s + Number(q.total ?? 0), 0);
+
   return (
     <>
+      {!loading && quotes.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+          <KpiCard label="Cotizaciones" value={quotes.length} icon="📄" />
+          <KpiCard label="Aprobadas" value={aprobadas} variant={aprobadas > 0 ? "positive" : "default"} icon="✅" />
+          <KpiCard label="Total aprobado" value={new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" }).format(totalAprobado)} variant="accent" icon="💰" />
+          <KpiCard label="Tasa aprobación" value={`${quotes.length > 0 ? Math.round((aprobadas / quotes.length) * 100) : 0}%`} variant={aprobadas / Math.max(quotes.length, 1) >= 0.5 ? "positive" : "warning"} icon="📊" />
+        </div>
+      )}
       <DetailSection title="Cotizaciones CRM">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
