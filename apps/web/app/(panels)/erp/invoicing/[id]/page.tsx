@@ -351,10 +351,11 @@ export default function InvoiceDetailPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Total" value={<Money value={invoice.totalAmount} />} icon="💰" />
-        <KpiCard label="Pagado" value={<Money value={invoice.paidAmount ?? 0} />} icon="✅" variant={paidPct === 100 ? "positive" : "default"} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
+        <KpiCard label="Total" value={<Money value={invoice.totalAmount} />} icon="💰" variant="accent" />
+        <KpiCard label="Pagado" value={<Money value={invoice.paidAmount ?? 0} />} icon="✅" variant={paidPct === 100 ? "positive" : "default"} hint={`${paidPct}% cubierto`} />
         <KpiCard label="Pendiente" value={<Money value={pendingAmount} />} icon="⏳" variant={pendingAmount > 0 ? "warning" : "positive"} />
+        <KpiCard label="Estado" value={STATUS_LABELS[invoice.status] ?? invoice.status} variant={STATUS_VARIANT[invoice.status] ?? "default"} icon="📋" />
       </div>
 
       {invoice.totalAmount > 0 && (

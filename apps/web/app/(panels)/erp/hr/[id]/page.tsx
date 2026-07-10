@@ -166,10 +166,11 @@ export default function EmployeeDetailPage() {
         }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
-        {yearsAtCompany && <KpiCard label="Antigüedad" value={yearsAtCompany} icon="📅" />}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
+        <KpiCard label="Estado" value={employee.isActive !== false ? "Activo" : "Inactivo"} variant={employee.isActive !== false ? "positive" : "warning"} icon="👤" />
         <KpiCard label="Área" value={employee.department?.nombre ?? "—"} icon="🏢" />
         <KpiCard label="Rol" value={employee.role?.nombre ?? "—"} icon="🎭" />
+        <KpiCard label="Antigüedad" value={yearsAtCompany ?? "—"} icon="📅" />
       </div>
 
       {editing ? (

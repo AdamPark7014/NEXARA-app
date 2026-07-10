@@ -155,9 +155,11 @@ export default function ServiceClientDetailPage() {
         }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
+        <KpiCard label="Estado" value={client.estado} variant={client.estado === "Activo" ? "positive" : "default"} icon="🏢" />
         <KpiCard label="OTs abiertas" value={openActivities.length} icon="🔧" variant={openActivities.length > 0 ? "accent" : "default"} />
         <KpiCard label="OTs totales" value={activities.length} icon="📋" />
+        <KpiCard label="OTs completadas" value={activities.filter((a) => a.estatus === "COMPLETADA" || a.estatus === "COMPLETED" || a.estatus === "DONE").length} icon="✅" variant="positive" />
       </div>
 
       {editing ? (

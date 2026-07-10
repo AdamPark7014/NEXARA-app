@@ -158,9 +158,10 @@ export default function VehicleDetailPage() {
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Estado" value={(vehicle.estatus ?? "Disponible").replace(/_/g, " ")} icon="🚗" />
-        {usageLabel && <KpiCard label="Último uso" value={usageLabel} icon="⏱" />}
-        {vehicle.assignedAt && <KpiCard label="Asignado desde" value={new Date(vehicle.assignedAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })} icon="📅" />}
+        <KpiCard label="Estado" value={(vehicle.estatus ?? "Disponible").replace(/_/g, " ")} variant={statusVariant(vehicle.estatus)} icon="🚗" />
+        <KpiCard label="Activo" value={vehicle.activo !== false ? "Sí" : "No"} variant={vehicle.activo !== false ? "positive" : "warning"} icon="✅" />
+        <KpiCard label="Uso registrado" value={usageLabel ?? "—"} icon="⏱" />
+        <KpiCard label="Movimientos" value={logs.length} icon="📋" hint="Historial reciente" />
       </div>
 
       {editing ? (

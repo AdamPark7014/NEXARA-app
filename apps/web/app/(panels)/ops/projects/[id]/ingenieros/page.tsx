@@ -10,6 +10,7 @@ import { assignProjectEngineer, removeProjectEngineer } from "@/lib/ops-operatio
 import { getActivitiesSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { DetailError } from "@/components/detail/DetailFrame";
+import KpiCard from "@/components/ui/KpiCard";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface AssignableUser { id: number; nombre: string; }
@@ -90,7 +91,17 @@ export default function OpsProjectEngineersPage() {
   if (error) return <DetailError message={error} onRetry={reload} />;
   if (!project) return null;
 
+  const available = engineers.filter((e) => !assignedIds.has(e.id));
+
   return (
+    <>
+    {assigned.length > 0 && (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <KpiCard label="Asignados" value={assigned.length} icon="👷" variant="accent" />
+        <KpiCard label="Disponibles" value={available.length} icon="👤" />
+        <KpiCard label="Total equipo" value={assigned.length + available.length} icon="🏗️" />
+      </div>
+    )}
     <Section title={`${assigned.length} ingenieros asignados`}>
       {actionErr && (
         <p style={{ color: "var(--danger)", fontSize: 13, margin: "0 0 12px" }}>{actionErr}</p>
@@ -139,5 +150,6 @@ export default function OpsProjectEngineersPage() {
         </p>
       )}
     </Section>
+    </>
   );
 }
