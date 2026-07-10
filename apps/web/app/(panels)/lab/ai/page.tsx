@@ -193,6 +193,35 @@ export default function AiSandboxPage() {
         <KpiCard label="Modelos distintos" value={new Set(runs.map((r) => r.model)).size} icon="🧠" hint="Modelos usados esta sesión" />
       </div>
 
+      {runs.length > 0 && (() => {
+        const byModel: Record<string, { count: number; totalMs: number }> = {};
+        for (const r of runs) {
+          const m = r.model;
+          if (!byModel[m]) byModel[m] = { count: 0, totalMs: 0 };
+          byModel[m].count++;
+          byModel[m].totalMs += r.result.elapsedMs;
+        }
+        const sorted = Object.entries(byModel).sort((a, b) => b[1].count - a[1].count);
+        const maxCount = sorted[0]?.[1].count ?? 1;
+        return (
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Uso por modelo (sesión actual)</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {sorted.map(([m, d]) => (
+                <div key={m} style={{ display: "grid", gridTemplateColumns: "140px 1fr 36px 70px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.split("-").slice(-2).join("-")}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(d.count / maxCount) * 100}%`, background: "var(--primary)", borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{d.count}</span>
+                  <span style={{ fontSize: 11, color: "var(--text-tertiary)", textAlign: "right" }}>{Math.round(d.totalMs / d.count)}ms avg</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, alignItems: "start" }}>
 
         {/* ── Panel principal ── */}
