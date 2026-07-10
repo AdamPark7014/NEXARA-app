@@ -267,6 +267,28 @@ export default function WarehousePage() {
         <KpiCard label="Almacenes" value={warehouses.length} hint="Ubicaciones configuradas" icon="🏭" />
       </div>
 
+      {items.length > 0 && (() => {
+        const byCategory = Object.entries(
+          items.reduce<Record<string, number>>((acc, s) => { const k = s.categoria || "Sin categoría"; acc[k] = (acc[k] ?? 0) + 1; return acc; }, {})
+        ).sort((a, b) => b[1] - a[1]).slice(0, 6);
+        return (
+          <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>SKUs por categoría</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {byCategory.map(([cat, count]) => (
+                <div key={cat} style={{ display: "grid", gridTemplateColumns: "130px 1fr 36px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{cat}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(count / items.length) * 100}%`, background: "var(--primary)", borderRadius: 3, transition: "width .4s" }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Nuevo almacén ── */}
       {showWarehouseForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
