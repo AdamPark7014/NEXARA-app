@@ -2,6 +2,7 @@
 
 import { DetailError, DetailSection, formatDateTime } from "@/components/detail/DetailFrame";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
+import KpiCard from "@/components/ui/KpiCard";
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -54,7 +55,18 @@ export default function ActivityHistoryPage() {
   }
   events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
+  const pastEvents = events.filter((e) => e.isPast).length;
+  const hasOverdue = events.some((e) => e.label.includes("vencida"));
+  const isCompleted = !!activity.fechaFinalizacion;
+
   return (
+    <>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+      <KpiCard label="Total eventos" value={events.length} icon="📅" />
+      <KpiCard label="Completados" value={pastEvents} icon="✅" variant={pastEvents === events.length ? "positive" : "accent"} />
+      <KpiCard label="Estado" value={isCompleted ? "Finalizada" : hasOverdue ? "Vencida" : "En curso"} icon={isCompleted ? "✅" : hasOverdue ? "⚠️" : "⚙️"} variant={isCompleted ? "positive" : hasOverdue ? "danger" : "accent"} />
+      <KpiCard label="Con evidencia" value={activity.activityEvidence ? "Sí" : "No"} icon="📸" variant={activity.activityEvidence ? "positive" : "default"} />
+    </div>
     <DetailSection title="Línea de tiempo">
       {events.length === 0 ? (
         <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>Sin eventos registrados aún.</p>
@@ -105,5 +117,6 @@ export default function ActivityHistoryPage() {
         </div>
       )}
     </DetailSection>
+    </>
   );
 }
