@@ -11,6 +11,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import FilterToolbar from "@/components/FilterToolbar";
 import { filterRowsByScope, getCrmSalesSectionConfig } from "@/lib/section-views";
+import { exportToCsv } from "@/lib/export-csv";
 import {
   PIPELINE_STAGES,
   isClosedOpportunityStage,
@@ -136,6 +137,15 @@ export default function PipelinePage() {
           search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por cliente, título o ejecutivo…" }}
           onClear={() => setSearchQ("")}
           resultCount={filteredItems.filter((o) => !isClosedOpportunityStage(o.stage)).length}
+          rightActions={filteredItems.length > 0 ? (
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(filteredItems, [
+              { key: "title", label: "Oportunidad" },
+              { key: "stage", label: "Etapa" },
+              { key: "value", label: "Valor", format: (v) => Number(v).toFixed(2) },
+              { key: "probability", label: "Probabilidad %" },
+              { key: "assignedTo", label: "Ejecutivo", format: (v) => (v as { nombre?: string })?.nombre ?? "" },
+            ], "pipeline-crm")}>CSV</Button>
+          ) : undefined}
         />
       )}
 

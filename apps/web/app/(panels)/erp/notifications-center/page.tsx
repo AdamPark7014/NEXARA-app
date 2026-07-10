@@ -10,6 +10,7 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { normalizeLegacyPath } from "@/lib/legacy-path-remap";
 import { toast } from "@/components/Toast";
+import KpiCard from "@/components/ui/KpiCard";
 
 interface Notif {
   id: number;
@@ -124,6 +125,15 @@ export default function NotificationsCenterPage() {
           ) : undefined
         }
       />
+
+      {!loading && notifs.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 18 }}>
+          <KpiCard label="Total" value={notifs.length} icon="🔔" />
+          <KpiCard label="Sin leer" value={unread} icon="📬" variant={unread > 0 ? "warning" : "positive"} />
+          <KpiCard label="Leídas" value={notifs.length - unread} icon="✅" variant="positive" />
+          <KpiCard label="Categorías" value={new Set(notifs.map((n) => n.category)).size} icon="🏷️" variant="accent" />
+        </div>
+      )}
 
       <Section
         title={loading ? "Cargando…" : `${unread} sin leer`}

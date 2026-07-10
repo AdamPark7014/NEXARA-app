@@ -12,6 +12,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { countEvidenceFiles } from "@/lib/evidence-display";
 import { EVIDENCE_STEP_ORDER, evidenceStepLabel } from "@/lib/evidence-lock";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
+import KpiCard from "@/components/ui/KpiCard";
 
 export default function ActivityApprovalsPage() {
   const { activity, error, reload, id } = useActivityDetail();
@@ -109,8 +110,23 @@ export default function ActivityApprovalsPage() {
 
   const fileCount = countEvidenceFiles(review);
 
+  const reviewVariant =
+    reviewState === "APROBADA" || reviewState === "APPROVED"
+      ? "positive"
+      : reviewState === "RECHAZADA" || reviewState === "REJECTED"
+        ? "danger"
+        : isPending
+          ? "warning"
+          : "default";
+
   return (
     <>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <KpiCard label="Estado revisión" value={(reviewState || "PENDIENTE").replace(/_/g, " ")} variant={reviewVariant} icon="🔍" />
+        <KpiCard label="Archivos" value={fileCount} icon="📎" variant={fileCount > 0 ? "accent" : "default"} />
+        <KpiCard label="Pasos del flujo" value={EVIDENCE_STEP_ORDER.length} icon="📋" />
+        <KpiCard label="Requiere acción" value={isPending && cfg.canApprove ? "Sí" : "No"} variant={isPending && cfg.canApprove ? "warning" : "positive"} icon="⚡" />
+      </div>
       <ActivityEvidenceReviewPanel activity={activity} />
 
       <DetailSection title="Decisión de revisión">
