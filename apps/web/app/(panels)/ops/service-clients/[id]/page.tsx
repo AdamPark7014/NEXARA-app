@@ -162,6 +162,30 @@ export default function ServiceClientDetailPage() {
         <KpiCard label="OTs completadas" value={activities.filter((a) => a.estatus === "COMPLETADA" || a.estatus === "COMPLETED" || a.estatus === "DONE").length} icon="✅" variant="positive" />
       </div>
 
+      {activities.length > 0 && (() => {
+        const byEstatus: Record<string, number> = {};
+        for (const a of activities) byEstatus[a.estatus] = (byEstatus[a.estatus] ?? 0) + 1;
+        const total = activities.length;
+        const estatusColors: Record<string, string> = { COMPLETADA: "var(--success)", COMPLETED: "var(--success)", DONE: "var(--success)", EN_CURSO: "var(--primary)", PROGRAMADA: "var(--warning)", REPROGRAMAR: "var(--danger)", CANCELADA: "var(--text-tertiary)" };
+        const estatusLabels: Record<string, string> = { COMPLETADA: "Completadas", COMPLETED: "Completadas", DONE: "Completadas", EN_CURSO: "En curso", PROGRAMADA: "Programadas", REPROGRAMAR: "Reprogramar", CANCELADA: "Canceladas" };
+        return (
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Estado de OTs recientes</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {Object.entries(byEstatus).sort((a, b) => b[1] - a[1]).map(([s, count]) => (
+                <div key={s} style={{ display: "grid", gridTemplateColumns: "110px 1fr 36px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{estatusLabels[s] ?? s}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: estatusColors[s] ?? "var(--primary)", borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {editing ? (
         <Section title="Editar cliente de servicio">
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
