@@ -124,7 +124,22 @@ export default function SupportInboxPage() {
     },
     { key: "urgency", label: "Urgencia", render: (t) => <Tag variant={urgencyVariant(t.urgency)}>{t.urgency ?? "—"}</Tag>, width: 100 },
     { key: "status", label: "Estado", render: (t) => <Tag variant={statusVariant(t.status)}>{t.status ?? "NEW"}</Tag>, width: 110 },
-    { key: "createdAt", label: "Abierto", render: (t) => <span style={{ fontSize: 12 }}>{t.createdAt ? new Date(t.createdAt).toLocaleDateString("es-MX") : "—"}</span>, width: 100 },
+    {
+      key: "createdAt", label: "Antigüedad",
+      render: (t) => {
+        const days = t.createdAt ? Math.floor((Date.now() - new Date(t.createdAt).getTime()) / 86400000) : null;
+        const color = days === null ? "var(--text-tertiary)" : days >= 14 ? "var(--danger)" : days >= 7 ? "var(--warning)" : "var(--success)";
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color, fontWeight: days !== null && days >= 7 ? 700 : 400 }}>
+              {days !== null ? `${days}d` : "—"}
+            </span>
+          </div>
+        );
+      },
+      width: 85,
+    },
     {
       key: "dueAt", label: "Vence",
       render: (t) => {
