@@ -73,6 +73,30 @@ export default function ArchitecturePage() {
         <KpiCard label="Vista actual" value={selectedPanel === "all" ? "Todos" : (PANEL_META[selectedPanel as PanelId]?.name ?? selectedPanel)} icon="📋" variant="default" />
       </div>
 
+      {/* Módulos por panel */}
+      {(() => {
+        const total = Object.keys(MODULES).length;
+        return (
+          <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Módulos por panel</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {Object.values(PANEL_META).map((p) => {
+                const count = modulesByPanel.get(p.id as PanelId)?.length ?? 0;
+                return (
+                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: "70px 1fr 36px", gap: 10, alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{p.icon} {p.name.replace(/^NEXARA\s+/, "")}</span>
+                    <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: p.accent, borderRadius: 3 }} />
+                    </div>
+                    <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* SELECTOR DE PANEL */}
       <div
         style={{

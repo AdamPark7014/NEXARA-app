@@ -135,6 +135,33 @@ export default function NotificationsCenterPage() {
         </div>
       )}
 
+      {!loading && notifs.length > 1 && (() => {
+        const byCategory: Record<string, number> = {};
+        for (const n of notifs) byCategory[n.category] = (byCategory[n.category] ?? 0) + 1;
+        const total = notifs.length;
+        const catColors: Record<string, string> = {
+          attendance: "var(--primary)", activity: "var(--success)", tool: "var(--warning)",
+          finance: "#10b981", noc: "var(--danger)", crm: "#a855f7",
+          approval: "#0ea5e9", evidence: "#f59e0b",
+        };
+        return (
+          <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Por categoría</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {Object.entries(byCategory).sort((a, b) => b[1] - a[1]).map(([cat, count]) => (
+                <div key={cat} style={{ display: "grid", gridTemplateColumns: "100px 1fr 36px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{CATEGORY_ICON[cat] ?? "🔔"} {cat}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: catColors[cat] ?? "var(--primary)", borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       <Section
         title={loading ? "Cargando…" : `${unread} sin leer`}
         subtitle="Notificaciones recientes"
