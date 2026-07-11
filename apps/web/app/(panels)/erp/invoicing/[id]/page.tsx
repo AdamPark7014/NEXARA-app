@@ -351,12 +351,59 @@ export default function InvoiceDetailPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
         <KpiCard label="Total" value={<Money value={invoice.totalAmount} />} icon="💰" variant="accent" />
         <KpiCard label="Pagado" value={<Money value={invoice.paidAmount ?? 0} />} icon="✅" variant={paidPct === 100 ? "positive" : "default"} hint={`${paidPct}% cubierto`} />
         <KpiCard label="Pendiente" value={<Money value={pendingAmount} />} icon="⏳" variant={pendingAmount > 0 ? "warning" : "positive"} />
         <KpiCard label="Estado" value={STATUS_LABELS[invoice.status] ?? invoice.status} variant={STATUS_VARIANT[invoice.status] ?? "default"} icon="📋" />
       </div>
+      {/* Invoice lifecycle stepper */}
+      {(() => {
+        const isCancelled = invoice.status === "CANCELLED";
+        const isOverdue = invoice.status === "OVERDUE";
+        const MAIN = [
+          { key: "DRAFT", label: "Borrador", icon: "📝" },
+          { key: "SENT", label: "Enviada", icon: "📤" },
+          { key: "PARTIALLY_PAID", label: "Pago parcial", icon: "💳" },
+          { key: "PAID", label: "Pagada", icon: "✅" },
+        ];
+        const CANCELLED_FLOW = [
+          { key: "DRAFT", label: "Borrador", icon: "📝" },
+          { key: "CANCELLED", label: "Cancelada", icon: "✕" },
+        ];
+        const OVERDUE_FLOW = [
+          { key: "DRAFT", label: "Borrador", icon: "📝" },
+          { key: "SENT", label: "Enviada", icon: "📤" },
+          { key: "OVERDUE", label: "Vencida", icon: "⚠️" },
+        ];
+        const flow = isCancelled ? CANCELLED_FLOW : isOverdue ? OVERDUE_FLOW : MAIN;
+        const activeIdx = flow.findIndex((s) => s.key === invoice.status);
+        return (
+          <div style={{ marginBottom: 14, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Ciclo de cobro</div>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              {flow.map((step, idx) => {
+                const done = idx < activeIdx;
+                const active = idx === activeIdx;
+                const isBad = (step.key === "CANCELLED" || step.key === "OVERDUE") && active;
+                const color = isBad ? "var(--danger)" : done || active ? "var(--success)" : "var(--text-tertiary)";
+                const bg = isBad ? "color-mix(in srgb, var(--danger) 15%, var(--surface-2))" : (done || active) ? "color-mix(in srgb, var(--success) 15%, var(--surface-2))" : "var(--surface)";
+                return (
+                  <div key={step.key} style={{ display: "flex", alignItems: "center", flex: idx < flow.length - 1 ? 1 : undefined }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, minWidth: 60 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: bg, border: `2px solid ${active ? color : done ? "color-mix(in srgb, var(--success) 40%, var(--border))" : "var(--border)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: done ? 12 : 14, fontWeight: 700, color }}>
+                        {done ? "✓" : step.icon}
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: active ? color : done ? "var(--text-secondary)" : "var(--text-tertiary)", textAlign: "center", whiteSpace: "nowrap" }}>{step.label}</span>
+                    </div>
+                    {idx < flow.length - 1 && <div style={{ flex: 1, height: 2, background: done ? "color-mix(in srgb, var(--success) 35%, var(--border))" : "var(--border)", margin: "0 4px", marginBottom: 18 }} />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {invoice.totalAmount > 0 && (
         <div style={{ marginBottom: 20 }}>

@@ -160,6 +160,66 @@ export default function OpportunityDetailPage() {
         <Button size="sm" variant="secondary" onClick={openEdit}>✎ Editar</Button>
       </div>
 
+      {/* Stage flow stepper */}
+      {(() => {
+        const MAIN_FLOW = [
+          { key: "DISCOVERY", label: "Discovery", icon: "🔍" },
+          { key: "QUALIFICATION", label: "Calificación", icon: "📋" },
+          { key: "PROPOSAL", label: "Propuesta", icon: "📄" },
+          { key: "NEGOTIATION", label: "Negociación", icon: "🤝" },
+          { key: "CLOSING", label: "Cierre", icon: "🔒" },
+          { key: "WON", label: "Ganada", icon: "🏆" },
+        ];
+        const isLost = opportunity.stage === "LOST";
+        const flow = isLost
+          ? [
+              ...MAIN_FLOW.slice(0, MAIN_FLOW.findIndex((s) => s.key === (opportunity._prevStage ?? "CLOSING")) + 1),
+              { key: "LOST", label: "Perdida", icon: "✕" },
+            ]
+          : MAIN_FLOW;
+        const activeIdx = flow.findIndex((s) => s.key === opportunity.stage);
+        return (
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Etapa del negocio</div>
+            <div style={{ display: "flex", alignItems: "center", overflowX: "auto" }}>
+              {flow.map((step, idx) => {
+                const done = idx < activeIdx;
+                const active = idx === activeIdx;
+                const isWon = step.key === "WON" && active;
+                const isLostStep = step.key === "LOST" && active;
+                const color = isLostStep ? "var(--danger)" : (isWon || done || active) ? "var(--success)" : "var(--text-tertiary)";
+                const bg = isLostStep
+                  ? "color-mix(in srgb, var(--danger) 15%, var(--surface-2))"
+                  : (isWon || done || active)
+                    ? "color-mix(in srgb, var(--success) 15%, var(--surface-2))"
+                    : "var(--surface)";
+                return (
+                  <div key={step.key} style={{ display: "flex", alignItems: "center", flex: idx < flow.length - 1 ? 1 : undefined }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, minWidth: 56 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: "50%",
+                        background: bg,
+                        border: `2px solid ${active ? color : done ? "color-mix(in srgb, var(--success) 40%, var(--border))" : "var(--border)"}`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: done ? 12 : 14, fontWeight: 700, color,
+                      }}>
+                        {done ? "✓" : step.icon}
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: active ? color : done ? "var(--text-secondary)" : "var(--text-tertiary)", textAlign: "center", whiteSpace: "nowrap" }}>
+                        {step.label}
+                      </span>
+                    </div>
+                    {idx < flow.length - 1 && (
+                      <div style={{ flex: 1, height: 2, background: done ? "color-mix(in srgb, var(--success) 35%, var(--border))" : "var(--border)", margin: "0 2px", marginBottom: 18, minWidth: 10 }} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Probability bar */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ height: 6, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
