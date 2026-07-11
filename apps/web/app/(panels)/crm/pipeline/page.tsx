@@ -128,8 +128,8 @@ export default function PipelinePage() {
         const byStageCount = new Map<string, number>();
         for (const o of active) byStageCount.set(o.stage, (byStageCount.get(o.stage) ?? 0) + 1);
         const stageRows = PIPELINE_STAGES
-          .filter((s) => !isClosedOpportunityStage(s.id) && (byStageCount.get(s.id) ?? 0) > 0)
-          .map((s) => ({ label: s.label ?? s.id, count: byStageCount.get(s.id) ?? 0 }));
+          .filter((s) => (byStageCount.get(s.id) ?? 0) > 0)
+          .map((s) => ({ label: s.label, count: byStageCount.get(s.id) ?? 0 }));
         const total = active.length || 1;
         const stageColors = ["var(--primary)", "var(--warning)", "var(--success)", "#a855f7", "#f97316", "#0ea5e9"];
         return (
