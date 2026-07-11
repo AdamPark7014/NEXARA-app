@@ -143,9 +143,22 @@ export default function OpsViaticsPage() {
     { key: "montoSolicitado", label: "Monto", render: (v) => <Money value={v.montoSolicitado ?? 0} />, width: 110 },
     {
       key: "fechaSolicitud",
-      label: "Fecha",
-      accessor: (v) =>
-        v.fechaSolicitud ? new Date(v.fechaSolicitud).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—",
+      label: "Antigüedad",
+      render: (v) => {
+        if (!v.fechaSolicitud) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
+        const days = Math.floor((Date.now() - new Date(v.fechaSolicitud).getTime()) / 86400000);
+        const isPending = isViaticoPending(v.estatus);
+        const color = !isPending ? "var(--text-tertiary)" : days >= 14 ? "var(--danger)" : days >= 7 ? "var(--warning)" : "var(--success)";
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            {isPending && <div style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />}
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>{new Date(v.fechaSolicitud).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
+              {isPending && <span style={{ fontSize: 10.5, fontWeight: days >= 7 ? 700 : 400, color }}>{days}d</span>}
+            </div>
+          </div>
+        );
+      },
       width: 90,
     },
     {

@@ -362,7 +362,21 @@ export default function InvoicingPage() {
       return <Tag variant={t === "INCOME" ? "positive" : "danger"}>{t === "INCOME" ? "Ingreso" : "Egreso"}</Tag>;
     }, width: 100 },
     { key: "totalAmount", label: "Monto", align: "right" as const, render: (f) => <Money value={Number(f.totalAmount)} />, width: 130 },
-    { key: "issueDate", label: "Fecha", render: (f) => <span style={{ fontSize: 12 }}>{new Date(f.issueDate).toLocaleDateString("es-MX")}</span>, width: 100 },
+    {
+      key: "issueDate", label: "Antigüedad",
+      render: (f) => {
+        const days = Math.floor((Date.now() - new Date(f.issueDate).getTime()) / 86400000);
+        const isPending = f.status !== "PAID" && f.status !== "CANCELLED";
+        const color = !isPending ? "var(--text-tertiary)" : days >= 60 ? "var(--danger)" : days >= 30 ? "var(--warning)" : "var(--text-secondary)";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>{new Date(f.issueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
+            {isPending && <span style={{ fontSize: 10.5, fontWeight: days >= 30 ? 700 : 400, color }}>{days}d</span>}
+          </div>
+        );
+      },
+      width: 90,
+    },
     { key: "status", label: "Estado", render: (f) => <Tag variant={statusVariant(f.status)}>{f.status.replace(/_/g, " ")}</Tag>, width: 130 },
     ...(cfg.canApprove ? [{
       key: "acciones" as keyof InvoiceRow, label: "",
