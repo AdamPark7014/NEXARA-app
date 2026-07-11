@@ -132,6 +132,23 @@ export default function OpsProjectsPage() {
       key: "startDate",
       label: "Inicio",
       accessor: (p) => (p.startDate ? new Date(p.startDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—"),
+      width: 80,
+    },
+    {
+      key: "endDate",
+      label: "Cierre est.",
+      render: (p) => {
+        if (!p.endDate) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
+        const daysLeft = Math.ceil((new Date(p.endDate).getTime() - Date.now()) / 86400000);
+        const isActive = p.status === "ACTIVE";
+        const color = !isActive ? "var(--text-tertiary)" : daysLeft < 0 ? "var(--danger)" : daysLeft <= 7 ? "var(--danger)" : daysLeft <= 21 ? "var(--warning)" : "var(--text-secondary)";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 12, color }}>{new Date(p.endDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
+            {isActive && <span style={{ fontSize: 10.5, fontWeight: daysLeft <= 21 ? 700 : 400, color }}>{daysLeft < 0 ? "VENCIDO" : `${daysLeft}d`}</span>}
+          </div>
+        );
+      },
       width: 90,
     },
     {
