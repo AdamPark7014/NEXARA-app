@@ -60,6 +60,32 @@ export default function OpportunityAttachmentsPage() {
         <KpiCard label="Otros" value={files.filter((f) => f.kind !== "pdf" && f.kind !== "image").length} icon="📄" />
       </div>
     )}
+    {files.length > 1 && (() => {
+      const pdfs = files.filter((f) => f.kind === "pdf").length;
+      const imgs = files.filter((f) => f.kind === "image").length;
+      const otros = files.length - pdfs - imgs;
+      const total = files.length;
+      return (
+        <div style={{ marginBottom: 14, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Por tipo de archivo</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {([
+              { label: "PDFs", count: pdfs, color: "var(--danger)" },
+              { label: "Imágenes", count: imgs, color: "var(--primary)" },
+              { label: "Otros", count: otros, color: "var(--text-tertiary)" },
+            ] as { label: string; count: number; color: string }[]).filter((r) => r.count > 0).map((r) => (
+              <div key={r.label} style={{ display: "grid", gridTemplateColumns: "80px 1fr 36px", gap: 10, alignItems: "center" }}>
+                <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{r.label}</span>
+                <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${(r.count / total) * 100}%`, background: r.color, borderRadius: 3 }} />
+                </div>
+                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{r.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    })()}
     <DetailSection title="Adjuntos y evidencias">
       {/* Upload area */}
       <div
