@@ -212,7 +212,22 @@ export default function TendersPage() {
       ),
     },
     { key: "ourBidAmount", label: "Nuestra propuesta", render: (t) => <Money value={Number(t.ourBidAmount) || Number(t.budgetCeiling)} />, width: 140 },
-    { key: "submissionDeadline", label: "Cierre", render: (t) => <span style={{ fontSize: 12 }}>{t.submissionDeadline ? new Date(t.submissionDeadline).toLocaleDateString("es-MX") : "—"}</span>, width: 100 },
+    {
+      key: "submissionDeadline", label: "Cierre",
+      render: (t) => {
+        if (!t.submissionDeadline) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
+        const daysLeft = Math.ceil((new Date(t.submissionDeadline).getTime() - Date.now()) / 86400000);
+        const isActive = !["AWARDED", "LOST", "CANCELLED", "DISQUALIFIED"].includes(t.status);
+        const color = !isActive ? "var(--text-tertiary)" : daysLeft < 0 ? "var(--danger)" : daysLeft <= 7 ? "var(--danger)" : daysLeft <= 30 ? "var(--warning)" : "var(--success)";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 12, color }}>{new Date(t.submissionDeadline).toLocaleDateString("es-MX")}</span>
+            {isActive && <span style={{ fontSize: 10.5, fontWeight: 700, color }}>{daysLeft < 0 ? "VENCIDO" : `${daysLeft}d restantes`}</span>}
+          </div>
+        );
+      },
+      width: 110,
+    },
     {
       key: "status", label: "Estado",
       render: (t) => cfg.canEdit ? (

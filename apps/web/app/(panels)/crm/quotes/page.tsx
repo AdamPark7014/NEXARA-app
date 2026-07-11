@@ -195,6 +195,23 @@ export default function QuotesPage() {
     { key: "projectName", label: "Proyecto", render: (q) => q.projectName ?? "—", width: 160 },
     { key: "total", label: "Total", align: "right", render: (q) => <Money value={Number(q.total)} />, width: 110 },
     {
+      key: "validUntil", label: "Vigencia",
+      render: (q) => {
+        if (!q.validUntil) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
+        const daysLeft = Math.ceil((new Date(q.validUntil).getTime() - Date.now()) / 86400000);
+        const isActive = q.status !== "APPROVED" && q.status !== "REJECTED";
+        if (!isActive) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{new Date(q.validUntil).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>;
+        const color = daysLeft < 0 ? "var(--danger)" : daysLeft <= 5 ? "var(--danger)" : daysLeft <= 14 ? "var(--warning)" : "var(--text-secondary)";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 12, color }}>{new Date(q.validUntil).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
+            <span style={{ fontSize: 10.5, fontWeight: 700, color }}>{daysLeft < 0 ? "EXPIRADA" : `${daysLeft}d`}</span>
+          </div>
+        );
+      },
+      width: 90,
+    },
+    {
       key: "status", label: "Estado",
       render: (q) => {
         const s = q.status;
