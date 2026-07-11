@@ -233,7 +233,23 @@ export default function LeadsPage() {
       ),
     },
     { key: "source", label: "Fuente", render: (l) => <Tag variant="neutral">{l.source ?? "—"}</Tag>, width: 100 },
-    { key: "score", label: "Score", accessor: (l) => String(l.score ?? 0), width: 80 },
+    {
+      key: "score",
+      label: "Score",
+      render: (l) => {
+        const s = Number(l.score ?? 0);
+        const color = s >= 70 ? "var(--success)" : s >= 40 ? "var(--primary)" : "var(--warning)";
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 80 }}>
+            <div style={{ flex: 1, height: 5, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${s}%`, background: color, borderRadius: 3 }} />
+            </div>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color, minWidth: 24, textAlign: "right" }}>{s}</span>
+          </div>
+        );
+      },
+      width: 110,
+    },
     {
       key: "status",
       label: "Estado",
