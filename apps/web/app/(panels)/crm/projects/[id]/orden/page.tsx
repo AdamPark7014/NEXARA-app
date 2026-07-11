@@ -119,7 +119,7 @@ export default function ProjectOrderPage() {
   const invoices = order?.invoices ?? orderSummary?.invoices ?? [];
 
   const orderLines = order?.lines ?? [];
-  const pendingLines = orderLines.filter((l) => !l.invoiceItem).length;
+  const pendingLineCount = orderLines.filter((l) => !l.invoiceItem).length;
   const invoicedLines = orderLines.filter((l) => Boolean(l.invoiceItem)).length;
 
   return (
@@ -129,7 +129,7 @@ export default function ProjectOrderPage() {
         <KpiCard label="Estado" value={ORDER_STATUS_LABEL[activeOrder.status] ?? activeOrder.status} variant={activeOrder.status === "CLOSED" ? "positive" : "accent"} icon="📋" />
         <KpiCard label="Partidas" value={orderLines.length} icon="📝" />
         <KpiCard label="Facturadas" value={invoicedLines} variant={invoicedLines > 0 ? "positive" : "default"} icon="✅" />
-        <KpiCard label="Pendientes" value={pendingLines} variant={pendingLines > 0 ? "warning" : "positive"} icon="⏳" />
+        <KpiCard label="Pendientes" value={pendingLineCount} variant={pendingLineCount > 0 ? "warning" : "positive"} icon="⏳" />
       </div>
     )}
     {!loading && orderLines.length > 0 && (() => {
