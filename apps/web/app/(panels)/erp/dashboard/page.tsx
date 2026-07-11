@@ -300,6 +300,23 @@ export default function ErpDashboardPage() {
         />
       </div>
 
+      {healthDomains && (
+        <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Salud por dominio</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {healthDomains.map((d) => (
+              <div key={d.name} style={{ display: "grid", gridTemplateColumns: "160px 1fr 40px", gap: 10, alignItems: "center" }}>
+                <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{d.name}</span>
+                <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${d.health}%`, background: d.variant === "positive" ? "var(--success)" : d.variant === "warning" ? "var(--warning)" : "var(--danger)", borderRadius: 3 }} />
+                </div>
+                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{d.health}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)", gap: 20 }}>
         <Section
           eyebrow="Bandeja del CEO"
