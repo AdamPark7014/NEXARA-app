@@ -138,7 +138,22 @@ export default function MaintenancePage() {
       </div>
     )},
     { key: "priority", label: "Prioridad", render: w => <Tag variant={w.priority === "CRITICA" ? "danger" : w.priority === "ALTA" ? "warning" : "neutral"}>{w.priority ?? "—"}</Tag>, width: 90 },
-    { key: "scheduledAt", label: "Programada", accessor: w => w.scheduledAt ? new Date(w.scheduledAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—", width: 100 },
+    {
+      key: "scheduledAt", label: "Programada",
+      render: (w) => {
+        if (!w.scheduledAt) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
+        const daysLeft = Math.ceil((new Date(w.scheduledAt).getTime() - Date.now()) / 86400000);
+        const isOpen = w.status === "PENDIENTE" || w.status === "EN_PROGRESO";
+        const color = !isOpen ? "var(--text-tertiary)" : daysLeft < 0 ? "var(--danger)" : daysLeft <= 3 ? "var(--danger)" : daysLeft <= 7 ? "var(--warning)" : "var(--text-secondary)";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 12, color }}>{new Date(w.scheduledAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
+            {isOpen && <span style={{ fontSize: 10.5, fontWeight: daysLeft <= 7 ? 700 : 400, color }}>{daysLeft < 0 ? "VENCIDA" : `${daysLeft}d`}</span>}
+          </div>
+        );
+      },
+      width: 100,
+    },
     { key: "estimatedCost", label: "Costo est.", render: w => <Money value={w.estimatedCost ?? 0} />, width: 110 },
     { key: "status", label: "Estado", render: w => (
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

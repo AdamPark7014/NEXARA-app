@@ -474,7 +474,18 @@ export default function ProcurementPage() {
     {
       key: "expectedDate",
       label: "Entrega est.",
-      accessor: (o) => (o.expectedDate ? new Date(o.expectedDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—"),
+      render: (o) => {
+        if (!o.expectedDate) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
+        const daysLeft = Math.ceil((new Date(o.expectedDate).getTime() - Date.now()) / 86400000);
+        const isOpen = o.status !== "RECEIVED" && o.status !== "CANCELLED";
+        const color = !isOpen ? "var(--text-tertiary)" : daysLeft < 0 ? "var(--danger)" : daysLeft <= 3 ? "var(--danger)" : daysLeft <= 7 ? "var(--warning)" : "var(--text-secondary)";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 12, color }}>{new Date(o.expectedDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
+            {isOpen && <span style={{ fontSize: 10.5, fontWeight: daysLeft <= 7 ? 700 : 400, color }}>{daysLeft < 0 ? "ATRASADA" : `${daysLeft}d`}</span>}
+          </div>
+        );
+      },
       width: 100,
     },
     {
