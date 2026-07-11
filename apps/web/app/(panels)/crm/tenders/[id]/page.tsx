@@ -12,6 +12,7 @@ import { Tag, Money } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { toast } from "@/components/Toast";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface TenderDetail {
   id: number;
@@ -73,6 +74,7 @@ export default function TenderDetailPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [promoting, setPromoting] = useState(false);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [form, setForm] = useState({
     title: "", conveningEntity: "", tenderType: "PUBLIC_GOV",
     budgetCeiling: 0, ourBidAmount: 0, submissionDeadline: "",
@@ -139,16 +141,21 @@ export default function TenderDetailPage() {
     }
   };
 
-  const promote = async () => {
-    if (!token || !id || !confirm("¿Promover esta licitación como Oportunidad en el pipeline CRM?")) return;
-    setPromoting(true);
-    try {
-      await apiFetch(`tenders/${id}/promote-opportunity`, token, { method: "POST" });
-      toast.success("Oportunidad creada en el pipeline de CRM");
-      void load();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al crear oportunidad");
-    } finally { setPromoting(false); }
+  const promote = () => {
+    setConfirmState({
+      message: "¿Promover esta licitación como Oportunidad en el pipeline CRM?",
+      confirmLabel: "Promover",
+      fn: async () => {
+        setPromoting(true);
+        try {
+          await apiFetch(`tenders/${id}/promote-opportunity`, token, { method: "POST" });
+          toast.success("Oportunidad creada en el pipeline de CRM");
+          void load();
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Error al crear oportunidad");
+        } finally { setPromoting(false); }
+      },
+    });
   };
 
   const margin = useMemo(() => {
@@ -371,6 +378,7 @@ export default function TenderDetailPage() {
           </div>
         </Section>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

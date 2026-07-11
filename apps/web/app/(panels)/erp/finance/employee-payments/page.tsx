@@ -14,6 +14,8 @@ import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToCsv } from "@/lib/export-csv";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/components/Toast";
 
 interface Payment {
   id: number;
@@ -60,6 +62,7 @@ export default function EmployeePaymentsPage() {
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [searchQ, setSearchQ] = useState("");
   const [filterUser, setFilterUser] = useState("");
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -140,14 +143,20 @@ export default function EmployeePaymentsPage() {
     } finally { setSaving(false); }
   };
 
-  const remove = async (p: Payment) => {
-    if (!token || !confirm(`¿Eliminar pago a ${p.user?.nombre ?? "empleado"}?`)) return;
-    try {
-      await apiFetch(`employee-payments/${p.id}`, token, { method: "DELETE" });
-      setItems((prev) => prev.filter((x) => x.id !== p.id));
-    } catch (e) {
-      alert(formatApiError(e, "No se pudo eliminar"));
-    }
+  const remove = (p: Payment) => {
+    setConfirmState({
+      message: `¿Eliminar el pago a ${p.user?.nombre ?? "empleado"}? Esta acción no se puede deshacer.`,
+      confirmLabel: "Eliminar",
+      fn: async () => {
+        try {
+          await apiFetch(`employee-payments/${p.id}`, token, { method: "DELETE" });
+          setItems((prev) => prev.filter((x) => x.id !== p.id));
+          toast.success("Pago eliminado");
+        } catch (e) {
+          toast.error(formatApiError(e, "No se pudo eliminar"));
+        }
+      },
+    });
   };
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
@@ -291,6 +300,7 @@ export default function EmployeePaymentsPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }
