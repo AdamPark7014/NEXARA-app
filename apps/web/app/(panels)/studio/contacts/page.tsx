@@ -154,8 +154,18 @@ export default function StudioContactsPage() {
     },
     {
       key: "createdAt", label: "Recibido",
-      accessor: (c) => fmtDate(c.createdAt),
-      width: 110,
+      render: (c) => {
+        const days = Math.floor((Date.now() - new Date(c.createdAt).getTime()) / 86400000);
+        const isNew = c.status === "NEW";
+        const color = isNew && days >= 3 ? "var(--danger)" : isNew && days >= 1 ? "var(--warning)" : "var(--text-secondary)";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>{fmtDate(c.createdAt)}</span>
+            {isNew && <span style={{ fontSize: 10.5, fontWeight: days >= 1 ? 700 : 400, color }}>{days === 0 ? "Hoy" : `${days}d sin atender`}</span>}
+          </div>
+        );
+      },
+      width: 130,
     },
     {
       key: "status", label: "Estado",
