@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import KpiCard from "@/components/ui/KpiCard";
 import Section from "@/components/ui/Section";
@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getLabSectionConfig } from "@/lib/section-views";
+import { buildApiUrl } from "@/lib/api-base";
 
 const TOOLS = [
   {
@@ -40,6 +41,29 @@ const TOOLS = [
 export default function LabHome() {
   const { user } = useUser();
   const cfg = useMemo(() => getLabSectionConfig(user, "home"), [user]);
+
+  const [apiMs, setApiMs] = useState<number | null>(null);
+  const [apiOk, setApiOk] = useState<boolean | null>(null);
+
+  const ping = useCallback(async () => {
+    const start = performance.now();
+    try {
+      const res = await fetch(buildApiUrl("health/live"), { cache: "no-store" });
+      const ms = Math.round(performance.now() - start);
+      setApiMs(ms);
+      setApiOk(res.ok);
+    } catch {
+      setApiOk(false);
+      setApiMs(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    void ping();
+    const interval = setInterval(() => void ping(), 30000);
+    return () => clearInterval(interval);
+  }, [ping]);
+
   return (
     <>
       <PageHeader
@@ -50,7 +74,7 @@ export default function LabHome() {
         meta={
           <>
             <Tag variant="accent" dot>Solo developers + CEO</Tag>
-            <Tag variant="positive">API up 99.9%</Tag>
+            <Tag variant={apiOk === false ? "danger" : "positive"}>{apiOk === false ? "API down" : apiOk === true ? `API OK · ${apiMs}ms` : "API checking…"}</Tag>
             <Tag variant="neutral">v2.4.1-rc</Tag>
           </>
         }
@@ -64,9 +88,21 @@ export default function LabHome() {
           marginBottom: 24,
         }}
       >
-        <KpiCard label="API p95 latencia" value={<>142<span style={{ fontSize: "0.55em", marginLeft: 2, opacity: 0.7 }}>ms</span></>} hint="México · últimas 24h" icon="⚡" variant="positive" sparkline={[210, 180, 165, 152, 148, 144, 142]} />
-        <KpiCard label="Errores 5xx" value="0.04%" hint="2.3k req/min · sin incidentes" icon="🛡️" variant="positive" />
-        <KpiCard label="Webhooks SAT" value="100%" hint="412 CFDI timbrados hoy" icon="🧾" variant="positive" sparkline={[98, 99, 100, 100, 100, 100, 100]} />
+        <KpiCard
+          label="API latencia"
+          value={apiMs !== null ? <>{apiMs}<span style={{ fontSize: "0.55em", marginLeft: 2, opacity: 0.7 }}>ms</span></> : "—"}
+          hint={apiOk === null ? "Midiendo…" : apiOk ? "NestJS liveness" : "Sin respuesta"}
+          icon="⚡"
+          variant={apiOk === null ? "default" : apiOk ? (apiMs !== null && apiMs <= 400 ? "positive" : "warning") : "danger"}
+        />
+        <KpiCard
+          label="Estado API"
+          value={apiOk === null ? "—" : apiOk ? "OK" : "Down"}
+          hint={apiOk === null ? "Verificando…" : apiOk ? "Liveness OK" : "API no responde"}
+          icon={apiOk === false ? "🚨" : "🛡️"}
+          variant={apiOk === null ? "default" : apiOk ? "positive" : "danger"}
+        />
+        <KpiCard label="Webhooks SAT" value="100%" hint="Ver /lab/health para detalles" icon="🧾" variant="positive" />
         <KpiCard label="Feature flags" value="14" hint="3 en canary · 1 rollout pausado" icon="🚩" variant="accent" />
       </div>
 
