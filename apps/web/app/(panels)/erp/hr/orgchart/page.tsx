@@ -273,6 +273,32 @@ export default function OrgChartPage() {
         );
       })()}
 
+      {!loading && allUsers.length > 1 && (() => {
+        const byDept: Record<string, number> = {};
+        for (const u of allUsers) {
+          const dept = u.department?.nombre ?? "Sin área";
+          byDept[dept] = (byDept[dept] ?? 0) + 1;
+        }
+        const total = allUsers.length;
+        const colors = ["var(--primary)", "var(--success)", "var(--warning)", "#a855f7", "#0ea5e9", "#f59e0b", "var(--danger)"];
+        return (
+          <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Por departamento</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {Object.entries(byDept).sort((a, b) => b[1] - a[1]).map(([dept, count], i) => (
+                <div key={dept} style={{ display: "grid", gridTemplateColumns: "120px 1fr 36px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dept}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: colors[i % colors.length], borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {error && (
         <div style={{
           padding: 12, borderRadius: 10, marginBottom: 12,
