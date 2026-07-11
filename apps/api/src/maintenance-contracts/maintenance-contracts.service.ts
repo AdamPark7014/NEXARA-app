@@ -209,30 +209,28 @@ export class MaintenanceContractsService {
       throw new BadRequestException('El contrato no está activo');
     }
 
-    let operationalProjectId = visit.operationalProjectId;
+    let operationalProjectId = visit.operationalProjectId || contract.operationalProjectId;
     if (!operationalProjectId) {
-      const existingOp = await this.prisma.operationalProject.findFirst({
-        where: { clientId: contract.clientId, deletedAt: null, status: { in: ['ACTIVE', 'ON_HOLD'] } },
-        orderBy: { createdAt: 'desc' },
+      // Proyecto OPS dedicado al contrato — NUNCA reutilizar un proyecto comercial del cliente.
+      const vendorId = contract.ownerId || 1;
+      const created = await this.prisma.operationalProject.create({
+        data: {
+          title: `Mantenimiento ${contract.contractNumber} — ${contract.client?.name || contract.title}`,
+          description: contract.description || contract.serviceScope || null,
+          projectType: 'MANTENIMIENTO' as any,
+          scopeSummary: contract.serviceScope || null,
+          clientId: contract.clientId,
+          vendorId,
+          startDate: contract.startDate,
+          endDate: contract.endDate || null,
+          status: 'ACTIVE' as any,
+        },
       });
-      if (existingOp) {
-        operationalProjectId = existingOp.id;
-      } else {
-        const vendorId = contract.ownerId || 1;
-        const created = await this.prisma.operationalProject.create({
-          data: {
-            title: `Mantenimiento recurrente — ${contract.client?.name || contract.title}`,
-            description: contract.description || contract.serviceScope || null,
-            projectType: 'MANTENIMIENTO' as any,
-            scopeSummary: contract.serviceScope || null,
-            clientId: contract.clientId,
-            vendorId,
-            startDate: contract.startDate,
-            status: 'ACTIVE' as any,
-          },
-        });
-        operationalProjectId = created.id;
-      }
+      operationalProjectId = created.id;
+      await (this.prisma as any).maintenanceContract.update({
+        where: { id: contract.id },
+        data: { operationalProjectId },
+      });
     }
 
     const responsibleId = options?.assignedToId || visit.assignedToId || contract.ownerId || 1;

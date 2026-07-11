@@ -22,6 +22,7 @@ import { NotificationHierarchyService } from '../notifications/notification-hier
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { isSalesTeamLeadUser } from '../common/org-roles.js';
 import { AutoApprovalService } from '../workflow/auto-approval.service.js';
+import { opsPatchFromSales } from '../common/project-handoff.js';
 
 @Injectable()
 export class VentasService {
@@ -821,7 +822,10 @@ export class VentasService {
 
   async listProjects(user?: any, ownerId?: number, query?: PaginationQueryDto) {
     const where = this.buildScopedProjectOwnerWhere(user, ownerId);
-    const include = { opportunity: true };
+    const include = {
+      opportunity: true,
+      operationalProject: { select: { id: true, title: true, status: true, clientId: true } },
+    };
     if (query?.limit) {
       const [data, total] = await Promise.all([
         this.prisma.salesProject.findMany({ where, orderBy: { updatedAt: 'desc' }, include, skip: query.skip, take: query.take }),
@@ -857,8 +861,34 @@ export class VentasService {
         startDate: dto.startDate,
         endDate: dto.endDate,
       },
-      include: { opportunity: true },
+      include: { opportunity: true, operationalProject: true },
     });
+
+    // Propagar identidad + status al proyecto OPS vinculado (misma entrega).
+    if (updated.operationalProject) {
+      const patch = opsPatchFromSales({
+        name: updated.name,
+        projectType: updated.projectType,
+        scopeSummary: updated.scopeSummary,
+        siteCount: updated.siteCount,
+        startDate: updated.startDate,
+        endDate: updated.endDate,
+        status: updated.status,
+      });
+      await this.prisma.operationalProject.update({
+        where: { id: updated.operationalProject.id },
+        data: {
+          title: patch.title,
+          projectType: patch.projectType,
+          scopeSummary: patch.scopeSummary,
+          siteCount: patch.siteCount,
+          startDate: patch.startDate,
+          endDate: patch.endDate,
+          status: patch.status,
+          ...(patch.status === 'COMPLETED' ? { actualEndDate: new Date() } : {}),
+        },
+      }).catch(() => undefined);
+    }
 
     const requesterId = user?.id ?? project.opportunity?.ownerId ?? undefined;
     if (requesterId) {
@@ -897,11 +927,38 @@ export class VentasService {
     if (!project) throw new NotFoundException('Proyecto no encontrado');
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
 
-    const existing = await this.prisma.operationalProject.findFirst({
+    const existing = await this.prisma.operationalProject.findUnique({
       where: { salesProjectId: id },
     });
     if (existing) {
-      return { salesProject: project, operationalProject: existing, created: false };
+      // Re-provision: refrescar identidad compartida desde CRM (SoT comercial).
+      const patch = opsPatchFromSales({
+        name: project.name,
+        projectType: project.projectType,
+        scopeSummary: project.scopeSummary,
+        siteCount: project.siteCount,
+        startDate: project.startDate,
+        endDate: project.endDate,
+        status: project.status,
+      });
+      const refreshed = await this.prisma.operationalProject.update({
+        where: { id: existing.id },
+        data: {
+          title: patch.title,
+          description: project.scopeSummary || project.opportunity?.description || existing.description,
+          projectType: patch.projectType,
+          scopeSummary: patch.scopeSummary,
+          siteCount: patch.siteCount,
+          startDate: patch.startDate,
+          endDate: patch.endDate,
+          status: patch.status,
+        },
+        include: {
+          client: { select: { id: true, name: true } },
+          vendor: { select: { id: true, nombre: true, email: true } },
+        },
+      });
+      return { salesProject: project, operationalProject: refreshed, created: false };
     }
 
     const salesClient = project.opportunity?.client;
@@ -914,19 +971,37 @@ export class VentasService {
     const vendorId = project.opportunity?.ownerId || user?.id;
     if (!vendorId) throw new BadRequestException('No se pudo determinar el responsable comercial del proyecto');
 
+    const patch = opsPatchFromSales({
+      name: project.name,
+      projectType: project.projectType,
+      scopeSummary: project.scopeSummary,
+      siteCount: project.siteCount,
+      startDate: project.startDate,
+      endDate: project.endDate,
+      status: project.status === 'PLANNED' ? 'IN_PROGRESS' : project.status,
+    });
+
+    // Al desplegar a campo, el comercial pasa a IN_PROGRESS si seguía en PLANNED.
+    if (project.status === 'PLANNED') {
+      await this.prisma.salesProject.update({
+        where: { id: project.id },
+        data: { status: 'IN_PROGRESS' },
+      });
+    }
+
     const operationalProject = await this.prisma.operationalProject.create({
       data: {
-        title: project.name,
+        title: patch.title,
         description: project.scopeSummary || project.opportunity?.description || null,
-        projectType: project.projectType,
-        scopeSummary: project.scopeSummary,
-        siteCount: project.siteCount,
+        projectType: patch.projectType,
+        scopeSummary: patch.scopeSummary,
+        siteCount: patch.siteCount,
         salesProjectId: project.id,
         vendorId,
         clientId: salesClient.serviceClientId,
-        startDate: project.startDate || new Date(),
-        endDate: project.endDate,
-        status: 'ACTIVE',
+        startDate: patch.startDate,
+        endDate: patch.endDate,
+        status: patch.status,
       },
       include: {
         client: { select: { id: true, name: true } },
@@ -1111,7 +1186,7 @@ export class VentasService {
   // ===== COSTEO AUTOMÁTICO Y GESTIÓN DE PROYECTOS =====
 
   private async computeProjectActualCosts(salesProjectId: number) {
-    const opProject = await this.prisma.operationalProject.findFirst({
+    const opProject = await this.prisma.operationalProject.findUnique({
       where: { salesProjectId },
       select: { id: true, title: true },
     });
@@ -1639,18 +1714,18 @@ export class VentasService {
             },
           },
         },
+        operationalProject: {
+          include: {
+            engineers: { include: { engineer: { select: { id: true, nombre: true, email: true } } } },
+          },
+        },
       },
     });
 
     if (!project) throw new NotFoundException('Proyecto no encontrado');
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
 
-    const opProject = await this.prisma.operationalProject.findFirst({
-      where: { salesProjectId: projectId },
-      include: {
-        engineers: { include: { engineer: { select: { id: true, nombre: true, email: true } } } },
-      },
-    });
+    const opProject = project.operationalProject;
 
     let activityStats: { total: number; completed: number; inProgress: number; pending: number } | null = null;
     if (opProject?.id) {
