@@ -109,6 +109,30 @@ export default function ActivityViaticsPage() {
           <KpiCard label="Pendientes" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" />
         </div>
       )}
+      {viatics.length > 0 && (() => {
+        const byConcepto: Record<string, number> = {};
+        for (const v of viatics) { const c = v.motivo ?? v.concepto ?? "Otro"; byConcepto[c] = (byConcepto[c] ?? 0) + 1; }
+        const byEstatus: Record<string, number> = {};
+        for (const v of viatics) { const s = v.estatus ?? "PENDIENTE"; byEstatus[s] = (byEstatus[s] ?? 0) + 1; }
+        const total = viatics.length;
+        const estatusColors: Record<string, string> = { APROBADO: "var(--success)", PENDIENTE: "var(--warning)", RECHAZADO: "var(--danger)", PAGADO: "var(--primary)" };
+        return (
+          <div style={{ marginBottom: 14, padding: "10px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Estado de viáticos</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {Object.entries(byEstatus).sort((a, b) => b[1] - a[1]).map(([s, count]) => (
+                <div key={s} style={{ display: "grid", gridTemplateColumns: "90px 1fr 30px", gap: 8, alignItems: "center" }}>
+                  <span style={{ fontSize: 11.5, color: "var(--text-secondary)", fontWeight: 500 }}>{s.charAt(0) + s.slice(1).toLowerCase()}</span>
+                  <div style={{ height: 5, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: estatusColors[s] ?? "var(--primary)", borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
       <DetailSection title="Viáticos vinculados">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           {viatics.length > 0 && (
