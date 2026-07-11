@@ -42,6 +42,7 @@ type ApprovalRow = {
   pasos: ApprovalChainStep[];
   prioridad: "Alta" | "Media" | "Baja";
   fechaSolicitud: string;
+  createdAt: string;
 };
 
 const toApprovalRow = (approval: PendingApproval): ApprovalRow => {
@@ -63,6 +64,7 @@ const toApprovalRow = (approval: PendingApproval): ApprovalRow => {
     pasos: buildApprovalChain(inst, approval.id),
     prioridad,
     fechaSolicitud: formatRequestedAt(approval.createdAt),
+    createdAt: approval.createdAt,
   };
 };
 
@@ -367,7 +369,15 @@ export default function ApprovalsPage() {
                     >
                       {a.prioridad}
                     </span>
-                    <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{a.fechaSolicitud}</span>
+                    {(() => {
+                      const days = Math.floor((Date.now() - new Date(a.createdAt).getTime()) / 86400000);
+                      const color = days >= 3 ? "var(--danger)" : days >= 1 ? "var(--warning)" : "var(--text-tertiary)";
+                      return (
+                        <span style={{ fontSize: 11, color, fontWeight: days >= 1 ? 700 : 400 }}>
+                          {a.fechaSolicitud}{days >= 1 ? ` · ${days}d esperando` : ""}
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   <h3 style={{ margin: 0, fontSize: 15.5, fontWeight: 700, color: "var(--text-primary)", fontFamily: "var(--nx-font-display)", lineHeight: 1.3 }}>
