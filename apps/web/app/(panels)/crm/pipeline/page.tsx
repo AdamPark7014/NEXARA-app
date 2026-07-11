@@ -123,6 +123,33 @@ export default function PipelinePage() {
         </div>
       )}
 
+      {!loading && !error && scopedItems.length > 0 && (() => {
+        const active = scopedItems.filter((o) => !isClosedOpportunityStage(o.stage));
+        const byStageCount = new Map<string, number>();
+        for (const o of active) byStageCount.set(o.stage, (byStageCount.get(o.stage) ?? 0) + 1);
+        const stageRows = PIPELINE_STAGES
+          .filter((s) => !isClosedOpportunityStage(s.id) && (byStageCount.get(s.id) ?? 0) > 0)
+          .map((s) => ({ label: s.label ?? s.id, count: byStageCount.get(s.id) ?? 0 }));
+        const total = active.length || 1;
+        const stageColors = ["var(--primary)", "var(--warning)", "var(--success)", "#a855f7", "#f97316", "#0ea5e9"];
+        return (
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por etapa</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {stageRows.map((s, i) => (
+                <div key={s.label} style={{ display: "grid", gridTemplateColumns: "130px 1fr 36px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.label}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(s.count / total) * 100}%`, background: stageColors[i % stageColors.length], borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{s.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {moveErr && (
         <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>{moveErr}</span>

@@ -81,6 +81,29 @@ export default function ClientQuotesPage() {
           <KpiCard label="Tasa aprobación" value={`${quotes.length > 0 ? Math.round((aprobadas / quotes.length) * 100) : 0}%`} variant={aprobadas / Math.max(quotes.length, 1) >= 0.5 ? "positive" : "warning"} icon="📊" />
         </div>
       )}
+      {!loading && quotes.length > 0 && (() => {
+        const byStatus: Record<string, number> = {};
+        for (const q of quotes) byStatus[q.status] = (byStatus[q.status] ?? 0) + 1;
+        const total = quotes.length;
+        const statusColors: Record<string, string> = { DRAFT: "var(--text-tertiary)", SENT: "var(--primary)", APPROVED: "var(--success)", REJECTED: "var(--danger)", EXPIRED: "var(--warning)" };
+        return (
+          <div style={{ marginBottom: 14, padding: "10px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Distribución por estado</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {Object.entries(byStatus).sort((a, b) => b[1] - a[1]).map(([s, count]) => (
+                <div key={s} style={{ display: "grid", gridTemplateColumns: "90px 1fr 30px", gap: 8, alignItems: "center" }}>
+                  <span style={{ fontSize: 11.5, color: "var(--text-secondary)", fontWeight: 500 }}>{STATUS_LABEL[s] ?? s}</span>
+                  <div style={{ height: 5, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: statusColors[s] ?? "var(--primary)", borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       <DetailSection title="Cotizaciones CRM">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>

@@ -5,6 +5,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
 import styles from './ToolMyKitPanel.module.css';
 import { io, Socket } from 'socket.io-client';
+import KpiCard from './ui/KpiCard';
 
 interface KitEvent {
   id: number;
@@ -117,10 +118,23 @@ const ToolMyKitPanel: React.FC = () => {
 
   if (loading) return <div className={styles.loading}>Cargando mi kit...</div>;
 
+  const kitCount = items.filter(i => i.assignmentType === 'KIT').length;
+  const loanCount = items.filter(i => i.assignmentType === 'LOAN').length;
+  const incidentCount = items.reduce((acc, i) => acc + (i.events?.filter(e => e.resolution === 'PENDING').length ?? 0), 0);
+
   return (
     <div className={`card ${styles.panel}`}>
       <h3 className={styles.title}>🧰 Mi Kit / Quid</h3>
       {error && <div className={styles.errorText}>{error}</div>}
+
+      {items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 16 }}>
+          <KpiCard label="Herramientas" value={items.length} icon="🧰" variant="accent" />
+          <KpiCard label="Kit base" value={kitCount} icon="📦" variant={kitCount > 0 ? "positive" : "default"} />
+          <KpiCard label="Préstamos" value={loanCount} icon="🔁" />
+          <KpiCard label="Incidentes" value={incidentCount} icon="⚠️" variant={incidentCount > 0 ? "danger" : "positive"} hint={incidentCount > 0 ? "Pendientes de resolución" : "Sin incidentes activos"} />
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div className={styles.empty}>

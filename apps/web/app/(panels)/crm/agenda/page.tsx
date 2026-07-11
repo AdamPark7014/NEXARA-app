@@ -261,6 +261,32 @@ export default function AgendaPage() {
             <KpiCard label="Completadas recientes" value={agenda.recentlyCompleted.length} variant="positive" icon="✅" />
           </div>
 
+          {(() => {
+            const all = [...agenda.pendingToday, ...agenda.overdue, ...agenda.upcoming];
+            if (all.length === 0) return null;
+            const byType: Record<string, number> = {};
+            for (const a of all) byType[a.activityType] = (byType[a.activityType] ?? 0) + 1;
+            const total = all.length;
+            const typeColors: Record<string, string> = { CALL: "var(--success)", EMAIL: "var(--primary)", MEETING: "var(--warning)", TASK: "var(--text-tertiary)", WHATSAPP: "#22c55e", VISIT: "var(--danger)", NOTE: "#a855f7" };
+            const typeLabels: Record<string, string> = { CALL: "Llamadas", EMAIL: "Emails", MEETING: "Reuniones", TASK: "Tareas", WHATSAPP: "WhatsApp", VISIT: "Visitas", NOTE: "Notas" };
+            return (
+              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por tipo</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {Object.entries(byType).sort((a, b) => b[1] - a[1]).map(([t, count]) => (
+                    <div key={t} style={{ display: "grid", gridTemplateColumns: "90px 1fr 36px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{typeLabels[t] ?? t}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: typeColors[t] ?? "var(--primary)", borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           <FilterToolbar
             search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por asunto, descripción o contacto…" }}
             selects={[{
