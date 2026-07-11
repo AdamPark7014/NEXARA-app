@@ -201,7 +201,21 @@ export default function AssetsPage() {
       return <Tag variant="danger">{d > 0 ? `+${d}` : d}</Tag>;
     }, width: 120 },
     { key: "status", label: "Estado", render: (s) => <Tag variant={statusVariant(s.status)}>{s.status}</Tag>, width: 110 },
-    { key: "updatedAt", label: "Actualizado", render: (s) => <span style={{ fontSize: 12 }}>{s.updatedAt ? new Date(s.updatedAt).toLocaleDateString("es-MX") : "—"}</span>, width: 110 },
+    {
+      key: "updatedAt", label: "Última revisión",
+      render: (s) => {
+        if (!s.updatedAt) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
+        const days = Math.floor((Date.now() - new Date(s.updatedAt).getTime()) / 86400000);
+        const color = days >= 90 ? "var(--danger)" : days >= 30 ? "var(--warning)" : "var(--text-secondary)";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>{new Date(s.updatedAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
+            <span style={{ fontSize: 10.5, fontWeight: days >= 30 ? 700 : 400, color }}>{days}d atrás</span>
+          </div>
+        );
+      },
+      width: 110,
+    },
     ...(cfg.canEdit ? [{
       key: "id" as keyof Snapshot,
       label: "",
