@@ -216,7 +216,22 @@ export default function AccountingPage() {
     )},
     { key: "totalDebit", label: "Cargo", render: e => e.totalDebit ? <Money value={e.totalDebit} /> : <span style={{ color: "var(--text-tertiary)" }}>—</span>, width: 120 },
     { key: "totalCredit", label: "Abono", render: e => e.totalCredit ? <Money value={e.totalCredit} /> : <span style={{ color: "var(--text-tertiary)" }}>—</span>, width: 120 },
-    { key: "date", label: "Fecha", accessor: e => e.date ? new Date(e.date).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" }) : "—", width: 90 },
+    {
+      key: "date", label: "Fecha",
+      render: (e) => {
+        if (!e.date) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
+        const isDraft = e.status === "DRAFT" || e.status === "BORRADOR";
+        const days = Math.floor((Date.now() - new Date(e.date).getTime()) / 86400000);
+        const color = isDraft && days >= 14 ? "var(--danger)" : isDraft && days >= 7 ? "var(--warning)" : "var(--text-secondary)";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>{new Date(e.date).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "2-digit" })}</span>
+            {isDraft && <span style={{ fontSize: 10.5, fontWeight: days >= 7 ? 700 : 400, color }}>{days}d sin contabilizar</span>}
+          </div>
+        );
+      },
+      width: 120,
+    },
     { key: "status", label: "Estado", render: e => (
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <Tag variant={statusVariant(e.status)}>{e.status ?? "BORRADOR"}</Tag>
