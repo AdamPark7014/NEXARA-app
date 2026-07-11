@@ -170,7 +170,7 @@ export default function PipelinePage() {
               { key: "stage", label: "Etapa" },
               { key: "value", label: "Valor", format: (v) => Number(v).toFixed(2) },
               { key: "probability", label: "Probabilidad %" },
-              { key: "assignedTo", label: "Ejecutivo", format: (v) => (v as { nombre?: string })?.nombre ?? "" },
+              { key: "owner", label: "Ejecutivo", format: (v) => (v as { nombre?: string })?.nombre ?? "" },
             ], "pipeline-crm")}>CSV</Button>
           ) : undefined}
         />
