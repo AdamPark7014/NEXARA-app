@@ -142,6 +142,33 @@ export default function StudioPagesPage() {
         <KpiCard label="Pasos del proceso" value={proceso.length} icon="🔢" hint="Flujo de trabajo" />
       </div>
 
+      {(() => {
+        const sections = [
+          { label: "Métricas", count: metricas.length, color: "var(--primary)" },
+          { label: "Servicios", count: servicios.length, color: "var(--success)" },
+          { label: "Proceso", count: proceso.length, color: "var(--warning)" },
+          { label: "Industrias", count: industrias.length, color: "#a855f7" },
+        ];
+        const total = sections.reduce((s, r) => s + r.count, 0);
+        if (total === 0) return null;
+        return (
+          <div style={{ marginBottom: 14, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Elementos por sección</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {sections.filter((r) => r.count > 0).map((r) => (
+                <div key={r.label} style={{ display: "grid", gridTemplateColumns: "90px 1fr 36px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{r.label}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(r.count / Math.max(...sections.map((s) => s.count))) * 100}%`, background: r.color, borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{r.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       <div style={{ display: "flex", gap: 8, padding: "0 24px 4px", flexWrap: "wrap" }}>
         {TABS.map((tab) => (
           <button
