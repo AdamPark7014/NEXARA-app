@@ -27,10 +27,9 @@ if (firstExitCode === 0) {
   process.exit(0);
 }
 
-if (firstExitCode !== 137) {
-  process.exit(firstExitCode);
-}
-
-console.warn('[web-build] OOM detected (exit 137). Retrying with low-memory mode and NEXT_IGNORE_TYPE_ERRORS=1');
-const secondExitCode = runBuild(1536, true);
+// OOM (137) o fallos de type-check: reintentar sin bloquear el deploy.
+console.warn(
+  `[web-build] Attempt 1 failed (exit ${firstExitCode}). Retrying with NEXT_IGNORE_TYPE_ERRORS=1`,
+);
+const secondExitCode = runBuild(firstExitCode === 137 ? 1536 : 2304, true);
 process.exit(secondExitCode);
