@@ -186,7 +186,22 @@ export default function DocumentsPage() {
       ),
     },
     { key: "status", label: "Estado", render: (d) => <Tag variant={statusVariant(d.status)}>{d.status.replace(/_/g, " ")}</Tag>, width: 160 },
-    { key: "createdAt", label: "Creado", render: (d) => <span style={{ fontSize: 12 }}>{d.createdAt ? new Date(d.createdAt).toLocaleDateString("es-MX") : "—"}</span>, width: 100 },
+    {
+      key: "createdAt", label: "Antigüedad",
+      render: (d) => {
+        if (!d.createdAt) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
+        const days = Math.floor((Date.now() - new Date(d.createdAt).getTime()) / 86400000);
+        const isPending = d.status === "DRAFT" || d.status === "PENDING_APPROVAL";
+        const color = !isPending ? "var(--text-tertiary)" : days >= 14 ? "var(--danger)" : days >= 7 ? "var(--warning)" : "var(--text-secondary)";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>{new Date(d.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
+            {isPending && <span style={{ fontSize: 10.5, fontWeight: days >= 7 ? 700 : 400, color }}>{days}d pendiente</span>}
+          </div>
+        );
+      },
+      width: 110,
+    },
     {
       key: "acciones" as keyof ManagedDoc, label: "",
       render: (d) => (
