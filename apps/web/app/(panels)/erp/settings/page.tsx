@@ -134,6 +134,29 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {!loading && settings.length > 1 && (() => {
+        const byCategory: Record<string, number> = {};
+        for (const s of settings) byCategory[s.category] = (byCategory[s.category] ?? 0) + 1;
+        const total = settings.length;
+        const colors = ["var(--primary)", "var(--success)", "var(--warning)", "#a855f7", "#0ea5e9"];
+        return (
+          <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Por categoría</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {Object.entries(byCategory).sort((a, b) => b[1] - a[1]).map(([cat, count], i) => (
+                <div key={cat} style={{ display: "grid", gridTemplateColumns: "100px 1fr 36px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: colors[i % colors.length], borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       <FilterToolbar
         search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por clave, etiqueta o valor…" }}
         onClear={() => setSearchQ("")}
