@@ -260,7 +260,22 @@ export default function MaintenanceContractsPage() {
     { key: "frequency", label: "Frecuencia", accessor: (c) => c.frequency, width: 100 },
     { key: "slaResponseHours", label: "SLA resp.", accessor: (c) => `${c.slaResponseHours}h`, width: 90 },
     { key: "monthlyFee", label: "Cuota mensual", render: (c) => <Money value={Number(c.monthlyFee)} />, width: 120 },
-    { key: "nextVisitDate", label: "Próx. visita", render: (c) => <span style={{ fontSize: 12 }}>{c.nextVisitDate ? new Date(c.nextVisitDate).toLocaleDateString("es-MX") : "—"}</span>, width: 100 },
+    {
+      key: "nextVisitDate", label: "Próx. visita",
+      render: (c) => {
+        if (!c.nextVisitDate) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
+        const daysLeft = Math.ceil((new Date(c.nextVisitDate).getTime() - Date.now()) / 86400000);
+        const isActive = c.status === "ACTIVE";
+        const color = !isActive ? "var(--text-tertiary)" : daysLeft < 0 ? "var(--danger)" : daysLeft <= 3 ? "var(--danger)" : daysLeft <= 7 ? "var(--warning)" : "var(--text-secondary)";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 12, color }}>{new Date(c.nextVisitDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
+            {isActive && <span style={{ fontSize: 10.5, fontWeight: daysLeft <= 7 ? 700 : 400, color }}>{daysLeft < 0 ? "ATRASADA" : `${daysLeft}d`}</span>}
+          </div>
+        );
+      },
+      width: 100,
+    },
     {
       key: "status", label: "Estado",
       render: (c) => cfg.canEdit ? (
