@@ -13,7 +13,7 @@ import { ReactNode } from "react";
  *  - footer opcional para meta-info
  */
 
-export type KpiVariant = "default" | "positive" | "warning" | "danger" | "accent";
+export type KpiVariant = "default" | "neutral" | "positive" | "warning" | "danger" | "accent";
 
 type Trend = { value: string; direction: "up" | "down" | "flat" };
 
@@ -40,6 +40,11 @@ export default function KpiCard({
 }) {
   const variantStyles: Record<KpiVariant, { glow: string; accent: string; ring: string }> = {
     default: {
+      glow: "var(--surface-2)",
+      accent: "var(--text-secondary)",
+      ring: "var(--nx-panel-hairline)",
+    },
+    neutral: {
       glow: "var(--surface-2)",
       accent: "var(--text-secondary)",
       ring: "var(--nx-panel-hairline)",
