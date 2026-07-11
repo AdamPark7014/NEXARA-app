@@ -174,7 +174,22 @@ export default function ExpensesPage() {
       </div>
     )},
     { key: "monto", label: "Monto", render: e => <Money value={e.monto ?? 0} />, width: 110 },
-    { key: "fecha", label: "Fecha", accessor: e => e.fecha ? new Date(e.fecha + "T12:00:00").toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—", width: 90 },
+    {
+      key: "fecha", label: "Antigüedad",
+      render: (e) => {
+        if (!e.fecha) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
+        const days = Math.floor((Date.now() - new Date(e.fecha + "T12:00:00").getTime()) / 86400000);
+        const isPending = e.estado === "BORRADOR" || e.estado === "PENDIENTE_APROBACION";
+        const color = !isPending ? "var(--text-tertiary)" : days >= 14 ? "var(--danger)" : days >= 7 ? "var(--warning)" : "var(--text-secondary)";
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>{new Date(e.fecha + "T12:00:00").toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
+            {isPending && <span style={{ fontSize: 10.5, fontWeight: days >= 7 ? 700 : 400, color }}>{days}d pendiente</span>}
+          </div>
+        );
+      },
+      width: 100,
+    },
     { key: "creadoPor", label: "Creado por", accessor: e => e.creadoPor?.nombre ?? "—", width: 130 },
     { key: "estado", label: "Estado", render: e => <Tag variant={estadoVariant(e.estado)}>{(e.estado ?? "—").replace(/_/g, " ")}</Tag>, width: 160 },
     { key: "id", label: "", render: e => (
