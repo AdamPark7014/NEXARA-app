@@ -127,12 +127,58 @@ export default function CrmProjectDetailPage() {
 
   return (
     <DetailSection title="Resumen del proyecto">
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 14 }}>
         <KpiCard label="Presupuesto" value={<Money value={Number(c.budget ?? 0)} compact />} icon="💰" variant="accent" />
         <KpiCard label="Margen" value={<Money value={Number(c.margin ?? 0)} compact />} variant={marginPct >= 20 ? "positive" : marginPct >= 10 ? "accent" : "warning"} icon="📊" hint={`${marginPct}% sobre presupuesto`} />
         <KpiCard label="Estado" value={formatSalesProjectStatus(p.status)} variant={p.status === "CLOSED" ? "default" : p.status === "IN_PROGRESS" ? "accent" : "warning"} icon="📋" />
         <KpiCard label="Sitios" value={p.siteCount ?? "—"} icon="📍" hint="Ubicaciones de campo" />
       </div>
+      {/* Project lifecycle stepper */}
+      {(() => {
+        const MAIN = [
+          { key: "PLANNING", label: "Planificación", icon: "📐" },
+          { key: "IN_PROGRESS", label: "En progreso", icon: "⚙️" },
+          { key: "CLOSED", label: "Cerrado", icon: "✅" },
+        ];
+        const CANCELLED = [
+          { key: "PLANNING", label: "Planificación", icon: "📐" },
+          { key: "IN_PROGRESS", label: "En progreso", icon: "⚙️" },
+          { key: "CANCELLED", label: "Cancelado", icon: "✕" },
+        ];
+        const ON_HOLD = [
+          { key: "PLANNING", label: "Planificación", icon: "📐" },
+          { key: "ON_HOLD", label: "En pausa", icon: "⏸" },
+          { key: "IN_PROGRESS", label: "Retomado", icon: "⚙️" },
+          { key: "CLOSED", label: "Cerrado", icon: "✅" },
+        ];
+        const flow = p.status === "CANCELLED" ? CANCELLED : p.status === "ON_HOLD" ? ON_HOLD : MAIN;
+        const activeIdx = flow.findIndex((s) => s.key === p.status);
+        return (
+          <div style={{ marginBottom: 14, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Ciclo del proyecto</div>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              {flow.map((step, idx) => {
+                const done = idx < activeIdx;
+                const active = idx === activeIdx;
+                const isBad = (step.key === "CANCELLED") && active;
+                const color = isBad ? "var(--danger)" : done || active ? "var(--success)" : "var(--text-tertiary)";
+                const bg = isBad ? "color-mix(in srgb, var(--danger) 15%, var(--surface-2))" : (done || active) ? "color-mix(in srgb, var(--success) 15%, var(--surface-2))" : "var(--surface)";
+                return (
+                  <div key={step.key} style={{ display: "flex", alignItems: "center", flex: idx < flow.length - 1 ? 1 : undefined }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, minWidth: 60 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: bg, border: `2px solid ${active ? color : done ? "color-mix(in srgb, var(--success) 40%, var(--border))" : "var(--border)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: done ? 12 : 14, fontWeight: 700, color }}>
+                        {done ? "✓" : step.icon}
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: active ? color : done ? "var(--text-secondary)" : "var(--text-tertiary)", textAlign: "center", whiteSpace: "nowrap" }}>{step.label}</span>
+                    </div>
+                    {idx < flow.length - 1 && <div style={{ flex: 1, height: 2, background: done ? "color-mix(in srgb, var(--success) 35%, var(--border))" : "var(--border)", margin: "0 4px", marginBottom: 18 }} />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
       {c.budget > 0 && (() => {
         const costs = [
           { label: "Productos", amount: Number(c.costProducts ?? 0), color: "var(--primary)" },

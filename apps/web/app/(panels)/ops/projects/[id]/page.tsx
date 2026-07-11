@@ -89,6 +89,44 @@ export default function OpsProjectSummaryPage() {
             <KpiCard label="Estado" value={formatOperationalProjectStatus(project.status)} variant={project.status === "COMPLETED" ? "positive" : project.status === "ACTIVE" ? "accent" : "warning"} icon="📋" />
             <KpiCard label="Sitios" value={project.siteCount ?? "—"} icon="📍" hint="Ubicaciones de campo" />
           </div>
+          {/* Status stepper */}
+          {(() => {
+            const FLOW = [
+              { key: "ACTIVE", label: "Activo", icon: "⚙️" },
+              { key: "ON_HOLD", label: "En pausa", icon: "⏸" },
+              { key: "COMPLETED", label: "Completado", icon: "✅" },
+            ];
+            const COMPLETED_FLOW = [
+              { key: "ACTIVE", label: "Activo", icon: "⚙️" },
+              { key: "COMPLETED", label: "Completado", icon: "✅" },
+            ];
+            const flow = project.status === "COMPLETED" ? COMPLETED_FLOW : FLOW;
+            const activeIdx = flow.findIndex((s) => s.key === project.status);
+            return (
+              <div style={{ marginBottom: 12, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Estado del proyecto</div>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  {flow.map((step, idx) => {
+                    const done = idx < activeIdx;
+                    const active = idx === activeIdx;
+                    const color = done || active ? "var(--success)" : "var(--text-tertiary)";
+                    const bg = (done || active) ? "color-mix(in srgb, var(--success) 15%, var(--surface-2))" : "var(--surface)";
+                    return (
+                      <div key={step.key} style={{ display: "flex", alignItems: "center", flex: idx < flow.length - 1 ? 1 : undefined }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, minWidth: 60 }}>
+                          <div style={{ width: 32, height: 32, borderRadius: "50%", background: bg, border: `2px solid ${active ? color : done ? "color-mix(in srgb, var(--success) 40%, var(--border))" : "var(--border)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: done ? 12 : 14, fontWeight: 700, color }}>
+                            {done ? "✓" : step.icon}
+                          </div>
+                          <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: active ? color : done ? "var(--text-secondary)" : "var(--text-tertiary)", textAlign: "center", whiteSpace: "nowrap" }}>{step.label}</span>
+                        </div>
+                        {idx < flow.length - 1 && <div style={{ flex: 1, height: 2, background: done ? "color-mix(in srgb, var(--success) 35%, var(--border))" : "var(--border)", margin: "0 4px", marginBottom: 18 }} />}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
           <div style={{ marginBottom: 16, padding: "10px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Avance del proyecto</span>
