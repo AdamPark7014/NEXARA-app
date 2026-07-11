@@ -209,6 +209,41 @@ export default function QuoteDetailPage() {
         <KpiCard label="Estado" value={STATUS_LABEL[quote.status] ?? quote.status} variant={STATUS_VARIANT[quote.status] ?? "default"} icon="📄" />
       </div>
 
+      {/* Quote lifecycle stepper */}
+      {(() => {
+        const FLOW = [
+          { key: "DRAFT", label: "Borrador", icon: "📝" },
+          { key: "SENT", label: "Enviada", icon: "📤" },
+          { key: "APPROVED", label: "Aprobada", icon: "✅" },
+        ];
+        const activeIdx = FLOW.findIndex((s) => s.key === quote.status);
+        return (
+          <div style={{ marginBottom: 14, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Ciclo de la cotización</div>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              {FLOW.map((step, idx) => {
+                const done = idx < activeIdx;
+                const active = idx === activeIdx;
+                const isWon = step.key === "APPROVED" && active;
+                const color = (isWon || done || active) ? "var(--success)" : "var(--text-tertiary)";
+                const bg = (isWon || done || active) ? "color-mix(in srgb, var(--success) 15%, var(--surface-2))" : "var(--surface)";
+                return (
+                  <div key={step.key} style={{ display: "flex", alignItems: "center", flex: idx < FLOW.length - 1 ? 1 : undefined }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, minWidth: 64 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: bg, border: `2px solid ${active ? color : done ? "color-mix(in srgb, var(--success) 40%, var(--border))" : "var(--border)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: done ? 12 : 14, fontWeight: 700, color }}>
+                        {done ? "✓" : step.icon}
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: active ? color : done ? "var(--text-secondary)" : "var(--text-tertiary)", textAlign: "center", whiteSpace: "nowrap" }}>{step.label}</span>
+                    </div>
+                    {idx < FLOW.length - 1 && <div style={{ flex: 1, height: 2, background: done ? "color-mix(in srgb, var(--success) 35%, var(--border))" : "var(--border)", margin: "0 4px", marginBottom: 18 }} />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Status bar */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 18, alignItems: "center" }}>
         <Tag variant={STATUS_VARIANT[quote.status] ?? "default"}>{STATUS_LABEL[quote.status] ?? quote.status}</Tag>

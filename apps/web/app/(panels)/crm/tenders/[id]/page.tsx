@@ -212,6 +212,51 @@ export default function TenderDetailPage() {
         )}
       </div>
 
+      {/* Tender lifecycle stepper */}
+      {(() => {
+        const MAIN = [
+          { key: "PROSPECT", label: "Prospecto", icon: "🔍" },
+          { key: "IN_REVIEW", label: "En revisión", icon: "📋" },
+          { key: "PREPARING_BID", label: "Preparando", icon: "✏️" },
+          { key: "SUBMITTED", label: "Enviada", icon: "📤" },
+          { key: "AWARDED", label: "Adjudicada", icon: "🏆" },
+        ];
+        const TERMINAL: Record<string, { key: string; label: string; icon: string }[]> = {
+          LOST: [{ key: "PROSPECT", label: "Prospecto", icon: "🔍" }, { key: "SUBMITTED", label: "Enviada", icon: "📤" }, { key: "LOST", label: "Perdida", icon: "✕" }],
+          CANCELLED: [{ key: "PROSPECT", label: "Prospecto", icon: "🔍" }, { key: "CANCELLED", label: "Cancelada", icon: "✕" }],
+          DISQUALIFIED: [{ key: "PROSPECT", label: "Prospecto", icon: "🔍" }, { key: "IN_REVIEW", label: "En revisión", icon: "📋" }, { key: "DISQUALIFIED", label: "Descalificada", icon: "✕" }],
+        };
+        const flow = TERMINAL[tender.status] ?? MAIN;
+        const activeIdx = flow.findIndex((s) => s.key === tender.status);
+        const BAD_KEYS = new Set(["LOST", "CANCELLED", "DISQUALIFIED"]);
+        return (
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Progreso de licitación</div>
+            <div style={{ display: "flex", alignItems: "center", overflowX: "auto" }}>
+              {flow.map((step, idx) => {
+                const done = idx < activeIdx;
+                const active = idx === activeIdx;
+                const isBad = BAD_KEYS.has(step.key) && active;
+                const isWon = step.key === "AWARDED" && active;
+                const color = isBad ? "var(--danger)" : (isWon || done || active) ? "var(--success)" : "var(--text-tertiary)";
+                const bg = isBad ? "color-mix(in srgb, var(--danger) 15%, var(--surface-2))" : (isWon || done || active) ? "color-mix(in srgb, var(--success) 15%, var(--surface-2))" : "var(--surface)";
+                return (
+                  <div key={step.key} style={{ display: "flex", alignItems: "center", flex: idx < flow.length - 1 ? 1 : undefined }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, minWidth: 56 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: bg, border: `2px solid ${active ? color : done ? "color-mix(in srgb, var(--success) 40%, var(--border))" : "var(--border)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: done ? 12 : 14, fontWeight: 700, color }}>
+                        {done ? "✓" : step.icon}
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: active ? color : done ? "var(--text-secondary)" : "var(--text-tertiary)", textAlign: "center", whiteSpace: "nowrap" }}>{step.label}</span>
+                    </div>
+                    {idx < flow.length - 1 && <div style={{ flex: 1, height: 2, background: done ? "color-mix(in srgb, var(--success) 35%, var(--border))" : "var(--border)", margin: "0 2px", marginBottom: 18, minWidth: 12 }} />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Bid vs ceiling bar */}
       {Number(tender.budgetCeiling) > 0 && Number(tender.ourBidAmount) > 0 && (
         <div style={{ marginBottom: 20 }}>
