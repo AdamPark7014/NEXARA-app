@@ -11,6 +11,7 @@ export type OperationalProject = {
   endDate?: string | null;
   siteCount?: number | null;
   salesProjectId?: number | null;
+  salesProject?: { id: number; name: string; status: string } | null;
   vendor?: { id: number; nombre: string; email?: string } | null;
   client?: { id: number; name: string } | null;
   activities?: Array<{ id: number; anNumber: string; titulo: string; estatus: string }>;
