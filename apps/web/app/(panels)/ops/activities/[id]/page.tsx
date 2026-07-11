@@ -126,6 +126,19 @@ export default function ActivityDetailPage() {
 
   const evidenceCount = countEvidenceFiles(activity.evidencias);
 
+  const isCancelOrReschedule = activity.estatus === "CANCELADA" || activity.estatus === "REPROGRAMAR";
+  const activityFlow: { key: string; label: string; icon: string }[] = isCancelOrReschedule
+    ? [
+        { key: "PROGRAMADA", label: "Programada", icon: "📅" },
+        { key: activity.estatus, label: activity.estatus === "CANCELADA" ? "Cancelada" : "Reprogramar", icon: activity.estatus === "CANCELADA" ? "✕" : "🔄" },
+      ]
+    : [
+        { key: "PROGRAMADA", label: "Programada", icon: "📅" },
+        { key: "EN_CURSO", label: "En curso", icon: "⚙️" },
+        { key: "COMPLETADA", label: "Completada", icon: "✅" },
+      ];
+  const activeFlowIdx = activityFlow.findIndex((s) => s.key === activity.estatus);
+
   return (
     <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 16 }}>
@@ -133,6 +146,44 @@ export default function ActivityDetailPage() {
         <KpiCard label="Prioridad" value={activity.prioridad || "—"} variant={activity.prioridad === "URGENTE" ? "danger" : activity.prioridad === "ALTA" ? "warning" : "default"} icon="⚡" />
         <KpiCard label="Evidencias" value={evidenceCount} icon="📎" hint="Archivos adjuntos" />
         <KpiCard label="Responsable" value={activity.responsable?.nombre ?? "—"} icon="👷" />
+      </div>
+
+      {/* Status flow stepper */}
+      <div style={{ marginBottom: 16, padding: "14px 20px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>Flujo de la OT</div>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          {activityFlow.map((step, idx) => {
+            const done = idx < activeFlowIdx;
+            const active = idx === activeFlowIdx;
+            const isBad = active && (step.key === "CANCELADA" || step.key === "REPROGRAMAR");
+            const color = isBad ? "var(--danger)" : (done || active) ? "var(--success)" : "var(--text-tertiary)";
+            const bg = isBad
+              ? "color-mix(in srgb, var(--danger) 15%, var(--surface-2))"
+              : (done || active)
+                ? "color-mix(in srgb, var(--success) 15%, var(--surface-2))"
+                : "var(--surface)";
+            return (
+              <div key={step.key} style={{ display: "flex", alignItems: "center", flex: idx < activityFlow.length - 1 ? 1 : undefined }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 72 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: "50%", background: bg,
+                    border: `2px solid ${active ? color : done ? "color-mix(in srgb, var(--success) 40%, var(--border))" : "var(--border)"}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: done ? 14 : 16, fontWeight: 700, color,
+                  }}>
+                    {done ? "✓" : step.icon}
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: active ? 700 : 500, color: active ? color : done ? "var(--text-secondary)" : "var(--text-tertiary)", textAlign: "center", whiteSpace: "nowrap" }}>
+                    {step.label}
+                  </span>
+                </div>
+                {idx < activityFlow.length - 1 && (
+                  <div style={{ flex: 1, height: 2, background: done ? "color-mix(in srgb, var(--success) 35%, var(--border))" : "var(--border)", margin: "0 4px", marginBottom: 20 }} />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
       <DetailSection title="Información general">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>

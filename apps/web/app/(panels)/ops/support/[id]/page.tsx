@@ -182,6 +182,74 @@ export default function SupportTicketDetailPage() {
         )}
       </div>
 
+      {/* Status flow stepper */}
+      {(() => {
+        const FLOW = [
+          { key: "NEW", label: "Nuevo", icon: "📋" },
+          { key: "ASSIGNED", label: "Asignado", icon: "👤" },
+          { key: "APPROVED", label: "Aprobado", icon: "✅" },
+        ] as const;
+        const REJECTED_FLOW = [
+          { key: "NEW", label: "Nuevo", icon: "📋" },
+          { key: "ASSIGNED", label: "Asignado", icon: "👤" },
+          { key: "REJECTED", label: "Rechazado", icon: "✕" },
+        ] as const;
+        const CLOSED_FLOW = [
+          { key: "NEW", label: "Nuevo", icon: "📋" },
+          { key: "ASSIGNED", label: "Asignado", icon: "👤" },
+          { key: "CLOSED", label: "Cerrado", icon: "🔒" },
+        ] as const;
+
+        const flow: readonly { key: string; label: string; icon: string }[] =
+          ticket.status === "REJECTED" ? REJECTED_FLOW :
+          ticket.status === "CLOSED" ? CLOSED_FLOW : FLOW;
+
+        const currentIdx = flow.findIndex((s) => s.key === ticket.status);
+        const activeIdx = currentIdx >= 0 ? currentIdx : 0;
+
+        return (
+          <div style={{ marginBottom: 20, padding: "14px 20px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>Flujo del ticket</div>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              {flow.map((step, idx) => {
+                const done = idx < activeIdx;
+                const active = idx === activeIdx;
+                const isRejected = step.key === "REJECTED" && active;
+                const color = isRejected ? "var(--danger)" : done || active ? "var(--success)" : "var(--text-tertiary)";
+                const bg = isRejected
+                  ? "color-mix(in srgb, var(--danger) 15%, var(--surface-2))"
+                  : (done || active)
+                    ? "color-mix(in srgb, var(--success) 15%, var(--surface-2))"
+                    : "var(--surface)";
+                return (
+                  <div key={step.key} style={{ display: "flex", alignItems: "center", flex: idx < flow.length - 1 ? 1 : undefined }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 64 }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: "50%",
+                        background: bg,
+                        border: `2px solid ${active ? color : done ? "color-mix(in srgb, var(--success) 40%, var(--border))" : "var(--border)"}`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: done ? 14 : 16,
+                        fontWeight: 700, color,
+                        transition: "all 0.2s",
+                      }}>
+                        {done ? "✓" : step.icon}
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: active ? 700 : 500, color: active ? color : done ? "var(--text-secondary)" : "var(--text-tertiary)", textAlign: "center", whiteSpace: "nowrap" }}>
+                        {step.label}
+                      </span>
+                    </div>
+                    {idx < flow.length - 1 && (
+                      <div style={{ flex: 1, height: 2, background: done ? "color-mix(in srgb, var(--success) 35%, var(--border))" : "var(--border)", margin: "0 4px", marginBottom: 20 }} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       <Section title="Detalle de la solicitud">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           {[
