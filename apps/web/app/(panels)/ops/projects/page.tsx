@@ -141,6 +141,22 @@ export default function OpsProjectsPage() {
       width: 110,
     },
     {
+      key: "salesProject",
+      label: "CRM",
+      render: (p) =>
+        p.salesProjectId || p.salesProject ? (
+          <a
+            href={`https://sales.nexara.com.mx/crm/projects/${p.salesProject?.id ?? p.salesProjectId}`}
+            style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}
+          >
+            Comercial →
+          </a>
+        ) : (
+          <Tag variant="warning">Sin CRM</Tag>
+        ),
+      width: 110,
+    },
+    {
       key: "client",
       label: "Cliente",
       render: (p) => p.client ? (
@@ -175,7 +191,7 @@ export default function OpsProjectsPage() {
       <PageHeader
         eyebrow="OPS · Proyectos"
         title="Proyectos operativos"
-        subtitle="Proyectos de campo vinculados a clientes de servicio."
+        subtitle="Misma entrega que CRM: campo, OTs e ingenieros. Columna CRM muestra el vínculo comercial."
         actions={
           <div style={{ display: "flex", gap: 8 }}>
             {cfg.canCreate && (

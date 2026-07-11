@@ -208,6 +208,7 @@ export type SalesProjectDetail = {
     client?: { id: number; name: string; legalName?: string | null } | null;
     owner?: { id: number; nombre: string } | null;
   } | null;
+  operationalProject?: { id: number; title: string; status: string; clientId?: number } | null;
 };
 
 const SALES_PROJECT_STATUS_LABELS: Record<string, string> = {

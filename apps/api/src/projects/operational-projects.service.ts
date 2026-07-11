@@ -2,7 +2,13 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto, CreateProjectActivityDto } from './dto/create-operational-project.dto.js';
-import { salesPatchFromOps } from '../common/project-handoff.js';
+import { salesPatchFromOps, opsStatusToSales } from '../common/project-handoff.js';
+
+const salesProjectInclude = {
+  id: true,
+  name: true,
+  status: true,
+} as const;
 
 @Injectable()
 export class OperationalProjectsService {
@@ -17,6 +23,103 @@ export class OperationalProjectsService {
 
   private get projectEngineerRepo() {
     return (this.prisma as any).projectEngineer;
+  }
+
+  /**
+   * Espejo CRM ← OPS: si el proyecto de campo no tiene SalesProject,
+   * crea SalesClient (si falta) + oportunidad WON + SalesProject y enlaza.
+   * Así CRM y OPS muestran el mismo negocio.
+   */
+  async ensureCommercialMirror(operationalProjectId: number, actorId?: number) {
+    const op = await this.prisma.operationalProject.findUnique({
+      where: { id: operationalProjectId },
+      include: {
+        client: true,
+        salesProject: { select: { id: true, name: true, status: true } },
+      },
+    });
+    if (!op) throw new NotFoundException('Project not found');
+    if (op.salesProjectId && op.salesProject) {
+      return { operationalProject: op, salesProject: op.salesProject, created: false };
+    }
+
+    const serviceClient = op.client;
+    if (!serviceClient) throw new BadRequestException('El proyecto OPS no tiene cliente de servicio');
+
+    let salesClient = await this.prisma.salesClient.findFirst({
+      where: { serviceClientId: serviceClient.id },
+    });
+    if (!salesClient) {
+      salesClient = await this.prisma.salesClient.create({
+        data: {
+          name: serviceClient.name,
+          legalName: serviceClient.name,
+          billingEmail: serviceClient.contactEmail || null,
+          billingPhone: serviceClient.contactPhone || null,
+          ownerId: actorId || op.vendorId,
+          serviceClientId: serviceClient.id,
+          status: 'ACTIVE',
+          notes: `Creado automáticamente desde proyecto OPS #${op.id}`,
+        },
+      });
+    }
+
+    const opportunity = await this.prisma.salesOpportunity.create({
+      data: {
+        title: op.title,
+        description: op.description || op.scopeSummary || null,
+        stage: 'WON',
+        value: 0,
+        probability: 100,
+        closedAt: new Date(),
+        clientId: salesClient.id,
+        ownerId: actorId || op.vendorId,
+      },
+    });
+
+    const salesStatus = opsStatusToSales(op.status);
+    const salesProject = await this.prisma.salesProject.create({
+      data: {
+        opportunityId: opportunity.id,
+        name: op.title,
+        projectType: op.projectType,
+        scopeSummary: op.scopeSummary,
+        siteCount: op.siteCount,
+        status: salesStatus,
+        startDate: op.startDate,
+        endDate: op.endDate,
+      },
+    });
+
+    const linked = await this.prisma.operationalProject.update({
+      where: { id: op.id },
+      data: { salesProjectId: salesProject.id },
+      include: {
+        client: { select: { id: true, name: true } },
+        vendor: { select: { id: true, nombre: true, email: true } },
+        salesProject: { select: salesProjectInclude },
+      },
+    });
+
+    return { operationalProject: linked, salesProject, created: true };
+  }
+
+  async linkOrphansToCrm(actorId?: number) {
+    const orphans = await this.prisma.operationalProject.findMany({
+      where: { deletedAt: null, salesProjectId: null },
+      select: { id: true, title: true },
+    });
+    const results: Array<{ id: number; title: string; salesProjectId: number; created: boolean }> = [];
+    for (const orphan of orphans) {
+      const result = await this.ensureCommercialMirror(orphan.id, actorId);
+      results.push({
+        id: orphan.id,
+        title: orphan.title,
+        salesProjectId: result.salesProject.id,
+        created: result.created,
+      });
+    }
+    return { linked: results.length, results };
   }
 
   async create(createDto: CreateOperationalProjectDto, userId: number) {
@@ -39,7 +142,7 @@ export class OperationalProjectsService {
     }
 
     // Create the operational project
-    return this.projectRepo.create({
+    const created = await this.projectRepo.create({
       data: {
         title: createDto.title,
         description: createDto.description,
@@ -60,6 +163,7 @@ export class OperationalProjectsService {
         client: {
           select: { id: true, name: true },
         },
+        salesProject: { select: salesProjectInclude },
         engineers: {
           select: {
             engineer: {
@@ -77,6 +181,18 @@ export class OperationalProjectsService {
         },
       },
     });
+
+    // Si no vino ya enlazado desde CRM, crear espejo comercial automáticamente.
+    if (!created.salesProjectId) {
+      try {
+        const mirror = await this.ensureCommercialMirror(created.id, userId);
+        return { ...created, salesProjectId: mirror.salesProject.id, salesProject: mirror.salesProject };
+      } catch {
+        return created;
+      }
+    }
+
+    return created;
   }
 
   async findAll(vendorId?: number, clientId?: number, status?: string) {
@@ -94,6 +210,7 @@ export class OperationalProjectsService {
         client: {
           select: { id: true, name: true },
         },
+        salesProject: { select: salesProjectInclude },
         engineers: {
           select: {
             id: true,
@@ -125,6 +242,7 @@ export class OperationalProjectsService {
         client: {
           select: { id: true, name: true },
         },
+        salesProject: { select: salesProjectInclude },
         engineers: {
           select: {
             id: true,

@@ -162,6 +162,19 @@ export default function CrmProjectsPage() {
       width: 120,
     },
     {
+      key: "operationalProject",
+      label: "OPS",
+      render: (p) =>
+        p.operationalProject ? (
+          <a href={`https://ops.nexara.com.mx/ops/projects/${p.operationalProject.id}`} style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+            En campo →
+          </a>
+        ) : (
+          <Tag variant="warning">Sin handoff</Tag>
+        ),
+      width: 110,
+    },
+    {
       key: "margin",
       label: "Margen",
       render: (p) => <Money value={Number(p.margin ?? 0)} />,

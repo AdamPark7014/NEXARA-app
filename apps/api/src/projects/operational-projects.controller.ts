@@ -51,6 +51,18 @@ export class OperationalProjectsController {
     );
   }
 
+  @Post('link-orphans-crm')
+  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
+  linkOrphans(@CurrentUser() user: any) {
+    return this.operationalProjectsService.linkOrphansToCrm(user.id);
+  }
+
+  @Post(':id/link-crm')
+  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
+  linkCrm(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.operationalProjectsService.ensureCommercialMirror(id, user.id);
+  }
+
   @Get(':id')
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
   findById(@Param('id', ParseIntPipe) id: number) {
