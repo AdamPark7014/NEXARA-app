@@ -272,6 +272,22 @@ export default function FinesPage() {
     { key: "descripcion", label: "Descripción", render: (f) => <span style={{ fontSize: 13 }}>{f.descripcion ?? f.razon ?? "—"}</span> },
     { key: "monto", label: "Monto", render: (f) => <Money value={Number(f.monto ?? 0)} />, width: 100 },
     {
+      key: "fechaCreacion", label: "Antigüedad",
+      render: (f) => {
+        if (!f.fechaCreacion) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
+        const days = Math.floor((Date.now() - new Date(f.fechaCreacion).getTime()) / 86400000);
+        const isPending = f.estatusPago !== "Pagado" && f.estatusPago !== "Cancelado";
+        const color = !isPending ? "var(--text-tertiary)" : days >= 30 ? "var(--danger)" : days >= 14 ? "var(--warning)" : "var(--text-secondary)";
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            {isPending && <div style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />}
+            <span style={{ fontSize: 12, fontWeight: isPending && days >= 14 ? 700 : 400, color }}>{days}d</span>
+          </div>
+        );
+      },
+      width: 80,
+    },
+    {
       key: "estatusAprobacion",
       label: "Autorización",
       render: (f) => (
