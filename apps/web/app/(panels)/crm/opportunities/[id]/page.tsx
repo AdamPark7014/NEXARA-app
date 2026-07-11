@@ -173,7 +173,7 @@ export default function OpportunityDetailPage() {
         const isLost = opportunity.stage === "LOST";
         const flow = isLost
           ? [
-              ...MAIN_FLOW.slice(0, MAIN_FLOW.findIndex((s) => s.key === (opportunity._prevStage ?? "CLOSING")) + 1),
+              ...MAIN_FLOW.slice(0, MAIN_FLOW.findIndex((s) => s.key === "CLOSING") + 1),
               { key: "LOST", label: "Perdida", icon: "✕" },
             ]
           : MAIN_FLOW;
