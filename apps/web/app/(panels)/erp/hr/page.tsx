@@ -260,10 +260,18 @@ export default function HrPage() {
       },
     },
     {
-      key: "fechaIngreso", label: "Ingreso",
+      key: "fechaIngreso", label: "Antigüedad",
       render: (e) => {
         const d = e.fechaIngreso ?? e.fechaCreacion;
-        return <span style={{ fontSize: 12 }}>{d ? new Date(d).getFullYear() : "—"}</span>;
+        if (!d) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
+        const months = Math.floor((Date.now() - new Date(d).getTime()) / (1000 * 60 * 60 * 24 * 30.44));
+        const label = months >= 12 ? `${Math.floor(months / 12)}a ${months % 12}m` : `${months}m`;
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>{label}</span>
+            <span style={{ fontSize: 10.5, color: "var(--text-tertiary)" }}>{new Date(d).getFullYear()}</span>
+          </div>
+        );
       },
       width: 80,
     },
