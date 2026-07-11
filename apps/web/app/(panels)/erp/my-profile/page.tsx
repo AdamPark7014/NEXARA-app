@@ -130,6 +130,35 @@ export default function MyProfilePage() {
         );
       })()}
 
+      {!loading && !error && profile && (() => {
+        const sections = [
+          { label: "Datos personales", fields: [form.telefono, form.fechaNacimiento, form.ciudad, form.estado] },
+          { label: "Documentos", fields: [form.curp, form.rfc, form.nss] },
+          { label: "Emergencia", fields: [form.contactoEmergenciaNombre, form.contactoEmergenciaTelefono] },
+        ];
+        return (
+          <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Completitud del perfil</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {sections.map((sec) => {
+                const filled = sec.fields.filter(Boolean).length;
+                const pct = Math.round((filled / sec.fields.length) * 100);
+                const color = pct === 100 ? "var(--success)" : pct >= 50 ? "var(--warning)" : "var(--danger)";
+                return (
+                  <div key={sec.label} style={{ display: "grid", gridTemplateColumns: "120px 1fr 48px", gap: 10, alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{sec.label}</span>
+                    <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3 }} />
+                    </div>
+                    <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{filled}/{sec.fields.length}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {!loading && !error && profile && (
         <>
           <Section title="Datos de cuenta">
