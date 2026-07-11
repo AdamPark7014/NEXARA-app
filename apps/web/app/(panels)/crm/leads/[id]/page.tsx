@@ -165,6 +165,49 @@ export default function LeadDetailPage() {
         <KpiCard label="Empresa" value={lead.company || "—"} icon="🏢" />
       </div>
 
+      {/* Lead lifecycle stepper */}
+      {(() => {
+        const MAIN = [
+          { key: "NEW", label: "Nuevo", icon: "✨" },
+          { key: "QUALIFIED", label: "Calificado", icon: "⭐" },
+          { key: "NURTURING", label: "Nutriendo", icon: "🌱" },
+          { key: "CONVERTED", label: "Convertido", icon: "🏆" },
+        ];
+        const LOST_FLOW = [
+          { key: "NEW", label: "Nuevo", icon: "✨" },
+          { key: "QUALIFIED", label: "Calificado", icon: "⭐" },
+          { key: "LOST", label: "Perdido", icon: "✕" },
+        ];
+        const flow = lead.status === "LOST" ? LOST_FLOW : MAIN;
+        const activeIdx = flow.findIndex((s) => s.key === lead.status);
+        return (
+          <div style={{ marginBottom: 14, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Etapa del lead</div>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              {flow.map((step, idx) => {
+                const done = idx < activeIdx;
+                const active = idx === activeIdx;
+                const isBad = step.key === "LOST" && active;
+                const isWon = step.key === "CONVERTED" && active;
+                const color = isBad ? "var(--danger)" : (isWon || done || active) ? "var(--success)" : "var(--text-tertiary)";
+                const bg = isBad ? "color-mix(in srgb, var(--danger) 15%, var(--surface-2))" : (isWon || done || active) ? "color-mix(in srgb, var(--success) 15%, var(--surface-2))" : "var(--surface)";
+                return (
+                  <div key={step.key} style={{ display: "flex", alignItems: "center", flex: idx < flow.length - 1 ? 1 : undefined }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, minWidth: 64 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: bg, border: `2px solid ${active ? color : done ? "color-mix(in srgb, var(--success) 40%, var(--border))" : "var(--border)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: done ? 12 : 14, fontWeight: 700, color }}>
+                        {done ? "✓" : step.icon}
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: active ? color : done ? "var(--text-secondary)" : "var(--text-tertiary)", textAlign: "center", whiteSpace: "nowrap" }}>{step.label}</span>
+                    </div>
+                    {idx < flow.length - 1 && <div style={{ flex: 1, height: 2, background: done ? "color-mix(in srgb, var(--success) 35%, var(--border))" : "var(--border)", margin: "0 4px", marginBottom: 18 }} />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Score bar */}
       {lead.score > 0 && (
         <div style={{ marginBottom: 20 }}>
