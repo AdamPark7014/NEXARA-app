@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto, CreateProjectActivityDto } from './dto/create-operational-project.dto.js';
+import { salesPatchFromOps } from '../common/project-handoff.js';
 
 @Injectable()
 export class OperationalProjectsService {
@@ -155,7 +156,7 @@ export class OperationalProjectsService {
   async update(id: number, updateDto: UpdateOperationalProjectDto) {
     const project = await this.findById(id);
 
-    return this.projectRepo.update({
+    const updated = await this.projectRepo.update({
       where: { id },
       data: {
         ...(updateDto.title && { title: updateDto.title }),
@@ -170,6 +171,7 @@ export class OperationalProjectsService {
         client: {
           select: { id: true, name: true },
         },
+        salesProject: { select: { id: true } },
         engineers: {
           select: {
             id: true,
@@ -188,17 +190,30 @@ export class OperationalProjectsService {
         },
       },
     });
+
+    // Propagar identidad al SalesProject vinculado.
+    if (updated.salesProjectId) {
+      await this.prisma.salesProject.update({
+        where: { id: updated.salesProjectId },
+        data: {
+          ...(updateDto.title ? { name: updateDto.title } : {}),
+          ...(updateDto.endDate ? { endDate: new Date(updateDto.endDate) } : {}),
+        },
+      }).catch(() => undefined);
+    }
+
+    return updated;
   }
 
   async changeStatus(id: number, statusDto: ProjectStatusChangeDto) {
-    const project = await this.findById(id);
+    await this.findById(id);
     const validStatuses = ['ACTIVE', 'ON_HOLD', 'COMPLETED'];
 
     if (!validStatuses.includes(statusDto.status)) {
       throw new BadRequestException(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
     }
 
-    return this.projectRepo.update({
+    const updated = await this.projectRepo.update({
       where: { id },
       data: {
         status: statusDto.status as any,
@@ -211,6 +226,7 @@ export class OperationalProjectsService {
         client: {
           select: { id: true, name: true },
         },
+        salesProject: { select: { id: true } },
         engineers: {
           select: {
             id: true,
@@ -229,6 +245,24 @@ export class OperationalProjectsService {
         },
       },
     });
+
+    if (updated.salesProjectId) {
+      const salesStatus = salesPatchFromOps({
+        title: updated.title,
+        projectType: updated.projectType,
+        scopeSummary: updated.scopeSummary,
+        siteCount: updated.siteCount,
+        startDate: updated.startDate,
+        endDate: updated.endDate,
+        status: updated.status,
+      }).status;
+      await this.prisma.salesProject.update({
+        where: { id: updated.salesProjectId },
+        data: { status: salesStatus },
+      }).catch(() => undefined);
+    }
+
+    return updated;
   }
 
   async assignEngineer(projectId: number, assignDto: AssignProjectEngineerDto) {

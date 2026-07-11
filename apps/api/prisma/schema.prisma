@@ -140,27 +140,30 @@ enum ActivityType {
 }
 
 model OperationalProject {
-  id            Int                      @id @default(autoincrement())
-  title         String                   @db.VarChar(220)
-  description   String?
-  projectType   ServiceProjectType       @default(OTRO)
-  scopeSummary  String?
-  siteCount     Int?
-  salesProjectId Int?                    @unique
-  status        OperationalProjectStatus @default(ACTIVE)
-  vendorId      Int
-  clientId      Int
-  startDate     DateTime
-  endDate       DateTime?
-  actualEndDate DateTime?
-  createdAt     DateTime                 @default(now())
-  updatedAt     DateTime                 @updatedAt
-  deletedAt     DateTime?
+  id             Int                      @id @default(autoincrement())
+  title          String                   @db.VarChar(220)
+  description    String?
+  projectType    ServiceProjectType       @default(OTRO)
+  scopeSummary   String?
+  siteCount      Int?
+  /// Vínculo 1:1 con el proyecto comercial (CRM). Misma entrega, dos facetas.
+  salesProjectId Int?                     @unique
+  status         OperationalProjectStatus @default(ACTIVE)
+  vendorId       Int
+  clientId       Int
+  startDate      DateTime
+  endDate        DateTime?
+  actualEndDate  DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  deletedAt      DateTime?
 
-  vendor     User              @relation("ProjectVendor", fields: [vendorId], references: [id])
-  client     ServiceClient     @relation(fields: [clientId], references: [id])
-  engineers  ProjectEngineer[]
-  activities Activity[]
+  vendor              User                 @relation("ProjectVendor", fields: [vendorId], references: [id])
+  client              ServiceClient        @relation(fields: [clientId], references: [id])
+  salesProject        SalesProject?        @relation("SalesOperationalHandoff", fields: [salesProjectId], references: [id], onDelete: SetNull)
+  engineers           ProjectEngineer[]
+  activities          Activity[]
+  maintenanceContract MaintenanceContract? @relation("MaintenanceContractProject")
 
   @@index([vendorId])
   @@index([clientId])
@@ -1562,6 +1565,8 @@ model SalesProject {
   updatedAt      DateTime           @updatedAt
   opportunity    SalesOpportunity   @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   closureOrder   SalesProjectOrder? @relation("ProjectOrder")
+  /// Faceta operativa (OPS) del mismo proyecto — 0..1
+  operationalProject OperationalProject? @relation("SalesOperationalHandoff")
   viaticos       Viatico[]
 
   @@map("sales_projects")
@@ -3595,6 +3600,8 @@ model MaintenanceContract {
   autoGenerateOt      Boolean                      @default(true)
   notifyHoursBefore   Int                          @default(24)
   notes               String?
+  /// Proyecto OPS dedicado a este contrato (no reutilizar proyectos comerciales del cliente).
+  operationalProjectId Int?                        @unique
   createdAt           DateTime                     @default(now())
   updatedAt           DateTime                     @updatedAt
   deletedAt           DateTime?
@@ -3602,6 +3609,7 @@ model MaintenanceContract {
   client              ServiceClient                @relation(fields: [clientId], references: [id])
   branch              ServiceClientBranch?         @relation(fields: [branchId], references: [id])
   owner               User?                        @relation("MaintenanceContractOwner", fields: [ownerId], references: [id])
+  operationalProject  OperationalProject?          @relation("MaintenanceContractProject", fields: [operationalProjectId], references: [id], onDelete: SetNull)
   visits              MaintenanceContractVisit[]
 
   @@index([status, nextVisitDate])
