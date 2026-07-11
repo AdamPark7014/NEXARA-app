@@ -18,7 +18,7 @@ import { toast } from "@/components/Toast";
 const STATUSES = ["NEW", "QUALIFIED", "NURTURING", "LOST", "CONVERTED"] as const;
 const FUENTES = ["Web", "Referido", "LinkedIn", "Llamada", "Feria", "Otro"];
 
-const STATUS_VARIANT: Record<string, "warning" | "accent" | "positive" | "danger" | "neutral"> = {
+const STATUS_VARIANT: Record<string, "warning" | "accent" | "positive" | "danger" | "default"> = {
   NEW: "warning",
   QUALIFIED: "accent",
   NURTURING: "accent",
