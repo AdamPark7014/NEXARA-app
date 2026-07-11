@@ -154,6 +154,32 @@ export default function TargetsPage() {
             <KpiCard label="Cumplimiento promedio" value={`${perf.totals.avgAttainmentPct}%`} variant={perf.totals.avgAttainmentPct >= 100 ? "positive" : perf.totals.avgAttainmentPct >= 60 ? "warning" : "danger"} icon="📊" />
             <KpiCard label="Comisiones del mes" value={<Money value={perf.totals.totalCommissions} compact />} icon="💰" variant="accent" hint="Comisiones generadas" />
           </div>
+          {perf.performance.length > 0 && (() => {
+            const total = perf.performance.length;
+            const metaCumplida = perf.performance.filter((p) => p.attainmentPct >= 100).length;
+            const parcial = perf.performance.filter((p) => p.attainmentPct >= 60 && p.attainmentPct < 100).length;
+            const bajo = perf.performance.filter((p) => p.attainmentPct < 60).length;
+            return (
+              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Cumplimiento del equipo</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  {([
+                    { label: "Meta cumplida", count: metaCumplida, color: "var(--success)" },
+                    { label: "Parcial (60-99%)", count: parcial, color: "var(--warning)" },
+                    { label: "Bajo del 60%", count: bajo, color: "var(--danger)" },
+                  ] as { label: string; count: number; color: string }[]).filter((r) => r.count > 0).map((r) => (
+                    <div key={r.label} style={{ display: "grid", gridTemplateColumns: "130px 1fr 36px", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{r.label}</span>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(r.count / total) * 100}%`, background: r.color, borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{r.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           {perf.performance.length > 0 && (
             <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
               {perf.performance.map((p) => (
