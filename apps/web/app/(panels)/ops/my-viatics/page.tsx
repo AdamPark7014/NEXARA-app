@@ -167,6 +167,29 @@ export default function MyViaticsPage() {
         <KpiCard label="Aprobadas" value={items.filter((v) => v.estatus === "Aprobado" || v.estatus === "APROBADO").length} variant="accent" icon="✅" />
       </div>
 
+      {!loading && items.length > 0 && (() => {
+        const byEstatus: Record<string, number> = {};
+        for (const v of items) { const s = v.estatus ?? "Pendiente"; byEstatus[s] = (byEstatus[s] ?? 0) + 1; }
+        const total = items.length;
+        const estatusColors: Record<string, string> = { Pendiente: "var(--warning)", Aprobado: "var(--success)", Pagado: "var(--primary)", Rechazado: "var(--danger)", "Pre-aprobado": "color-mix(in srgb, var(--success) 60%, var(--warning))" };
+        return (
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por estatus</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {Object.entries(byEstatus).sort((a, b) => b[1] - a[1]).map(([s, count]) => (
+                <div key={s} style={{ display: "grid", gridTemplateColumns: "110px 1fr 36px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{s.replace(/_/g, " ")}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: estatusColors[s] ?? "var(--primary)", borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {actionErr && <InlineAlert message={actionErr} onDismiss={() => setActionErr(null)} />}
 
       <FilterToolbar

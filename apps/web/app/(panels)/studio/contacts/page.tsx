@@ -225,6 +225,29 @@ export default function StudioContactsPage() {
         </div>
       )}
 
+      {!loading && items.length > 0 && (() => {
+        const byStatus: Record<string, number> = {};
+        for (const c of items) byStatus[c.status] = (byStatus[c.status] ?? 0) + 1;
+        const total = items.length;
+        const statusColors: Record<string, string> = { NEW: "var(--warning)", ASSIGNED: "var(--primary)", IN_PROGRESS: "var(--primary)", RESOLVED: "var(--success)", DISCARDED: "var(--text-tertiary)" };
+        return (
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por estado</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {Object.entries(byStatus).sort((a, b) => b[1] - a[1]).map(([s, count]) => (
+                <div key={s} style={{ display: "grid", gridTemplateColumns: "130px 1fr 36px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{STATUS_LABEL[s] ?? s}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: statusColors[s] ?? "var(--primary)", borderRadius: 3 }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       <FilterToolbar
         search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por nombre, empresa o mensaje…" }}
         selects={[{
