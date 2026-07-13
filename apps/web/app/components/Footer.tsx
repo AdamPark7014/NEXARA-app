@@ -68,14 +68,13 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Soluciones */}
-          <nav className={styles.linkCol} aria-label="Soluciones">
-            <h4 className={styles.colTitle}>Soluciones</h4>
+          <nav className={styles.linkCol} aria-label="Capacidades">
+            <h4 className={styles.colTitle}>Capacidades</h4>
             <ul className={styles.list}>
-              <li><Link href="/servicios#software">Software</Link></li>
-              <li><Link href="/servicios#cloud">Cloud</Link></li>
-              <li><Link href="/servicios#ciberseguridad">Ciberseguridad</Link></li>
-              <li><Link href="/servicios#data-ai">Data & IA</Link></li>
+              <li><Link href="/servicios#cctv">Videovigilancia</Link></li>
+              <li><Link href="/servicios#redes">Redes y Wi‑Fi</Link></li>
+              <li><Link href="/servicios#computo">Cómputo</Link></li>
+              <li><Link href="/servicios#soporte">Soporte TI</Link></li>
             </ul>
           </nav>
 

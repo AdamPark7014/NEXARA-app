@@ -130,11 +130,10 @@
 	left: 50%;
 	bottom: 2px;
 	transform: translateX(-50%);
-	width: 20px;
-	height: 2px;
+	width: 18px;
+	height: 1px;
 	background: #2dd8f2;
-	border-radius: 2px;
-	box-shadow: 0 0 8px rgba(45, 216, 242, 0.8);
+	border-radius: 1px;
 }
 
 /* ── Estado top de página: sin fondo, totalmente transparente ────────── */
@@ -225,31 +224,31 @@
 	gap: 0.6rem;
 }
 
-/* ── Botón "Cotiza tu Proyecto" — borde neón cian, relleno al hover ── */
+/* ── Botón "Cotiza tu Proyecto" ── */
 .contactCta {
 	display: inline-flex;
 	align-items: center;
 	gap: 8px;
-	padding: 9px 18px;
-	border-radius: 999px;
-	background: rgba(45, 216, 242, 0.08);
+	padding: 9px 16px;
+	border-radius: 8px;
+	background: transparent;
 	color: #eef4ff;
-	font-family: "Inter Tight", var(--nx-font-ui, "Inter", system-ui), sans-serif;
+	font-family: "Space Grotesk", var(--nx-font-display, system-ui), sans-serif;
 	font-size: 0.84rem;
 	font-weight: 600;
-	letter-spacing: 0.01em;
+	letter-spacing: -0.01em;
 	text-decoration: none;
-	border: 1px solid rgba(45, 216, 242, 0.55);
-	box-shadow: 0 0 0 rgba(45, 216, 242, 0);
-	transition: transform 150ms ease, background 150ms ease, box-shadow 150ms ease;
+	border: 1px solid rgba(45, 216, 242, 0.5);
+	box-shadow: none;
+	transition: transform 150ms ease, background 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
 .contactCta:hover {
 	transform: translateY(-1px);
-	background: linear-gradient(135deg, #2dd8f2, #12b6d4);
-	border-color: transparent;
+	background: #2dd8f2;
+	border-color: #2dd8f2;
 	color: #04131a;
-	box-shadow: 0 8px 24px rgba(45, 216, 242, 0.4);
+	box-shadow: none;
 }
 
 .contactArrow {
@@ -259,7 +258,7 @@
 
 /* Versión transparente: el botón pierde la sombra pero queda visible */
 .headerTransparent .contactCta {
-	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 10px 24px rgba(0, 0, 0, 0.25);
+	box-shadow: none;
 }
 
 .backupPanel {

@@ -2,7 +2,6 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import shared from "../_shared/public.module.css";
-import styles from "./page.module.css";
 
 export const metadata = {
   title: "Servicios | Nexara — CCTV, redes, cómputo y soporte",
@@ -33,7 +32,7 @@ const servicios = [
     id: "computo",
     badge: "Infraestructura",
     title: "Cómputo e infraestructura lista para el día a día",
-    forWho: "Equipos que necesitan equipos confiables, respaldos y puesta a punto sin drama.",
+    forWho: "Equipos que necesitan estaciones confiables, respaldos y puesta a punto sin drama.",
     deliverable:
       "Estaciones, servidores, racks, almacenamiento, backups y estandarización de imagen/software.",
   },
@@ -41,7 +40,7 @@ const servicios = [
     id: "soporte",
     badge: "Operación",
     title: "Soporte TI con respuesta humana",
-    forWho: "Empresas que no pueden esperar días a que “alguien revise el ticket”.",
+    forWho: "Empresas que no pueden esperar días a que alguien revise el ticket.",
     deliverable:
       "Mesa de ayuda, visitas en sitio, monitoreo básico y acuerdos claros de tiempo de respuesta.",
   },
@@ -82,7 +81,8 @@ export default function ServiciosPage() {
             <div data-reveal="soft">
               <span className={shared.heroEyebrow}>Servicios</span>
               <h1 className={shared.heroTitle}>
-                Capacidades para <span className={shared.heroTitleAccent}>operar sin fricciones</span>
+                Capacidades para{" "}
+                <span className={shared.heroTitleAccent}>operar sin fricciones</span>
               </h1>
               <p className={shared.heroLead}>
                 Cinco líneas claras. Cada una con entregable concreto, equipo de campo y
@@ -144,19 +144,19 @@ export default function ServiciosPage() {
 
       <section className={`${shared.section} ${shared.sectionDivider}`}>
         <div className={shared.inner}>
-          <div className={shared.sectionHead} data-reveal="soft">
+          <div className={`${shared.sectionHead} ${shared.sectionHeadCenter}`} data-reveal="soft">
             <span className={shared.eyebrow}>Cómo contratas</span>
             <h2 className={shared.sectionTitle}>
               Proceso <span className={shared.sectionTitleAccent}>corto y cerrado</span>
             </h2>
             <p className={shared.sectionLead}>Tres pasos. Sin workshops eternos ni alcance abierto.</p>
           </div>
-          <div className={`${shared.grid3} ${styles.procesoGrid}`} data-reveal-stagger>
+          <div className={shared.stepGrid} data-reveal-stagger>
             {contratacion.map((p) => (
-              <div key={p.num} className={`${shared.card} ${styles.procesoCard}`} data-reveal="up">
-                <span className={styles.procesoNum}>{p.num}</span>
-                <h3 className={shared.cardTitle}>{p.title}</h3>
-                <p className={shared.cardText}>{p.text}</p>
+              <div key={p.num} className={shared.stepItem} data-reveal="up">
+                <span className={shared.stepNum}>{p.num}</span>
+                <h3 className={shared.stepTitle}>{p.title}</h3>
+                <p className={shared.stepText}>{p.text}</p>
               </div>
             ))}
           </div>

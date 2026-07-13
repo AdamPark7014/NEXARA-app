@@ -155,11 +155,11 @@ export default function ContactoPage() {
               <ExternalLinkButton
                 key={c.title}
                 href={c.href}
-                className={`${shared.card} ${styles.channelCard}`}
+                className={styles.channelCard}
               >
-                <span className={shared.cardIcon}>{c.icon}</span>
-                <h3 className={shared.cardTitle}>{c.title}</h3>
-                <p className={shared.cardText}>{c.desc}</p>
+                <span className={styles.channelIcon}>{c.icon}</span>
+                <h3 className={styles.channelTitle}>{c.title}</h3>
+                <p className={styles.channelDesc}>{c.desc}</p>
                 <span className={styles.channelCta}>
                   {c.cta} <span aria-hidden>→</span>
                 </span>
@@ -174,7 +174,7 @@ export default function ContactoPage() {
           <div className={styles.formLayout}>
             <aside className={styles.formAside} data-reveal="up">
               <span className={shared.eyebrow}>Formulario</span>
-              <h2 className={shared.sectionTitle} style={{ textAlign: "left", margin: "10px 0 18px" }}>
+              <h2 className={styles.formAsideTitle}>
                 Lo esencial para responderte bien
               </h2>
               <ul className={shared.bulletList}>

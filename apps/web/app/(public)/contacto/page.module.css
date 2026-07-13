@@ -1,38 +1,79 @@
 /* Contacto · estilos específicos (complementa public.module.css) */
 
 .channelCard {
-  display: flex !important;
+  display: flex;
   flex-direction: column;
   align-items: flex-start;
+  gap: 8px;
+  padding: clamp(24px, 3vw, 32px);
+  background: #050b18;
   text-decoration: none;
   color: inherit;
   cursor: pointer;
   text-align: left;
-  border: 1px solid rgba(140, 190, 255, 0.16) !important;
-  background: rgba(255, 255, 255, 0.06) !important;
+  border: none;
+  transition: background 180ms ease;
+  width: 100%;
+}
+
+.channelCard:hover {
+  background: #0a1628;
+}
+
+.channelIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 8px;
+  background: color-mix(in srgb, #2dd8f2 12%, transparent);
+  border: 1px solid color-mix(in srgb, #2dd8f2 28%, transparent);
+  color: #2dd8f2;
+}
+
+.channelIcon svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.7;
+}
+
+.channelTitle {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: #eef4ff;
+}
+
+.channelDesc {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #a9bbd6;
 }
 
 .channelCta {
-  margin-top: 16px;
+  margin-top: 10px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  font-family: "Space Grotesk", sans-serif;
   font-size: 0.88rem;
-  font-weight: 500;
+  font-weight: 600;
   color: #2dd8f2;
-  transition: gap 150ms ease;
+  transition: transform 180ms ease;
 }
 
 .channelCard:hover .channelCta {
-  gap: 10px;
+  transform: translateX(3px);
 }
-
-/* ── Layout formulario ───────────────────────────────────── */
 
 .formLayout {
   display: grid;
   grid-template-columns: 0.85fr 1.15fr;
-  gap: clamp(28px, 4vw, 56px);
+  gap: clamp(32px, 5vw, 64px);
   align-items: start;
 }
 
@@ -41,23 +82,31 @@
   top: 100px;
 }
 
+.formAsideTitle {
+  margin: 10px 0 18px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(1.5rem, 2.4vw, 1.9rem);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  color: #eef4ff;
+  line-height: 1.15;
+}
+
 .asideContact {
-  margin-top: 20px;
+  margin-top: 24px;
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  padding: 14px 16px;
-  border-radius: 10px;
-  border: 1px solid rgba(140, 190, 255, 0.16);
-  background: rgba(255, 255, 255, 0.05);
+  padding: 16px 0 0;
+  border-top: 1px solid rgba(140, 190, 255, 0.14);
 }
 
 .asideContact svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   color: #2dd8f2;
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 .asideContact strong {
@@ -73,19 +122,19 @@
 }
 
 .expectNote {
-  margin: 18px 0 0;
+  margin: 20px 0 0;
   font-size: 0.88rem;
   line-height: 1.55;
   color: #9fecfa;
   max-width: 42ch;
 }
 
-/* ── Form card ───────────────────────────────────────────── */
-
 .formCard {
-  padding: clamp(24px, 3vw, 36px) !important;
-  background: rgba(255, 255, 255, 0.06) !important;
-  border: 1px solid rgba(140, 190, 255, 0.16) !important;
+  padding: clamp(28px, 3.5vw, 40px) !important;
+  background: transparent !important;
+  border: 1px solid rgba(140, 190, 255, 0.14) !important;
+  border-radius: 12px !important;
+  backdrop-filter: none !important;
 }
 
 .form {
@@ -105,7 +154,7 @@
 }
 
 .field span {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: #eef4ff;
   letter-spacing: 0.01em;
@@ -115,10 +164,10 @@
 .field select,
 .field textarea {
   width: 100%;
-  padding: 11px 14px;
+  padding: 12px 14px;
   border-radius: 8px;
   border: 1px solid rgba(140, 190, 255, 0.16);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.03);
   color: #eef4ff;
   font: inherit;
   font-size: 0.94rem;
@@ -135,8 +184,7 @@
 .field select:focus,
 .field textarea:focus {
   border-color: #2dd8f2;
-  box-shadow: 0 0 0 3px rgba(45, 216, 242, 0.16);
-  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 3px rgba(45, 216, 242, 0.12);
 }
 
 .field textarea {
@@ -151,7 +199,7 @@
   background-repeat: no-repeat;
   background-position: calc(100% - 14px) 50%;
   padding-right: 36px;
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: rgba(255, 255, 255, 0.03);
 }
 
 .submitBtn {
@@ -176,8 +224,6 @@
   text-decoration: underline;
 }
 
-/* ── Success ────────────────────────────────────────────── */
-
 .successBlock {
   text-align: center;
   padding: 24px 8px;
@@ -187,25 +233,26 @@
 }
 
 .successIcon {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
-  background: rgba(45, 216, 242, 0.16);
+  background: rgba(45, 216, 242, 0.12);
   color: #2dd8f2;
 }
 
 .successIcon svg {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
 }
 
 .successBlock h3 {
   margin: 0;
-  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
-  font-size: 1.4rem;
-  font-weight: 400;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.35rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
   color: #eef4ff;
 }
 
@@ -215,23 +262,19 @@
   max-width: 36ch;
 }
 
-/* ── Map ─────────────────────────────────────────────────── */
-
 .mapWrap {
   position: relative;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(140, 190, 255, 0.16);
-  background: rgba(45, 216, 242, 0.16);
-  height: 420px;
+  border: 1px solid rgba(140, 190, 255, 0.14);
+  background: #0a1628;
+  height: 400px;
 }
 
 .mapWrap :global(.leaflet-container) {
   height: 100%;
   width: 100%;
 }
-
-/* ── Responsive ─────────────────────────────────────────── */
 
 @media (max-width: 1024px) {
   .formLayout {
@@ -247,6 +290,6 @@
     grid-template-columns: 1fr;
   }
   .mapWrap {
-    height: 300px;
+    height: 280px;
   }
 }
