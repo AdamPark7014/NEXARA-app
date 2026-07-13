@@ -85,6 +85,7 @@ export default function Footer() {
             <ul className={styles.list}>
               <li><Link href="/nosotros">Nosotros</Link></li>
               <li><Link href="/proyectos">Proyectos</Link></li>
+              <li><Link href="/blog">Blog</Link></li>
               <li><Link href="/cobertura">Cobertura</Link></li>
               <li><Link href="/contacto">Contacto</Link></li>
             </ul>

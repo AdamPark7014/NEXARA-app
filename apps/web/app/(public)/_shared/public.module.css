@@ -1,7 +1,7 @@
 /* ============================================================
    NEXARA · Estilos compartidos — páginas del sitio público
-   Sistema de diseño: Tinta/Pino/Papel
-   Tipografía: Fraunces (display) · Inter (body) · JetBrains Mono (datos)
+   Sistema de diseño: Circuito nocturno (marino profundo + neón)
+   Tipografía: Space Grotesk (display) · Manrope (body) · JetBrains Mono (datos)
    ============================================================ */
 
 /* !important: anula :where(main){ max-width: var(--content-max) } de globals.scss
@@ -14,31 +14,45 @@
   padding-left: 0 !important;
   padding-right: 0 !important;
 
-  --ds-tinta:       #14211C;
-  --ds-pino:        #1F5F4E;
-  --ds-pino-claro:  #2F7A65;
-  --ds-papel:       #FAF9F6;
-  --ds-papel-hueso: #F1F0EA;
-  --ds-musgo:       #DCE6DD;
-  --ds-pizarra:     #5B6660;
-  --ds-niebla:      #9FB0A8;
-  --ds-linea:       #E3E5DF;
-  --ds-linea-osc:   rgba(255, 255, 255, 0.08);
-  --ds-sombra:      0 2px 8px rgba(20, 33, 28, 0.06);
+  /* Fondo / superficies */
+  --ds-abyss:       #050b18;   /* fondo base de la página */
+  --ds-panel:       #0a1628;   /* paneles elevados (hero, stats, cta) */
+  --ds-glass:       rgba(255, 255, 255, 0.045);
+  --ds-glass-strong: rgba(255, 255, 255, 0.075);
+  --ds-linea:       rgba(140, 190, 255, 0.14);
+  --ds-linea-osc:   rgba(140, 190, 255, 0.22);
+  --ds-sombra:      0 18px 44px rgba(0, 0, 0, 0.45);
 
-  /* Legacy aliases for partial compatibility */
-  --bg:    var(--ds-papel);
-  --text:  var(--ds-tinta);
+  /* Texto */
+  --ds-ink:      #eef4ff;   /* texto primario, claro sobre fondo oscuro */
+  --ds-pizarra:  #a9bbd6;   /* texto secundario */
+  --ds-niebla:   #7288ad;   /* texto terciario / dim */
+
+  /* Acentos neón */
+  --ds-cyan:        #2dd8f2;
+  --ds-cyan-strong: #12b6d4;
+  --ds-cyan-soft:   #9fecfa;
+  --ds-orange:      #ff9d3c;
+  --ds-purple:      #b06bff;
+
+  /* Legacy aliases (compatibilidad con nombres previos) */
+  --ds-tinta:       var(--ds-ink);
+  --ds-pino:        var(--ds-cyan);
+  --ds-pino-claro:  var(--ds-cyan-strong);
+  --ds-papel:       var(--ds-abyss);
+  --ds-papel-hueso: var(--ds-glass);
+  --ds-musgo:       var(--ds-cyan-soft);
+  --bg:    var(--ds-abyss);
+  --text:  var(--ds-ink);
   --line:  var(--ds-linea);
-  --teal:  var(--ds-pino);
-  --mint:  var(--ds-pino-claro);
-  --glass: var(--ds-papel-hueso);
+  --teal:  var(--ds-cyan);
+  --mint:  var(--ds-cyan-strong);
+  --glass: var(--ds-glass);
 
   position: relative;
-  background: var(--ds-papel);
-  color: var(--ds-tinta);
+  background: var(--ds-abyss);
+  color: var(--ds-ink);
   min-height: 100vh;
-  /* Manrope Regular — texto descriptivo según brand guide */
   font-family: "Manrope", var(--nx-font-body, system-ui), sans-serif;
   overflow-x: hidden;
 }
@@ -49,7 +63,7 @@
   padding: 0 clamp(20px, 4vw, 56px);
 }
 
-/* ── Hero — fondo Tinta full-bleed ── */
+/* ── Hero — panel oscuro elevado full-bleed con glow de circuito ── */
 /* !important: anula :where(section){max-width} de globals.scss */
 .hero {
   width: 100% !important;
@@ -57,14 +71,17 @@
   margin-left: 0 !important;
   margin-right: 0 !important;
   position: relative;
-  background: var(--ds-tinta);
-  color: var(--ds-papel);
+  background:
+    radial-gradient(120% 140% at 14% -10%, color-mix(in srgb, var(--ds-cyan) 16%, transparent), transparent 58%),
+    radial-gradient(90% 120% at 100% 0%, color-mix(in srgb, var(--ds-purple) 14%, transparent), transparent 60%),
+    var(--ds-panel);
+  color: var(--ds-ink);
   padding: clamp(100px, 13vw, 148px) 0 clamp(64px, 8vw, 96px);
   overflow: hidden;
   isolation: isolate;
 }
 
-/* Fade suave Tinta → Papel al pie del hero */
+/* Fade suave del hero hacia el fondo de la página */
 .hero::after {
   content: "";
   position: absolute;
@@ -72,7 +89,7 @@
   left: 0;
   right: 0;
   height: 96px;
-  background: linear-gradient(to bottom, transparent, var(--ds-papel));
+  background: linear-gradient(to bottom, transparent, var(--ds-abyss));
   pointer-events: none;
   z-index: 2;
 }
@@ -86,7 +103,7 @@
   z-index: 1;
 }
 
-/* Eyebrow del hero: mono con línea izquierda, sobre fondo oscuro */
+/* Eyebrow del hero: mono con línea izquierda cian */
 .heroEyebrow {
   display: inline-flex;
   align-items: center;
@@ -96,7 +113,7 @@
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ds-musgo);
+  color: var(--ds-cyan-soft);
   margin-bottom: 20px;
 }
 
@@ -105,24 +122,28 @@
   display: inline-block;
   width: 24px;
   height: 1px;
-  background: var(--ds-musgo);
+  background: var(--ds-cyan);
   flex-shrink: 0;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ds-cyan) 70%, transparent);
 }
 
 .heroTitle {
   margin: 0 0 18px;
-  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
+  font-family: "Space Grotesk", var(--ds-font-display, "Manrope", sans-serif);
   font-size: clamp(2.2rem, 4.8vw, 3.6rem);
-  font-weight: 400;
+  font-weight: 500;
   line-height: 1.06;
   letter-spacing: -0.025em;
-  color: var(--ds-papel);
+  color: var(--ds-ink);
   text-wrap: balance;
 }
 
-/* Un único acento por título — Musgo sobre fondo oscuro */
+/* Un único acento por título — cian neón */
 .heroTitleAccent {
-  color: var(--ds-musgo);
+  background: linear-gradient(120deg, var(--ds-cyan) 0%, var(--ds-cyan-soft) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   font-style: normal;
 }
 
@@ -130,7 +151,7 @@
   margin: 0 0 28px;
   font-size: clamp(1rem, 1.3vw, 1.14rem);
   line-height: 1.65;
-  color: var(--ds-niebla);
+  color: var(--ds-pizarra);
   max-width: 54ch;
   text-wrap: pretty;
 }
@@ -141,14 +162,15 @@
   gap: 12px;
 }
 
-/* Imagen del hero — sin overlay oscuro intrusivo */
+/* Imagen del hero */
 .heroImage {
   position: relative;
   aspect-ratio: 4 / 3;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
   border: 1px solid var(--ds-linea-osc);
-  background: #14211C;
+  background: #071120;
+  box-shadow: var(--ds-sombra);
 }
 
 .heroImage img {
@@ -161,7 +183,7 @@
 .heroImageOverlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 55%, rgba(20, 33, 28, 0.55) 100%);
+  background: linear-gradient(180deg, transparent 55%, rgba(3, 8, 18, 0.6) 100%);
   pointer-events: none;
 }
 
@@ -172,10 +194,10 @@
   align-items: center;
   gap: 10px;
   padding: 13px 24px;
-  border-radius: 8px;
+  border-radius: 10px;
   font-family: "Inter Tight", var(--nx-font-ui, "Inter", system-ui), sans-serif;
   font-size: 0.93rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   border: 1px solid transparent;
   transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
@@ -183,44 +205,46 @@
 }
 
 .btn:focus-visible {
-  outline: 2px solid var(--ds-pino);
+  outline: 2px solid var(--ds-cyan);
   outline-offset: 2px;
 }
 
-/* Primario: Pino sobre Papel (en hero: sobre Tinta bg → válido por contraste) */
+/* Primario: cian sólido con glow neón */
 .btnPrimary {
-  background: var(--ds-pino);
-  color: var(--ds-papel);
-  border-color: var(--ds-pino);
+  background: linear-gradient(135deg, var(--ds-cyan) 0%, var(--ds-cyan-strong) 100%);
+  color: #04131a;
+  border-color: transparent;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ds-cyan) 38%, transparent);
 }
 
 .btnPrimary:hover {
-  background: var(--ds-pino-claro);
-  border-color: var(--ds-pino-claro);
   transform: translateY(-2px);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--ds-cyan) 52%, transparent);
 }
 
 /* Secundario sobre fondo oscuro del hero */
 .btnSecondary {
-  background: transparent;
-  color: var(--ds-papel);
-  border-color: rgba(250, 249, 246, 0.35);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ds-ink);
+  border-color: rgba(238, 244, 255, 0.28);
 }
 
 .btnSecondary:hover {
-  border-color: var(--ds-papel);
+  border-color: var(--ds-cyan);
+  color: var(--ds-cyan-soft);
   transform: translateY(-2px);
 }
 
-/* Secundario sobre fondo claro (en secciones del body) */
+/* Secundario sobre secciones del body (ya no hay fondo claro, mismo skin oscuro) */
 .btnSecondaryLight {
   background: transparent;
-  color: var(--ds-tinta);
+  color: var(--ds-ink);
   border: 1px solid var(--ds-linea);
 }
 
 .btnSecondaryLight:hover {
-  border-color: var(--ds-pino);
+  border-color: var(--ds-cyan);
+  color: var(--ds-cyan-soft);
   transform: translateY(-2px);
 }
 
@@ -245,7 +269,7 @@
   margin: 0 auto clamp(20px, 2.8vw, 36px);
 }
 
-/* Eyebrow de sección: mono con líneas a ambos lados cuando centrado */
+/* Eyebrow de sección: mono con líneas cian a ambos lados */
 .eyebrow {
   display: inline-flex;
   align-items: center;
@@ -265,24 +289,28 @@
   display: inline-block;
   width: 24px;
   height: 1px;
-  background: var(--ds-pino);
+  background: var(--ds-cyan);
   flex-shrink: 0;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ds-cyan) 60%, transparent);
 }
 
 .sectionTitle {
   margin: 0 0 14px;
-  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
+  font-family: "Space Grotesk", var(--ds-font-display, "Manrope", sans-serif);
   font-size: clamp(1.75rem, 3.2vw, 2.6rem);
-  font-weight: 400;
+  font-weight: 500;
   line-height: 1.1;
   letter-spacing: -0.022em;
-  color: var(--ds-tinta);
+  color: var(--ds-ink);
   text-wrap: balance;
 }
 
-/* Un único acento por título — Pino sobre fondo claro */
+/* Un único acento por título — cian neón */
 .sectionTitleAccent {
-  color: var(--ds-pino);
+  background: linear-gradient(120deg, var(--ds-cyan) 0%, var(--ds-cyan-soft) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   font-style: normal;
 }
 
@@ -314,37 +342,42 @@
   gap: clamp(14px, 1.8vw, 20px);
 }
 
-/* ── Cards genéricas ─────────────────────────────────────── */
+/* ── Cards genéricas — vidrio esmerilado ─────────────────── */
 
 .card {
   position: relative;
-  background: var(--ds-papel-hueso);
+  background: var(--ds-glass);
   border: 1px solid var(--ds-linea);
-  border-radius: 12px;
+  border-radius: 16px;
   padding: clamp(20px, 2.4vw, 28px);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease, background 200ms ease;
 }
 
 .card:hover {
-  border-color: color-mix(in srgb, var(--ds-pino) 60%, transparent);
-  box-shadow: 0 4px 16px rgba(31, 95, 78, 0.07);
+  background: var(--ds-glass-strong);
+  border-color: color-mix(in srgb, var(--ds-cyan) 55%, transparent);
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--ds-cyan) 16%, transparent);
+  transform: translateY(-2px);
 }
 
 .cardIcon {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
   margin-bottom: 16px;
-  background: var(--ds-musgo);
-  color: var(--ds-pino);
+  background: color-mix(in srgb, var(--ds-cyan) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ds-cyan) 30%, transparent);
+  color: var(--ds-cyan);
   flex-shrink: 0;
 }
 
 .cardIcon svg {
-  width: 20px;
-  height: 20px;
+  width: 21px;
+  height: 21px;
   stroke-width: 1.7;
 }
 
@@ -353,7 +386,7 @@
   font-size: 1.08rem;
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: var(--ds-tinta);
+  color: var(--ds-ink);
   line-height: 1.3;
 }
 
@@ -368,23 +401,24 @@
 
 .imageCard {
   position: relative;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
   border: 1px solid var(--ds-linea);
-  background: var(--ds-papel-hueso);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  background: var(--ds-glass);
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
 }
 
 .imageCard:hover {
-  border-color: color-mix(in srgb, var(--ds-pino) 60%, transparent);
-  box-shadow: 0 4px 16px rgba(31, 95, 78, 0.07);
+  border-color: color-mix(in srgb, var(--ds-cyan) 55%, transparent);
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--ds-cyan) 16%, transparent);
+  transform: translateY(-2px);
 }
 
 .imageCardImg {
   position: relative;
   aspect-ratio: 16 / 10;
   overflow: hidden;
-  background: var(--ds-tinta);
+  background: #071120;
 }
 
 .imageCardImg img {
@@ -402,7 +436,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 45%, rgba(20, 33, 28, 0.65) 100%);
+  background: linear-gradient(180deg, transparent 45%, rgba(3, 8, 18, 0.7) 100%);
   pointer-events: none;
 }
 
@@ -415,7 +449,7 @@
   font-size: 1.08rem;
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: var(--ds-tinta);
+  color: var(--ds-ink);
   line-height: 1.3;
 }
 
@@ -426,15 +460,20 @@
   color: var(--ds-pizarra);
 }
 
-/* ── CTA Final — Pino sólido ─────────────────────────────── */
+/* ── CTA Final — panel de vidrio con borde neón ──────────── */
 
 .ctaShell {
   position: relative;
   padding: clamp(48px, 6vw, 72px) clamp(32px, 6vw, 64px);
-  border-radius: 16px;
-  background: var(--ds-pino);
-  color: var(--ds-papel);
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--ds-cyan) 18%, transparent), transparent 60%),
+    radial-gradient(100% 140% at 100% 100%, color-mix(in srgb, var(--ds-purple) 16%, transparent), transparent 60%),
+    var(--ds-panel);
+  border: 1px solid var(--ds-linea-osc);
+  color: var(--ds-ink);
   text-align: center;
+  overflow: hidden;
 }
 
 .ctaShell::before {
@@ -448,11 +487,11 @@
 
 .ctaTitle {
   margin: 0 0 12px;
-  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
+  font-family: "Space Grotesk", var(--ds-font-display, "Manrope", sans-serif);
   font-size: clamp(1.6rem, 3vw, 2.4rem);
-  font-weight: 400;
+  font-weight: 500;
   letter-spacing: -0.02em;
-  color: var(--ds-papel);
+  color: var(--ds-ink);
   text-wrap: balance;
 }
 
@@ -461,7 +500,7 @@
   max-width: 50ch;
   font-size: 1rem;
   line-height: 1.65;
-  color: rgba(250, 249, 246, 0.78);
+  color: var(--ds-pizarra);
 }
 
 .ctaActions {
@@ -471,31 +510,28 @@
   justify-content: center;
 }
 
-/* Botones dentro del CTA Pino */
+/* Botones dentro del CTA (ya heredan .btnPrimary / .btnSecondary) */
 .ctaShell .btnPrimary {
-  background: var(--ds-papel);
-  color: var(--ds-tinta);
-  border-color: var(--ds-papel);
-}
-
-.ctaShell .btnPrimary:hover {
-  background: var(--ds-papel-hueso);
-  border-color: var(--ds-papel-hueso);
+  background: linear-gradient(135deg, var(--ds-cyan) 0%, var(--ds-cyan-strong) 100%);
+  color: #04131a;
+  border-color: transparent;
 }
 
 .ctaShell .btnSecondary {
   background: transparent;
-  color: var(--ds-papel);
-  border-color: rgba(250, 249, 246, 0.38);
+  color: var(--ds-ink);
+  border-color: rgba(238, 244, 255, 0.3);
 }
 
 .ctaShell .btnSecondary:hover {
-  border-color: var(--ds-papel);
+  border-color: var(--ds-cyan);
 }
 
 /* Acento del título dentro del CTA */
 .ctaShell .sectionTitleAccent {
-  color: var(--ds-musgo);
+  background: linear-gradient(120deg, var(--ds-orange) 0%, var(--ds-purple) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
 }
 
 /* ── Chips / filtros ─────────────────────────────────────── */
@@ -512,10 +548,10 @@
   align-items: center;
   gap: 8px;
   padding: 9px 16px;
-  border-radius: 8px;
-  background: var(--ds-papel-hueso);
+  border-radius: 10px;
+  background: var(--ds-glass);
   border: 1px solid var(--ds-linea);
-  color: var(--ds-tinta);
+  color: var(--ds-ink);
   font-size: 0.88rem;
   font-weight: 500;
   transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
@@ -523,25 +559,26 @@
 }
 
 .chip:hover {
-  border-color: var(--ds-pino);
-  color: var(--ds-pino);
-  background: color-mix(in srgb, var(--ds-musgo) 40%, var(--ds-papel-hueso));
+  border-color: var(--ds-cyan);
+  color: var(--ds-cyan-soft);
+  background: color-mix(in srgb, var(--ds-cyan) 10%, var(--ds-glass));
 }
 
 .chip svg {
   width: 16px;
   height: 16px;
-  color: var(--ds-pino);
+  color: var(--ds-cyan);
 }
 
 /* ── Métricas / stats ────────────────────────────────────── */
 
-/* Shell oscuro para secciones de resultados */
+/* Shell oscuro elevado para secciones de resultados */
 .statsShell {
   padding: clamp(40px, 5vw, 64px) clamp(24px, 4vw, 48px);
-  border-radius: 16px;
-  background: var(--ds-tinta);
-  color: var(--ds-papel);
+  border-radius: 20px;
+  background: var(--ds-panel);
+  border: 1px solid var(--ds-linea);
+  color: var(--ds-ink);
 }
 
 .statsGrid {
@@ -563,16 +600,16 @@
   top: 15%;
   bottom: 15%;
   width: 1px;
-  background: var(--ds-linea-osc);
+  background: var(--ds-linea);
 }
 
 .statValue {
   display: block;
   font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
   font-size: clamp(1.8rem, 3vw, 2.6rem);
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.02em;
-  color: var(--ds-papel);
+  color: var(--ds-cyan-soft);
   line-height: 1;
 }
 
@@ -587,9 +624,9 @@
   color: var(--ds-niebla);
 }
 
-/* Stat sobre fondo claro (cuando no está en statsShell) */
+/* Stat fuera de statsShell: mismo skin oscuro (ya no hay fondo claro) */
 .statsGrid:not(.statsShell .statsGrid) .statValue {
-  color: var(--ds-tinta);
+  color: var(--ds-cyan-soft);
 }
 
 .statsGrid:not(.statsShell .statsGrid) .stat + .stat::before {
@@ -608,10 +645,10 @@
 .splitImage {
   position: relative;
   aspect-ratio: 4 / 3;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
   border: 1px solid var(--ds-linea);
-  background: var(--ds-papel-hueso);
+  background: var(--ds-glass);
 }
 
 .splitImage img {
@@ -622,11 +659,11 @@
 
 .splitBody h3 {
   margin: 0 0 14px;
-  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
+  font-family: "Space Grotesk", var(--ds-font-display, "Manrope", sans-serif);
   font-size: clamp(1.4rem, 2.4vw, 1.9rem);
-  font-weight: 400;
+  font-weight: 500;
   letter-spacing: -0.02em;
-  color: var(--ds-tinta);
+  color: var(--ds-ink);
 }
 
 .splitBody p {
@@ -649,7 +686,7 @@
   padding-left: 20px;
   font-size: 0.94rem;
   line-height: 1.55;
-  color: var(--ds-tinta);
+  color: var(--ds-ink);
 }
 
 .bulletList li::before {
@@ -660,7 +697,8 @@
   width: 8px;
   height: 8px;
   border-radius: 2px;
-  background: var(--ds-pino);
+  background: var(--ds-cyan);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ds-cyan) 70%, transparent);
 }
 
 /* ── Responsive ──────────────────────────────────────────── */

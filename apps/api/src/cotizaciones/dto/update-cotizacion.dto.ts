@@ -35,6 +35,14 @@ export class UpdateCotizacionDto {
   clientAddress?: string;
 
   @IsOptional()
+  @IsInt()
+  salesClientId?: number;
+
+  @IsOptional()
+  @IsInt()
+  opportunityId?: number;
+
+  @IsOptional()
   @IsString()
   projectName?: string;
 

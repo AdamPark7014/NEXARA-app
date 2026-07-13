@@ -12,8 +12,10 @@ import {
   Put,
   Res,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import * as path from 'path';
@@ -81,16 +83,19 @@ export class HeroSlidesController {
   // ── Admin (Studio) ─────────────────────────────────────────────────
 
   @Get()
+  @UseGuards(AuthGuard('jwt'))
   adminList() {
     return this.heroSlidesService.adminList();
   }
 
   @Get(':id')
+  @UseGuards(AuthGuard('jwt'))
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.heroSlidesService.findOne(id);
   }
 
   @Post()
+  @UseGuards(AuthGuard('jwt'))
   @UseInterceptors(FileInterceptor('image'))
   create(
     @Body() payload: CreateHeroSlideDto,
@@ -101,6 +106,7 @@ export class HeroSlidesController {
   }
 
   @Put(':id')
+  @UseGuards(AuthGuard('jwt'))
   @UseInterceptors(FileInterceptor('image'))
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -112,11 +118,13 @@ export class HeroSlidesController {
   }
 
   @Patch('reorder')
+  @UseGuards(AuthGuard('jwt'))
   reorder(@Body() payload: ReorderHeroSlidesDto) {
     return this.heroSlidesService.reorder(payload.ids);
   }
 
   @Delete(':id')
+  @UseGuards(AuthGuard('jwt'))
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.heroSlidesService.remove(id);
   }

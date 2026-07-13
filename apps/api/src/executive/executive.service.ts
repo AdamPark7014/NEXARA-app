@@ -118,7 +118,7 @@ export class ExecutiveService {
       this.prisma.activity.count({
         where: { ticketType: { not: null }, estatus: 'Finalizado', fechaFinalizacion: { gte: startOfMonth, lte: endOfMonth } },
       }).catch(() => 0),
-      this.prisma.client.count().catch(() => 0),
+      this.prisma.salesClient.count().catch(() => 0),
       (this.prisma as any).maintenanceContract.count({ where: { status: 'ACTIVE' } }).catch(() => 0),
       (this.prisma as any).maintenanceContractVisit.count({
         where: { scheduledDate: { gte: now, lte: new Date(now.getTime() + 30 * 86400000) }, status: { in: ['SCHEDULED', 'GENERATED'] } },

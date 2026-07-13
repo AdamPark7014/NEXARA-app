@@ -156,16 +156,52 @@ export class CotizacionesService {
     const baseQuoteNumber = dto.quoteNumber.trim();
     const quoteNumber = await this.ensureUniqueQuoteNumber(baseQuoteNumber);
 
-    const data = {
+    let salesClientId = dto.salesClientId ? Number(dto.salesClientId) : null;
+    let opportunityId = dto.opportunityId ? Number(dto.opportunityId) : null;
+    let clientName = dto.clientName?.trim() || null;
+    let clientCompany = dto.clientCompany?.trim() || null;
+    let clientEmail = dto.clientEmail?.trim() || null;
+    let clientPhone = dto.clientPhone?.trim() || null;
+    let clientAddress = dto.clientAddress?.trim() || null;
+
+    if (opportunityId) {
+      const opportunity = await this.db.salesOpportunity.findUnique({
+        where: { id: opportunityId },
+        include: { client: true },
+      });
+      if (!opportunity) throw new BadRequestException('Oportunidad no encontrada');
+      if (!salesClientId && opportunity.clientId) salesClientId = opportunity.clientId;
+      if (!clientName && opportunity.client) {
+        clientName = opportunity.client.name;
+        clientCompany = clientCompany || opportunity.client.legalName || opportunity.client.name;
+        clientEmail = clientEmail || opportunity.client.billingEmail;
+        clientPhone = clientPhone || opportunity.client.billingPhone;
+        clientAddress = clientAddress || opportunity.client.fiscalAddress;
+      }
+    }
+
+    if (salesClientId) {
+      const salesClient = await this.db.salesClient.findUnique({ where: { id: salesClientId } });
+      if (!salesClient) throw new BadRequestException('Cliente comercial no encontrado');
+      clientName = clientName || salesClient.name;
+      clientCompany = clientCompany || salesClient.legalName || salesClient.name;
+      clientEmail = clientEmail || salesClient.billingEmail;
+      clientPhone = clientPhone || salesClient.billingPhone;
+      clientAddress = clientAddress || salesClient.fiscalAddress;
+    }
+
+    const data: Prisma.CotizacionUncheckedCreateInput = {
       quoteNumber,
       issueDate: this.parseDate(dto.issueDate) || new Date(),
       validUntil: this.parseDate(dto.validUntil),
       status,
-      clientName: dto.clientName?.trim() || null,
-      clientCompany: dto.clientCompany?.trim() || null,
-      clientEmail: dto.clientEmail?.trim() || null,
-      clientPhone: dto.clientPhone?.trim() || null,
-      clientAddress: dto.clientAddress?.trim() || null,
+      salesClientId,
+      opportunityId,
+      clientName,
+      clientCompany,
+      clientEmail,
+      clientPhone,
+      clientAddress,
       projectName: dto.projectName?.trim() || null,
       scope: dto.scope?.trim() || null,
       paymentTerms: dto.paymentTerms?.trim() || null,
@@ -181,26 +217,37 @@ export class CotizacionesService {
       iepsTotal: round2(totals.iepsTotal),
       retentionTotal: round2(totals.retentionTotal),
       total: round2(totals.total),
+      createdById: createdById || null,
       items: { create: this.buildItemData(items) },
-      createdBy: createdById ? { connect: { id: createdById } } : undefined,
     };
 
     let created: Awaited<ReturnType<typeof this.db.cotizacion.create>>;
     try {
       created = await this.db.cotizacion.create({
         data,
-        include: { items: true },
+        include: { items: true, salesClient: true, opportunity: true },
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const fallback = await this.ensureUniqueQuoteNumber(`${baseQuoteNumber}-${String(Date.now()).slice(-4)}`);
         created = await this.db.cotizacion.create({
           data: { ...data, quoteNumber: fallback },
-          include: { items: true },
+          include: { items: true, salesClient: true, opportunity: true },
         });
       } else {
         throw error;
       }
+    }
+
+    if (opportunityId && createdById) {
+      await this.db.salesOpportunityQuote.create({
+        data: {
+          opportunityId,
+          cotizacionId: created.id,
+          versionLabel: created.quoteNumber,
+          createdById,
+        },
+      }).catch(() => undefined);
     }
 
     if (createdById) {
@@ -254,6 +301,8 @@ export class CotizacionesService {
       quoteNumber: dto.quoteNumber?.trim(),
       issueDate: this.parseDate(dto.issueDate),
       validUntil: this.parseDate(dto.validUntil),
+      salesClientId: dto.salesClientId !== undefined ? (dto.salesClientId ? Number(dto.salesClientId) : null) : undefined,
+      opportunityId: dto.opportunityId !== undefined ? (dto.opportunityId ? Number(dto.opportunityId) : null) : undefined,
       clientName: dto.clientName?.trim(),
       clientCompany: dto.clientCompany?.trim(),
       clientEmail: dto.clientEmail?.trim(),

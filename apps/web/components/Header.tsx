@@ -103,17 +103,17 @@ function BackupRestorePanel() {
   );
 }
 import Link from 'next/link';
-import Image from 'next/image';
+import NexaraMark from '../app/components/NexaraMark';
 import styles from './Header.module.css';
 
 import { usePathname } from 'next/navigation';
 
 const navLinks = [
   { name: 'Inicio', href: '/' },
+  { name: 'Soluciones', href: '/soluciones' },
   { name: 'Servicios', href: '/servicios' },
   { name: 'Nosotros', href: '/nosotros' },
-  { name: 'Proyectos', href: '/proyectos' },
-  { name: 'Blog', href: '/blog' },
+  { name: 'Contacto', href: '/contacto' },
 ];
 
 const isHomeRoute = (pathname: string | null) =>
@@ -196,7 +196,10 @@ export default function Header() {
       <div className={styles.headerInner}>
         <div className={styles.logoSection}>
           <Link href="/" onClick={closeMobileMenu} className={styles.logoLink}>
-            <Image src="/logo-nexara.png" alt="Nexara Logo" className={styles.logo} width={200} height={62} priority />
+            <span className={styles.logoMark}>
+              <NexaraMark size={40} />
+            </span>
+            <span className={styles.logoWordmark}>NEXARA</span>
           </Link>
         </div>
 
@@ -218,7 +221,7 @@ export default function Header() {
           {(pathname && pathname.startsWith('/console')) && <BackupRestorePanel />}
 
           <Link href="/contacto" className={styles.contactCta} onClick={closeMobileMenu}>
-            Contactar
+            Cotiza tu Proyecto
             <span aria-hidden className={styles.contactArrow}>→</span>
           </Link>
 

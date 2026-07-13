@@ -29,6 +29,7 @@ import { ContactMessagesModule } from './contact-messages/contact-messages.modul
 import { NewsletterModule } from './newsletter/newsletter.module';
 import { NewsModule } from './news/news.module';
 import { HeroSlidesModule } from './hero-slides/hero-slides.module';
+import { HeroVideoModule } from './hero-video/hero-video.module.js';
 import { WorkProjectsModule } from './work-projects/work-projects.module';
 import { EmployeePaymentsModule } from './employee-payments/employee-payments.module';
 import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
@@ -108,6 +109,7 @@ import { InternalComunicadosModule } from './internal-comunicados/internal-comun
     NewsletterModule,
     NewsModule,
     HeroSlidesModule,
+    HeroVideoModule,
     PageContentModule,
     CaseStudiesModule,
     SocialPostsModule,

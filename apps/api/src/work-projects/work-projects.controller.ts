@@ -1,8 +1,8 @@
 import {
-  Body,
   Controller,
   Delete,
   Get,
+  GoneException,
   Param,
   ParseIntPipe,
   Patch,
@@ -15,15 +15,17 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { WorkProjectsService } from './work-projects.service.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
-import { CreateWorkProjectDto } from './dto/create-work-project.dto.js';
-import { UpdateWorkProjectDto } from './dto/update-work-project.dto.js';
-import { CreateWorkProjectExpenseDto } from './dto/create-work-project-expense.dto.js';
-import { CreateWorkProjectPayrollDto } from './dto/create-work-project-payroll.dto.js';
-import { CreateWorkProjectLogDto } from './dto/create-work-project-log.dto.js';
 
+/** @deprecated Use OperationalProject (/operational-projects). Read-only for legacy data. */
 @Controller('work-projects')
 export class WorkProjectsController {
   constructor(private readonly service: WorkProjectsService) {}
+
+  private rejectWrites(): never {
+    throw new GoneException(
+      'work-projects está deprecado. Usa operational-projects (OPS) y sales-projects (CRM).',
+    );
+  }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
@@ -42,51 +44,42 @@ export class WorkProjectsController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Post()
-  create(@Body() dto: CreateWorkProjectDto) {
-    return this.service.create(dto);
+  create() {
+    return this.rejectWrites();
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateWorkProjectDto) {
-    return this.service.update(id, dto);
+  update() {
+    return this.rejectWrites();
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.service.remove(id);
+  remove() {
+    return this.rejectWrites();
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Post(':id/expenses')
-  addExpense(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: CreateWorkProjectExpenseDto,
-  ) {
-    return this.service.addExpense(id, dto);
+  addExpense() {
+    return this.rejectWrites();
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Post(':id/payroll')
-  addPayroll(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: CreateWorkProjectPayrollDto,
-  ) {
-    return this.service.addPayroll(id, dto);
+  addPayroll() {
+    return this.rejectWrites();
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Post(':id/logs')
-  addLog(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: CreateWorkProjectLogDto,
-  ) {
-    return this.service.addLog(id, dto);
+  addLog() {
+    return this.rejectWrites();
   }
 }

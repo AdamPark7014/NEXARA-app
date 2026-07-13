@@ -9,8 +9,8 @@
   color: inherit;
   cursor: pointer;
   text-align: left;
-  border: 1px solid #E3E5DF !important;
-  background: #F1F0EA !important;
+  border: 1px solid rgba(140, 190, 255, 0.16) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
 }
 
 .channelCta {
@@ -20,7 +20,7 @@
   gap: 6px;
   font-size: 0.88rem;
   font-weight: 500;
-  color: #1F5F4E;
+  color: #2dd8f2;
   transition: gap 150ms ease;
 }
 
@@ -49,14 +49,14 @@
   align-items: flex-start;
   padding: 14px 16px;
   border-radius: 10px;
-  border: 1px solid #E3E5DF;
-  background: #FAF9F6;
+  border: 1px solid rgba(140, 190, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .asideContact svg {
   width: 20px;
   height: 20px;
-  color: #1F5F4E;
+  color: #2dd8f2;
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -65,20 +65,20 @@
   display: block;
   font-size: 0.93rem;
   font-weight: 600;
-  color: #14211C;
+  color: #eef4ff;
 }
 
 .asideContact span {
   font-size: 0.82rem;
-  color: #5B6660;
+  color: #a9bbd6;
 }
 
 /* ── Form card ───────────────────────────────────────────── */
 
 .formCard {
   padding: clamp(24px, 3vw, 36px) !important;
-  background: #F1F0EA !important;
-  border: 1px solid #E3E5DF !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(140, 190, 255, 0.16) !important;
 }
 
 .form {
@@ -100,7 +100,7 @@
 .field span {
   font-size: 0.82rem;
   font-weight: 600;
-  color: #14211C;
+  color: #eef4ff;
   letter-spacing: 0.01em;
 }
 
@@ -110,9 +110,9 @@
   width: 100%;
   padding: 11px 14px;
   border-radius: 8px;
-  border: 1px solid #E3E5DF;
-  background: #FAF9F6;
-  color: #14211C;
+  border: 1px solid rgba(140, 190, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: #eef4ff;
   font: inherit;
   font-size: 0.94rem;
   outline: none;
@@ -121,15 +121,15 @@
 
 .field input::placeholder,
 .field textarea::placeholder {
-  color: #9FB0A8;
+  color: #7288ad;
 }
 
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  border-color: #1F5F4E;
-  box-shadow: 0 0 0 3px rgba(31, 95, 78, 0.1);
-  background: #FAF9F6;
+  border-color: #2dd8f2;
+  box-shadow: 0 0 0 3px rgba(45, 216, 242, 0.16);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .field textarea {
@@ -140,11 +140,11 @@
 
 .field select {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235B6660' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a9bbd6' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: calc(100% - 14px) 50%;
   padding-right: 36px;
-  background-color: #FAF9F6;
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
 .submitBtn {
@@ -157,11 +157,11 @@
   margin: 0;
   text-align: center;
   font-size: 0.78rem;
-  color: #9FB0A8;
+  color: #7288ad;
 }
 
 .formNote a {
-  color: #1F5F4E;
+  color: #2dd8f2;
   text-decoration: none;
 }
 
@@ -185,8 +185,8 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: #DCE6DD;
-  color: #1F5F4E;
+  background: rgba(45, 216, 242, 0.16);
+  color: #2dd8f2;
 }
 
 .successIcon svg {
@@ -199,12 +199,12 @@
   font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
   font-size: 1.4rem;
   font-weight: 400;
-  color: #14211C;
+  color: #eef4ff;
 }
 
 .successBlock p {
   margin: 0;
-  color: #5B6660;
+  color: #a9bbd6;
   max-width: 36ch;
 }
 
@@ -214,8 +214,8 @@
   position: relative;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid #E3E5DF;
-  background: #DCE6DD;
+  border: 1px solid rgba(140, 190, 255, 0.16);
+  background: rgba(45, 216, 242, 0.16);
   height: 420px;
 }
 

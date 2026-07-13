@@ -17,18 +17,23 @@ export class SearchService {
     const q = term.trim();
     const take = Math.min(limit, 50);
 
-    const [users, clients, projects, activities, invoices, assets, vehicles, workProjects] = await Promise.all([
+    const [users, salesClients, salesProjects, operationalProjects, activities, invoices, assets, vehicles] = await Promise.all([
       this.prisma.user.findMany({
         where: { OR: [{ nombre: { contains: q, mode: 'insensitive' } }, { email: { contains: q, mode: 'insensitive' } }] },
         select: { id: true, nombre: true, email: true },
         take,
       }),
-      this.prisma.client.findMany({
+      this.prisma.salesClient.findMany({
+        where: { OR: [{ name: { contains: q, mode: 'insensitive' } }, { legalName: { contains: q, mode: 'insensitive' } }] },
+        select: { id: true, name: true, legalName: true },
+        take,
+      }),
+      this.prisma.salesProject.findMany({
         where: { name: { contains: q, mode: 'insensitive' } },
         select: { id: true, name: true },
         take,
       }),
-      this.prisma.project.findMany({
+      this.prisma.operationalProject.findMany({
         where: { title: { contains: q, mode: 'insensitive' } },
         select: { id: true, title: true },
         take,
@@ -53,22 +58,17 @@ export class SearchService {
         select: { id: true, nombre: true, placas: true },
         take,
       }),
-      this.prisma.workProject.findMany({
-        where: { title: { contains: q, mode: 'insensitive' } },
-        select: { id: true, title: true },
-        take,
-      }),
     ]);
 
     const results: SearchResult[] = [
       ...users.map((u: any) => ({ type: 'user', id: u.id, title: u.nombre, subtitle: u.email })),
-      ...clients.map((c: any) => ({ type: 'client', id: c.id, title: c.name })),
-      ...projects.map((p: any) => ({ type: 'project', id: p.id, title: p.title })),
+      ...salesClients.map((c: any) => ({ type: 'sales-client', id: c.id, title: c.name, subtitle: c.legalName ?? undefined })),
+      ...salesProjects.map((p: any) => ({ type: 'sales-project', id: p.id, title: p.name })),
+      ...operationalProjects.map((p: any) => ({ type: 'operational-project', id: p.id, title: p.title })),
       ...activities.map((a: any) => ({ type: 'activity', id: a.id, title: a.titulo })),
       ...invoices.map((i: any) => ({ type: 'invoice', id: i.id, title: i.invoiceNumber, subtitle: i.receptorName ?? undefined })),
       ...assets.map((a: any) => ({ type: 'asset', id: a.id, title: a.name, subtitle: a.code })),
       ...vehicles.map((v: any) => ({ type: 'vehicle', id: v.id, title: v.nombre, subtitle: v.placas ?? undefined })),
-      ...workProjects.map((w: any) => ({ type: 'work-project', id: w.id, title: w.title })),
     ];
 
     return { results: results.slice(0, take), total: results.length };

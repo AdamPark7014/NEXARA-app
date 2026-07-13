@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════
    NEXARA · Landing — Design System
-   Paleta:      Tinta #14211C · Pino #1F5F4E · Papel #FAF9F6
+   Paleta:      Tinta #eef4ff · Pino #2dd8f2 · Papel #FAF9F6
    Tipografía:  Fraunces (display) · Inter (body) · JetBrains Mono (data)
    Espaciado:   base-8px · secciones clamp(48–80px) top
    ═══════════════════════════════════════════════════════════ */
@@ -10,7 +10,7 @@
   max-width: 1140px;
   margin: 0 auto;
   padding: 0 clamp(20px, 4vw, 56px);
-  background: #FAF9F6;
+  background: #050b18;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -23,7 +23,10 @@
   max-width: none !important;
   margin-left: 0 !important;
   margin-right: 0 !important;
-  background: #14211C;
+  background:
+    radial-gradient(80% 140% at 15% 0%, rgba(45, 216, 242, 0.1), transparent 60%),
+    radial-gradient(70% 120% at 90% 100%, rgba(176, 107, 255, 0.09), transparent 60%),
+    #0a1628;
   padding: clamp(44px, 5.5vw, 64px) clamp(20px, 4vw, 56px);
 }
 
@@ -97,7 +100,7 @@
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: #1F5F4E;
+  color: #2dd8f2;
   margin-bottom: 18px;
 }
 
@@ -106,7 +109,7 @@
   display: inline-block;
   width: 24px;
   height: 1px;
-  background: #1F5F4E;
+  background: #2dd8f2;
   flex-shrink: 0;
 }
 
@@ -116,7 +119,7 @@
   font-size: clamp(26px, 3.6vw, 44px);
   font-weight: 300;
   line-height: 1.16;
-  color: #14211C;
+  color: #eef4ff;
   letter-spacing: -0.022em;
   margin: 0 0 14px;
   text-wrap: balance;
@@ -125,14 +128,14 @@
 /* Acento: itálica Pino — una sola frase por página */
 .accent {
   font-style: italic;
-  color: #1F5F4E;
+  color: #2dd8f2;
 }
 
 .sectionLead {
   font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
   font-size: 15px;
   line-height: 1.7;
-  color: #5B6660;
+  color: #a9bbd6;
   margin: 0;
   max-width: 58ch;
 }
@@ -152,7 +155,7 @@
   display: inline-block;
   width: 24px;
   height: 1px;
-  background: #1F5F4E;
+  background: #2dd8f2;
   flex-shrink: 0;
 }
 
@@ -165,7 +168,7 @@
    ════════════════════════════════════════════════════════════ */
 
 .serviciosList {
-  border-top: 1px solid #E3E5DF;
+  border-top: 1px solid rgba(140, 190, 255, 0.14);
   padding-bottom: clamp(56px, 7vw, 88px);
   overflow-x: clip;
 }
@@ -177,7 +180,7 @@
   gap: 0 clamp(24px, 3.5vw, 44px);
   padding: 24px 12px;
   margin: 0 -12px;
-  border-bottom: 1px solid #E3E5DF;
+  border-bottom: 1px solid rgba(140, 190, 255, 0.14);
   text-decoration: none;
   color: inherit;
   border-radius: 6px;
@@ -185,11 +188,11 @@
 }
 
 .servicioRow:hover {
-  background: #F1F0EA;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .servicioRow:focus-visible {
-  outline: 2px solid #1F5F4E;
+  outline: 2px solid #2dd8f2;
   outline-offset: -2px;
 }
 
@@ -212,8 +215,8 @@
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #1F5F4E;
-  background: #DCE6DD;
+  color: #9fecfa;
+  background: rgba(45, 216, 242, 0.14);
   padding: 4px 8px;
   border-radius: 4px;
   white-space: nowrap;
@@ -224,7 +227,7 @@
   font-family: 'Fraunces', var(--ds-font-serif, Georgia, serif);
   font-size: 19px;
   font-weight: 400;
-  color: #14211C;
+  color: #eef4ff;
   margin: 0 0 5px;
   line-height: 1.3;
   letter-spacing: -0.01em;
@@ -232,14 +235,14 @@
 }
 
 .servicioRow:hover .servicioTitle {
-  color: #1F5F4E;
+  color: #2dd8f2;
 }
 
 .servicioText {
   font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
   font-size: 13px;
   line-height: 1.65;
-  color: #5B6660;
+  color: #a9bbd6;
   margin: 0;
   max-width: 58ch;
 }
@@ -247,7 +250,7 @@
 /* Flecha: aparece con deslizamiento, visible solo en hover */
 .servicioArrow {
   font-size: 16px;
-  color: #1F5F4E;
+  color: #2dd8f2;
   opacity: 0;
   transform: translateX(-6px);
   transition: opacity 140ms ease, transform 140ms ease;
@@ -264,7 +267,7 @@
    ════════════════════════════════════════════════════════════ */
 
 .procesoSection {
-  border-top: 1px solid #E3E5DF;
+  border-top: 1px solid rgba(140, 190, 255, 0.14);
   padding-top: 0;
   padding-bottom: clamp(56px, 7vw, 88px);
 }
@@ -283,7 +286,7 @@
 /* Borde Musgo — estructural, no de énfasis */
 .procesoStep {
   padding: clamp(20px, 2.5vw, 28px) 0 clamp(20px, 2.5vw, 28px) 0;
-  border-top: 1px solid #DCE6DD;
+  border-top: 1px solid rgba(140, 190, 255, 0.18);
 }
 
 /* Número gran Fraunces italic — decorativo, no funcional */
@@ -292,7 +295,7 @@
   font-size: clamp(34px, 3.8vw, 46px);
   font-weight: 300;
   font-style: italic;
-  color: #B8C9BD;
+  color: #7288ad;
   display: block;
   line-height: 1;
   margin-bottom: 16px;
@@ -303,7 +306,7 @@
   font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
   font-size: 14px;
   font-weight: 600;
-  color: #14211C;
+  color: #eef4ff;
   margin: 0 0 7px;
   letter-spacing: -0.005em;
   line-height: 1.3;
@@ -313,7 +316,7 @@
   font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
   font-size: 13px;
   line-height: 1.65;
-  color: #5B6660;
+  color: #a9bbd6;
   margin: 0;
 }
 
@@ -322,7 +325,7 @@
    ════════════════════════════════════════════════════════════ */
 
 .industriasSection {
-  border-top: 1px solid #E3E5DF;
+  border-top: 1px solid rgba(140, 190, 255, 0.14);
   padding-bottom: clamp(56px, 7vw, 88px);
 }
 
@@ -345,8 +348,8 @@
   font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
   font-size: 13px;
   font-weight: 400;
-  color: #14211C;
-  border: 1px solid #E3E5DF;
+  color: #eef4ff;
+  border: 1px solid rgba(140, 190, 255, 0.14);
   padding: 8px 18px;
   border-radius: 6px;
   letter-spacing: 0.01em;
@@ -357,9 +360,9 @@
 }
 
 .industriaChip:hover {
-  background: #F1F0EA;
-  border-color: #9FB0A8;
-  color: #14211C;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #7288ad;
+  color: #eef4ff;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -372,7 +375,10 @@
   max-width: none !important;
   margin-left: 0 !important;
   margin-right: 0 !important;
-  background: #14211C;
+  background:
+    radial-gradient(90% 160% at 85% 0%, rgba(176, 107, 255, 0.12), transparent 60%),
+    radial-gradient(70% 120% at 10% 100%, rgba(45, 216, 242, 0.1), transparent 60%),
+    #0a1628;
   padding: clamp(64px, 8vw, 104px) clamp(20px, 4vw, 56px);
   text-align: center;
 }
@@ -410,7 +416,7 @@
 /* Acento en Musgo — en paleta, legible sobre Tinta */
 .ctaAccent {
   font-style: italic;
-  color: #DCE6DD;
+  color: #9fecfa;
 }
 
 .ctaText {
@@ -449,20 +455,20 @@
 }
 
 .btn:focus-visible {
-  outline: 2px solid #1F5F4E;
+  outline: 2px solid #2dd8f2;
   outline-offset: 2px;
 }
 
 /* Primario: Pino sólido */
 .btnPrimary {
-  background: #1F5F4E;
-  color: #FAF9F6;
-  border: 1px solid #1F5F4E;
+  background: linear-gradient(135deg, #2dd8f2, #12b6d4);
+  color: #04131a;
+  border: 1px solid transparent;
 }
 
 .btnPrimary:hover {
-  background: #2F7A65;
-  border-color: #2F7A65;
+  background: #12b6d4;
+  border-color: #12b6d4;
   transform: translateY(-1px);
 }
 

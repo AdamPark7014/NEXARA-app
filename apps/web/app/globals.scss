@@ -909,7 +909,7 @@ textarea:disabled {
    el orbe decorativo (position:fixed) que se asomaban al exterior
    del wrapper cuando el contenido tiene max-width < viewport */
 body.dark:has(.public-layout-wrapper) {
-  background: #FAF9F6;
+  background: #050b18;
 }
 
 body.dark:has(.public-layout-wrapper)::before {
@@ -923,76 +923,88 @@ body.dark:has(.public-layout-wrapper)::before {
    marca SIN afectar ningún subdominio.
    ============================================================ */
 .public-friendly {
-  /* Paleta semántica reasignada a los colores oficiales */
-  --primary: var(--nx-teal);
-  --primary-strong: var(--nx-teal-strong);
-  --secondary: #2ec4aa;
-  --accent: var(--nx-orange);
-  --accent-strong: var(--nx-orange-strong);
-  --support: var(--nx-teal-soft);
-  --highlight: var(--nx-magenta);
-  --deep: var(--nx-maroon);
+  /* ============================================================
+     NEXARA · Public brand layer v2 — "Circuito nocturno"
+     Fondo marino profundo + acentos neón (cian / naranja / morado).
+     Reescribe los tokens semánticos SIN afectar ningún subdominio.
+     ============================================================ */
+  --nx-neon-cyan:        #2dd8f2;
+  --nx-neon-cyan-strong: #12b6d4;
+  --nx-neon-cyan-soft:   #9fecfa;
+  --nx-neon-orange:      #ff9d3c;
+  --nx-neon-orange-strong: #ff7a1a;
+  --nx-neon-orange-soft: #ffc27a;
+  --nx-neon-purple:      #b06bff;
+  --nx-neon-purple-strong: #9333ea;
+  --nx-neon-purple-soft: #d9baff;
 
-  /* Superficies claras — eliminan el cast verde oscuro en cards y secciones
-     que usan estos tokens semánticos vía reglas globales con !important.
-     Los tokens de acento (--primary, --accent etc.) se mantienen teal/orange. */
-  --background:          #FAF9F6;   /* ds-papel */
-  --background-elevated: #FFFFFF;
-  --surface:             #FFFFFF;
-  --surface-2:           #F1F0EA;   /* ds-papel-hueso */
-  --surface-3:           #E3E5DF;   /* ds-linea */
+  --primary: var(--nx-neon-cyan);
+  --primary-strong: var(--nx-neon-cyan-strong);
+  --secondary: var(--nx-neon-purple);
+  --accent: var(--nx-neon-orange);
+  --accent-strong: var(--nx-neon-orange-strong);
+  --support: var(--nx-neon-cyan-soft);
+  --highlight: var(--nx-neon-purple);
+  --deep: #0a1628;
 
-  --foreground:      #14211C;   /* ds-tinta */
-  --text-primary:    #14211C;
-  --text-secondary:  #5B6660;   /* ds-pizarra */
-  --text-tertiary:   #9FB0A8;   /* ds-niebla */
+  /* Superficies oscuras — marino profundo con paneles de vidrio esmerilado. */
+  --background:          #050b18;
+  --background-elevated: #0a1628;
+  --surface:             rgba(255, 255, 255, 0.04);
+  --surface-2:           rgba(255, 255, 255, 0.06);
+  --surface-3:           rgba(255, 255, 255, 0.09);
 
-  --border:        rgba(20, 33, 28, 0.10);
-  --border-strong: rgba(20, 33, 28, 0.18);
-  --shadow:        0 4px 16px rgba(20, 33, 28, 0.08);
-  --focus:         color-mix(in srgb, var(--nx-teal) 40%, transparent);
-  --surface-clean:      #FFFFFF;
-  --surface-clean-soft: #F1F0EA;
-  --stroke-clean:       rgba(31, 95, 78, 0.15);
-  --surface-light:      #F1F0EA;
-  --bg-secondary:       #FAF9F6;
+  --foreground:      #eef4ff;
+  --text-primary:    #eef4ff;
+  --text-secondary:  #a9bbd6;
+  --text-tertiary:   #7288ad;
 
-  --header-bg: linear-gradient(142deg, #041813 0%, #0a2a22 54%, #0f3a31 100%);
-  --header-border: color-mix(in srgb, var(--nx-teal) 32%, transparent);
-  --header-text: #f4f1ec;
-  --header-link: #f4f1ec;
-  --header-link-hover-bg: color-mix(in srgb, var(--nx-teal) 20%, transparent);
-  --header-link-active-bg: linear-gradient(135deg, color-mix(in srgb, var(--nx-teal) 34%, transparent), color-mix(in srgb, var(--nx-teal-soft) 16%, transparent));
+  --border:        rgba(140, 190, 255, 0.14);
+  --border-strong: rgba(140, 190, 255, 0.26);
+  --shadow:        0 20px 48px rgba(0, 0, 0, 0.5);
+  --focus:         color-mix(in srgb, var(--nx-neon-cyan) 45%, transparent);
+  --surface-clean:      #0a1628;
+  --surface-clean-soft: #0d1c33;
+  --stroke-clean:       rgba(45, 216, 242, 0.22);
+  --surface-light:      #0d1c33;
+  --bg-secondary:       #081221;
 
-  --menu-bg: linear-gradient(170deg, #041a14 0%, #0a2b23 54%, #0e362d 100%);
-  --menu-text: #f4f1ec;
-  --menu-muted: rgba(244, 241, 236, 0.78);
-  --menu-item-bg: color-mix(in srgb, var(--nx-teal) 12%, transparent);
-  --menu-item-hover-bg: color-mix(in srgb, var(--nx-teal) 20%, transparent);
-  --menu-item-active-bg: linear-gradient(135deg, color-mix(in srgb, var(--nx-teal-soft) 34%, transparent), color-mix(in srgb, var(--nx-teal) 24%, transparent));
+  --header-bg: linear-gradient(142deg, rgba(4, 9, 20, 0.94) 0%, rgba(8, 18, 36, 0.9) 54%, rgba(10, 22, 40, 0.88) 100%);
+  --header-border: color-mix(in srgb, var(--nx-neon-cyan) 28%, transparent);
+  --header-text: #eef4ff;
+  --header-link: #eef4ff;
+  --header-link-hover-bg: color-mix(in srgb, var(--nx-neon-cyan) 16%, transparent);
+  --header-link-active-bg: linear-gradient(135deg, color-mix(in srgb, var(--nx-neon-cyan) 30%, transparent), color-mix(in srgb, var(--nx-neon-purple) 18%, transparent));
+
+  --menu-bg: linear-gradient(170deg, #05101f 0%, #0a1c32 54%, #0d2038 100%);
+  --menu-text: #eef4ff;
+  --menu-muted: rgba(200, 220, 245, 0.74);
+  --menu-item-bg: color-mix(in srgb, var(--nx-neon-cyan) 10%, transparent);
+  --menu-item-hover-bg: color-mix(in srgb, var(--nx-neon-cyan) 18%, transparent);
+  --menu-item-active-bg: linear-gradient(135deg, color-mix(in srgb, var(--nx-neon-cyan-soft) 28%, transparent), color-mix(in srgb, var(--nx-neon-cyan) 22%, transparent));
 
   /* Tipografías globales del manual aplicadas al sitio público */
   --font-base: var(--nx-font-body, "Manrope", "Inter", "Segoe UI", sans-serif);
   --font-heading: var(--nx-font-display, "Space Grotesk", "Manrope", "Segoe UI", sans-serif);
 
   /* === Premium gradients (mesh + linear) === */
-  --nx-gradient-hero: linear-gradient(135deg, var(--nx-teal) 0%, var(--nx-skyblue) 100%);
-  --nx-gradient-warm: linear-gradient(135deg, var(--nx-orange) 0%, var(--nx-maroon) 100%);
-  --nx-gradient-cool: linear-gradient(135deg, var(--nx-skyblue) 0%, var(--nx-teal) 100%);
-  --nx-gradient-creative: linear-gradient(135deg, var(--nx-magenta) 0%, var(--nx-maroon) 100%);
+  --nx-gradient-hero: linear-gradient(135deg, var(--nx-neon-cyan) 0%, var(--nx-neon-purple) 100%);
+  --nx-gradient-warm: linear-gradient(135deg, var(--nx-neon-orange) 0%, var(--nx-neon-purple) 100%);
+  --nx-gradient-cool: linear-gradient(135deg, var(--nx-neon-cyan-soft) 0%, var(--nx-neon-cyan) 100%);
+  --nx-gradient-creative: linear-gradient(135deg, var(--nx-neon-purple) 0%, var(--nx-neon-orange) 100%);
   --nx-gradient-spectrum: linear-gradient(120deg,
-    var(--nx-teal) 0%,
-    var(--nx-skyblue) 30%,
-    var(--nx-orange) 65%,
-    var(--nx-magenta) 100%);
+    var(--nx-neon-cyan) 0%,
+    var(--nx-neon-cyan-soft) 30%,
+    var(--nx-neon-orange) 65%,
+    var(--nx-neon-purple) 100%);
 
   /* Aliases brand-tinted (mantenidos para compatibilidad pública) */
-  --nx-shadow-soft: 0 12px 28px color-mix(in srgb, var(--nx-maroon) 22%, transparent);
-  --nx-shadow-glow: 0 18px 44px color-mix(in srgb, var(--nx-teal) 28%, transparent);
+  --nx-shadow-soft: 0 12px 28px rgba(0, 0, 0, 0.4);
+  --nx-shadow-glow: 0 18px 44px color-mix(in srgb, var(--nx-neon-cyan) 32%, transparent);
 
-  --nx-surface-deep: rgba(8, 12, 18, 0.96);
-  --nx-surface-elevated: rgba(14, 18, 26, 0.92);
-  --nx-surface-glass: color-mix(in srgb, var(--nx-maroon) 8%, rgba(16, 22, 32, 0.78));
+  --nx-surface-deep: rgba(3, 7, 15, 0.96);
+  --nx-surface-elevated: rgba(9, 17, 30, 0.9);
+  --nx-surface-glass: rgba(14, 24, 42, 0.72);
 
   --nx-section-gap: clamp(48px, 7vw, 96px);
 }

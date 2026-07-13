@@ -38,8 +38,22 @@ import {
   updateHeroSlide,
   type HeroSlide,
 } from "@/lib/hero-slides-api";
+import {
+  deleteHeroVideo,
+  getHeroVideo,
+  resolveHeroVideoUrl,
+  uploadHeroVideo,
+  type HeroVideo,
+} from "@/lib/hero-video-api";
+import {
+  getPageSection,
+  savePageSection,
+  type HeroMediaConfig,
+} from "@/lib/page-content-api";
 
 const HERO_SPEC = STUDIO_IMAGE_SPECS.heroCarousel;
+const VIDEO_ACCEPT = "video/mp4,video/webm";
+const MAX_VIDEO_MB = 80;
 
 export default function StudioHeroPage() {
   const { user, isContextReady } = useUser();
@@ -57,6 +71,15 @@ export default function StudioHeroPage() {
     file: null as File | null,
   });
 
+  const [mediaType, setMediaType] = useState<"carousel" | "video">("carousel");
+  const [mediaTypeLoading, setMediaTypeLoading] = useState(true);
+  const [mediaTypeSaving, setMediaTypeSaving] = useState(false);
+  const [video, setVideo] = useState<HeroVideo | null>(null);
+  const [videoLoading, setVideoLoading] = useState(true);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoTitle, setVideoTitle] = useState("");
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+
   const refresh = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -70,9 +93,113 @@ export default function StudioHeroPage() {
     }
   }, [token]);
 
+  const refreshVideo = useCallback(async () => {
+    if (!token) return;
+    setVideoLoading(true);
+    try {
+      const data = await getHeroVideo(token);
+      setVideo(data);
+    } catch (err) {
+      toast.error(`No se pudo cargar el video: ${(err as Error).message}`);
+    } finally {
+      setVideoLoading(false);
+    }
+  }, [token]);
+
+  const refreshMediaType = useCallback(async () => {
+    if (!token) return;
+    setMediaTypeLoading(true);
+    try {
+      const row = await getPageSection("home_hero", token);
+      const content = row?.content as HeroMediaConfig | undefined;
+      setMediaType(content?.mediaType === "video" ? "video" : "carousel");
+    } catch (err) {
+      toast.error(`No se pudo cargar la configuración del hero: ${(err as Error).message}`);
+    } finally {
+      setMediaTypeLoading(false);
+    }
+  }, [token]);
+
   useEffect(() => {
-    if (isContextReady && token) refresh();
-  }, [isContextReady, token, refresh]);
+    if (isContextReady && token) {
+      refresh();
+      refreshVideo();
+      refreshMediaType();
+    }
+  }, [isContextReady, token, refresh, refreshVideo, refreshMediaType]);
+
+  const onChangeMediaType = async (next: "carousel" | "video") => {
+    if (next === mediaType) return;
+    setMediaTypeSaving(true);
+    const previous = mediaType;
+    setMediaType(next);
+    try {
+      await savePageSection("home_hero", { mediaType: next }, token);
+      toast.success(next === "video" ? "El hero ahora muestra el video." : "El hero ahora muestra el carrusel.");
+    } catch (err) {
+      setMediaType(previous);
+      toast.error(`No se pudo guardar: ${(err as Error).message}`);
+    } finally {
+      setMediaTypeSaving(false);
+    }
+  };
+
+  const onVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setVideoFile(null);
+      return;
+    }
+    if (!["video/mp4", "video/webm"].includes(file.type)) {
+      toast.error("Formato no permitido. Usa MP4 o WEBM.");
+      e.target.value = "";
+      setVideoFile(null);
+      return;
+    }
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+      toast.error(`El archivo supera ${MAX_VIDEO_MB} MB.`);
+      e.target.value = "";
+      setVideoFile(null);
+      return;
+    }
+    setVideoFile(file);
+  };
+
+  const onUploadVideo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!videoFile) {
+      toast.error("Selecciona un archivo de video.");
+      return;
+    }
+    setVideoUploading(true);
+    try {
+      await uploadHeroVideo(token, { file: videoFile, title: videoTitle.trim() || undefined });
+      toast.success("Video del hero actualizado.");
+      setVideoFile(null);
+      setVideoTitle("");
+      await refreshVideo();
+    } catch (err) {
+      toast.error(`No se pudo subir el video: ${(err as Error).message}`);
+    } finally {
+      setVideoUploading(false);
+    }
+  };
+
+  const onDeleteVideo = () => {
+    if (!video) return;
+    setConfirmState({
+      message: `¿Eliminar el video actual del hero? ${video.title || video.videoUrl}`,
+      fn: async () => {
+        try {
+          await deleteHeroVideo(token, video.id);
+          toast.success("Video eliminado.");
+          await refreshVideo();
+        } catch (err) {
+          toast.error(`No se pudo eliminar: ${(err as Error).message}`);
+        }
+      },
+    });
+  };
 
   const activeCount = useMemo(
     () => slides.filter((s) => s.isActive).length,
@@ -165,21 +292,53 @@ export default function StudioHeroPage() {
       <PageHeader
         eyebrow="STUDIO · Contenido"
         title={cfg.title}
-        subtitle={`${cfg.subtitle} Aquí solo se gestionan las fotos del carrusel.`}
+        subtitle={`${cfg.subtitle} Elige si el hero muestra un carrusel de imágenes o un video de fondo.`}
         variant="hero"
         meta={
-          <>
-            <Tag variant="accent" dot>
-              {slides.length} {slides.length === 1 ? "slide" : "slides"}
+          mediaType === "carousel" ? (
+            <>
+              <Tag variant="accent" dot>
+                {slides.length} {slides.length === 1 ? "slide" : "slides"}
+              </Tag>
+              <Tag variant={activeCount > 0 ? "positive" : "neutral"}>
+                {activeCount} visibles en producción
+              </Tag>
+            </>
+          ) : (
+            <Tag variant={video ? "positive" : "neutral"}>
+              {video ? "Video configurado" : "Sin video todavía"}
             </Tag>
-            <Tag variant={activeCount > 0 ? "positive" : "neutral"}>
-              {activeCount} visibles en producción
-            </Tag>
-          </>
+          )
         }
       />
 
-      {slides.length > 0 && (
+      <Section
+        eyebrow="Tipo de contenido"
+        title="Carrusel de imágenes o video de fondo"
+        subtitle="El sitio público usa lo que elijas aquí; el otro modo queda guardado pero oculto."
+        tone="accent"
+      >
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Button
+            type="button"
+            variant={mediaType === "carousel" ? "primary" : "secondary"}
+            disabled={mediaTypeLoading || mediaTypeSaving}
+            onClick={() => onChangeMediaType("carousel")}
+          >
+            🖼️ Carrusel de imágenes
+          </Button>
+          <Button
+            type="button"
+            variant={mediaType === "video" ? "primary" : "secondary"}
+            disabled={mediaTypeLoading || mediaTypeSaving}
+            onClick={() => onChangeMediaType("video")}
+          >
+            🎬 Video de fondo
+          </Button>
+        </div>
+      </Section>
+
+      {mediaType === "carousel" && slides.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 18 }}>
           <KpiCard label="Total slides" value={slides.length} icon="🖼️" />
           <KpiCard label="Visibles" value={activeCount} icon="✅" variant={activeCount > 0 ? "positive" : "warning"} hint="En producción" />
@@ -188,7 +347,7 @@ export default function StudioHeroPage() {
         </div>
       )}
 
-      {slides.length > 0 && (
+      {mediaType === "carousel" && slides.length > 0 && (
         <div style={{ marginBottom: 18, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución de slides</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
@@ -208,6 +367,8 @@ export default function StudioHeroPage() {
         </div>
       )}
 
+      {mediaType === "carousel" && (
+      <>
       <Section
         eyebrow="Nuevo slide"
         title="Subir imagen al carrusel"
@@ -414,6 +575,85 @@ export default function StudioHeroPage() {
           </div>
         )}
       </Section>
+      </>
+      )}
+
+      {mediaType === "video" && (
+        <Section
+          eyebrow="Video del hero"
+          title="Video de fondo del inicio"
+          subtitle={`MP4 o WEBM · máx. ${MAX_VIDEO_MB} MB · se reproduce en loop, sin sonido, de fondo en la home.`}
+          tone="accent"
+        >
+          {videoLoading ? (
+            <p style={{ color: "var(--text-tertiary)", padding: "24px 0" }}>Cargando…</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              {video ? (
+                <article
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "240px 1fr auto",
+                    gap: 16,
+                    padding: 14,
+                    borderRadius: 14,
+                    background: "var(--surface)",
+                    border: "1px solid var(--nx-panel-hairline)",
+                    boxShadow: "var(--nx-panel-elev-1)",
+                  }}
+                >
+                  <video
+                    src={resolveHeroVideoUrl(video.videoUrl)}
+                    controls
+                    muted
+                    style={{ width: "100%", height: 140, borderRadius: 10, background: "#0a1419", objectFit: "cover" }}
+                  />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0, justifyContent: "center" }}>
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>{video.title || "Video sin título"}</span>
+                    <Tag variant="positive" size="sm">Video activo en producción</Tag>
+                    <code style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{video.videoUrl}</code>
+                  </div>
+                  {cfg.canDelete && (
+                    <div style={{ display: "flex", alignItems: "center" }}>
+                      <Button size="sm" variant="ghost" onClick={onDeleteVideo} style={{ color: "var(--danger)" }}>
+                        Eliminar
+                      </Button>
+                    </div>
+                  )}
+                </article>
+              ) : (
+                <p style={{ color: "var(--text-tertiary)" }}>
+                  Aún no hay video configurado. Mientras tanto, la home usa el carrusel de imágenes como respaldo.
+                </p>
+              )}
+
+              <form
+                onSubmit={onUploadVideo}
+                style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) auto", gap: 12, alignItems: "end" }}
+              >
+                <label style={fieldStyle}>
+                  <span style={labelStyle}>{video ? "Reemplazar video" : "Subir video"}</span>
+                  <input type="file" accept={VIDEO_ACCEPT} onChange={onVideoFileChange} style={inputStyle} />
+                </label>
+                <label style={fieldStyle}>
+                  <span style={labelStyle}>Título (opcional)</span>
+                  <input
+                    type="text"
+                    value={videoTitle}
+                    onChange={(e) => setVideoTitle(e.target.value)}
+                    placeholder="Ej. Reel institucional 2026"
+                    style={inputStyle}
+                    maxLength={200}
+                  />
+                </label>
+                <Button type="submit" variant="primary" disabled={videoUploading || !videoFile}>
+                  {videoUploading ? "Subiendo…" : video ? "Reemplazar" : "Subir"}
+                </Button>
+              </form>
+            </div>
+          )}
+        </Section>
+      )}
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );

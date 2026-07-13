@@ -17,6 +17,7 @@ import { buildApiUrl } from "@/lib/api-base";
 // ── Tipos de sección ─────────────────────────────────────────────────────────
 
 export type HomeSection =
+  | "home_hero"
   | "home_metricas"
   | "home_servicios"
   | "home_proceso"
@@ -50,6 +51,10 @@ export interface ProcesoItem {
   num: string;
   title: string;
   text: string;
+}
+
+export interface HeroMediaConfig {
+  mediaType: "carousel" | "video";
 }
 
 export interface CtaContent {
@@ -91,6 +96,10 @@ export const DEFAULT_PROCESO: ProcesoItem[] = [
 export const DEFAULT_INDUSTRIAS: string[] = [
   "Retail", "Manufactura", "Hospitalidad", "Salud", "Educación", "Gobierno",
 ];
+
+export const DEFAULT_HERO_MEDIA: HeroMediaConfig = {
+  mediaType: "carousel",
+};
 
 export const DEFAULT_CTA: CtaContent = {
   eyebrow: "Listos cuando tú lo estés",
