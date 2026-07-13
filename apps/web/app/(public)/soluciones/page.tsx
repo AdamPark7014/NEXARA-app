@@ -2,11 +2,11 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import shared from "../_shared/public.module.css";
-import styles from "./page.module.css";
 
 export const metadata = {
-  title: "Soluciones | Nexara",
-  description: "Soluciones tecnológicas por industria diseñadas por Nexara.",
+  title: "Soluciones por industria | Nexara",
+  description:
+    "Soluciones Nexara por vertical: retail, manufactura, hospitalidad, salud, educación y gobierno. Tecnología alineada a operación multi-sede.",
 };
 
 export const dynamic = "force-dynamic";
@@ -15,119 +15,124 @@ const industrias = [
   {
     slug: "retail",
     title: "Retail",
-    desc: "POS, inventario en tiempo real, redes y CCTV inteligente para cadenas multi-sede.",
-    image: "/images/hero/hero-01.png",
+    problem: "Pérdidas, caídas de red en punta de venta y cámaras que nadie revisa.",
+    weDo: "CCTV por sucursal, Wi‑Fi estable, cómputo de piso y soporte remoto/en sitio.",
   },
   {
     slug: "manufactura",
     title: "Manufactura",
-    desc: "IoT industrial, MES, mantenimiento predictivo y trazabilidad de producción.",
-    image: "/images/hero/hero-02.png",
+    problem: "Planta desconectada, accesos sin control y evidencia débil ante incidentes.",
+    weDo: "Redes industriales/office, videovigilancia de perímetro y continuidad de equipos críticos.",
   },
   {
     slug: "hospitalidad",
     title: "Hospitalidad",
-    desc: "Wi-Fi de alta densidad, telefonía IP, control de acceso y experiencias digitales.",
-    image: "/images/hero/hero-03.png",
+    problem: "Huéspedes sin Wi‑Fi, telefonía inestable y seguridad dispersa entre áreas.",
+    weDo: "Wi‑Fi de alta densidad, CCTV, control de acceso y operación unificada por propiedad.",
   },
   {
     slug: "salud",
     title: "Salud",
-    desc: "Expediente clínico, telemedicina, integración HL7/FHIR y portales de paciente.",
-    image: "/images/hero/hero-04.png",
+    problem: "Consultorios y clínicas con equipos frágiles y redes que no aguantan carga clínica.",
+    weDo: "Infraestructura confiable, respaldo, conectividad segmentada y soporte prioritario.",
   },
   {
     slug: "educacion",
     title: "Educación",
-    desc: "Aulas inteligentes, plataformas LMS, control de acceso y campus conectado.",
-    image: "/images/hero/hero-05.png",
+    problem: "Campus con puntos ciegos, laboratorios lentos y soporte saturado al inicio de ciclo.",
+    weDo: "Cobertura Wi‑Fi, CCTV, aulas conectadas y mesa de ayuda para el personal técnico.",
   },
   {
     slug: "gobierno",
     title: "Gobierno",
-    desc: "Centros de datos, ciberseguridad, gobernanza de datos y transparencia digital.",
-    image: "/images/hero/hero-06.png",
+    problem: "Edificios con legado, requisitos de evidencia y ventanas cortas de intervención.",
+    weDo: "Modernización por fases: redes, videovigilancia, cómputo y documentación auditable.",
   },
 ];
 
 export default function SolucionesPage() {
   return (
     <main className={shared.page}>
-      {/* Hero */}
       <section className={shared.hero}>
         <div className={shared.inner}>
           <div className={shared.heroGrid}>
             <div data-reveal="soft">
               <span className={shared.heroEyebrow}>Soluciones por industria</span>
               <h1 className={shared.heroTitle}>
-                Tecnología que <span className={shared.heroTitleAccent}>entiende tu sector</span>
+                Tecnología que <span className={shared.heroTitleAccent}>entiende tu operación</span>
               </h1>
               <p className={shared.heroLead}>
-                No vendemos productos sueltos: armamos soluciones completas con la experiencia
-                acumulada en cada industria que servimos.
+                Multi-sede, uptime y cumplimiento. Armamos la solución con lo que tu vertical
+                realmente exige — no con un catálogo genérico.
               </p>
               <div className={shared.heroActions}>
                 <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
-                  Habla con un experto <span className={shared.btnArrow}>→</span>
+                  Hablar con un especialista <span className={shared.btnArrow}>→</span>
                 </Link>
-                <Link href="/proyectos" className={`${shared.btn} ${shared.btnSecondary}`}>
-                  Ver casos
+                <Link href="/servicios" className={`${shared.btn} ${shared.btnSecondary}`}>
+                  Ver capacidades
                 </Link>
               </div>
             </div>
             <div className={shared.heroImage} data-reveal="soft">
-              <Image src="/images/hero/hero-08.png" alt="Soluciones por industria" width={720} height={540} priority />
+              <Image
+                src="/images/hero/hero-03.png"
+                alt="Técnico Nexara en instalación"
+                width={720}
+                height={540}
+                priority
+              />
               <div className={shared.heroImageOverlay} />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Industrias */}
       <section className={shared.section}>
         <div className={shared.inner}>
           <div className={shared.sectionHead} data-reveal="soft">
-            <span className={shared.eyebrow}>Industrias</span>
+            <span className={shared.eyebrow}>Verticales</span>
             <h2 className={shared.sectionTitle}>
-              Soluciones diseñadas para <span className={shared.sectionTitleAccent}>tu industria</span>
+              El problema típico y <span className={shared.sectionTitleAccent}>cómo lo resolvemos</span>
             </h2>
             <p className={shared.sectionLead}>
-              Equipos con experiencia comprobada en cada vertical.
+              Cada industria tiene su ritmo. Aquí va lo esencial, sin relleno.
             </p>
           </div>
-          <div className={shared.grid3} data-reveal-stagger>
-            {industrias.map((i) => (
+
+          <div className={shared.capabilityList} data-reveal-stagger>
+            {industrias.map((i, idx) => (
               <Link
                 key={i.slug}
                 href={`/soluciones/${i.slug}`}
-                className={`${shared.imageCard} ${styles.indCard}`}
+                className={shared.editorialRow}
                 data-reveal="up"
               >
-                <div className={shared.imageCardImg}>
-                  <Image src={i.image} alt={i.title} width={640} height={400} />
+                <span className={shared.editorialNum}>0{idx + 1}</span>
+                <div className={shared.editorialBody}>
+                  <span className={shared.editorialBadge}>{i.title}</span>
+                  <h3 className={shared.editorialTitle}>{i.problem}</h3>
+                  <p className={shared.editorialText}>{i.weDo}</p>
                 </div>
-                <div className={shared.imageCardBody}>
-                  <h3 className={shared.imageCardTitle}>{i.title}</h3>
-                  <p className={shared.imageCardText}>{i.desc}</p>
-                  <span className={styles.indCta}>
-                    Ver soluciones <span aria-hidden>→</span>
-                  </span>
-                </div>
+                <span className={shared.editorialCta}>
+                  Ver detalle <span aria-hidden>→</span>
+                </span>
               </Link>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
       <section className={`${shared.section} ${shared.sectionDivider}`}>
         <div className={shared.inner}>
           <div className={shared.ctaShell} data-reveal="up">
             <h2 className={shared.ctaTitle}>
-              ¿Tu industria no está aquí? <span className={shared.sectionTitleAccent}>Hablemos.</span>
+              ¿Tu vertical no está listada?{" "}
+              <span className={shared.sectionTitleAccent}>Cuéntanos el contexto.</span>
             </h2>
             <p className={shared.ctaLead}>
-              Atendemos proyectos a la medida en cualquier sector con base tecnológica.
+              Atendemos proyectos a la medida cuando hay un sitio real, un riesgo claro y un
+              responsable de operación.
             </p>
             <div className={shared.ctaActions}>
               <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>

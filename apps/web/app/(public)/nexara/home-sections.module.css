@@ -345,6 +345,8 @@
 
 /* Chips de industria: sin píldora, estilo inline limpio */
 .industriaChip {
+  display: inline-flex;
+  align-items: center;
   font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
   font-size: 13px;
   font-weight: 400;
@@ -355,14 +357,14 @@
   letter-spacing: 0.01em;
   background: transparent;
   transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
-  cursor: default;
-  user-select: none;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .industriaChip:hover {
   background: rgba(255, 255, 255, 0.05);
-  border-color: #7288ad;
-  color: #eef4ff;
+  border-color: #2dd8f2;
+  color: #9fecfa;
 }
 
 /* ════════════════════════════════════════════════════════════

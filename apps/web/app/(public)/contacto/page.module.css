@@ -72,6 +72,14 @@
   color: #a9bbd6;
 }
 
+.expectNote {
+  margin: 18px 0 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: #9fecfa;
+  max-width: 42ch;
+}
+
 /* ── Form card ───────────────────────────────────────────── */
 
 .formCard {

@@ -1,16 +1,9 @@
 /* Servicios · estilos específicos */
 
-.servGrid {
-  /* hereda grid3 */
+.procesoGrid {
+  /* hereda grid3 de shared */
 }
 
-/* Icono en el cuerpo de la card, sin superposición sobre imagen */
-.servIconRow {
-  margin-bottom: 12px;
-  display: flex;
-}
-
-/* Cards de proceso: número decorativo sutil en esquina */
 .procesoCard {
   position: relative;
   padding-top: 44px !important;
@@ -21,10 +14,10 @@
   top: 18px;
   right: 20px;
   font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
-  font-size: 1.8rem;
+  font-size: 1.6rem;
   font-weight: 500;
   line-height: 1;
-  color: #B0C4B8;
+  color: color-mix(in srgb, #2dd8f2 55%, transparent);
   user-select: none;
   letter-spacing: -0.02em;
 }

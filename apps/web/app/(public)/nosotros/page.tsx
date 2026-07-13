@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import baseStyles from "../nexara/page.module.css";
+import shared from "../_shared/public.module.css";
 import styles from "./page.module.css";
 import { buildApiUrl } from "@/lib/api-base";
 import { resolveUserAvatarUrl } from "@/lib/user-avatar";
@@ -8,33 +8,16 @@ import { resolveUserAvatarUrl } from "@/lib/user-avatar";
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 
 export const metadata: Metadata = {
-  title: "Nosotros | Nexara — Personas detrás de la tecnología",
+  title: "Nosotros | Nexara — Equipo de integración tecnológica",
   description:
-    "Conoce al equipo de Nexara: nuestra historia, misión, visión, valores y las personas que acompañan cada proyecto. Cercanos, claros y comprometidos con tu operación.",
-  keywords: [
-    "sobre Nexara",
-    "equipo Nexara",
-    "mision Nexara",
-    "vision Nexara",
-    "valores Nexara",
-    "empresa de tecnologia en Mexico",
-  ],
-  alternates: {
-    canonical: "/nosotros",
-  },
+    "Quiénes somos: equipo de campo e ingeniería en Puebla y CDMX. Cercanos, claros y responsables de la continuidad operativa de cada cliente.",
+  alternates: { canonical: "/nosotros" },
   openGraph: {
     type: "website",
     url: `${siteUrl}/nosotros`,
-    title: "Nosotros | Nexara — Personas detrás de la tecnología",
-    description:
-      "Somos un equipo cercano de ingeniería e integración TI. Conoce nuestra misión, visión, valores y a las personas que hacen posible cada proyecto.",
-    images: [{ url: "/logo-nexara.png", width: 1200, height: 630, alt: "Equipo Nexara" }],
-  },
-  twitter: {
-    card: "summary_large_image",
     title: "Nosotros | Nexara",
-    description: "Cercanos, claros y comprometidos. Conoce al equipo Nexara.",
-    images: ["/logo-nexara.png"],
+    description: "Personas detrás de la tecnología que sostiene tu operación.",
+    images: [{ url: "/logo-nexara.png", width: 1200, height: 630, alt: "Equipo Nexara" }],
   },
 };
 
@@ -42,36 +25,35 @@ export const dynamic = "force-dynamic";
 
 const valores = [
   {
-    n: 1,
-    title: "INNOVACIÓN",
-    text: "Probamos, aprendemos y elegimos la tecnología que de verdad mueve la aguja en tu operación, sin enamorarnos de modas.",
+    n: "01",
+    title: "Claridad",
+    text: "Alcance, tiempos y riesgos en voz alta. Preferimos una conversación incómoda a una sorpresa en factura.",
   },
   {
-    n: 2,
-    title: "TRANSPARENCIA",
-    text: "Te decimos lo que vemos: alcance, tiempos, riesgos y costos. Sin letras chiquitas, sin sorpresas, sin promesas vacías.",
+    n: "02",
+    title: "Campo primero",
+    text: "Diseñamos lo que se puede instalar y operar. La propuesta sale del sitio, no solo del PowerPoint.",
   },
   {
-    n: 3,
-    title: "COMPROMISO",
-    text: "Cuando algo se complica, estamos. Acompañamos cada entrega hasta que opera estable y tú duermes tranquilo.",
+    n: "03",
+    title: "Continuidad",
+    text: "Después de la entrega seguimos: soporte, ajustes y evidencia. Un proyecto vivo, no un ticket cerrado.",
   },
   {
-    n: 4,
-    title: "INTEGRIDAD",
-    text: "Cuidamos tu información, tu gente y tu negocio como si fueran nuestros. Hacemos lo correcto, también cuando nadie mira.",
+    n: "04",
+    title: "Integridad",
+    text: "Cuidamos tu información, tu gente y tu operación. Hacemos lo correcto también cuando nadie mira.",
   },
 ];
 
 const expertosFallback = [
   { name: "Ing. Alejandro Gonzales Bustamante", role: "Ingeniero de Sistemas" },
-  { name: "Ing. Carolina Juarez Alvarez", role: "Ingeniera encargada de soporte" },
-  { name: "Ing. Karen Elizalde Sarmiento", role: "Encargado de Ventas" },
-  { name: "Ing. David Morales Zenon", role: "IDC/Instalador" },
-  { name: "Ing. Julio Cesar Rivera Vazquez", role: "IDC/Instalador" },
-  { name: "Ing. Israel Ramos Lima", role: "IDC/Instalador" },
+  { name: "Ing. Carolina Juarez Alvarez", role: "Ingeniera de soporte" },
   { name: "Lic. Karen Elizalde Sarmiento", role: "Dirección Administrativa & Comercial" },
   { name: "Ing. Luis Joel Aguilar", role: "Coordinador de Operaciones" },
+  { name: "Ing. David Morales Zenon", role: "IDC / Instalador" },
+  { name: "Ing. Julio Cesar Rivera Vazquez", role: "IDC / Instalador" },
+  { name: "Ing. Israel Ramos Lima", role: "IDC / Instalador" },
 ];
 
 type PublicTeamUser = {
@@ -151,174 +133,147 @@ export default async function NosotrosPage() {
       url: siteUrl,
       logo: `${siteUrl}/logo-nexara.png`,
       description:
-        "Equipo de integración tecnológica en México: cercanos, claros y comprometidos con la continuidad operativa de cada cliente.",
+        "Integrador tecnológico en México: CCTV, redes, cómputo y soporte con disciplina de campo.",
     },
   };
 
   return (
-    <main className={`${baseStyles.brochurePage} home-main-flush`} aria-label="Sobre nosotros — Nexara">
+    <main className={shared.page} aria-label="Sobre nosotros — Nexara">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(aboutSchema) }}
       />
-      <div className={baseStyles.brochureBg} aria-hidden />
-      <div className={baseStyles.brochureInner}>
-        {/* Hero amigable */}
-        <section className={styles.friendlyHero} aria-label="Hola, somos Nexara" data-reveal="up">
-          <span className={styles.friendlyBadge}>
-            <span className={styles.friendlyBadgeDot} aria-hidden />
-            Hola, mucho gusto
-          </span>
-          <h1 className={styles.friendlyTitle}>
-            Somos <em className={styles.friendlyTitleAccent}>Nexara</em>, las personas detrás de tu tecnología
-          </h1>
-          <p className={styles.friendlyLead}>
-            Más que proveedores, queremos ser tu equipo de confianza. Combinamos ingeniería,
-            cercanía humana y disciplina de campo para que tu operación no se detenga y tu
-            tecnología trabaje para ti, no al revés.
-          </p>
-          <div className={styles.friendlyActions}>
-            <Link
-              href="/contacto"
-              data-track-conversion="nosotros_hero_primary_cta"
-              className={baseStyles.primaryCta}
-            >
-              Platiquemos
-              <span aria-hidden className={baseStyles.ctaArrow}>→</span>
-            </Link>
-            <Link
-              href="/proyectos"
-              data-track-conversion="nosotros_hero_projects_cta"
-              className={baseStyles.secondaryCta}
-            >
-              Ver lo que hemos hecho
-            </Link>
-          </div>
 
-          <div className={styles.friendlyStats} data-reveal-stagger>
-            <div className={styles.friendlyStat} data-reveal="up">
-              <span className={styles.friendlyStatValue}>+10</span>
-              <span className={styles.friendlyStatLabel}>años acompañando</span>
-            </div>
-            <div className={styles.friendlyStat} data-reveal="up">
-              <span className={styles.friendlyStatValue}>24/7</span>
-              <span className={styles.friendlyStatLabel}>monitoreo y soporte</span>
-            </div>
-            <div className={styles.friendlyStat} data-reveal="up">
-              <span className={styles.friendlyStatValue}>100%</span>
-              <span className={styles.friendlyStatLabel}>compromiso humano</span>
-            </div>
-          </div>
-        </section>
-
-        {/* Misión y Visión */}
-        <section id="fundamentos" className={baseStyles.section} data-reveal="up">
-          <h2 className={baseStyles.sectionH2Center}>Lo que nos mueve</h2>
-          <div className={baseStyles.mvGrid} data-reveal-stagger>
-            <article className={baseStyles.mvCard} data-reveal="up">
-              <h3 className={baseStyles.mvTitle}>MISIÓN</h3>
-              <p className={baseStyles.bodyText}>
-                Acompañar a cada cliente con soluciones de TI confiables y sostenibles, hechas a la
-                medida de su realidad operativa, para que opere con continuidad, seguridad y
-                resultados medibles, sintiendo siempre que tiene un equipo aliado, no un
-                proveedor más.
+      <section className={`${shared.hero} ${shared.heroNarrow}`}>
+        <div className={shared.inner}>
+          <div className={shared.heroGrid}>
+            <div data-reveal="soft">
+              <span className={shared.heroEyebrow}>Nosotros</span>
+              <h1 className={shared.heroTitle}>
+                Personas detrás de la tecnología que{" "}
+                <span className={shared.heroTitleAccent}>sostiene tu operación</span>
+              </h1>
+              <p className={shared.heroLead}>
+                Somos un equipo de ingeniería y campo con base en Puebla y CDMX. Integramos,
+                instalamos y acompañamos — sin vender humo ni desaparecer después del go-live.
               </p>
-            </article>
-            <article className={baseStyles.mvCard} data-reveal="up">
-              <h3 className={baseStyles.mvTitle}>VISIÓN</h3>
-              <p className={baseStyles.bodyText}>
-                Ser el aliado tecnológico de cabecera para organizaciones en México y la región,
-                reconocidos por nuestra cercanía, ejecución impecable y por mejorar, año con año,
-                la vida operativa de quienes confían en nosotros.
-              </p>
-            </article>
+              <div className={shared.heroActions}>
+                <Link
+                  href="/contacto"
+                  data-track-conversion="nosotros_hero_primary_cta"
+                  className={`${shared.btn} ${shared.btnPrimary}`}
+                >
+                  Platiquemos <span className={shared.btnArrow}>→</span>
+                </Link>
+                <Link
+                  href="/servicios"
+                  data-track-conversion="nosotros_hero_services_cta"
+                  className={`${shared.btn} ${shared.btnSecondary}`}
+                >
+                  Ver capacidades
+                </Link>
+              </div>
+            </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Valores */}
-        <section id="valores" className={baseStyles.section} data-reveal="up">
-          <h2 className={baseStyles.sectionH2Center}>Cómo nos comportamos</h2>
-          <div className={baseStyles.valoresGrid} data-reveal-stagger>
+      <section className={shared.section}>
+        <div className={shared.inner}>
+          <div className={styles.storyBlock} data-reveal="soft">
+            <span className={shared.eyebrow}>Historia</span>
+            <h2 className={shared.sectionTitle} style={{ textAlign: "left", margin: "12px 0 16px" }}>
+              Operamos donde la tecnología <span className={shared.sectionTitleAccent}>tiene que funcionar</span>
+            </h2>
+            <p className={shared.sectionLead} style={{ maxWidth: "68ch" }}>
+              NEXARA nació para resolver el hueco entre “la propuesta bonita” y “el lunes en el
+              sitio”. Combinamos disciplina de instalación, soporte humano y criterio técnico para
+              que CCTV, redes y cómputo no se conviertan en otro proveedor más en tu lista.
+            </p>
+            <p className={styles.storyNote}>
+              Cobertura nacional con presencia directa en el centro del país. Trabajamos con
+              responsables de operación, no solo con compradores.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="valores" className={`${shared.section} ${shared.sectionDivider}`}>
+        <div className={shared.inner}>
+          <div className={shared.sectionHead} data-reveal="soft">
+            <span className={shared.eyebrow}>Valores</span>
+            <h2 className={shared.sectionTitle}>
+              Cómo nos <span className={shared.sectionTitleAccent}>comportamos</span>
+            </h2>
+            <p className={shared.sectionLead}>Cuatro reglas simples. Las medimos en cada proyecto.</p>
+          </div>
+          <div className={shared.capabilityList} data-reveal-stagger>
             {valores.map((v) => (
-              <article key={v.n} className={baseStyles.valorCard} data-reveal="up">
-                <div className={baseStyles.valorHead}>
-                  <div className={baseStyles.valorDiamond}>
-                    <span>{v.n}</span>
-                  </div>
-                  <h3 className={baseStyles.valorTitle}>{v.title}</h3>
+              <div key={v.n} className={shared.editorialRow} data-reveal="up">
+                <span className={shared.editorialNum}>{v.n}</span>
+                <div className={shared.editorialBody}>
+                  <h3 className={shared.editorialTitle}>{v.title}</h3>
+                  <p className={shared.editorialText}>{v.text}</p>
                 </div>
-                <p className={baseStyles.bodyText}>{v.text}</p>
-              </article>
+              </div>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Equipo */}
-        <section id="expertos" className={baseStyles.section} data-reveal="up">
-          <div className={baseStyles.sectionHead}>
-            <span className={baseStyles.headDiamond} aria-hidden />
-            <div className={baseStyles.sectionHeadText}>
-              <h2 className={baseStyles.sectionH2}>Las personas del equipo</h2>
-              <span className={baseStyles.headRule} />
-            </div>
+      <section id="equipo" className={shared.section}>
+        <div className={shared.inner}>
+          <div className={shared.sectionHead} data-reveal="soft">
+            <span className={shared.eyebrow}>Equipo</span>
+            <h2 className={shared.sectionTitle}>
+              Rostros detrás de <span className={shared.sectionTitleAccent}>cada entrega</span>
+            </h2>
+            <p className={shared.sectionLead}>
+              Ingenieros de campo, soporte y coordinación. Personas reales con nombre y cargo.
+            </p>
           </div>
-          <p className={baseStyles.bodyText} style={{ marginBottom: 24, maxWidth: "68ch" }}>
-            Detrás de cada proyecto hay personas reales: ingenieros de campo, especialistas de
-            soporte, coordinadores y gente de oficina que se conocen, se apoyan y se hacen cargo.
-            Estos son algunos rostros del equipo:
-          </p>
-          <div className={baseStyles.expertosRow} data-reveal-stagger>
+          <div className={shared.teamGrid} data-reveal-stagger>
             {expertos.map((ex) => (
-              <article key={ex.key} className={baseStyles.expertCard} data-reveal="up">
-                <div className={baseStyles.expertPhoto}>
+              <article key={ex.key} className={shared.teamCard} data-reveal="up">
+                <div className={shared.teamPhoto}>
                   {ex.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={ex.avatarUrl}
-                      alt={`Foto de ${ex.name}`}
-                      className={baseStyles.expertPhotoImage}
-                      loading="lazy"
-                      decoding="async"
-                    />
+                    <img src={ex.avatarUrl} alt={`Foto de ${ex.name}`} loading="lazy" decoding="async" />
                   ) : (
-                    <span className={baseStyles.expertPhotoFallback} aria-hidden>
+                    <span className={shared.teamInitials} aria-hidden>
                       {getInitials(ex.name)}
                     </span>
                   )}
                 </div>
-                <p className={baseStyles.expertName}>{ex.name}</p>
-                <p className={baseStyles.expertRole}>{ex.role}</p>
+                <p className={shared.teamName}>{ex.name}</p>
+                <p className={shared.teamRole}>{ex.role}</p>
               </article>
             ))}
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Cierre cálido */}
-        <section className={styles.warmClose} data-reveal="up" aria-label="Trabajemos juntos">
-          <h2 className={styles.warmCloseTitle}>¿Nos tomamos un café (virtual o presencial)?</h2>
-          <p className={styles.warmCloseText}>
-            Cuéntanos qué necesitas y juntos vemos el mejor camino. Sin compromiso, sin venta
-            agresiva, sólo una conversación honesta entre personas que entienden tu negocio.
-          </p>
-          <div className={styles.warmCloseActions}>
-            <Link
-              href="/contacto"
-              data-track-conversion="nosotros_close_primary_cta"
-              className={baseStyles.primaryCta}
-            >
-              Hablemos
-              <span aria-hidden className={baseStyles.ctaArrow}>→</span>
-            </Link>
-            <Link
-              href="/servicios"
-              data-track-conversion="nosotros_close_services_cta"
-              className={baseStyles.secondaryCta}
-            >
-              Ver nuestros servicios
-            </Link>
+      <section className={`${shared.section} ${shared.sectionDivider}`}>
+        <div className={shared.inner}>
+          <div className={shared.ctaShell} data-reveal="up">
+            <h2 className={shared.ctaTitle}>
+              ¿Agendamos una <span className={shared.sectionTitleAccent}>conversación corta</span>?
+            </h2>
+            <p className={shared.ctaLead}>
+              Sin pitch agresivo. Solo una revisión honesta de tu sitio o tu problema técnico.
+            </p>
+            <div className={shared.ctaActions}>
+              <Link
+                href="/contacto"
+                data-track-conversion="nosotros_close_primary_cta"
+                className={`${shared.btn} ${shared.btnPrimary}`}
+              >
+                Ir a contacto <span className={shared.btnArrow}>→</span>
+              </Link>
+            </div>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </main>
   );
 }
