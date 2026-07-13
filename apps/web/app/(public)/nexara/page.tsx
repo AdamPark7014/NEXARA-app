@@ -10,6 +10,7 @@ import {
   DEFAULT_PROCESO,
   DEFAULT_INDUSTRIAS,
   DEFAULT_CTA,
+  INDUSTRIA_SLUGS,
   type MetricaItem,
   type ServicioItem,
   type ProcesoItem,
@@ -21,31 +22,34 @@ const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").re
 export const metadata: Metadata = {
   title: "Nexara | Tecnología que sostiene tu operación",
   description:
-    "Nexara: integración tecnológica, ingeniería y servicios de extremo a extremo para empresas en México. Continuidad operativa, ejecución impecable y resultados medibles.",
+    "Integración tecnológica en México: CCTV, redes, cómputo y soporte TI con disciplina de campo. Continuidad operativa desde Puebla y CDMX.",
   keywords: [
     "Nexara",
-    "empresa de tecnologia en Mexico",
-    "integracion tecnologica empresarial",
-    "consultoria tecnologica",
-    "servicios TI Mexico",
+    "cctv Puebla",
+    "redes empresariales",
+    "soporte ti Mexico",
+    "integracion tecnologica",
   ],
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     url: siteUrl,
     title: "Nexara | Tecnología que sostiene tu operación",
-    description: "Equipo de integración tecnológica orientado a continuidad operativa y resultados medibles.",
+    description: "CCTV, redes, cómputo y soporte con una sola firma responsable.",
     images: [{ url: "/logo-nexara.png", width: 1200, height: 630, alt: "Nexara" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Nexara | Tecnología que sostiene tu operación",
-    description: "Experiencia de campo, ejecución y acompañamiento para operaciones empresariales.",
+    description: "Integración tecnológica de campo para operaciones empresariales.",
     images: ["/logo-nexara.png"],
   },
 };
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
+
+const resolveIndustriaSlug = (label: string) =>
+  INDUSTRIA_SLUGS[label] || label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 export default async function NexaraPage() {
   const [metricasData, serviciosData, procesoData, industriasData, ctaData] =
@@ -57,11 +61,11 @@ export default async function NexaraPage() {
       fetchPageSection<CtaContent>("home_cta"),
     ]);
 
-  const metricas   = metricasData?.items   ?? DEFAULT_METRICAS;
-  const servicios  = serviciosData?.items  ?? DEFAULT_SERVICIOS;
-  const proceso    = procesoData?.items    ?? DEFAULT_PROCESO;
+  const metricas = metricasData?.items ?? DEFAULT_METRICAS;
+  const servicios = (serviciosData?.items ?? DEFAULT_SERVICIOS).slice(0, 4);
+  const proceso = (procesoData?.items ?? DEFAULT_PROCESO).slice(0, 3);
   const industrias = industriasData?.items ?? DEFAULT_INDUSTRIAS;
-  const cta        = ctaData               ?? DEFAULT_CTA;
+  const cta = ctaData ?? DEFAULT_CTA;
 
   const orgSchema = {
     "@context": "https://schema.org",
@@ -69,7 +73,8 @@ export default async function NexaraPage() {
     url: siteUrl,
     name: "NEXARA",
     logo: `${siteUrl}/logo-nexara.png`,
-    description: "Empresa de integración tecnológica enfocada en continuidad operativa y resultados empresariales.",
+    description:
+      "Integrador tecnológico de operación en México: videovigilancia, redes, cómputo y soporte.",
   };
 
   return (
@@ -79,10 +84,8 @@ export default async function NexaraPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(orgSchema) }}
       />
 
-      {/* 1. Hero */}
       <HomeHero />
 
-      {/* 2. Métricas — banda oscura full-bleed */}
       <section className={styles.metricsBand} aria-label="Cifras clave de Nexara">
         <div className={styles.metricsInner}>
           {metricas.map((m) => (
@@ -94,20 +97,15 @@ export default async function NexaraPage() {
         </div>
       </section>
 
-      {/* Cuerpo central */}
       <div className={styles.homeBody}>
-
-        {/* 3. Servicios */}
-        <section id="servicios" aria-label="Servicios de Nexara">
+        <section id="servicios" aria-label="Qué hacemos">
           <header className={styles.sectionHead}>
             <p className={styles.eyebrow}>Qué hacemos</p>
             <h2 className={styles.sectionTitle}>
-              Servicios pensados para{" "}
-              <em className={styles.accent}>operaciones reales</em>
+              Cuatro capacidades para <em className={styles.accent}>operar sin fricciones</em>
             </h2>
             <p className={styles.sectionLead}>
-              Cobertura de extremo a extremo: desde el diseño hasta el monitoreo continuo.
-              Sin entregar y desaparecer.
+              Diseñamos, instalamos y acompañamos. Sin entregar un proyecto y desaparecer.
             </p>
           </header>
           <div className={styles.serviciosList}>
@@ -121,27 +119,30 @@ export default async function NexaraPage() {
                   <h3 className={styles.servicioTitle}>{s.title}</h3>
                   <p className={styles.servicioText}>{s.text}</p>
                 </div>
-                <span className={styles.servicioArrow} aria-hidden>→</span>
+                <span className={styles.servicioArrow} aria-hidden>
+                  →
+                </span>
               </Link>
             ))}
           </div>
         </section>
 
-        {/* 4. Proceso */}
         <section id="proceso" aria-label="Cómo trabajamos" className={styles.procesoSection}>
           <header className={`${styles.sectionHead} ${styles.centered}`}>
             <p className={styles.eyebrow}>Cómo trabajamos</p>
             <h2 className={styles.sectionTitle}>
-              Un método <em className={styles.accent}>claro y predecible</em>
+              Tres fases, <em className={styles.accent}>cero ambigüedad</em>
             </h2>
             <p className={styles.sectionLead}>
-              Cuatro fases visibles, hitos cortos y comunicación honesta en cada paso.
+              Diagnóstico honesto, implementación con evidencia y operación continua.
             </p>
           </header>
           <div className={styles.procesoGrid}>
             {proceso.map((p) => (
               <div key={p.title} className={styles.procesoStep}>
-                <span className={styles.procesoNum} aria-hidden>{p.num}</span>
+                <span className={styles.procesoNum} aria-hidden>
+                  {p.num}
+                </span>
                 <h3 className={styles.procesoTitle}>{p.title}</h3>
                 <p className={styles.procesoText}>{p.text}</p>
               </div>
@@ -149,34 +150,35 @@ export default async function NexaraPage() {
           </div>
         </section>
 
-        {/* 5. Industrias */}
-        <section aria-label="Industrias que atendemos" className={styles.industriasSection}>
+        <section aria-label="Industrias" className={styles.industriasSection}>
           <header className={`${styles.sectionHead} ${styles.centered}`}>
             <p className={styles.eyebrow}>Sectores</p>
             <h2 className={styles.sectionTitle}>
-              Hablamos el idioma de tu <em className={styles.accent}>industria</em>
+              Soluciones que hablan el idioma de <em className={styles.accent}>tu industria</em>
             </h2>
             <p className={styles.sectionLead}>
-              Cada sector tiene su ritmo y sus normas. Adaptamos la solución a tu realidad
-              operativa, no al revés.
+              Multi-sede, cumplimiento y uptime: adaptamos la tecnología a tu ritmo operativo.
             </p>
           </header>
           <div className={styles.industriasFlow}>
-            {industrias.map((ind) => (
-              <span key={ind} className={styles.industriaChip}>{ind}</span>
-            ))}
+            {industrias.map((ind) => {
+              const label = typeof ind === "string" ? ind : String(ind);
+              const slug = resolveIndustriaSlug(label);
+              return (
+                <Link key={label} href={`/soluciones/${slug}`} className={styles.industriaChip}>
+                  {label}
+                </Link>
+              );
+            })}
           </div>
         </section>
-
       </div>
 
-      {/* 6. CTA — banda oscura full-bleed */}
-      <section aria-label="Empecemos a trabajar" className={styles.ctaBand}>
+      <section aria-label="Empecemos" className={styles.ctaBand}>
         <div className={styles.ctaInner}>
           <p className={styles.ctaEyebrow}>{cta.eyebrow}</p>
           <h2 className={styles.ctaTitle}>
-            {cta.title}{" "}
-            <em className={styles.ctaAccent}>{cta.titleAccent}</em>
+            {cta.title} <em className={styles.ctaAccent}>{cta.titleAccent}</em>
           </h2>
           <p className={styles.ctaText}>{cta.text}</p>
           <div className={styles.ctaActions}>
@@ -186,7 +188,9 @@ export default async function NexaraPage() {
               className={`${styles.btn} ${styles.btnPrimary}`}
             >
               {cta.primaryLabel}
-              <span className={styles.btnArrow} aria-hidden>→</span>
+              <span className={styles.btnArrow} aria-hidden>
+                →
+              </span>
             </Link>
             <Link
               href={cta.secondaryHref}
@@ -198,7 +202,6 @@ export default async function NexaraPage() {
           </div>
         </div>
       </section>
-
     </main>
   );
 }

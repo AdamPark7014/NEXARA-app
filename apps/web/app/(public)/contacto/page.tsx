@@ -1,6 +1,5 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import shared from "../_shared/public.module.css";
 import styles from "./page.module.css";
@@ -38,16 +37,9 @@ const channels = [
   {
     icon: <IconChat />,
     title: "WhatsApp",
-    desc: "Respuesta inmediata en horario laboral",
+    desc: "Respuesta humana en horario laboral",
     cta: "Iniciar chat",
     href: "https://wa.me/525536505044?text=Hola%2C%20me%20interesa%20información",
-  },
-  {
-    icon: <IconMail />,
-    title: "Email",
-    desc: "ventas@nexara.com.mx · soporte@nexara.com.mx",
-    cta: "Escribir correo",
-    href: "mailto:ventas@nexara.com.mx",
   },
   {
     icon: <IconPhone />,
@@ -55,6 +47,13 @@ const channels = [
     desc: "Lun a Vie · 9:00 – 18:00 hrs",
     cta: "+52 55 3650 5044",
     href: "tel:+525536505044",
+  },
+  {
+    icon: <IconMail />,
+    title: "Email",
+    desc: "ventas@nexara.com.mx",
+    cta: "Escribir correo",
+    href: "mailto:ventas@nexara.com.mx",
   },
 ];
 
@@ -95,7 +94,10 @@ export default function ContactoPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!response.ok) { setLoading(false); return; }
+      if (!response.ok) {
+        setLoading(false);
+        return;
+      }
     } catch {
       setLoading(false);
       return;
@@ -111,60 +113,50 @@ export default function ContactoPage() {
 
   return (
     <main className={shared.page}>
-      {/* Hero */}
-      <section className={shared.hero}>
+      <section className={`${shared.hero} ${shared.heroNarrow}`}>
         <div className={shared.inner}>
           <div className={shared.heroGrid}>
             <div data-reveal="soft">
               <span className={shared.heroEyebrow}>Contacto</span>
               <h1 className={shared.heroTitle}>
-                Hablemos de tu <span className={shared.heroTitleAccent}>próximo proyecto</span>
+                Cuéntanos el sitio o el <span className={shared.heroTitleAccent}>problema técnico</span>
               </h1>
               <p className={shared.heroLead}>
-                Cuéntanos lo que necesitas. Un especialista te responde en menos de 24 horas con una
-                ruta de acción clara, alcance y presupuesto estimado.
+                Un especialista responde en horario laboral — normalmente en menos de 24 horas —
+                con una ruta clara: alcance, tiempos y presupuesto orientativo.
               </p>
               <div className={shared.heroActions}>
                 <ExternalLinkButton
                   href="https://wa.me/525536505044?text=Hola%2C%20me%20interesa%20agendar%20una%20llamada"
                   className={`${shared.btn} ${shared.btnPrimary}`}
                 >
-                  Iniciar WhatsApp <span className={shared.btnArrow}>→</span>
+                  WhatsApp <span className={shared.btnArrow}>→</span>
                 </ExternalLinkButton>
                 <a href="#formulario" className={`${shared.btn} ${shared.btnSecondary}`}>
                   Enviar formulario
                 </a>
               </div>
             </div>
-            <div className={shared.heroImage} data-reveal="soft">
-              <Image
-                src="/images/hero/hero-02.png"
-                alt="Equipo Nexara en proyecto"
-                width={720}
-                height={540}
-                priority
-              />
-              <div className={shared.heroImageOverlay} />
-            </div>
           </div>
         </div>
       </section>
 
-      {/* Canales rápidos */}
       <section className={shared.section}>
         <div className={shared.inner}>
           <div className={shared.sectionHead} data-reveal="soft">
-            <span className={shared.eyebrow}>Canales directos</span>
+            <span className={shared.eyebrow}>Canales</span>
             <h2 className={shared.sectionTitle}>
               Elige el <span className={shared.sectionTitleAccent}>medio que prefieras</span>
             </h2>
-            <p className={shared.sectionLead}>
-              Tres formas de empezar la conversación. Todas responden con un humano.
-            </p>
+            <p className={shared.sectionLead}>Tres puertas. Todas llegan a un humano.</p>
           </div>
-          <div className={shared.grid3} data-reveal-stagger>
+          <div className={shared.channelRow} data-reveal-stagger>
             {channels.map((c) => (
-              <ExternalLinkButton key={c.title} href={c.href} className={`${shared.card} ${styles.channelCard}`}>
+              <ExternalLinkButton
+                key={c.title}
+                href={c.href}
+                className={`${shared.card} ${styles.channelCard}`}
+              >
                 <span className={shared.cardIcon}>{c.icon}</span>
                 <h3 className={shared.cardTitle}>{c.title}</h3>
                 <p className={shared.cardText}>{c.desc}</p>
@@ -177,25 +169,27 @@ export default function ContactoPage() {
         </div>
       </section>
 
-      {/* Formulario */}
       <section id="formulario" className={`${shared.section} ${shared.sectionDivider}`}>
         <div className={shared.inner}>
           <div className={styles.formLayout}>
             <aside className={styles.formAside} data-reveal="up">
-              <span className={shared.eyebrow}>Antes de enviar</span>
+              <span className={shared.eyebrow}>Formulario</span>
               <h2 className={shared.sectionTitle} style={{ textAlign: "left", margin: "10px 0 18px" }}>
-                Cuéntanos lo esencial
+                Lo esencial para responderte bien
               </h2>
               <ul className={shared.bulletList}>
-                <li>Objetivo de negocio o problema a resolver</li>
-                <li>Plazo y nivel de urgencia</li>
-                <li>Alcance estimado (sedes, usuarios, equipos)</li>
+                <li>Qué necesitas (CCTV, redes, cómputo, soporte u otro)</li>
+                <li>Cuántas sedes o puntos aproximados</li>
+                <li>Urgencia y ventana de intervención</li>
                 <li>Presupuesto orientativo si lo tienes</li>
               </ul>
+              <p className={styles.expectNote}>
+                Expectativa: respuesta humana en horario laboral, normalmente &lt; 24 h.
+              </p>
               <div className={styles.asideContact}>
                 <IconPin />
                 <div>
-                  <strong>Ciudad de México</strong>
+                  <strong>Puebla · CDMX</strong>
                   <span>Cobertura nacional</span>
                 </div>
               </div>
@@ -227,8 +221,10 @@ export default function ContactoPage() {
                   <label className={styles.field}>
                     <span>¿En qué te ayudamos? *</span>
                     <select name="category" required disabled={loading} defaultValue="">
-                      <option value="" disabled>Selecciona…</option>
-                      <option value="VENTAS">Ventas / Proyecto nuevo</option>
+                      <option value="" disabled>
+                        Selecciona…
+                      </option>
+                      <option value="VENTAS">Proyecto nuevo / cotización</option>
                       <option value="SOPORTE">Soporte técnico</option>
                       <option value="ALIANZA">Alianza comercial</option>
                     </select>
@@ -239,7 +235,13 @@ export default function ContactoPage() {
                   </label>
                   <label className={styles.field}>
                     <span>Mensaje *</span>
-                    <textarea name="message" rows={5} required placeholder="Cuéntanos el contexto…" disabled={loading} />
+                    <textarea
+                      name="message"
+                      rows={5}
+                      required
+                      placeholder="Sitio, problema y lo que ya intentaste…"
+                      disabled={loading}
+                    />
                   </label>
                   <button
                     type="submit"
@@ -261,8 +263,8 @@ export default function ContactoPage() {
                       <polyline points="22 4 12 14.01 9 11.01" />
                     </svg>
                   </div>
-                  <h3>¡Mensaje recibido!</h3>
-                  <p>Un especialista te contacta en menos de 24 horas.</p>
+                  <h3>Mensaje recibido</h3>
+                  <p>Un especialista te contacta en horario laboral, normalmente en menos de 24 horas.</p>
                   <button
                     type="button"
                     className={`${shared.btn} ${shared.btnSecondary}`}
@@ -277,15 +279,14 @@ export default function ContactoPage() {
         </div>
       </section>
 
-      {/* Mapa */}
       <section id="ubicacion" className={`${shared.section} ${shared.sectionDivider}`}>
         <div className={shared.inner}>
           <div className={shared.sectionHead} data-reveal="soft">
             <span className={shared.eyebrow}>Ubicación</span>
             <h2 className={shared.sectionTitle}>
-              Sede central <span className={shared.sectionTitleAccent}>en CDMX</span>
+              Base en el centro, <span className={shared.sectionTitleAccent}>cobertura nacional</span>
             </h2>
-            <p className={shared.sectionLead}>Atendemos con cobertura nacional en sitio y remoto.</p>
+            <p className={shared.sectionLead}>Operamos en sitio y remoto según el alcance del proyecto.</p>
           </div>
           <div className={styles.mapWrap} data-reveal="up">
             <Map />

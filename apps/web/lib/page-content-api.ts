@@ -71,45 +71,90 @@ export interface CtaContent {
 // ── Defaults (fallback cuando la DB aún no tiene contenido) ──────────────────
 
 export const DEFAULT_METRICAS: MetricaItem[] = [
-  { value: "+10", label: "Años de experiencia" },
-  { value: "+200", label: "Proyectos entregados" },
-  { value: "99.9%", label: "Uptime promedio" },
-  { value: "24/7", label: "Soporte continuo" },
+  { value: "+10", label: "Años en campo" },
+  { value: "+200", label: "Sitios implementados" },
+  { value: "Puebla · CDMX", label: "Base de operación" },
+  { value: "< 24 h", label: "Primera respuesta" },
 ];
 
 export const DEFAULT_SERVICIOS: ServicioItem[] = [
-  { badge: "Software", title: "Desarrollo a medida", text: "Plataformas web, móviles y APIs para procesos críticos. Arquitectura limpia, código mantenible y ciclos cortos.", href: "/servicios#software" },
-  { badge: "Cloud", title: "Infraestructura en la nube", text: "Migración, optimización y operación en AWS, Azure y GCP. Costos bajo control y escalabilidad real.", href: "/servicios#cloud" },
-  { badge: "Ciberseguridad", title: "Defensa empresarial", text: "Hardening, EDR, gestión de identidades y respuesta a incidentes. Protegemos la operación sin frenar al equipo.", href: "/servicios#ciberseguridad" },
-  { badge: "Data & IA", title: "Datos que deciden", text: "BI, analítica avanzada e IA aplicada. Visibilidad, predicción y automatización donde realmente mueve la aguja.", href: "/servicios#data-ai" },
-  { badge: "Conectividad", title: "Redes y telecomunicaciones", text: "Diseño, instalación y mantenimiento de redes, enlaces, CCTV y videovigilancia con monitoreo central.", href: "/servicios#conectividad" },
-  { badge: "Transformación", title: "Acompañamiento estratégico", text: "Roadmaps tecnológicos, optimización de procesos y gobierno de TI. De la estrategia a la operación.", href: "/servicios#transformacion" },
+  {
+    badge: "CCTV",
+    title: "Videovigilancia que se opera",
+    text: "Diseño, instalación y monitoreo de cámaras IP. Grabación confiable, acceso remoto y mantenimiento sin sorpresas.",
+    href: "/servicios#cctv",
+  },
+  {
+    badge: "Redes",
+    title: "Conectividad estable en cada sede",
+    text: "Cableado, Wi‑Fi empresarial, enlaces y telefonía IP. La red deja de ser el cuello de botella de tu operación.",
+    href: "/servicios#redes",
+  },
+  {
+    badge: "Cómputo",
+    title: "Infraestructura lista para el día a día",
+    text: "Equipos, racks, respaldos y puesta a punto. Hardware y software alineados a cómo trabaja tu equipo.",
+    href: "/servicios#computo",
+  },
+  {
+    badge: "Soporte",
+    title: "Mesa de ayuda que responde",
+    text: "Tickets, visitas en sitio y continuidad. Cuando algo falla, hay un humano y un plan — no un buzón vacío.",
+    href: "/servicios#soporte",
+  },
 ];
 
 export const DEFAULT_PROCESO: ProcesoItem[] = [
-  { num: "01", title: "Diagnóstico", text: "Entendemos tu operación y tus objetivos antes de proponer nada." },
-  { num: "02", title: "Diseño", text: "Alcance, tiempos y costos claros. Sin sorpresas ni letra chiquita." },
-  { num: "03", title: "Implementación", text: "Ejecutamos con disciplina de campo e hitos visibles." },
-  { num: "04", title: "Acompañamiento", text: "Soporte, monitoreo y mejora continua. Estamos cuando se complica." },
+  {
+    num: "01",
+    title: "Diagnóstico",
+    text: "Recorremos el sitio, levantamos riesgos y priorizamos lo que realmente mueve la operación.",
+  },
+  {
+    num: "02",
+    title: "Implementación",
+    text: "Alcance cerrado, calendario visible e instalación con evidencia. Sin alcance abierto ni costos escondidos.",
+  },
+  {
+    num: "03",
+    title: "Operación",
+    text: "Soporte, monitoreo y mejoras. Seguimos cuando el proyecto ya está en producción.",
+  },
 ];
 
 export const DEFAULT_INDUSTRIAS: string[] = [
-  "Retail", "Manufactura", "Hospitalidad", "Salud", "Educación", "Gobierno",
+  "Retail",
+  "Manufactura",
+  "Hospitalidad",
+  "Salud",
+  "Educación",
+  "Gobierno",
 ];
+
+/** Slugs canónicos para enlazar chips de industria a /soluciones/{slug} */
+export const INDUSTRIA_SLUGS: Record<string, string> = {
+  Retail: "retail",
+  Manufactura: "manufactura",
+  Hospitalidad: "hospitalidad",
+  Salud: "salud",
+  Educación: "educacion",
+  Educacion: "educacion",
+  Gobierno: "gobierno",
+};
 
 export const DEFAULT_HERO_MEDIA: HeroMediaConfig = {
   mediaType: "carousel",
 };
 
 export const DEFAULT_CTA: CtaContent = {
-  eyebrow: "Listos cuando tú lo estés",
-  title: "Hablemos de cómo",
-  titleAccent: "blindar tu operación",
-  text: "Una conversación honesta, sin compromiso. Te decimos qué se puede mejorar y qué tiene sentido invertir.",
-  primaryLabel: "Agendar conversación",
+  eyebrow: "Siguiente paso",
+  title: "Cuéntanos tu",
+  titleAccent: "sitio o tu problema",
+  text: "En una llamada corta te decimos qué conviene instalar, qué posponer y qué presupuesto tiene sentido.",
+  primaryLabel: "Agendar diagnóstico",
   primaryHref: "/contacto",
-  secondaryLabel: "Ver casos publicados",
-  secondaryHref: "/proyectos",
+  secondaryLabel: "Ver servicios",
+  secondaryHref: "/servicios",
 };
 
 // ── Fetch server-side (Next.js Server Component) ─────────────────────────────

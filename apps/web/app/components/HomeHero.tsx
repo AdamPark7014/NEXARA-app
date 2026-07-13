@@ -51,55 +51,44 @@ type ServiceItem = {
 
 const SERVICES: ServiceItem[] = [
   {
-    label: "Desarrollo de Software",
-    href: "/servicios#software",
+    label: "Videovigilancia",
+    href: "/servicios#cctv",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="8 18 2 12 8 6" />
-        <polyline points="16 6 22 12 16 18" />
+        <path d="M23 7l-7 5 7 5V7z" />
+        <rect x="1" y="5" width="15" height="14" rx="2" />
       </svg>
     ),
   },
   {
-    label: "Soluciones en la Nube",
-    href: "/servicios#cloud",
+    label: "Redes y Wi‑Fi",
+    href: "/servicios#redes",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M18 18a4 4 0 0 0 0-8 6 6 0 0 0-11.6-1.5A4.5 4.5 0 0 0 6.5 18z" />
+        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+        <circle cx="12" cy="20" r="1" />
       </svg>
     ),
   },
   {
-    label: "Ciberseguridad Avanzada",
-    href: "/servicios#ciberseguridad",
+    label: "Cómputo",
+    href: "/servicios#computo",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 3l8 3v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V6z" />
-        <path d="M9 12l2 2 4-4" />
+        <rect x="2" y="3" width="20" height="14" rx="2" />
+        <line x1="8" y1="21" x2="16" y2="21" />
+        <line x1="12" y1="17" x2="12" y2="21" />
       </svg>
     ),
   },
   {
-    label: "Data & IA Inteligente",
-    href: "/servicios#data-ai",
+    label: "Soporte TI",
+    href: "/servicios#soporte",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="4" y1="20" x2="4" y2="10" />
-        <line x1="10" y1="20" x2="10" y2="4" />
-        <line x1="16" y1="20" x2="16" y2="13" />
-        <line x1="22" y1="20" x2="2" y2="20" />
-      </svg>
-    ),
-  },
-  {
-    label: "Transformación Digital",
-    href: "/servicios#transformacion",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2" />
-        <line x1="12" y1="22" x2="12" y2="12" />
-        <line x1="22" y1="8.5" x2="12" y2="12" />
-        <line x1="2" y1="8.5" x2="12" y2="12" />
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
       </svg>
     ),
   },
@@ -228,30 +217,29 @@ export default function HomeHero() {
       <div className={styles.overlay} aria-hidden />
 
       <div className={styles.content}>
-        <p className={styles.kicker}>Tecnología que impulsa ideas</p>
+        <p className={styles.kicker}>Integración tecnológica en México</p>
         <h1 className={styles.title}>
-          Transformamos tecnología en{" "}
-          <em className={styles.titleAccent}>soluciones reales</em>
+          Tecnología que <em className={styles.titleAccent}>sostiene tu operación</em>
         </h1>
         <p className={styles.lead}>
-          En Nexara ayudamos a empresas a innovar, optimizar procesos y escalar con
-          tecnología inteligente.
+          CCTV, redes, cómputo y soporte con disciplina de campo. Una sola firma
+          responsable de que todo funcione el lunes por la mañana.
         </p>
         <div className={styles.actions}>
           <Link
-            href="/servicios"
+            href="/contacto"
             className={styles.ctaPrimary}
             data-track-conversion="home_hero_primary_cta"
           >
-            Conoce nuestros servicios
+            Cotiza tu proyecto
             <span aria-hidden className={styles.ctaArrow}>→</span>
           </Link>
           <Link
-            href="/proyectos"
+            href="/servicios"
             className={styles.ctaSecondary}
             data-track-conversion="home_hero_projects_cta"
           >
-            Ver proyectos
+            Ver capacidades
             <span aria-hidden className={styles.ctaArrow}>→</span>
           </Link>
         </div>
