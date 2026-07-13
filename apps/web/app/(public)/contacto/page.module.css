@@ -1,6 +1,5 @@
 /* Contacto · estilos específicos (complementa public.module.css) */
 
-/* Canales de contacto — tarjetas limpias sobre fondo claro */
 .channelCard {
   display: flex !important;
   flex-direction: column;
