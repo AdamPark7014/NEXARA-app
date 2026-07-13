@@ -9,6 +9,8 @@ export const metadata = {
   description: "Soluciones tecnológicas por industria diseñadas por Nexara.",
 };
 
+export const dynamic = "force-dynamic";
+
 const industrias = [
   {
     slug: "retail",

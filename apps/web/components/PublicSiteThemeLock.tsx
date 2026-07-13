@@ -9,9 +9,11 @@ import { useLayoutEffect } from "react";
  */
 export default function PublicSiteThemeLock() {
   useLayoutEffect(() => {
+    document.documentElement.classList.add("dark");
     document.body.classList.add("dark");
     document.body.classList.remove("light");
     return () => {
+      document.documentElement.classList.remove("dark");
       document.body.classList.remove("dark");
       document.body.classList.add("light");
     };

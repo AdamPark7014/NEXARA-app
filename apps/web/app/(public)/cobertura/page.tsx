@@ -9,6 +9,8 @@ export const metadata = {
   description: "Operamos en todo México con presencia directa en regiones clave y partners certificados.",
 };
 
+export const dynamic = "force-dynamic";
+
 const regiones = [
   { name: "Centro", desc: "CDMX · Estado de México · Querétaro · Puebla", base: true },
   { name: "Bajío", desc: "Guanajuato · Aguascalientes · San Luis Potosí" },
