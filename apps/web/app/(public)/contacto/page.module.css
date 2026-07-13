@@ -1,79 +1,13 @@
-/* Contacto · estilos específicos (complementa public.module.css) */
+/* Contacto — limpio, sin redundancia */
 
-.channelCard {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: clamp(24px, 3vw, 32px);
-  background: #050b18;
-  text-decoration: none;
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
-  border: none;
-  transition: background 180ms ease;
-  width: 100%;
-}
-
-.channelCard:hover {
-  background: #0a1628;
-}
-
-.channelIcon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  margin-bottom: 8px;
-  background: color-mix(in srgb, #2dd8f2 12%, transparent);
-  border: 1px solid color-mix(in srgb, #2dd8f2 28%, transparent);
-  color: #2dd8f2;
-}
-
-.channelIcon svg {
-  width: 18px;
-  height: 18px;
-  stroke-width: 1.7;
-}
-
-.channelTitle {
-  margin: 0;
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 1.1rem;
-  font-weight: 500;
-  letter-spacing: -0.015em;
-  color: #eef4ff;
-}
-
-.channelDesc {
-  margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: #a9bbd6;
-}
-
-.channelCta {
-  margin-top: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: #2dd8f2;
-  transition: transform 180ms ease;
-}
-
-.channelCard:hover .channelCta {
-  transform: translateX(3px);
+.contactSection {
+  padding: clamp(48px, 6vw, 72px) 0 clamp(64px, 8vw, 96px);
 }
 
 .formLayout {
   display: grid;
-  grid-template-columns: 0.85fr 1.15fr;
-  gap: clamp(32px, 5vw, 64px);
+  grid-template-columns: 0.75fr 1.25fr;
+  gap: clamp(32px, 5vw, 56px);
   align-items: start;
 }
 
@@ -83,213 +17,215 @@
 }
 
 .formAsideTitle {
-  margin: 10px 0 18px;
+  margin: 10px 0 20px;
   font-family: "Space Grotesk", sans-serif;
-  font-size: clamp(1.5rem, 2.4vw, 1.9rem);
-  font-weight: 500;
-  letter-spacing: -0.025em;
-  color: #eef4ff;
+  font-size: clamp(1.4rem, 2.2vw, 1.75rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: #fff;
   line-height: 1.15;
 }
 
-.asideContact {
-  margin-top: 24px;
+.directList {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  border: 1px solid rgba(140, 190, 255, 0.14);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(140, 190, 255, 0.1);
+}
+
+.directLink {
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 16px 0 0;
-  border-top: 1px solid rgba(140, 190, 255, 0.14);
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  background: rgba(5, 10, 20, 0.88);
+  text-align: left;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 150ms ease;
 }
 
-.asideContact svg {
-  width: 18px;
-  height: 18px;
-  color: #2dd8f2;
-  flex-shrink: 0;
-  margin-top: 3px;
+.directLink:hover {
+  background: rgba(8, 18, 36, 0.98);
 }
 
-.asideContact strong {
-  display: block;
-  font-size: 0.93rem;
+.directLabel {
+  font-size: 0.72rem;
   font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #2dd8f2;
+}
+
+.directValue {
+  font-size: 0.95rem;
+  font-weight: 500;
   color: #eef4ff;
 }
 
-.asideContact span {
-  font-size: 0.82rem;
-  color: #a9bbd6;
+.expectNote {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #9bb0cc;
 }
 
-.expectNote {
-  margin: 20px 0 0;
-  font-size: 0.88rem;
-  line-height: 1.55;
-  color: #9fecfa;
-  max-width: 42ch;
+.locationNote {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #6f85a5;
 }
 
 .formCard {
-  padding: clamp(28px, 3.5vw, 40px) !important;
-  background: transparent !important;
-  border: 1px solid rgba(140, 190, 255, 0.14) !important;
-  border-radius: 12px !important;
-  backdrop-filter: none !important;
+  padding: clamp(22px, 3vw, 30px);
+  border: 1px solid rgba(140, 190, 255, 0.16);
+  border-radius: 14px;
+  background: #0a1424;
 }
 
 .form {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .formRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  gap: 12px;
 }
 
 .field {
   display: grid;
-  gap: 7px;
+  gap: 6px;
 }
 
 .field span {
   font-size: 0.8rem;
-  font-weight: 600;
-  color: #eef4ff;
-  letter-spacing: 0.01em;
+  font-weight: 500;
+  color: #9bb0cc;
 }
 
 .field input,
 .field select,
 .field textarea {
   width: 100%;
-  padding: 12px 14px;
-  border-radius: 8px;
+  padding: 11px 13px;
+  border-radius: 10px;
   border: 1px solid rgba(140, 190, 255, 0.16);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(5, 10, 20, 0.65);
   color: #eef4ff;
-  font: inherit;
-  font-size: 0.94rem;
+  font-family: inherit;
+  font-size: 0.95rem;
   outline: none;
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .field input::placeholder,
 .field textarea::placeholder {
-  color: #7288ad;
+  color: #6f85a5;
 }
 
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  border-color: #2dd8f2;
-  box-shadow: 0 0 0 3px rgba(45, 216, 242, 0.12);
+  border-color: rgba(45, 216, 242, 0.5);
+  box-shadow: 0 0 0 3px rgba(45, 216, 242, 0.1);
 }
 
 .field textarea {
-  resize: vertical;
   min-height: 110px;
-  font-family: inherit;
+  resize: vertical;
 }
 
 .field select {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a9bbd6' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%232dd8f2' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: calc(100% - 14px) 50%;
+  background-position: right 14px center;
   padding-right: 36px;
-  background-color: rgba(255, 255, 255, 0.03);
 }
 
 .submitBtn {
-  justify-content: center;
-  width: 100%;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .formNote {
-  margin: 0;
-  text-align: center;
-  font-size: 0.78rem;
-  color: #7288ad;
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: #6f85a5;
 }
 
 .formNote a {
   color: #2dd8f2;
-  text-decoration: none;
-}
-
-.formNote a:hover {
-  text-decoration: underline;
 }
 
 .successBlock {
-  text-align: center;
-  padding: 24px 8px;
+  text-align: left;
+  padding: 12px 4px;
   display: grid;
-  gap: 14px;
-  justify-items: center;
-}
-
-.successIcon {
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  background: rgba(45, 216, 242, 0.12);
-  color: #2dd8f2;
-}
-
-.successIcon svg {
-  width: 26px;
-  height: 26px;
+  gap: 12px;
 }
 
 .successBlock h3 {
   margin: 0;
   font-family: "Space Grotesk", sans-serif;
   font-size: 1.35rem;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  color: #eef4ff;
+  font-weight: 600;
+  color: #fff;
 }
 
 .successBlock p {
   margin: 0;
-  color: #a9bbd6;
+  color: #9bb0cc;
   max-width: 36ch;
+  line-height: 1.55;
+}
+
+.mapSection {
+  padding: 0 0 clamp(64px, 8vw, 96px);
+  border-top: 1px solid rgba(140, 190, 255, 0.12);
+  padding-top: clamp(48px, 6vw, 64px);
+}
+
+.mapHeader {
+  margin-bottom: 16px;
+}
+
+.mapTitle {
+  margin: 8px 0 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.02em;
 }
 
 .mapWrap {
-  position: relative;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid rgba(140, 190, 255, 0.14);
-  background: #0a1628;
-  height: 400px;
-}
-
-.mapWrap :global(.leaflet-container) {
-  height: 100%;
   width: 100%;
+  height: clamp(240px, 28vw, 300px);
+  border-radius: 14px;
+  overflow: hidden;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 900px) {
   .formLayout {
     grid-template-columns: 1fr;
   }
+
   .formAside {
     position: static;
   }
-}
 
-@media (max-width: 560px) {
   .formRow {
     grid-template-columns: 1fr;
-  }
-  .mapWrap {
-    height: 280px;
   }
 }

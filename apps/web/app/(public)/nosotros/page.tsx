@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import shared from "../_shared/public.module.css";
 import styles from "./page.module.css";
+import PublicPageHero from "../../components/PublicPageHero";
+import heroStyles from "../../components/PublicPageHero.module.css";
 import { buildApiUrl } from "@/lib/api-base";
 import { resolveUserAvatarUrl } from "@/lib/user-avatar";
 
@@ -23,26 +25,18 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-const valores = [
+const principios = [
   {
-    n: "01",
     title: "Claridad",
     text: "Alcance, tiempos y riesgos en voz alta. Preferimos una conversación incómoda a una sorpresa en factura.",
   },
   {
-    n: "02",
     title: "Campo primero",
     text: "Diseñamos lo que se puede instalar y operar. La propuesta sale del sitio, no solo del PowerPoint.",
   },
   {
-    n: "03",
     title: "Continuidad",
     text: "Después de la entrega seguimos: soporte, ajustes y evidencia. Un proyecto vivo, no un ticket cerrado.",
-  },
-  {
-    n: "04",
-    title: "Integridad",
-    text: "Cuidamos tu información, tu gente y tu operación. Hacemos lo correcto también cuando nadie mira.",
   },
 ];
 
@@ -138,101 +132,79 @@ export default async function NosotrosPage() {
   };
 
   return (
-    <main className={shared.page} aria-label="Sobre nosotros — Nexara">
+    <main className={`${shared.page} home-main-flush`} aria-label="Sobre nosotros — Nexara">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(aboutSchema) }}
       />
 
-      <section className={`${shared.hero} ${shared.heroNarrow}`}>
+      <PublicPageHero
+        eyebrow="Nosotros"
+        title={
+          <>
+            Personas detrás de{" "}
+            <span className={heroStyles.titleAccent}>cada entrega</span>
+          </>
+        }
+        lead="Ingeniería y campo desde Puebla y CDMX. Diseñamos, instalamos y acompañamos — sin desaparecer después del go-live."
+        imageSrc="/images/hero/hero-05.png"
+        imageAlt="Equipo Nexara en campo"
+      />
+
+      <section className={shared.section} data-reveal="up">
         <div className={shared.inner}>
-          <div className={shared.heroGrid}>
-            <div data-reveal="soft">
-              <span className={shared.heroEyebrow}>Nosotros</span>
-              <h1 className={shared.heroTitle}>
-                Personas detrás de la tecnología que{" "}
-                <span className={shared.heroTitleAccent}>sostiene tu operación</span>
-              </h1>
-              <p className={shared.heroLead}>
-                Somos un equipo de ingeniería y campo con base en Puebla y CDMX. Integramos,
-                instalamos y acompañamos — sin vender humo ni desaparecer después del go-live.
+          <div className={styles.storySplit}>
+            <div className={styles.storyBlock}>
+              <p className={shared.eyebrow}>Quiénes somos</p>
+              <h2 className={styles.storyTitle}>
+                Operamos donde la tecnología{" "}
+                <span className={shared.sectionTitleAccent}>tiene que funcionar</span>
+              </h2>
+            </div>
+            <div>
+              <p className={styles.storyLead}>
+                Cerramos el hueco entre la propuesta y el lunes en el sitio: instalación con evidencia, soporte humano y criterio técnico.
               </p>
-              <div className={shared.heroActions}>
-                <Link
-                  href="/contacto"
-                  data-track-conversion="nosotros_hero_primary_cta"
-                  className={`${shared.btn} ${shared.btnPrimary}`}
-                >
-                  Platiquemos <span className={shared.btnArrow}>→</span>
-                </Link>
-                <Link
-                  href="/servicios"
-                  data-track-conversion="nosotros_hero_services_cta"
-                  className={`${shared.btn} ${shared.btnSecondary}`}
-                >
-                  Ver capacidades
-                </Link>
-              </div>
+              <p className={styles.storyLeadSecondary}>
+                Base en Puebla y CDMX, cobertura nacional. CCTV, redes y cómputo bajo una sola responsabilidad — no una cadena de proveedores que se echan la pelota.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className={shared.section}>
+      <section id="valores" className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
         <div className={shared.inner}>
-          <div className={styles.storyBlock} data-reveal="soft">
-            <span className={shared.eyebrow}>Historia</span>
-            <h2 className={styles.storyTitle}>
-              Operamos donde la tecnología{" "}
-              <span className={shared.sectionTitleAccent}>tiene que funcionar</span>
-            </h2>
-            <p className={styles.storyLead}>
-              NEXARA nació para resolver el hueco entre “la propuesta bonita” y “el lunes en el
-              sitio”. Combinamos disciplina de instalación, soporte humano y criterio técnico para
-              que CCTV, redes y cómputo no se conviertan en otro proveedor más en tu lista.
-            </p>
-            <p className={styles.storyNote}>
-              Cobertura nacional con presencia directa en el centro del país. Trabajamos con
-              responsables de operación, no solo con compradores.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section id="valores" className={`${shared.section} ${shared.sectionDivider}`}>
-        <div className={shared.inner}>
-          <div className={shared.sectionHead} data-reveal="soft">
-            <span className={shared.eyebrow}>Valores</span>
+          <div className={shared.sectionHead}>
+            <p className={shared.eyebrow}>Principios</p>
             <h2 className={shared.sectionTitle}>
               Cómo nos <span className={shared.sectionTitleAccent}>comportamos</span>
             </h2>
-            <p className={shared.sectionLead}>Cuatro reglas simples. Las medimos en cada proyecto.</p>
           </div>
-          <div className={shared.featureGrid} data-reveal-stagger>
-            {valores.map((v) => (
-              <div key={v.n} className={shared.featureCell} data-reveal="up">
-                <span className={shared.featureNum}>{v.n}</span>
-                <h3 className={shared.featureTitle}>{v.title}</h3>
-                <p className={shared.featureText}>{v.text}</p>
+          <div className={shared.principleGrid} data-reveal-stagger>
+            {principios.map((v) => (
+              <div key={v.title} className={shared.principleItem} data-reveal="up">
+                <h3 className={shared.principleTitle}>{v.title}</h3>
+                <p className={shared.principleText}>{v.text}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="equipo" className={shared.section}>
+      <section id="equipo" className={shared.section} data-reveal="up">
         <div className={shared.inner}>
-          <div className={shared.sectionHead} data-reveal="soft">
-            <span className={shared.eyebrow}>Equipo</span>
+          <div className={shared.sectionHead}>
+            <p className={shared.eyebrow}>Equipo</p>
             <h2 className={shared.sectionTitle}>
-              Rostros detrás de <span className={shared.sectionTitleAccent}>cada entrega</span>
+              Quién hace <span className={shared.sectionTitleAccent}>el trabajo</span>
             </h2>
             <p className={shared.sectionLead}>
-              Ingenieros de campo, soporte y coordinación. Personas reales con nombre y cargo.
+              Ingeniería, operaciones e instalación — las personas detrás de cada entrega.
             </p>
           </div>
           <div className={shared.teamGrid} data-reveal-stagger>
-            {expertos.map((ex) => (
+            {expertos.slice(0, 8).map((ex) => (
               <article key={ex.key} className={shared.teamCard} data-reveal="up">
                 <div className={shared.teamPhoto}>
                   {ex.avatarUrl ? (
@@ -249,28 +221,11 @@ export default async function NosotrosPage() {
               </article>
             ))}
           </div>
-        </div>
-      </section>
-
-      <section className={`${shared.section} ${shared.sectionDivider}`}>
-        <div className={shared.inner}>
-          <div className={shared.ctaShell} data-reveal="up">
-            <h2 className={shared.ctaTitle}>
-              ¿Agendamos una <span className={shared.sectionTitleAccent}>conversación corta</span>?
-            </h2>
-            <p className={shared.ctaLead}>
-              Sin pitch agresivo. Solo una revisión honesta de tu sitio o tu problema técnico.
-            </p>
-            <div className={shared.ctaActions}>
-              <Link
-                href="/contacto"
-                data-track-conversion="nosotros_close_primary_cta"
-                className={`${shared.btn} ${shared.btnPrimary}`}
-              >
-                Ir a contacto <span className={shared.btnArrow}>→</span>
-              </Link>
-            </div>
-          </div>
+          <p className={styles.storyCta}>
+            <Link href="/contacto" data-track-conversion="nosotros_team_cta">
+              Platiquemos →
+            </Link>
+          </p>
         </div>
       </section>
     </main>

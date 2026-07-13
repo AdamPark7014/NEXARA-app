@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * HomeHero — hero principal de la home pública (`/`).
- * Carrusel/video full-bleed + copy + CTAs. Capacidad shortcuts
- * viven en la sección “Qué hacemos”, no en el primer viewport.
+ * HomeHero — presupuesto estricto:
+ * video/carrusel full-bleed + titular + una línea + CTAs.
+ * Sin feature bar en el primer viewport.
  */
 
 import Link from "next/link";
@@ -16,63 +16,52 @@ import type { HeroMediaConfig } from "@/lib/page-content-api";
 
 const SLIDE_INTERVAL_MS = 7000;
 
-type Slide = {
-  key: string;
-  src: string;
-  alt: string;
-};
-
-const SLIDES: Slide[] = [
-  { key: "s1", src: "/images/hero/hero-01.png", alt: "Antena de telecomunicaciones Nexara con vista a la ciudad" },
-  { key: "s2", src: "/images/hero/hero-02.png", alt: "Cobertura tecnológica metropolitana con vista al skyline" },
-  { key: "s3", src: "/images/hero/hero-03.png", alt: "Técnico Nexara realizando instalación en campo" },
-  { key: "s4", src: "/images/hero/hero-04.png", alt: "Equipo Nexara — identidad de marca en uniforme" },
-  { key: "s5", src: "/images/hero/hero-05.png", alt: "Equipo Nexara comprometido con cada proyecto" },
-  { key: "s6", src: "/images/hero/hero-06.png", alt: "Ingeniero Nexara en gabinete de telecomunicaciones" },
-  { key: "s7", src: "/images/hero/hero-07.png", alt: "Instalación profesional de racks e infraestructura" },
-  { key: "s8", src: "/images/hero/hero-08.png", alt: "Centro de monitoreo NOC Nexara 24/7" },
-];
+type Slide = { key: string; src: string; alt: string };
 
 export default function HomeHero() {
-  const [dynamicSlides, setDynamicSlides] = useState<Slide[] | null>(null);
+  const [dynamicSlides, setDynamicSlides] = useState<Slide[]>([]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoFailed, setVideoFailed] = useState(false);
   const [index, setIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
       try {
-        const res = await fetch(buildApiUrl("studio/page-content/home_hero"), {
-          cache: "no-store",
-        });
-        const mediaType: HeroMediaConfig["mediaType"] = res.ok
-          ? ((await res.json())?.content?.mediaType === "video" ? "video" : "carousel")
-          : "carousel";
+        const [mediaRes, publicVideo] = await Promise.all([
+          fetch(buildApiUrl("studio/page-content/home_hero"), { cache: "no-store" }).catch(() => null),
+          fetchPublicHeroVideo().catch(() => null),
+        ]);
 
-        if (mediaType === "video") {
-          const video = await fetchPublicHeroVideo().catch(() => null);
+        let mediaType: HeroMediaConfig["mediaType"] = "carousel";
+        if (mediaRes?.ok) {
+          const json = await mediaRes.json().catch(() => null);
+          if (json?.content?.mediaType === "video") mediaType = "video";
+        }
+
+        const preferVideo = mediaType === "video" || Boolean(publicVideo?.videoUrl && publicVideo.isActive);
+
+        if (preferVideo && publicVideo?.videoUrl) {
           if (cancelled) return;
-          if (video) {
-            setVideoUrl(resolveHeroVideoUrl(video.videoUrl));
-            return;
-          }
+          setVideoUrl(resolveHeroVideoUrl(publicVideo.videoUrl));
+          setVideoFailed(false);
+          return;
         }
 
-        const publicSlides = await fetchPublicHeroSlides().catch(() => []);
+        const slides = await fetchPublicHeroSlides().catch(() => []);
         if (cancelled) return;
-        if (publicSlides.length > 0) {
-          setDynamicSlides(
-            publicSlides.map((s) => ({
-              key: `db-${s.id}`,
-              src: resolveHeroImageUrl(s.imageUrl),
-              alt: s.altText || "Nexara",
-            })),
-          );
-        }
+        setDynamicSlides(
+          slides.map((s) => ({
+            key: `db-${s.id}`,
+            src: resolveHeroImageUrl(s.imageUrl),
+            alt: s.altText || "Nexara",
+          })),
+        );
       } catch {
-        // fallback estático
+        /* atmósfera */
       }
     };
 
@@ -82,21 +71,14 @@ export default function HomeHero() {
     };
   }, []);
 
-  const slides = dynamicSlides ?? SLIDES;
+  const showVideo = Boolean(videoUrl) && !videoFailed;
+  const hasMedia = showVideo || dynamicSlides.length > 0;
 
-  const goTo = useCallback(
-    (next: number) => {
-      setIndex(((next % slides.length) + slides.length) % slides.length);
-    },
-    [slides.length],
-  );
-
-  const startAutoPlay = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      setIndex((i) => (i + 1) % slides.length);
-    }, SLIDE_INTERVAL_MS);
-  }, [slides.length]);
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!showVideo || !el) return;
+    void el.play().catch(() => undefined);
+  }, [showVideo, videoUrl]);
 
   const stopAutoPlay = useCallback(() => {
     if (timerRef.current) {
@@ -105,44 +87,64 @@ export default function HomeHero() {
     }
   }, []);
 
-  useEffect(() => {
-    if (videoUrl) return;
-    startAutoPlay();
-    return stopAutoPlay;
-  }, [startAutoPlay, stopAutoPlay, videoUrl]);
+  const startAutoPlay = useCallback(() => {
+    if (dynamicSlides.length <= 1) return;
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setIndex((i) => (i + 1) % dynamicSlides.length);
+    }, SLIDE_INTERVAL_MS);
+  }, [dynamicSlides.length]);
+
+  const goTo = useCallback(
+    (next: number) => {
+      if (dynamicSlides.length === 0) return;
+      setIndex(((next % dynamicSlides.length) + dynamicSlides.length) % dynamicSlides.length);
+    },
+    [dynamicSlides.length],
+  );
 
   useEffect(() => {
-    const onVisibility = () => {
-      if (document.hidden) stopAutoPlay();
-      else if (!videoUrl) startAutoPlay();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [startAutoPlay, stopAutoPlay, videoUrl]);
+    if (showVideo) {
+      stopAutoPlay();
+      return;
+    }
+    startAutoPlay();
+    return stopAutoPlay;
+  }, [showVideo, startAutoPlay, stopAutoPlay]);
+
+  useEffect(() => {
+    if (index >= dynamicSlides.length && dynamicSlides.length > 0) setIndex(0);
+  }, [dynamicSlides.length, index]);
 
   return (
     <section
-      className={styles.hero}
+      className={`${styles.hero} ${hasMedia ? styles.heroMedia : styles.heroFallback}`}
       aria-label="Bienvenido a Nexara"
       data-home-hero="true"
       onMouseEnter={stopAutoPlay}
       onMouseLeave={() => {
-        if (!videoUrl) startAutoPlay();
+        if (!showVideo) startAutoPlay();
       }}
     >
-      {videoUrl ? (
+      {showVideo ? (
         <video
+          ref={videoRef}
           className={styles.bgVideo}
-          src={videoUrl}
+          src={videoUrl ?? undefined}
           autoPlay
           muted
           loop
           playsInline
+          preload="auto"
+          onError={() => {
+            setVideoFailed(true);
+            setVideoUrl(null);
+          }}
           aria-hidden
         />
-      ) : (
+      ) : dynamicSlides.length > 0 ? (
         <div className={styles.slides} aria-hidden>
-          {slides.map((slide, i) => (
+          {dynamicSlides.map((slide, i) => (
             <div
               key={slide.key}
               className={`${styles.slide} ${i === index ? styles.slideActive : ""}`}
@@ -152,44 +154,38 @@ export default function HomeHero() {
             />
           ))}
         </div>
+      ) : (
+        <>
+          <div className={styles.atmosphere} aria-hidden />
+          <div className={styles.gridGlow} aria-hidden />
+        </>
       )}
 
-      <div className={styles.overlay} aria-hidden />
+      <div className={styles.mediaScrim} aria-hidden />
 
-      <div className={styles.content}>
-        <p className={styles.brand}>NEXARA</p>
-        <p className={styles.kicker}>Integración tecnológica · México</p>
+      <div className={styles.stage}>
+        <p className={styles.kicker}>Conectamos tecnología, impulsamos el futuro</p>
         <h1 className={styles.title}>
-          Tecnología que <span className={styles.titleAccent}>sostiene tu operación</span>
+          Soluciones inteligentes para un{" "}
+          <span className={styles.titleAccent}>mundo conectado</span>
         </h1>
         <p className={styles.lead}>
-          CCTV, redes, cómputo y soporte con disciplina de campo. Una firma
-          responsable de que todo funcione el lunes por la mañana.
+          CCTV, redes, cómputo y soporte — una sola firma responsable de tu operación.
         </p>
         <div className={styles.actions}>
-          <Link
-            href="/contacto"
-            className={styles.ctaPrimary}
-            data-track-conversion="home_hero_primary_cta"
-          >
+          <Link href="/contacto" className={styles.ctaPrimary} data-track-conversion="home_hero_contact_cta">
             Cotiza tu proyecto
-            <span aria-hidden className={styles.ctaArrow}>
-              →
-            </span>
+            <span aria-hidden className={styles.ctaArrow}>→</span>
           </Link>
-          <Link
-            href="/servicios"
-            className={styles.ctaSecondary}
-            data-track-conversion="home_hero_projects_cta"
-          >
+          <Link href="/servicios" className={styles.ctaGhost} data-track-conversion="home_hero_primary_cta">
             Ver capacidades
           </Link>
         </div>
       </div>
 
-      {!videoUrl && (
+      {!showVideo && dynamicSlides.length > 1 && (
         <ul className={styles.dots} role="tablist" aria-label="Selector de slide">
-          {slides.map((slide, i) => (
+          {dynamicSlides.map((slide, i) => (
             <li key={slide.key}>
               <button
                 type="button"

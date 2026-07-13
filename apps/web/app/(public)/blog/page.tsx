@@ -3,7 +3,14 @@ import Image from "next/image";
 import Link from "next/link";
 import shared from "../_shared/public.module.css";
 import styles from "./page.module.css";
+import PublicPageHero from "../../components/PublicPageHero";
+import heroStyles from "../../components/PublicPageHero.module.css";
 import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
+
+export const metadata = {
+  title: "Blog | Nexara",
+  description: "Noticias, guías y notas de campo sobre CCTV, redes, cómputo y soporte TI.",
+};
 
 export const dynamic = "force-dynamic";
 
@@ -33,16 +40,14 @@ function normalizeNewsImageUrl(imageUrl?: string | null): string {
 
 function toPlainExcerpt(text?: string | null, fallback = ""): string {
   const raw = (text || fallback).replace(/\s+/g, " ").trim();
-  if (!raw) return "Contenido disponible en actualización.";
-  if (raw.length <= 220) return raw;
-  return `${raw.slice(0, 217)}...`;
+  if (!raw) return "Contenido disponible pronto.";
+  if (raw.length <= 180) return raw;
+  return `${raw.slice(0, 177)}…`;
 }
 
 async function fetchBlogPosts(): Promise<NewsPost[]> {
   try {
-    const res = await fetch(buildApiUrl("news?limit=12"), {
-      cache: "no-store",
-    });
+    const res = await fetch(buildApiUrl("news?limit=12"), { cache: "no-store" });
     if (!res.ok) return [];
 
     const payload = (await res.json()) as
@@ -69,109 +74,98 @@ export default async function BlogPage() {
   const [featured, ...rest] = posts;
 
   return (
-    <main className={shared.page}>
-      <section className={shared.hero}>
-        <div className={shared.inner}>
-          <div className={styles.heroCompact}>
-            <span className={shared.heroEyebrow}>Blog Nexara</span>
-            <h1 className={shared.heroTitle}>
-              Noticias y análisis para <span className={shared.heroTitleAccent}>decisiones reales</span>
-            </h1>
-            <p className={shared.heroLead}>
-              Publicaciones creadas desde Studio y publicadas automáticamente en esta sección.
-              Aquí concentramos tendencias, guías prácticas y resultados de campo.
-            </p>
-            <div className={shared.heroActions}>
-              <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
-                Hablar con un asesor
-                <span aria-hidden className={shared.btnArrow}>→</span>
-              </Link>
-              <Link href="/proyectos" className={`${shared.btn} ${shared.btnSecondary}`}>
-                Ver proyectos
-                <span aria-hidden className={shared.btnArrow}>→</span>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+    <main className={`${shared.page} home-main-flush`}>
+      <PublicPageHero
+        eyebrow="Blog"
+        title={
+          <>
+            Notas de campo y{" "}
+            <span className={heroStyles.titleAccent}>criterio técnico</span>
+          </>
+        }
+        lead="Guías prácticas, tendencias y resultados de operación — publicadas desde Studio."
+        imageSrc="/images/hero/hero-04.png"
+        imageAlt="Equipo Nexara"
+      />
 
-      {featured && (
-        <section className={`${shared.section} ${shared.sectionDivider}`}>
+      {featured ? (
+        <section className={shared.section} data-reveal="up">
           <div className={shared.inner}>
-            <div className={shared.sectionHead} data-reveal="soft">
-              <span className={shared.eyebrow}>Destacado</span>
-              <h2 className={shared.sectionTitle}>
-                {featured.title}
-              </h2>
+            <header className={shared.sectionHead}>
+              <p className={shared.eyebrow}>Destacado</p>
+              <h2 className={shared.sectionTitle}>{featured.title}</h2>
               <p className={shared.sectionLead}>
                 {toPlainExcerpt(featured.summary, featured.content)}
               </p>
-            </div>
-
-            <article className={styles.featuredCard} data-reveal="up">
+            </header>
+            <article className={styles.featuredRow} data-reveal="up">
               <div className={styles.featuredMedia}>
                 <Image
                   src={normalizeNewsImageUrl(featured.coverImageUrl)}
                   alt={featured.title}
                   fill
-                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  sizes="(max-width: 900px) 100vw, 48vw"
                   className={styles.featuredImage}
                   unoptimized
                 />
               </div>
               <div className={styles.featuredBody}>
-                <div className={styles.featuredMeta}>
-                  <span>{new Date(featured.publishedAt || featured.createdAt).toLocaleDateString("es-MX")}</span>
-                  <span>Publicación</span>
-                </div>
-                <h3 className={styles.featuredTitle}>{featured.title}</h3>
-                <p className={styles.featuredSummary}>{toPlainExcerpt(featured.summary, featured.content)}</p>
+                <p className={styles.featuredMeta}>
+                  {new Date(featured.publishedAt || featured.createdAt).toLocaleDateString("es-MX")}
+                </p>
                 {featured.tags?.length ? (
                   <div className={styles.tagsRow}>
-                    {featured.tags.slice(0, 6).map((tag) => (
+                    {featured.tags.slice(0, 5).map((tag) => (
                       <span key={`${featured.id}-${tag}`} className={styles.tag}>
                         {tag}
                       </span>
                     ))}
                   </div>
                 ) : null}
+                <p className={styles.featuredSummary}>
+                  {toPlainExcerpt(featured.summary, featured.content)}
+                </p>
               </div>
             </article>
           </div>
         </section>
-      )}
+      ) : null}
 
-      <section className={`${shared.section} ${shared.sectionDivider}`}>
+      <section className={`${shared.section} ${featured ? shared.sectionDivider : ""}`} data-reveal="up">
         <div className={shared.inner}>
-          <div className={shared.sectionHead} data-reveal="soft">
-            <span className={shared.eyebrow}>Archivo</span>
+          <header className={shared.sectionHead}>
+            <p className={shared.eyebrow}>Archivo</p>
             <h2 className={shared.sectionTitle}>
-              Más contenido del <span className={shared.sectionTitleAccent}>blog</span>
+              {posts.length ? (
+                <>
+                  Más <span className={shared.sectionTitleAccent}>publicaciones</span>
+                </>
+              ) : (
+                <>
+                  Pronto habrá <span className={shared.sectionTitleAccent}>contenido aquí</span>
+                </>
+              )}
             </h2>
             <p className={shared.sectionLead}>
-              Contenido inyectado desde el módulo de noticias, listo para SEO y lectura pública.
+              {posts.length
+                ? "Listado desde el módulo de noticias de Studio."
+                : "Mientras tanto, revisa capacidades o escribe a contacto."}
             </p>
-          </div>
+          </header>
 
           {posts.length > 0 ? (
-            <div className={styles.blogGrid} data-reveal-stagger>
-              {(featured ? rest : posts).map((post) => (
-                <article key={post.id} className={shared.imageCard} data-reveal="up">
-                  <div className={shared.imageCardImg}>
-                    <Image
-                      src={normalizeNewsImageUrl(post.coverImageUrl)}
-                      alt={post.title}
-                      width={720}
-                      height={430}
-                      unoptimized
-                    />
-                    <span className={styles.publishedDate}>
+            <div className={shared.capList} data-reveal-stagger>
+              {(featured ? rest : posts).map((post, i) => (
+                <article key={post.id} className={styles.postRow} data-reveal="up">
+                  <span className={shared.capNum}>
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <div>
+                    <p className={styles.postDate}>
                       {new Date(post.publishedAt || post.createdAt).toLocaleDateString("es-MX")}
-                    </span>
-                  </div>
-                  <div className={shared.imageCardBody}>
-                    <h3 className={shared.imageCardTitle}>{post.title}</h3>
-                    <p className={shared.imageCardText}>{toPlainExcerpt(post.summary, post.content)}</p>
+                    </p>
+                    <h3 className={shared.capTitle}>{post.title}</h3>
+                    <p className={shared.capText}>{toPlainExcerpt(post.summary, post.content)}</p>
                     {post.tags?.length ? (
                       <div className={styles.tagsRow}>
                         {post.tags.slice(0, 4).map((tag) => (
@@ -187,9 +181,10 @@ export default async function BlogPage() {
             </div>
           ) : (
             <div className={styles.emptyState}>
-              <h3>Aun no hay noticias publicadas</h3>
               <p>
-                Corre el seeder de noticias o publica desde Studio para que aparezcan aqui.
+                Aún no hay noticias publicadas. Explora{" "}
+                <Link href="/servicios">servicios</Link> o{" "}
+                <Link href="/contacto">contáctanos</Link>.
               </p>
             </div>
           )}

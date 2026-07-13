@@ -1,24 +1,21 @@
-/* ── Hero ───────────────────────────────────────────────── */
+/* Blog — editorial list */
 
-.heroCompact {
-  max-width: 680px;
-}
-
-/* ── Artículo destacado ──────────────────────────────────── */
-
-.featuredCard {
+.featuredRow {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid var(--ds-linea);
-  background: var(--ds-papel-hueso);
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: clamp(20px, 3vw, 36px);
+  align-items: stretch;
+  border-top: 1px solid rgba(140, 190, 255, 0.12);
+  padding-top: clamp(20px, 3vw, 28px);
 }
 
 .featuredMedia {
   position: relative;
-  min-height: 300px;
-  background: var(--ds-tinta);
+  min-height: 280px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(140, 190, 255, 0.12);
+  background: #07111f;
 }
 
 .featuredImage {
@@ -26,68 +23,44 @@
 }
 
 .featuredBody {
-  padding: clamp(28px, 3vw, 42px);
   display: flex;
   flex-direction: column;
-  gap: 14px;
   justify-content: center;
+  gap: 14px;
 }
 
 .featuredMeta {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ds-pizarra);
-}
-
-.featuredTitle {
   margin: 0;
-  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
-  font-size: clamp(1.25rem, 2vw, 1.7rem);
-  font-weight: 400;
-  line-height: 1.16;
-  letter-spacing: -0.02em;
-  color: var(--ds-tinta);
+  font-family: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #2dd8f2;
 }
 
 .featuredSummary {
   margin: 0;
-  font-size: 0.93rem;
-  line-height: 1.65;
-  color: var(--ds-pizarra);
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #9bb0cc;
+  max-width: 42ch;
 }
 
-/* ── Grid del blog ───────────────────────────────────────── */
-
-.blogGrid {
+.postRow {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: clamp(18px, 2vw, 24px);
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: clamp(16px, 3vw, 32px);
+  align-items: start;
+  padding: clamp(22px, 2.8vw, 30px) 0;
+  border-bottom: 1px solid rgba(140, 190, 255, 0.12);
 }
 
-/* ── Fecha sobre imagen ──────────────────────────────────── */
-
-.publishedDate {
-  position: absolute;
-  left: 12px;
-  top: 12px;
-  z-index: 2;
-  padding: 4px 9px;
-  border-radius: 4px;
-  background: rgba(5, 11, 24, 0.85);
-  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
-  font-size: 0.66rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #eef4ff;
+.postDate {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  color: #6f85a5;
 }
-
-/* ── Tags ────────────────────────────────────────────────── */
 
 .tagsRow {
   margin-top: 10px;
@@ -98,58 +71,47 @@
 
 .tag {
   display: inline-flex;
-  align-items: center;
-  padding: 3px 8px;
-  border-radius: 4px;
-  background: var(--ds-musgo);
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: var(--ds-pino);
+  padding: 4px 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(140, 190, 255, 0.14);
+  font-size: 0.72rem;
+  color: #9bb0cc;
+  background: rgba(255, 255, 255, 0.02);
 }
-
-/* ── Estado vacío ────────────────────────────────────────── */
 
 .emptyState {
-  border-radius: 12px;
-  border: 1px dashed var(--ds-linea);
-  padding: clamp(40px, 5vw, 64px) clamp(28px, 4vw, 40px);
-  text-align: center;
-}
-
-.emptyState h3 {
-  margin: 0 0 8px;
-  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
-  font-size: 1.25rem;
-  font-weight: 400;
-  color: var(--ds-tinta);
+  padding: clamp(28px, 4vw, 40px) 0;
+  border-top: 1px solid rgba(140, 190, 255, 0.12);
 }
 
 .emptyState p {
   margin: 0;
-  font-size: 0.93rem;
-  color: var(--ds-pizarra);
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #9bb0cc;
+  max-width: 42ch;
 }
 
-/* ── Responsive ──────────────────────────────────────────── */
-
-@media (max-width: 1100px) {
-  .blogGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.emptyState a {
+  color: #2dd8f2;
+  text-decoration: none;
+  font-weight: 600;
 }
 
-@media (max-width: 900px) {
-  .featuredCard {
+.emptyState a:hover {
+  color: #9fecfa;
+}
+
+@media (max-width: 800px) {
+  .featuredRow {
     grid-template-columns: 1fr;
   }
+
   .featuredMedia {
-    min-height: 240px;
+    min-height: 220px;
   }
-}
 
-@media (max-width: 640px) {
-  .blogGrid {
-    grid-template-columns: 1fr;
+  .postRow {
+    grid-template-columns: 3rem minmax(0, 1fr);
   }
 }

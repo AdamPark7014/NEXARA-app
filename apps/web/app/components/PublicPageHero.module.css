@@ -1,0 +1,200 @@
+/* PublicPageHero — brand accents */
+
+.hero {
+  position: relative;
+  z-index: 2;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  min-height: min(82vh, 720px);
+  min-height: min(82dvh, 720px);
+  overflow: hidden;
+  isolation: isolate;
+  background: #050a14;
+  color: #eef4ff;
+  font-family: var(--nx-font-body, "Manrope", system-ui, sans-serif);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.compact {
+  min-height: min(52vh, 460px);
+  min-height: min(52dvh, 460px);
+}
+
+.media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-color: #050a14;
+  background-size: cover;
+  background-position: center;
+}
+
+.compact .media {
+  transform: none;
+  animation: none;
+}
+
+.hero:not(.compact) .media {
+  transform: scale(1.02);
+  animation: drift 36s ease-in-out infinite alternate;
+}
+
+@keyframes drift {
+  from { transform: scale(1.02); }
+  to { transform: scale(1.05); }
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(105deg, rgba(5, 10, 20, 0.92) 0%, rgba(5, 10, 20, 0.7) 42%, rgba(5, 10, 20, 0.35) 100%),
+    linear-gradient(180deg, rgba(5, 10, 20, 0.35) 0%, transparent 40%, rgba(5, 10, 20, 0.75) 100%),
+    radial-gradient(50% 50% at 85% 40%, rgba(45, 216, 242, 0.12), transparent 60%);
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 96px;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, #050a14);
+}
+
+.content {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: calc(var(--public-header-height, 76px) + 28px) clamp(24px, 4vw, 48px) clamp(40px, 6vh, 64px);
+  animation: enter 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.compact .content {
+  padding: calc(var(--public-header-height, 76px) + 20px) clamp(24px, 4vw, 48px) clamp(32px, 5vh, 48px);
+}
+
+.compact .title {
+  font-size: clamp(2rem, 4.2vw, 3rem);
+  max-width: 16ch;
+}
+
+.compact .actions {
+  margin-top: 22px;
+}
+
+@keyframes enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.brand { display: none; }
+
+.eyebrow {
+  margin: 0 0 16px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #2dd8f2;
+}
+
+.title {
+  margin: 0 0 18px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(2.4rem, 5.4vw, 4rem);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  color: #fff;
+  max-width: 14ch;
+  text-wrap: balance;
+}
+
+.titleAccent {
+  color: #2dd8f2;
+  font-style: normal;
+}
+
+.lead {
+  margin: 0 0 28px;
+  font-size: clamp(1rem, 1.3vw, 1.12rem);
+  line-height: 1.6;
+  color: rgba(238, 244, 255, 0.72);
+  max-width: 42ch;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.ctaPrimary,
+.ctaSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 22px;
+  border-radius: 12px;
+  font-family: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
+  font-size: 0.94rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
+}
+
+.ctaPrimary {
+  background: linear-gradient(135deg, #2dd8f2, #12b6d4);
+  color: #04131a;
+}
+
+.ctaPrimary:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.ctaSecondary {
+  background: transparent;
+  color: #2dd8f2;
+  border-color: rgba(45, 216, 242, 0.5);
+}
+
+.ctaSecondary:hover {
+  transform: translateY(-1px);
+  background: rgba(45, 216, 242, 0.08);
+  border-color: #2dd8f2;
+}
+
+.ctaArrow {
+  line-height: 1;
+  transition: transform 180ms ease;
+}
+
+.ctaPrimary:hover .ctaArrow {
+  transform: translateX(3px);
+}
+
+@media (max-width: 720px) {
+  .title { max-width: 16ch; }
+  .actions { width: 100%; flex-direction: column; }
+  .ctaPrimary, .ctaSecondary { width: 100%; justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media, .content { animation: none; }
+  .media { transform: none; }
+}

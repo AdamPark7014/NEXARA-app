@@ -132,7 +132,11 @@ const nextConfig = {
     //   - http://nexara-api:3001/api    (con /api, según docker-compose.nexara.yml)
     // Tenemos que normalizarlo a un ORIGIN sin /api para que los rewrites no
     // dupliquen el prefijo y terminen golpeando /api/api/... en el backend.
-    const rawApiUrl = (process.env.API_INTERNAL_URL || 'http://nexara-api:3001').trim();
+    // En local (turbo/dev) no existe el host Docker `nexara-api`.
+    // Preferir API_INTERNAL_URL; si no, localhost en development y nexara-api en prod.
+    const defaultApiOrigin =
+      process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : 'http://nexara-api:3001';
+    const rawApiUrl = (process.env.API_INTERNAL_URL || defaultApiOrigin).trim();
     const apiOrigin = rawApiUrl
       .replace(/\/+$/, '')        // sin trailing slash
       .replace(/\/api\/?$/, '');  // sin /api final
@@ -171,7 +175,8 @@ const nextConfig = {
       "img-src 'self' data: blob: https:",
       "font-src 'self' data: https:",
       "connect-src 'self' https: wss: http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* http://*.localhost:* ws://*.localhost:* wss://*.localhost:* https://www.google-analytics.com https://analytics.google.com https://region1.google-analytics.com https://stats.g.doubleclick.net",
-      "media-src 'self' blob: https:",
+      // Permite video del hero desde el API local (puerto 3001) y same-origin /api.
+      "media-src 'self' blob: https: http://localhost:* http://127.0.0.1:* http://*.localhost:*",
       "object-src 'none'",
       "base-uri 'self'",
       "frame-ancestors 'none'",

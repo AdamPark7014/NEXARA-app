@@ -1,31 +1,33 @@
-/* Map container: consistent card (footer + contacto) */
+/* NEXARA · Map — navy + cyan, proporción usable */
+
 .mapContainer {
+  --map-cyan: #2dd8f2;
+  --map-navy: #050a14;
+  --map-panel: #0a1628;
+  --map-line: rgba(140, 190, 255, 0.18);
+  --map-muted: #9bb0cc;
+
   width: 100%;
   height: 100%;
-  max-width: 100%;
-  margin: 0 auto;
-  padding: 6px;
+  min-height: 320px;
+  margin: 0;
+  padding: 0;
   border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
-  background:
-    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 58%),
-    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--secondary) 10%, transparent), transparent 60%),
-    linear-gradient(160deg, var(--surface-clean), var(--surface-clean-soft));
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--shadow) 22%, transparent);
+  border: 1px solid var(--map-line);
+  background: var(--map-panel);
+  overflow: hidden;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.35);
 }
 
-/* Inner frame for Google tiles */
 .mapWrapper {
   width: 100%;
   height: 100%;
-  min-height: 180px;
-  border-radius: 14px;
+  min-height: 320px;
+  border-radius: 16px;
   overflow: hidden;
-  background: #0f1c28;
-  border: 1px solid color-mix(in srgb, var(--primary) 10%, var(--border));
+  background: #07111f;
 }
 
-/* Force Google Maps InfoWindow to show full content */
 .mapContainer :global(.gm-style .gm-style-iw-d) {
   overflow: visible !important;
   max-height: none !important;
@@ -33,66 +35,56 @@
 
 .mapContainer :global(.gm-style .gm-style-iw-c) {
   padding: 0 !important;
-  max-width: 320px !important;
+  max-width: 260px !important;
   max-height: none !important;
-  border-radius: 14px !important;
-  border: 1px solid color-mix(in srgb, var(--primary) 14%, rgba(0, 0, 0, 0.12)) !important;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.22) !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(45, 216, 242, 0.35) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45) !important;
   background: transparent !important;
 }
 
-.mapContainer :global(.gm-style .gm-style-iw-tc) {
-  display: none;
-}
-
-/* Remove native InfoWindow chrome (white header area) */
-.mapContainer :global(.gm-style .gm-style-iw-chr) {
-  display: none !important;
-}
-
+.mapContainer :global(.gm-style .gm-style-iw-tc),
+.mapContainer :global(.gm-style .gm-style-iw-chr),
 .mapContainer :global(.gm-style .gm-ui-hover-effect) {
   display: none !important;
 }
 
-/* InfoWindow styles - consistent with public site */
 .mapContainer :global(.nexara-map-info) {
-  font-family: var(--font-body, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
-  text-align: center;
-  padding: 12px 14px 14px;
-  min-width: 180px;
+  font-family: "Manrope", system-ui, sans-serif;
+  text-align: left;
+  padding: 14px 16px 16px;
+  min-width: 200px;
   box-sizing: border-box;
-  background: #ffffff;
-  border-radius: 14px;
+  background: #0a1628;
+  border-radius: 12px;
 }
 
 .mapContainer :global(.nexara-map-logo) {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
-  margin: 0 auto 8px;
+  margin: 0 0 10px;
   display: block;
-  border-radius: 10px;
-  padding: 6px;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--primary) 10%, transparent),
-    color-mix(in srgb, var(--secondary) 10%, transparent)
-  );
+  border-radius: 8px;
+  padding: 4px;
+  background: rgba(45, 216, 242, 0.1);
+  border: 1px solid rgba(45, 216, 242, 0.28);
 }
 
 .mapContainer :global(.nexara-map-title) {
   margin: 0 0 2px;
-  font-size: 0.92rem;
-  font-weight: 850;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
   letter-spacing: -0.01em;
-  color: #0f172a;
+  color: #eef4ff;
 }
 
 .mapContainer :global(.nexara-map-subtitle) {
   margin: 0 0 12px;
   font-size: 0.8rem;
-  font-weight: 600;
-  color: #64748b;
+  font-weight: 500;
+  color: #9bb0cc;
 }
 
 .mapContainer :global(.nexara-map-btn) {
@@ -102,19 +94,18 @@
   justify-content: center;
   min-height: 40px;
   padding: 0 14px;
-  border-radius: 999px;
+  border-radius: 10px;
   text-decoration: none;
-  color: #fff !important;
-  font-size: 0.82rem;
-  font-weight: 750;
-  letter-spacing: 0.02em;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--primary) 92%, #0a2840),
-    var(--secondary)
-  ) !important;
-  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
-  box-shadow: 0 8px 18px rgba(9, 22, 40, 0.18);
+  color: #04131a !important;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #2dd8f2, #12b6d4) !important;
+  border: none;
+  box-shadow: 0 0 18px rgba(45, 216, 242, 0.25);
+  cursor: pointer;
   transition: filter 0.15s ease, transform 0.15s ease;
 }
 
@@ -123,66 +114,28 @@
   transform: translateY(-1px);
 }
 
-.mapContainer :global(.nexara-map-btn:active) {
-  transform: translateY(0);
-}
-
 .mapError {
   width: 100%;
   height: 100%;
-  min-height: 160px;
-  border-radius: 14px;
+  min-height: 280px;
+  border-radius: 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 14px;
+  padding: 20px;
   text-align: center;
-  color: color-mix(in srgb, var(--primary) 55%, var(--danger));
-  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--danger) 16%, transparent);
-  font-size: 0.85rem;
-}
-
-:global(body.dark) .mapContainer {
-  border-color: color-mix(in srgb, var(--primary) 20%, var(--border));
-  background:
-    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 60%),
-    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--secondary) 12%, transparent), transparent 60%),
-    linear-gradient(160deg, color-mix(in srgb, var(--surface) 92%, #050a10), color-mix(in srgb, #0a1620 90%, var(--surface)));
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.38);
-}
-
-:global(body.dark) .mapContainer :global(.nexara-map-info) {
-  background: #122234;
-}
-
-:global(body.dark) .mapContainer :global(.nexara-map-title) {
-  color: #eef6ff;
-}
-
-:global(body.dark) .mapContainer :global(.nexara-map-subtitle) {
-  color: #a9bbce;
-}
-
-@media (max-width: 900px) {
-  .mapWrapper,
-  .mapError {
-    min-height: 160px;
-  }
+  color: #9bb0cc;
+  background: #0a1628;
+  border: 1px solid var(--map-line);
+  font-size: 0.9rem;
 }
 
 @media (max-width: 600px) {
-  .mapContainer {
-    border-radius: 14px;
-    padding: 5px;
-  }
-
+  .mapContainer,
   .mapWrapper,
   .mapError {
-    min-height: 150px;
-    border-radius: 12px;
+    min-height: 260px;
+    border-radius: 14px;
   }
 }
-

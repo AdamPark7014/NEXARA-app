@@ -1,12 +1,13 @@
 import React from "react";
-import Image from "next/image";
 import Link from "next/link";
 import shared from "../_shared/public.module.css";
+import PublicPageHero from "../../components/PublicPageHero";
+import heroStyles from "../../components/PublicPageHero.module.css";
 
 export const metadata = {
   title: "Servicios | Nexara — CCTV, redes, cómputo y soporte",
   description:
-    "Capacidades Nexara: videovigilancia, redes empresariales, cómputo, soporte TI y plataformas a medida. Una firma responsable de punta a punta.",
+    "Capacidades Nexara: videovigilancia, redes empresariales, cómputo, soporte TI y plataformas a medida.",
 };
 
 export const dynamic = "force-dynamic";
@@ -14,172 +15,78 @@ export const dynamic = "force-dynamic";
 const servicios = [
   {
     id: "cctv",
-    badge: "Videovigilancia",
-    title: "CCTV que se opera, no solo se instala",
-    forWho: "Retail, corporativos, plantas y multi-sede que necesitan evidencia y control.",
-    deliverable:
-      "Diseño de cobertura, cámaras IP, NVR/VMS, acceso remoto, mantenimiento y capacitación al equipo local.",
+    title: "Seguridad inteligente",
+    text: "Levantamos cobertura real del sitio, instalamos IP + NVR/VMS y dejamos acceso remoto operable. El mantenimiento incluye evidencia — no solo un ticket cerrado.",
+    points: ["Diseño de cobertura", "Cámaras IP + NVR/VMS", "Acceso remoto", "Mantenimiento con evidencia"],
   },
   {
     id: "redes",
-    badge: "Conectividad",
-    title: "Redes y Wi‑Fi estables en cada sede",
-    forWho: "Operaciones donde la caída de red detiene ventas, producción o atención.",
-    deliverable:
-      "Cableado estructurado, switching, Wi‑Fi empresarial, enlaces, telefonía IP y documentación de red.",
+    title: "Conectividad",
+    text: "Cableado, switching y Wi‑Fi empresarial para una o varias sedes. Documentamos el enlace para que no dependas de “el que instaló” cuando algo falle.",
+    points: ["Cableado estructurado", "Switching y VLANs", "Wi‑Fi empresarial", "Enlaces y documentación"],
   },
   {
     id: "computo",
-    badge: "Infraestructura",
-    title: "Cómputo e infraestructura lista para el día a día",
-    forWho: "Equipos que necesitan estaciones confiables, respaldos y puesta a punto sin drama.",
-    deliverable:
-      "Estaciones, servidores, racks, almacenamiento, backups y estandarización de imagen/software.",
+    title: "Infraestructura",
+    text: "Estaciones, servidores, racks y respaldos con imagen estándar. Menos improvisación en el mostrador y más continuidad cuando un equipo deja de servir.",
+    points: ["Estaciones y servidores", "Racks y energía", "Respaldos", "Imagen / estándar de sitio"],
   },
   {
     id: "soporte",
-    badge: "Operación",
-    title: "Soporte TI con respuesta humana",
-    forWho: "Empresas que no pueden esperar días a que alguien revise el ticket.",
-    deliverable:
-      "Mesa de ayuda, visitas en sitio, monitoreo básico y acuerdos claros de tiempo de respuesta.",
+    title: "Soporte TI",
+    text: "Mesa de ayuda humana: remoto primero, visita cuando haga falta. Tiempos de respuesta acordados para que el negocio sepa a qué atenerse.",
+    points: ["Mesa de ayuda", "Soporte remoto", "Visitas en sitio", "SLA acordado"],
   },
   {
     id: "software",
-    badge: "Software",
-    title: "Plataformas a medida cuando el proceso no alcanza",
-    forWho: "Procesos críticos donde un sistema genérico frena más de lo que ayuda.",
-    deliverable:
-      "Aplicaciones web internas, portales e integraciones acotadas al flujo real de tu operación.",
-  },
-];
-
-const contratacion = [
-  {
-    num: "01",
-    title: "Levantamiento",
-    text: "Visita o llamada: entendemos el sitio, el riesgo y la prioridad.",
-  },
-  {
-    num: "02",
-    title: "Propuesta cerrada",
-    text: "Alcance, materiales, tiempos y costo. Sin letra chiquita.",
-  },
-  {
-    num: "03",
-    title: "Entrega con evidencia",
-    text: "Instalación, pruebas, documentación y canal de soporte activo.",
+    title: "Plataformas a medida",
+    text: "Portales e integraciones acotados al flujo real. Alcance por fases — sin proyectos eternamente abiertos ni alcance que crece cada semana.",
+    points: ["Portales internos", "Integraciones", "Entrega por fases", "Alcance cerrado"],
   },
 ];
 
 export default function ServiciosPage() {
   return (
-    <main className={shared.page}>
-      <section className={shared.hero}>
-        <div className={shared.inner}>
-          <div className={shared.heroGrid}>
-            <div data-reveal="soft">
-              <span className={shared.heroEyebrow}>Servicios</span>
-              <h1 className={shared.heroTitle}>
-                Capacidades para{" "}
-                <span className={shared.heroTitleAccent}>operar sin fricciones</span>
-              </h1>
-              <p className={shared.heroLead}>
-                Cinco líneas claras. Cada una con entregable concreto, equipo de campo y
-                responsabilidad después de la instalación.
-              </p>
-              <div className={shared.heroActions}>
-                <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
-                  Solicitar propuesta <span className={shared.btnArrow}>→</span>
-                </Link>
-                <Link href="/soluciones" className={`${shared.btn} ${shared.btnSecondary}`}>
-                  Ver por industria
-                </Link>
-              </div>
-            </div>
-            <div className={shared.heroImage} data-reveal="soft">
-              <Image
-                src="/images/hero/hero-08.png"
-                alt="Centro de monitoreo Nexara"
-                width={720}
-                height={540}
-                priority
-              />
-              <div className={shared.heroImageOverlay} />
-            </div>
-          </div>
-        </div>
-      </section>
+    <main className={`${shared.page} home-main-flush`}>
+      <PublicPageHero
+        eyebrow="Servicios"
+        title={
+          <>
+            Capacidades con{" "}
+            <span className={heroStyles.titleAccent}>entrega concreta</span>
+          </>
+        }
+        lead="CCTV, redes, cómputo, soporte y software — instalados con criterio de campo y acompañados después del go-live."
+        imageSrc="/images/hero/hero-08.png"
+        imageAlt="Centro de monitoreo Nexara"
+      />
 
-      <section id="catalogo" className={shared.section}>
+      <section className={shared.section} data-reveal="up">
         <div className={shared.inner}>
-          <div className={shared.sectionHead} data-reveal="soft">
-            <span className={shared.eyebrow}>Catálogo</span>
-            <h2 className={shared.sectionTitle}>
-              Lo que <span className={shared.sectionTitleAccent}>realmente entregamos</span>
-            </h2>
-            <p className={shared.sectionLead}>
-              Sin catálogo infinito. Priorizamos lo que sostiene tu operación diaria.
-            </p>
-          </div>
-
-          <div className={shared.capabilityList} data-reveal-stagger>
-            {servicios.map((s, i) => (
-              <article id={s.id} key={s.id} className={shared.editorialRow} data-reveal="up">
-                <span className={shared.editorialNum}>0{i + 1}</span>
-                <div className={shared.editorialBody}>
-                  <span className={shared.editorialBadge}>{s.badge}</span>
-                  <h3 className={shared.editorialTitle}>{s.title}</h3>
-                  <p className={shared.editorialText}>{s.forWho}</p>
-                  <p className={shared.editorialMeta}>{s.deliverable}</p>
-                </div>
-                <Link href="/contacto" className={shared.editorialCta}>
-                  Cotizar <span aria-hidden>→</span>
-                </Link>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className={`${shared.section} ${shared.sectionDivider}`}>
-        <div className={shared.inner}>
-          <div className={`${shared.sectionHead} ${shared.sectionHeadCenter}`} data-reveal="soft">
-            <span className={shared.eyebrow}>Cómo contratas</span>
-            <h2 className={shared.sectionTitle}>
-              Proceso <span className={shared.sectionTitleAccent}>corto y cerrado</span>
-            </h2>
-            <p className={shared.sectionLead}>Tres pasos. Sin workshops eternos ni alcance abierto.</p>
-          </div>
-          <div className={shared.stepGrid} data-reveal-stagger>
-            {contratacion.map((p) => (
-              <div key={p.num} className={shared.stepItem} data-reveal="up">
-                <span className={shared.stepNum}>{p.num}</span>
-                <h3 className={shared.stepTitle}>{p.title}</h3>
-                <p className={shared.stepText}>{p.text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className={shared.section} id="contacto">
-        <div className={shared.inner}>
-          <div className={shared.ctaShell} data-reveal="up">
-            <h2 className={shared.ctaTitle}>
-              ¿Necesitas un <span className={shared.sectionTitleAccent}>diagnóstico de sitio</span>?
-            </h2>
-            <p className={shared.ctaLead}>
-              30 minutos. Te decimos qué conviene instalar ahora, qué puede esperar y un
-              presupuesto orientativo.
-            </p>
-            <div className={shared.ctaActions}>
-              <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
-                Agendar llamada <span className={shared.btnArrow}>→</span>
+          <div className={shared.serviceLayout}>
+            <nav className={shared.serviceNav} aria-label="Índice de servicios">
+              {servicios.map((s) => (
+                <a key={s.id} href={`#${s.id}`} className={shared.serviceNavLink}>
+                  {s.title}
+                </a>
+              ))}
+              <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary} ${shared.serviceNavCta}`}>
+                Cotizar proyecto <span className={shared.btnArrow} aria-hidden>→</span>
               </Link>
-              <Link href="/nosotros" className={`${shared.btn} ${shared.btnSecondary}`}>
-                Conocer al equipo
-              </Link>
+            </nav>
+
+            <div className={shared.serviceDetail} data-reveal-stagger>
+              {servicios.map((s) => (
+                <article key={s.id} id={s.id} className={shared.serviceBlock} data-reveal="up">
+                  <h2 className={shared.serviceBlockTitle}>{s.title}</h2>
+                  <p className={shared.serviceBlockText}>{s.text}</p>
+                  <ul className={shared.servicePoints}>
+                    {s.points.map((pt) => (
+                      <li key={pt}>{pt}</li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
             </div>
           </div>
         </div>

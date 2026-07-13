@@ -8,20 +8,20 @@ const GOOGLE_MAPS_API_KEY =
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "";
 
 const NEXARA_MAP_STYLES = [
-  { elementType: "geometry", stylers: [{ color: "#0b1918" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#9fd9cb" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#0b1918" }] },
-  { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#18413b" }] },
-  { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#102725" }] },
-  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#13332f" }] },
-  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#123a33" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#24524a" }] },
-  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#2a5f56" }] },
-  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#2f776a" }] },
-  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1a4e46" }] },
-  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#1a3d38" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#113838" }] },
-  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#8bd8c6" }] },
+  { elementType: "geometry", stylers: [{ color: "#07111f" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#9bb0cc" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#050a14" }] },
+  { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#1a2a40" }] },
+  { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#0a1628" }] },
+  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#0d1a2e" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#0c1f2a" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#1a2f48" }] },
+  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#243a55" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#2a4560" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1a3048" }] },
+  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#132438" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0a2038" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#6f85a5" }] },
 ] as const;
 
 // Tipos para Google Maps
@@ -178,13 +178,13 @@ export default function Map() {
 
         const location = { lat: 19.073802875589788, lng: -98.2778382565653 };
         mapInstance.current = new MapConstructor(mapRef.current, {
-          zoom: 18,
+          zoom: 16,
           center: location,
           ...(GOOGLE_MAPS_MAP_ID ? { mapId: GOOGLE_MAPS_MAP_ID } : {}),
           ...(!GOOGLE_MAPS_MAP_ID ? { styles: NEXARA_MAP_STYLES } : {}),
-          mapTypeControl: true,
-          fullscreenControl: true,
-          streetViewControl: true,
+          mapTypeControl: false,
+          fullscreenControl: false,
+          streetViewControl: false,
           zoomControl: true,
         });
 
@@ -207,15 +207,15 @@ export default function Map() {
         const infoWindow = new mapsAny.InfoWindow({
           content: `
             <div class="nexara-map-info">
-              <img src="/logo-nexara.png" alt="NEXARA" class="nexara-map-logo" />
+              <img src="/logo-nexara-lockup.png" alt="NEXARA" class="nexara-map-logo" />
               <h3 class="nexara-map-title">NEXARA</h3>
-              <p class="nexara-map-subtitle">Soluciones Tecnológicas</p>
-              <button class="nexara-map-btn" onclick="window.location.href='https://maps.app.goo.gl/34XSHPwUSeMAB7x69'">
+              <p class="nexara-map-subtitle">Explanada Puebla · Momoxpan</p>
+              <button type="button" class="nexara-map-btn" onclick="window.open('https://maps.app.goo.gl/34XSHPwUSeMAB7x69','_blank','noopener')">
                 Ver ubicación
               </button>
             </div>
           `,
-          maxWidth: 280,
+          maxWidth: 260,
         });
 
         const openInfoWindow = () => {
