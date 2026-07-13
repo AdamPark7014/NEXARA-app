@@ -18,6 +18,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./HomeHero.module.css";
+import { buildApiUrl } from "@/lib/api-base";
+import { fetchPublicHeroSlides, resolveHeroImageUrl } from "@/lib/hero-slides-api";
+import { fetchPublicHeroVideo, resolveHeroVideoUrl } from "@/lib/hero-video-api";
+import type { HeroMediaConfig } from "@/lib/page-content-api";
 
 const SLIDE_INTERVAL_MS = 6000;
 
@@ -102,9 +106,57 @@ const SERVICES: ServiceItem[] = [
 ];
 
 export default function HomeHero() {
-  const slides = SLIDES;
+  const [dynamicSlides, setDynamicSlides] = useState<Slide[] | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Carga la config del hero desde la BD (Studio → /studio/hero). Si la API
+  // falla o no hay nada configurado, el componente cae a SLIDES hardcodeado.
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const res = await fetch(buildApiUrl("studio/page-content/home_hero"), {
+          cache: "no-store",
+        });
+        const mediaType: HeroMediaConfig["mediaType"] = res.ok
+          ? ((await res.json())?.content?.mediaType === "video" ? "video" : "carousel")
+          : "carousel";
+
+        if (mediaType === "video") {
+          const video = await fetchPublicHeroVideo().catch(() => null);
+          if (cancelled) return;
+          if (video) {
+            setVideoUrl(resolveHeroVideoUrl(video.videoUrl));
+            return;
+          }
+        }
+
+        const publicSlides = await fetchPublicHeroSlides().catch(() => []);
+        if (cancelled) return;
+        if (publicSlides.length > 0) {
+          setDynamicSlides(
+            publicSlides.map((s) => ({
+              key: `db-${s.id}`,
+              src: resolveHeroImageUrl(s.imageUrl),
+              alt: s.altText || "Nexara",
+            })),
+          );
+        }
+      } catch {
+        // silencioso: se mantiene el fallback estático
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const slides = dynamicSlides ?? SLIDES;
 
   const goTo = useCallback(
     (next: number) => {
@@ -149,17 +201,29 @@ export default function HomeHero() {
       onMouseEnter={stopAutoPlay}
       onMouseLeave={startAutoPlay}
     >
-      <div className={styles.slides} aria-hidden>
-        {slides.map((slide, i) => (
-          <div
-            key={slide.key}
-            className={`${styles.slide} ${i === index ? styles.slideActive : ""}`}
-            style={{ backgroundImage: `url("${slide.src}")` }}
-            role="img"
-            aria-label={slide.alt}
-          />
-        ))}
-      </div>
+      {videoUrl ? (
+        <video
+          className={styles.bgVideo}
+          src={videoUrl}
+          autoPlay
+          muted
+          loop
+          playsInline
+          aria-hidden
+        />
+      ) : (
+        <div className={styles.slides} aria-hidden>
+          {slides.map((slide, i) => (
+            <div
+              key={slide.key}
+              className={`${styles.slide} ${i === index ? styles.slideActive : ""}`}
+              style={{ backgroundImage: `url("${slide.src}")` }}
+              role="img"
+              aria-label={slide.alt}
+            />
+          ))}
+        </div>
+      )}
 
       <div className={styles.overlay} aria-hidden />
 
@@ -193,20 +257,22 @@ export default function HomeHero() {
         </div>
       </div>
 
-      <ul className={styles.dots} role="tablist" aria-label="Selector de slide">
-        {slides.map((slide, i) => (
-          <li key={slide.key}>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={i === index}
-              aria-label={`Mostrar slide ${i + 1}`}
-              className={`${styles.dot} ${i === index ? styles.dotActive : ""}`}
-              onClick={() => goTo(i)}
-            />
-          </li>
-        ))}
-      </ul>
+      {!videoUrl && (
+        <ul className={styles.dots} role="tablist" aria-label="Selector de slide">
+          {slides.map((slide, i) => (
+            <li key={slide.key}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={i === index}
+                aria-label={`Mostrar slide ${i + 1}`}
+                className={`${styles.dot} ${i === index ? styles.dotActive : ""}`}
+                onClick={() => goTo(i)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
 
       <nav className={styles.services} aria-label="Servicios principales">
         {SERVICES.map((service) => (

@@ -46,27 +46,43 @@
  * `.header` / `.navLinks` / `.link` base sin reescribir todo el archivo.
  */
 .headerPublic {
-	background: #FAF9F6 !important;
-	border-bottom: 1px solid #E3E5DF !important;
-	backdrop-filter: none !important;
-	-webkit-backdrop-filter: none !important;
-	box-shadow: 0 1px 0 #E3E5DF !important;
+	background: linear-gradient(142deg, rgba(4, 9, 20, 0.92) 0%, rgba(7, 16, 32, 0.9) 100%) !important;
+	border-bottom: 1px solid rgba(140, 190, 255, 0.16) !important;
+	backdrop-filter: blur(16px) saturate(140%) !important;
+	-webkit-backdrop-filter: blur(16px) saturate(140%) !important;
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
 }
 
 .headerPublic::before {
-	opacity: 0 !important;
-	background: none !important;
+	opacity: 0.7 !important;
+	background:
+		radial-gradient(120% 140% at 15% 0%, rgba(45, 216, 242, 0.14), transparent 62%),
+		radial-gradient(100% 130% at 90% 0%, rgba(176, 107, 255, 0.12), transparent 60%) !important;
 }
 
 .headerPublic .link,
 .headerPublic .logoLink {
-	color: #14211C;
+	color: #eef4ff;
 }
 
-.headerPublic .logo {
-	/* Sobre fondo blanco: sombra oscura discreta para
-	   que el texto/icono claro del logo sea legible */
-	filter: drop-shadow(0 0 3px rgba(20, 33, 28, 0.45)) drop-shadow(0 1px 6px rgba(20, 33, 28, 0.25));
+.logoLink {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.6rem;
+	text-decoration: none;
+}
+
+.logoMark {
+	display: inline-flex;
+	filter: drop-shadow(0 0 10px rgba(45, 216, 242, 0.45));
+}
+
+.logoWordmark {
+	font-family: "Space Grotesk", var(--nx-font-display, sans-serif);
+	font-size: 1.15rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	color: #eef4ff;
 }
 
 /* Nav plano — sin contenedor pill */
@@ -78,12 +94,12 @@
 	gap: 0.1rem !important;
 }
 
-/* Links limpios sobre fondo claro */
+/* Links sobre fondo oscuro con glow cian al activarse */
 .headerPublic .link {
 	background: transparent !important;
 	border-color: transparent !important;
 	box-shadow: none !important;
-	color: #14211C !important;
+	color: #c3d4ee !important;
 	text-transform: uppercase;
 	letter-spacing: 0.07em;
 	font-weight: 600;
@@ -93,18 +109,18 @@
 }
 
 .headerPublic .link:hover {
-	background: #F1F0EA !important;
+	background: rgba(45, 216, 242, 0.1) !important;
 	border-color: transparent !important;
 	box-shadow: none !important;
 	transform: none;
-	color: #1F5F4E !important;
+	color: #9fecfa !important;
 }
 
 .headerPublic .linkActive {
 	background: transparent !important;
 	border-color: transparent !important;
 	box-shadow: none !important;
-	color: #1F5F4E !important;
+	color: #2dd8f2 !important;
 	position: relative;
 }
 
@@ -116,8 +132,9 @@
 	transform: translateX(-50%);
 	width: 20px;
 	height: 2px;
-	background: #1F5F4E;
+	background: #2dd8f2;
 	border-radius: 2px;
+	box-shadow: 0 0 8px rgba(45, 216, 242, 0.8);
 }
 
 /* ── Estado top de página: sin fondo, totalmente transparente ────────── */
@@ -152,12 +169,6 @@
 	align-items: center;
 }
 
-.logo {
-	width: auto;
-	height: 62px;
-	object-fit: contain;
-	filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.2));
-}
 
 .navLinks {
 	display: flex;
@@ -214,29 +225,31 @@
 	gap: 0.6rem;
 }
 
-/* ── Botón "Contactar" — Pino sólido ── */
+/* ── Botón "Cotiza tu Proyecto" — borde neón cian, relleno al hover ── */
 .contactCta {
 	display: inline-flex;
 	align-items: center;
 	gap: 8px;
 	padding: 9px 18px;
-	border-radius: 8px;
-	background: #1F5F4E;
-	color: #FAF9F6;
+	border-radius: 999px;
+	background: rgba(45, 216, 242, 0.08);
+	color: #eef4ff;
 	font-family: "Inter Tight", var(--nx-font-ui, "Inter", system-ui), sans-serif;
 	font-size: 0.84rem;
-	font-weight: 500;
+	font-weight: 600;
 	letter-spacing: 0.01em;
 	text-decoration: none;
-	border: 1px solid #1F5F4E;
-	box-shadow: none;
-	transition: transform 150ms ease, background 150ms ease;
+	border: 1px solid rgba(45, 216, 242, 0.55);
+	box-shadow: 0 0 0 rgba(45, 216, 242, 0);
+	transition: transform 150ms ease, background 150ms ease, box-shadow 150ms ease;
 }
 
 .contactCta:hover {
 	transform: translateY(-1px);
-	background: #2F7A65;
-	border-color: #2F7A65;
+	background: linear-gradient(135deg, #2dd8f2, #12b6d4);
+	border-color: transparent;
+	color: #04131a;
+	box-shadow: 0 8px 24px rgba(45, 216, 242, 0.4);
 }
 
 .contactArrow {
@@ -420,8 +433,8 @@
 		min-height: 66px;
 	}
 
-	.logo {
-		height: 32px;
+	.logoWordmark {
+		font-size: 1rem;
 	}
 }
 

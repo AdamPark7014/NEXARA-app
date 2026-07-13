@@ -50,14 +50,21 @@ export type AttendanceRangeSummary = {
   }[];
 };
 
-export type WorkProjectRecord = {
+/** Proyectos de campo (OperationalProject). Antes: WorkProject legacy. */
+export type OperationalProjectRecord = {
   id: number;
   title: string;
-  clientName?: string | null;
   status?: string | null;
+  client?: { id?: number; name?: string | null } | null;
+  salesProject?: { id?: number; name?: string | null; budget?: string | number | null } | null;
+  createdAt?: string | null;
+};
+
+/** @deprecated Prefer OperationalProjectRecord */
+export type WorkProjectRecord = OperationalProjectRecord & {
+  clientName?: string | null;
   budgetTotal?: string | number | null;
   budgetUsed?: string | number | null;
-  createdAt?: string | null;
 };
 
 export type ExpenseRecord = {
@@ -105,7 +112,9 @@ export type UnifiedContabilidadSnapshot = {
   viatics: ViaticRecord[];
   vehicles: VehiclePenaltyRecord[];
   attendance: AttendanceRangeSummary | null;
+  /** Alias estable: proyectos OPS (antes work-projects legacy). */
   workProjects: WorkProjectRecord[];
+  operationalProjects: OperationalProjectRecord[];
   expenses: ExpenseRecord[];
   fines: FineRecord[];
   consoleStats: ConsoleDashboardStats | null;
@@ -215,7 +224,7 @@ export const getUnifiedContabilidadSnapshot = async (
   const [
     viatics,
     vehicles,
-    workProjects,
+    operationalProjectsRaw,
     expenses,
     fines,
     consoleStats,
@@ -225,7 +234,7 @@ export const getUnifiedContabilidadSnapshot = async (
   ] = await Promise.all([
     safeArrayFetch<ViaticRecord>("viatics", token, warnings, "viáticos"),
     safeArrayFetch<VehiclePenaltyRecord>("vehicles", token, warnings, "multas de vehículos"),
-    safeArrayFetch<WorkProjectRecord>("work-projects", token, warnings, "proyectos operativos"),
+    safeArrayFetch<OperationalProjectRecord>("operational-projects", token, warnings, "proyectos operativos"),
     safeArrayFetch<ExpenseRecord>("expenses", token, warnings, "gastos operativos"),
     safeArrayFetch<FineRecord>("fines", token, warnings, "multas"),
     safeObjectFetch<ConsoleDashboardStats>("dashboard", token, warnings, "resumen de consola"),
@@ -240,6 +249,12 @@ export const getUnifiedContabilidadSnapshot = async (
     }),
   ]);
 
+  const operationalProjects = operationalProjectsRaw.map((p) => ({
+    ...p,
+    clientName: p.client?.name ?? null,
+    budgetTotal: p.salesProject?.budget ?? null,
+  }));
+
   return {
     generatedAt: new Date().toISOString(),
     period: options.period,
@@ -247,7 +262,8 @@ export const getUnifiedContabilidadSnapshot = async (
     viatics,
     vehicles,
     attendance,
-    workProjects,
+    workProjects: operationalProjects,
+    operationalProjects,
     expenses,
     fines,
     consoleStats,

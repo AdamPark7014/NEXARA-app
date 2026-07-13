@@ -755,6 +755,11 @@ export class VentasService {
     if (!opportunity || opportunity.stage !== 'WON') return null;
 
     const actorUser = actorId ? { id: actorId } : undefined;
+
+    if (opportunity.clientId) {
+      void this.provisionServiceClient(opportunity.clientId, actorUser).catch(() => undefined);
+    }
+
     let project = opportunity.projects[0] ?? null;
 
     if (!project) {
@@ -961,11 +966,18 @@ export class VentasService {
       return { salesProject: project, operationalProject: refreshed, created: false };
     }
 
-    const salesClient = project.opportunity?.client;
-    if (!salesClient?.serviceClientId) {
+    let salesClient = project.opportunity?.client;
+    if (!salesClient) {
       throw new BadRequestException(
-        'El cliente comercial no tiene cuenta operativa. Actívalo en Ventas → Clientes antes de desplegar en campo.',
+        'El proyecto comercial no tiene cliente. Asigna un cliente a la oportunidad antes de desplegar en campo.',
       );
+    }
+    if (!salesClient.serviceClientId) {
+      const provisioned = await this.provisionServiceClient(salesClient.id, user);
+      salesClient = provisioned.salesClient as typeof salesClient;
+    }
+    if (!salesClient.serviceClientId) {
+      throw new BadRequestException('No se pudo crear la cuenta operativa del cliente.');
     }
 
     const vendorId = project.opportunity?.ownerId || user?.id;

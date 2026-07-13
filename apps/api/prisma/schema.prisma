@@ -1274,6 +1274,26 @@ model HeroSlide {
   @@map("hero_slides")
 }
 
+// ──────────────────────────────────────────────────────────────────────
+// Video de fondo del Hero del home — alternativa al carrusel de imágenes
+// ──────────────────────────────────────────────────────────────────────
+// Singleton lógico: solo existe un video "activo" a la vez. Al subir uno
+// nuevo se reemplaza el anterior (archivo físico incluido). El campo
+// `mediaType` que decide si el hero muestra el carrusel o este video vive
+// en `PageContent` (section = "home_hero"), no aquí.
+model HeroVideo {
+  id        Int      @id @default(autoincrement())
+  videoUrl  String   @db.VarChar(500)
+  posterUrl String?  @db.VarChar(500)
+  title     String?  @db.VarChar(200)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("hero_video")
+}
+
 model PageContent {
   id        Int      @id @default(autoincrement())
   section   String   @unique @db.VarChar(80)
@@ -1311,6 +1331,9 @@ model Cotizacion {
   issueDate      DateTime
   validUntil     DateTime?
   status         CotizacionStatus        @default(DRAFT)
+  /// FK al cliente comercial ERP (opcional: cotizaciones legacy solo con strings)
+  salesClientId  Int?
+  opportunityId  Int?
   clientName     String?                 @db.VarChar(180)
   clientCompany  String?                 @db.VarChar(200)
   clientEmail    String?                 @db.VarChar(200)
@@ -1343,8 +1366,12 @@ model Cotizacion {
   deletedAt      DateTime?
   items          CotizacionItem[]
   createdBy      User?                   @relation(fields: [createdById], references: [id])
+  salesClient    SalesClient?            @relation(fields: [salesClientId], references: [id], onDelete: SetNull)
+  opportunity    SalesOpportunity?       @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
   salesQuotes    SalesOpportunityQuote[]
 
+  @@index([salesClientId])
+  @@index([opportunityId])
   @@map("cotizaciones")
 }
 
@@ -1428,6 +1455,7 @@ model SalesClient {
   documents       SalesClientDocument[]
   leads           SalesLead[]
   opportunities   SalesOpportunity[]
+  cotizaciones    Cotizacion[]
   owner           User?                 @relation("SalesClientOwner", fields: [ownerId], references: [id])
   serviceClient   ServiceClient?        @relation(fields: [serviceClientId], references: [id])
 
@@ -1496,6 +1524,7 @@ model SalesOpportunity {
   notes             SalesOpportunityNote[]
   evidences         SalesOpportunityEvidence[]
   quotes            SalesOpportunityQuote[]
+  cotizaciones      Cotizacion[]
   projects          SalesProject[]
   tender            Tender?
   crmActivities     CrmActivity[]

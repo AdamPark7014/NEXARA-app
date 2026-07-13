@@ -5,12 +5,37 @@ import { CreateExpenseDto } from './dto/create-expense.dto.js';
 import { UpdateExpenseDto } from './dto/update-expense.dto.js';
 import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 
+const ADMIN_EXPENSE_ACTIVITY_AN = 'SYS-ADMIN-GASTOS';
+
 @Injectable()
 export class ExpensesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly autoApproval: AutoApprovalService,
   ) {}
+
+  /** OT interna para gastos administrativos (renta, SaaS, servicios) — no se cuelga de OT de campo. */
+  private async ensureAdministrativeActivity(usuarioId: number): Promise<number> {
+    const existing = await this.prisma.activity.findFirst({
+      where: { anNumber: ADMIN_EXPENSE_ACTIVITY_AN, deletedAt: null },
+      select: { id: true },
+    });
+    if (existing) return existing.id;
+
+    const created = await this.prisma.activity.create({
+      data: {
+        anNumber: ADMIN_EXPENSE_ACTIVITY_AN,
+        titulo: 'Gastos administrativos',
+        descripcion: 'Contenedor interno para gastos de oficina, renta y servicios (no operación de campo).',
+        estatus: 'Finalizado',
+        activityType: 'INTERNAL',
+        creadoPorId: usuarioId,
+        responsableId: usuarioId,
+      },
+      select: { id: true },
+    });
+    return created.id;
+  }
 
   async create(createExpenseDto: CreateExpenseDto) {
     const expense = await this.prisma['expense'].create({ data: createExpenseDto });
@@ -40,14 +65,7 @@ export class ExpensesService {
     fecha?: string;
     actividadId?: number;
   }) {
-    let actividadId = dto.actividadId;
-    if (!actividadId) {
-      const fallback = await this.prisma.activity.findFirst({ orderBy: { id: 'desc' }, select: { id: true } });
-      if (!fallback) {
-        throw new BadRequestException('No hay OT en el sistema. Crea una actividad o indica actividadId.');
-      }
-      actividadId = fallback.id;
-    }
+    const actividadId = dto.actividadId ?? (await this.ensureAdministrativeActivity(dto.usuarioId));
     const meta = JSON.stringify({
       tipo: 'ADMIN',
       concepto: dto.concepto.trim(),

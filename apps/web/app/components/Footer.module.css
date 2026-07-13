@@ -4,15 +4,15 @@
    ============================================================ */
 
 .footer {
-  /* Maroon corporativo del brand guide */
-  --f-bg:     #531318;
-  --f-acento: #F08A1E;
-  --f-papel:  #FAF9F6;
-  --f-linea:  rgba(255, 255, 255, 0.09);
-  --f-text:   rgba(250, 249, 246, 0.90);
-  --f-dim:    rgba(250, 249, 246, 0.52);
-  /* niebla: subtono apagado sobre fondo maroon */
-  --f-niebla: rgba(250, 249, 246, 0.48);
+  /* Marino profundo + acentos neón */
+  --f-bg:     #04070f;
+  --f-acento: #2dd8f2;
+  --f-acento-2: #b06bff;
+  --f-papel:  #eef4ff;
+  --f-linea:  rgba(140, 190, 255, 0.12);
+  --f-text:   rgba(238, 244, 255, 0.92);
+  --f-dim:    rgba(169, 187, 214, 0.7);
+  --f-niebla: rgba(114, 136, 173, 0.85);
 
   position: relative;
   width: 100%;
@@ -23,15 +23,15 @@
   isolation: isolate;
 }
 
-/* Línea divisora superior — naranja del brand guide */
+/* Línea divisora superior — degradado cian → morado */
 .topAccent {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #F08A1E 50%, transparent);
-  opacity: 0.8;
+  background: linear-gradient(90deg, transparent, var(--f-acento) 40%, var(--f-acento-2) 65%, transparent);
+  opacity: 0.9;
 }
 
 .footerInner {
@@ -184,8 +184,8 @@
   border-radius: 8px;
   display: grid;
   place-items: center;
-  background: #F08A1E;
-  color: #FAF9F6;
+  background: linear-gradient(135deg, var(--f-acento), var(--f-acento-2));
+  color: #04131a;
 }
 
 .contactIcon svg {
@@ -299,20 +299,20 @@
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  border: 1px solid rgba(240, 138, 30, 0.35);
-  background: #F08A1E;
-  color: #FAF9F6;
+  border: 1px solid rgba(45, 216, 242, 0.4);
+  background: linear-gradient(135deg, #2dd8f2, #12b6d4);
+  color: #04131a;
   display: grid;
   place-items: center;
   cursor: pointer;
   z-index: 50;
-  box-shadow: 0 8px 20px rgba(240, 138, 30, 0.28);
-  transition: transform 150ms ease, background 150ms ease;
+  box-shadow: 0 8px 20px rgba(45, 216, 242, 0.32);
+  transition: transform 150ms ease, box-shadow 150ms ease;
 }
 
 .backTop:hover {
   transform: translateY(-2px);
-  background: #d77713;
+  box-shadow: 0 10px 26px rgba(45, 216, 242, 0.45);
 }
 
 .backTop svg {

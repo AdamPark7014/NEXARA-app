@@ -4,6 +4,7 @@ import { UpsertPageContentDto } from './dto/upsert-page-content.dto.js';
 
 /** Secciones válidas de la home pública. */
 export const VALID_SECTIONS = [
+  'home_hero',
   'home_metricas',
   'home_servicios',
   'home_proceso',

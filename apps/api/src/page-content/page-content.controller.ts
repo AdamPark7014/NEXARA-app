@@ -4,7 +4,9 @@ import {
   Get,
   Param,
   Put,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { PageContentService, VALID_SECTIONS } from './page-content.service.js';
 import { UpsertPageContentDto } from './dto/upsert-page-content.dto.js';
 
@@ -14,12 +16,14 @@ export class PageContentController {
 
   /** GET /api/studio/page-content — lista todas las secciones guardadas */
   @Get()
+  @UseGuards(AuthGuard('jwt'))
   findAll() {
     return this.svc.findAll();
   }
 
   /** GET /api/studio/page-content/sections — lista las secciones válidas */
   @Get('sections')
+  @UseGuards(AuthGuard('jwt'))
   listSections() {
     return { sections: VALID_SECTIONS };
   }
@@ -35,9 +39,10 @@ export class PageContentController {
 
   /**
    * PUT /api/studio/page-content/:section
-   * Solo Studio (requiere auth en producción — añadir JwtAuthGuard cuando esté listo).
+   * Solo Studio.
    */
   @Put(':section')
+  @UseGuards(AuthGuard('jwt'))
   upsert(
     @Param('section') section: string,
     @Body() dto: UpsertPageContentDto,
