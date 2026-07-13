@@ -59,7 +59,8 @@ export default function SolucionesPage() {
             <div data-reveal="soft">
               <span className={shared.heroEyebrow}>Soluciones por industria</span>
               <h1 className={shared.heroTitle}>
-                Tecnología que <span className={shared.heroTitleAccent}>entiende tu operación</span>
+                Tecnología que{" "}
+                <span className={shared.heroTitleAccent}>entiende tu operación</span>
               </h1>
               <p className={shared.heroLead}>
                 Multi-sede, uptime y cumplimiento. Armamos la solución con lo que tu vertical
@@ -93,30 +94,24 @@ export default function SolucionesPage() {
           <div className={shared.sectionHead} data-reveal="soft">
             <span className={shared.eyebrow}>Verticales</span>
             <h2 className={shared.sectionTitle}>
-              El problema típico y <span className={shared.sectionTitleAccent}>cómo lo resolvemos</span>
+              Seis industrias.{" "}
+              <span className={shared.sectionTitleAccent}>Una misma disciplina.</span>
             </h2>
             <p className={shared.sectionLead}>
-              Cada industria tiene su ritmo. Aquí va lo esencial, sin relleno.
+              El problema típico, lo que instalamos y operamos, y el detalle por vertical.
             </p>
           </div>
 
-          <div className={shared.capabilityList} data-reveal-stagger>
-            {industrias.map((i, idx) => (
+          <div className={shared.industryFlow} data-reveal-stagger>
+            {industrias.map((i) => (
               <Link
                 key={i.slug}
                 href={`/soluciones/${i.slug}`}
-                className={shared.editorialRow}
+                className={shared.industryChip}
                 data-reveal="up"
               >
-                <span className={shared.editorialNum}>0{idx + 1}</span>
-                <div className={shared.editorialBody}>
-                  <span className={shared.editorialBadge}>{i.title}</span>
-                  <h3 className={shared.editorialTitle}>{i.problem}</h3>
-                  <p className={shared.editorialText}>{i.weDo}</p>
-                </div>
-                <span className={shared.editorialCta}>
-                  Ver detalle <span aria-hidden>→</span>
-                </span>
+                <span>{i.title}</span>
+                <span className={shared.industryChipMeta}>{i.problem}</span>
               </Link>
             ))}
           </div>

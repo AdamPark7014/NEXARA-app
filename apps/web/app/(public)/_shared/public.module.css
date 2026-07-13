@@ -59,12 +59,12 @@
 }
 
 .inner {
-  max-width: 1180px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 0 clamp(20px, 4vw, 56px);
+  padding: 0 clamp(20px, 4vw, 48px);
 }
 
-/* ── Hero — panel oscuro elevado full-bleed con glow de circuito ── */
+/* ── Hero — panel elevado, acento cian único ── */
 /* !important: anula :where(section){max-width} de globals.scss */
 .hero {
   width: 100% !important;
@@ -73,11 +73,10 @@
   margin-right: 0 !important;
   position: relative;
   background:
-    radial-gradient(120% 140% at 14% -10%, color-mix(in srgb, var(--ds-cyan) 16%, transparent), transparent 58%),
-    radial-gradient(90% 120% at 100% 0%, color-mix(in srgb, var(--ds-purple) 14%, transparent), transparent 60%),
+    radial-gradient(90% 80% at 8% -20%, color-mix(in srgb, var(--ds-cyan) 12%, transparent), transparent 55%),
     var(--ds-panel);
   color: var(--ds-ink);
-  padding: clamp(100px, 13vw, 148px) 0 clamp(64px, 8vw, 96px);
+  padding: clamp(112px, 14vw, 160px) 0 clamp(72px, 9vw, 112px);
   overflow: hidden;
   isolation: isolate;
 }
@@ -121,20 +120,19 @@
 .heroEyebrow::before {
   content: "";
   display: inline-block;
-  width: 24px;
+  width: 28px;
   height: 1px;
   background: var(--ds-cyan);
   flex-shrink: 0;
-  box-shadow: 0 0 8px color-mix(in srgb, var(--ds-cyan) 70%, transparent);
 }
 
 .heroTitle {
-  margin: 0 0 18px;
+  margin: 0 0 20px;
   font-family: "Space Grotesk", var(--ds-font-display, "Manrope", sans-serif);
-  font-size: clamp(2.2rem, 4.8vw, 3.6rem);
+  font-size: clamp(2.35rem, 5vw, 3.75rem);
   font-weight: 500;
-  line-height: 1.06;
-  letter-spacing: -0.025em;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
   color: var(--ds-ink);
   text-wrap: balance;
 }
@@ -167,11 +165,10 @@
 .heroImage {
   position: relative;
   aspect-ratio: 4 / 3;
-  border-radius: 16px;
+  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid var(--ds-linea-osc);
+  border: 1px solid var(--ds-linea);
   background: #071120;
-  box-shadow: var(--ds-sombra);
 }
 
 .heroImage img {
@@ -194,14 +191,15 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 13px 24px;
-  border-radius: 10px;
-  font-family: "Inter Tight", var(--nx-font-ui, "Inter", system-ui), sans-serif;
-  font-size: 0.93rem;
+  padding: 12px 22px;
+  border-radius: 8px;
+  font-family: "Space Grotesk", var(--ds-font-display, sans-serif);
+  font-size: 0.9rem;
   font-weight: 600;
+  letter-spacing: -0.01em;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, color 180ms ease;
   text-decoration: none;
 }
 
@@ -210,17 +208,16 @@
   outline-offset: 2px;
 }
 
-/* Primario: cian sólido con glow neón */
+/* Primario: cian sólido, sin glow excesivo */
 .btnPrimary {
-  background: linear-gradient(135deg, var(--ds-cyan) 0%, var(--ds-cyan-strong) 100%);
+  background: var(--ds-cyan);
   color: #04131a;
   border-color: transparent;
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--ds-cyan) 38%, transparent);
 }
 
 .btnPrimary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 32px color-mix(in srgb, var(--ds-cyan) 52%, transparent);
+  background: var(--ds-cyan-soft);
+  transform: translateY(-1px);
 }
 
 /* Secundario sobre fondo oscuro del hero */
@@ -257,7 +254,7 @@
 /* ── Encabezados de sección ──────────────────────────────── */
 
 .section {
-  padding: clamp(32px, 4vw, 52px) 0;
+  padding: clamp(72px, 10vw, 120px) 0;
 }
 
 .sectionDivider {
@@ -265,43 +262,63 @@
 }
 
 .sectionHead {
-  text-align: center;
-  max-width: 680px;
-  margin: 0 auto clamp(20px, 2.8vw, 36px);
+  text-align: left;
+  max-width: 640px;
+  margin: 0 0 clamp(36px, 5vw, 56px);
 }
 
-/* Eyebrow de sección: mono con líneas cian a ambos lados */
+.sectionHeadCenter {
+  text-align: center;
+  margin-inline: auto;
+}
+
+.sectionHeadCenter .sectionLead {
+  margin-inline: auto;
+}
+
+.sectionHeadCenter .eyebrow {
+  justify-content: center;
+}
+
+/* Eyebrow de sección: mono + línea cian */
 .eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 12px;
   font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 500;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ds-pizarra);
-  margin-bottom: 14px;
+  color: var(--ds-cyan-soft);
+  margin-bottom: 16px;
 }
 
-.eyebrow::before,
-.eyebrow::after {
+.eyebrow::before {
   content: "";
   display: inline-block;
-  width: 24px;
+  width: 28px;
   height: 1px;
   background: var(--ds-cyan);
   flex-shrink: 0;
-  box-shadow: 0 0 8px color-mix(in srgb, var(--ds-cyan) 60%, transparent);
+}
+
+.sectionHeadCenter .eyebrow::after {
+  content: "";
+  display: inline-block;
+  width: 28px;
+  height: 1px;
+  background: var(--ds-cyan);
+  flex-shrink: 0;
 }
 
 .sectionTitle {
-  margin: 0 0 14px;
+  margin: 0 0 16px;
   font-family: "Space Grotesk", var(--ds-font-display, "Manrope", sans-serif);
-  font-size: clamp(1.75rem, 3.2vw, 2.6rem);
+  font-size: clamp(1.85rem, 3.4vw, 2.75rem);
   font-weight: 500;
-  line-height: 1.1;
-  letter-spacing: -0.022em;
+  line-height: 1.08;
+  letter-spacing: -0.028em;
   color: var(--ds-ink);
   text-wrap: balance;
 }
@@ -343,24 +360,21 @@
   gap: clamp(14px, 1.8vw, 20px);
 }
 
-/* ── Cards genéricas — vidrio esmerilado ─────────────────── */
+/* ── Cards — superficie quieta (solo interacción) ────────── */
 
 .card {
   position: relative;
-  background: var(--ds-glass);
+  background: transparent;
   border: 1px solid var(--ds-linea);
-  border-radius: 16px;
-  padding: clamp(20px, 2.4vw, 28px);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease, background 200ms ease;
+  border-radius: 12px;
+  padding: clamp(22px, 2.6vw, 28px);
+  transition: border-color 200ms ease, background 200ms ease;
 }
 
-.card:hover {
-  background: var(--ds-glass-strong);
-  border-color: color-mix(in srgb, var(--ds-cyan) 55%, transparent);
-  box-shadow: 0 16px 40px color-mix(in srgb, var(--ds-cyan) 16%, transparent);
-  transform: translateY(-2px);
+a.card:hover,
+button.card:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: color-mix(in srgb, var(--ds-cyan) 40%, transparent);
 }
 
 .cardIcon {
@@ -408,18 +422,26 @@
 
 .editorialRow {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) auto;
-  gap: clamp(16px, 2.5vw, 32px);
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: clamp(16px, 2.5vw, 36px);
   align-items: start;
-  padding: clamp(22px, 2.8vw, 32px) 4px;
+  padding: clamp(28px, 3.2vw, 40px) 0;
   border-bottom: 1px solid var(--ds-linea);
   text-decoration: none;
   color: inherit;
-  transition: background 160ms ease, border-color 160ms ease;
+  transition: background 180ms ease;
 }
 
 a.editorialRow:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: transparent;
+}
+
+a.editorialRow:hover .editorialTitle {
+  color: var(--ds-cyan-soft);
+}
+
+a.editorialRow:hover .editorialCta {
+  transform: translateX(4px);
 }
 
 a.editorialRow:focus-visible {
@@ -454,11 +476,12 @@ a.editorialRow:focus-visible {
 .editorialTitle {
   margin: 0 0 8px;
   font-family: "Space Grotesk", var(--ds-font-display, sans-serif);
-  font-size: clamp(1.15rem, 1.8vw, 1.45rem);
-  font-weight: 600;
-  letter-spacing: -0.015em;
+  font-size: clamp(1.2rem, 2vw, 1.5rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
   color: var(--ds-ink);
   line-height: 1.25;
+  transition: color 180ms ease;
 }
 
 .editorialText {
@@ -482,11 +505,13 @@ a.editorialRow:focus-visible {
   align-items: center;
   gap: 6px;
   margin-top: 4px;
+  font-family: "Space Grotesk", sans-serif;
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--ds-cyan);
   white-space: nowrap;
   padding-top: 4px;
+  transition: transform 180ms ease;
 }
 
 .heroNarrow .heroGrid {
@@ -499,55 +524,146 @@ a.editorialRow:focus-visible {
 }
 
 .industryFlow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--ds-linea);
+  border: 1px solid var(--ds-linea);
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .industryChip {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  padding: 10px 16px;
-  border-radius: 999px;
-  border: 1px solid var(--ds-linea);
-  background: var(--ds-glass);
+  padding: clamp(22px, 2.8vw, 32px);
+  background: var(--ds-abyss);
   color: var(--ds-ink);
-  font-size: 0.9rem;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.05rem;
   font-weight: 500;
+  letter-spacing: -0.015em;
   text-decoration: none;
-  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+  transition: background 180ms ease, color 180ms ease;
 }
 
 .industryChip:hover {
-  border-color: color-mix(in srgb, var(--ds-cyan) 50%, transparent);
+  background: var(--ds-panel);
   color: var(--ds-cyan-soft);
-  background: color-mix(in srgb, var(--ds-cyan) 10%, transparent);
+}
+
+.industryChipMeta {
+  font-family: "Manrope", sans-serif;
+  font-size: 0.86rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--ds-pizarra);
+}
+
+.industryChip:hover .industryChipMeta {
+  color: var(--ds-pizarra);
+}
+
+.stepGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(28px, 4vw, 48px);
+}
+
+.stepItem {
+  padding-top: 20px;
+  border-top: 1px solid var(--ds-linea);
+}
+
+.stepNum {
+  display: block;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--ds-cyan);
+  margin-bottom: 16px;
+}
+
+.stepTitle {
+  margin: 0 0 10px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--ds-ink);
+}
+
+.stepText {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.65;
+  color: var(--ds-pizarra);
+}
+
+.featureGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--ds-linea);
+  border: 1px solid var(--ds-linea);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.featureCell {
+  padding: clamp(28px, 3.5vw, 40px);
+  background: var(--ds-abyss);
+}
+
+.featureNum {
+  display: block;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: var(--ds-cyan);
+  margin-bottom: 14px;
+}
+
+.featureTitle {
+  margin: 0 0 10px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: var(--ds-ink);
+}
+
+.featureText {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.65;
+  color: var(--ds-pizarra);
+  max-width: 42ch;
 }
 
 .teamGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: clamp(14px, 2vw, 22px);
+  gap: clamp(20px, 2.5vw, 28px);
 }
 
 .teamCard {
-  padding: 18px 14px;
-  border-radius: 14px;
-  border: 1px solid var(--ds-linea);
-  background: var(--ds-glass);
-  text-align: center;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
 }
 
 .teamPhoto {
-  width: 72px;
-  height: 72px;
-  margin: 0 auto 12px;
-  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+  margin: 0 0 14px;
+  border-radius: 10px;
   overflow: hidden;
   border: 1px solid var(--ds-linea);
-  background: color-mix(in srgb, var(--ds-cyan) 12%, transparent);
+  background: color-mix(in srgb, var(--ds-cyan) 10%, transparent);
   display: grid;
   place-items: center;
 }
@@ -560,22 +676,23 @@ a.editorialRow:focus-visible {
 
 .teamInitials {
   font-family: "JetBrains Mono", monospace;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--ds-cyan-soft);
 }
 
 .teamName {
   margin: 0 0 4px;
-  font-size: 0.92rem;
-  font-weight: 600;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
   color: var(--ds-ink);
   line-height: 1.3;
 }
 
 .teamRole {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--ds-pizarra);
   line-height: 1.4;
 }
@@ -583,7 +700,11 @@ a.editorialRow:focus-visible {
 .channelRow {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: clamp(12px, 2vw, 20px);
+  gap: 1px;
+  background: var(--ds-linea);
+  border: 1px solid var(--ds-linea);
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 @media (max-width: 900px) {
@@ -597,6 +718,12 @@ a.editorialRow:focus-visible {
 
   .teamGrid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .industryFlow,
+  .featureGrid,
+  .stepGrid {
+    grid-template-columns: 1fr;
   }
 
   .channelRow {
@@ -673,24 +800,25 @@ a.editorialRow:focus-visible {
   color: var(--ds-pizarra);
 }
 
-/* ── CTA Final — panel de vidrio con borde neón ──────────── */
+/* ── CTA Final — banda limpia, acento cian ───────────────── */
 
 .ctaShell {
   position: relative;
-  padding: clamp(48px, 6vw, 72px) clamp(32px, 6vw, 64px);
-  border-radius: 20px;
-  background:
-    radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--ds-cyan) 18%, transparent), transparent 60%),
-    radial-gradient(100% 140% at 100% 100%, color-mix(in srgb, var(--ds-purple) 16%, transparent), transparent 60%),
-    var(--ds-panel);
-  border: 1px solid var(--ds-linea-osc);
+  padding: clamp(56px, 7vw, 88px) clamp(28px, 5vw, 56px);
+  border-radius: 12px;
+  background: var(--ds-panel);
+  border: 1px solid var(--ds-linea);
   color: var(--ds-ink);
-  text-align: center;
+  text-align: left;
   overflow: hidden;
 }
 
 .ctaShell::before {
-  display: none;
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(70% 80% at 100% 0%, color-mix(in srgb, var(--ds-cyan) 10%, transparent), transparent 55%);
+  pointer-events: none;
 }
 
 .ctaShell > * {
@@ -699,18 +827,19 @@ a.editorialRow:focus-visible {
 }
 
 .ctaTitle {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   font-family: "Space Grotesk", var(--ds-font-display, "Manrope", sans-serif);
-  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-size: clamp(1.7rem, 3vw, 2.5rem);
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.028em;
   color: var(--ds-ink);
   text-wrap: balance;
+  max-width: 22ch;
 }
 
 .ctaLead {
-  margin: 0 auto 28px;
-  max-width: 50ch;
+  margin: 0 0 32px;
+  max-width: 48ch;
   font-size: 1rem;
   line-height: 1.65;
   color: var(--ds-pizarra);
@@ -720,12 +849,11 @@ a.editorialRow:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
-/* Botones dentro del CTA (ya heredan .btnPrimary / .btnSecondary) */
 .ctaShell .btnPrimary {
-  background: linear-gradient(135deg, var(--ds-cyan) 0%, var(--ds-cyan-strong) 100%);
+  background: var(--ds-cyan);
   color: #04131a;
   border-color: transparent;
 }
@@ -733,16 +861,15 @@ a.editorialRow:focus-visible {
 .ctaShell .btnSecondary {
   background: transparent;
   color: var(--ds-ink);
-  border-color: rgba(238, 244, 255, 0.3);
+  border-color: rgba(238, 244, 255, 0.22);
 }
 
 .ctaShell .btnSecondary:hover {
   border-color: var(--ds-cyan);
 }
 
-/* Acento del título dentro del CTA */
 .ctaShell .sectionTitleAccent {
-  background: linear-gradient(120deg, var(--ds-orange) 0%, var(--ds-purple) 100%);
+  background: linear-gradient(120deg, var(--ds-cyan) 0%, var(--ds-cyan-soft) 100%);
   -webkit-background-clip: text;
   background-clip: text;
 }
@@ -818,11 +945,11 @@ a.editorialRow:focus-visible {
 
 .statValue {
   display: block;
-  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
-  font-size: clamp(1.8rem, 3vw, 2.6rem);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--ds-cyan-soft);
+  font-family: "Space Grotesk", var(--ds-font-display, sans-serif);
+  font-size: clamp(2rem, 3.2vw, 2.75rem);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  color: var(--ds-ink);
   line-height: 1;
 }
 

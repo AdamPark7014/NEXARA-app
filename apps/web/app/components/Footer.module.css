@@ -7,7 +7,6 @@
   /* Marino profundo + acentos neón */
   --f-bg:     #04070f;
   --f-acento: #2dd8f2;
-  --f-acento-2: #b06bff;
   --f-papel:  #eef4ff;
   --f-linea:  rgba(140, 190, 255, 0.12);
   --f-text:   rgba(238, 244, 255, 0.92);
@@ -18,27 +17,27 @@
   width: 100%;
   background: var(--f-bg);
   color: var(--f-text);
-  font-family: "Inter Tight", var(--nx-font-ui, "Inter", system-ui), sans-serif;
+  font-family: "Manrope", var(--nx-font-body, system-ui), sans-serif;
   overflow: hidden;
   isolation: isolate;
 }
 
-/* Línea divisora superior — degradado cian → morado */
+/* Línea divisora superior — cian único */
 .topAccent {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--f-acento) 40%, var(--f-acento-2) 65%, transparent);
-  opacity: 0.9;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--f-acento) 35%, var(--f-acento) 65%, transparent);
+  opacity: 0.7;
 }
 
 .footerInner {
   position: relative;
-  max-width: 1180px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: clamp(48px, 6vw, 72px) clamp(20px, 4vw, 56px) clamp(24px, 3vw, 36px);
+  padding: clamp(56px, 7vw, 80px) clamp(20px, 4vw, 48px) clamp(28px, 3vw, 40px);
   z-index: 1;
 }
 
@@ -184,8 +183,9 @@
   border-radius: 8px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, var(--f-acento), var(--f-acento-2));
-  color: #04131a;
+  background: color-mix(in srgb, var(--f-acento) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--f-acento) 35%, transparent);
+  color: var(--f-acento);
 }
 
 .contactIcon svg {

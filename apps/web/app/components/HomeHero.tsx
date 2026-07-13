@@ -2,17 +2,8 @@
 
 /**
  * HomeHero — hero principal de la home pública (`/`).
- * ============================================================
- * Carrusel full-bleed con crossfade automático cada 6 s entre
- * 8 imágenes oficiales del banco NEXARA (cobertura, equipo,
- * instalaciones y NOC). Overlay verde teal sobre cada foto y
- * copy fijo a la izquierda.
- *
- * Si quieres editar el orden / añadir / quitar slides desde
- * el admin sin tocar código, usa la página `/studio/hero` que
- * persiste todo en la tabla `hero_slides` de Postgres. Este
- * componente sólo sirve como fallback estático (no requiere
- * API ni conexión a BD para renderizar la home).
+ * Carrusel/video full-bleed + copy + CTAs. Capacidad shortcuts
+ * viven en la sección “Qué hacemos”, no en el primer viewport.
  */
 
 import Link from "next/link";
@@ -23,7 +14,7 @@ import { fetchPublicHeroSlides, resolveHeroImageUrl } from "@/lib/hero-slides-ap
 import { fetchPublicHeroVideo, resolveHeroVideoUrl } from "@/lib/hero-video-api";
 import type { HeroMediaConfig } from "@/lib/page-content-api";
 
-const SLIDE_INTERVAL_MS = 6000;
+const SLIDE_INTERVAL_MS = 7000;
 
 type Slide = {
   key: string;
@@ -31,7 +22,6 @@ type Slide = {
   alt: string;
 };
 
-/** Slides oficiales — imágenes en `apps/web/public/images/hero/`. */
 const SLIDES: Slide[] = [
   { key: "s1", src: "/images/hero/hero-01.png", alt: "Antena de telecomunicaciones Nexara con vista a la ciudad" },
   { key: "s2", src: "/images/hero/hero-02.png", alt: "Cobertura tecnológica metropolitana con vista al skyline" },
@@ -43,65 +33,12 @@ const SLIDES: Slide[] = [
   { key: "s8", src: "/images/hero/hero-08.png", alt: "Centro de monitoreo NOC Nexara 24/7" },
 ];
 
-type ServiceItem = {
-  label: string;
-  href: string;
-  icon: React.ReactNode;
-};
-
-const SERVICES: ServiceItem[] = [
-  {
-    label: "Videovigilancia",
-    href: "/servicios#cctv",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M23 7l-7 5 7 5V7z" />
-        <rect x="1" y="5" width="15" height="14" rx="2" />
-      </svg>
-    ),
-  },
-  {
-    label: "Redes y Wi‑Fi",
-    href: "/servicios#redes",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
-        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
-        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-        <circle cx="12" cy="20" r="1" />
-      </svg>
-    ),
-  },
-  {
-    label: "Cómputo",
-    href: "/servicios#computo",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="3" width="20" height="14" rx="2" />
-        <line x1="8" y1="21" x2="16" y2="21" />
-        <line x1="12" y1="17" x2="12" y2="21" />
-      </svg>
-    ),
-  },
-  {
-    label: "Soporte TI",
-    href: "/servicios#soporte",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      </svg>
-    ),
-  },
-];
-
 export default function HomeHero() {
   const [dynamicSlides, setDynamicSlides] = useState<Slide[] | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Carga la config del hero desde la BD (Studio → /studio/hero). Si la API
-  // falla o no hay nada configurado, el componente cae a SLIDES hardcodeado.
   useEffect(() => {
     let cancelled = false;
 
@@ -135,7 +72,7 @@ export default function HomeHero() {
           );
         }
       } catch {
-        // silencioso: se mantiene el fallback estático
+        // fallback estático
       }
     };
 
@@ -169,18 +106,19 @@ export default function HomeHero() {
   }, []);
 
   useEffect(() => {
+    if (videoUrl) return;
     startAutoPlay();
     return stopAutoPlay;
-  }, [startAutoPlay, stopAutoPlay]);
+  }, [startAutoPlay, stopAutoPlay, videoUrl]);
 
   useEffect(() => {
     const onVisibility = () => {
       if (document.hidden) stopAutoPlay();
-      else startAutoPlay();
+      else if (!videoUrl) startAutoPlay();
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [startAutoPlay, stopAutoPlay]);
+  }, [startAutoPlay, stopAutoPlay, videoUrl]);
 
   return (
     <section
@@ -188,7 +126,9 @@ export default function HomeHero() {
       aria-label="Bienvenido a Nexara"
       data-home-hero="true"
       onMouseEnter={stopAutoPlay}
-      onMouseLeave={startAutoPlay}
+      onMouseLeave={() => {
+        if (!videoUrl) startAutoPlay();
+      }}
     >
       {videoUrl ? (
         <video
@@ -217,12 +157,13 @@ export default function HomeHero() {
       <div className={styles.overlay} aria-hidden />
 
       <div className={styles.content}>
-        <p className={styles.kicker}>Integración tecnológica en México</p>
+        <p className={styles.brand}>NEXARA</p>
+        <p className={styles.kicker}>Integración tecnológica · México</p>
         <h1 className={styles.title}>
-          Tecnología que <em className={styles.titleAccent}>sostiene tu operación</em>
+          Tecnología que <span className={styles.titleAccent}>sostiene tu operación</span>
         </h1>
         <p className={styles.lead}>
-          CCTV, redes, cómputo y soporte con disciplina de campo. Una sola firma
+          CCTV, redes, cómputo y soporte con disciplina de campo. Una firma
           responsable de que todo funcione el lunes por la mañana.
         </p>
         <div className={styles.actions}>
@@ -232,7 +173,9 @@ export default function HomeHero() {
             data-track-conversion="home_hero_primary_cta"
           >
             Cotiza tu proyecto
-            <span aria-hidden className={styles.ctaArrow}>→</span>
+            <span aria-hidden className={styles.ctaArrow}>
+              →
+            </span>
           </Link>
           <Link
             href="/servicios"
@@ -240,7 +183,6 @@ export default function HomeHero() {
             data-track-conversion="home_hero_projects_cta"
           >
             Ver capacidades
-            <span aria-hidden className={styles.ctaArrow}>→</span>
           </Link>
         </div>
       </div>
@@ -261,17 +203,6 @@ export default function HomeHero() {
           ))}
         </ul>
       )}
-
-      <nav className={styles.services} aria-label="Servicios principales">
-        {SERVICES.map((service) => (
-          <Link key={service.label} href={service.href} className={styles.serviceItem}>
-            <span className={styles.serviceIcon} aria-hidden>
-              {service.icon}
-            </span>
-            <span className={styles.serviceLabel}>{service.label}</span>
-          </Link>
-        ))}
-      </nav>
     </section>
   );
 }

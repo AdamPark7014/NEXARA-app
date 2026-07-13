@@ -182,10 +182,11 @@ export default async function NosotrosPage() {
         <div className={shared.inner}>
           <div className={styles.storyBlock} data-reveal="soft">
             <span className={shared.eyebrow}>Historia</span>
-            <h2 className={shared.sectionTitle} style={{ textAlign: "left", margin: "12px 0 16px" }}>
-              Operamos donde la tecnología <span className={shared.sectionTitleAccent}>tiene que funcionar</span>
+            <h2 className={styles.storyTitle}>
+              Operamos donde la tecnología{" "}
+              <span className={shared.sectionTitleAccent}>tiene que funcionar</span>
             </h2>
-            <p className={shared.sectionLead} style={{ maxWidth: "68ch" }}>
+            <p className={styles.storyLead}>
               NEXARA nació para resolver el hueco entre “la propuesta bonita” y “el lunes en el
               sitio”. Combinamos disciplina de instalación, soporte humano y criterio técnico para
               que CCTV, redes y cómputo no se conviertan en otro proveedor más en tu lista.
@@ -207,14 +208,12 @@ export default async function NosotrosPage() {
             </h2>
             <p className={shared.sectionLead}>Cuatro reglas simples. Las medimos en cada proyecto.</p>
           </div>
-          <div className={shared.capabilityList} data-reveal-stagger>
+          <div className={shared.featureGrid} data-reveal-stagger>
             {valores.map((v) => (
-              <div key={v.n} className={shared.editorialRow} data-reveal="up">
-                <span className={shared.editorialNum}>{v.n}</span>
-                <div className={shared.editorialBody}>
-                  <h3 className={shared.editorialTitle}>{v.title}</h3>
-                  <p className={shared.editorialText}>{v.text}</p>
-                </div>
+              <div key={v.n} className={shared.featureCell} data-reveal="up">
+                <span className={shared.featureNum}>{v.n}</span>
+                <h3 className={shared.featureTitle}>{v.title}</h3>
+                <p className={shared.featureText}>{v.text}</p>
               </div>
             ))}
           </div>
