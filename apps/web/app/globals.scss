@@ -528,9 +528,10 @@ body::before {
 
 .public-layout-wrapper {
   min-height: 100vh;
-  /* Fondo claro: elimina el gradiente verde oscuro que se colaba
-     en los costados cuando el contenido tiene max-width limitado */
-  background: #FAF9F6;
+  /* Circuito nocturno — NUNCA papel crema; eso dejaba bandas claras
+     alrededor de cada sección cuando el contenido no es full-bleed. */
+  background: #050b18;
+  color: #eef4ff;
 }
 
 .public-layout-content {
@@ -604,7 +605,10 @@ body::before {
   box-shadow: 0 16px 32px color-mix(in srgb, var(--shadow) 58%, transparent);
 }
 
-/* Home landing sections controlled globally via data-ui attributes */
+/* Home landing sections — estilo legacy con !important.
+   Desactivado: pisaba el sitio público (bordes, fondos, tipografía).
+   Si se reactiva, debe vivir SOLO en landing-corporate.module.css. */
+/*
 body :where([data-ui="landing-news"],
 [data-ui="landing-metrics"],
 [data-ui="landing-qa"],
@@ -622,59 +626,7 @@ body :where([data-ui="landing-news"],
     inset 0 1px 0 color-mix(in srgb, #ffffff 55%, transparent),
     0 0 0 1px color-mix(in srgb, var(--primary) 8%, transparent) !important;
 }
-
-body :where([data-ui="metric-card"],
-[data-ui="capability-card"],
-[data-ui="solution-card"],
-[data-ui="delivery-card"],
-[data-ui="client-card"]) {
-  border-radius: var(--radius-md) !important;
-  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent) !important;
-  background: color-mix(in srgb, var(--surface) 97%, transparent) !important;
-  box-shadow: 0 10px 22px color-mix(in srgb, var(--shadow) 56%, transparent) !important;
-}
-
-body :where([data-ui="landing-quicknav"]) {
-  border: 1px solid color-mix(in srgb, var(--primary) 26%, transparent) !important;
-  border-radius: 999px !important;
-  background: color-mix(in srgb, var(--surface) 94%, transparent) !important;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--shadow) 45%, transparent) !important;
-}
-
-/* Extra pass: professional aqua styling for Inicio internals */
-body [data-ui="landing-news"] [id="news-active-slide"],
-body [data-ui="landing-qa"],
-body [data-ui="landing-cta"] {
-  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent) !important;
-  border-radius: var(--radius-md) !important;
-  background: color-mix(in srgb, var(--surface) 96%, transparent) !important;
-  box-shadow: 0 12px 24px color-mix(in srgb, var(--shadow) 54%, transparent) !important;
-}
-
-body [data-ui="landing-news"] :where(h2, h3),
-body [data-ui="landing-capabilities"] :where(h2, h3),
-body [data-ui="landing-solutions"] :where(h2, h3),
-body [data-ui="landing-delivery"] :where(h2, h3),
-body [data-ui="landing-clients"] :where(h2, h3),
-body [data-ui="landing-qa"] :where(h2, h3),
-body [data-ui="landing-cta"] :where(h2, h3) {
-  color: color-mix(in srgb, var(--foreground) 94%, var(--primary)) !important;
-  letter-spacing: -0.015em;
-}
-
-body [data-ui="landing-quicknav"] a {
-  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent) !important;
-  background: color-mix(in srgb, var(--surface) 94%, transparent) !important;
-  color: color-mix(in srgb, var(--foreground) 92%, var(--primary)) !important;
-  border-radius: 999px !important;
-  font-weight: 700 !important;
-}
-
-body [data-ui="landing-quicknav"] a:hover,
-body [data-ui="landing-quicknav"] a:focus-visible {
-  background: color-mix(in srgb, var(--primary) 10%, var(--surface)) !important;
-  border-color: color-mix(in srgb, var(--primary) 40%, transparent) !important;
-}
+*/
 
 h1,
 h2,
@@ -851,9 +803,20 @@ textarea:disabled {
     line-height: 1.6;
   }
 
-  :where(main, section, article, .public-layout-content) {
+  /* NO limitar .public-layout-content ni secciones del sitio público:
+     eso metía max-width 1380px + bandas laterales con el fondo del wrapper. */
+  body:not(:has(.public-friendly)) :where(main, section, article),
+  body:not(:has(.public-friendly)) .public-layout-content {
     max-width: var(--content-max);
     margin-inline: auto;
+  }
+
+  .public-friendly,
+  .public-friendly .public-layout-content,
+  .public-friendly :where(main, section, article) {
+    max-width: none;
+    width: 100%;
+    margin-inline: 0;
   }
 
   :where(.card):not([class*="heroTopCard"]) {
@@ -905,15 +868,28 @@ textarea:disabled {
   }
 }
 
-/* Sitio público: neutraliza el background oscuro del body.dark y
-   el orbe decorativo (position:fixed) que se asomaban al exterior
-   del wrapper cuando el contenido tiene max-width < viewport */
+/* Sitio público: fondo abismo + sin orbe decorativo del body,
+   aunque aún no haya clase .dark (PublicSiteThemeLock hidrata después). */
+body:has(.public-layout-wrapper),
 body.dark:has(.public-layout-wrapper) {
-  background: #050b18;
+  background: #050b18 !important;
 }
 
+body:has(.public-layout-wrapper)::before,
 body.dark:has(.public-layout-wrapper)::before {
-  display: none;
+  display: none !important;
+  content: none !important;
+}
+
+/* Anula el polish global de .card sobre el sitio público (borde/sombra/inset claro). */
+.public-friendly :where(.card) {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+.public-friendly :where(.card):hover {
+  transform: none;
+  box-shadow: none;
 }
 
 /* ============================================================
@@ -937,6 +913,23 @@ body.dark:has(.public-layout-wrapper)::before {
   --nx-neon-purple:      #b06bff;
   --nx-neon-purple-strong: #9333ea;
   --nx-neon-purple-soft: #d9baff;
+
+  /* Anula la paleta legacy del :root (naranja #f08a / teal #10a1)
+     para que NINGUNA regla antigua filtre colores viejos. */
+  --nx-orange: var(--nx-neon-orange);
+  --nx-orange-strong: var(--nx-neon-orange-strong);
+  --nx-orange-soft: var(--nx-neon-orange-soft);
+  --nx-teal: var(--nx-neon-cyan);
+  --nx-teal-strong: var(--nx-neon-cyan-strong);
+  --nx-teal-soft: var(--nx-neon-cyan-soft);
+  --nx-skyblue: var(--nx-neon-cyan-soft);
+  --nx-skyblue-strong: var(--nx-neon-cyan);
+  --nx-skyblue-soft: #c8f4fc;
+  --nx-magenta: var(--nx-neon-purple);
+  --nx-magenta-strong: var(--nx-neon-purple-strong);
+  --nx-magenta-soft: var(--nx-neon-purple-soft);
+  --nx-paper: #050b18;
+  --nx-ink: #eef4ff;
 
   --primary: var(--nx-neon-cyan);
   --primary-strong: var(--nx-neon-cyan-strong);
@@ -1007,16 +1000,21 @@ body.dark:has(.public-layout-wrapper)::before {
   --nx-surface-glass: rgba(14, 24, 42, 0.72);
 
   --nx-section-gap: clamp(48px, 7vw, 96px);
+
+  /* Aísla el árbol público: hijos no heredan fondos/gradientes del body. */
+  isolation: isolate;
+  background: #050b18;
+  color: #eef4ff;
 }
 
 /* === Selección y scrollbar premium en sitio público === */
 .public-friendly ::selection {
-  background: color-mix(in srgb, var(--nx-orange) 32%, transparent);
+  background: color-mix(in srgb, var(--nx-neon-cyan) 36%, transparent);
   color: #fff;
 }
 
 .public-friendly {
-  scrollbar-color: color-mix(in srgb, var(--nx-teal) 40%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--nx-neon-cyan) 40%, transparent) transparent;
 }
 
 /* === Decorative utility: textura sutil de grano para hero/heros === */
@@ -1050,7 +1048,7 @@ body.dark:has(.public-layout-wrapper)::before {
   padding: 6px 14px;
   border-radius: 999px;
   border: var(--nx-hairline-strong);
-  background: color-mix(in srgb, var(--nx-orange) 14%, rgba(0, 0, 0, 0.3));
+  background: color-mix(in srgb, var(--nx-neon-cyan) 14%, rgba(0, 0, 0, 0.3));
   font-family: var(--nx-font-ui);
   font-size: var(--nx-text-xs);
   font-weight: 600;
@@ -1065,7 +1063,7 @@ body.dark:has(.public-layout-wrapper)::before {
   height: 6px;
   border-radius: 2px;
   transform: rotate(45deg);
-  background: var(--nx-orange);
+  background: var(--nx-neon-cyan);
 }
 
 /* Tipografía base del sitio público: aplicar la jerarquía oficial */
