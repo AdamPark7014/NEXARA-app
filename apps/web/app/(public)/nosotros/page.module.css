@@ -6,11 +6,15 @@
   position: relative;
   padding: clamp(48px, 6vw, 72px) clamp(32px, 5vw, 60px);
   border-radius: 16px;
-  background: var(--ds-tinta);
+  background:
+    radial-gradient(90% 120% at 10% -20%, color-mix(in srgb, var(--ds-pino) 18%, transparent), transparent 55%),
+    radial-gradient(70% 100% at 100% 0%, color-mix(in srgb, #b06bff 14%, transparent), transparent 60%),
+    var(--ds-tinta);
   color: var(--ds-papel);
   text-align: center;
   overflow: hidden;
   margin-bottom: clamp(32px, 5vw, 56px);
+  border: 1px solid var(--ds-linea);
 }
 
 .friendlyBadge {

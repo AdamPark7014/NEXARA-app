@@ -35,11 +35,12 @@
   --ds-orange:      #ff9d3c;
   --ds-purple:      #b06bff;
 
-  /* Legacy aliases (compatibilidad con nombres previos) */
-  --ds-tinta:       var(--ds-ink);
+  /* Legacy aliases — semántica Tinta/Papel intacta:
+     tinta = panel oscuro · papel = texto claro (como en el mockup) */
+  --ds-tinta:       var(--ds-panel);
   --ds-pino:        var(--ds-cyan);
   --ds-pino-claro:  var(--ds-cyan-strong);
-  --ds-papel:       var(--ds-abyss);
+  --ds-papel:       var(--ds-ink);
   --ds-papel-hueso: var(--ds-glass);
   --ds-musgo:       var(--ds-cyan-soft);
   --bg:    var(--ds-abyss);

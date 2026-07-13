@@ -9,6 +9,9 @@ export const metadata = {
   description: "Catálogo de servicios tecnológicos de Nexara: Software, Cloud, Ciberseguridad, Data & IA, Conectividad y Transformación.",
 };
 
+/** Evita ISR de 1 año que dejaba el front viejo tras deploys. */
+export const dynamic = "force-dynamic";
+
 /* ── Iconos ─────────────────────────────────────────────── */
 const IconCode = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

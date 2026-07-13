@@ -15,17 +15,20 @@
   --nb-muted:   #a9bbd6;
   --nb-line:    rgba(140, 190, 255, 0.14);
 
-  /* Variables ds-* (usadas por nosotros/page.module.css y otros) */
-  --ds-tinta:       #eef4ff;
+  /* Variables ds-* — semántica original Tinta/Papel (no invertir):
+     tinta = superficie oscura · papel = texto/superficie clara */
+  --ds-tinta:       #0a1628;
   --ds-pino:        #2dd8f2;
   --ds-pino-claro:  #12b6d4;
-  --ds-papel:       #050b18;
-  --ds-papel-hueso: rgba(255, 255, 255, 0.05);
+  --ds-papel:       #eef4ff;
+  --ds-papel-hueso: rgba(255, 255, 255, 0.06);
   --ds-musgo:       #9fecfa;
   --ds-pizarra:     #a9bbd6;
-  --ds-niebla:      #7288ad;
+  --ds-niebla:      #a9bbd6;
   --ds-linea:       rgba(140, 190, 255, 0.14);
   --ds-linea-osc:   rgba(140, 190, 255, 0.22);
+  --ds-ink:         #eef4ff;
+  --ds-abyss:       #050b18;
 
   position: relative;
   width: 100%;

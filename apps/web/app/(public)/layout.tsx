@@ -2,9 +2,9 @@
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import PublicSiteThemeLock from "@/components/PublicSiteThemeLock";
+import Header from "../../components/Header";
+import Footer from "../components/Footer";
 
-const Header = dynamic(() => import("../../components/Header"), { ssr: false });
-const Footer = dynamic(() => import("../components/Footer"), { ssr: false });
 const FloatingContactForm = dynamic(() => import("../components/FloatingContactForm"), { ssr: false });
 const PublicTrafficTracker = dynamic(() => import("../../components/PublicTrafficTracker"), { ssr: false });
 const PublicScrollReveal = dynamic(() => import("../../components/PublicScrollReveal"), { ssr: false });
