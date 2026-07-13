@@ -1,32 +1,33 @@
-/* Proyectos · estilos específicos */
+/* Proyectos — editorial overrides */
 
-/* Badge de métrica sobre la imagen del caso */
 .caseMetric {
   position: absolute;
   top: 12px;
   right: 12px;
   z-index: 2;
-  padding: 5px 10px;
-  border-radius: 6px;
-  background: rgba(20, 33, 28, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(45, 216, 242, 0.16);
-  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(5, 10, 20, 0.82);
+  border: 1px solid rgba(45, 216, 242, 0.35);
+  color: #2dd8f2;
+  font-family: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
   font-size: 0.74rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-weight: 600;
 }
 
-/* Etiqueta de sector — mono label */
 .caseSector {
   display: inline-block;
   margin-bottom: 8px;
-  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  font-family: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #2dd8f2;
+}
+
+.caseCell {
+  min-height: 180px;
 }
 
 .studioCasesList {
@@ -34,27 +35,20 @@
   gap: clamp(20px, 2.6vw, 28px);
 }
 
-/* Tarjeta de caso: diseño de 2 columnas limpio */
 .studioCaseCard {
   display: grid;
   grid-template-columns: 0.95fr 1.05fr;
   border-radius: 12px;
-  border: 1px solid rgba(140, 190, 255, 0.16);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(140, 190, 255, 0.14);
+  background: #0a1424;
   overflow: hidden;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
-}
-
-.studioCaseCard:hover {
-  border-color: color-mix(in srgb, #2dd8f2 55%, transparent);
-  box-shadow: 0 4px 18px rgba(45, 216, 242, 0.16);
 }
 
 .studioCaseMedia {
   position: relative;
-  min-height: 320px;
-  border-right: 1px solid rgba(140, 190, 255, 0.16);
-  background: rgba(45, 216, 242, 0.16);
+  min-height: 280px;
+  border-right: 1px solid rgba(140, 190, 255, 0.12);
+  background: #07111f;
 }
 
 .studioCasePhoto {
@@ -66,141 +60,55 @@
   display: grid;
   gap: 10px;
   align-content: start;
-  background: rgba(255, 255, 255, 0.06);
 }
 
 .studioCaseTitle {
   margin: 0;
-  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
-  font-size: clamp(1.15rem, 1.9vw, 1.5rem);
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(1.15rem, 1.9vw, 1.45rem);
   line-height: 1.15;
-  letter-spacing: -0.015em;
-  font-weight: 400;
+  letter-spacing: -0.02em;
+  font-weight: 600;
   color: #eef4ff;
 }
 
 .studioCaseSummary {
   margin: 0;
-  font-size: 0.93rem;
-  line-height: 1.6;
-  color: #a9bbd6;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #9bb0cc;
 }
 
 .infoRow {
-  display: grid;
-  gap: 4px;
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #9bb0cc;
 }
 
 .infoRow strong {
-  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #2dd8f2;
-}
-
-.infoRow span {
-  font-size: 0.9rem;
-  line-height: 1.5;
   color: #eef4ff;
-}
-
-.tagsWrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 5px 10px;
-  border-radius: 6px;
-  border: 1px solid rgba(140, 190, 255, 0.16);
-  background: rgba(255, 255, 255, 0.05);
-  font-size: 0.76rem;
-  color: #a9bbd6;
+  font-weight: 600;
 }
 
 .highlights {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  margin: 4px 0 0;
+  padding-left: 18px;
   display: grid;
-  gap: 7px;
-}
-
-.highlights li {
-  position: relative;
-  padding-left: 16px;
-  font-size: 0.88rem;
-  line-height: 1.5;
-  color: #a9bbd6;
-}
-
-.highlights li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0.55em;
-  width: 7px;
-  height: 7px;
-  border-radius: 2px;
-  background: #2dd8f2;
-}
-
-.galleryBlock {
-  display: grid;
-  gap: 8px;
-}
-
-.galleryTitle {
-  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #a9bbd6;
-}
-
-.galleryGrid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
+  color: #9bb0cc;
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
-.galleryThumb {
-  position: relative;
-  aspect-ratio: 1 / 1;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid rgba(140, 190, 255, 0.16);
-  background: rgba(45, 216, 242, 0.16);
-}
-
-.galleryThumbPhoto {
-  object-fit: cover;
-}
-
-.metaFooter {
-  margin-top: 6px;
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  font-size: 0.76rem;
-  color: #7288ad;
-}
-
-@media (max-width: 1024px) {
+@media (max-width: 900px) {
   .studioCaseCard {
     grid-template-columns: 1fr;
   }
 
   .studioCaseMedia {
-    min-height: 240px;
+    min-height: 220px;
     border-right: none;
-    border-bottom: 1px solid rgba(140, 190, 255, 0.16);
+    border-bottom: 1px solid rgba(140, 190, 255, 0.12);
   }
 }

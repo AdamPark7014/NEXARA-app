@@ -1,79 +1,77 @@
-/* ============================================================
-   NEXARA · Footer (sitio público)
-   Sistema de diseño: Tinta oscuro — paleta unificada
-   ============================================================ */
+/* NEXARA · Footer — limpio, marca cyan */
 
 .footer {
-  /* Marino profundo + acentos neón */
-  --f-bg:     #04070f;
+  --f-bg: #050a14;
+  --f-panel: #0a1628;
   --f-acento: #2dd8f2;
-  --f-papel:  #eef4ff;
-  --f-linea:  rgba(140, 190, 255, 0.12);
-  --f-text:   rgba(238, 244, 255, 0.92);
-  --f-dim:    rgba(169, 187, 214, 0.7);
-  --f-niebla: rgba(114, 136, 173, 0.85);
+  --f-papel: #eef4ff;
+  --f-linea: rgba(140, 190, 255, 0.14);
+  --f-text: rgba(238, 244, 255, 0.88);
+  --f-dim: #9bb0cc;
+  --f-niebla: #6f85a5;
 
   position: relative;
   width: 100%;
-  background: var(--f-bg);
+  background:
+    radial-gradient(55% 70% at 0% 0%, rgba(45, 216, 242, 0.1), transparent 55%),
+    var(--f-bg);
   color: var(--f-text);
-  font-family: "Manrope", var(--nx-font-body, system-ui), sans-serif;
+  font-family: var(--nx-font-body, "Manrope", system-ui, sans-serif);
   overflow: hidden;
   isolation: isolate;
+  border-top: 1px solid var(--f-linea);
 }
 
-/* Línea divisora superior — cian único */
 .topAccent {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--f-acento) 35%, var(--f-acento) 65%, transparent);
-  opacity: 0.7;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, rgba(45, 216, 242, 0.55), rgba(176, 107, 255, 0.4), transparent);
 }
 
 .footerInner {
   position: relative;
   max-width: 1120px;
   margin: 0 auto;
-  padding: clamp(56px, 7vw, 80px) clamp(20px, 4vw, 48px) clamp(28px, 3vw, 40px);
+  padding: clamp(48px, 6vw, 72px) clamp(24px, 4vw, 48px) clamp(28px, 3vw, 40px);
   z-index: 1;
 }
 
-/* ── Grid principal ─────────────────────────────────────── */
-
 .mainGrid {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1fr 1fr;
-  gap: clamp(28px, 4vw, 56px);
+  grid-template-columns: 1.5fr 1fr 1fr 1.1fr;
+  gap: clamp(28px, 4vw, 48px);
   align-items: start;
-  margin-bottom: clamp(32px, 4vw, 48px);
+  margin-bottom: clamp(36px, 4vw, 48px);
 }
-
-/* ── Brand column ───────────────────────────────────────── */
 
 .brandCol {
   display: grid;
   gap: 14px;
-  max-width: 340px;
+  max-width: 300px;
 }
 
-.brandName {
-  margin: 0;
-  font-family: "Space Grotesk", var(--nx-font-display, "Manrope", sans-serif);
-  font-size: 1.4rem;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  color: var(--f-papel);
+.brandLogoLink {
+  display: inline-flex;
+  line-height: 0;
+  text-decoration: none;
+  width: fit-content;
+}
+
+.brandLogo {
+  display: block;
+  height: 38px;
+  width: auto;
+  max-width: 190px;
+  object-fit: contain;
+  object-position: left center;
 }
 
 .brandTagline {
   margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.6;
+  font-size: 0.92rem;
+  line-height: 1.55;
   color: var(--f-dim);
-  max-width: 30ch;
+  max-width: 28ch;
 }
 
 .socials {
@@ -85,28 +83,26 @@
 .social {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.06);
+  background: transparent;
   border: 1px solid var(--f-linea);
   color: var(--f-niebla);
   cursor: pointer;
-  transition: transform 150ms ease, background 150ms ease, color 150ms ease;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
 }
 
 .social svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
 }
 
 .social:hover {
-  transform: translateY(-2px);
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--f-papel);
+  color: var(--f-acento);
+  border-color: rgba(45, 216, 242, 0.45);
+  background: rgba(45, 216, 242, 0.08);
 }
-
-/* ── Link columns ───────────────────────────────────────── */
 
 .linkCol {
   display: grid;
@@ -114,15 +110,14 @@
   min-width: 0;
 }
 
-/* Títulos de columna: JetBrains Mono — sin mint */
 .colTitle {
   margin: 0;
-  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
-  font-size: 0.68rem;
-  font-weight: 500;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--f-niebla);
+  color: var(--f-acento);
 }
 
 .list {
@@ -130,189 +125,78 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
-.list li a {
-  font-size: 0.9rem;
+.list a,
+.textBtn {
   color: var(--f-dim);
   text-decoration: none;
+  font-size: 0.9rem;
   transition: color 150ms ease;
-  display: inline-block;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
 }
 
-.list li a:hover {
+.list a:hover,
+.textBtn:hover {
   color: var(--f-papel);
 }
 
-/* ── Contacto compacto ───────────────────────────────────── */
-
-.contactRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  padding-top: clamp(20px, 2.4vw, 28px);
-  border-top: 1px solid var(--f-linea);
-}
-
-.contactBlock {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 10px;
-  border: 1px solid var(--f-linea);
-  background: rgba(255, 255, 255, 0.04);
-  text-decoration: none;
-  color: inherit;
-  cursor: pointer;
-  transition: background 150ms ease, border-color 150ms ease;
-  text-align: left;
-  font: inherit;
-}
-
-.contactBlock:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.14);
-}
-
-.contactIcon {
-  flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  background: color-mix(in srgb, var(--f-acento) 18%, transparent);
-  border: 1px solid color-mix(in srgb, var(--f-acento) 35%, transparent);
-  color: var(--f-acento);
-}
-
-.contactIcon svg {
-  width: 15px;
-  height: 15px;
-}
-
-.contactInfo {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.contactLabel {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--f-text);
-  letter-spacing: 0.01em;
-}
-
-.contactValue {
-  font-size: 0.8rem;
-  color: var(--f-dim);
-}
-
-/* ── Mapa / Ubicación ───────────────────────────────────── */
-
-.mapSection {
-  margin-top: clamp(10px, 1.8vw, 16px);
-  padding-top: clamp(12px, 1.8vw, 16px);
-  border-top: 1px solid var(--f-linea);
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-  text-align: center;
-}
-
-.mapHeader {
-  display: grid;
-  gap: 4px;
-}
-
-.mapTitle {
-  margin: 0;
-  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+.muted {
   color: var(--f-niebla);
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
-
-.mapAddress {
-  margin: 0;
-  color: var(--f-dim);
-  font-size: 0.82rem;
-}
-
-.mapFrameWrap {
-  width: min(640px, 100%);
-  border-radius: 10px;
-  padding: 4px;
-  border: 1px solid var(--f-linea);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.mapCanvas {
-  width: 100%;
-  height: clamp(170px, 24vw, 220px);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-/* ── Bottom bar ──────────────────────────────────────────── */
 
 .bottomBar {
-  margin-top: clamp(24px, 3vw, 32px);
-  padding-top: clamp(18px, 2vw, 24px);
-  border-top: 1px solid var(--f-linea);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
   flex-wrap: wrap;
-  font-size: 0.8rem;
-  color: var(--f-dim);
+  padding-top: 22px;
+  border-top: 1px solid var(--f-linea);
+  font-size: 0.82rem;
+  color: var(--f-niebla);
 }
 
 .legalLinks {
   display: flex;
-  gap: 18px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
 .legalLinks a {
-  color: var(--f-dim);
+  color: var(--f-niebla);
   text-decoration: none;
   transition: color 150ms ease;
 }
 
 .legalLinks a:hover {
-  color: var(--f-papel);
+  color: var(--f-acento);
 }
-
-/* ── Back-to-top ─────────────────────────────────────────── */
 
 .backTop {
   position: fixed;
-  right: 22px;
-  bottom: 22px;
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  border: 1px solid rgba(45, 216, 242, 0.4);
-  background: linear-gradient(135deg, #2dd8f2, #12b6d4);
-  color: #04131a;
+  right: 20px;
+  bottom: 88px;
+  z-index: 40;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
+  background: #0a1628;
+  border: 1px solid rgba(45, 216, 242, 0.35);
+  color: var(--f-acento);
+  padding: 0;
+  border-radius: 10px;
   cursor: pointer;
-  z-index: 50;
-  box-shadow: 0 8px 20px rgba(45, 216, 242, 0.32);
-  transition: transform 150ms ease, box-shadow 150ms ease;
-}
-
-.backTop:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 26px rgba(45, 216, 242, 0.45);
+  transition: color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .backTop svg {
@@ -321,30 +205,25 @@
   fill: currentColor;
 }
 
-/* ── Responsive ──────────────────────────────────────────── */
+.backTop:hover {
+  color: #fff;
+  border-color: #2dd8f2;
+  box-shadow: 0 0 16px rgba(45, 216, 242, 0.25);
+}
 
-@media (max-width: 980px) {
+@media (max-width: 900px) {
   .mainGrid {
     grid-template-columns: 1fr 1fr;
   }
 
   .brandCol {
     grid-column: 1 / -1;
-    max-width: 100%;
-  }
-
-  .contactRow {
-    grid-template-columns: 1fr;
+    max-width: none;
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 600px) {
   .mainGrid {
     grid-template-columns: 1fr;
-  }
-
-  .bottomBar {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }

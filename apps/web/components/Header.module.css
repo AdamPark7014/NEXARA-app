@@ -46,18 +46,18 @@
  * `.header` / `.navLinks` / `.link` base sin reescribir todo el archivo.
  */
 .headerPublic {
-	background: linear-gradient(142deg, rgba(4, 9, 20, 0.92) 0%, rgba(7, 16, 32, 0.9) 100%) !important;
-	border-bottom: 1px solid rgba(140, 190, 255, 0.16) !important;
+	background: rgba(5, 10, 20, 0.78) !important;
+	border-bottom: 1px solid rgba(45, 216, 242, 0.14) !important;
 	backdrop-filter: blur(16px) saturate(140%) !important;
 	-webkit-backdrop-filter: blur(16px) saturate(140%) !important;
-	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
+	box-shadow: none !important;
 }
 
 .headerPublic::before {
-	opacity: 0.7 !important;
+	opacity: 0.5 !important;
 	background:
-		radial-gradient(120% 140% at 15% 0%, rgba(45, 216, 242, 0.14), transparent 62%),
-		radial-gradient(100% 130% at 90% 0%, rgba(176, 107, 255, 0.12), transparent 60%) !important;
+		radial-gradient(100% 120% at 15% 0%, rgba(45, 216, 242, 0.12), transparent 60%),
+		radial-gradient(90% 100% at 90% 0%, rgba(176, 107, 255, 0.08), transparent 55%) !important;
 }
 
 .headerPublic .link,
@@ -68,21 +68,17 @@
 .logoLink {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.6rem;
 	text-decoration: none;
+	line-height: 0;
 }
 
-.logoMark {
-	display: inline-flex;
-	filter: drop-shadow(0 0 10px rgba(45, 216, 242, 0.45));
-}
-
-.logoWordmark {
-	font-family: "Space Grotesk", var(--nx-font-display, sans-serif);
-	font-size: 1.15rem;
-	font-weight: 600;
-	letter-spacing: 0.06em;
-	color: #eef4ff;
+.logoLockup {
+	display: block;
+	height: clamp(36px, 4.6vw, 48px);
+	width: auto;
+	max-width: min(240px, 52vw);
+	object-fit: contain;
+	object-position: left center;
 }
 
 /* Nav plano — sin contenedor pill */
@@ -91,25 +87,25 @@
 	border: 1px solid transparent !important;
 	box-shadow: none !important;
 	padding: 0 !important;
-	gap: 0.1rem !important;
+	gap: 0.15rem !important;
 }
 
-/* Links sobre fondo oscuro con glow cian al activarse */
 .headerPublic .link {
 	background: transparent !important;
 	border-color: transparent !important;
 	box-shadow: none !important;
-	color: #c3d4ee !important;
+	color: rgba(238, 244, 255, 0.78) !important;
 	text-transform: uppercase;
-	letter-spacing: 0.07em;
+	letter-spacing: 0.1em;
 	font-weight: 600;
-	font-size: 0.8rem;
+	font-size: 0.74rem;
+	font-family: "Space Grotesk", sans-serif;
 	text-shadow: none;
-	padding: 0.5rem 0.9rem;
+	padding: 0.5rem 0.85rem;
 }
 
 .headerPublic .link:hover {
-	background: rgba(45, 216, 242, 0.1) !important;
+	background: transparent !important;
 	border-color: transparent !important;
 	box-shadow: none !important;
 	transform: none;
@@ -133,7 +129,8 @@
 	width: 18px;
 	height: 1px;
 	background: #2dd8f2;
-	border-radius: 1px;
+	border-radius: 0;
+	box-shadow: 0 0 8px rgba(45, 216, 242, 0.6);
 }
 
 /* ── Estado top de página: sin fondo, totalmente transparente ────────── */
@@ -151,14 +148,14 @@
 }
 
 .headerInner {
-	max-width: var(--content-max);
+	max-width: 1200px;
 	margin: 0 auto;
-	min-height: 72px;
-	padding: 0 var(--page-padding-x);
+	min-height: 76px;
+	padding: 0 clamp(20px, 4vw, 40px);
 	display: grid;
 	grid-template-columns: auto 1fr auto;
 	align-items: center;
-	gap: 1rem;
+	gap: 1.25rem;
 	position: relative;
 	z-index: 1;
 }
@@ -224,31 +221,29 @@
 	gap: 0.6rem;
 }
 
-/* ── Botón "Cotiza tu Proyecto" ── */
+/* ── Botón "Cotiza tu Proyecto" — ghost cian editorial ── */
 .contactCta {
 	display: inline-flex;
 	align-items: center;
 	gap: 8px;
-	padding: 9px 16px;
-	border-radius: 8px;
+	padding: 10px 16px;
+	border-radius: 10px;
 	background: transparent;
-	color: #eef4ff;
-	font-family: "Space Grotesk", var(--nx-font-display, system-ui), sans-serif;
-	font-size: 0.84rem;
+	color: #2dd8f2;
+	font-family: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
+	font-size: 0.88rem;
 	font-weight: 600;
 	letter-spacing: -0.01em;
 	text-decoration: none;
 	border: 1px solid rgba(45, 216, 242, 0.5);
-	box-shadow: none;
 	transition: transform 150ms ease, background 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
 .contactCta:hover {
 	transform: translateY(-1px);
-	background: #2dd8f2;
+	background: rgba(45, 216, 242, 0.1);
 	border-color: #2dd8f2;
-	color: #04131a;
-	box-shadow: none;
+	color: #9fecfa;
 }
 
 .contactArrow {

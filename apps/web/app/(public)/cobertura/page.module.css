@@ -1,36 +1,5 @@
-/* Cobertura · estilos específicos */
+/* Cobertura — layout overrides mínimos (DS en public.module.css) */
 
-.regionCard {
-  position: relative;
-}
-
-.regionHead {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-
-.regionBadge {
-  padding: 4px 10px;
-  border-radius: 5px;
-  background: var(--ds-musgo);
-  color: var(--ds-pino);
-  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.regionBase {
-  border-color: color-mix(in srgb, var(--ds-pino) 40%, transparent) !important;
-}
-
-.modIcon {
-  display: inline-block;
-  font-size: 2rem;
-  line-height: 1;
-  margin-bottom: 14px;
+.regionNote {
+  margin: 0;
 }

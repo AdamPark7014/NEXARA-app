@@ -1,140 +1,137 @@
 import React from "react";
-import Image from "next/image";
 import Link from "next/link";
 import shared from "../_shared/public.module.css";
-import styles from "./page.module.css";
+import PublicPageHero from "../../components/PublicPageHero";
+import heroStyles from "../../components/PublicPageHero.module.css";
 
 export const metadata = {
   title: "Cobertura | Nexara",
-  description: "Operamos en todo México con presencia directa en regiones clave y partners certificados.",
+  description:
+    "Operamos en México con base en Puebla y CDMX. En sitio, remoto e híbrido según urgencia y SLA.",
 };
 
 export const dynamic = "force-dynamic";
 
 const regiones = [
-  { name: "Centro", desc: "CDMX · Estado de México · Querétaro · Puebla", base: true },
-  { name: "Bajío", desc: "Guanajuato · Aguascalientes · San Luis Potosí" },
-  { name: "Occidente", desc: "Jalisco · Nayarit · Colima · Michoacán" },
-  { name: "Norte", desc: "Nuevo León · Coahuila · Chihuahua · Sonora" },
-  { name: "Sureste", desc: "Yucatán · Quintana Roo · Veracruz · Tabasco" },
-  { name: "Pacífico", desc: "Sinaloa · Baja California · Baja California Sur" },
+  {
+    name: "Centro",
+    role: "Base operativa",
+    desc: "Puebla, CDMX, Estado de México y Querétaro — cuadrillas propias y tiempos de respuesta locales.",
+  },
+  {
+    name: "Bajío",
+    role: "Campo + partners",
+    desc: "Guanajuato, Aguascalientes y San Luis Potosí. Levantamiento en sitio y seguimiento remoto.",
+  },
+  {
+    name: "Occidente",
+    role: "Campo + partners",
+    desc: "Jalisco, Nayarit, Colima y Michoacán. Instalación y mantenimiento con logística coordinada.",
+  },
+  {
+    name: "Norte",
+    role: "Cobertura extendida",
+    desc: "Nuevo León, Coahuila, Chihuahua y Sonora. Proyectos por fases con equipo móvil.",
+  },
+  {
+    name: "Sureste",
+    role: "Cobertura extendida",
+    desc: "Yucatán, Quintana Roo, Veracruz y Tabasco. Intervenciones programadas y soporte híbrido.",
+  },
+  {
+    name: "Pacífico",
+    role: "Cobertura extendida",
+    desc: "Sinaloa y Baja California. Enlaces, CCTV y redes con ventanas de trabajo claras.",
+  },
 ];
 
 const modalidades = [
   {
     title: "En sitio",
-    desc: "Cuadrillas certificadas con kit completo, EPP y permisos.",
-    icon: "🛠️",
+    text: "Cuadrillas con kit completo, EPP y permisos. Ideal para instalaciones, cableado y entregas con evidencia.",
   },
   {
-    title: "Remoto 24/7",
-    desc: "NOC propio, monitoreo proactivo y atención por canal de tu preferencia.",
-    icon: "📡",
+    title: "Remoto",
+    text: "Diagnóstico, configuración y mesa de ayuda sin desplazar personal. Primera línea para la mayoría de incidentes.",
   },
   {
     title: "Híbrido",
-    desc: "Combinamos campo + remoto según urgencia y SLA contratado.",
-    icon: "🔄",
+    text: "Remoto primero; visita cuando el riesgo o el SLA lo piden. El modelo se define en el contrato, no al calor del ticket.",
   },
 ];
 
 export default function CoberturaPage() {
   return (
-    <main className={shared.page}>
-      {/* Hero */}
-      <section className={shared.hero}>
-        <div className={shared.inner}>
-          <div className={shared.heroGrid}>
-            <div data-reveal="soft">
-              <span className={shared.heroEyebrow}>Cobertura</span>
-              <h1 className={shared.heroTitle}>
-                Presencia en <span className={shared.heroTitleAccent}>toda la República</span>
-              </h1>
-              <p className={shared.heroLead}>
-                Operamos directamente en seis regiones de México con personal propio y partners
-                certificados. Llegamos donde tu operación lo necesita.
-              </p>
-              <div className={shared.heroActions}>
-                <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
-                  Consultar tu zona <span className={shared.btnArrow}>→</span>
-                </Link>
-                <Link href="/servicios" className={`${shared.btn} ${shared.btnSecondary}`}>
-                  Ver servicios
-                </Link>
-              </div>
-            </div>
-            <div className={shared.heroImage} data-reveal="soft">
-              <Image src="/images/hero/hero-06.png" alt="Cobertura nacional Nexara" width={720} height={540} priority />
-              <div className={shared.heroImageOverlay} />
-            </div>
-          </div>
-        </div>
-      </section>
+    <main className={`${shared.page} home-main-flush`}>
+      <PublicPageHero
+        eyebrow="Cobertura"
+        title={
+          <>
+            Base en el centro,{" "}
+            <span className={heroStyles.titleAccent}>alcance nacional</span>
+          </>
+        }
+        lead="Puebla y CDMX como ancla operativa. El resto del país con campo propio, partners y modelo remoto o híbrido."
+        imageSrc="/images/hero/hero-06.png"
+        imageAlt="Cobertura nacional Nexara"
+      />
 
-      {/* Regiones */}
-      <section className={shared.section}>
+      <section className={shared.section} data-reveal="up">
         <div className={shared.inner}>
-          <div className={shared.sectionHead} data-reveal="soft">
-            <span className={shared.eyebrow}>Regiones</span>
+          <header className={shared.sectionHead}>
+            <p className={shared.eyebrow}>Regiones</p>
             <h2 className={shared.sectionTitle}>
-              Seis regiones, <span className={shared.sectionTitleAccent}>un solo equipo</span>
+              Dónde llegamos — y <span className={shared.sectionTitleAccent}>cómo</span>
             </h2>
             <p className={shared.sectionLead}>
-              Operación nacional con tiempos de respuesta locales.
+              Seis regiones. La base centra el personal; el resto se arma según urgencia, sitio y SLA.
             </p>
-          </div>
-          <div className={shared.grid3} data-reveal-stagger>
+          </header>
+          <div className={shared.industryBoard} data-reveal-stagger>
             {regiones.map((r) => (
-              <div
-                key={r.name}
-                className={`${shared.card} ${styles.regionCard} ${r.base ? styles.regionBase : ""}`}
-                data-reveal="up"
-              >
-                <div className={styles.regionHead}>
-                  <h3 className={shared.cardTitle}>{r.name}</h3>
-                  {r.base && <span className={styles.regionBadge}>Sede</span>}
-                </div>
-                <p className={shared.cardText}>{r.desc}</p>
+              <div key={r.name} className={shared.industryCell} data-reveal="up">
+                <span className={shared.industryRisk}>{r.role}</span>
+                <h3 className={shared.industryCellTitle}>{r.name}</h3>
+                <p className={shared.industryCellText}>{r.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Modalidades */}
-      <section className={`${shared.section} ${shared.sectionDivider}`}>
+      <section className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
         <div className={shared.inner}>
-          <div className={shared.sectionHead} data-reveal="soft">
-            <span className={shared.eyebrow}>Modalidades</span>
+          <header className={shared.sectionHead}>
+            <p className={shared.eyebrow}>Modalidades</p>
             <h2 className={shared.sectionTitle}>
-              Como tú <span className={shared.sectionTitleAccent}>lo necesites</span>
+              Cómo <span className={shared.sectionTitleAccent}>intervenimos</span>
             </h2>
-          </div>
-          <div className={shared.grid3} data-reveal-stagger>
+            <p className={shared.sectionLead}>
+              El modelo se adapta al riesgo y a la ventana de trabajo — no al contrario.
+            </p>
+          </header>
+          <div className={shared.principleGrid} data-reveal-stagger>
             {modalidades.map((m) => (
-              <div key={m.title} className={shared.card} data-reveal="up">
-                <span className={styles.modIcon}>{m.icon}</span>
-                <h3 className={shared.cardTitle}>{m.title}</h3>
-                <p className={shared.cardText}>{m.desc}</p>
+              <div key={m.title} className={shared.principleItem} data-reveal="up">
+                <h3 className={shared.principleTitle}>{m.title}</h3>
+                <p className={shared.principleText}>{m.text}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className={shared.section}>
+      <section className={shared.sectionTight} data-reveal="up">
         <div className={shared.inner}>
-          <div className={shared.ctaShell} data-reveal="up">
-            <h2 className={shared.ctaTitle}>
-              ¿Necesitas atención <span className={shared.sectionTitleAccent}>en tu ciudad</span>?
-            </h2>
+          <div className={shared.ctaBand}>
+            <p className={shared.ctaEyebrow}>Tu zona</p>
+            <h2 className={shared.ctaTitle}>¿Operas fuera del centro?</h2>
             <p className={shared.ctaLead}>
-              Coordinamos visita o conexión remota en 24 horas hábiles.
+              Indica ciudad, tipo de intervención y urgencia. Te confirmamos tiempo de respuesta y modelo de servicio.
             </p>
             <div className={shared.ctaActions}>
               <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
-                Solicitar atención <span className={shared.btnArrow}>→</span>
+                Consultar mi zona <span className={shared.btnArrow}>→</span>
               </Link>
             </div>
           </div>

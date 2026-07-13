@@ -1,507 +1,67 @@
-/* ============================================================
-   NEXARA · Home sections — alineado al DS circuito nocturno
-   Space Grotesk · Manrope · JetBrains Mono · acento cian
-   ============================================================ */
+/* Home — composition overrides only (DS lives in public.module.css) */
 
 .homeBody {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 0 clamp(20px, 4vw, 48px);
-  background: #050b18;
-}
-
-/* ── Métricas ────────────────────────────────────────────── */
-
-.metricsBand {
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
-  background: #0a1628;
-  border-bottom: 1px solid rgba(140, 190, 255, 0.14);
-  padding: clamp(40px, 5.5vw, 64px) clamp(20px, 4vw, 48px);
-}
-
-.metricsInner {
-  max-width: 1120px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0;
-}
-
-.metricItem {
-  position: relative;
-  text-align: left;
-  padding: 0 clamp(16px, 2.2vw, 32px);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.metricItem:first-child {
-  padding-left: 0;
-}
-
-.metricItem + .metricItem::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 8%;
-  height: 84%;
-  width: 1px;
-  background: rgba(140, 190, 255, 0.14);
-}
-
-.metricValue {
-  font-family: "Space Grotesk", sans-serif;
-  font-size: clamp(2rem, 3.4vw, 2.75rem);
-  font-weight: 500;
-  color: #eef4ff;
-  line-height: 1;
-  letter-spacing: -0.03em;
-}
-
-.metricLabel {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.68rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #7288ad;
-  line-height: 1.45;
-  max-width: 18ch;
-}
-
-/* ── Section heads ───────────────────────────────────────── */
-
-.sectionHead {
-  padding: clamp(72px, 10vw, 112px) 0 clamp(32px, 4vw, 48px);
-  max-width: 560px;
-}
-
-.eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.7rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #9fecfa;
-  margin: 0 0 16px;
-}
-
-.eyebrow::before {
-  content: "";
-  display: inline-block;
-  width: 28px;
-  height: 1px;
-  background: #2dd8f2;
-  flex-shrink: 0;
-}
-
-.sectionTitle {
-  font-family: "Space Grotesk", sans-serif;
-  font-size: clamp(1.85rem, 3.4vw, 2.75rem);
-  font-weight: 500;
-  line-height: 1.08;
-  color: #eef4ff;
-  letter-spacing: -0.028em;
-  margin: 0 0 16px;
-  text-wrap: balance;
-}
-
-.accent {
-  background: linear-gradient(120deg, #2dd8f2 0%, #9fecfa 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  font-style: normal;
-}
-
-.sectionLead {
-  font-family: "Manrope", sans-serif;
-  font-size: 1rem;
-  line-height: 1.65;
-  color: #a9bbd6;
+  max-width: none;
   margin: 0;
-  max-width: 52ch;
+  padding: 0;
+  background:
+    radial-gradient(50% 40% at 100% 0%, rgba(45, 216, 242, 0.07), transparent 55%),
+    radial-gradient(40% 35% at 0% 55%, rgba(176, 107, 255, 0.05), transparent 50%),
+    #050a14;
 }
 
-.centered {
-  text-align: center;
-  margin-inline: auto;
+.band {
+  background:
+    radial-gradient(60% 70% at 0% 50%, rgba(45, 216, 242, 0.08), transparent 55%),
+    #07111f;
+  border-top: 1px solid rgba(140, 190, 255, 0.12);
+  border-bottom: 1px solid rgba(140, 190, 255, 0.12);
 }
 
-.centered .eyebrow {
-  justify-content: center;
-}
-
-.centered .eyebrow::after {
-  content: "";
-  display: inline-block;
-  width: 28px;
-  height: 1px;
-  background: #2dd8f2;
-  flex-shrink: 0;
-}
-
-.centered .sectionLead {
-  margin-inline: auto;
-}
-
-/* ── Capacidades (lista editorial) ───────────────────────── */
-
-.serviciosList {
-  border-top: 1px solid rgba(140, 190, 255, 0.14);
-  padding-bottom: clamp(24px, 4vw, 40px);
-}
-
-.servicioRow {
+.headSplit {
   display: grid;
-  grid-template-columns: 100px minmax(0, 1fr) 28px;
-  align-items: center;
-  gap: clamp(16px, 2.5vw, 36px);
-  padding: clamp(26px, 3vw, 36px) 0;
-  border-bottom: 1px solid rgba(140, 190, 255, 0.14);
-  text-decoration: none;
-  color: inherit;
-  transition: color 180ms ease;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: clamp(20px, 4vw, 48px);
+  align-items: end;
+  max-width: none;
+  margin-bottom: clamp(28px, 3.5vw, 40px);
 }
 
-.servicioRow:hover .servicioTitle {
-  color: #9fecfa;
-}
-
-.servicioRow:hover .servicioArrow {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-.servicioRow:focus-visible {
-  outline: 2px solid #2dd8f2;
-  outline-offset: 4px;
-}
-
-.servicioMeta {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.servicioNum {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  color: #2dd8f2;
-}
-
-.servicioCat {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.65rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #7288ad;
-}
-
-.servicioTitle {
-  font-family: "Space Grotesk", sans-serif;
-  font-size: clamp(1.15rem, 1.8vw, 1.4rem);
-  font-weight: 500;
-  color: #eef4ff;
-  margin: 0 0 6px;
-  line-height: 1.25;
-  letter-spacing: -0.02em;
-  transition: color 180ms ease;
-}
-
-.servicioText {
-  font-family: "Manrope", sans-serif;
-  font-size: 0.94rem;
-  line-height: 1.6;
-  color: #a9bbd6;
+.headLead {
   margin: 0;
-  max-width: 58ch;
-}
-
-.servicioArrow {
-  font-size: 1.1rem;
-  color: #2dd8f2;
-  opacity: 0;
-  transform: translateX(-6px);
-  transition: opacity 180ms ease, transform 180ms ease;
+  max-width: 38ch;
   justify-self: end;
 }
 
-/* ── Proceso ─────────────────────────────────────────────── */
-
-.procesoSection {
-  border-top: 1px solid rgba(140, 190, 255, 0.14);
-  padding-bottom: clamp(24px, 4vw, 40px);
+.sectionMore {
+  margin: clamp(18px, 2.5vw, 24px) 0 0;
 }
 
-.procesoSection .sectionHead {
-  padding-top: clamp(64px, 8vw, 96px);
-}
-
-.procesoGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: clamp(28px, 4vw, 48px);
-}
-
-.procesoStep {
-  padding-top: 20px;
-  border-top: 1px solid rgba(140, 190, 255, 0.18);
-}
-
-.procesoNum {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  color: #2dd8f2;
-  display: block;
-  margin-bottom: 16px;
-}
-
-.procesoTitle {
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: #eef4ff;
-  margin: 0 0 10px;
-  letter-spacing: -0.015em;
-}
-
-.procesoText {
-  font-family: "Manrope", sans-serif;
-  font-size: 0.94rem;
-  line-height: 1.65;
-  color: #a9bbd6;
-  margin: 0;
-}
-
-/* ── Industrias — grid de paneles ────────────────────────── */
-
-.industriasSection {
-  border-top: 1px solid rgba(140, 190, 255, 0.14);
-  padding-bottom: clamp(72px, 10vw, 112px);
-}
-
-.industriasSection .sectionHead {
-  padding-top: clamp(64px, 8vw, 96px);
-  padding-bottom: clamp(28px, 3.5vw, 40px);
-}
-
-.industriasFlow {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background: rgba(140, 190, 255, 0.14);
-  border: 1px solid rgba(140, 190, 255, 0.14);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.industriaChip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: clamp(22px, 2.8vw, 28px) clamp(18px, 2.4vw, 24px);
-  background: #050b18;
-  color: #eef4ff;
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 1.02rem;
-  font-weight: 500;
-  letter-spacing: -0.015em;
-  text-decoration: none;
-  transition: background 180ms ease, color 180ms ease;
-}
-
-.industriaChip::after {
-  content: "→";
-  color: #2dd8f2;
-  opacity: 0;
-  transform: translateX(-4px);
-  transition: opacity 180ms ease, transform 180ms ease;
-}
-
-.industriaChip:hover {
-  background: #0a1628;
-  color: #9fecfa;
-}
-
-.industriaChip:hover::after {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-/* ── CTA band ────────────────────────────────────────────── */
-
-.ctaBand {
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
-  background: #0a1628;
-  border-top: 1px solid rgba(140, 190, 255, 0.14);
-  padding: clamp(80px, 11vw, 128px) clamp(20px, 4vw, 48px);
-}
-
-.ctaInner {
-  max-width: 1120px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.ctaEyebrow {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.7rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #9fecfa;
-  margin: 0 0 18px;
-}
-
-.ctaTitle {
-  font-family: "Space Grotesk", sans-serif;
-  font-size: clamp(2rem, 4vw, 3rem);
-  font-weight: 500;
-  line-height: 1.08;
-  color: #ffffff;
-  letter-spacing: -0.03em;
-  margin: 0 0 16px;
-  text-wrap: balance;
-  max-width: 18ch;
-}
-
-.ctaAccent {
-  background: linear-gradient(120deg, #2dd8f2 0%, #9fecfa 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  font-style: normal;
-}
-
-.ctaText {
-  font-family: "Manrope", sans-serif;
-  font-size: 1rem;
-  line-height: 1.65;
-  color: #a9bbd6;
-  margin: 0 0 36px;
-  max-width: 48ch;
-}
-
-.ctaActions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 22px;
-  border-radius: 8px;
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 0.9rem;
+.sectionMore a {
+  font-family: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
+  font-size: 0.92rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  color: #2dd8f2;
   text-decoration: none;
-  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, color 180ms ease;
-  cursor: pointer;
+  transition: color 150ms ease;
 }
 
-.btn:focus-visible {
-  outline: 2px solid #2dd8f2;
-  outline-offset: 2px;
-}
-
-.btnPrimary {
-  background: #2dd8f2;
-  color: #04131a;
-  border: 1px solid transparent;
-}
-
-.btnPrimary:hover {
-  background: #9fecfa;
-  transform: translateY(-1px);
-}
-
-.btnGhost {
-  background: transparent;
-  color: #eef4ff;
-  border: 1px solid rgba(238, 244, 255, 0.22);
-}
-
-.btnGhost:hover {
-  border-color: #2dd8f2;
+.sectionMore a:hover {
   color: #9fecfa;
-  transform: translateY(-1px);
 }
 
-.btnArrow {
-  transition: transform 180ms ease;
-  line-height: 1;
+.ctaSection {
+  padding-top: clamp(40px, 5vw, 56px);
 }
 
-.btn:hover .btnArrow {
-  transform: translateX(3px);
-}
-
-@media (max-width: 900px) {
-  .metricsInner {
-    grid-template-columns: repeat(2, 1fr);
-    row-gap: 28px;
-  }
-
-  .metricItem + .metricItem::before {
-    display: none;
-  }
-
-  .procesoGrid {
+@media (max-width: 800px) {
+  .headSplit {
     grid-template-columns: 1fr;
+    align-items: start;
+    gap: 12px;
   }
 
-  .industriasFlow {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 600px) {
-  .servicioRow {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-
-  .servicioArrow {
-    display: none;
-  }
-
-  .ctaActions {
-    flex-direction: column;
-    width: 100%;
-  }
-
-  .btn {
-    width: 100%;
-    justify-content: center;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .servicioRow,
-  .servicioArrow,
-  .btn,
-  .industriaChip {
-    transition: none;
+  .headLead {
+    justify-self: start;
   }
 }

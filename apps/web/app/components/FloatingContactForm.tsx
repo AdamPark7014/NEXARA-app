@@ -1,9 +1,12 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import styles from "./FloatingContactForm.module.css";
 import { buildApiUrl } from "@/lib/api-base";
 
 export default function FloatingContactForm() {
+  const pathname = usePathname();
+  const hideOnContact = (pathname?.replace(/\/+$/, "") || "") === "/contacto";
   const [open, setOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -58,16 +61,18 @@ export default function FloatingContactForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!response.ok) { setLoading(false); return; }
+      if (!response.ok) {
+        setLoading(false);
+        return;
+      }
     } catch {
       setLoading(false);
       return;
     }
-    
+
     setLoading(false);
     setSubmitted(true);
 
-    // Reset form after 3 seconds (cleared on unmount)
     timeoutRef.current = setTimeout(() => {
       setSubmitted(false);
       setOpen(false);
@@ -84,6 +89,8 @@ export default function FloatingContactForm() {
     setOpen(false);
     setSubmitted(false);
   };
+
+  if (hideOnContact) return null;
 
   return (
     <>
@@ -119,12 +126,8 @@ export default function FloatingContactForm() {
           >
             <div className={styles.panelHeader}>
               <div>
-                <p className={styles.panelEyebrow}>
-                  NEXARA | CONTACTO DIRECTIVO
-                </p>
-                <h3 id="floating-contact-title">
-                  Asesoria corporativa inmediata
-                </h3>
+                <p className={styles.panelEyebrow}>Hablemos</p>
+                <h3 id="floating-contact-title">Cuéntanos tu proyecto</h3>
               </div>
               <button
                 type="button"
@@ -153,19 +156,19 @@ export default function FloatingContactForm() {
                     name="name"
                     type="text"
                     required
-                    placeholder="Tu nombre completo"
+                    placeholder="Tu nombre"
                     disabled={loading}
                   />
                 </div>
 
                 <div className={styles.formField}>
-                  <label htmlFor="float-email">Correo electrónico *</label>
+                  <label htmlFor="float-email">Email *</label>
                   <input
                     id="float-email"
                     name="email"
                     type="email"
                     required
-                    placeholder="tu@email.com"
+                    placeholder="tu@correo.com"
                     disabled={loading}
                   />
                 </div>
@@ -182,27 +185,11 @@ export default function FloatingContactForm() {
                 </div>
 
                 <div className={styles.formField}>
-                  <label htmlFor="float-company">Empresa</label>
-                  <input
-                    id="float-company"
-                    name="company"
-                    type="text"
-                    placeholder="Nombre de tu empresa"
-                    disabled={loading}
-                  />
-                </div>
-
-                <div className={styles.formField}>
                   <label htmlFor="float-category">¿En qué podemos ayudarte? *</label>
-                  <select
-                    id="float-category"
-                    name="category"
-                    required
-                    disabled={loading}
-                  >
-                    <option value="">Selecciona una opción</option>
-                    <option value="SOPORTE">Soporte y ayuda</option>
-                    <option value="VENTAS">Ventas, productos o proyectos</option>
+                  <select id="float-category" name="category" required disabled={loading}>
+                    <option value="">Selecciona…</option>
+                    <option value="VENTAS">Proyecto / cotización</option>
+                    <option value="SOPORTE">Soporte técnico</option>
                   </select>
                 </div>
 
@@ -213,26 +200,17 @@ export default function FloatingContactForm() {
                     name="message"
                     rows={3}
                     required
-                    placeholder="¿En qué podemos ayudarte?"
+                    placeholder="Qué necesitas…"
                     disabled={loading}
                   />
                 </div>
 
-                <div className={styles.formField}>
-                  <label className={styles.checkboxLabel}>
-                    <input type="checkbox" name="newsletter" disabled={loading} />
-                    <span>Quiero recibir noticias y promociones</span>
-                  </label>
-                </div>
-
-                <button
-                  type="submit"
-                  className={styles.submitButton}
-                  disabled={loading}
-                >
-                  {loading ? "Enviando solicitud..." : "Solicitar contacto"}
+                <button type="submit" className={styles.submitButton} disabled={loading}>
+                  {loading ? "Enviando…" : "Enviar mensaje"}
                 </button>
-                <p className={styles.footNote}>Al enviar aceptas recibir comunicación de seguimiento sobre tu solicitud.</p>
+                <p className={styles.footNote}>
+                  Al enviar aceptas el seguimiento de tu solicitud.
+                </p>
               </form>
             ) : (
               <div className={styles.success}>
@@ -240,8 +218,8 @@ export default function FloatingContactForm() {
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                   <polyline points="22 4 12 14.01 9 11.01" />
                 </svg>
-                <h4>Solicitud registrada</h4>
-                <p>Un asesor de Nexara te contactara en breve.</p>
+                <h4>Mensaje recibido</h4>
+                <p>Te contactamos en horario laboral.</p>
               </div>
             )}
           </div>
@@ -250,4 +228,3 @@ export default function FloatingContactForm() {
     </>
   );
 }
-

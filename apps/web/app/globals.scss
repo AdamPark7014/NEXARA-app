@@ -67,7 +67,7 @@
   --panel-gap: clamp(14px, 1.8vw, 22px);
   --panel-sidebar-width: 280px;
   --header-offset: 16px;
-  --public-header-height: 72px;
+  --public-header-height: 76px;
   --panel-title-leading: 1.28;
   --panel-title-tracking: -0.01em;
   --panel-font-family: var(--font-base);
@@ -213,7 +213,22 @@ body {
   width: 100%;
   min-height: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+}
+
+/*
+ * Un solo scroll vertical en el documento.
+ * Quirk CSS: si overflow-x ≠ visible y overflow-y = visible, y se computa
+ * como auto → html Y body crean barra. Usamos clip (sin scrollport) en X
+ * y dejamos el scroll solo en html.
+ */
+html {
+  overflow-x: clip;
+  overflow-y: auto;
+}
+
+body {
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 html {
@@ -528,10 +543,11 @@ body::before {
 
 .public-layout-wrapper {
   min-height: 100vh;
-  /* Circuito nocturno — NUNCA papel crema; eso dejaba bandas claras
-     alrededor de cada sección cuando el contenido no es full-bleed. */
-  background: #050b18;
+  background: #050a14;
   color: #eef4ff;
+  /* No crear segundo scrollport: clip no genera scrollbar (a diferencia de hidden). */
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 .public-layout-content {
@@ -758,6 +774,14 @@ textarea:disabled {
     overflow-x: clip;
   }
 
+  html {
+    overflow-y: auto;
+  }
+
+  body {
+    overflow-y: visible;
+  }
+
   :where(main, section, article, aside, [class*="layout"], [class*="Layout"], [class*="content"], [class*="Content"]) {
     min-width: 0;
     max-width: 100%;
@@ -870,9 +894,31 @@ textarea:disabled {
 
 /* Sitio público: fondo abismo + sin orbe decorativo del body,
    aunque aún no haya clase .dark (PublicSiteThemeLock hidrata después). */
+/* Sitio público: un solo scrollbar, acento cian */
+html:has(.public-friendly),
+html:has(.public-layout-wrapper) {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(45, 216, 242, 0.45) transparent;
+}
+
+html:has(.public-friendly)::-webkit-scrollbar,
+html:has(.public-layout-wrapper)::-webkit-scrollbar {
+  width: 10px;
+}
+
+html:has(.public-friendly)::-webkit-scrollbar-thumb,
+html:has(.public-layout-wrapper)::-webkit-scrollbar-thumb {
+  background: rgba(45, 216, 242, 0.4);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
 body:has(.public-layout-wrapper),
 body.dark:has(.public-layout-wrapper) {
-  background: #050b18 !important;
+  background: #050a14 !important;
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 body:has(.public-layout-wrapper)::before,
@@ -900,22 +946,19 @@ body.dark:has(.public-layout-wrapper)::before {
    ============================================================ */
 .public-friendly {
   /* ============================================================
-     NEXARA · Public brand layer v2 — "Circuito nocturno"
-     Fondo marino profundo + acentos neón (cian / naranja / morado).
-     Reescribe los tokens semánticos SIN afectar ningún subdominio.
+     NEXARA · Public brand layer — mockup
+     Navy #050a14 · Cyan #2dd8f2 · Orange #ff9d3c · Purple #b06bff
      ============================================================ */
   --nx-neon-cyan:        #2dd8f2;
   --nx-neon-cyan-strong: #12b6d4;
   --nx-neon-cyan-soft:   #9fecfa;
   --nx-neon-orange:      #ff9d3c;
-  --nx-neon-orange-strong: #ff7a1a;
-  --nx-neon-orange-soft: #ffc27a;
+  --nx-neon-orange-strong: #ff8a1a;
+  --nx-neon-orange-soft: #ffc58a;
   --nx-neon-purple:      #b06bff;
-  --nx-neon-purple-strong: #9333ea;
-  --nx-neon-purple-soft: #d9baff;
+  --nx-neon-purple-strong: #9a4dff;
+  --nx-neon-purple-soft: #d4a8ff;
 
-  /* Anula la paleta legacy del :root (naranja #f08a / teal #10a1)
-     para que NINGUNA regla antigua filtre colores viejos. */
   --nx-orange: var(--nx-neon-orange);
   --nx-orange-strong: var(--nx-neon-orange-strong);
   --nx-orange-soft: var(--nx-neon-orange-soft);
@@ -924,97 +967,105 @@ body.dark:has(.public-layout-wrapper)::before {
   --nx-teal-soft: var(--nx-neon-cyan-soft);
   --nx-skyblue: var(--nx-neon-cyan-soft);
   --nx-skyblue-strong: var(--nx-neon-cyan);
-  --nx-skyblue-soft: #c8f4fc;
+  --nx-skyblue-soft: #9fecfa;
   --nx-magenta: var(--nx-neon-purple);
   --nx-magenta-strong: var(--nx-neon-purple-strong);
   --nx-magenta-soft: var(--nx-neon-purple-soft);
-  --nx-paper: #050b18;
+  --nx-paper: #050a14;
   --nx-ink: #eef4ff;
 
-  --primary: var(--nx-neon-cyan);
-  --primary-strong: var(--nx-neon-cyan-strong);
-  --secondary: var(--nx-neon-purple);
-  --accent: var(--nx-neon-orange);
-  --accent-strong: var(--nx-neon-orange-strong);
-  --support: var(--nx-neon-cyan-soft);
-  --highlight: var(--nx-neon-purple);
-  --deep: #0a1628;
+  --primary: #2dd8f2;
+  --primary-strong: #12b6d4;
+  --secondary: #ff9d3c;
+  --accent: #2dd8f2;
+  --accent-strong: #9fecfa;
+  --support: #b06bff;
+  --highlight: #ff9d3c;
+  --deep: #0a1424;
 
-  /* Superficies oscuras — marino profundo con paneles de vidrio esmerilado. */
-  --background:          #050b18;
-  --background-elevated: #0a1628;
-  --surface:             rgba(255, 255, 255, 0.04);
-  --surface-2:           rgba(255, 255, 255, 0.06);
-  --surface-3:           rgba(255, 255, 255, 0.09);
+  --background:          #050a14;
+  --background-elevated: #0a1424;
+  --surface:             rgba(140, 190, 255, 0.05);
+  --surface-2:           rgba(140, 190, 255, 0.08);
+  --surface-3:           rgba(140, 190, 255, 0.12);
 
   --foreground:      #eef4ff;
   --text-primary:    #eef4ff;
-  --text-secondary:  #a9bbd6;
-  --text-tertiary:   #7288ad;
+  --text-secondary:  #9bb0cc;
+  --text-tertiary:   #6f85a5;
 
   --border:        rgba(140, 190, 255, 0.14);
-  --border-strong: rgba(140, 190, 255, 0.26);
-  --shadow:        0 20px 48px rgba(0, 0, 0, 0.5);
-  --focus:         color-mix(in srgb, var(--nx-neon-cyan) 45%, transparent);
-  --surface-clean:      #0a1628;
-  --surface-clean-soft: #0d1c33;
-  --stroke-clean:       rgba(45, 216, 242, 0.22);
-  --surface-light:      #0d1c33;
-  --bg-secondary:       #081221;
+  --border-strong: rgba(140, 190, 255, 0.28);
+  --shadow:        0 20px 48px rgba(0, 0, 0, 0.4);
+  --focus:         rgba(45, 216, 242, 0.55);
+  --surface-clean:      #0a1424;
+  --surface-clean-soft: #0d1a2e;
+  --stroke-clean:       rgba(140, 190, 255, 0.18);
+  --surface-light:      #0d1a2e;
+  --bg-secondary:       #050a14;
 
-  --header-bg: linear-gradient(142deg, rgba(4, 9, 20, 0.94) 0%, rgba(8, 18, 36, 0.9) 54%, rgba(10, 22, 40, 0.88) 100%);
-  --header-border: color-mix(in srgb, var(--nx-neon-cyan) 28%, transparent);
+  --header-bg: rgba(5, 10, 20, 0.78);
+  --header-border: rgba(140, 190, 255, 0.12);
   --header-text: #eef4ff;
-  --header-link: #eef4ff;
-  --header-link-hover-bg: color-mix(in srgb, var(--nx-neon-cyan) 16%, transparent);
-  --header-link-active-bg: linear-gradient(135deg, color-mix(in srgb, var(--nx-neon-cyan) 30%, transparent), color-mix(in srgb, var(--nx-neon-purple) 18%, transparent));
+  --header-link: rgba(238, 244, 255, 0.72);
+  --header-link-hover-bg: rgba(45, 216, 242, 0.08);
+  --header-link-active-bg: rgba(45, 216, 242, 0.12);
 
-  --menu-bg: linear-gradient(170deg, #05101f 0%, #0a1c32 54%, #0d2038 100%);
+  --menu-bg: rgba(5, 10, 20, 0.96);
   --menu-text: #eef4ff;
-  --menu-muted: rgba(200, 220, 245, 0.74);
-  --menu-item-bg: color-mix(in srgb, var(--nx-neon-cyan) 10%, transparent);
-  --menu-item-hover-bg: color-mix(in srgb, var(--nx-neon-cyan) 18%, transparent);
-  --menu-item-active-bg: linear-gradient(135deg, color-mix(in srgb, var(--nx-neon-cyan-soft) 28%, transparent), color-mix(in srgb, var(--nx-neon-cyan) 22%, transparent));
+  --menu-muted: rgba(155, 176, 204, 0.95);
+  --menu-item-bg: rgba(140, 190, 255, 0.05);
+  --menu-item-hover-bg: rgba(45, 216, 242, 0.1);
+  --menu-item-active-bg: rgba(45, 216, 242, 0.14);
 
-  /* Tipografías globales del manual aplicadas al sitio público */
-  --font-base: var(--nx-font-body, "Manrope", "Inter", "Segoe UI", sans-serif);
-  --font-heading: var(--nx-font-display, "Space Grotesk", "Manrope", "Segoe UI", sans-serif);
+  --font-base: var(--nx-font-body, "Manrope", system-ui, sans-serif);
+  --font-heading: var(--nx-font-display, "Space Grotesk", "Manrope", system-ui, sans-serif);
 
-  /* === Premium gradients (mesh + linear) === */
-  --nx-gradient-hero: linear-gradient(135deg, var(--nx-neon-cyan) 0%, var(--nx-neon-purple) 100%);
-  --nx-gradient-warm: linear-gradient(135deg, var(--nx-neon-orange) 0%, var(--nx-neon-purple) 100%);
-  --nx-gradient-cool: linear-gradient(135deg, var(--nx-neon-cyan-soft) 0%, var(--nx-neon-cyan) 100%);
-  --nx-gradient-creative: linear-gradient(135deg, var(--nx-neon-purple) 0%, var(--nx-neon-orange) 100%);
-  --nx-gradient-spectrum: linear-gradient(120deg,
-    var(--nx-neon-cyan) 0%,
-    var(--nx-neon-cyan-soft) 30%,
-    var(--nx-neon-orange) 65%,
-    var(--nx-neon-purple) 100%);
+  --nx-gradient-hero:
+    radial-gradient(70% 55% at 75% 40%, rgba(45, 216, 242, 0.16), transparent 60%),
+    radial-gradient(50% 45% at 20% 80%, rgba(176, 107, 255, 0.1), transparent 55%);
+  --nx-gradient-warm: radial-gradient(50% 50% at 50% 50%, rgba(255, 157, 60, 0.12), transparent 70%);
+  --nx-gradient-cool: radial-gradient(50% 50% at 50% 50%, rgba(45, 216, 242, 0.14), transparent 70%);
+  --nx-gradient-creative: radial-gradient(50% 50% at 50% 50%, rgba(176, 107, 255, 0.12), transparent 70%);
+  --nx-gradient-spectrum: linear-gradient(135deg, #2dd8f2, #b06bff, #ff9d3c);
 
-  /* Aliases brand-tinted (mantenidos para compatibilidad pública) */
-  --nx-shadow-soft: 0 12px 28px rgba(0, 0, 0, 0.4);
-  --nx-shadow-glow: 0 18px 44px color-mix(in srgb, var(--nx-neon-cyan) 32%, transparent);
+  --nx-shadow-soft: 0 16px 40px rgba(0, 0, 0, 0.28);
+  --nx-shadow-glow: 0 0 24px rgba(45, 216, 242, 0.12);
 
-  --nx-surface-deep: rgba(3, 7, 15, 0.96);
-  --nx-surface-elevated: rgba(9, 17, 30, 0.9);
-  --nx-surface-glass: rgba(14, 24, 42, 0.72);
+  --nx-surface-deep: #050a14;
+  --nx-surface-elevated: #0a1424;
+  --nx-surface-glass: rgba(8, 18, 36, 0.72);
 
-  --nx-section-gap: clamp(48px, 7vw, 96px);
+  /* Spacing rhythm */
+  --nx-space-1: 4px;
+  --nx-space-2: 8px;
+  --nx-space-3: 12px;
+  --nx-space-4: 16px;
+  --nx-space-5: 24px;
+  --nx-space-6: 32px;
+  --nx-space-7: 48px;
+  --nx-space-8: 64px;
+  --nx-section-gap: clamp(64px, 8vw, 104px);
+  --nx-content-width: 1120px;
+  --nx-radius: 12px;
+  --nx-radius-lg: 16px;
+  --nx-line: rgba(140, 190, 255, 0.12);
+  --nx-line-strong: rgba(140, 190, 255, 0.22);
 
-  /* Aísla el árbol público: hijos no heredan fondos/gradientes del body. */
   isolation: isolate;
-  background: #050b18;
+  background: #050a14;
   color: #eef4ff;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* === Selección y scrollbar premium en sitio público === */
 .public-friendly ::selection {
-  background: color-mix(in srgb, var(--nx-neon-cyan) 36%, transparent);
+  background: rgba(45, 216, 242, 0.35);
   color: #fff;
 }
 
 .public-friendly {
-  scrollbar-color: color-mix(in srgb, var(--nx-neon-cyan) 40%, transparent) transparent;
+  scrollbar-color: rgba(45, 216, 242, 0.4) transparent;
 }
 
 /* === Decorative utility: textura sutil de grano para hero/heros === */
@@ -1024,46 +1075,28 @@ body.dark:has(.public-layout-wrapper)::before {
 }
 
 .public-friendly [data-nx-grain]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background-image: radial-gradient(
-    circle at 1px 1px,
-    rgba(255, 255, 255, 0.04) 1px,
-    transparent 0
-  );
-  background-size: 3px 3px;
-  opacity: 0.5;
-  mix-blend-mode: overlay;
-  border-radius: inherit;
+  display: none;
 }
 
 /* === Decorative utility: badge premium === */
 .public-friendly [data-nx-eyebrow] {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: var(--nx-hairline-strong);
-  background: color-mix(in srgb, var(--nx-neon-cyan) 14%, rgba(0, 0, 0, 0.3));
-  font-family: var(--nx-font-ui);
-  font-size: var(--nx-text-xs);
+  gap: 0;
+  padding: 0;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  font-family: "Manrope", sans-serif;
+  font-size: 0.76rem;
   font-weight: 600;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #fff;
+  color: #2dd8f2;
 }
 
 .public-friendly [data-nx-eyebrow]::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 2px;
-  transform: rotate(45deg);
-  background: var(--nx-neon-cyan);
+  display: none;
 }
 
 /* Tipografía base del sitio público: aplicar la jerarquía oficial */

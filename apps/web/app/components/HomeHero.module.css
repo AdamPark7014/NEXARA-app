@@ -1,10 +1,13 @@
-/* ============================================================
-   NEXARA · HomeHero — full-bleed premium
-   Tipografía: Space Grotesk · Manrope · JetBrains Mono
-   Acento: cian único. Sin dock de servicios en el primer viewport.
-   ============================================================ */
+/* HomeHero — composition premium, presupuesto estricto */
 
 .hero {
+  --nx-cyan: #2dd8f2;
+  --nx-navy: #050a14;
+  --nx-ink: #eef4ff;
+  --font-display: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  --font-body: var(--nx-font-body, "Manrope", system-ui, sans-serif);
+  --font-ui: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
+
   position: relative;
   z-index: 2;
   width: 100% !important;
@@ -14,213 +17,201 @@
   min-height: 100dvh;
   overflow: hidden;
   isolation: isolate;
-  background: #050b18;
-  color: #eef4ff;
-  font-family: "Manrope", var(--nx-font-body, system-ui), sans-serif;
+  background: var(--nx-navy);
+  color: var(--nx-ink);
+  font-family: var(--font-body);
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  /* Centro vertical: el logo del video vive a la derecha;
+     el copy ancla a la izquierda a media altura, no pegado abajo. */
+  justify-content: center;
+  padding:
+    calc(var(--public-header-height, 76px) + 8px)
+    clamp(24px, 4vw, 48px)
+    clamp(40px, 6vh, 64px);
 }
 
-.hero::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: clamp(100px, 14vh, 160px);
-  z-index: 3;
-  pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(5, 11, 24, 0.55) 55%,
-    #050b18 100%
-  );
-}
-
-.slides {
+.slides,
+.bgVideo {
   position: absolute;
   inset: 0;
   z-index: 0;
 }
 
 .bgVideo {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center;
+  /* Logo animado suele estar a la derecha; priorizamos esa zona */
+  object-position: center right;
+  filter: brightness(0.7) saturate(1.05) contrast(1.04);
 }
+
+.slides { overflow: hidden; }
 
 .slide {
   position: absolute;
   inset: 0;
-  background-color: #050b18;
+  background-color: #050a14;
   background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background-position: center right;
   opacity: 0;
-  transform: scale(1.04);
-  transition: opacity 1400ms ease-in-out;
+  transform: scale(1.02);
+  transition: opacity 900ms ease;
 }
 
-.slideActive {
-  opacity: 1;
-  animation: heroDrift 18s ease-in-out infinite alternate;
-}
+.slideActive { opacity: 1; }
 
-@keyframes heroDrift {
-  from {
-    transform: scale(1.04) translate3d(0, 0, 0);
-  }
-  to {
-    transform: scale(1.08) translate3d(-0.8%, -0.6%, 0);
-  }
-}
-
-.overlay {
+.mediaScrim {
   position: absolute;
   inset: 0;
   z-index: 1;
+  pointer-events: none;
+  /* Scrim más fuerte a la izquierda para legibilidad; derecha más abierta al logo */
   background:
     linear-gradient(
-      105deg,
-      rgba(5, 11, 24, 0.94) 0%,
-      rgba(5, 11, 24, 0.72) 38%,
-      rgba(5, 11, 24, 0.28) 68%,
-      rgba(5, 11, 24, 0.12) 100%
+      100deg,
+      rgba(2, 8, 18, 0.92) 0%,
+      rgba(2, 8, 18, 0.72) 28%,
+      rgba(2, 8, 18, 0.28) 58%,
+      rgba(2, 8, 18, 0.22) 100%
     ),
-    linear-gradient(180deg, rgba(5, 11, 24, 0.35) 0%, transparent 28%, transparent 55%, rgba(5, 11, 24, 0.5) 100%);
+    linear-gradient(
+      180deg,
+      rgba(2, 8, 18, 0.45) 0%,
+      transparent 32%,
+      transparent 68%,
+      rgba(2, 8, 18, 0.55) 100%
+    );
+}
+
+.heroFallback .mediaScrim {
+  background:
+    linear-gradient(105deg, rgba(2, 8, 18, 0.55) 0%, transparent 58%),
+    linear-gradient(180deg, transparent 40%, rgba(2, 8, 18, 0.5) 100%);
+}
+
+.atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(60% 50% at 70% 40%, rgba(45, 216, 242, 0.18), transparent 60%),
+    radial-gradient(45% 40% at 15% 70%, rgba(176, 107, 255, 0.1), transparent 55%),
+    linear-gradient(180deg, #02060f, #050a14 50%, #07101c);
   pointer-events: none;
 }
 
-.content {
+.gridGlow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.2;
+  background-image:
+    linear-gradient(rgba(45, 216, 242, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 216, 242, 0.1) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(ellipse 65% 55% at 65% 40%, black 5%, transparent 70%);
+  pointer-events: none;
+}
+
+.stage {
   position: relative;
-  z-index: 4;
+  z-index: 2;
   width: 100%;
-  max-width: 1120px;
-  margin: 0 auto;
-  padding:
-    clamp(100px, 14vh, 160px)
-    clamp(20px, 4vw, 48px)
-    clamp(28px, 4vh, 48px);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0;
-  animation: heroEnter 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  max-width: min(560px, 100%);
+  margin: 0;
+  margin-left: max(0px, calc((100% - 1120px) / 2));
+  padding-top: 0;
+  animation: enter 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@keyframes heroEnter {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.brand {
-  margin: 0 0 18px;
-  font-family: "Space Grotesk", var(--nx-font-display, sans-serif);
-  font-size: clamp(1.05rem, 1.4vw, 1.25rem);
-  font-weight: 600;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: #ffffff;
+@keyframes enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .kicker {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.72rem;
-  font-weight: 500;
+  margin: 0 0 14px;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #9fecfa;
-  margin: 0 0 18px;
+  color: var(--nx-cyan);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.35);
 }
 
 .title {
-  font-family: "Space Grotesk", var(--nx-font-display, sans-serif);
-  font-size: clamp(2.6rem, 6.2vw, 4.75rem);
-  line-height: 1.02;
-  font-weight: 500;
-  color: #ffffff;
-  letter-spacing: -0.035em;
-  margin: 0 0 20px;
-  max-width: 13ch;
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-size: clamp(2.35rem, 5vw, 3.85rem);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.038em;
+  color: #fff;
   text-wrap: balance;
+  text-shadow: 0 2px 28px rgba(0, 0, 0, 0.4);
 }
 
 .titleAccent {
-  display: inline;
-  background: linear-gradient(120deg, #2dd8f2 0%, #9fecfa 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  font-style: normal;
+  color: var(--nx-cyan);
 }
 
 .lead {
-  font-size: clamp(1rem, 1.35vw, 1.15rem);
-  line-height: 1.6;
+  margin: 0 0 26px;
+  font-size: clamp(1.02rem, 1.35vw, 1.12rem);
+  line-height: 1.55;
   color: rgba(238, 244, 255, 0.78);
-  margin: 0 0 32px;
-  max-width: 42ch;
+  max-width: 36ch;
 }
 
 .actions {
   display: flex;
-  gap: 12px;
   flex-wrap: wrap;
+  gap: 12px;
 }
 
 .ctaPrimary,
-.ctaSecondary {
+.ctaGhost {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 13px 22px;
-  border-radius: 8px;
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 0.92rem;
+  border-radius: 12px;
+  font-family: var(--font-ui);
+  font-size: 0.94rem;
   font-weight: 600;
   letter-spacing: -0.01em;
   text-decoration: none;
-  cursor: pointer;
-  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, color 180ms ease;
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
 .ctaPrimary {
-  background: #2dd8f2;
   color: #04131a;
+  background: linear-gradient(135deg, #2dd8f2, #12b6d4);
+  border: 1px solid transparent;
 }
 
 .ctaPrimary:hover {
-  background: #9fecfa;
   transform: translateY(-1px);
+  filter: brightness(1.04);
 }
 
-.ctaSecondary {
-  background: transparent;
-  color: #eef4ff;
-  border: 1px solid rgba(238, 244, 255, 0.28);
+.ctaGhost {
+  color: var(--nx-cyan);
+  border: 1px solid rgba(45, 216, 242, 0.5);
+  background: rgba(5, 10, 20, 0.35);
+  backdrop-filter: blur(8px);
 }
 
-.ctaSecondary:hover {
-  border-color: #2dd8f2;
-  color: #9fecfa;
+.ctaGhost:hover {
   transform: translateY(-1px);
+  background: rgba(45, 216, 242, 0.1);
+  border-color: var(--nx-cyan);
 }
 
 .ctaArrow {
-  font-size: 1em;
-  line-height: 1;
   transition: transform 180ms ease;
 }
 
@@ -229,62 +220,66 @@
 }
 
 .dots {
-  position: relative;
+  position: absolute;
   z-index: 4;
-  align-self: center;
+  left: clamp(24px, 4vw, 48px);
+  bottom: clamp(24px, 4vh, 40px);
   display: flex;
   gap: 8px;
+  margin: 0;
   padding: 0;
-  margin: 0 0 clamp(36px, 5vh, 56px);
   list-style: none;
 }
 
 .dot {
-  width: 28px;
-  height: 2px;
-  border-radius: 1px;
-  background: rgba(255, 255, 255, 0.28);
-  border: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid rgba(45, 216, 242, 0.5);
+  background: transparent;
   padding: 0;
   cursor: pointer;
-  transition: background 220ms ease, width 220ms ease;
-}
-
-.dot:hover {
-  background: rgba(255, 255, 255, 0.5);
 }
 
 .dotActive {
   background: #2dd8f2;
-  width: 48px;
 }
 
-@media (max-width: 720px) {
-  .content {
-    padding-top: clamp(96px, 16vh, 140px);
+@media (max-width: 900px) {
+  .stage {
+    max-width: min(520px, 100%);
+  }
+}
+
+@media (max-width: 600px) {
+  .hero {
+    justify-content: flex-end;
+    padding-top: calc(var(--public-header-height, 66px) + 20px);
+    padding-bottom: clamp(36px, 6vh, 56px);
   }
 
-  .title {
-    max-width: 14ch;
+  .stage {
+    margin-left: 0;
+    max-width: 100%;
+  }
+
+  .bgVideo,
+  .slide {
+    object-position: center center;
+    background-position: center center;
   }
 
   .actions {
-    width: 100%;
     flex-direction: column;
   }
 
   .ctaPrimary,
-  .ctaSecondary {
+  .ctaGhost {
     width: 100%;
     justify-content: center;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .slide,
-  .slideActive,
-  .content {
-    transition: none;
-    animation: none;
-  }
+  .stage { animation: none; }
 }

@@ -103,7 +103,7 @@ function BackupRestorePanel() {
   );
 }
 import Link from 'next/link';
-import NexaraMark from '../app/components/NexaraMark';
+import Image from 'next/image';
 import styles from './Header.module.css';
 
 import { usePathname } from 'next/navigation';
@@ -119,25 +119,41 @@ const navLinks = [
 const isHomeRoute = (pathname: string | null) =>
   pathname === '/' || pathname === '/nexara' || pathname === '/nexara/';
 
+/** Rutas con hero full-bleed: header transparente hasta hacer scroll. */
+const isFlushHeroRoute = (pathname: string | null) => {
+  if (!pathname) return false;
+  const p = pathname.replace(/\/+$/, '') || '/';
+  return (
+    isHomeRoute(p) ||
+    p === '/servicios' ||
+    p === '/soluciones' ||
+    p === '/nosotros' ||
+    p === '/contacto' ||
+    p === '/proyectos' ||
+    p === '/cobertura' ||
+    p === '/blog' ||
+    p === '/Nexara-Ingenieros' ||
+    p.startsWith('/soluciones/')
+  );
+};
+
 export default function Header() {
   const pathname = usePathname();
   const isConsole = Boolean(pathname && pathname.startsWith('/console'));
-  const isHome = isHomeRoute(pathname);
+  const isFlushHero = isFlushHeroRoute(pathname);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
-  // En la home el header arranca transparente sobre el hero y, al hacer scroll
-  // más allá de ~80 px, se condensa con blur para garantizar legibilidad.
   useEffect(() => {
-    if (!isHome) {
+    if (!isFlushHero) {
       setScrolled(true);
       return;
     }
-    const onScroll = () => setScrolled(window.scrollY > 80);
+    const onScroll = () => setScrolled(window.scrollY > 64);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, [isHome]);
+  }, [isFlushHero]);
 
   const isActiveLink = (href: string) => {
     if (!pathname) return false;
@@ -161,9 +177,12 @@ export default function Header() {
   useEffect(() => {
     if (!mobileMenuOpen) {
       document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
       return;
     }
 
+    // Bloquear scroll del documento sin dejar segundo scrollport raro.
+    document.documentElement.style.overflow = 'hidden';
     document.body.style.overflow = 'hidden';
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -174,19 +193,16 @@ export default function Header() {
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [mobileMenuOpen]);
 
-  // El componente `Header` SOLO se monta dentro de `(public)/layout.tsx`,
-  // así que el estilo "limpio" (`.headerPublic`) aplica siempre. Lo único
-  // que cambia entre rutas es si arriba se muestra transparente sobre el
-  // hero (sólo en home, antes de hacer scroll).
   const headerClass = [
     styles.header,
     isConsole ? styles.consoleHeader : '',
     styles.headerPublic,
-    isHome && !scrolled ? styles.headerTransparent : '',
+    isFlushHero && !scrolled ? styles.headerTransparent : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -195,11 +211,15 @@ export default function Header() {
     <header className={headerClass}>
       <div className={styles.headerInner}>
         <div className={styles.logoSection}>
-          <Link href="/" onClick={closeMobileMenu} className={styles.logoLink}>
-            <span className={styles.logoMark}>
-              <NexaraMark size={40} />
-            </span>
-            <span className={styles.logoWordmark}>NEXARA</span>
+          <Link href="/" onClick={closeMobileMenu} className={styles.logoLink} aria-label="Nexara — Inicio">
+            <Image
+              src="/logo-nexara-lockup.png"
+              alt="Nexara"
+              width={220}
+              height={52}
+              className={styles.logoLockup}
+              priority
+            />
           </Link>
         </div>
 
@@ -221,7 +241,7 @@ export default function Header() {
           {(pathname && pathname.startsWith('/console')) && <BackupRestorePanel />}
 
           <Link href="/contacto" className={styles.contactCta} onClick={closeMobileMenu}>
-            Cotiza tu Proyecto
+            Cotiza tu proyecto
             <span aria-hidden className={styles.contactArrow}>→</span>
           </Link>
 

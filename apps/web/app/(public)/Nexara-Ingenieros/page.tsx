@@ -1,137 +1,128 @@
 import React from "react";
-import Image from "next/image";
 import Link from "next/link";
 import shared from "../_shared/public.module.css";
-import styles from "./page.module.css";
+import PublicPageHero from "../../components/PublicPageHero";
+import heroStyles from "../../components/PublicPageHero.module.css";
 
 export const metadata = {
-  title: "Nexara Ingenieros | Nexara",
-  description: "División de ingeniería en sitio: instalación, integración y mantenimiento de infraestructura tecnológica.",
+  title: "Nexara Ingenieros | División de campo",
+  description:
+    "División de ingeniería en sitio: instalación, integración y mantenimiento de infraestructura tecnológica.",
 };
 
-const capacidades = [
+export const dynamic = "force-dynamic";
+
+const lineas = [
   {
+    id: "instalacion",
     title: "Instalación",
-    desc: "Cableado estructurado, fibra óptica, racks, energía y enfriamiento.",
-    image: "/images/hero/hero-04.png",
+    text: "Cableado estructurado, fibra, racks, energía y enfriamiento. Entrega con evidencia y documentación del sitio.",
+    points: ["Cableado y fibra", "Racks y energía", "Hand-over documentado"],
   },
   {
+    id: "integracion",
     title: "Integración",
-    desc: "Puesta en marcha, configuración y handover documentado.",
-    image: "/images/hero/hero-05.png",
+    text: "Puesta en marcha, configuración y pruebas. Lo instalado queda operable — no “listo para que alguien más lo configure”.",
+    points: ["Configuración", "Pruebas en sitio", "Capacitación básica"],
   },
   {
+    id: "mantenimiento",
     title: "Mantenimiento",
-    desc: "Preventivo, correctivo y mantenimiento predictivo con SLA.",
-    image: "/images/hero/hero-06.png",
+    text: "Preventivo y correctivo con SLA. Visitas programadas y respuesta cuando el sitio no puede esperar.",
+    points: ["Preventivo", "Correctivo", "SLA acordado"],
   },
 ];
 
-const certificaciones = [
-  "Certificación CommScope/Belden",
-  "Avalado por Cisco / Fortinet",
+const credenciales = [
   "Personal con DC3 vigente",
-  "Cumplimiento NOM-001-SEDE",
+  "Cumplimiento NOM-001-SEDE en instalaciones aplicables",
+  "Trabajo con estándares de cableado estructurado (CommScope / Belden)",
+  "Experiencia en redes Cisco / Fortinet en campo",
 ];
 
 export default function NexaraIngenierosPage() {
   return (
-    <main className={shared.page}>
-      {/* Hero */}
-      <section className={shared.hero}>
+    <main className={`${shared.page} home-main-flush`}>
+      <PublicPageHero
+        eyebrow="Nexara Ingenieros"
+        title={
+          <>
+            Ingeniería de campo con{" "}
+            <span className={heroStyles.titleAccent}>responsabilidad</span>
+          </>
+        }
+        lead="La división técnica: diseñamos, instalamos y mantenemos la infraestructura que sostiene tu operación."
+        imageSrc="/images/hero/hero-03.png"
+        imageAlt="Ingenieros Nexara en sitio"
+      />
+
+      <section className={shared.section} data-reveal="up">
         <div className={shared.inner}>
-          <div className={shared.heroGrid}>
-            <div data-reveal="soft">
-              <span className={shared.heroEyebrow}>Nexara Ingenieros</span>
-              <h1 className={shared.heroTitle}>
-                Ingeniería de campo <span className={shared.heroTitleAccent}>con responsabilidad</span>
-              </h1>
-              <p className={shared.heroLead}>
-                Nuestra división técnica especializada en infraestructura tecnológica. Diseñamos,
-                instalamos y mantenemos lo que sostiene tu operación.
-              </p>
-              <div className={shared.heroActions}>
-                <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
-                  Solicitar visita técnica <span className={shared.btnArrow}>→</span>
-                </Link>
-                <Link href="/cobertura" className={`${shared.btn} ${shared.btnSecondary}`}>
-                  Ver cobertura
-                </Link>
-              </div>
-            </div>
-            <div className={shared.heroImage} data-reveal="soft">
-              <Image src="/images/hero/hero-03.png" alt="Ingenieros Nexara en sitio" width={720} height={540} priority />
-              <div className={shared.heroImageOverlay} />
+          <div className={shared.serviceLayout}>
+            <nav className={shared.serviceNav} aria-label="Líneas de ingeniería">
+              {lineas.map((l) => (
+                <a key={l.id} href={`#${l.id}`} className={shared.serviceNavLink}>
+                  {l.title}
+                </a>
+              ))}
+              <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary} ${shared.serviceNavCta}`}>
+                Solicitar visita <span className={shared.btnArrow} aria-hidden>→</span>
+              </Link>
+            </nav>
+
+            <div className={shared.serviceDetail} data-reveal-stagger>
+              {lineas.map((l) => (
+                <article key={l.id} id={l.id} className={shared.serviceBlock} data-reveal="up">
+                  <h2 className={shared.serviceBlockTitle}>{l.title}</h2>
+                  <p className={shared.serviceBlockText}>{l.text}</p>
+                  <ul className={shared.servicePoints}>
+                    {l.points.map((pt) => (
+                      <li key={pt}>{pt}</li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* Capacidades */}
-      <section className={shared.section}>
+      <section className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
         <div className={shared.inner}>
-          <div className={shared.sectionHead} data-reveal="soft">
-            <span className={shared.eyebrow}>Capacidades</span>
+          <header className={shared.sectionHead}>
+            <p className={shared.eyebrow}>Campo</p>
             <h2 className={shared.sectionTitle}>
-              Del diseño a la <span className={shared.sectionTitleAccent}>operación</span>
+              Trabajo certificado,{" "}
+              <span className={shared.sectionTitleAccent}>entrega formal</span>
             </h2>
             <p className={shared.sectionLead}>
-              Tres líneas de servicio que cubren el ciclo de vida de tu infraestructura.
+              Acreditaciones vigentes y estándares aplicables — para que la obra no dependa de improvisación.
             </p>
-          </div>
-          <div className={shared.grid3} data-reveal-stagger>
-            {capacidades.map((c) => (
-              <article key={c.title} className={shared.imageCard} data-reveal="up">
-                <div className={shared.imageCardImg}>
-                  <Image src={c.image} alt={c.title} width={640} height={400} />
-                </div>
-                <div className={shared.imageCardBody}>
-                  <h3 className={shared.imageCardTitle}>{c.title}</h3>
-                  <p className={shared.imageCardText}>{c.desc}</p>
-                </div>
-              </article>
+          </header>
+          <ul className={shared.bulletList} data-reveal-stagger>
+            {credenciales.map((c) => (
+              <li key={c} data-reveal="up">
+                {c}
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       </section>
 
-      {/* Certificaciones */}
-      <section className={`${shared.section} ${shared.sectionDivider}`}>
+      <section className={shared.sectionTight} data-reveal="up">
         <div className={shared.inner}>
-          <div className={shared.splitGrid}>
-            <div className={shared.splitImage} data-reveal="soft">
-              <Image src="/images/hero/hero-07.png" alt="Certificaciones Nexara" width={720} height={540} />
-            </div>
-            <div className={shared.splitBody} data-reveal="up">
-              <span className={shared.eyebrow}>Certificaciones</span>
-              <h3>Trabajo certificado, garantía formal</h3>
-              <p>
-                Todo nuestro personal cuenta con acreditaciones vigentes y nuestras instalaciones
-                cumplen con normas mexicanas e internacionales aplicables.
-              </p>
-              <ul className={shared.bulletList}>
-                {certificaciones.map((c) => (
-                  <li key={c}>{c}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className={shared.section}>
-        <div className={shared.inner}>
-          <div className={shared.ctaShell} data-reveal="up">
-            <h2 className={shared.ctaTitle}>
-              ¿Listo para <span className={shared.sectionTitleAccent}>arrancar tu obra</span>?
-            </h2>
+          <div className={shared.ctaBand}>
+            <p className={shared.ctaEyebrow}>Levantamiento</p>
+            <h2 className={shared.ctaTitle}>¿Listo para arrancar?</h2>
             <p className={shared.ctaLead}>
-              Levantamiento sin costo. Te dejamos plano, BoQ y propuesta económica en 5 días hábiles.
+              Levantamiento sin costo. Plano, alcance y propuesta económica en días hábiles.
             </p>
             <div className={shared.ctaActions}>
               <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
                 Agendar levantamiento <span className={shared.btnArrow}>→</span>
+              </Link>
+              <Link href="/cobertura" className={`${shared.btn} ${shared.btnSecondary}`}>
+                Ver cobertura
               </Link>
             </div>
           </div>

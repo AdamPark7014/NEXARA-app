@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -8,8 +7,10 @@ import {
   getProgrammaticLandings,
 } from "@/lib/seo/programmatic-landings";
 import { getPageKeywords, categoryFromSlug } from "@/lib/seo/keywords";
-import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { getSolucionHeroImage } from "../../solucionesLandingImagery";
+import shared from "../../../_shared/public.module.css";
+import PublicPageHero from "../../../../components/PublicPageHero";
+import heroStyles from "../../../../components/PublicPageHero.module.css";
 import styles from "./page.module.css";
 
 type Params = {
@@ -59,9 +60,7 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
       `soluciones TI para ${industry.name}`,
       "Nexara",
     ],
-    alternates: {
-      canonical: path,
-    },
+    alternates: { canonical: path },
     openGraph: {
       type: "website",
       url: `${siteUrl}${path}`,
@@ -92,7 +91,7 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
   const related = getProgrammaticLandings()
     .filter((item) => item.industry.slug === industry.slug || item.service.slug === service.slug)
     .filter((item) => !(item.industry.slug === industry.slug && item.service.slug === service.slug))
-    .slice(0, 8);
+    .slice(0, 6);
 
   const pageSchema = {
     "@context": "https://schema.org",
@@ -117,22 +116,18 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      {
-        "@type": "ListItem",
-        position: 1,
-        name: "Inicio",
-        item: siteUrl,
-      },
-      {
-        "@type": "ListItem",
-        position: 2,
-        name: "Servicios",
-        item: `${siteUrl}/servicios`,
-      },
+      { "@type": "ListItem", position: 1, name: "Inicio", item: siteUrl },
+      { "@type": "ListItem", position: 2, name: "Soluciones", item: `${siteUrl}/soluciones` },
       {
         "@type": "ListItem",
         position: 3,
-        name: `${service.name} para ${industry.name}`,
+        name: industry.name,
+        item: `${siteUrl}/soluciones/${industry.slug}`,
+      },
+      {
+        "@type": "ListItem",
+        position: 4,
+        name: `${service.name} · ${industry.name}`,
         item: `${siteUrl}${landingPath}`,
       },
     ],
@@ -140,7 +135,7 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
 
   return (
     <main
-      className={`${styles.container} public-section-page ultra-corp-page ultra-corp-soluciones ultra-corp-strict`}
+      className={`${shared.page} home-main-flush`}
       aria-label={`Solución ${service.name} para ${industry.name}`}
     >
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(pageSchema) }} />
@@ -149,133 +144,124 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
 
-      <nav aria-label="Ruta de navegación">
+      <PublicPageHero
+        eyebrow={`${industry.name} · ${service.name}`}
+        title={
+          <>
+            {service.name} para{" "}
+            <span className={heroStyles.titleAccent}>{industry.name}</span>
+          </>
+        }
+        lead={`${industry.painPoint} ${service.summary}`}
+        imageSrc={heroImage}
+        imageAlt={`${service.name} — referencia visual`}
+      />
+
+      <nav className={styles.breadcrumbBar} aria-label="Ruta de navegación">
         <ol className={styles.breadcrumb}>
           <li>
             <Link href="/">Inicio</Link>
           </li>
           <li>
-            <Link href="/servicios">Servicios</Link>
+            <Link href="/soluciones">Soluciones</Link>
           </li>
-          <li aria-current="page">
-            {service.name} · {industry.name}
+          <li>
+            <Link href={`/soluciones/${industry.slug}`}>{industry.name}</Link>
           </li>
+          <li aria-current="page">{service.name}</li>
         </ol>
       </nav>
 
-      <header className={styles.hero}>
-        <div className={styles.heroSplit}>
-          <div className={styles.heroCopy}>
-            <p className={styles.kicker}>Solución especializada</p>
-            <h1 className={styles.pageTitle}>
-              {service.name} para {industry.name}
-            </h1>
-            <p className={styles.pageLead}>
-              {industry.painPoint} {service.summary}
-            </p>
-          </div>
-          <div className={styles.heroVisual}>
-            <Image
-              src={heroImage}
-              alt={`${service.name} — referencia visual`}
-              fill
-              className={styles.heroImg}
-              sizes="(max-width: 900px) 100vw, 42vw"
-              priority
-            />
+      <section className={shared.section} data-reveal="up">
+        <div className={shared.inner}>
+          <header className={shared.sectionHead}>
+            <p className={shared.eyebrow}>Resultados</p>
+            <h2 className={shared.sectionTitle}>
+              Qué buscamos en{" "}
+              <span className={shared.sectionTitleAccent}>{industry.name}</span>
+            </h2>
+          </header>
+          <div className={shared.principleGrid} data-reveal-stagger>
+            {industry.outcomes.map((outcome) => (
+              <div key={outcome} className={shared.principleItem} data-reveal="up">
+                <h3 className={shared.principleTitle}>{outcome}</h3>
+              </div>
+            ))}
           </div>
         </div>
-      </header>
-
-      <section className={styles.outcomeGrid} aria-label="Resultados esperados">
-        {industry.outcomes.map((outcome) => (
-          <article key={outcome} className={styles.outcomeTile}>
-            <h2>{outcome}</h2>
-          </article>
-        ))}
       </section>
 
-      <section className={styles.detailShell} aria-labelledby="implement-heading">
-        <div className={styles.sectionHead}>
-          <h2 id="implement-heading" className={styles.sectionTitle}>
-            Qué implementamos
-          </h2>
-        </div>
-        <ul className={styles.proseList}>
-          {service.deliverables.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </section>
-
-      <section className={styles.ctaBand} aria-label="Contacto comercial">
-        <h2>Solicita una propuesta para {industry.name}</h2>
-        <p>
-          Te enviamos una ruta de implementación por fases y objetivos medibles para tu operación.
-        </p>
-        <div className={styles.ctaRow}>
-          <Link
-            href={`/contacto?industry=${industry.slug}&service=${service.slug}`}
-            data-track-conversion="landing_primary_cta"
-            data-landing-path={landingPath}
-            className={styles.ctaPrimary}
-          >
-            Hablar con un especialista
-          </Link>
-          <Link
-            href="/servicios"
-            data-track-conversion="landing_secondary_cta"
-            data-landing-path={landingPath}
-            className={styles.ctaSecondary}
-          >
-            Ver todos los servicios
-          </Link>
+      <section className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
+        <div className={shared.inner}>
+          <header className={shared.sectionHead}>
+            <p className={shared.eyebrow}>Implementación</p>
+            <h2 className={shared.sectionTitle}>
+              Qué <span className={shared.sectionTitleAccent}>entregamos</span>
+            </h2>
+            <p className={shared.sectionLead}>{service.summary}</p>
+          </header>
+          <ul className={shared.bulletList} data-reveal-stagger>
+            {service.deliverables.map((item) => (
+              <li key={item} data-reveal="up">
+                {item}
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
       {related.length > 0 ? (
-        <section className={styles.relatedSection} aria-labelledby="related-heading">
-          <div className={styles.sectionHead}>
-            <h2 id="related-heading" className={styles.sectionTitle}>
-              Rutas relacionadas
-            </h2>
-            <p className={styles.pageLead}>Otras combinaciones sector + servicio que suelen consultarse junto a esta.</p>
-          </div>
-          <div className={styles.relatedGrid}>
-            {related.map((item) => {
-              const href = `/soluciones/${item.industry.slug}/${item.service.slug}`;
-              const img = getSolucionHeroImage(item.service.slug);
-              return (
-                <Link key={href} href={href} className={styles.relatedTile}>
-                  <div className={styles.relatedTileMedia}>
-                    <Image
-                      src={img}
-                      alt=""
-                      fill
-                      className={styles.relatedTileImg}
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                    />
-                  </div>
-                  <div className={styles.relatedTileBody}>
-                    <strong>{item.service.name}</strong>
-                    <span>{item.industry.name}</span>
-                  </div>
-                </Link>
-              );
-            })}
+        <section className={shared.section} data-reveal="up">
+          <div className={shared.inner}>
+            <header className={shared.sectionHead}>
+              <p className={shared.eyebrow}>Relacionadas</p>
+              <h2 className={shared.sectionTitle}>
+                Otras rutas <span className={shared.sectionTitleAccent}>cercanas</span>
+              </h2>
+            </header>
+            <div className={shared.industryBoard} data-reveal-stagger>
+              {related.map((item) => {
+                const href = `/soluciones/${item.industry.slug}/${item.service.slug}`;
+                return (
+                  <Link key={href} href={href} className={shared.industryCell} data-reveal="up">
+                    <span className={shared.industryRisk}>{item.industry.name}</span>
+                    <h3 className={shared.industryCellTitle}>{item.service.name}</h3>
+                    <p className={shared.industryCellText}>{item.service.summary}</p>
+                    <span className={shared.industryCellLink}>Ver detalle →</span>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         </section>
       ) : null}
 
-      <section className={styles.hubShell} aria-label="Más soluciones por industria">
-        <SeoInterlinkHub
-          title="Soluciones recomendadas por industria"
-          subtitle="Cada columna agrupa enlaces de contexto; el conjunto cubre distintas combinaciones sector + servicio."
-          currentPath={landingPath}
-          maxItems={12}
-          maxIndustries={6}
-          maxServicesPerIndustry={3}
-        />
+      <section className={shared.sectionTight} data-reveal="up">
+        <div className={shared.inner}>
+          <div className={shared.ctaBand}>
+            <p className={shared.ctaEyebrow}>Propuesta</p>
+            <h2 className={shared.ctaTitle}>Para {industry.name}</h2>
+            <p className={shared.ctaLead}>
+              Te armamos una ruta por fases con objetivos medibles para tu operación.
+            </p>
+            <div className={shared.ctaActions}>
+              <Link
+                href={`/contacto?industry=${industry.slug}&service=${service.slug}`}
+                data-track-conversion="landing_primary_cta"
+                data-landing-path={landingPath}
+                className={`${shared.btn} ${shared.btnPrimary}`}
+              >
+                Hablar con un especialista <span className={shared.btnArrow}>→</span>
+              </Link>
+              <Link
+                href={`/soluciones/${industry.slug}`}
+                className={`${shared.btn} ${shared.btnSecondary}`}
+              >
+                Volver a {industry.name}
+              </Link>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
   );

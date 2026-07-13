@@ -9,8 +9,24 @@ const FloatingContactForm = dynamic(() => import("../components/FloatingContactF
 const PublicTrafficTracker = dynamic(() => import("../../components/PublicTrafficTracker"), { ssr: false });
 const PublicScrollReveal = dynamic(() => import("../../components/PublicScrollReveal"), { ssr: false });
 
-const isHomePath = (pathname: string | null) =>
-  pathname === "/" || pathname === "/nexara" || pathname === "/nexara/";
+/** Páginas con hero full-bleed bajo el header transparente. */
+const isFlushHeroPath = (pathname: string | null) => {
+  if (!pathname) return false;
+  const p = pathname.replace(/\/+$/, "") || "/";
+  return (
+    p === "/" ||
+    p === "/nexara" ||
+    p === "/servicios" ||
+    p === "/soluciones" ||
+    p === "/nosotros" ||
+    p === "/contacto" ||
+    p === "/proyectos" ||
+    p === "/cobertura" ||
+    p === "/blog" ||
+    p === "/Nexara-Ingenieros" ||
+    p.startsWith("/soluciones/")
+  );
+};
 
 export default function PublicLayout({
   children,
@@ -18,11 +34,10 @@ export default function PublicLayout({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
-  // En la home pública liberamos al `<main>` del `max-width: var(--content-max)`
-  // y del `padding-top: header-height` para que el `HomeHero` ocupe TODO el
-  // viewport (ambos bordes laterales + arriba del header transparente).
+  // Liberamos padding-top / max-width para que el hero ocupe el viewport
+  // edge-to-edge bajo el header transparente (home + páginas clave).
   const contentClass = `public-layout-content${
-    isHomePath(pathname) ? " public-layout-content--flush" : ""
+    isFlushHeroPath(pathname) ? " public-layout-content--flush" : ""
   }`;
 
   return (
