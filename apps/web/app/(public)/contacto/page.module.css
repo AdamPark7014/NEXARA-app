@@ -58,6 +58,34 @@
   background: rgba(8, 18, 36, 0.98);
 }
 
+.whatsappLink {
+  background: #25d366 !important;
+  color: #fff;
+}
+
+.whatsappLink:hover {
+  background: #1ebe57 !important;
+}
+
+.whatsappLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.whatsappLink .directValue {
+  color: #fff !important;
+  font-weight: 650;
+}
+
+.whatsappIcon {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
 .directLabel {
   font-size: 0.72rem;
   font-weight: 600;
@@ -77,6 +105,10 @@
   font-size: 0.9rem;
   line-height: 1.55;
   color: #9bb0cc;
+}
+
+.asideMedia {
+  margin-top: 24px;
 }
 
 .locationNote {
@@ -219,6 +251,7 @@
 @media (max-width: 900px) {
   .formLayout {
     grid-template-columns: 1fr;
+    gap: 28px;
   }
 
   .formAside {
@@ -227,5 +260,31 @@
 
   .formRow {
     grid-template-columns: 1fr;
+  }
+
+  .contactSection {
+    padding: clamp(36px, 5vw, 56px) 0 clamp(48px, 6vw, 72px);
+  }
+
+  .mapWrap {
+    height: clamp(220px, 55vw, 280px);
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 520px) {
+  .formCard {
+    padding: 18px;
+    border-radius: 12px;
+  }
+
+  .directList {
+    border-radius: 10px;
+  }
+
+  .submitBtn {
+    width: 100%;
+    justify-content: center;
+    min-height: 48px;
   }
 }

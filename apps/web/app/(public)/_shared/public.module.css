@@ -47,7 +47,16 @@
 }
 
 .sectionTight {
-  padding: clamp(48px, 6vw, 72px) 0;
+  padding: clamp(40px, 5vw, 64px) 0;
+}
+
+/* Bandas de imagen editorial: menos aire vertical que las secciones de copy */
+.sectionImageBand {
+  padding: clamp(24px, 3.5vw, 44px) 0;
+}
+
+.sectionImageBandBleed {
+  padding: clamp(8px, 1.5vw, 20px) 0;
 }
 
 .sectionDivider {
@@ -772,14 +781,32 @@
 
 @media (max-width: 980px) {
   .serviceLayout { grid-template-columns: 1fr; }
-  .serviceNav { position: static; display: flex; flex-wrap: wrap; gap: 6px; }
+  .serviceNav {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .serviceNavLink {
+    padding: 8px 12px;
+    border: 1px solid var(--ds-line);
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .serviceNavCta {
+    width: 100%;
+    margin-top: 8px;
+    justify-content: center;
+  }
   .timeline { grid-template-columns: 1fr; }
   .timeline::before { display: none; }
+  .timelineStep { padding-top: 0; padding-left: 20px; }
+  .timelineDot { top: 0.45em; left: 0; }
   .metricsStrip { grid-template-columns: 1fr 1fr; }
   .metric:nth-child(2) { border-right: none; }
   .metric:nth-child(1),
   .metric:nth-child(2) { border-bottom: 1px solid var(--ds-line); }
-  .industryBoard,
+  .industryBoard { grid-template-columns: 1fr 1fr; }
   .industryBoardTrio { grid-template-columns: 1fr; }
   .principleGrid,
   .stepGrid { grid-template-columns: 1fr; }
@@ -787,14 +814,32 @@
   .splitGrid { grid-template-columns: 1fr; }
   .capRow { grid-template-columns: 3rem minmax(0, 1fr); }
   .capGo { display: none; }
+  .section {
+    padding: clamp(48px, 7vw, 72px) 0;
+  }
+  .inner {
+    padding: 0 clamp(18px, 4vw, 32px);
+  }
 }
 
 @media (max-width: 600px) {
   .metricsStrip { grid-template-columns: 1fr; }
   .metric { border-right: none; border-bottom: 1px solid var(--ds-line); }
   .metric:last-child { border-bottom: none; }
-  .teamGrid { grid-template-columns: 1fr; }
+  .industryBoard,
+  .industryBoardTrio { grid-template-columns: 1fr; }
+  .industryCell { min-height: 0; padding: 22px 18px; }
+  .teamGrid { grid-template-columns: 1fr 1fr; gap: 16px; }
   .grid2, .grid3, .grid4 { grid-template-columns: 1fr; }
   .btn { width: 100%; justify-content: center; }
   .ctaActions, .heroActions { flex-direction: column; }
+  .ctaBand { padding: 28px 20px; border-radius: 14px; }
+  .ctaTitle { max-width: none; }
+  .sectionTitle { font-size: clamp(1.55rem, 7vw, 2rem); }
+  .capNum { font-size: 0.8rem; }
+  .capRow { gap: 12px; padding: 18px 0; }
+}
+
+@media (max-width: 400px) {
+  .teamGrid { grid-template-columns: 1fr; }
 }

@@ -1,23 +1,25 @@
-/* NEXARA · Footer — limpio, marca cyan */
+/* NEXARA · Footer — composición editorial equilibrada */
 
 .footer {
   --f-bg: #050a14;
-  --f-panel: #0a1628;
   --f-acento: #2dd8f2;
   --f-papel: #eef4ff;
-  --f-linea: rgba(140, 190, 255, 0.14);
+  --f-linea: rgba(140, 190, 255, 0.12);
   --f-text: rgba(238, 244, 255, 0.88);
   --f-dim: #9bb0cc;
   --f-niebla: #6f85a5;
+  --f-display: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  --f-ui: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
+  --f-body: var(--nx-font-body, "Manrope", system-ui, sans-serif);
 
   position: relative;
   width: 100%;
   background:
-    radial-gradient(55% 70% at 0% 0%, rgba(45, 216, 242, 0.1), transparent 55%),
+    radial-gradient(50% 60% at 0% 0%, rgba(45, 216, 242, 0.08), transparent 55%),
     var(--f-bg);
   color: var(--f-text);
-  font-family: var(--nx-font-body, "Manrope", system-ui, sans-serif);
-  overflow: hidden;
+  font-family: var(--f-body);
+  overflow-x: clip;
   isolation: isolate;
   border-top: 1px solid var(--f-linea);
 }
@@ -25,29 +27,39 @@
 .topAccent {
   height: 1px;
   width: 100%;
-  background: linear-gradient(90deg, transparent, rgba(45, 216, 242, 0.55), rgba(176, 107, 255, 0.4), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(45, 216, 242, 0.45),
+    rgba(176, 107, 255, 0.35),
+    transparent
+  );
 }
 
 .footerInner {
   position: relative;
   max-width: 1120px;
   margin: 0 auto;
-  padding: clamp(48px, 6vw, 72px) clamp(24px, 4vw, 48px) clamp(28px, 3vw, 40px);
+  padding: clamp(40px, 5.5vw, 64px) clamp(20px, 4vw, 48px) clamp(24px, 3vw, 36px);
   z-index: 1;
+  display: grid;
+  gap: clamp(28px, 4vw, 40px);
 }
 
-.mainGrid {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 1.1fr;
-  gap: clamp(28px, 4vw, 48px);
-  align-items: start;
-  margin-bottom: clamp(36px, 4vw, 48px);
+/* Marca + redes en una sola franja */
+.brandRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: clamp(16px, 3vw, 32px);
+  padding-bottom: clamp(22px, 3vw, 28px);
+  border-bottom: 1px solid var(--f-linea);
 }
 
-.brandCol {
+.brandBlock {
   display: grid;
-  gap: 14px;
-  max-width: 300px;
+  gap: 10px;
+  min-width: 0;
 }
 
 .brandLogoLink {
@@ -59,30 +71,30 @@
 
 .brandLogo {
   display: block;
-  height: 38px;
+  height: clamp(36px, 4vw, 44px);
   width: auto;
-  max-width: 190px;
+  max-width: min(220px, 70vw);
   object-fit: contain;
   object-position: left center;
 }
 
 .brandTagline {
   margin: 0;
-  font-size: 0.92rem;
-  line-height: 1.55;
+  font-size: 0.94rem;
+  line-height: 1.5;
   color: var(--f-dim);
-  max-width: 28ch;
+  max-width: 36ch;
 }
 
 .socials {
   display: flex;
+  flex-shrink: 0;
   gap: 8px;
-  margin-top: 4px;
 }
 
 .social {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 10px;
   display: grid;
   place-items: center;
@@ -94,14 +106,23 @@
 }
 
 .social svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
+  display: block;
 }
 
 .social:hover {
   color: var(--f-acento);
   border-color: rgba(45, 216, 242, 0.45);
   background: rgba(45, 216, 242, 0.08);
+}
+
+/* Tres columnas equilibradas */
+.navGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(24px, 4vw, 48px);
+  align-items: start;
 }
 
 .linkCol {
@@ -112,8 +133,8 @@
 
 .colTitle {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 0.78rem;
+  font-family: var(--f-ui);
+  font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -125,14 +146,15 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 10px;
+  gap: 9px;
 }
 
 .list a,
 .textBtn {
   color: var(--f-dim);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
+  line-height: 1.4;
   transition: color 150ms ease;
   background: none;
   border: none;
@@ -140,6 +162,7 @@
   cursor: pointer;
   text-align: left;
   font-family: inherit;
+  display: inline;
 }
 
 .list a:hover,
@@ -147,31 +170,73 @@
   color: var(--f-papel);
 }
 
+.whatsappBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 999px;
+  background: #25d366;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.86rem;
+  font-weight: 650;
+  line-height: 1.2;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 6px 16px rgba(37, 211, 102, 0.28);
+  transition: background 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.whatsappBtn:hover {
+  background: #1ebe57;
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(37, 211, 102, 0.36);
+}
+
+.whatsappIcon {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
 .muted {
+  display: block;
   color: var(--f-niebla);
-  font-size: 0.88rem;
-  line-height: 1.45;
+  font-size: 0.86rem;
+  line-height: 1.5;
 }
 
 .bottomBar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 16px 24px;
   flex-wrap: wrap;
-  padding-top: 22px;
+  padding-top: clamp(18px, 2.5vw, 22px);
   border-top: 1px solid var(--f-linea);
-  font-size: 0.82rem;
+}
+
+.copyright {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
   color: var(--f-niebla);
+  max-width: 52ch;
 }
 
 .legalLinks {
   display: flex;
-  gap: 16px;
+  gap: 6px 18px;
   flex-wrap: wrap;
 }
 
 .legalLinks a {
+  font-size: 0.82rem;
   color: var(--f-niebla);
   text-decoration: none;
   transition: color 150ms ease;
@@ -183,8 +248,8 @@
 
 .backTop {
   position: fixed;
-  right: 20px;
-  bottom: 88px;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
   z-index: 40;
   width: 40px;
   height: 40px;
@@ -196,7 +261,7 @@
   padding: 0;
   border-radius: 10px;
   cursor: pointer;
-  transition: color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
 }
 
 .backTop svg {
@@ -208,22 +273,48 @@
 .backTop:hover {
   color: #fff;
   border-color: #2dd8f2;
-  box-shadow: 0 0 16px rgba(45, 216, 242, 0.25);
+  background: rgba(45, 216, 242, 0.1);
 }
 
-@media (max-width: 900px) {
-  .mainGrid {
-    grid-template-columns: 1fr 1fr;
+@media (max-width: 800px) {
+  .brandRow {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
-  .brandCol {
+  .navGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 28px;
+  }
+
+  .linkCol:last-child {
     grid-column: 1 / -1;
-    max-width: none;
   }
 }
 
-@media (max-width: 600px) {
-  .mainGrid {
-    grid-template-columns: 1fr;
+@media (max-width: 520px) {
+  .footerInner {
+    padding-inline: 18px;
+    gap: 24px;
+  }
+
+  .navGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 22px 18px;
+  }
+
+  .linkCol:last-child {
+    grid-column: auto;
+  }
+
+  .bottomBar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .social {
+    width: 40px;
+    height: 40px;
   }
 }

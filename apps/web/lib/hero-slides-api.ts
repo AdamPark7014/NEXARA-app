@@ -1,21 +1,15 @@
 /**
  * NEXARA · Hero Slides API (frontend client)
  * ------------------------------------------
- * Consume `apps/api/src/hero-slides/hero-slides.controller.ts`.
- *
- * Endpoints:
- *   GET    /hero-slides/public        ← público (sitio web)
- *   GET    /hero-slides               ← admin (lista completa)
- *   POST   /hero-slides               ← admin (multipart con `image`)
- *   PUT    /hero-slides/:id           ← admin (multipart con `image` opcional)
- *   PATCH  /hero-slides/reorder       ← admin (body: { ids: number[] })
- *   DELETE /hero-slides/:id           ← admin
+ * `imageUrl` = desktop (obligatorio).
+ * `imageUrlMobile` = móvil opcional; si falta, el sitio usa desktop.
  */
 import { buildApiUrl } from "@/lib/api-base";
 
 export type HeroSlide = {
   id: number;
   imageUrl: string;
+  imageUrlMobile: string | null;
   altText: string | null;
   caption: string | null;
   href: string | null;
@@ -52,15 +46,11 @@ const apiFetch = async (path: string, token: string, init: RequestInit = {}) => 
   return text ? JSON.parse(text) : null;
 };
 
-/** Resuelve la URL final de la imagen — soporta tanto rutas relativas servidas
- *  por el API (`/hero-slides/image/...`) como rutas estáticas del sitio
- *  (`/images/hero/...`) o URLs externas absolutas. */
+/** Resuelve la URL final de la imagen — soporta rutas API, estáticas y absolutas. */
 export function resolveHeroImageUrl(imageUrl: string): string {
   if (!imageUrl) return "";
   if (/^https?:\/\//i.test(imageUrl)) return imageUrl;
   if (imageUrl.startsWith("/images/")) return imageUrl;
-  // Cualquier otra ruta relativa (incluida `/hero-slides/image/...`) la
-  // resolvemos contra el API.
   return buildApiUrl(imageUrl.replace(/^\//, ""));
 }
 
@@ -82,10 +72,20 @@ export const listHeroSlides = (token: string): Promise<HeroSlide[]> =>
 
 export const createHeroSlide = (
   token: string,
-  payload: { altText?: string; caption?: string; href?: string; isActive?: boolean; file: File },
+  payload: {
+    altText?: string;
+    caption?: string;
+    href?: string;
+    isActive?: boolean;
+    /** Imagen desktop (obligatoria). */
+    file: File;
+    /** Imagen móvil opcional. */
+    fileMobile?: File;
+  },
 ): Promise<HeroSlide> => {
   const form = new FormData();
   form.append("image", payload.file);
+  if (payload.fileMobile) form.append("imageMobile", payload.fileMobile);
   if (payload.altText) form.append("altText", payload.altText);
   if (payload.caption) form.append("caption", payload.caption);
   if (payload.href) form.append("href", payload.href);
@@ -96,14 +96,24 @@ export const createHeroSlide = (
 export const updateHeroSlide = (
   token: string,
   id: number,
-  payload: { altText?: string; caption?: string; href?: string; isActive?: boolean; file?: File },
+  payload: {
+    altText?: string;
+    caption?: string;
+    href?: string;
+    isActive?: boolean;
+    file?: File;
+    fileMobile?: File;
+    clearMobile?: boolean;
+  },
 ): Promise<HeroSlide> => {
   const form = new FormData();
   if (payload.file) form.append("image", payload.file);
+  if (payload.fileMobile) form.append("imageMobile", payload.fileMobile);
   if (payload.altText !== undefined) form.append("altText", payload.altText);
   if (payload.caption !== undefined) form.append("caption", payload.caption);
   if (payload.href !== undefined) form.append("href", payload.href);
   if (payload.isActive !== undefined) form.append("isActive", String(payload.isActive));
+  if (payload.clearMobile) form.append("clearMobile", "true");
   return apiFetch(`hero-slides/${id}`, token, { method: "PUT", body: form });
 };
 

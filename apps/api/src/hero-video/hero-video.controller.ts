@@ -11,12 +11,12 @@ import {
   Patch,
   Post,
   Res,
-  UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -107,10 +107,29 @@ export class HeroVideoController {
 
   @Post()
   @UseGuards(AuthGuard('jwt'))
-  @UseInterceptors(FileInterceptor('video'))
-  upload(@Body('title') title: string | undefined, @UploadedFile() file?: MulterFile) {
-    this.assertValidVideo(file);
-    return this.heroVideoService.upload(title, file);
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'video', maxCount: 1 },
+      { name: 'videoMobile', maxCount: 1 },
+    ]),
+  )
+  upload(
+    @Body('title') title: string | undefined,
+    @Body('clearMobile') clearMobileRaw: string | undefined,
+    @UploadedFiles()
+    files?: { video?: MulterFile[]; videoMobile?: MulterFile[] },
+  ) {
+    const video = files?.video?.[0];
+    const videoMobile = files?.videoMobile?.[0];
+    this.assertValidVideo(video, false);
+    this.assertValidVideo(videoMobile, false);
+    const clearMobile = clearMobileRaw === 'true' || clearMobileRaw === '1';
+    return this.heroVideoService.upsert({
+      title,
+      video,
+      videoMobile,
+      clearMobile,
+    });
   }
 
   @Patch(':id')
@@ -127,9 +146,12 @@ export class HeroVideoController {
 
   // ── Validación común ───────────────────────────────────────────────
 
-  private assertValidVideo(file?: MulterFile) {
+  private assertValidVideo(file?: MulterFile, required = false) {
     if (!file) {
-      throw new BadRequestException('Selecciona un archivo de video.');
+      if (required) {
+        throw new BadRequestException('Selecciona un archivo de video.');
+      }
+      return;
     }
     const maxSize = parseInt(process.env['MAX_VIDEO_SIZE'] || '83886080', 10); // 80MB
     if (!ALLOWED_MIME.includes(file.mimetype) || file.size > maxSize) {

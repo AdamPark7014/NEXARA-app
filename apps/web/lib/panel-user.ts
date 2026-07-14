@@ -125,7 +125,7 @@ export const getRoleLabel = (user: PanelUser | null | undefined) => {
 };
 
 export const getAvatarSrc = (user: PanelUser | null | undefined) => {
-  if (user?.isSuperAdmin) return "/logo-nexara.png";
+  if (user?.isSuperAdmin) return "/logo-nexara-platform.png";
 
   const assignedAvatar = (user?.avatarUrl || "").trim();
   if (assignedAvatar) {

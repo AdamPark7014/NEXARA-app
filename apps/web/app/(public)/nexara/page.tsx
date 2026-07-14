@@ -3,8 +3,10 @@ import type { Metadata } from "next";
 import shared from "../_shared/public.module.css";
 import styles from "./home-sections.module.css";
 import HomeHero from "../../components/HomeHero";
+import EditorialImage from "../../components/EditorialImage";
 import {
   fetchPageSection,
+  fetchPageVisuals,
   DEFAULT_PROCESO,
   DEFAULT_INDUSTRIAS,
   DEFAULT_CTA,
@@ -97,16 +99,18 @@ const resolveIndustriaSlug = (label: string) =>
   INDUSTRIA_SLUGS[label] || label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 export default async function NexaraPage() {
-  const [procesoData, industriasData, ctaData] = await Promise.all([
+  const [procesoData, industriasData, ctaData, visuals] = await Promise.all([
     fetchPageSection<{ items: ProcesoItem[] }>("home_proceso"),
     fetchPageSection<{ items: string[] }>("home_industrias"),
     fetchPageSection<CtaContent>("home_cta"),
+    fetchPageVisuals("page_home"),
   ]);
 
   const proceso = (procesoData?.items ?? DEFAULT_PROCESO).slice(0, 3);
-  // Cuatro verticales: tablero 2×2 con sustancia, sin duplicar las seis de /soluciones
   const industrias = (industriasData?.items ?? DEFAULT_INDUSTRIAS).slice(0, 4);
   const cta = ctaData ?? DEFAULT_CTA;
+  const slotCaps = visuals.slots.find((s) => s.id === "home_band_capabilities");
+  const slotInd = visuals.slots.find((s) => s.id === "home_band_industrias");
 
   return (
     <main className={`${shared.page} home-main-flush`} aria-label="Nexara — Inicio">
@@ -151,6 +155,22 @@ export default async function NexaraPage() {
           </div>
         </section>
 
+        {slotCaps?.desktopUrl ? (
+          <div className={`${shared.sectionImageBandBleed} ${styles.visualBridge}`}>
+            <EditorialImage
+              desktopUrl={slotCaps.desktopUrl}
+              mobileUrl={slotCaps.mobileUrl}
+              alt={slotCaps.alt}
+              caption={slotCaps.caption || "Campo y entrega — entre el diseño y el soporte."}
+              kicker="En sitio"
+              title={slotCaps.caption ? undefined : "Donde la propuesta se vuelve instalación"}
+              layout={slotCaps.layout}
+              objectPosition={slotCaps.objectPosition}
+              compose="caption-bar"
+            />
+          </div>
+        ) : null}
+
         <section id="proceso" className={`${shared.section} ${styles.band}`} data-reveal="up">
           <div className={shared.inner}>
             <header className={`${shared.sectionHead} ${styles.headSplit}`}>
@@ -189,6 +209,22 @@ export default async function NexaraPage() {
             </div>
           </div>
         </section>
+
+        {slotInd?.desktopUrl ? (
+          <div className={`${shared.sectionImageBandBleed} ${styles.visualBridge}`}>
+            <EditorialImage
+              desktopUrl={slotInd.desktopUrl}
+              mobileUrl={slotInd.mobileUrl}
+              alt={slotInd.alt}
+              caption={slotInd.caption || "Cada industria con su riesgo; cada sitio con su alcance."}
+              kicker="Sectores"
+              title={slotInd.caption ? undefined : "Antes de hablar de verticales"}
+              layout={slotInd.layout}
+              objectPosition={slotInd.objectPosition}
+              compose="caption-bar"
+            />
+          </div>
+        ) : null}
 
         <section className={shared.section} aria-label="Industrias" data-reveal="up">
           <div className={shared.inner}>

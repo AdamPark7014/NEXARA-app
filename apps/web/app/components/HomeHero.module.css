@@ -246,37 +246,84 @@
 }
 
 @media (max-width: 900px) {
+  .hero {
+    justify-content: center;
+    padding-inline: clamp(18px, 4vw, 32px);
+  }
+
   .stage {
-    max-width: min(520px, 100%);
+    max-width: min(540px, 100%);
+    margin-left: 0;
+  }
+
+  .title {
+    font-size: clamp(2.15rem, 7vw, 3.2rem);
   }
 }
 
 @media (max-width: 600px) {
   .hero {
     justify-content: flex-end;
-    padding-top: calc(var(--public-header-height, 66px) + 20px);
-    padding-bottom: clamp(36px, 6vh, 56px);
+    min-height: 100svh;
+    padding-top: calc(var(--public-header-height, 66px) + 16px);
+    padding-bottom: clamp(32px, 7vh, 48px);
+    padding-inline: 18px;
   }
 
   .stage {
-    margin-left: 0;
     max-width: 100%;
+  }
+
+  .kicker {
+    margin-bottom: 12px;
+    font-size: 0.72rem;
+  }
+
+  .title {
+    margin-bottom: 12px;
+    font-size: clamp(1.95rem, 8.2vw, 2.45rem);
+    max-width: 14ch;
+  }
+
+  .lead {
+    margin-bottom: 22px;
+    font-size: 0.98rem;
+    max-width: none;
   }
 
   .bgVideo,
   .slide {
-    object-position: center center;
-    background-position: center center;
+    object-position: 62% center;
+    background-position: 62% center;
+  }
+
+  .mediaScrim {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(2, 8, 18, 0.55) 0%,
+        rgba(2, 8, 18, 0.35) 35%,
+        rgba(2, 8, 18, 0.78) 72%,
+        rgba(2, 8, 18, 0.92) 100%
+      ),
+      linear-gradient(
+        100deg,
+        rgba(2, 8, 18, 0.82) 0%,
+        rgba(2, 8, 18, 0.35) 55%,
+        rgba(2, 8, 18, 0.2) 100%
+      );
   }
 
   .actions {
     flex-direction: column;
+    gap: 10px;
   }
 
   .ctaPrimary,
   .ctaGhost {
     width: 100%;
     justify-content: center;
+    min-height: 48px;
   }
 }
 

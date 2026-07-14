@@ -1,0 +1,349 @@
+/* Editorial images — soft edges, full opacity, text harmony */
+
+.figure {
+  --ei-radius: 18px;
+  --ei-bg: #050a14;
+  --ei-ink: #eef4ff;
+  --ei-muted: #9bb0cc;
+  --ei-cyan: #2dd8f2;
+  margin: 0;
+  position: relative;
+  isolation: isolate;
+}
+
+.frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--ei-radius);
+  background: var(--ei-bg);
+  opacity: 1;
+  min-width: 0;
+}
+
+.img {
+  display: block;
+  width: 100%;
+  object-fit: cover;
+  opacity: 1;
+  filter: none;
+  background: var(--ei-bg);
+  transform: scale(1.01);
+}
+
+.imgDesktop { display: block; }
+.imgMobile { display: none; }
+
+@media (max-width: 768px) {
+  .imgDesktop { display: none; }
+  .imgMobile { display: block; }
+}
+
+.posCenter .img { object-position: center center; }
+.posLeft .img { object-position: left center; }
+.posRight .img { object-position: right center; }
+.posTop .img { object-position: center top; }
+.posBottom .img { object-position: center bottom; }
+
+.veil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  border-radius: inherit;
+  background:
+    linear-gradient(180deg, rgba(5, 10, 20, 0.2) 0%, transparent 30%, transparent 70%, rgba(5, 10, 20, 0.36) 100%),
+    linear-gradient(90deg, rgba(5, 10, 20, 0.14) 0%, transparent 20%, transparent 80%, rgba(5, 10, 20, 0.14) 100%);
+}
+
+/* ── Text copy paired with media ───────────────────────────── */
+
+.copyCol {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+  min-width: 0;
+  max-width: 34ch;
+}
+
+.kicker {
+  margin: 0;
+  font-family: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ei-cyan);
+}
+
+.copyTitle {
+  margin: 0;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(1.25rem, 2.4vw, 1.7rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  color: var(--ei-ink);
+  text-wrap: balance;
+}
+
+.copyText,
+.caption {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--ei-muted);
+  font-family: var(--nx-font-body, "Manrope", system-ui, sans-serif);
+}
+
+.composeSplit {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: clamp(20px, 4vw, 40px);
+  align-items: center;
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+}
+
+.composeSplit .frame {
+  width: 100%;
+}
+
+.composeBar {
+  display: grid;
+  gap: 0;
+}
+
+.bar {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 0 clamp(4px, 1vw, 8px);
+  max-width: 56ch;
+}
+
+.barTitle {
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ei-ink);
+  letter-spacing: -0.02em;
+}
+
+/* ── Layouts ─────────────────────────────────────────────── */
+
+.bleedCinema {
+  width: 100%;
+  max-width: none;
+}
+
+.bleedCinema .frame {
+  --ei-radius: 0;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+}
+
+.bleedCinema .img {
+  height: clamp(140px, 16vw, 230px);
+  aspect-ratio: 10 / 3;
+}
+
+.bleedCinema .veil {
+  background: linear-gradient(180deg, rgba(5, 10, 20, 0.4) 0%, transparent 40%, transparent 60%, rgba(5, 10, 20, 0.5) 100%);
+}
+
+.bleedCinema.composeBar .bar,
+.bleedLandscape.composeBar .bar {
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-inline: clamp(24px, 4vw, 48px);
+}
+
+.bleedLandscape {
+  width: 100%;
+  max-width: none;
+}
+
+.bleedLandscape .frame {
+  --ei-radius: 0;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
+}
+
+.bleedLandscape .img {
+  height: clamp(220px, 32vw, 400px);
+  aspect-ratio: 32 / 15;
+}
+
+.framedWide {
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+}
+
+.framedWide:not(.composeSplit) .frame {
+  --ei-radius: 20px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+.framedWide:not(.composeSplit) .img {
+  height: clamp(210px, 30vw, 360px);
+  aspect-ratio: 16 / 9;
+}
+
+.framedWide.composeSplit .img {
+  height: clamp(200px, 28vw, 340px);
+  aspect-ratio: 16 / 10;
+  border-radius: 18px;
+}
+
+.framedWide.composeSplit .frame {
+  --ei-radius: 18px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.26);
+}
+
+.framedSquare {
+  width: min(100%, 440px);
+  margin-inline: auto;
+}
+
+.framedSquare .frame {
+  --ei-radius: 22px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.26);
+}
+
+.framedSquare .img {
+  aspect-ratio: 1 / 1;
+  height: auto;
+  max-height: 440px;
+}
+
+.portraitFeatured {
+  width: 100%;
+  max-width: 400px;
+  margin-inline: auto 0;
+  justify-self: end;
+}
+
+.portraitFeatured .frame {
+  --ei-radius: 24px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+}
+
+.portraitFeatured .img {
+  aspect-ratio: 3 / 4;
+  height: auto;
+  max-height: min(520px, 66vh);
+}
+
+.asideCompact {
+  width: 100%;
+  max-width: 240px;
+}
+
+.asideCompact .frame {
+  --ei-radius: 16px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+}
+
+.asideCompact .img {
+  aspect-ratio: 4 / 5;
+  height: auto;
+  max-height: 200px;
+}
+
+.insetOffset {
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+}
+
+.insetOffset:not(.composeSplit) {
+  width: min(100%, 880px);
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.insetOffset .frame {
+  --ei-radius: 20px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.26);
+}
+
+.insetOffset:not(.composeSplit) .frame {
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 90%, transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0%, #000 90%, transparent 100%);
+}
+
+.insetOffset .img {
+  height: clamp(200px, 26vw, 340px);
+  aspect-ratio: 7 / 4;
+}
+
+.insetOffset.composeSplit .img {
+  aspect-ratio: 5 / 3;
+}
+
+@media (max-width: 900px) {
+  .composeSplit {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .copyCol {
+    max-width: none;
+  }
+
+  .insetOffset:not(.composeSplit) .frame {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .portraitFeatured {
+    max-width: min(100%, 340px);
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .figure { --ei-radius: 16px; }
+
+  .bleedCinema .img {
+    height: clamp(140px, 38vw, 200px);
+    aspect-ratio: 3 / 2;
+  }
+
+  .bleedLandscape .img {
+    height: clamp(180px, 46vw, 260px);
+    aspect-ratio: 6 / 5;
+  }
+
+  .framedWide:not(.composeSplit) .img,
+  .insetOffset .img {
+    height: clamp(160px, 44vw, 240px);
+    aspect-ratio: 3 / 2;
+  }
+
+  .portraitFeatured .img {
+    max-height: 380px;
+    aspect-ratio: 4 / 5;
+  }
+
+  .asideCompact {
+    max-width: 100%;
+  }
+
+  .asideCompact .img {
+    max-height: 180px;
+    aspect-ratio: 4 / 3;
+  }
+
+  .insetOffset:not(.composeSplit) {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .img { transform: none; }
+}

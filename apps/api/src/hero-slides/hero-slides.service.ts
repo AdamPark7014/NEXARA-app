@@ -48,22 +48,30 @@ export class HeroSlidesService {
 
   // ── Escritura ──────────────────────────────────────────────────────
 
-  async create(payload: CreateHeroSlideDto, file?: MulterFile) {
-    const imageUrl = file
-      ? await this.saveImage(file)
+  async create(
+    payload: CreateHeroSlideDto,
+    files?: { image?: MulterFile; imageMobile?: MulterFile },
+  ) {
+    const imageUrl = files?.image
+      ? await this.saveImage(files.image)
       : payload.imageUrl?.trim() || null;
 
     if (!imageUrl) {
       throw new BadRequestException(
-        'Debes subir una imagen o proporcionar un imageUrl válido.',
+        'Debes subir una imagen desktop o proporcionar un imageUrl válido.',
       );
     }
+
+    const imageUrlMobile = files?.imageMobile
+      ? await this.saveImage(files.imageMobile)
+      : null;
 
     const position = payload.position ?? (await this.nextPosition());
 
     return this.prisma.heroSlide.create({
       data: {
         imageUrl,
+        imageUrlMobile,
         altText: payload.altText?.trim() || null,
         caption: payload.caption?.trim() || null,
         href: payload.href?.trim() || null,
@@ -73,24 +81,47 @@ export class HeroSlidesService {
     });
   }
 
-  async update(id: number, payload: UpdateHeroSlideDto, file?: MulterFile) {
+  async update(
+    id: number,
+    payload: UpdateHeroSlideDto,
+    files?: { image?: MulterFile; imageMobile?: MulterFile },
+    options?: { clearMobile?: boolean },
+  ) {
     const existing = await this.findOne(id);
 
     let imageUrl: string | undefined;
-    if (file) {
-      imageUrl = await this.saveImage(file);
+    if (files?.image) {
+      imageUrl = await this.saveImage(files.image);
       await this.deleteImageFile(existing.imageUrl);
     } else {
       imageUrl = payload.imageUrl?.trim();
+    }
+
+    let imageUrlMobile: string | null | undefined;
+    if (options?.clearMobile) {
+      await this.deleteImageFile(existing.imageUrlMobile);
+      imageUrlMobile = null;
+    } else if (files?.imageMobile) {
+      imageUrlMobile = await this.saveImage(files.imageMobile);
+      await this.deleteImageFile(existing.imageUrlMobile);
     }
 
     return this.prisma.heroSlide.update({
       where: { id },
       data: {
         imageUrl: imageUrl || undefined,
-        altText: payload.altText !== undefined ? payload.altText?.trim() || null : undefined,
-        caption: payload.caption !== undefined ? payload.caption?.trim() || null : undefined,
-        href: payload.href !== undefined ? payload.href?.trim() || null : undefined,
+        imageUrlMobile:
+          imageUrlMobile === undefined ? undefined : imageUrlMobile,
+        altText:
+          payload.altText !== undefined
+            ? payload.altText?.trim() || null
+            : undefined,
+        caption:
+          payload.caption !== undefined
+            ? payload.caption?.trim() || null
+            : undefined,
+        href:
+          payload.href !== undefined ? payload.href?.trim() || null : undefined,
         position: payload.position ?? undefined,
         isActive: payload.isActive ?? undefined,
       },
@@ -101,6 +132,7 @@ export class HeroSlidesService {
     const existing = await this.findOne(id);
     await this.prisma.heroSlide.delete({ where: { id } });
     await this.deleteImageFile(existing.imageUrl);
+    await this.deleteImageFile(existing.imageUrlMobile);
   }
 
   /** Reordena en lote: el primer ID queda en posición 1, etc. */
@@ -153,18 +185,23 @@ export class HeroSlidesService {
       await fs.writeFile(filepath, file.buffer);
       return `/hero-slides/image/${filename}`;
     } catch (_error) {
-      throw new InternalServerErrorException('Error al guardar la imagen del hero');
+      throw new InternalServerErrorException(
+        'Error al guardar la imagen del hero',
+      );
     }
   }
 
-  private async deleteImageFile(imageUrl: string | null): Promise<void> {
+  private async deleteImageFile(imageUrl: string | null | undefined): Promise<void> {
     if (!imageUrl) return;
-    // Solo borra archivos locales; las URLs externas (https://) se ignoran.
     const localPrefix = '/hero-slides/image/';
     if (!imageUrl.startsWith(localPrefix)) return;
     try {
       const filename = imageUrl.slice(localPrefix.length);
-      const filepath = path.resolve(process.cwd(), './uploads/hero', filename);
+      const filepath = path.resolve(
+        process.cwd(),
+        './uploads/hero',
+        filename,
+      );
       await fs.unlink(filepath);
     } catch {
       // Si el archivo ya no existe no es un error crítico

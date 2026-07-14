@@ -4,6 +4,9 @@
  * HomeHero — presupuesto estricto:
  * video/carrusel full-bleed + titular + una línea + CTAs.
  * Sin feature bar en el primer viewport.
+ *
+ * Media: usa variantes desktop / móvil desde Studio.
+ * `imageUrl` / `videoUrl` = desktop; `*Mobile` = móvil (fallback a desktop).
  */
 
 import Link from "next/link";
@@ -15,16 +18,45 @@ import { fetchPublicHeroVideo, resolveHeroVideoUrl } from "@/lib/hero-video-api"
 import type { HeroMediaConfig } from "@/lib/page-content-api";
 
 const SLIDE_INTERVAL_MS = 7000;
+const MOBILE_MQ = "(max-width: 768px)";
 
 type Slide = { key: string; src: string; alt: string };
 
+type RawSlide = {
+  id: number;
+  imageUrl: string;
+  imageUrlMobile: string | null;
+  altText: string | null;
+};
+
+type RawVideo = {
+  videoUrl: string;
+  videoUrlMobile: string | null;
+  isActive: boolean;
+};
+
+function pickUrl(desktop: string, mobile: string | null | undefined, isMobile: boolean) {
+  if (isMobile && mobile) return mobile;
+  return desktop;
+}
+
 export default function HomeHero() {
-  const [dynamicSlides, setDynamicSlides] = useState<Slide[]>([]);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [rawSlides, setRawSlides] = useState<RawSlide[]>([]);
+  const [rawVideo, setRawVideo] = useState<RawVideo | null>(null);
+  const [preferVideo, setPreferVideo] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
   const [index, setIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_MQ);
+    const apply = () => setIsMobile(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,22 +74,30 @@ export default function HomeHero() {
           if (json?.content?.mediaType === "video") mediaType = "video";
         }
 
-        const preferVideo = mediaType === "video" || Boolean(publicVideo?.videoUrl && publicVideo.isActive);
+        const hasVideo = Boolean(publicVideo?.videoUrl && publicVideo.isActive);
+        const useVideo = mediaType === "video" || hasVideo;
 
-        if (preferVideo && publicVideo?.videoUrl) {
+        if (useVideo && publicVideo?.videoUrl) {
           if (cancelled) return;
-          setVideoUrl(resolveHeroVideoUrl(publicVideo.videoUrl));
+          setPreferVideo(true);
+          setRawVideo({
+            videoUrl: publicVideo.videoUrl,
+            videoUrlMobile: publicVideo.videoUrlMobile ?? null,
+            isActive: publicVideo.isActive,
+          });
           setVideoFailed(false);
           return;
         }
 
+        setPreferVideo(false);
         const slides = await fetchPublicHeroSlides().catch(() => []);
         if (cancelled) return;
-        setDynamicSlides(
+        setRawSlides(
           slides.map((s) => ({
-            key: `db-${s.id}`,
-            src: resolveHeroImageUrl(s.imageUrl),
-            alt: s.altText || "Nexara",
+            id: s.id,
+            imageUrl: s.imageUrl,
+            imageUrlMobile: s.imageUrlMobile ?? null,
+            altText: s.altText,
           })),
         );
       } catch {
@@ -70,6 +110,17 @@ export default function HomeHero() {
       cancelled = true;
     };
   }, []);
+
+  const videoUrl =
+    preferVideo && rawVideo?.videoUrl
+      ? resolveHeroVideoUrl(pickUrl(rawVideo.videoUrl, rawVideo.videoUrlMobile, isMobile))
+      : null;
+
+  const dynamicSlides: Slide[] = rawSlides.map((s) => ({
+    key: `db-${s.id}`,
+    src: resolveHeroImageUrl(pickUrl(s.imageUrl, s.imageUrlMobile, isMobile)),
+    alt: s.altText || "Nexara",
+  }));
 
   const showVideo = Boolean(videoUrl) && !videoFailed;
   const hasMedia = showVideo || dynamicSlides.length > 0;
@@ -128,6 +179,7 @@ export default function HomeHero() {
     >
       {showVideo ? (
         <video
+          key={videoUrl ?? "video"}
           ref={videoRef}
           className={styles.bgVideo}
           src={videoUrl ?? undefined}
@@ -138,7 +190,6 @@ export default function HomeHero() {
           preload="auto"
           onError={() => {
             setVideoFailed(true);
-            setVideoUrl(null);
           }}
           aria-hidden
         />
@@ -146,7 +197,7 @@ export default function HomeHero() {
         <div className={styles.slides} aria-hidden>
           {dynamicSlides.map((slide, i) => (
             <div
-              key={slide.key}
+              key={`${slide.key}-${slide.src}`}
               className={`${styles.slide} ${i === index ? styles.slideActive : ""}`}
               style={{ backgroundImage: `url("${slide.src}")` }}
               role="img"
