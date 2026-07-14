@@ -1259,15 +1259,17 @@ model NewsPost {
 // y opcionalmente su orden, alt-text accesible y un href cuando se
 // quiera que el slide entero sea clickeable.
 model HeroSlide {
-  id        Int      @id @default(autoincrement())
-  imageUrl  String   @db.VarChar(500)
-  altText   String?  @db.VarChar(200)
-  caption   String?  @db.VarChar(500)
-  href      String?  @db.VarChar(500)
-  position  Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             Int      @id @default(autoincrement())
+  imageUrl       String   @db.VarChar(500)
+  /// Variante móvil del slide (opcional). Si falta, el sitio usa `imageUrl` (desktop).
+  imageUrlMobile String?  @db.VarChar(500)
+  altText        String?  @db.VarChar(200)
+  caption        String?  @db.VarChar(500)
+  href           String?  @db.VarChar(500)
+  position       Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([position])
   @@index([isActive])
@@ -1282,13 +1284,16 @@ model HeroSlide {
 // `mediaType` que decide si el hero muestra el carrusel o este video vive
 // en `PageContent` (section = "home_hero"), no aquí.
 model HeroVideo {
-  id        Int      @id @default(autoincrement())
-  videoUrl  String   @db.VarChar(500)
-  posterUrl String?  @db.VarChar(500)
-  title     String?  @db.VarChar(200)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             Int      @id @default(autoincrement())
+  /// Video desktop (principal). Lo que ya existía antes de variantes móviles.
+  videoUrl       String   @db.VarChar(500)
+  /// Video móvil (opcional). Si falta, el sitio usa `videoUrl`.
+  videoUrlMobile String?  @db.VarChar(500)
+  posterUrl      String?  @db.VarChar(500)
+  title          String?  @db.VarChar(200)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([isActive])
   @@map("hero_video")

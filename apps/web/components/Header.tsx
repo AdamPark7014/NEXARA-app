@@ -216,7 +216,7 @@ export default function Header() {
               src="/logo-nexara-lockup.png"
               alt="Nexara"
               width={220}
-              height={52}
+              height={69}
               className={styles.logoLockup}
               priority
             />

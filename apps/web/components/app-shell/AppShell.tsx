@@ -342,7 +342,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
       <aside className={styles.sidebar}>
         <div className={styles.brand}>
           <div className={styles.brandLogo} aria-hidden="true">
-            N
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-nexara-platform.png" alt="" width={38} height={38} />
           </div>
           <div className={styles.brandText}>
             <div className={styles.brandName}>NEXARA</div>

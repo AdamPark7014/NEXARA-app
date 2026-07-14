@@ -3,9 +3,11 @@ import type { Metadata } from "next";
 import shared from "../_shared/public.module.css";
 import styles from "./page.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
+import EditorialImage from "../../components/EditorialImage";
 import heroStyles from "../../components/PublicPageHero.module.css";
 import { buildApiUrl } from "@/lib/api-base";
 import { resolveUserAvatarUrl } from "@/lib/user-avatar";
+import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 
@@ -19,7 +21,7 @@ export const metadata: Metadata = {
     url: `${siteUrl}/nosotros`,
     title: "Nosotros | Nexara",
     description: "Personas detrás de la tecnología que sostiene tu operación.",
-    images: [{ url: "/logo-nexara.png", width: 1200, height: 630, alt: "Equipo Nexara" }],
+    images: [{ url: "/logo-nexara-lockup.png", width: 1200, height: 630, alt: "Equipo Nexara" }],
   },
 };
 
@@ -114,7 +116,13 @@ const fetchPublicExperts = async (): Promise<ExpertCard[]> => {
 };
 
 export default async function NosotrosPage() {
-  const expertos = await fetchPublicExperts();
+  const [expertos, visuals] = await Promise.all([
+    fetchPublicExperts(),
+    fetchPageVisuals("page_nosotros"),
+  ]);
+  const storyImg = visuals.slots[0];
+  const heroDesktop = resolvePageMediaUrl(visuals.heroDesktopUrl);
+  const heroMobile = resolvePageMediaUrl(visuals.heroMobileUrl || visuals.heroDesktopUrl);
 
   const aboutSchema = {
     "@context": "https://schema.org",
@@ -125,7 +133,7 @@ export default async function NosotrosPage() {
       "@type": "Organization",
       name: "NEXARA",
       url: siteUrl,
-      logo: `${siteUrl}/logo-nexara.png`,
+      logo: `${siteUrl}/logo-nexara-lockup.png`,
       description:
         "Integrador tecnológico en México: CCTV, redes, cómputo y soporte con disciplina de campo.",
     },
@@ -147,8 +155,9 @@ export default async function NosotrosPage() {
           </>
         }
         lead="Ingeniería y campo desde Puebla y CDMX. Diseñamos, instalamos y acompañamos — sin desaparecer después del go-live."
-        imageSrc="/images/hero/hero-05.png"
-        imageAlt="Equipo Nexara en campo"
+        imageSrc={heroDesktop}
+        imageSrcMobile={heroMobile}
+        imageAlt={visuals.heroAlt}
       />
 
       <section className={shared.section} data-reveal="up">
@@ -160,8 +169,6 @@ export default async function NosotrosPage() {
                 Operamos donde la tecnología{" "}
                 <span className={shared.sectionTitleAccent}>tiene que funcionar</span>
               </h2>
-            </div>
-            <div>
               <p className={styles.storyLead}>
                 Cerramos el hueco entre la propuesta y el lunes en el sitio: instalación con evidencia, soporte humano y criterio técnico.
               </p>
@@ -169,6 +176,19 @@ export default async function NosotrosPage() {
                 Base en Puebla y CDMX, cobertura nacional. CCTV, redes y cómputo bajo una sola responsabilidad — no una cadena de proveedores que se echan la pelota.
               </p>
             </div>
+            {storyImg?.desktopUrl ? (
+              <div className={styles.storyMedia}>
+                <EditorialImage
+                  desktopUrl={storyImg.desktopUrl}
+                  mobileUrl={storyImg.mobileUrl}
+                  alt={storyImg.alt}
+                  caption={storyImg.caption}
+                  layout={storyImg.layout}
+                  objectPosition={storyImg.objectPosition}
+                  compose="solo"
+                />
+              </div>
+            ) : null}
           </div>
         </div>
       </section>

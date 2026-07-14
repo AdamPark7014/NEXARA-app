@@ -3,18 +3,15 @@
  * ------------------------------------------
  * Consume `apps/api/src/hero-video/hero-video.controller.ts`.
  *
- * Endpoints:
- *   GET    /hero-video/public   ← público (sitio web), null si no hay video activo
- *   GET    /hero-video          ← admin (registro actual, si existe)
- *   POST   /hero-video          ← admin (multipart con `video`; reemplaza el anterior)
- *   PATCH  /hero-video/:id      ← admin (título / isActive)
- *   DELETE /hero-video/:id      ← admin
+ * `videoUrl` = desktop (obligatorio / lo que había antes).
+ * `videoUrlMobile` = móvil opcional; si falta, el sitio usa desktop.
  */
 import { buildApiUrl } from "@/lib/api-base";
 
 export type HeroVideo = {
   id: number;
   videoUrl: string;
+  videoUrlMobile: string | null;
   posterUrl: string | null;
   title: string | null;
   isActive: boolean;
@@ -75,11 +72,20 @@ export const getHeroVideo = (token: string): Promise<HeroVideo | null> =>
 
 export const uploadHeroVideo = (
   token: string,
-  payload: { title?: string; file: File },
+  payload: {
+    title?: string;
+    /** Video desktop (formato principal). */
+    file?: File;
+    /** Video móvil opcional. */
+    fileMobile?: File;
+    clearMobile?: boolean;
+  },
 ): Promise<HeroVideo> => {
   const form = new FormData();
-  form.append("video", payload.file);
+  if (payload.file) form.append("video", payload.file);
+  if (payload.fileMobile) form.append("videoMobile", payload.fileMobile);
   if (payload.title) form.append("title", payload.title);
+  if (payload.clearMobile) form.append("clearMobile", "true");
   return apiFetch("hero-video", token, { method: "POST", body: form });
 };
 

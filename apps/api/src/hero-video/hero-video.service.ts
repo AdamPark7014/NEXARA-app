@@ -45,30 +45,91 @@ export class HeroVideoService {
 
   // ── Escritura ──────────────────────────────────────────────────────
 
-  /** Sube (o reemplaza) el video del hero. Es un singleton lógico: el
-   *  registro y archivo previos se eliminan al confirmar el nuevo. */
-  async upload(title: string | undefined, file?: MulterFile) {
-    if (!file) {
-      throw new BadRequestException('Debes subir un archivo de video.');
+  /**
+   * Sube / actualiza el video del hero.
+   * - `video` = desktop (obligatorio si aún no hay registro).
+   * - `videoMobile` = móvil (opcional).
+   * - `clearMobile` = quita la variante móvil y conserva el desktop.
+   */
+  async upsert(opts: {
+    title?: string;
+    video?: MulterFile;
+    videoMobile?: MulterFile;
+    clearMobile?: boolean;
+  }) {
+    const previous = await this.adminCurrent();
+    const { video, videoMobile, clearMobile, title } = opts;
+
+    if (!previous && !video) {
+      throw new BadRequestException(
+        'Debes subir el video desktop (formato principal).',
+      );
     }
 
-    const videoUrl = await this.saveVideo(file);
-    const previous = await this.adminCurrent();
+    if (!video && !videoMobile && !clearMobile && title === undefined) {
+      throw new BadRequestException(
+        'No hay cambios: sube desktop, móvil o un título.',
+      );
+    }
+
+    // Solo actualizar móvil / título sobre el registro existente
+    if (previous && !video) {
+      let videoUrlMobile = previous.videoUrlMobile;
+      if (clearMobile) {
+        await this.deleteVideoFile(previous.videoUrlMobile);
+        videoUrlMobile = null;
+      } else if (videoMobile) {
+        const nextMobile = await this.saveVideo(videoMobile);
+        await this.deleteVideoFile(previous.videoUrlMobile);
+        videoUrlMobile = nextMobile;
+      }
+
+      return this.prisma.heroVideo.update({
+        where: { id: previous.id },
+        data: {
+          videoUrlMobile,
+          title:
+            title !== undefined ? title.trim() || null : undefined,
+        },
+      });
+    }
+
+    // Desktop nuevo (crea o reemplaza singleton)
+    const videoUrl = video
+      ? await this.saveVideo(video)
+      : previous!.videoUrl;
+
+    let videoUrlMobile: string | null =
+      previous?.videoUrlMobile ?? null;
+    if (clearMobile) {
+      await this.deleteVideoFile(previous?.videoUrlMobile);
+      videoUrlMobile = null;
+    } else if (videoMobile) {
+      videoUrlMobile = await this.saveVideo(videoMobile);
+      await this.deleteVideoFile(previous?.videoUrlMobile);
+    }
 
     const created = await this.prisma.heroVideo.create({
       data: {
         videoUrl,
-        title: title?.trim() || null,
+        videoUrlMobile,
+        title: title?.trim() || previous?.title || null,
         isActive: true,
       },
     });
 
     if (previous) {
       await this.prisma.heroVideo.delete({ where: { id: previous.id } });
-      await this.deleteVideoFile(previous.videoUrl);
+      if (video) await this.deleteVideoFile(previous.videoUrl);
+      // mobile ya se gestionó arriba si se reemplazó
     }
 
     return created;
+  }
+
+  /** @deprecated Prefer upsert — mantenido por compatibilidad. */
+  async upload(title: string | undefined, file?: MulterFile) {
+    return this.upsert({ title, video: file });
   }
 
   async update(id: number, payload: UpdateHeroVideoDto) {
@@ -76,7 +137,10 @@ export class HeroVideoService {
     return this.prisma.heroVideo.update({
       where: { id },
       data: {
-        title: payload.title !== undefined ? payload.title?.trim() || null : undefined,
+        title:
+          payload.title !== undefined
+            ? payload.title?.trim() || null
+            : undefined,
         isActive: payload.isActive ?? undefined,
       },
     });
@@ -86,6 +150,7 @@ export class HeroVideoService {
     const existing = await this.findOne(id);
     await this.prisma.heroVideo.delete({ where: { id } });
     await this.deleteVideoFile(existing.videoUrl);
+    await this.deleteVideoFile(existing.videoUrlMobile);
   }
 
   // ── Utilidades ─────────────────────────────────────────────────────
@@ -109,16 +174,20 @@ export class HeroVideoService {
     }
   }
 
-  private async deleteVideoFile(videoUrl: string | null): Promise<void> {
+  private async deleteVideoFile(videoUrl: string | null | undefined): Promise<void> {
     if (!videoUrl) return;
     const localPrefix = '/hero-video/stream/';
     if (!videoUrl.startsWith(localPrefix)) return;
     try {
       const filename = videoUrl.slice(localPrefix.length);
-      const filepath = path.resolve(process.cwd(), './uploads/hero-video', filename);
+      const filepath = path.resolve(
+        process.cwd(),
+        './uploads/hero-video',
+        filename,
+      );
       await fs.unlink(filepath);
     } catch {
-      // Si el archivo ya no existe no es un error crítico
+      // ignore
     }
   }
 }

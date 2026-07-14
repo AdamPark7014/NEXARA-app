@@ -108,10 +108,18 @@
   }
 
   .featuredMedia {
-    min-height: 220px;
+    min-height: 200px;
   }
 
   .postRow {
-    grid-template-columns: 3rem minmax(0, 1fr);
+    grid-template-columns: 2.75rem minmax(0, 1fr);
+    gap: 12px;
+    padding: 18px 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .postRow {
+    grid-template-columns: 1fr;
   }
 }

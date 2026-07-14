@@ -2,7 +2,9 @@ import React from "react";
 import Link from "next/link";
 import shared from "../_shared/public.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
+import EditorialImage from "../../components/EditorialImage";
 import heroStyles from "../../components/PublicPageHero.module.css";
+import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
 
 export const metadata = {
   title: "Servicios | Nexara — CCTV, redes, cómputo y soporte",
@@ -45,7 +47,12 @@ const servicios = [
   },
 ];
 
-export default function ServiciosPage() {
+export default async function ServiciosPage() {
+  const visuals = await fetchPageVisuals("page_servicios");
+  const mid = visuals.slots[0];
+  const heroDesktop = resolvePageMediaUrl(visuals.heroDesktopUrl);
+  const heroMobile = resolvePageMediaUrl(visuals.heroMobileUrl || visuals.heroDesktopUrl);
+
   return (
     <main className={`${shared.page} home-main-flush`}>
       <PublicPageHero
@@ -57,8 +64,9 @@ export default function ServiciosPage() {
           </>
         }
         lead="CCTV, redes, cómputo, soporte y software — instalados con criterio de campo y acompañados después del go-live."
-        imageSrc="/images/hero/hero-08.png"
-        imageAlt="Centro de monitoreo Nexara"
+        imageSrc={heroDesktop}
+        imageSrcMobile={heroMobile}
+        imageAlt={visuals.heroAlt}
       />
 
       <section className={shared.section} data-reveal="up">
@@ -76,7 +84,7 @@ export default function ServiciosPage() {
             </nav>
 
             <div className={shared.serviceDetail} data-reveal-stagger>
-              {servicios.map((s) => (
+              {servicios.slice(0, 3).map((s) => (
                 <article key={s.id} id={s.id} className={shared.serviceBlock} data-reveal="up">
                   <h2 className={shared.serviceBlockTitle}>{s.title}</h2>
                   <p className={shared.serviceBlockText}>{s.text}</p>
@@ -88,6 +96,45 @@ export default function ServiciosPage() {
                 </article>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      {mid?.desktopUrl ? (
+        <section className={`${shared.sectionTight} ${shared.sectionDivider}`} data-reveal="up" aria-label="Campo">
+          <div className={shared.inner}>
+            <EditorialImage
+              desktopUrl={mid.desktopUrl}
+              mobileUrl={mid.mobileUrl}
+              alt={mid.alt}
+              caption={
+                mid.caption ||
+                "Documentamos, instalamos y dejamos operable — con evidencia, no solo con promesas."
+              }
+              kicker="Mitad del alcance"
+              title="Del índice a la línea de servicio"
+              layout={mid.layout === "bleed_cinema" || mid.layout === "bleed_landscape" ? "inset_offset" : mid.layout}
+              objectPosition={mid.objectPosition}
+              compose="split"
+            />
+          </div>
+        </section>
+      ) : null}
+
+      <section className={shared.section} data-reveal="up">
+        <div className={shared.inner}>
+          <div className={shared.serviceDetail} data-reveal-stagger>
+            {servicios.slice(3).map((s) => (
+              <article key={s.id} id={s.id} className={shared.serviceBlock} data-reveal="up">
+                <h2 className={shared.serviceBlockTitle}>{s.title}</h2>
+                <p className={shared.serviceBlockText}>{s.text}</p>
+                <ul className={shared.servicePoints}>
+                  {s.points.map((pt) => (
+                    <li key={pt}>{pt}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
           </div>
         </div>
       </section>

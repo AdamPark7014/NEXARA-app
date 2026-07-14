@@ -74,9 +74,9 @@
 
 .logoLockup {
 	display: block;
-	height: clamp(36px, 4.6vw, 48px);
+	height: clamp(34px, 4.4vw, 46px);
 	width: auto;
-	max-width: min(240px, 52vw);
+	max-width: min(220px, 58vw);
 	object-fit: contain;
 	object-position: left center;
 }
@@ -395,6 +395,17 @@
 	.headerInner {
 		grid-template-columns: auto 1fr auto;
 		gap: 0.6rem;
+		padding-inline: clamp(14px, 3vw, 22px);
+	}
+
+	.logoLockup {
+		height: 34px;
+		max-width: min(168px, 46vw);
+	}
+
+	.contactCta {
+		padding: 9px 12px;
+		font-size: 0.82rem;
 	}
 
 	.navLinks {
@@ -425,6 +436,17 @@
 @media (max-width: 640px) {
 	.headerInner {
 		min-height: 66px;
+		gap: 0.5rem;
+	}
+
+	.logoLockup {
+		height: 30px;
+		max-width: min(148px, 42vw);
+	}
+
+	.contactCta {
+		padding: 8px 10px;
+		font-size: 0.78rem;
 	}
 
 	.logoWordmark {

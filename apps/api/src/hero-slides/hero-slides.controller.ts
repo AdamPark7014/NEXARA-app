@@ -11,12 +11,12 @@ import {
   Post,
   Put,
   Res,
-  UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -96,25 +96,50 @@ export class HeroSlidesController {
 
   @Post()
   @UseGuards(AuthGuard('jwt'))
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'image', maxCount: 1 },
+      { name: 'imageMobile', maxCount: 1 },
+    ]),
+  )
   create(
     @Body() payload: CreateHeroSlideDto,
-    @UploadedFile() file?: MulterFile,
+    @UploadedFiles()
+    files?: { image?: MulterFile[]; imageMobile?: MulterFile[] },
   ) {
-    this.assertValidImage(file);
-    return this.heroSlidesService.create(payload, file);
+    const image = files?.image?.[0];
+    const imageMobile = files?.imageMobile?.[0];
+    this.assertValidImage(image, false);
+    this.assertValidImage(imageMobile, false);
+    return this.heroSlidesService.create(payload, { image, imageMobile });
   }
 
   @Put(':id')
   @UseGuards(AuthGuard('jwt'))
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'image', maxCount: 1 },
+      { name: 'imageMobile', maxCount: 1 },
+    ]),
+  )
   update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() payload: UpdateHeroSlideDto,
-    @UploadedFile() file?: MulterFile,
+    @Body() payload: UpdateHeroSlideDto & { clearMobile?: string },
+    @UploadedFiles()
+    files?: { image?: MulterFile[]; imageMobile?: MulterFile[] },
   ) {
-    this.assertValidImage(file);
-    return this.heroSlidesService.update(id, payload, file);
+    const image = files?.image?.[0];
+    const imageMobile = files?.imageMobile?.[0];
+    this.assertValidImage(image, false);
+    this.assertValidImage(imageMobile, false);
+    const clearMobile =
+      payload.clearMobile === 'true' || payload.clearMobile === '1';
+    return this.heroSlidesService.update(
+      id,
+      payload,
+      { image, imageMobile },
+      { clearMobile },
+    );
   }
 
   @Patch('reorder')
@@ -131,8 +156,13 @@ export class HeroSlidesController {
 
   // ── Validación común ───────────────────────────────────────────────
 
-  private assertValidImage(file?: MulterFile) {
-    if (!file) return;
+  private assertValidImage(file?: MulterFile, required = false) {
+    if (!file) {
+      if (required) {
+        throw new BadRequestException('Selecciona la imagen desktop.');
+      }
+      return;
+    }
     const maxSize = parseInt(process.env['MAX_FILE_SIZE'] || '5242880', 10);
     if (!ALLOWED_MIME.includes(file.mimetype) || file.size > maxSize) {
       throw new BadRequestException(

@@ -4,12 +4,9 @@
  * Consume `apps/api/src/page-content/`.
  *
  * Endpoints:
- *   GET /studio/page-content/:section  → contenido de una sección
- *   PUT /studio/page-content/:section  → guardar (Studio, requiere token)
- *
- * Se usa en dos contextos:
- *   1. Server Component (Next.js) → fetch con revalidación
- *   2. Studio editor (client)     → fetch autenticado
+ *   GET  /studio/page-content/:section  → contenido de una sección
+ *   PUT  /studio/page-content/:section  → guardar (Studio, requiere token)
+ *   POST /studio/page-content/media     → subir imagen de página
  */
 
 import { buildApiUrl } from "@/lib/api-base";
@@ -22,7 +19,19 @@ export type HomeSection =
   | "home_servicios"
   | "home_proceso"
   | "home_industrias"
-  | "home_cta";
+  | "home_cta"
+  | "page_home"
+  | "page_servicios"
+  | "page_soluciones"
+  | "page_nosotros"
+  | "page_contacto";
+
+export type PageVisualSection =
+  | "page_home"
+  | "page_servicios"
+  | "page_soluciones"
+  | "page_nosotros"
+  | "page_contacto";
 
 export interface PageContentRow {
   id: number;
@@ -66,6 +75,98 @@ export interface CtaContent {
   primaryHref: string;
   secondaryLabel: string;
   secondaryHref: string;
+}
+
+/** Slot de imagen editable (desktop + móvil) dentro de una página pública. */
+export type PageImageLayout =
+  | "bleed_cinema"       // full-bleed, franja cinematográfica baja
+  | "bleed_landscape"    // full-bleed, paisaje alto
+  | "framed_wide"        // contenida 16:9
+  | "framed_square"      // contenida 1:1
+  | "portrait_featured"  // vertical editorial (columna historia)
+  | "aside_compact"      // compacta lateral (contacto)
+  | "inset_offset";      // ancha pero no full-bleed, con offset
+
+export type PageImagePosition = "center" | "left" | "right" | "top" | "bottom";
+
+export interface PageImageSlot {
+  id: string;
+  /** Etiqueta en Studio (ej. "Banda capacidades"). */
+  label: string;
+  desktopUrl: string;
+  mobileUrl: string;
+  alt: string;
+  caption: string;
+  /** Cómo se acomoda y dimensiona en la página. */
+  layout: PageImageLayout;
+  /** Encuadre del crop (object-position). */
+  objectPosition?: PageImagePosition;
+}
+
+/** Specs de layout para Studio (medidas recomendadas al subir). */
+export const PAGE_IMAGE_LAYOUTS: Record<
+  PageImageLayout,
+  {
+    label: string;
+    hint: string;
+    desktop: { width: number; height: number; ratio: string };
+    mobile: { width: number; height: number; ratio: string };
+  }
+> = {
+  bleed_cinema: {
+    label: "Franja cinema (full-bleed)",
+    hint: "Banda ancha y baja, de borde a borde. Ideal entre secciones.",
+    desktop: { width: 2400, height: 720, ratio: "10:3" },
+    mobile: { width: 1080, height: 720, ratio: "3:2" },
+  },
+  bleed_landscape: {
+    label: "Paisaje full-bleed",
+    hint: "Imagen ancha de borde a borde, más alta que la franja cinema.",
+    desktop: { width: 1920, height: 900, ratio: "32:15" },
+    mobile: { width: 1080, height: 900, ratio: "6:5" },
+  },
+  framed_wide: {
+    label: "Editorial ancha (contenida)",
+    hint: "Dentro del ancho de contenido, proporción ~16:9.",
+    desktop: { width: 1600, height: 900, ratio: "16:9" },
+    mobile: { width: 1080, height: 720, ratio: "3:2" },
+  },
+  framed_square: {
+    label: "Cuadrada contenida",
+    hint: "Acento 1:1 centrado o en grid.",
+    desktop: { width: 1200, height: 1200, ratio: "1:1" },
+    mobile: { width: 1080, height: 1080, ratio: "1:1" },
+  },
+  portrait_featured: {
+    label: "Retrato editorial",
+    hint: "Vertical para columnas tipo historia / equipo. Desktop 3:4.",
+    desktop: { width: 900, height: 1200, ratio: "3:4" },
+    mobile: { width: 1080, height: 1350, ratio: "4:5" },
+  },
+  aside_compact: {
+    label: "Compacta lateral",
+    hint: "Pequeña, junto a formularios o asides. 4:5.",
+    desktop: { width: 720, height: 900, ratio: "4:5" },
+    mobile: { width: 1080, height: 810, ratio: "4:3" },
+  },
+  inset_offset: {
+    label: "Inset con offset",
+    hint: "Ancha pero no full-bleed; deja aire a un lado (editoriales).",
+    desktop: { width: 1400, height: 800, ratio: "7:4" },
+    mobile: { width: 1080, height: 720, ratio: "3:2" },
+  },
+};
+
+export const PAGE_IMAGE_LAYOUT_OPTIONS = Object.entries(PAGE_IMAGE_LAYOUTS).map(
+  ([id, meta]) => ({ id: id as PageImageLayout, ...meta }),
+);
+
+/** Visuales de una página pública (hero + slots estratégicos). */
+export interface PageVisualsContent {
+  heroDesktopUrl: string;
+  heroMobileUrl: string;
+  heroAlt: string;
+  slots: PageImageSlot[];
 }
 
 // ── Defaults (fallback cuando la DB aún no tiene contenido) ──────────────────
@@ -157,6 +258,168 @@ export const DEFAULT_CTA: CtaContent = {
   secondaryHref: "/servicios",
 };
 
+export const DEFAULT_PAGE_VISUALS: Record<PageVisualSection, PageVisualsContent> = {
+  page_home: {
+    heroDesktopUrl: "",
+    heroMobileUrl: "",
+    heroAlt: "Nexara",
+    slots: [
+      {
+        id: "home_band_capabilities",
+        label: "Franja cinema tras capacidades",
+        desktopUrl: "/images/hero/hero-06.png",
+        mobileUrl: "",
+        alt: "Instalación Nexara en sitio",
+        caption: "",
+        layout: "bleed_cinema",
+        objectPosition: "center",
+      },
+      {
+        id: "home_band_industrias",
+        label: "Paisaje antes de industrias",
+        desktopUrl: "/images/hero/hero-04.png",
+        mobileUrl: "",
+        alt: "Operación tecnológica Nexara",
+        caption: "",
+        layout: "bleed_landscape",
+        objectPosition: "top",
+      },
+    ],
+  },
+  page_servicios: {
+    heroDesktopUrl: "/images/hero/hero-08.png",
+    heroMobileUrl: "",
+    heroAlt: "Centro de monitoreo Nexara",
+    slots: [
+      {
+        id: "servicios_mid",
+        label: "Inset editorial (mitad de página)",
+        desktopUrl: "/images/hero/hero-02.png",
+        mobileUrl: "",
+        alt: "Redes e infraestructura Nexara",
+        caption: "De la cobertura al soporte — una sola firma.",
+        layout: "inset_offset",
+        objectPosition: "left",
+      },
+    ],
+  },
+  page_soluciones: {
+    heroDesktopUrl: "/images/hero/hero-03.png",
+    heroMobileUrl: "",
+    heroAlt: "Técnico Nexara en instalación",
+    slots: [
+      {
+        id: "soluciones_mid",
+        label: "Franja cinema antes del CTA",
+        desktopUrl: "/images/hero/hero-07.png",
+        mobileUrl: "",
+        alt: "Soluciones por industria",
+        caption: "Cada vertical con su riesgo típico.",
+        layout: "bleed_cinema",
+        objectPosition: "center",
+      },
+    ],
+  },
+  page_nosotros: {
+    heroDesktopUrl: "/images/hero/hero-05.png",
+    heroMobileUrl: "",
+    heroAlt: "Equipo Nexara en campo",
+    slots: [
+      {
+        id: "nosotros_story",
+        label: "Retrato junto a la historia",
+        desktopUrl: "/images/hero/hero-02.png",
+        mobileUrl: "",
+        alt: "Equipo de campo Nexara",
+        caption: "",
+        layout: "portrait_featured",
+        objectPosition: "center",
+      },
+    ],
+  },
+  page_contacto: {
+    heroDesktopUrl: "/images/hero/hero-01.png",
+    heroMobileUrl: "",
+    heroAlt: "Infraestructura Nexara",
+    slots: [
+      {
+        id: "contacto_aside",
+        label: "Compacta junto al formulario",
+        desktopUrl: "/images/hero/hero-04.png",
+        mobileUrl: "",
+        alt: "Oficina y operación Nexara",
+        caption: "",
+        layout: "aside_compact",
+        objectPosition: "center",
+      },
+    ],
+  },
+};
+
+// ── Helpers de URL ───────────────────────────────────────────────────────────
+
+/** Resuelve URL de media de página (API relativa, /images/… o absoluta). */
+export function resolvePageMediaUrl(url: string): string {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith("/images/")) return url;
+  return buildApiUrl(url.replace(/^\//, ""));
+}
+
+export function mergePageVisuals(
+  section: PageVisualSection,
+  stored: Partial<PageVisualsContent> | null | undefined,
+): PageVisualsContent {
+  const defaults = DEFAULT_PAGE_VISUALS[section];
+  if (!stored) return structuredClone(defaults);
+
+  const defaultSlots = defaults.slots;
+  const storedSlots = Array.isArray(stored.slots) ? stored.slots : [];
+  const byId = new Map(storedSlots.map((s) => [s.id, s]));
+
+  const slots = defaultSlots.map((d) => {
+    const s = byId.get(d.id);
+    if (!s) return { ...d };
+    return normalizeSlot({ ...d, ...s, id: d.id });
+  });
+
+  // Conserva slots extra que el editor haya añadido
+  for (const s of storedSlots) {
+    if (!slots.some((x) => x.id === s.id)) {
+      slots.push(normalizeSlot(s));
+    }
+  }
+
+  return {
+    heroDesktopUrl: stored.heroDesktopUrl ?? defaults.heroDesktopUrl,
+    heroMobileUrl: stored.heroMobileUrl ?? defaults.heroMobileUrl,
+    heroAlt: stored.heroAlt ?? defaults.heroAlt,
+    slots,
+  };
+}
+
+function normalizeSlot(s: Partial<PageImageSlot> & { id?: string }): PageImageSlot {
+  const layout =
+    s.layout && s.layout in PAGE_IMAGE_LAYOUTS
+      ? s.layout
+      : ("framed_wide" as PageImageLayout);
+  const objectPosition =
+    s.objectPosition &&
+    ["center", "left", "right", "top", "bottom"].includes(s.objectPosition)
+      ? s.objectPosition
+      : "center";
+  return {
+    id: s.id || `slot_${Date.now()}`,
+    label: s.label || s.id || "Slot",
+    desktopUrl: s.desktopUrl || "",
+    mobileUrl: s.mobileUrl || "",
+    alt: s.alt || "",
+    caption: s.caption || "",
+    layout,
+    objectPosition,
+  };
+}
+
 // ── Fetch server-side (Next.js Server Component) ─────────────────────────────
 
 /**
@@ -178,6 +441,13 @@ export async function fetchPageSection<T = Record<string, unknown>>(
   } catch {
     return null;
   }
+}
+
+export async function fetchPageVisuals(
+  section: PageVisualSection,
+): Promise<PageVisualsContent> {
+  const stored = await fetchPageSection<Partial<PageVisualsContent>>(section);
+  return mergePageVisuals(section, stored);
 }
 
 // ── Fetch cliente (Studio) ───────────────────────────────────────────────────
@@ -208,6 +478,24 @@ export async function savePageSection(
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ content, updatedBy }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Error ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
+export async function uploadPageMedia(
+  token: string,
+  file: File,
+): Promise<{ url: string }> {
+  const form = new FormData();
+  form.append("image", file);
+  const res = await fetch(buildApiUrl("studio/page-content/media"), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");

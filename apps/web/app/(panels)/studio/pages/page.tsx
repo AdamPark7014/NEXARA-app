@@ -2,7 +2,9 @@
 
 /**
  * Studio · Editor de contenido del sitio público (/studio/pages)
- * Permite al diseñador editar: Métricas, Servicios, Proceso, Industrias, CTA
+ * Permite al diseñador editar:
+ * - Textos: Métricas, Servicios, Proceso, Industrias, CTA
+ * - Imágenes: hero y slots de Inicio, Servicios, Soluciones, Nosotros, Contacto
  * Guarda en: PUT /api/studio/page-content/:section
  */
 
@@ -12,27 +14,44 @@ import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import KpiCard from "@/components/ui/KpiCard";
+import StudioFileInput from "@/components/studio/StudioFileInput";
 import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { toast } from "@/components/Toast";
 import {
+  STUDIO_IMAGE_SPECS,
+  studioImageHintLine,
+} from "@/lib/studio-image-specs";
+import {
   getPageSection,
   savePageSection,
+  uploadPageMedia,
+  resolvePageMediaUrl,
+  mergePageVisuals,
   DEFAULT_METRICAS,
   DEFAULT_SERVICIOS,
   DEFAULT_PROCESO,
   DEFAULT_INDUSTRIAS,
   DEFAULT_CTA,
+  DEFAULT_PAGE_VISUALS,
+  PAGE_IMAGE_LAYOUTS,
+  PAGE_IMAGE_LAYOUT_OPTIONS,
   type MetricaItem,
   type ServicioItem,
   type ProcesoItem,
   type CtaContent,
   type HomeSection,
+  type PageVisualSection,
+  type PageVisualsContent,
+  type PageImageSlot,
+  type PageImageLayout,
+  type PageImagePosition,
 } from "@/lib/page-content-api";
 
-type ActiveTab = "metricas" | "servicios" | "proceso" | "industrias" | "cta";
+type EditorMode = "textos" | "imagenes";
+type ActiveTextTab = "metricas" | "servicios" | "proceso" | "industrias" | "cta";
 
-const TABS: { id: ActiveTab; label: string; section: HomeSection }[] = [
+const TEXT_TABS: { id: ActiveTextTab; label: string; section: HomeSection }[] = [
   { id: "metricas",   label: "Metricas",   section: "home_metricas"   },
   { id: "servicios",  label: "Servicios",  section: "home_servicios"  },
   { id: "proceso",    label: "Proceso",    section: "home_proceso"    },
@@ -40,12 +59,54 @@ const TABS: { id: ActiveTab; label: string; section: HomeSection }[] = [
   { id: "cta",        label: "CTA Final",  section: "home_cta"        },
 ];
 
+const VISUAL_TABS: { id: PageVisualSection; label: string; path: string }[] = [
+  { id: "page_home",      label: "Inicio",     path: "/"          },
+  { id: "page_servicios", label: "Servicios",  path: "/servicios" },
+  { id: "page_soluciones",label: "Soluciones", path: "/soluciones"},
+  { id: "page_nosotros",  label: "Nosotros",   path: "/nosotros"  },
+  { id: "page_contacto",  label: "Contacto",   path: "/contacto"  },
+];
+
+const PAGE_VISUAL_SECTIONS: PageVisualSection[] = VISUAL_TABS.map((t) => t.id);
+
+function newSlotId(): string {
+  return `slot_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function ImagePreview({ url, alt }: { url: string; alt?: string }) {
+  const src = resolvePageMediaUrl(url);
+  if (!src) return null;
+  return (
+    <div
+      style={{
+        marginTop: 8,
+        borderRadius: 10,
+        overflow: "hidden",
+        border: "1px solid var(--border)",
+        background: "var(--surface-elevated, var(--surface))",
+        maxWidth: 360,
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt || "Vista previa"}
+        style={{ display: "block", width: "100%", maxHeight: 200, objectFit: "cover" }}
+      />
+    </div>
+  );
+}
+
 export default function StudioPagesPage() {
   const { user, isContextReady } = useUser();
   const cfg = useMemo(() => getStudioSectionConfig(user, "pages"), [user]);
   const token = user?.token ?? "";
-  const [activeTab, setActiveTab] = useState<ActiveTab>("metricas");
+
+  const [mode, setMode] = useState<EditorMode>("textos");
+  const [activeTextTab, setActiveTextTab] = useState<ActiveTextTab>("metricas");
+  const [activeVisualTab, setActiveVisualTab] = useState<PageVisualSection>("page_home");
   const [saving, setSaving] = useState(false);
+  const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
   const [metricas, setMetricas]     = useState<MetricaItem[]>(DEFAULT_METRICAS);
@@ -53,8 +114,14 @@ export default function StudioPagesPage() {
   const [proceso, setProceso]       = useState<ProcesoItem[]>(DEFAULT_PROCESO);
   const [industrias, setIndustrias] = useState<string[]>(DEFAULT_INDUSTRIAS);
   const [cta, setCta]               = useState<CtaContent>(DEFAULT_CTA);
+  const [visuals, setVisuals]       = useState<Record<PageVisualSection, PageVisualsContent>>(
+    () => structuredClone(DEFAULT_PAGE_VISUALS),
+  );
 
-  const loadAll = useCallback(async () => {
+  const activeVisual = visuals[activeVisualTab];
+  const activeVisualMeta = VISUAL_TABS.find((t) => t.id === activeVisualTab)!;
+
+  const loadTextContent = useCallback(async () => {
     if (!token) return;
     const [m, s, p, i, c] = await Promise.allSettled([
       getPageSection("home_metricas",   token),
@@ -70,20 +137,87 @@ export default function StudioPagesPage() {
     if (c.status === "fulfilled" && c.value?.content) setCta(c.value.content as unknown as CtaContent);
   }, [token]);
 
-  useEffect(() => { if (isContextReady && token) loadAll(); }, [isContextReady, token, loadAll]);
+  const loadVisualContent = useCallback(async () => {
+    if (!token) return;
+    const results = await Promise.allSettled(
+      PAGE_VISUAL_SECTIONS.map((section) => getPageSection(section, token)),
+    );
+    setVisuals((prev) => {
+      const next = { ...prev };
+      PAGE_VISUAL_SECTIONS.forEach((section, idx) => {
+        const row = results[idx];
+        const stored =
+          row.status === "fulfilled" && row.value?.content
+            ? (row.value.content as Partial<PageVisualsContent>)
+            : null;
+        next[section] = mergePageVisuals(section, stored);
+      });
+      return next;
+    });
+  }, [token]);
+
+  const loadAll = useCallback(async () => {
+    await Promise.all([loadTextContent(), loadVisualContent()]);
+  }, [loadTextContent, loadVisualContent]);
+
+  useEffect(() => {
+    if (isContextReady && token) loadAll();
+  }, [isContextReady, token, loadAll]);
+
+  const patchVisuals = (section: PageVisualSection, patch: Partial<PageVisualsContent>) => {
+    setVisuals((prev) => ({
+      ...prev,
+      [section]: { ...prev[section], ...patch },
+    }));
+  };
+
+  const updateSlot = (section: PageVisualSection, index: number, patch: Partial<PageImageSlot>) => {
+    setVisuals((prev) => {
+      const slots = [...prev[section].slots];
+      slots[index] = { ...slots[index], ...patch };
+      return { ...prev, [section]: { ...prev[section], slots } };
+    });
+  };
+
+  const handleUpload = async (
+    key: string,
+    file: File | null,
+    onUrl: (url: string) => void,
+  ) => {
+    if (!file) return;
+    if (!token) {
+      toast.error("Sesión no válida.");
+      return;
+    }
+    setUploadingKey(key);
+    try {
+      const { url } = await uploadPageMedia(token, file);
+      onUrl(url);
+      toast.success("Imagen subida.");
+    } catch (err) {
+      toast.error("Error al subir: " + (err as Error).message);
+    } finally {
+      setUploadingKey(null);
+    }
+  };
 
   const handleSave = async () => {
     if (!token) return;
     setSaving(true);
     try {
-      const tab = TABS.find((t) => t.id === activeTab)!;
-      let content: Record<string, unknown>;
-      if (activeTab === "metricas")        content = { items: metricas };
-      else if (activeTab === "servicios")  content = { items: servicios };
-      else if (activeTab === "proceso")    content = { items: proceso };
-      else if (activeTab === "industrias") content = { items: industrias };
-      else                                 content = cta as unknown as Record<string, unknown>;
-      await savePageSection(tab.section, content, token, user?.email ?? undefined);
+      if (mode === "textos") {
+        const tab = TEXT_TABS.find((t) => t.id === activeTextTab)!;
+        let content: Record<string, unknown>;
+        if (activeTextTab === "metricas")        content = { items: metricas };
+        else if (activeTextTab === "servicios")  content = { items: servicios };
+        else if (activeTextTab === "proceso")    content = { items: proceso };
+        else if (activeTextTab === "industrias") content = { items: industrias };
+        else                                     content = cta as unknown as Record<string, unknown>;
+        await savePageSection(tab.section, content, token, user?.email ?? undefined);
+      } else {
+        const content = visuals[activeVisualTab] as unknown as Record<string, unknown>;
+        await savePageSection(activeVisualTab, content, token, user?.email ?? undefined);
+      }
       const now = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
       setLastSaved(now);
       toast.success("Guardado. Cambios visibles en el sitio en ~5 min.");
@@ -92,6 +226,26 @@ export default function StudioPagesPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const addSlot = () => {
+    const slot: PageImageSlot = {
+      id: newSlotId(),
+      label: "Nuevo slot de imagen",
+      desktopUrl: "",
+      mobileUrl: "",
+      alt: "",
+      caption: "",
+      layout: "framed_wide",
+      objectPosition: "center",
+    };
+    patchVisuals(activeVisualTab, { slots: [...activeVisual.slots, slot] });
+  };
+
+  const removeSlot = (index: number) => {
+    patchVisuals(activeVisualTab, {
+      slots: activeVisual.slots.filter((_, i) => i !== index),
+    });
   };
 
   const card: React.CSSProperties = {
@@ -109,26 +263,56 @@ export default function StudioPagesPage() {
     color: "var(--text-primary)", fontSize: 13, fontFamily: "inherit",
     outline: "none", width: "100%", boxSizing: "border-box",
   };
+  const tabBtn = (active: boolean): React.CSSProperties => ({
+    padding: "8px 16px", borderRadius: 8,
+    border: "1px solid var(--border)",
+    background: active ? "var(--primary)" : "var(--surface)",
+    color: active ? "#fff" : "var(--text-primary)",
+    fontSize: 13, fontWeight: 500, cursor: "pointer",
+  });
+  const modeBtn = (active: boolean): React.CSSProperties => ({
+    padding: "10px 20px", borderRadius: 10,
+    border: active ? "2px solid var(--primary)" : "1px solid var(--border)",
+    background: active ? "color-mix(in srgb, var(--primary) 12%, var(--surface))" : "var(--surface)",
+    color: active ? "var(--primary)" : "var(--text-primary)",
+    fontSize: 14, fontWeight: 600, cursor: "pointer",
+  });
+
+  const totalVisualSlots = PAGE_VISUAL_SECTIONS.reduce(
+    (sum, section) => sum + visuals[section].slots.length,
+    0,
+  );
 
   return (
     <>
       <PageHeader
         eyebrow="STUDIO · Contenido"
         title={cfg.title}
-        subtitle={cfg.subtitle}
+        subtitle={
+          mode === "textos"
+            ? cfg.subtitle
+            : "Hero y bandas visuales de las páginas públicas. Sube variantes desktop (≥768 px) y móvil (<768 px) cuando quieras un encuadre distinto."
+        }
         variant="hero"
         meta={
           <>
             <Tag variant="positive" dot>Sitio en produccion</Tag>
             {lastSaved && <Tag variant="neutral">Guardado {lastSaved}</Tag>}
+            {uploadingKey && <Tag variant="neutral">Subiendo imagen…</Tag>}
           </>
         }
         actions={
           <>
-            <Button variant="secondary" iconLeft="Ver" onClick={() => window.open("/", "_blank")}>
-              Ver sitio
+            <Button
+              variant="secondary"
+              iconLeft="Ver"
+              onClick={() =>
+                window.open(mode === "imagenes" ? activeVisualMeta.path : "/", "_blank")
+              }
+            >
+              Ver pagina
             </Button>
-            <Button variant="primary" iconLeft="Guardar" onClick={handleSave} disabled={saving}>
+            <Button variant="primary" iconLeft="Guardar" onClick={handleSave} disabled={saving || !!uploadingKey}>
               {saving ? "Guardando..." : "Guardar seccion"}
             </Button>
           </>
@@ -136,13 +320,29 @@ export default function StudioPagesPage() {
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 16 }}>
-        <KpiCard label="Secciones del sitio" value={TABS.length} icon="📄" variant="accent" hint="Secciones editables" />
-        <KpiCard label="Métricas" value={metricas.length} icon="📊" hint="Números bajo el hero" />
-        <KpiCard label="Servicios" value={servicios.length} icon="⚙️" hint="Tarjetas de servicios" />
-        <KpiCard label="Pasos del proceso" value={proceso.length} icon="🔢" hint="Flujo de trabajo" />
+        {mode === "textos" ? (
+          <>
+            <KpiCard label="Secciones de texto" value={TEXT_TABS.length} icon="📄" variant="accent" hint="Bloques editables" />
+            <KpiCard label="Métricas" value={metricas.length} icon="📊" hint="Números bajo el hero" />
+            <KpiCard label="Servicios" value={servicios.length} icon="⚙️" hint="Tarjetas de servicios" />
+            <KpiCard label="Pasos del proceso" value={proceso.length} icon="🔢" hint="Flujo de trabajo" />
+          </>
+        ) : (
+          <>
+            <KpiCard label="Páginas visuales" value={VISUAL_TABS.length} icon="🖼️" variant="accent" hint="Hero + slots" />
+            <KpiCard label="Slots en esta página" value={activeVisual.slots.length} icon="📷" hint={activeVisualMeta.label} />
+            <KpiCard label="Slots totales" value={totalVisualSlots} icon="🗂️" hint="En las 5 páginas" />
+            <KpiCard
+              label="Hero desktop"
+              value={activeVisual.heroDesktopUrl ? "✓" : "—"}
+              icon="🖥️"
+              hint={studioImageHintLine(STUDIO_IMAGE_SPECS.pageHeroDesktop)}
+            />
+          </>
+        )}
       </div>
 
-      {(() => {
+      {mode === "textos" && (() => {
         const sections = [
           { label: "Métricas", count: metricas.length, color: "var(--primary)" },
           { label: "Servicios", count: servicios.length, color: "var(--success)" },
@@ -169,25 +369,46 @@ export default function StudioPagesPage() {
         );
       })()}
 
-      <div style={{ display: "flex", gap: 8, padding: "0 24px 4px", flexWrap: "wrap" }}>
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: "8px 16px", borderRadius: 8,
-              border: "1px solid var(--border)",
-              background: activeTab === tab.id ? "var(--primary)" : "var(--surface)",
-              color: activeTab === tab.id ? "#fff" : "var(--text-primary)",
-              fontSize: 13, fontWeight: 500, cursor: "pointer",
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div style={{ display: "flex", gap: 8, padding: "0 24px 12px", flexWrap: "wrap" }}>
+        <button type="button" onClick={() => setMode("textos")} style={modeBtn(mode === "textos")}>
+          Textos
+        </button>
+        <button type="button" onClick={() => setMode("imagenes")} style={modeBtn(mode === "imagenes")}>
+          Imágenes
+        </button>
       </div>
 
-      {activeTab === "metricas" && (
+      {mode === "textos" && (
+        <div style={{ display: "flex", gap: 8, padding: "0 24px 4px", flexWrap: "wrap" }}>
+          {TEXT_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTextTab(tab.id)}
+              style={tabBtn(activeTextTab === tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {mode === "imagenes" && (
+        <div style={{ display: "flex", gap: 8, padding: "0 24px 4px", flexWrap: "wrap" }}>
+          {VISUAL_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveVisualTab(tab.id)}
+              style={tabBtn(activeVisualTab === tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {mode === "textos" && activeTextTab === "metricas" && (
         <Section title="Metricas" subtitle="Los 4 numeros bajo el hero.">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
             {metricas.map((m, i) => (
@@ -202,7 +423,7 @@ export default function StudioPagesPage() {
         </Section>
       )}
 
-      {activeTab === "servicios" && (
+      {mode === "textos" && activeTextTab === "servicios" && (
         <Section title="Servicios" subtitle="Las 6 tarjetas de servicios.">
           <div style={{ display: "grid", gap: 14 }}>
             {servicios.map((s, i) => (
@@ -217,7 +438,7 @@ export default function StudioPagesPage() {
         </Section>
       )}
 
-      {activeTab === "proceso" && (
+      {mode === "textos" && activeTextTab === "proceso" && (
         <Section title="Proceso" subtitle="Los 4 pasos de como trabajamos.">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
             {proceso.map((p, i) => (
@@ -234,7 +455,7 @@ export default function StudioPagesPage() {
         </Section>
       )}
 
-      {activeTab === "industrias" && (
+      {mode === "textos" && activeTextTab === "industrias" && (
         <Section title="Industrias" subtitle="Los chips de sectores. Un nombre por linea.">
           <textarea
             style={{ ...inp, minHeight:180, resize:"vertical", fontSize:14 }}
@@ -249,7 +470,7 @@ export default function StudioPagesPage() {
         </Section>
       )}
 
-      {activeTab === "cta" && (
+      {mode === "textos" && activeTextTab === "cta" && (
         <Section title="CTA Final" subtitle="La banda al final de la pagina.">
           <div style={{ display:"grid", gap:10 }}>
             {(
@@ -270,6 +491,275 @@ export default function StudioPagesPage() {
                   onChange={(e) => setCta({ ...cta, [field]: e.target.value })} />
               </div>
             ))}
+          </div>
+        </Section>
+      )}
+
+      {mode === "imagenes" && (
+        <Section
+          title={`Imágenes · ${activeVisualMeta.label}`}
+          subtitle={`Página ${activeVisualMeta.path}. Desktop = pantallas anchas (≥768 px). Móvil = teléfonos (<768 px); si dejas móvil vacío, el sitio reutiliza la imagen desktop.`}
+        >
+          <div style={{ display: "grid", gap: 16 }}>
+            <div style={{ ...card, gap: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>Hero de página</div>
+              <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                Imagen full-bleed al inicio de la página. Sube o pega la URL de la variante <strong>desktop</strong> (horizontal, 16:9)
+                y, si quieres otro encuadre en teléfono, la variante <strong>móvil</strong> (más vertical).
+              </p>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
+                <div>
+                  <label style={lbl}>Hero desktop · URL</label>
+                  <input
+                    style={inp}
+                    value={activeVisual.heroDesktopUrl}
+                    onChange={(e) => patchVisuals(activeVisualTab, { heroDesktopUrl: e.target.value })}
+                    placeholder="/images/hero/… o URL del servidor"
+                  />
+                  <StudioFileInput
+                    spec={STUDIO_IMAGE_SPECS.pageHeroDesktop}
+                    label="Hero desktop · subir archivo"
+                    inputStyle={inp}
+                    onChange={(file) =>
+                      handleUpload(`${activeVisualTab}-hero-desktop`, file, (url) =>
+                        patchVisuals(activeVisualTab, { heroDesktopUrl: url }),
+                      )
+                    }
+                    onError={(msg) => toast.error(msg)}
+                  />
+                  <ImagePreview url={activeVisual.heroDesktopUrl} alt={activeVisual.heroAlt} />
+                </div>
+
+                <div>
+                  <label style={lbl}>Hero móvil · URL (opcional)</label>
+                  <input
+                    style={inp}
+                    value={activeVisual.heroMobileUrl}
+                    onChange={(e) => patchVisuals(activeVisualTab, { heroMobileUrl: e.target.value })}
+                    placeholder="Opcional — si está vacío se usa desktop"
+                  />
+                  <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+                    <div style={{ flex: "1 1 200px" }}>
+                      <StudioFileInput
+                        spec={STUDIO_IMAGE_SPECS.pageHeroMobile}
+                        label="Hero móvil · subir archivo"
+                        inputStyle={inp}
+                        onChange={(file) =>
+                          handleUpload(`${activeVisualTab}-hero-mobile`, file, (url) =>
+                            patchVisuals(activeVisualTab, { heroMobileUrl: url }),
+                          )
+                        }
+                        onError={(msg) => toast.error(msg)}
+                      />
+                    </div>
+                    {activeVisual.heroMobileUrl ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => patchVisuals(activeVisualTab, { heroMobileUrl: "" })}
+                      >
+                        Limpiar móvil
+                      </Button>
+                    ) : null}
+                  </div>
+                  <ImagePreview url={activeVisual.heroMobileUrl || activeVisual.heroDesktopUrl} alt={activeVisual.heroAlt} />
+                </div>
+              </div>
+
+              <div>
+                <label style={lbl}>Texto alternativo del hero (alt)</label>
+                <input
+                  style={inp}
+                  value={activeVisual.heroAlt}
+                  onChange={(e) => patchVisuals(activeVisualTab, { heroAlt: e.target.value })}
+                  placeholder="Descripción breve para accesibilidad y SEO"
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>Slots de imagen ({activeVisual.slots.length})</div>
+                <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--text-secondary)" }}>
+                  Cada slot tiene layout y medidas distintas. Elige el formato en Studio; el sitio respetará alto, proporciones y acomodo.
+                </p>
+              </div>
+              <Button variant="secondary" size="sm" onClick={addSlot}>
+                Añadir slot
+              </Button>
+            </div>
+
+            {activeVisual.slots.map((slot, i) => {
+              const layoutMeta = PAGE_IMAGE_LAYOUTS[slot.layout] || PAGE_IMAGE_LAYOUTS.framed_wide;
+              return (
+              <div key={slot.id} style={{ ...card, gap: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <label style={lbl}>Etiqueta del slot (solo Studio)</label>
+                    <input
+                      style={inp}
+                      value={slot.label}
+                      onChange={(e) => updateSlot(activeVisualTab, i, { label: e.target.value })}
+                    />
+                    <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>ID: {slot.id}</span>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => removeSlot(i)}>
+                    Eliminar slot
+                  </Button>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10 }}>
+                  <div>
+                    <label style={lbl}>Layout / acomodo en página</label>
+                    <select
+                      style={inp}
+                      value={slot.layout}
+                      onChange={(e) =>
+                        updateSlot(activeVisualTab, i, {
+                          layout: e.target.value as PageImageLayout,
+                        })
+                      }
+                    >
+                      {PAGE_IMAGE_LAYOUT_OPTIONS.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label} · {opt.desktop.ratio}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={lbl}>Encuadre (object-position)</label>
+                    <select
+                      style={inp}
+                      value={slot.objectPosition || "center"}
+                      onChange={(e) =>
+                        updateSlot(activeVisualTab, i, {
+                          objectPosition: e.target.value as PageImagePosition,
+                        })
+                      }
+                    >
+                      <option value="center">Centro</option>
+                      <option value="left">Izquierda</option>
+                      <option value="right">Derecha</option>
+                      <option value="top">Arriba</option>
+                      <option value="bottom">Abajo</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    background: "var(--surface-2, color-mix(in srgb, var(--primary) 6%, var(--surface)))",
+                    border: "1px solid var(--border)",
+                    fontSize: 12.5,
+                    lineHeight: 1.5,
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  <strong style={{ color: "var(--text-primary)" }}>{layoutMeta.label}</strong>
+                  {" — "}
+                  {layoutMeta.hint}
+                  <br />
+                  <span>
+                    Desktop recomendado: {layoutMeta.desktop.width}×{layoutMeta.desktop.height}px ({layoutMeta.desktop.ratio})
+                    {" · "}
+                    Móvil: {layoutMeta.mobile.width}×{layoutMeta.mobile.height}px ({layoutMeta.mobile.ratio})
+                  </span>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+                  <div>
+                    <label style={lbl}>
+                      Desktop · URL · {layoutMeta.desktop.width}×{layoutMeta.desktop.height}
+                    </label>
+                    <input
+                      style={inp}
+                      value={slot.desktopUrl}
+                      onChange={(e) => updateSlot(activeVisualTab, i, { desktopUrl: e.target.value })}
+                    />
+                    <StudioFileInput
+                      spec={{
+                        ...STUDIO_IMAGE_SPECS.pageEditorial,
+                        label: `Desktop · ${layoutMeta.label}`,
+                        width: layoutMeta.desktop.width,
+                        height: layoutMeta.desktop.height,
+                        ratio: layoutMeta.desktop.ratio,
+                        tip: layoutMeta.hint,
+                      }}
+                      label="Desktop · subir"
+                      inputStyle={inp}
+                      onChange={(file) =>
+                        handleUpload(`${activeVisualTab}-slot-${slot.id}-desktop`, file, (url) =>
+                          updateSlot(activeVisualTab, i, { desktopUrl: url }),
+                        )
+                      }
+                      onError={(msg) => toast.error(msg)}
+                    />
+                    <ImagePreview url={slot.desktopUrl} alt={slot.alt} />
+                  </div>
+
+                  <div>
+                    <label style={lbl}>
+                      Móvil · URL (opcional) · {layoutMeta.mobile.width}×{layoutMeta.mobile.height}
+                    </label>
+                    <input
+                      style={inp}
+                      value={slot.mobileUrl}
+                      onChange={(e) => updateSlot(activeVisualTab, i, { mobileUrl: e.target.value })}
+                      placeholder="Opcional — si está vacío se usa desktop"
+                    />
+                    <StudioFileInput
+                      spec={{
+                        ...STUDIO_IMAGE_SPECS.pageEditorial,
+                        label: `Móvil · ${layoutMeta.label}`,
+                        width: layoutMeta.mobile.width,
+                        height: layoutMeta.mobile.height,
+                        ratio: layoutMeta.mobile.ratio,
+                        tip: "Opcional. Sin móvil se usa la variante desktop.",
+                      }}
+                      label="Móvil · subir"
+                      inputStyle={inp}
+                      onChange={(file) =>
+                        handleUpload(`${activeVisualTab}-slot-${slot.id}-mobile`, file, (url) =>
+                          updateSlot(activeVisualTab, i, { mobileUrl: url }),
+                        )
+                      }
+                      onError={(msg) => toast.error(msg)}
+                    />
+                    <ImagePreview url={slot.mobileUrl || slot.desktopUrl} alt={slot.alt} />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10 }}>
+                  <div>
+                    <label style={lbl}>Alt (accesibilidad)</label>
+                    <input
+                      style={inp}
+                      value={slot.alt}
+                      onChange={(e) => updateSlot(activeVisualTab, i, { alt: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label style={lbl}>Pie de foto / caption (opcional)</label>
+                    <input
+                      style={inp}
+                      value={slot.caption}
+                      onChange={(e) => updateSlot(activeVisualTab, i, { caption: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+              );
+            })}
+
+            {activeVisual.slots.length === 0 && (
+              <div style={{ ...card, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>
+                No hay slots en esta página. Usa «Añadir slot» para crear uno.
+              </div>
+            )}
           </div>
         </Section>
       )}

@@ -54,14 +54,31 @@
   padding-top: clamp(40px, 5vw, 56px);
 }
 
+.visualBridge {
+  margin-block: clamp(-8px, -0.5vw, 0);
+}
+
+.visualBridge :global(figure),
+.visualBridge figure {
+  max-width: none;
+}
+
 @media (max-width: 800px) {
   .headSplit {
     grid-template-columns: 1fr;
     align-items: start;
-    gap: 12px;
+    gap: 10px;
+    margin-bottom: 24px;
   }
 
   .headLead {
     justify-self: start;
+    max-width: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .sectionMore {
+    margin-top: 16px;
   }
 }

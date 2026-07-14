@@ -2,7 +2,9 @@ import React from "react";
 import Link from "next/link";
 import shared from "../_shared/public.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
+import EditorialImage from "../../components/EditorialImage";
 import heroStyles from "../../components/PublicPageHero.module.css";
+import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
 
 export const metadata = {
   title: "Soluciones por industria | Nexara",
@@ -51,7 +53,12 @@ const industrias = [
   },
 ];
 
-export default function SolucionesPage() {
+export default async function SolucionesPage() {
+  const visuals = await fetchPageVisuals("page_soluciones");
+  const mid = visuals.slots[0];
+  const heroDesktop = resolvePageMediaUrl(visuals.heroDesktopUrl);
+  const heroMobile = resolvePageMediaUrl(visuals.heroMobileUrl || visuals.heroDesktopUrl);
+
   return (
     <main className={`${shared.page} home-main-flush`}>
       <PublicPageHero
@@ -63,8 +70,9 @@ export default function SolucionesPage() {
           </>
         }
         lead="Seis verticales. En cada una: el riesgo típico, qué instalamos y cómo lo sostenemos."
-        imageSrc="/images/hero/hero-03.png"
-        imageAlt="Técnico Nexara en instalación"
+        imageSrc={heroDesktop}
+        imageSrcMobile={heroMobile}
+        imageAlt={visuals.heroAlt}
       />
 
       <section className={shared.section} data-reveal="up">
@@ -95,6 +103,25 @@ export default function SolucionesPage() {
           </div>
         </div>
       </section>
+
+      {mid?.desktopUrl ? (
+        <div className={shared.sectionImageBandBleed} data-reveal="up">
+          <EditorialImage
+            desktopUrl={mid.desktopUrl}
+            mobileUrl={mid.mobileUrl}
+            alt={mid.alt}
+            caption={
+              mid.caption ||
+              "Retail, planta, hospitalidad o campus: el diseño sigue el riesgo, no un kit genérico."
+            }
+            kicker="Antes de cotizar"
+            title={mid.caption ? undefined : "Una imagen del contexto real"}
+            layout={mid.layout}
+            objectPosition={mid.objectPosition}
+            compose="caption-bar"
+          />
+        </div>
+      ) : null}
 
       <section className={shared.sectionTight} data-reveal="up">
         <div className={shared.inner}>

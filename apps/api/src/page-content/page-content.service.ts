@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { UpsertPageContentDto } from './dto/upsert-page-content.dto.js';
 
-/** Secciones válidas de la home pública. */
+/** Secciones válidas del sitio público (copy + visuales). */
 export const VALID_SECTIONS = [
   'home_hero',
   'home_metricas',
@@ -10,6 +10,12 @@ export const VALID_SECTIONS = [
   'home_proceso',
   'home_industrias',
   'home_cta',
+  /** Imágenes estratégicas del inicio (debajo del hero Studio). */
+  'page_home',
+  'page_servicios',
+  'page_soluciones',
+  'page_nosotros',
+  'page_contacto',
 ] as const;
 
 export type HomeSection = (typeof VALID_SECTIONS)[number];
@@ -27,6 +33,11 @@ export class PageContentService {
 
   /** Crea o actualiza el contenido de una sección (upsert). */
   async upsert(section: string, dto: UpsertPageContentDto) {
+    if (!(VALID_SECTIONS as readonly string[]).includes(section)) {
+      throw new BadRequestException(
+        `Sección "${section}" no es válida. Usa una de: ${VALID_SECTIONS.join(', ')}`,
+      );
+    }
     return this.prisma.pageContent.upsert({
       where: { section },
       create: {
