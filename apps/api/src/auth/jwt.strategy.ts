@@ -72,6 +72,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Usuario inactivo o inexistente');
     }
 
+    if (user.isActive === false) {
+      throw new UnauthorizedException('Usuario inactivo');
+    }
+
     const isSuperAdmin = Boolean(payload.isSuperAdmin) || isSuperAdminEmail(user.email);
     const effectiveRoleKey = this.authService.resolveEffectiveRoleKey(user);
     const permissions = this.authService.resolveUserPermissions(user, isSuperAdmin);

@@ -72,7 +72,15 @@ export class NewsController {
 
   @Get()
   list(@Query('search') search?: string, @Query('status') status?: string, @Query() query?: PaginationQueryDto) {
-    return this.newsService.list(search, status, query);
+    // Público: solo publicadas. El Studio usa endpoints autenticados abajo.
+    return this.newsService.list(search, status, query, { includeDrafts: false });
+  }
+
+  @Get('admin')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  listAdmin(@Query('search') search?: string, @Query('status') status?: string, @Query() query?: PaginationQueryDto) {
+    return this.newsService.list(search, status, query, { includeDrafts: true });
   }
 
   @Get('image/:filename')
@@ -102,7 +110,14 @@ export class NewsController {
 
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.newsService.findOne(id);
+    return this.newsService.findOne(id, { includeDrafts: false });
+  }
+
+  @Get('admin/:id')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  findOneAdmin(@Param('id', ParseIntPipe) id: number) {
+    return this.newsService.findOne(id, { includeDrafts: true });
   }
 
   @Put(':id')

@@ -72,7 +72,7 @@ export class NewsService {
     return post;
   }
 
-  async list(search?: string, status?: string, query?: PaginationQueryDto) {
+  async list(search?: string, status?: string, query?: PaginationQueryDto, options?: { includeDrafts?: boolean }) {
     const term = search?.trim();
     const normalizedStatus = this.normalizeStatus(status);
     const where = {
@@ -84,7 +84,11 @@ export class NewsService {
             ],
           }
         : {}),
-      ...(normalizedStatus ? { status: normalizedStatus } : {}),
+      ...(options?.includeDrafts
+        ? normalizedStatus
+          ? { status: normalizedStatus }
+          : {}
+        : { status: NewsStatus.PUBLISHED }),
     };
 
     if (query?.limit) {
@@ -97,16 +101,19 @@ export class NewsService {
     return this.db.newsPost.findMany({ where, orderBy: { createdAt: 'desc' } });
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, options?: { includeDrafts?: boolean }) {
     const post = await this.db.newsPost.findUnique({ where: { id } });
     if (!post) {
+      throw new NotFoundException(`Noticia con ID ${id} no encontrada`);
+    }
+    if (!options?.includeDrafts && post.status !== NewsStatus.PUBLISHED) {
       throw new NotFoundException(`Noticia con ID ${id} no encontrada`);
     }
     return post;
   }
 
   async update(id: number, payload: UpdateNewsPostDto) {
-    const existing = await this.findOne(id);
+    const existing = await this.findOne(id, { includeDrafts: true });
 
     const nextSlugBase = payload.slug?.trim() ? this.slugify(payload.slug.trim()) : undefined;
     const slug = nextSlugBase ? await this.ensureUniqueSlug(nextSlugBase, id) : existing.slug;
@@ -141,7 +148,7 @@ export class NewsService {
   }
 
   async remove(id: number) {
-    await this.findOne(id);
+    await this.findOne(id, { includeDrafts: true });
     return this.db.newsPost.delete({ where: { id } });
   }
 

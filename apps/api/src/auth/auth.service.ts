@@ -685,6 +685,9 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
+    if (user.isActive === false) {
+      throw new UnauthorizedException('Usuario inactivo');
+    }
     const isPasswordMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordMatch) {
       throw new UnauthorizedException('Credenciales inválidas');
@@ -736,43 +739,12 @@ export class AuthService {
       throw new UnauthorizedException('Usuario inactivo o inexistente');
     }
 
+    if (user.isActive === false) {
+      throw new UnauthorizedException('Usuario inactivo');
+    }
+
     const isSuperAdmin = this.isSuperAdmin(user.email);
     const permissions = this.resolveUserPermissions(user, isSuperAdmin);
     return this.mapSessionUser(user, permissions, isSuperAdmin);
-  }
-
-  async debugVerifyUser(email: string) {
-    const normalizedEmail = email.trim().toLowerCase();
-    const user = await this.prisma.user.findFirst({
-      where: {
-        email: {
-          equals: normalizedEmail,
-          mode: 'insensitive',
-        },
-      },
-      include: { role: true, department: true },
-    });
-
-    if (!user) {
-      return {
-        exists: false,
-        email: normalizedEmail,
-        message: 'Usuario no encontrado en la base de datos',
-      };
-    }
-
-    return {
-      exists: true,
-      id: user.id,
-      nombre: user.nombre,
-      email: user.email,
-      roleId: user.roleId,
-      role: user.role?.nombre,
-      departmentId: user.departmentId,
-      department: user.department?.nombre,
-      hasPasswordHash: !!user.passwordHash,
-      isSuperAdmin: this.isSuperAdmin(user.email),
-      message: 'Usuario encontrado en base de datos',
-    };
   }
 }

@@ -11,6 +11,7 @@ import {
   Query,
   Res,
   UploadedFiles,
+  UseGuards,
   UseInterceptors,
   Body,
 } from '@nestjs/common';
@@ -23,6 +24,7 @@ import { ProjectsService } from './projects.service.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CreateProjectDto } from './dto/create-project.dto.js';
 import { UpdateProjectDto } from './dto/update-project.dto.js';
+import { RbacGuard } from '../common/rbac.guard.js';
 
 interface MulterFile {
   fieldname: string;
@@ -43,6 +45,7 @@ export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
   @Post()
+  @UseGuards(RbacGuard)
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'mainImage', maxCount: 1 },
@@ -114,6 +117,7 @@ export class ProjectsController {
   }
 
   @Put(':id')
+  @UseGuards(RbacGuard)
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'mainImage', maxCount: 1 },
@@ -140,11 +144,13 @@ export class ProjectsController {
   }
 
   @Delete(':id')
+  @UseGuards(RbacGuard)
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.projectsService.remove(id);
   }
 
   @Post(':id/delete')
+  @UseGuards(RbacGuard)
   removeViaPost(@Param('id', ParseIntPipe) id: number) {
     return this.projectsService.remove(id);
   }

@@ -446,33 +446,39 @@ async function bootstrap() {
     }),
   );
 
-  // ── Swagger / OpenAPI ─────────────────────────────────────
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('NEXARA ERP Servicios IT/CCTV')
-    .setDescription('API del sistema ERP NEXARA orientado a venta y servicios de cómputo, tech y CCTV — operaciones, RRHH, finanzas, inventario, mantenimiento, helpdesk y más.')
-    .setVersion('1.0.0')
-    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'JWT')
-    .addTag('auth', 'Autenticación y tokens')
-    .addTag('users', 'Gestión de usuarios y roles')
-    .addTag('operations', 'Actividades, evidencias, viáticos, vehículos, GPS')
-    .addTag('hr', 'Asistencia, breaks, multas, nómina, CVs')
-    .addTag('commercial', 'Clientes, cotizaciones, ventas')
-    .addTag('inventory', 'Almacenes, stock, compras')
-    .addTag('service', 'Helpdesk, órdenes de servicio, mantenimiento, contratos')
-    .addTag('finance', 'Contabilidad, facturación, banca')
-    .addTag('compliance', 'Documentos, auditoría, BI')
-    .addTag('system', 'Configuración, health, notificaciones')
-    .build();
+  // ── Swagger / OpenAPI (solo fuera de producción, o con ENABLE_SWAGGER=true) ──
+  const enableSwagger =
+    process.env['ENABLE_SWAGGER'] === 'true' ||
+    process.env['NODE_ENV'] !== 'production';
 
-  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, swaggerDocument, {
-    swaggerOptions: {
-      persistAuthorization: true,
-      docExpansion: 'none',
-      filter: true,
-      tagsSorter: 'alpha',
-    },
-  });
+  if (enableSwagger) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('NEXARA ERP Servicios IT/CCTV')
+      .setDescription('API del sistema ERP NEXARA orientado a venta y servicios de cómputo, tech y CCTV — operaciones, RRHH, finanzas, inventario, mantenimiento, helpdesk y más.')
+      .setVersion('1.0.0')
+      .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'JWT')
+      .addTag('auth', 'Autenticación y tokens')
+      .addTag('users', 'Gestión de usuarios y roles')
+      .addTag('operations', 'Actividades, evidencias, viáticos, vehículos, GPS')
+      .addTag('hr', 'Asistencia, breaks, multas, nómina, CVs')
+      .addTag('commercial', 'Clientes, cotizaciones, ventas')
+      .addTag('inventory', 'Almacenes, stock, compras')
+      .addTag('service', 'Helpdesk, órdenes de servicio, mantenimiento, contratos')
+      .addTag('finance', 'Contabilidad, facturación, banca')
+      .addTag('compliance', 'Documentos, auditoría, BI')
+      .addTag('system', 'Configuración, health, notificaciones')
+      .build();
+
+    const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, swaggerDocument, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        docExpansion: 'none',
+        filter: true,
+        tagsSorter: 'alpha',
+      },
+    });
+  }
 
   // Prefijo global '/api' para todas las rutas, pero excluir la ruta de uploads
   app.setGlobalPrefix('api', {

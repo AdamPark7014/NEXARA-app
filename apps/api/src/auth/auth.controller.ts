@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Req, HttpCode, Get, UnauthorizedException, UseGuards, Query, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, Req, HttpCode, Get, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { Request } from 'express';
@@ -22,13 +22,5 @@ export class AuthController {
       throw new UnauthorizedException('Token de usuario inválido');
     }
     return this.authService.getProfile(Number(user.id));
-  }
-
-  @Get('debug/verify-user')
-  async verifyUser(@Query('email') email?: string) {
-    if (!email) {
-      throw new BadRequestException('Email parameter required');
-    }
-    return this.authService.debugVerifyUser(email);
   }
 }
