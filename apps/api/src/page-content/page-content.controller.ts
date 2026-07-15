@@ -21,6 +21,7 @@ import * as fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import { PageContentService, VALID_SECTIONS } from './page-content.service.js';
 import { UpsertPageContentDto } from './dto/upsert-page-content.dto.js';
+import { resolveUploadsDir } from '../common/uploads-path.js';
 
 interface MulterFile {
   fieldname: string;
@@ -67,7 +68,7 @@ export class PageContentController {
     }
 
     try {
-      const uploadDir = path.resolve(process.cwd(), './uploads/page-media');
+      const uploadDir = resolveUploadsDir('page-media');
       await fs.mkdir(uploadDir, { recursive: true });
       const safeBase = file.originalname
         .replace(/[^a-zA-Z0-9._-]/g, '-')
@@ -85,15 +86,34 @@ export class PageContentController {
   @Get('media/:filename')
   async getMedia(@Param('filename') filename: string, @Res() res: Response) {
     try {
-      const uploadDir = path.resolve(process.cwd(), './uploads/page-media');
-      const filepath = path.join(uploadDir, filename);
-      const realPath = await fs.realpath(filepath);
-      const realUploadDir = await fs.realpath(uploadDir);
-      if (!realPath.startsWith(realUploadDir)) {
-        throw new NotFoundException('File not found');
+      const safeName = path.basename(filename);
+      const primaryDir = resolveUploadsDir('page-media');
+      const legacyDir = path.resolve(process.cwd(), './uploads/page-media');
+      const candidates = [
+        path.join(primaryDir, safeName),
+        path.join(legacyDir, safeName),
+      ];
+
+      let filepath: string | null = null;
+      for (const candidate of candidates) {
+        try {
+          const realPath = await fs.realpath(candidate);
+          const realUploadDir = await fs.realpath(path.dirname(candidate));
+          if (realPath === realUploadDir || realPath.startsWith(realUploadDir + path.sep)) {
+            await fs.access(candidate);
+            filepath = candidate;
+            break;
+          }
+        } catch {
+          // try next
+        }
       }
-      await fs.access(filepath);
-      const ext = path.extname(filename).toLowerCase();
+
+      if (!filepath) {
+        throw new NotFoundException('Image not found');
+      }
+
+      const ext = path.extname(safeName).toLowerCase();
       const contentType =
         ext === '.png'
           ? 'image/png'

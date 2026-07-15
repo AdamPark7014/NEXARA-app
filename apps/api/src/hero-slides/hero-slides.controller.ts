@@ -25,6 +25,7 @@ import { HeroSlidesService } from './hero-slides.service.js';
 import { CreateHeroSlideDto } from './dto/create-hero-slide.dto.js';
 import { UpdateHeroSlideDto } from './dto/update-hero-slide.dto.js';
 import { ReorderHeroSlidesDto } from './dto/reorder-hero-slides.dto.js';
+import { resolveLegacyUploadsDir, resolveUploadsDir } from '../common/uploads-path.js';
 
 interface MulterFile {
   fieldname: string;
@@ -51,18 +52,32 @@ export class HeroSlidesController {
   @Get('image/:filename')
   async getImage(@Param('filename') filename: string, @Res() res: Response) {
     try {
-      const uploadDir = path.resolve(process.cwd(), './uploads/hero');
-      const filepath = path.join(uploadDir, filename);
+      const safeName = path.basename(filename);
+      const candidates = [
+        path.join(resolveUploadsDir('hero'), safeName),
+        path.join(resolveLegacyUploadsDir('hero'), safeName),
+      ];
 
-      const realPath = await fs.realpath(filepath);
-      const realUploadDir = await fs.realpath(uploadDir);
-      if (!realPath.startsWith(realUploadDir)) {
-        throw new NotFoundException('File not found');
+      let filepath: string | null = null;
+      for (const candidate of candidates) {
+        try {
+          const realPath = await fs.realpath(candidate);
+          const realUploadDir = await fs.realpath(path.dirname(candidate));
+          if (realPath === realUploadDir || realPath.startsWith(realUploadDir + path.sep)) {
+            await fs.access(candidate);
+            filepath = candidate;
+            break;
+          }
+        } catch {
+          // try next
+        }
       }
 
-      await fs.access(filepath);
+      if (!filepath) {
+        throw new NotFoundException('Image not found');
+      }
 
-      const ext = path.extname(filename).toLowerCase();
+      const ext = path.extname(safeName).toLowerCase();
       const contentType =
         ext === '.png'
           ? 'image/png'
