@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateHeroSlideDto } from './dto/create-hero-slide.dto.js';
 import { UpdateHeroSlideDto } from './dto/update-hero-slide.dto.js';
+import { resolveLegacyUploadsDir, resolveUploadsDir } from '../common/uploads-path.js';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 
@@ -172,7 +173,7 @@ export class HeroSlidesService {
 
   private async saveImage(file: MulterFile): Promise<string> {
     try {
-      const uploadDir = path.resolve(process.cwd(), './uploads/hero');
+      const uploadDir = resolveUploadsDir('hero');
       await fs.mkdir(uploadDir, { recursive: true });
 
       const safeBase = file.originalname
@@ -196,13 +197,18 @@ export class HeroSlidesService {
     const localPrefix = '/hero-slides/image/';
     if (!imageUrl.startsWith(localPrefix)) return;
     try {
-      const filename = imageUrl.slice(localPrefix.length);
-      const filepath = path.resolve(
-        process.cwd(),
-        './uploads/hero',
-        filename,
-      );
-      await fs.unlink(filepath);
+      const filename = path.basename(imageUrl.slice(localPrefix.length));
+      const candidates = [
+        path.join(resolveUploadsDir('hero'), filename),
+        path.join(resolveLegacyUploadsDir('hero'), filename),
+      ];
+      for (const filepath of candidates) {
+        try {
+          await fs.unlink(filepath);
+        } catch {
+          // Si el archivo ya no existe no es un error crítico
+        }
+      }
     } catch {
       // Si el archivo ya no existe no es un error crítico
     }

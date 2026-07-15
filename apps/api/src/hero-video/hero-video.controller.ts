@@ -23,6 +23,7 @@ import * as fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import { HeroVideoService } from './hero-video.service.js';
 import { UpdateHeroVideoDto } from './dto/update-hero-video.dto.js';
+import { resolveLegacyUploadsDir, resolveUploadsDir } from '../common/uploads-path.js';
 
 interface MulterFile {
   fieldname: string;
@@ -54,17 +55,38 @@ export class HeroVideoController {
     @Res() res: Response,
   ) {
     try {
-      const uploadDir = path.resolve(process.cwd(), './uploads/hero-video');
-      const filepath = path.join(uploadDir, filename);
+      const safeName = path.basename(filename);
+      const primaryDir = resolveUploadsDir('hero-video');
+      const legacyDir = resolveLegacyUploadsDir('hero-video');
+      const candidates = [
+        path.join(primaryDir, safeName),
+        path.join(legacyDir, safeName),
+      ];
 
-      const realPath = await fs.realpath(filepath);
-      const realUploadDir = await fs.realpath(uploadDir);
-      if (!realPath.startsWith(realUploadDir)) {
-        throw new NotFoundException('File not found');
+      let filepath: string | null = null;
+      for (const candidate of candidates) {
+        try {
+          const realPath = await fs.realpath(candidate);
+          const realUploadDir = await fs.realpath(path.dirname(candidate));
+          if (
+            realPath === realUploadDir ||
+            realPath.startsWith(realUploadDir + path.sep)
+          ) {
+            await fs.access(candidate);
+            filepath = candidate;
+            break;
+          }
+        } catch {
+          // try next
+        }
+      }
+
+      if (!filepath) {
+        throw new NotFoundException('Video not found');
       }
 
       const stat = await fs.stat(filepath);
-      const ext = path.extname(filename).toLowerCase();
+      const ext = path.extname(safeName).toLowerCase();
       const contentType = ext === '.webm' ? 'video/webm' : 'video/mp4';
 
       res.setHeader('Content-Type', contentType);

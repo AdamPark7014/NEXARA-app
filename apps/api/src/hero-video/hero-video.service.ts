@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { UpdateHeroVideoDto } from './dto/update-hero-video.dto.js';
+import { resolveLegacyUploadsDir, resolveUploadsDir } from '../common/uploads-path.js';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 
@@ -22,9 +23,6 @@ interface MulterFile {
 export class HeroVideoService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ── Lectura ────────────────────────────────────────────────────────
-
-  /** Video activo para el sitio público, o null si no hay ninguno configurado. */
   publicActive() {
     return this.prisma.heroVideo.findFirst({
       where: { isActive: true },
@@ -32,7 +30,6 @@ export class HeroVideoService {
     });
   }
 
-  /** Registro actual (admin) — el más reciente, sin filtrar por isActive. */
   adminCurrent() {
     return this.prisma.heroVideo.findFirst({ orderBy: { id: 'desc' } });
   }
@@ -43,14 +40,6 @@ export class HeroVideoService {
     return video;
   }
 
-  // ── Escritura ──────────────────────────────────────────────────────
-
-  /**
-   * Sube / actualiza el video del hero.
-   * - `video` = desktop (obligatorio si aún no hay registro).
-   * - `videoMobile` = móvil (opcional).
-   * - `clearMobile` = quita la variante móvil y conserva el desktop.
-   */
   async upsert(opts: {
     title?: string;
     video?: MulterFile;
@@ -72,7 +61,6 @@ export class HeroVideoService {
       );
     }
 
-    // Solo actualizar móvil / título sobre el registro existente
     if (previous && !video) {
       let videoUrlMobile = previous.videoUrlMobile;
       if (clearMobile) {
@@ -88,19 +76,14 @@ export class HeroVideoService {
         where: { id: previous.id },
         data: {
           videoUrlMobile,
-          title:
-            title !== undefined ? title.trim() || null : undefined,
+          title: title !== undefined ? title.trim() || null : undefined,
         },
       });
     }
 
-    // Desktop nuevo (crea o reemplaza singleton)
-    const videoUrl = video
-      ? await this.saveVideo(video)
-      : previous!.videoUrl;
+    const videoUrl = video ? await this.saveVideo(video) : previous!.videoUrl;
 
-    let videoUrlMobile: string | null =
-      previous?.videoUrlMobile ?? null;
+    let videoUrlMobile: string | null = previous?.videoUrlMobile ?? null;
     if (clearMobile) {
       await this.deleteVideoFile(previous?.videoUrlMobile);
       videoUrlMobile = null;
@@ -121,13 +104,11 @@ export class HeroVideoService {
     if (previous) {
       await this.prisma.heroVideo.delete({ where: { id: previous.id } });
       if (video) await this.deleteVideoFile(previous.videoUrl);
-      // mobile ya se gestionó arriba si se reemplazó
     }
 
     return created;
   }
 
-  /** @deprecated Prefer upsert — mantenido por compatibilidad. */
   async upload(title: string | undefined, file?: MulterFile) {
     return this.upsert({ title, video: file });
   }
@@ -153,11 +134,9 @@ export class HeroVideoService {
     await this.deleteVideoFile(existing.videoUrlMobile);
   }
 
-  // ── Utilidades ─────────────────────────────────────────────────────
-
   private async saveVideo(file: MulterFile): Promise<string> {
     try {
-      const uploadDir = path.resolve(process.cwd(), './uploads/hero-video');
+      const uploadDir = resolveUploadsDir('hero-video');
       await fs.mkdir(uploadDir, { recursive: true });
 
       const safeBase = file.originalname
@@ -179,13 +158,18 @@ export class HeroVideoService {
     const localPrefix = '/hero-video/stream/';
     if (!videoUrl.startsWith(localPrefix)) return;
     try {
-      const filename = videoUrl.slice(localPrefix.length);
-      const filepath = path.resolve(
-        process.cwd(),
-        './uploads/hero-video',
-        filename,
-      );
-      await fs.unlink(filepath);
+      const filename = path.basename(videoUrl.slice(localPrefix.length));
+      const candidates = [
+        path.join(resolveUploadsDir('hero-video'), filename),
+        path.join(resolveLegacyUploadsDir('hero-video'), filename),
+      ];
+      for (const filepath of candidates) {
+        try {
+          await fs.unlink(filepath);
+        } catch {
+          // ignore missing
+        }
+      }
     } catch {
       // ignore
     }
