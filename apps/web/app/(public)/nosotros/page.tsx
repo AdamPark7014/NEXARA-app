@@ -14,13 +14,13 @@ const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").re
 export const metadata: Metadata = {
   title: "Nosotros | Nexara — Equipo de integración tecnológica",
   description:
-    "Quiénes somos: equipo de campo e ingeniería en Puebla y CDMX. Cercanos, claros y responsables de la continuidad operativa de cada cliente.",
+    "Quiénes somos: ingeniería, implementación y soporte tecnológico desde Puebla y Ciudad de México, con cobertura para empresas en todo México.",
   alternates: { canonical: "/nosotros" },
   openGraph: {
     type: "website",
     url: `${siteUrl}/nosotros`,
     title: "Nosotros | Nexara",
-    description: "Personas detrás de la tecnología que sostiene tu operación.",
+    description: "Donde la tecnología se convierte en resultados.",
     images: [{ url: "/logo-nexara-lockup.png", width: 1200, height: 630, alt: "Equipo Nexara" }],
   },
 };
@@ -30,15 +30,15 @@ export const dynamic = "force-dynamic";
 const principios = [
   {
     title: "Claridad",
-    text: "Alcance, tiempos y riesgos en voz alta. Preferimos una conversación incómoda a una sorpresa en factura.",
+    text: "Construimos confianza mediante una comunicación transparente. Alcances, tiempos, costos y riesgos se definen desde el inicio para mantener expectativas claras y decisiones informadas.",
   },
   {
-    title: "Campo primero",
-    text: "Diseñamos lo que se puede instalar y operar. La propuesta sale del sitio, no solo del PowerPoint.",
+    title: "Ingeniería basada en la realidad",
+    text: "Cada solución nace del análisis del entorno operativo. Diseñamos pensando en la implementación, la mantenibilidad y el desempeño, no únicamente en la teoría.",
   },
   {
-    title: "Continuidad",
-    text: "Después de la entrega seguimos: soporte, ajustes y evidencia. Un proyecto vivo, no un ticket cerrado.",
+    title: "Compromiso continuo",
+    text: "La entrega es el inicio de una relación, no el final del proyecto. Brindamos seguimiento, soporte técnico y mejora continua para garantizar la estabilidad y evolución de cada implementación.",
   },
 ];
 
@@ -151,10 +151,10 @@ export default async function NosotrosPage() {
         title={
           <>
             Personas detrás de{" "}
-            <span className={heroStyles.titleAccent}>cada entrega</span>
+            <span className={heroStyles.titleAccent}>cada solución</span>
           </>
         }
-        lead="Ingeniería y campo desde Puebla y CDMX. Diseñamos, instalamos y acompañamos — sin desaparecer después del go-live."
+        lead="Ingeniería, implementación y soporte con un solo compromiso: que tu tecnología funcione cuando más la necesitas."
         imageSrc={heroDesktop}
         imageSrcMobile={heroMobile}
         imageAlt={visuals.heroAlt}
@@ -166,14 +166,14 @@ export default async function NosotrosPage() {
             <div className={styles.storyBlock}>
               <p className={shared.eyebrow}>Quiénes somos</p>
               <h2 className={styles.storyTitle}>
-                Operamos donde la tecnología{" "}
-                <span className={shared.sectionTitleAccent}>tiene que funcionar</span>
+                Donde la tecnología{" "}
+                <span className={shared.sectionTitleAccent}>se convierte en resultados</span>
               </h2>
               <p className={styles.storyLead}>
-                Cerramos el hueco entre la propuesta y el lunes en el sitio: instalación con evidencia, soporte humano y criterio técnico.
+                En NEXARA desarrollamos soluciones que fortalecen la operación de las empresas. Cada proyecto se diseña con una visión integral, priorizando la continuidad, la seguridad y el rendimiento de la infraestructura tecnológica.
               </p>
               <p className={styles.storyLeadSecondary}>
-                Base en Puebla y CDMX, cobertura nacional. CCTV, redes y cómputo bajo una sola responsabilidad — no una cadena de proveedores que se echan la pelota.
+                No solo entregamos un proyecto: construimos relaciones de largo plazo respaldadas por experiencia técnica, metodologías claras y un servicio cercano.
               </p>
             </div>
             {storyImg?.desktopUrl ? (
