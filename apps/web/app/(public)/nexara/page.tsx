@@ -36,28 +36,28 @@ export const dynamic = "force-dynamic";
 const CAPABILITIES = [
   {
     id: "cctv",
-    title: "Videovigilancia",
-    text: "Diseño de cobertura, NVR/VMS, acceso remoto y mantenimiento con evidencia — no solo montar cámaras.",
+    title: "Videovigilancia Inteligente",
+    text: "Diseño de cobertura, implementación de CCTV, NVR/VMS, acceso remoto seguro y mantenimiento preventivo — soluciones enfocadas en proteger activos y generar evidencia confiable.",
   },
   {
     id: "redes",
-    title: "Redes y Wi‑Fi",
-    text: "Cableado, switching y Wi‑Fi empresarial documentado para una o varias sedes, listo para operar.",
+    title: "Redes Empresariales y Wi‑Fi",
+    text: "Infraestructura de red, cableado estructurado, switching administrable y redes Wi‑Fi de alto rendimiento para oficinas, plantas y múltiples sedes, con documentación técnica completa.",
   },
   {
     id: "computo",
-    title: "Cómputo e infraestructura",
-    text: "Estaciones, servidores, racks y respaldos con imagen estándar para que el día a día no dependa de parches.",
+    title: "Infraestructura Tecnológica",
+    text: "Estaciones de trabajo, servidores, racks, almacenamiento y sistemas de respaldo con configuraciones estandarizadas que garantizan estabilidad, continuidad y crecimiento.",
   },
   {
     id: "soporte",
-    title: "Soporte TI",
-    text: "Mesa de ayuda remota y visitas en sitio, con tiempos de respuesta claros después del go-live.",
+    title: "Soporte y Gestión TI",
+    text: "Soporte remoto y en sitio con tiempos de respuesta definidos, mantenimiento preventivo y correctivo, monitoreo y acompañamiento continuo para una operación sin interrupciones.",
   },
   {
     id: "software",
-    title: "Plataformas a medida",
-    text: "Portales e integraciones acotadas al flujo real: alcance cerrado, entrega por fases.",
+    title: "Desarrollo de Plataformas",
+    text: "Portales web, aplicaciones e integraciones adaptadas a los procesos de cada organización — proyectos por fases, con objetivos claros y alcance controlado.",
   },
 ];
 
@@ -127,7 +127,7 @@ export default async function NexaraPage() {
                 </h2>
               </div>
               <p className={`${shared.sectionLead} ${styles.headLead}`}>
-                Cinco líneas con entregable concreto. Una sola firma responsable del diseño, la instalación y el soporte.
+                Diseñamos, instalamos y damos soporte a cada solución para garantizar un funcionamiento confiable, escalable y alineado con las necesidades de tu empresa.
               </p>
             </header>
             <div className={shared.capList} data-reveal-stagger>

@@ -9,7 +9,7 @@ import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
 export const metadata = {
   title: "Servicios | Nexara — CCTV, redes, cómputo y soporte",
   description:
-    "Capacidades Nexara: videovigilancia, redes empresariales, cómputo, soporte TI y plataformas a medida.",
+    "Seguridad inteligente, conectividad, infraestructura TI, soporte TI y plataformas a medida — soluciones tecnológicas diseñadas para operar desde el primer día.",
 };
 
 export const dynamic = "force-dynamic";
@@ -17,33 +17,63 @@ export const dynamic = "force-dynamic";
 const servicios = [
   {
     id: "cctv",
-    title: "Seguridad inteligente",
-    text: "Levantamos cobertura real del sitio, instalamos IP + NVR/VMS y dejamos acceso remoto operable. El mantenimiento incluye evidencia — no solo un ticket cerrado.",
-    points: ["Diseño de cobertura", "Cámaras IP + NVR/VMS", "Acceso remoto", "Mantenimiento con evidencia"],
+    title: "Seguridad Inteligente",
+    text: "Protegemos personas, activos y operaciones mediante sistemas de videovigilancia diseñados para las necesidades reales de cada sitio.",
+    points: [
+      "Diseño estratégico de cobertura",
+      "Cámaras IP y sistemas NVR/VMS",
+      "Monitoreo y acceso remoto seguro",
+      "Mantenimiento preventivo y correctivo",
+      "Evidencia técnica y documentación de servicio",
+    ],
   },
   {
     id: "redes",
     title: "Conectividad",
-    text: "Cableado, switching y Wi‑Fi empresarial para una o varias sedes. Documentamos el enlace para que no dependas de “el que instaló” cuando algo falle.",
-    points: ["Cableado estructurado", "Switching y VLANs", "Wi‑Fi empresarial", "Enlaces y documentación"],
+    text: "Construimos redes estables, escalables y preparadas para el crecimiento de tu empresa.",
+    points: [
+      "Cableado estructurado certificado",
+      "Switching administrable y segmentación VLAN",
+      "Redes Wi‑Fi empresariales",
+      "Optimización y documentación de infraestructura",
+      "Integración entre sedes y dispositivos",
+    ],
   },
   {
     id: "computo",
-    title: "Infraestructura",
-    text: "Estaciones, servidores, racks y respaldos con imagen estándar. Menos improvisación en el mostrador y más continuidad cuando un equipo deja de servir.",
-    points: ["Estaciones y servidores", "Racks y energía", "Respaldos", "Imagen / estándar de sitio"],
+    title: "Infraestructura TI",
+    text: "Implementamos infraestructura tecnológica que garantiza continuidad operativa y un mejor desempeño de los equipos.",
+    points: [
+      "Estaciones de trabajo y servidores",
+      "Instalación y organización de racks",
+      "Sistemas de respaldo y recuperación",
+      "Configuración estandarizada de equipos",
+      "Optimización y administración de recursos",
+    ],
   },
   {
     id: "soporte",
     title: "Soporte TI",
-    text: "Mesa de ayuda humana: remoto primero, visita cuando haga falta. Tiempos de respuesta acordados para que el negocio sepa a qué atenerse.",
-    points: ["Mesa de ayuda", "Soporte remoto", "Visitas en sitio", "SLA acordado"],
+    text: "Acompañamos la operación de tu empresa con soporte técnico oportuno y atención especializada.",
+    points: [
+      "Mesa de ayuda especializada",
+      "Soporte remoto y asistencia en sitio",
+      "Mantenimiento preventivo y correctivo",
+      "Atención bajo acuerdos de nivel de servicio (SLA)",
+      "Seguimiento y documentación de incidencias",
+    ],
   },
   {
     id: "software",
-    title: "Plataformas a medida",
-    text: "Portales e integraciones acotados al flujo real. Alcance por fases — sin proyectos eternamente abiertos ni alcance que crece cada semana.",
-    points: ["Portales internos", "Integraciones", "Entrega por fases", "Alcance cerrado"],
+    title: "Plataformas a Medida",
+    text: "Desarrollamos soluciones digitales adaptadas a los procesos de tu organización para mejorar la eficiencia y el control operativo.",
+    points: [
+      "Desarrollo de portales empresariales",
+      "Automatización de procesos",
+      "Integración entre plataformas",
+      "Dashboards e indicadores",
+      "Implementación por fases con objetivos definidos",
+    ],
   },
 ];
 
@@ -136,6 +166,26 @@ export default async function ServiciosPage() {
               </article>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className={`${shared.sectionTight} ${shared.sectionDivider}`} data-reveal="up" aria-label="Por qué Nexara">
+        <div className={shared.inner}>
+          <div className={shared.sectionHead}>
+            <p className={shared.eyebrow}>Una sola empresa</p>
+            <h2 className={shared.sectionTitle}>
+              Una sola <span className={shared.sectionTitleAccent}>responsabilidad</span>
+            </h2>
+            <p className={shared.sectionLead}>
+              Desde la infraestructura física hasta el soporte y la evolución tecnológica, centralizamos todo el proyecto bajo un mismo equipo. Esto reduce tiempos, mejora la coordinación y garantiza una implementación consistente de principio a fin.
+            </p>
+          </div>
+          <ul className={shared.servicePoints}>
+            <li>Ingeniería basada en las necesidades reales de tu operación.</li>
+            <li>Implementación con estándares profesionales y documentación completa.</li>
+            <li>Soporte técnico especializado antes, durante y después de la entrega.</li>
+            <li>Soluciones escalables preparadas para el crecimiento de tu empresa.</li>
+          </ul>
         </div>
       </section>
     </main>
