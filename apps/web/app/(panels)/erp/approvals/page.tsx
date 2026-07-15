@@ -267,7 +267,7 @@ export default function ApprovalsPage() {
           <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(list, [
             { key: "type", label: "Tipo" },
             { key: "titulo", label: "Título" },
-            { key: "urgencia", label: "Urgencia" },
+            { key: "prioridad", label: "Prioridad" },
             { key: "monto", label: "Monto" },
           ], "aprobaciones-pendientes")}>CSV</Button>
         ) : undefined}

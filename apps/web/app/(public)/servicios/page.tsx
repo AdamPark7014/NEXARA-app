@@ -89,11 +89,11 @@ export default async function ServiciosPage() {
         eyebrow="Servicios"
         title={
           <>
-            Capacidades con{" "}
-            <span className={heroStyles.titleAccent}>entrega concreta</span>
+            Soluciones tecnológicas diseñadas para operar{" "}
+            <span className={heroStyles.titleAccent}>desde el primer día</span>
           </>
         }
-        lead="CCTV, redes, cómputo, soporte y software — instalados con criterio de campo y acompañados después del go-live."
+        lead="Integramos seguridad, infraestructura y tecnología empresarial con un enfoque práctico: diseñamos, implementamos, documentamos y damos seguimiento para que cada solución funcione de forma confiable a largo plazo."
         imageSrc={heroDesktop}
         imageSrcMobile={heroMobile}
         imageAlt={visuals.heroAlt}

@@ -154,7 +154,7 @@ export default async function NosotrosPage() {
             <span className={heroStyles.titleAccent}>cada solución</span>
           </>
         }
-        lead="Ingeniería, implementación y soporte con un solo compromiso: que tu tecnología funcione cuando más la necesitas."
+        lead="Ingeniería, implementación y soporte con un solo compromiso: que tu tecnología funcione cuando más la necesitas. Desde nuestras sedes en Puebla y Ciudad de México, diseñamos, implementamos y respaldamos soluciones tecnológicas para empresas en todo México. Acompañamos cada proyecto desde la planeación hasta la operación, con procesos documentados, atención especializada y soporte continuo."
         imageSrc={heroDesktop}
         imageSrcMobile={heroMobile}
         imageAlt={visuals.heroAlt}
@@ -174,6 +174,12 @@ export default async function NosotrosPage() {
               </p>
               <p className={styles.storyLeadSecondary}>
                 No solo entregamos un proyecto: construimos relaciones de largo plazo respaldadas por experiencia técnica, metodologías claras y un servicio cercano.
+              </p>
+              <p className={styles.storyLeadSecondary}>
+                Transformamos necesidades tecnológicas en soluciones confiables mediante un proceso que integra consultoría, diseño, implementación y soporte especializado. Cada entrega está documentada, validada y orientada a garantizar una operación estable desde el primer día.
+              </p>
+              <p className={styles.storyLeadSecondary}>
+                Con cobertura nacional y presencia en Puebla y Ciudad de México, integramos videovigilancia, redes empresariales, infraestructura, Wi‑Fi, cómputo y soporte TI bajo una sola responsabilidad técnica. Un solo equipo, un solo proceso y un único compromiso con la calidad de cada proyecto.
               </p>
             </div>
             {storyImg?.desktopUrl ? (

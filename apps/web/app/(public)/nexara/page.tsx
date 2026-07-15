@@ -37,27 +37,27 @@ const CAPABILITIES = [
   {
     id: "cctv",
     title: "Videovigilancia Inteligente",
-    text: "Diseño de cobertura, implementación de CCTV, NVR/VMS, acceso remoto seguro y mantenimiento preventivo — soluciones enfocadas en proteger activos y generar evidencia confiable.",
+    text: "Diseño de cobertura, implementación de sistemas CCTV, NVR/VMS, acceso remoto seguro y mantenimiento preventivo. Soluciones enfocadas en proteger activos y generar evidencia confiable, más allá de la instalación de cámaras.",
   },
   {
     id: "redes",
     title: "Redes Empresariales y Wi‑Fi",
-    text: "Infraestructura de red, cableado estructurado, switching administrable y redes Wi‑Fi de alto rendimiento para oficinas, plantas y múltiples sedes, con documentación técnica completa.",
+    text: "Diseño e implementación de infraestructura de red, cableado estructurado, switching administrable y redes Wi‑Fi de alto rendimiento para oficinas, plantas y múltiples sedes, con documentación técnica completa.",
   },
   {
     id: "computo",
     title: "Infraestructura Tecnológica",
-    text: "Estaciones de trabajo, servidores, racks, almacenamiento y sistemas de respaldo con configuraciones estandarizadas que garantizan estabilidad, continuidad y crecimiento.",
+    text: "Implementación de estaciones de trabajo, servidores, racks, almacenamiento y sistemas de respaldo con configuraciones estandarizadas que garantizan estabilidad, continuidad y crecimiento.",
   },
   {
     id: "soporte",
     title: "Soporte y Gestión TI",
-    text: "Soporte remoto y en sitio con tiempos de respuesta definidos, mantenimiento preventivo y correctivo, monitoreo y acompañamiento continuo para una operación sin interrupciones.",
+    text: "Servicio de soporte remoto y en sitio con tiempos de respuesta definidos, mantenimiento preventivo y correctivo, monitoreo y acompañamiento continuo para mantener la operación sin interrupciones.",
   },
   {
     id: "software",
     title: "Desarrollo de Plataformas",
-    text: "Portales web, aplicaciones e integraciones adaptadas a los procesos de cada organización — proyectos por fases, con objetivos claros y alcance controlado.",
+    text: "Desarrollo de portales web, aplicaciones e integraciones adaptadas a los procesos de cada organización. Proyectos ejecutados por fases, con objetivos claros, entregables definidos y alcance controlado.",
   },
 ];
 
@@ -127,7 +127,7 @@ export default async function NexaraPage() {
                 </h2>
               </div>
               <p className={`${shared.sectionLead} ${styles.headLead}`}>
-                Diseñamos, instalamos y damos soporte a cada solución para garantizar un funcionamiento confiable, escalable y alineado con las necesidades de tu empresa.
+                En NEXARA integramos tecnología con una visión estratégica. Diseñamos, instalamos y damos soporte a cada solución para garantizar un funcionamiento confiable, escalable y alineado con las necesidades de tu empresa.
               </p>
             </header>
             <div className={shared.capList} data-reveal-stagger>
