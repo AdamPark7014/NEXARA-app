@@ -7,30 +7,22 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
+import * as jwt from 'jsonwebtoken';
 
 /**
  * RealtimeGateway — punto único de broadcast en tiempo real.
  *
- * Lo inyectan PrismaService, AttendanceService, ContactMessagesService,
- * ProjectsService y todos los flujos que necesitan empujar cambios al
- * frontend (sockets) sin acoplar la lógica de dominio a socket.io.
- *
  * Diseño:
  *  - Un solo `emit(event, payload)` para difusión global.
  *  - `emitToUser(userId, event, payload)` para canales privados por usuario.
- *  - `emitToRoom(room, event, payload)` para grupos arbitrarios (equipos,
- *    paneles, geozonas, etc.).
- *  - Si por cualquier motivo el server aún no está inicializado (p.ej.
- *    durante seeds o tests aislados), las llamadas a emit se vuelven no-op
- *    y se logean, en lugar de lanzar.
+ *  - `emitToRoom(room, event, payload)` para grupos arbitrarios.
+ *  - userId de rooms privadas solo se toma del JWT verificado (auth.token).
  */
 @WebSocketGateway({
   cors: {
     origin: true,
     credentials: true,
   },
-  // Mantenemos el namespace por defecto ('/'). Si más adelante separamos
-  // por dominio (ops, crm, etc.) basta con clonar este gateway.
 })
 export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(RealtimeGateway.name);
@@ -54,10 +46,6 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     this.logger.debug(`Socket desconectado: ${client.id}`);
   }
 
-  /**
-   * Broadcast global a todos los clientes conectados.
-   * Operación idempotente: si el server aún no está listo, no hace nada.
-   */
   emit(event: string, payload: unknown): void {
     if (!this.server) {
       this.logger.verbose(`emit(${event}) ignorado: server no inicializado`);
@@ -66,13 +54,11 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     this.server.emit(event, payload);
   }
 
-  /** Broadcast a la "room" privada de un usuario (ver `roomForUser`). */
   emitToUser(userId: number | string, event: string, payload: unknown): void {
     if (!this.server) return;
     this.server.to(this.roomForUser(userId)).emit(event, payload);
   }
 
-  /** Broadcast a una room arbitraria (p.ej. equipo de ventas, área NOC). */
   emitToRoom(room: string, event: string, payload: unknown): void {
     if (!this.server) return;
     this.server.to(room).emit(event, payload);
@@ -83,13 +69,28 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   }
 
   private extractUserId(client: Socket): number | string | null {
-    // El handshake puede traer user en auth (JWT decodificado), query o headers.
     const auth = client.handshake?.auth as Record<string, unknown> | undefined;
-    const query = client.handshake?.query as Record<string, unknown> | undefined;
-    const candidate =
-      (auth?.['userId'] as number | string | undefined) ??
-      (auth?.['sub'] as number | string | undefined) ??
-      (query?.['userId'] as string | undefined);
-    return candidate ?? null;
+    const headerAuth = client.handshake?.headers?.authorization;
+    const rawToken =
+      (typeof auth?.['token'] === 'string' && auth['token']) ||
+      (typeof headerAuth === 'string' && headerAuth.startsWith('Bearer ')
+        ? headerAuth.slice(7)
+        : null);
+
+    if (!rawToken) {
+      return null;
+    }
+
+    const secret = process.env['JWT_SECRET'];
+    if (!secret) {
+      return null;
+    }
+
+    try {
+      const payload = jwt.verify(rawToken, secret) as { sub?: number | string };
+      return payload.sub ?? null;
+    } catch {
+      return null;
+    }
   }
 }

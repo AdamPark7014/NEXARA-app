@@ -30,9 +30,16 @@ yarn-debug.log*
 yarn-error.log*
 logs/
 
+# IDEs
+.vscode/
+.idea/
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+**/desktop.ini
 
 # Prisma
 prisma/dev.db
@@ -40,10 +47,6 @@ prisma/dev.db-journal
 
 # Coverage
 coverage/
-
-# IDEs
-.vscode/
-.idea/
 
 # Expo
 .expo/

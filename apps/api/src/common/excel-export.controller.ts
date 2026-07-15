@@ -1,11 +1,14 @@
-import { Controller, Get, Param, Res, BadRequestException, Query } from '@nestjs/common';
+import { Controller, Get, Param, Res, BadRequestException, Query, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ExcelExportService } from './excel-export.service.js';
+import { RBAC, RbacGuard } from './rbac.guard.js';
+import { PERMISSIONS } from './permissions.js';
 
 const ALLOWED_MODELS = ['viatic', 'vehicle', 'activity', 'evidence'];
 
 @Controller('export')
+@UseGuards(RbacGuard)
 export class ExcelExportController {
   constructor(
     private readonly prisma: PrismaService,
@@ -13,6 +16,15 @@ export class ExcelExportController {
   ) {}
 
   @Get(':model')
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.ACTIVITIES_EXPORT,
+      PERMISSIONS.EVIDENCES_EXPORT,
+      PERMISSIONS.VIATICS_EXPORT,
+      PERMISSIONS.VEHICLES_EXPORT,
+      PERMISSIONS.CONSOLE_ADMIN,
+    ],
+  })
   async exportExcel(
     @Param('model') model: string,
     @Res() res: Response,

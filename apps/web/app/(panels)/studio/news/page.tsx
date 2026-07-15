@@ -66,7 +66,7 @@ export default function StudioNewsPage() {
     if (!token) return;
     setLoading(true); setError(null);
     try {
-      const data = await apiFetch("news", token);
+      const data = await apiFetch("news/admin", token);
       setItems(Array.isArray(data) ? data : (data?.data ?? []));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar noticias");

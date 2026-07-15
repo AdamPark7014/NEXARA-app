@@ -13,6 +13,7 @@ import {
   ParseIntPipe,
   Res,
   NotFoundException,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
@@ -23,6 +24,8 @@ import { ClientsService } from './clients.service.js';
 import { CreateClientDto } from './dto/create-client.dto.js';
 import { UpdateClientDto } from './dto/update-client.dto.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
+import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { PERMISSIONS } from '../common/permissions.js';
 
 interface MulterFile {
   fieldname: string;
@@ -38,6 +41,8 @@ export class ClientsController {
   constructor(private readonly clientsService: ClientsService) {}
 
   @Post()
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CLIENTS_MANAGE] })
   @UseInterceptors(FileInterceptor('image'))
   async create(
     @Body() createClientDto: CreateClientDto,
@@ -95,6 +100,8 @@ export class ClientsController {
   }
 
   @Put(':id')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CLIENTS_MANAGE] })
   @UseInterceptors(FileInterceptor('image'))
   async update(
     @Param('id', ParseIntPipe) id: number,
@@ -108,6 +115,8 @@ export class ClientsController {
   }
 
   @Delete(':id')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CLIENTS_MANAGE] })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.clientsService.remove(id);
   }

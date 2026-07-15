@@ -36,7 +36,7 @@ export class ContactMessagesController {
     @Body() inboundContactMessageDto: InboundContactMessageDto,
   ) {
     const expectedToken = process.env.INBOUND_EMAIL_TOKEN;
-    if (expectedToken && token !== expectedToken) {
+    if (!expectedToken || token !== expectedToken) {
       throw new UnauthorizedException('Token invalido');
     }
     return this.contactMessagesService.ingestInbound(inboundContactMessageDto);
