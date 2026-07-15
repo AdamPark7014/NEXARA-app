@@ -111,7 +111,7 @@ export default function ActivityViaticsPage() {
       )}
       {viatics.length > 0 && (() => {
         const byConcepto: Record<string, number> = {};
-        for (const v of viatics) { const c = v.motivo ?? v.concepto ?? "Otro"; byConcepto[c] = (byConcepto[c] ?? 0) + 1; }
+        for (const v of viatics) { const c = v.motivo ?? "Otro"; byConcepto[c] = (byConcepto[c] ?? 0) + 1; }
         const byEstatus: Record<string, number> = {};
         for (const v of viatics) { const s = v.estatus ?? "PENDIENTE"; byEstatus[s] = (byEstatus[s] ?? 0) + 1; }
         const total = viatics.length;

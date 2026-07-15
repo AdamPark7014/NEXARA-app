@@ -55,6 +55,10 @@
   max-width: 42ch;
 }
 
+.storyLeadSecondary + .storyLeadSecondary {
+  margin-top: 12px;
+}
+
 .storyCta {
   margin: clamp(28px, 4vw, 40px) 0 0;
 }

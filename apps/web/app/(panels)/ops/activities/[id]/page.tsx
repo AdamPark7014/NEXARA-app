@@ -124,7 +124,7 @@ export default function ActivityDetailPage() {
     color: "var(--foreground)", fontSize: 13,
   };
 
-  const evidenceCount = countEvidenceFiles(activity.evidencias);
+  const evidenceCount = countEvidenceFiles(activity.activityEvidence);
 
   const isCancelOrReschedule = activity.estatus === "CANCELADA" || activity.estatus === "REPROGRAMAR";
   const activityFlow: { key: string; label: string; icon: string }[] = isCancelOrReschedule
