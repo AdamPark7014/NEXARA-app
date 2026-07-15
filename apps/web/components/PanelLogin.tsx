@@ -269,18 +269,18 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           width: 88px;
           height: 88px;
           margin: 0 auto 12px;
-          border-radius: 20px;
+          border-radius: 0;
           display: flex;
           align-items: center;
           justify-content: center;
-          background: #050a14;
-          border: 1px solid color-mix(in srgb, var(--primary) 26%, var(--border));
-          box-shadow: var(--elev-1);
+          background: transparent;
+          border: none;
+          box-shadow: none;
         }
 
         .logoImage {
-          width: 68px;
-          height: 68px;
+          width: 78px;
+          height: 78px;
           object-fit: contain;
         }
 
@@ -506,12 +506,12 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           .logo {
             width: 74px;
             height: 74px;
-            border-radius: 16px;
+            border-radius: 0;
           }
 
           .logoImage {
-            width: 48px;
-            height: 48px;
+            width: 64px;
+            height: 64px;
           }
 
           .title {
@@ -551,7 +551,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           ) : null}
           <div className="logo-container">
             <div className="logo">
-              <Image src="/logo-nexara-platform.png" alt="Nexara" width={68} height={62} className="logoImage" priority />
+              <Image src="/logo-nexara-platform.png" alt="Nexara" width={78} height={78} className="logoImage" priority />
             </div>
             <p className="brandName">Nexara</p>
             <h1 className="title">{title || "Iniciar sesión"}</h1>
