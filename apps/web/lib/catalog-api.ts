@@ -13,6 +13,7 @@ export type CatalogProduct = {
   satProductKey?: string | null;
   satUnitKey?: string | null;
   unitName?: string | null;
+  activo?: boolean | null;
   brand?: { id: number; name: string } | null;
   stockLevels?: Array<{
     quantity: number | string;

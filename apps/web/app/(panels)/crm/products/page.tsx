@@ -367,8 +367,8 @@ export default function ProductsPage() {
             { key: "name", label: "Nombre" },
             { key: "category", label: "Categoría" },
             { key: "price", label: "Precio", format: (v) => `${Number(v).toFixed(2)}` },
-            { key: "unit", label: "Unidad" },
-            { key: "isActive", label: "Activo", format: (v) => v ? "Sí" : "No" },
+            { key: "unitName", label: "Unidad" },
+            { key: "activo", label: "Activo", format: (v) => v ? "Sí" : "No" },
           ], "catalogo-productos")}>CSV</Button>
         ) : undefined}
       />
