@@ -528,6 +528,10 @@ model User {
   documentsCreated        ManagedDocument[]      @relation("DocumentCreator")
   documentsApproved       ManagedDocument[]      @relation("DocumentApprover")
   documentVersionsCreated DocumentVersion[]      @relation("DocumentVersionCreator")
+  chatChannelsCreated     ChatChannel[]          @relation("ChatChannelCreator")
+  chatMemberships         ChatChannelMember[]    @relation("ChatChannelMember")
+  chatMessagesAuthored    ChatMessage[]          @relation("ChatMessageAuthor")
+  chatReactions           ChatMessageReaction[]  @relation("ChatReactionUser")
   workflowStepsApprover   WorkflowStep[]         @relation("WorkflowStepApprover")
   workflowsStarted        WorkflowInstance[]     @relation("WorkflowStarter")
   workflowApprovals       WorkflowApproval[]     @relation("ApprovalDecider")
@@ -3306,6 +3310,7 @@ model ManagedDocument {
   createdBy      User              @relation("DocumentCreator", fields: [createdById], references: [id])
   approvedBy     User?             @relation("DocumentApprover", fields: [approvedById], references: [id])
   versions       DocumentVersion[]
+  chatChannel    ChatChannel?
 
   @@index([status])
   @@map("managed_documents")
@@ -4040,4 +4045,98 @@ model InternalComunicado {
   updatedAt          DateTime  @updatedAt
 
   @@index([estado, createdAt])
+}
+
+// ============================================================================
+// WORKSPACE CHAT (Slack-like — channels, DMs, threads, document rooms)
+// ============================================================================
+
+enum ChatChannelKind {
+  PUBLIC
+  PRIVATE
+  DIRECT
+  DOCUMENT
+}
+
+enum ChatMessageKind {
+  TEXT
+  SYSTEM
+  FILE
+}
+
+model ChatChannel {
+  id             Int                 @id @default(autoincrement())
+  kind           ChatChannelKind     @default(PUBLIC)
+  slug           String?             @unique @db.VarChar(80)
+  name           String              @db.VarChar(120)
+  topic          String?             @db.VarChar(500)
+  description    String?             @db.VarChar(1000)
+  isArchived     Boolean             @default(false)
+  documentId     Int?                @unique
+  dmKey          String?             @unique @db.VarChar(64)
+  createdById    Int?
+  lastMessageAt  DateTime?
+  lastMessagePreview String?         @db.VarChar(280)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  document       ManagedDocument?    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy      User?               @relation("ChatChannelCreator", fields: [createdById], references: [id])
+  members        ChatChannelMember[]
+  messages       ChatMessage[]
+
+  @@index([kind, lastMessageAt])
+  @@map("chat_channels")
+}
+
+model ChatChannelMember {
+  id           Int         @id @default(autoincrement())
+  channelId    Int
+  userId       Int
+  role         String      @default("member") @db.VarChar(20)
+  lastReadAt   DateTime?
+  mutedUntil   DateTime?
+  joinedAt     DateTime    @default(now())
+  channel      ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user         User        @relation("ChatChannelMember", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+  @@index([userId, lastReadAt])
+  @@map("chat_channel_members")
+}
+
+model ChatMessage {
+  id              Int                   @id @default(autoincrement())
+  channelId       Int
+  authorId        Int
+  parentId        Int?
+  kind            ChatMessageKind       @default(TEXT)
+  body            String                @db.Text
+  attachmentUrl   String?               @db.VarChar(500)
+  attachmentName  String?               @db.VarChar(255)
+  editedAt        DateTime?
+  deletedAt       DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  channel         ChatChannel           @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  author          User                  @relation("ChatMessageAuthor", fields: [authorId], references: [id])
+  parent          ChatMessage?          @relation("ChatThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies         ChatMessage[]         @relation("ChatThread")
+  reactions       ChatMessageReaction[]
+
+  @@index([channelId, createdAt])
+  @@index([parentId, createdAt])
+  @@map("chat_messages")
+}
+
+model ChatMessageReaction {
+  id        Int         @id @default(autoincrement())
+  messageId Int
+  userId    Int
+  emoji     String      @db.VarChar(32)
+  createdAt DateTime    @default(now())
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User        @relation("ChatReactionUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@map("chat_message_reactions")
 }

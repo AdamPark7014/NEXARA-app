@@ -54,6 +54,7 @@ import { MaintenanceModule } from './maintenance/maintenance.module.js';
 import { AuditModule } from './audit/audit.module.js';
 import { AnalyticsModule } from './analytics/analytics.module.js';
 import { DocumentsModule } from './documents/documents.module.js';
+import { ChatModule } from './chat/chat.module.js';
 import { HealthModule } from './health/health.module';
 import { SettingsModule } from './settings/settings.module';
 import { UserPreferencesModule } from './user-preferences/user-preferences.module';
@@ -139,6 +140,7 @@ import { InternalComunicadosModule } from './internal-comunicados/internal-comun
     AuditModule,
     AnalyticsModule,
     DocumentsModule,
+    ChatModule,
     HealthModule,
     SettingsModule,
     UserPreferencesModule,
