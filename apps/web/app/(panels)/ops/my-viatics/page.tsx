@@ -25,7 +25,15 @@ async function apiFetch(path: string, token: string) {
   return t ? JSON.parse(t) : null;
 }
 
-const emptyForm = { concepto: "", montoSolicitado: 0, comprobanteUrl: "" };
+const emptyForm = {
+  concepto: "",
+  montoSolicitado: 0,
+  comprobanteUrl: "",
+  categoria: "OTROS",
+  projectId: "",
+  actividadId: "",
+  vehicleId: "",
+};
 
 export default function MyViaticsPage() {
   const { user } = useUser();
@@ -44,6 +52,8 @@ export default function MyViaticsPage() {
   const [form, setForm] = useState({ ...emptyForm });
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [projects, setProjects] = useState<{ id: number; name: string }[]>([]);
+  const [vehicles, setVehicles] = useState<{ id: number; nombre: string; placas?: string | null }[]>([]);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -61,6 +71,28 @@ export default function MyViaticsPage() {
   }, [token]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (!token) return;
+    void apiFetch("ventas/proyectos", token)
+      .then((data) => {
+        const rows = Array.isArray(data) ? data : (data?.data ?? []);
+        setProjects(rows.map((p: { id: number; name?: string }) => ({ id: p.id, name: p.name || `#${p.id}` })));
+      })
+      .catch(() => setProjects([]));
+    void apiFetch("vehicles/inventory", token)
+      .then((data) => {
+        const rows = Array.isArray(data) ? data : (data?.data ?? []);
+        setVehicles(
+          rows.map((v: { id: number; nombre?: string; placas?: string | null }) => ({
+            id: v.id,
+            nombre: v.nombre || `Vehículo #${v.id}`,
+            placas: v.placas,
+          })),
+        );
+      })
+      .catch(() => setVehicles([]));
+  }, [token]);
 
   const visibleItems = useMemo(() => {
     let rows = items;
@@ -89,6 +121,10 @@ export default function MyViaticsPage() {
       concepto: v.concepto ?? "",
       montoSolicitado: v.montoSolicitado ?? 0,
       comprobanteUrl: v.comprobante ?? "",
+      categoria: (v as { categoria?: string }).categoria || "OTROS",
+      projectId: (v as { projectId?: number }).projectId ? String((v as { projectId?: number }).projectId) : "",
+      actividadId: v.actividadId ? String(v.actividadId) : "",
+      vehicleId: (v as { vehicleId?: number }).vehicleId ? String((v as { vehicleId?: number }).vehicleId) : "",
     });
     setEvidenceFile(null);
     setActionErr(null);
@@ -97,6 +133,10 @@ export default function MyViaticsPage() {
 
   const submit = async () => {
     if (!token || !form.concepto.trim() || !form.montoSolicitado) return;
+    if (!editTarget && !form.projectId && !form.actividadId) {
+      setActionErr("Debes ligar la solicitud a un proyecto o una actividad");
+      return;
+    }
     if (!editTarget && !evidenceFile && !form.comprobanteUrl.trim()) {
       setActionErr("Debes adjuntar el ticket o comprobante");
       return;
@@ -104,26 +144,29 @@ export default function MyViaticsPage() {
     setSaving(true);
     setActionErr(null);
     try {
+      const payload = {
+        motivo: form.concepto.trim(),
+        montoSolicitado: form.montoSolicitado,
+        comprobanteUrl: form.comprobanteUrl.trim() || undefined,
+        categoria: form.categoria,
+        projectId: form.projectId ? Number(form.projectId) : null,
+        actividadId: form.actividadId ? Number(form.actividadId) : null,
+        vehicleId: form.vehicleId ? Number(form.vehicleId) : null,
+      };
       if (editTarget) {
-        const updated = await patchViatico(
-          token,
-          editTarget.id,
-          { motivo: form.concepto.trim(), montoSolicitado: form.montoSolicitado, comprobanteUrl: form.comprobanteUrl.trim() || undefined },
-          evidenceFile,
-        );
+        const updated = await patchViatico(token, editTarget.id, payload, evidenceFile);
         setItems((prev) => prev.map((v) => (v.id === editTarget.id ? normalizeViaticoRow({ ...(v as unknown as Record<string, unknown>), ...(updated ?? {}) }) : v)));
       } else {
         await postViatico(
           token,
-          { usuarioId: user?.id, motivo: form.concepto.trim(), montoSolicitado: form.montoSolicitado, comprobanteUrl: form.comprobanteUrl.trim() || undefined },
+          { usuarioId: user?.id, ...payload },
           evidenceFile,
         );
-        void load();
+        await load();
       }
       setShowForm(false);
-      setEditTarget(null);
     } catch (e) {
-      setActionErr(e instanceof Error ? e.message : "Error al guardar");
+      setActionErr(e instanceof Error ? e.message : "No se pudo guardar");
     } finally {
       setSaving(false);
     }
@@ -228,7 +271,36 @@ export default function MyViaticsPage() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowForm(false)}>
           <div style={{ background: "var(--surface)", borderRadius: 16, padding: 28, width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>{editTarget ? `Editar viático #${editTarget.id}` : "Solicitar viático"}</div>
+            {actionErr && <InlineAlert variant="danger" message={actionErr} />}
             <div style={{ display: "grid", gap: 14 }}>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Categoría</span>
+                <select value={form.categoria} onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))} style={inp}>
+                  {["COMBUSTIBLE", "CASETA", "HOSPEDAJE", "ALIMENTACION", "TRANSPORTE", "OTROS"].map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Proyecto</span>
+                <select value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))} style={inp}>
+                  <option value="">— Seleccionar —</option>
+                  {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>ID actividad OPS</span>
+                <input value={form.actividadId} onChange={(e) => setForm((f) => ({ ...f, actividadId: e.target.value }))} placeholder="Opcional si hay proyecto" style={inp} />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Vehículo (opcional)</span>
+                <select value={form.vehicleId} onChange={(e) => setForm((f) => ({ ...f, vehicleId: e.target.value }))} style={inp}>
+                  <option value="">— Sin vehículo —</option>
+                  {vehicles.map((v) => (
+                    <option key={v.id} value={v.id}>{v.nombre}{v.placas ? ` · ${v.placas}` : ""}</option>
+                  ))}
+                </select>
+              </label>
               <label style={{ display: "grid", gap: 4 }}>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Concepto</span>
                 <input value={form.concepto} onChange={(e) => setForm((f) => ({ ...f, concepto: e.target.value }))} placeholder="Hospedaje + gasolina Puebla" style={inp} />

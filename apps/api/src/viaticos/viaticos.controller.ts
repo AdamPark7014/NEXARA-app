@@ -19,7 +19,6 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { ViaticosService } from './viaticos.service.js';
-import { UsersService } from '../users/users.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
@@ -27,21 +26,60 @@ import { ExcelImportService } from '../common/excel-import.service.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
 
 @Controller('viatics')
-@UseGuards(UrlAccessGuard) // RBAC v2 — gate por URL/rol antes que RbacGuard legacy
+@UseGuards(UrlAccessGuard)
 export class ViaticosController {
   constructor(
     private readonly viaticosService: ViaticosService,
-    private readonly usersService: UsersService,
     private readonly excelExport: ExcelExportService,
     private readonly excelImport: ExcelImportService,
   ) {}
 
-  // Endpoint para obtener todos los viáticos
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_VIEW, PERMISSIONS.VIATICS_MANAGE] })
   async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
     return this.viaticosService.findAll(user, query);
+  }
+
+  @Get('analytics')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_VIEW, PERMISSIONS.VIATICS_MANAGE] })
+  analytics(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('projectId') projectId?: string,
+  ) {
+    return this.viaticosService.analytics({
+      from: from || undefined,
+      to: to || undefined,
+      projectId: projectId ? Number(projectId) : undefined,
+    });
+  }
+
+  @Get('report.pdf')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_VIEW, PERMISSIONS.VIATICS_MANAGE, PERMISSIONS.VIATICS_EXPORT] })
+  async reportPdf(
+    @CurrentUser() user: any,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('projectId') projectId?: string,
+    @Res() res?: Response,
+  ) {
+    const buffer = await this.viaticosService.reportPdf(
+      {
+        from: from || undefined,
+        to: to || undefined,
+        projectId: projectId ? Number(projectId) : undefined,
+      },
+      user?.nombre ?? null,
+    );
+    res!.header('Content-Type', 'application/pdf');
+    res!.header(
+      'Content-Disposition',
+      `attachment; filename="viaticos-${from || 'inicio'}-${to || 'hoy'}.pdf"`,
+    );
+    return res!.send(buffer);
   }
 
   @Post()
@@ -55,18 +93,22 @@ export class ViaticosController {
     if (!ticketEvidenciaUrl) {
       throw new BadRequestException('Debes adjuntar el ticket o comprobante');
     }
-    return this.viaticosService.create({
-      usuarioId: body.usuarioId ? Number(body.usuarioId) : user.id,
-      actividadId: body.actividadId ? Number(body.actividadId) : null,
-      projectId: body.projectId ? Number(body.projectId) : null,
-      montoSolicitado: Number(body.montoSolicitado),
-      motivo: body.motivo ?? body.concepto,
-      ticketEvidenciaUrl,
-      estatus: body.estatus ?? 'Pendiente',
-    });
+    return this.viaticosService.create(
+      {
+        usuarioId: body.usuarioId ? Number(body.usuarioId) : user.id,
+        actividadId: body.actividadId ? Number(body.actividadId) : null,
+        projectId: body.projectId ? Number(body.projectId) : null,
+        vehicleId: body.vehicleId ? Number(body.vehicleId) : null,
+        categoria: body.categoria,
+        montoSolicitado: Number(body.montoSolicitado),
+        motivo: body.motivo ?? body.concepto,
+        ticketEvidenciaUrl,
+        estatus: body.estatus ?? 'Pendiente',
+      },
+      user,
+    );
   }
 
-  // Exportar viáticos (CSV o JSON)
   @Get('export/:format')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_EXPORT] })
@@ -80,26 +122,22 @@ export class ViaticosController {
       return res.send(Buffer.from(buffer));
     }
     if (format === 'csv') {
-      res.header('Content-Type', 'text/csv');
+      res.header('Content-Type', 'text/csv; charset=utf-8');
       res.attachment('viaticos.csv');
-      return res.send('');
-    } else {
-      res.header('Content-Type', 'application/json');
-      res.attachment('viaticos.json');
-      return res.send(JSON.stringify(data, null, 2));
+      return res.send(this.viaticosService.toCSV(data));
     }
+    res.header('Content-Type', 'application/json');
+    res.attachment('viaticos.json');
+    return res.send(JSON.stringify(data, null, 2));
   }
 
-  // Importar viáticos desde archivo JSON
   @Post('import')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_IMPORT] })
   @UseInterceptors(FileInterceptor('file'))
   async import(@UploadedFile() file: any, @Res() res: Response) {
     if (!file) {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .json({ message: 'Archivo requerido' });
+      return res.status(HttpStatus.BAD_REQUEST).json({ message: 'Archivo requerido' });
     }
     try {
       const result = await this.excelImport.importExcel('viatic', file.buffer);
@@ -150,8 +188,16 @@ export class ViaticosController {
     if (body.montoSolicitado !== undefined) {
       data.montoSolicitado = Number(body.montoSolicitado);
     }
+    if (body.categoria !== undefined) data.categoria = body.categoria;
+    if (body.projectId !== undefined) {
+      data.projectId = body.projectId ? Number(body.projectId) : null;
+    }
+    if (body.actividadId !== undefined) {
+      data.actividadId = body.actividadId ? Number(body.actividadId) : null;
+    }
+    if (body.vehicleId !== undefined) {
+      data.vehicleId = body.vehicleId ? Number(body.vehicleId) : null;
+    }
     return this.viaticosService.update(+id, data);
   }
 }
-
-

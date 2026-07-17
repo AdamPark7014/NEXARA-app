@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -251,8 +252,39 @@ export default function AccountingPage() {
         eyebrow="ERP · Finanzas"
         title="Contabilidad · Pólizas"
         subtitle="Libro diario de pólizas contables: ingresos, egresos, ajustes y diarios."
-        actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={() => { setForm({ ...emptyForm }); setShowForm(true); }}>Nueva póliza</Button> : undefined}
+        actions={
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Link href="/erp/finance/viatics?tab=analytics" style={{ textDecoration: "none" }}>
+              <Button variant="ghost" iconLeft="💸">Viáticos / control de gastos</Button>
+            </Link>
+            {cfg.canCreate ? (
+              <Button variant="primary" iconLeft="+" onClick={() => { setForm({ ...emptyForm }); setShowForm(true); }}>Nueva póliza</Button>
+            ) : null}
+          </div>
+        }
       />
+
+      <div
+        style={{
+          marginBottom: 14,
+          padding: "12px 16px",
+          borderRadius: 10,
+          border: "1px solid var(--border)",
+          background: "var(--surface-2)",
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+          Control de viáticos con refs contables (`VIAT-…`), analytics por proyecto/persona/categoría y PDF del periodo.
+        </div>
+        <Link href="/erp/finance/viatics" style={{ fontSize: 13, fontWeight: 600 }}>
+          Abrir módulo de viáticos →
+        </Link>
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 14 }}>
         <KpiCard label="Ingresos registrados" value={<Money value={ingresos} compact />} hint={`${items.filter(e => e.type === "INGRESOS").length} pólizas de ingreso`} variant="positive" icon="📈" />

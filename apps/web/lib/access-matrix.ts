@@ -216,10 +216,12 @@ export type ModuleId =
   | "studio-social"
   | "studio-newsletter"
   | "studio-leads"
+  | "studio-chat"
   // LAB
   | "lab-home"
   | "lab-ai"
-  | "lab-health";
+  | "lab-health"
+  | "lab-chat";
 
 export type ModuleEntry = {
   id: ModuleId;
@@ -742,6 +744,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     icon: "🎨", allowedRoles: STUDIO_TEAM,
     group: "Tablero", visible: true,
   },
+  "studio-chat": {
+    id: "studio-chat", panel: PANELS.STUDIO, path: "/chat",
+    label: "Chat", description: "Canales y mensajes del equipo",
+    icon: "💬", allowedRoles: STUDIO_TEAM,
+    group: "Tablero", visible: true,
+  },
   "studio-hero": {
     id: "studio-hero", panel: PANELS.STUDIO, path: "/hero",
     label: "Banner del inicio", description: "Imágenes y orden del carrusel principal",
@@ -798,6 +806,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "lab-home", panel: PANELS.LAB, path: "/",
     label: "Lab home", description: "Playground y feature flags",
     icon: "🧪", allowedRoles: [R.CEO],
+    group: "Lab", visible: true,
+  },
+  "lab-chat": {
+    id: "lab-chat", panel: PANELS.LAB, path: "/chat",
+    label: "Chat", description: "Canales y mensajes del equipo",
+    icon: "💬", allowedRoles: [R.CEO],
     group: "Lab", visible: true,
   },
   "lab-ai": {
@@ -875,8 +889,8 @@ export function canAccessUrl(
 
   // 2) Rutas personales `/[panel]/my-profile` / `/[panel]/calendar` siempre permitidas
   if (/^\/(erp|crm|ops|studio|lab)\/(my-profile|calendar)(\/|$)/.test(normalized)) return true;
-  // Chat corporativo — disponible en paneles principales
-  if (/^\/(erp|crm|ops)\/chat(\/|$)/.test(normalized)) return true;
+  // Chat corporativo — mismo módulo en los 5 paneles, misma API/DB
+  if (/^\/(erp|crm|ops|studio|lab)\/chat(\/|$)/.test(normalized)) return true;
 
   return false;
 }

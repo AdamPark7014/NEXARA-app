@@ -1,0 +1,9 @@
+# Copia este archivo a key.properties (NO se versiona) y rellena valores reales.
+# Ubicación: apps/mobile-native/android/key.properties
+#
+# storeFile es relativo a apps/mobile-native/android/
+
+storePassword=CHANGE_ME_STORE_PASSWORD
+keyPassword=CHANGE_ME_KEY_PASSWORD
+keyAlias=nexara
+storeFile=nexara-upload.jks

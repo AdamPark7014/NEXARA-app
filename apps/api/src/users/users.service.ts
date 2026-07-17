@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
@@ -6,6 +6,7 @@ import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import * as bcrypt from 'bcryptjs';
 import { PERMISSIONS } from '../common/permissions.js';
+import { ChatService } from '../chat/chat.service.js';
 
 /** Roles que reciben OT, kits de herramientas y asignaciones de campo. */
 const FIELD_ASSIGNEE_ROLE_KEYS = ['ing_campo', 'ing_soporte'] as const;
@@ -220,10 +221,20 @@ export class UsersService {
     if (body.estadoRRHH !== undefined) data.estadoRRHH = body.estadoRRHH;
     if (body.isActive !== undefined) data.isActive = body.isActive;
     if (body.fechaIngreso !== undefined) data.fechaIngreso = body.fechaIngreso ? new Date(body.fechaIngreso) : null;
-    return this.prisma['user'].update({ where: { id }, data });
+    const updated = await this.prisma['user'].update({ where: { id }, data });
+    if (body.isActive === false) {
+      await this.chat.removeUserMemberships(id);
+    } else if (body.isActive === true) {
+      await this.chat.addUserToOrgChannels(id);
+    }
+    return updated;
   }
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => ChatService))
+    private readonly chat: ChatService,
+  ) {}
 
   private async resolveRoleId(value: unknown) {
     if (value === undefined || value === null) {
@@ -297,7 +308,7 @@ export class UsersService {
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const created = await this.prisma.$transaction(async (tx) => {
         const dupInTx = await tx.user.findFirst({
           where: { email: { equals: emailNorm, mode: 'insensitive' } },
           select: { id: true },
@@ -334,6 +345,8 @@ export class UsersService {
         });
         return this.withEmployeeNumber(updatedUser);
       });
+      await this.chat.addUserToOrgChannels(created.id);
+      return created;
     } catch (e) {
       if (e instanceof BadRequestException) throw e;
       if (e instanceof Prisma.PrismaClientKnownRequestError) {

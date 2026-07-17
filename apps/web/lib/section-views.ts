@@ -673,7 +673,20 @@ export function getEvidencesSectionConfig(user: UserAccessInput | null | undefin
 
 export function getViaticsSectionConfig(user: UserAccessInput | null | undefined): SectionConfig {
   const v2 = resolveV2RoleKey(user);
-  if (!v2 || isOpsManager(v2) || user?.isSuperAdmin) {
+  if (!v2 || user?.isSuperAdmin || v2 === ROLES.CEO || v2 === ROLES.SUPER_ADMIN) {
+    return {
+      viewMode: 'manage',
+      defaultScope: 'team',
+      canCreate: false,
+      canEdit: true,
+      canDelete: false,
+      canAssign: false,
+      canApprove: true,
+      title: 'Viáticos · Aprobación',
+      subtitle: 'Revisa y autoriza solicitudes de viáticos del equipo.',
+    };
+  }
+  if (isOpsManager(v2)) {
     return {
       viewMode: 'manage',
       defaultScope: 'team',
@@ -1159,35 +1172,47 @@ const ERP_VIATICS_APPROVERS = new Set<RoleKey>([
   ROLES.CONTABILIDAD,
   ROLES.RH,
   ROLES.DIR_OPERACIONES,
+  ROLES.ADMINISTRATIVO,
+]);
+
+/** Roles que pueden solicitar (CEO / dueño nunca pide; solo aprueba). */
+const ERP_VIATICS_REQUESTERS = new Set<RoleKey>([
+  ROLES.ADMINISTRATIVO,
+  ROLES.COORD_ADMIN,
+  ROLES.DIR_ADMIN,
 ]);
 
 /** Viáticos administrativos (ERP) — solicitar vs aprobar. */
 export function getErpViaticsAdminSectionConfig(user: UserAccessInput | null | undefined): SectionConfig {
   const v2 = resolveV2RoleKey(user);
-  if (!v2 || user?.isSuperAdmin) {
+  // Dueño / super-admin / sin rol: solo gestión y aprobación — nunca "Solicitar".
+  if (!v2 || user?.isSuperAdmin || v2 === ROLES.CEO || v2 === ROLES.SUPER_ADMIN) {
     return {
       viewMode: 'manage',
       defaultScope: 'team',
-      canCreate: true,
+      canCreate: false,
       canEdit: true,
-      canDelete: true,
+      canDelete: Boolean(user?.isSuperAdmin) || v2 === ROLES.SUPER_ADMIN,
       canAssign: false,
       canApprove: true,
-      title: 'Viáticos · Gestión',
-      subtitle: 'Revisa y autoriza solicitudes de viáticos del equipo.',
+      title: 'Viáticos · Aprobación',
+      subtitle: 'Autoriza solicitudes del equipo — el dueño no solicita viáticos.',
     };
   }
   if (ERP_VIATICS_APPROVERS.has(v2)) {
+    const canCreate = ERP_VIATICS_REQUESTERS.has(v2);
     return {
       viewMode: 'manage',
       defaultScope: 'team',
-      canCreate: v2 === ROLES.ADMINISTRATIVO,
+      canCreate,
       canEdit: true,
       canDelete: tier(v2) >= 70,
       canAssign: false,
       canApprove: true,
-      title: 'Viáticos · Aprobación',
-      subtitle: 'Gestión y autorización de viáticos — flujo coordinador → administración → banca.',
+      title: canCreate ? 'Viáticos · Gestión' : 'Viáticos · Aprobación',
+      subtitle: canCreate
+        ? 'Preaprueba del equipo y, si lo necesitas, solicita los tuyos.'
+        : 'Gestión y autorización de viáticos — flujo admin → coordinación → dirección → CEO.',
     };
   }
   return {
@@ -1199,7 +1224,7 @@ export function getErpViaticsAdminSectionConfig(user: UserAccessInput | null | u
     canAssign: false,
     canApprove: false,
     title: 'Mis viáticos',
-    subtitle: 'Solicita viáticos y adjunta comprobante — espera aprobación de tu coordinador.',
+    subtitle: 'Solicita viáticos ligados a actividad o proyecto y adjunta comprobante.',
   };
 }
 

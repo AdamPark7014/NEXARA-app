@@ -522,7 +522,6 @@ fun ServiceSheetsModuleScreen() {
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        fun r(k: String, v: String) { if (v.isNotBlank()) item { Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Text(k, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(v) } } }
                         DetailLine("Folio", str(s, "folio", "number", "folioNumber"))
                         DetailLine("Cliente", str(s, "clientName", "cliente"))
                         DetailLine("Sucursal", str(s, "branchName", "sucursal"))

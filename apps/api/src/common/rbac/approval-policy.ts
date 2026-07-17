@@ -32,11 +32,12 @@ export type ApprovalStep = {
  */
 export const APPROVAL_CHAINS: Record<ApprovalFlow, ApprovalStep[]> = {
   // ─── VIÁTICOS ────────────────────────────────────────────────────
+  // Campo solicita → Admin / Coord.Admin preaprueban → Dir.Admin (≥$10k) → CEO siempre cierra
   viaticos: [
-    { role: ROLES.ADMINISTRATIVO,    label: 'Revisión administrativa' },           // siempre
-    { role: ROLES.COORD_ADMIN,       label: 'Coordinación administrativa' },       // siempre
+    { role: ROLES.ADMINISTRATIVO,    label: 'Revisión administrativa' },
+    { role: ROLES.COORD_ADMIN,       label: 'Coordinación administrativa' },
     { role: ROLES.DIR_ADMIN,         thresholdMxn: 10_000,  label: 'Dir. Administrativo' },
-    { role: ROLES.CEO,               thresholdMxn: 50_000,  label: 'CEO', isFinal: true },
+    { role: ROLES.CEO,               label: 'CEO — Autorización final', isFinal: true },
   ],
 
   // ─── EVIDENCIAS / ACTIVIDADES DE CAMPO ───────────────────────────

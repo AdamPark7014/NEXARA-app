@@ -61,6 +61,140 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / 1024).toFixed(0)} KB`;
 }
 
+/** Previsualización en marco de dispositivo (desktop 16:9 / móvil 9:16). */
+function HeroVideoDevicePreview({
+  label,
+  hint,
+  src,
+  aspect,
+}: {
+  label: string;
+  hint: string;
+  src: string | null;
+  aspect: "desktop" | "mobile";
+}) {
+  const isMobile = aspect === "mobile";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: isMobile ? "center" : "stretch", minWidth: 0 }}>
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 2 }}>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            color: "var(--text-secondary)",
+          }}
+        >
+          {label}
+        </span>
+        <span style={{ fontSize: 12, color: "var(--text-tertiary)", lineHeight: 1.35 }}>{hint}</span>
+      </div>
+
+      <div
+        style={{
+          width: isMobile ? "min(100%, 168px)" : "100%",
+          marginInline: isMobile ? "auto" : 0,
+          padding: isMobile ? "10px 8px 14px" : "10px 10px 12px",
+          borderRadius: isMobile ? 28 : 16,
+          background: "linear-gradient(160deg, #1a2330 0%, #0b1018 55%, #111827 100%)",
+          border: "1px solid color-mix(in srgb, var(--border) 70%, #2dd8f2)",
+          boxShadow: "0 18px 40px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)",
+        }}
+      >
+        {/* “Notch” / barra superior del dispositivo */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            marginBottom: isMobile ? 8 : 6,
+          }}
+        >
+          <div
+            style={{
+              width: isMobile ? 42 : "36%",
+              height: isMobile ? 5 : 4,
+              borderRadius: 999,
+              background: "rgba(255,255,255,0.18)",
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            aspectRatio: isMobile ? "9 / 16" : "16 / 9",
+            borderRadius: isMobile ? 18 : 10,
+            overflow: "hidden",
+            background: "#050a14",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
+        >
+          {src ? (
+            <video
+              key={src}
+              src={src}
+              controls
+              muted
+              playsInline
+              preload="metadata"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+                background: "#050a14",
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "grid",
+                placeItems: "center",
+                padding: 16,
+                background:
+                  "radial-gradient(ellipse at 50% 40%, rgba(45,216,242,0.12), transparent 60%), #071018",
+              }}
+            >
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", textAlign: "center", lineHeight: 1.4 }}>
+                {isMobile
+                  ? "Sin variante móvil. En phones se usará el video desktop."
+                  : "Aún no hay video desktop."}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div
+          style={{
+            marginTop: isMobile ? 10 : 8,
+            display: "flex",
+            justifyContent: "center",
+            gap: 6,
+            alignItems: "center",
+          }}
+        >
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: "0.04em",
+              color: "rgba(255,255,255,0.45)",
+              textTransform: "uppercase",
+            }}
+          >
+            {isMobile ? "9:16 · vertical" : "16:9 · horizontal"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function StudioHeroPage() {
   const { user, isContextReady } = useUser();
   const cfg = useMemo(() => getStudioSectionConfig(user, "hero"), [user]);
@@ -758,66 +892,50 @@ export default function StudioHeroPage() {
               {video ? (
                 <article
                   style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                    gap: 16,
-                    padding: 14,
-                    borderRadius: 14,
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 22,
+                    padding: 18,
+                    borderRadius: 16,
                     background: "var(--surface)",
                     border: "1px solid var(--nx-panel-hairline)",
                     boxShadow: "var(--nx-panel-elev-1)",
+                    alignItems: "flex-start",
                   }}
                 >
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-tertiary)" }}>
-                      Video desktop (principal)
-                    </span>
-                    <video
+                  <div style={{ flex: "1 1 320px", minWidth: 0 }}>
+                    <HeroVideoDevicePreview
+                      label="Video desktop (principal)"
+                      hint="Formato horizontal — como se ve en monitores y laptops."
                       src={resolveHeroVideoUrl(video.videoUrl)}
-                      controls
-                      muted
-                      style={{ width: "100%", height: 140, borderRadius: 10, background: "#0a1419", objectFit: "cover" }}
+                      aspect="desktop"
                     />
-                    <code style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{video.videoUrl}</code>
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-tertiary)" }}>
-                      Video móvil (opcional)
-                    </span>
-                    {video.videoUrlMobile ? (
-                      <>
-                        <video
-                          src={resolveHeroVideoUrl(video.videoUrlMobile)}
-                          controls
-                          muted
-                          style={{ width: "100%", height: 140, borderRadius: 10, background: "#0a1419", objectFit: "cover" }}
-                        />
-                        <code style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{video.videoUrlMobile}</code>
-                      </>
-                    ) : (
-                      <div
-                        style={{
-                          height: 140,
-                          borderRadius: 10,
-                          background: "var(--surface-2)",
-                          border: "1px dashed var(--border)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          padding: 12,
-                        }}
-                      >
-                        <span style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center" }}>
-                          Sin variante móvil. En pantallas pequeñas se usa el video desktop.
-                        </span>
-                      </div>
-                    )}
+                  <div style={{ flex: "0 0 180px" }}>
+                    <HeroVideoDevicePreview
+                      label="Video móvil (opcional)"
+                      hint="Formato vertical — optimizado para teléfono."
+                      src={video.videoUrlMobile ? resolveHeroVideoUrl(video.videoUrlMobile) : null}
+                      aspect="mobile"
+                    />
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center", minWidth: 0 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 28, flex: "1 1 160px", minWidth: 0 }}>
                     <span style={{ fontWeight: 600, fontSize: 14 }}>{video.title || "Video sin título"}</span>
                     <Tag variant="positive" size="sm">Video activo en producción</Tag>
+                    <code
+                      style={{
+                        fontSize: 10,
+                        color: "var(--text-tertiary)",
+                        wordBreak: "break-all",
+                        lineHeight: 1.4,
+                        whiteSpace: "pre-wrap",
+                      }}
+                    >
+                      {video.videoUrl}
+                      {video.videoUrlMobile ? `\n${video.videoUrlMobile}` : ""}
+                    </code>
                     {video.videoUrlMobile && (
                       <Button
                         size="sm"
