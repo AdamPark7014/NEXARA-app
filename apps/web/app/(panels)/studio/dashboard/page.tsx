@@ -2,12 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useState, useCallback, useMemo } from "react";
-import PageHeader from "@/components/ui/PageHeader";
-import KpiCard from "@/components/ui/KpiCard";
-import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import { Tag } from "@/components/ui/DataTable";
-import EmptyState from "@/components/ui/EmptyState";
+import {
+  DashPage,
+  DashHero,
+  DashGrid,
+  DashCol,
+  StatStrip,
+  DashPanel,
+  BarList,
+  ListRow,
+  DashPill,
+  DashEmpty,
+} from "@/components/dashboard/DashKit";
 import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
@@ -121,240 +128,183 @@ export default function StudioDashboardPage() {
   function fmtAge(iso: string) {
     const diff = Date.now() - new Date(iso).getTime();
     const hours = Math.floor(diff / 3600000);
-    if (hours < 1) return "Hace unos minutos";
+    if (hours < 1) return "Hace min";
     if (hours < 24) return `Hace ${hours}h`;
     const days = Math.floor(hours / 24);
     return days === 1 ? "Ayer" : `Hace ${days}d`;
   }
 
+  const programados = posts.filter((p) => p.estado === "Programado").length;
+
   return (
-    <>
-      {loadErr && <p role="alert" style={{ color: "var(--danger)", fontSize: 12, marginBottom: 12 }}>⚠ {loadErr}</p>}
-      <PageHeader
+    <DashPage>
+      <DashHero
         eyebrow="STUDIO · Marca y marketing"
         title={cfg.title}
         subtitle={cfg.subtitle}
-        variant="hero"
-        meta={
-          <>
-            <Tag variant="accent" dot>Sitio en producción</Tag>
-            {contacts !== null && <Tag variant="neutral">{contacts} contactos capturados</Tag>}
-            {cases !== null && <Tag variant="positive">{cases.publicados} casos publicados</Tag>}
-            {nlStats && <Tag variant="neutral">📬 {nlStats.totalSubscribers} suscriptores</Tag>}
-          </>
-        }
         actions={
           <>
+            <DashPill tone="positive">Sitio en producción</DashPill>
             <Link href="/studio/leads" style={{ textDecoration: "none" }}>
-              <Button variant="secondary" iconLeft="✨">Nuevo lead</Button>
+              <Button variant="secondary">Nuevo lead</Button>
             </Link>
             <Link href="/studio/pages" style={{ textDecoration: "none" }}>
-              <Button variant="primary" iconLeft="🌐" iconRight="→">Gestionar sitio</Button>
+              <Button variant="primary" iconRight="→">Gestionar sitio</Button>
             </Link>
           </>
         }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 24 }}>
-        <KpiCard
-          label="Contactos web"
-          value={contacts ?? "—"}
-          hint="Formularios recibidos"
-          icon="📥"
-          variant="accent"
-        />
-        <KpiCard
-          label="Casos publicados"
-          value={cases?.publicados ?? "—"}
-          hint={cases ? `${cases.total - cases.publicados} borradores en revisión` : "Cargando…"}
-          icon="🏆"
-          variant="positive"
-        />
-        <KpiCard
-          label="Suscriptores newsletter"
-          value={nlStats?.totalSubscribers ?? "—"}
-          hint={nlStats?.activeSubscribers != null ? `${nlStats.activeSubscribers} activos` : "Newsletter"}
-          icon="📬"
-          variant="default"
-        />
-        <KpiCard
-          label="Posts programados"
-          value={posts.filter((p) => p.estado === "Programado").length || "—"}
-          hint="Redes sociales"
-          icon="📅"
-          variant="default"
-        />
-      </div>
-
-      {cases !== null && cases.total > 0 && (
-        <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Casos de éxito</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-            {[
-              { label: "Publicados", count: cases.publicados, color: "var(--success)" },
-              { label: "Borradores", count: cases.total - cases.publicados, color: "var(--warning)" },
-            ].filter(r => r.count > 0).map(r => (
-              <div key={r.label} style={{ display: "grid", gridTemplateColumns: "90px 1fr 36px", gap: 10, alignItems: "center" }}>
-                <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{r.label}</span>
-                <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${(r.count / cases.total) * 100}%`, background: r.color, borderRadius: 3 }} />
-                </div>
-                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{r.count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {loadErr && (
+        <DashPanel title="No se pudo cargar" subtitle={loadErr}>
+          <Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>
+        </DashPanel>
       )}
 
-      {/* Atajos de módulos */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 24 }}>
-        {[
-          { href: "/studio/pages", icon: "🌐", label: "Páginas web", desc: "Gestión del sitio público" },
-          { href: "/studio/leads", icon: "✨", label: "Leads digitales", desc: "Contactos del sitio web" },
-          { href: "/studio/contacts", icon: "📇", label: "Contactos", desc: "Directorio de contactos" },
-          { href: "/studio/newsletter", icon: "📬", label: "Newsletter", desc: "Campañas de email" },
-        ].map((m) => (
-          <Link key={m.href} href={m.href} style={{ textDecoration: "none", color: "var(--text-primary)", padding: "14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, display: "flex", alignItems: "center", gap: 10, boxShadow: "var(--nx-panel-elev-1)" }}>
-            <span style={{ fontSize: 20, width: 36, height: 36, borderRadius: 9, background: "color-mix(in srgb, var(--primary) 12%, var(--surface))", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{m.icon}</span>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{m.label}</div>
-              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{m.desc}</div>
-            </div>
-          </Link>
-        ))}
-      </div>
+      <StatStrip
+        stats={[
+          {
+            label: "Contactos web",
+            value: contacts ?? "…",
+            sub: "Formularios recibidos",
+            tone: "accent",
+            big: true,
+          },
+          {
+            label: "Casos publicados",
+            value: cases?.publicados ?? "…",
+            sub: cases ? `${cases.total - cases.publicados} borradores en revisión` : undefined,
+            tone: "positive",
+          },
+          {
+            label: "Suscriptores newsletter",
+            value: nlStats?.totalSubscribers ?? "…",
+            sub: nlStats?.activeSubscribers != null ? `${nlStats.activeSubscribers} activos` : "Newsletter",
+          },
+          {
+            label: "Posts programados",
+            value: programados,
+            sub: "Redes sociales",
+          },
+        ]}
+      />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, marginBottom: 20 }}>
-        {/* Contactos recientes */}
-        <Section
-          eyebrow="Leads"
-          title="Contactos recientes"
-          subtitle="Últimas solicitudes del formulario web"
-          actions={<Link href="/studio/contacts" style={{ fontSize: 12, color: "var(--primary)" }}>Ver todos →</Link>}
-        >
-          {recentContacts.length === 0 ? (
-            <EmptyState icon="📥" title="Sin contactos" description="Aún no hay solicitudes del sitio web." />
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <DashGrid>
+        <DashCol span={7}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <DashPanel
+              title="Contactos recientes"
+              subtitle="Últimas solicitudes del formulario web"
+              action="Ver todos"
+              actionHref="/studio/contacts"
+            >
+              {recentContacts.length === 0 && (
+                <DashEmpty title="Sin contactos" description="Aún no hay solicitudes del sitio web." />
+              )}
               {recentContacts.map((c) => (
-                <article key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</div>
-                    <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{c.company ? `${c.company} · ` : ""}{c.email}</div>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
-                    {c.status && <Tag variant={c.status === "NUEVO" ? "accent" : "neutral"} size="sm">{c.status}</Tag>}
-                    {c.createdAt && <span style={{ fontSize: 10.5, color: "var(--text-tertiary)" }}>{fmtAge(c.createdAt)}</span>}
-                  </div>
-                </article>
+                <ListRow
+                  key={c.id}
+                  title={c.name}
+                  sub={`${c.company ? `${c.company} · ` : ""}${c.email}`}
+                  trail={
+                    <>
+                      {c.status && <DashPill tone={c.status === "NUEVO" ? "accent" : "neutral"}>{c.status}</DashPill>}
+                      {c.createdAt && <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{fmtAge(c.createdAt)}</span>}
+                    </>
+                  }
+                />
               ))}
-            </div>
-          )}
-        </Section>
+            </DashPanel>
 
-        {/* Casos de éxito */}
-        <Section
-          eyebrow="Portfolio"
-          title="Casos de éxito"
-          subtitle={cases ? `${cases.publicados} publicados · ${cases.total - cases.publicados} borradores` : "Portafolio"}
-          actions={<Link href="/studio/cases" style={{ fontSize: 12, color: "var(--primary)" }}>Gestionar →</Link>}
-        >
-          {recentCases.length === 0 ? (
-            <EmptyState icon="🏆" title="Sin casos" description="Agrega el primer caso de éxito." />
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {recentCases.map((c) => (
-                <article key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title}</div>
-                    {(c.client ?? c.industry) && (
-                      <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{[c.client, c.industry].filter(Boolean).join(" · ")}</div>
-                    )}
-                  </div>
-                  <Tag variant={c.publicado ? "positive" : "warning"} size="sm">{c.publicado ? "Publicado" : "Borrador"}</Tag>
-                </article>
-              ))}
-            </div>
-          )}
-        </Section>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
-        {/* Newsletter */}
-        {nlStats && (
-          <Section eyebrow="Newsletter" title="Estado de la campaña" subtitle="Métricas de la lista de suscriptores">
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <div style={{ padding: "12px 16px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 4 }}>Suscriptores totales</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: "var(--primary)" }}>{nlStats.totalSubscribers.toLocaleString("es-MX")}</div>
-              </div>
-              {nlStats.activeSubscribers != null && (
-                <div style={{ padding: "12px 16px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 4 }}>Activos</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: "var(--success, #10b981)" }}>{nlStats.activeSubscribers.toLocaleString("es-MX")}</div>
+            <DashPanel
+              title="Casos de éxito"
+              subtitle={cases ? `${cases.publicados} publicados · ${cases.total - cases.publicados} borradores` : "Portafolio"}
+              action="Gestionar"
+              actionHref="/studio/cases"
+            >
+              {cases !== null && cases.total > 0 && (
+                <div style={{ marginBottom: 6 }}>
+                  <BarList
+                    max={cases.total}
+                    items={[
+                      { label: "Publicados", value: cases.publicados, color: "var(--success)" },
+                      { label: "Borradores", value: cases.total - cases.publicados, color: "var(--warning)" },
+                    ].filter((r) => r.value > 0)}
+                  />
                 </div>
               )}
-            </div>
-            {nlStats.lastCampaignSentAt && (
-              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                Última campaña: {new Date(nlStats.lastCampaignSentAt).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })}
-                {nlStats.lastCampaignOpenRate != null && ` · ${nlStats.lastCampaignOpenRate}% apertura`}
-              </div>
-            )}
-            <div style={{ marginTop: 12, textAlign: "right" }}>
-              <Link href="/studio/newsletter" style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>Gestionar newsletter →</Link>
-            </div>
-          </Section>
-        )}
-
-        {/* Calendario de publicaciones */}
-        <Section eyebrow="Redes sociales" title="Próximas publicaciones" subtitle="Posts programados y borradores">
-          {posts.length === 0 ? (
-            <div style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>
-              No hay posts pendientes.{" "}
-              <Link href="/studio/social" style={{ color: "var(--primary)", fontWeight: 600 }}>Crea uno →</Link>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {posts.map((p) => {
-                const color = RED_COLOR[p.red] ?? "#666";
-                return (
-                  <article key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface)" }}>
-                    <span style={{ width: 40, height: 40, borderRadius: 11, flexShrink: 0, background: `linear-gradient(135deg, ${color} 0%, color-mix(in srgb, ${color} 70%, white) 100%)`, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 17, fontWeight: 800 }}>
-                      {p.red[0]}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.titulo}</div>
-                      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>{p.red} · {fmtDate(p.cuando)}</div>
-                    </div>
-                    <Tag variant={p.estado === "Programado" ? "positive" : "warning"} size="sm">{p.estado}</Tag>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-          <div style={{ marginTop: 12, textAlign: "right" }}>
-            <Link href="/studio/social" style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>Ver calendario social →</Link>
+              {recentCases.length === 0 && (
+                <DashEmpty title="Sin casos" description="Agrega el primer caso de éxito." />
+              )}
+              {recentCases.map((c) => (
+                <ListRow
+                  key={c.id}
+                  title={c.title}
+                  sub={[c.client, c.industry].filter(Boolean).join(" · ") || undefined}
+                  trail={<DashPill tone={c.publicado ? "positive" : "warning"}>{c.publicado ? "Publicado" : "Borrador"}</DashPill>}
+                />
+              ))}
+            </DashPanel>
           </div>
-        </Section>
+        </DashCol>
 
-        {/* Sitio público */}
-        <Section eyebrow="Sitio" title="Secciones públicas" subtitle="nexara.com.mx — en producción">
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {PAGES_STATIC.map((s) => (
-              <article key={s.name} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "center", padding: "13px 16px", borderRadius: 12, background: "var(--surface)", border: "1px solid var(--border)" }}>
-                <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 700 }}>{s.name}</div>
-                  <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                    <code>nexara.com.mx{s.url}</code>
-                  </div>
-                </div>
-                <Tag variant="positive" size="sm">Publicada</Tag>
-              </article>
-            ))}
+        <DashCol span={5}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <DashPanel
+              title="Próximas publicaciones"
+              subtitle="Posts programados y borradores"
+              action="Calendario social"
+              actionHref="/studio/social"
+            >
+              {posts.length === 0 && (
+                <DashEmpty title="Sin posts pendientes" description="Crea uno desde el calendario social." />
+              )}
+              {posts.map((p) => (
+                <ListRow
+                  key={p.id}
+                  accent={RED_COLOR[p.red] ?? "#666"}
+                  title={p.titulo}
+                  sub={`${p.red} · ${fmtDate(p.cuando)}`}
+                  trail={<DashPill tone={p.estado === "Programado" ? "positive" : "warning"}>{p.estado}</DashPill>}
+                />
+              ))}
+            </DashPanel>
+
+            <DashPanel
+              title="Newsletter"
+              subtitle={
+                nlStats?.lastCampaignSentAt
+                  ? `Última campaña ${new Date(nlStats.lastCampaignSentAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}${nlStats.lastCampaignOpenRate != null ? ` · ${nlStats.lastCampaignOpenRate}% apertura` : ""}`
+                  : "Lista de suscriptores"
+              }
+              action="Gestionar"
+              actionHref="/studio/newsletter"
+            >
+              <ListRow
+                title="Suscriptores totales"
+                trail={<span style={{ fontSize: 15, fontWeight: 700 }}>{(nlStats?.totalSubscribers ?? 0).toLocaleString("es-MX")}</span>}
+              />
+              {nlStats?.activeSubscribers != null && (
+                <ListRow
+                  title="Activos"
+                  trail={<span style={{ fontSize: 15, fontWeight: 700, color: "var(--success)" }}>{nlStats.activeSubscribers.toLocaleString("es-MX")}</span>}
+                />
+              )}
+            </DashPanel>
+
+            <DashPanel title="Sitio público" subtitle="nexara.com.mx — en producción" action="Páginas" actionHref="/studio/pages">
+              {PAGES_STATIC.map((s) => (
+                <ListRow
+                  key={s.name}
+                  title={s.name}
+                  sub={`nexara.com.mx${s.url}`}
+                  trail={<DashPill tone="positive">Publicada</DashPill>}
+                />
+              ))}
+            </DashPanel>
           </div>
-        </Section>
-      </div>
-    </>
+        </DashCol>
+      </DashGrid>
+    </DashPage>
   );
 }

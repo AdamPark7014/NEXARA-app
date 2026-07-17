@@ -1,14 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
-import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
-import EmptyState from "@/components/ui/EmptyState";
-import { Tag, Money } from "@/components/ui/DataTable";
+import { Money } from "@/components/ui/DataTable";
+import {
+  DashPage,
+  DashHero,
+  DashGrid,
+  DashCol,
+  StatStrip,
+  DashPanel,
+  MiniStatGrid,
+  BarList,
+  AlertRow,
+  ListRow,
+  DashPill,
+  DashEmpty,
+  RankIndex,
+} from "@/components/dashboard/DashKit";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES, type RoleKey } from "@/lib/rbac";
@@ -61,6 +72,9 @@ interface DashboardData {
 
 const ERP_EXECUTIVE_ROLES = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.DIR_OPERACIONES]);
 
+const fmtCompact = (v: number) =>
+  new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" }).format(v);
+
 export default function ExecutivePage() {
   const { token, user } = useUser();
   const router = useRouter();
@@ -80,8 +94,8 @@ export default function ExecutivePage() {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (!token || !mounted) return;
+  const load = useCallback(() => {
+    if (!token) return;
     setLoading(true);
     setError(null);
     fetch(buildApiUrl("executive/c-level"), {
@@ -94,7 +108,12 @@ export default function ExecutivePage() {
       .then((d) => setData(d))
       .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar dashboard"))
       .finally(() => setLoading(false));
-  }, [token, mounted]);
+  }, [token]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    load();
+  }, [mounted, load]);
 
   if (!mounted) {
     return (
@@ -116,23 +135,23 @@ export default function ExecutivePage() {
   const shortcuts =
     v2Role === ROLES.DIR_OPERACIONES
       ? [
-          { href: "/erp/approvals", label: "Aprobaciones", icon: "🛡️", accent: "#ef4444" },
-          { href: "/ops/dashboard", label: "Centro OPS", icon: "🔧", accent: "#f59e0b" },
-          { href: "/ops/projects", label: "Proyectos", icon: "🏗️", accent: "#0ea5e9" },
-          { href: "/erp/procurement", label: "Compras", icon: "🛒", accent: "#10b981" },
+          { href: "/erp/approvals", label: "Aprobaciones", desc: "Solicitudes pendientes" },
+          { href: "/ops/dashboard", label: "Centro OPS", desc: "Operación diaria" },
+          { href: "/ops/projects", label: "Proyectos", desc: "Portafolio activo" },
+          { href: "/erp/procurement", label: "Compras", desc: "Requisiciones y OC" },
         ]
       : v2Role === ROLES.DIR_ADMIN
       ? [
-          { href: "/erp/approvals", label: "Aprobaciones", icon: "🛡️", accent: "#ef4444" },
-          { href: "/erp/invoicing", label: "Facturación", icon: "🧾", accent: "#10b981" },
-          { href: "/erp/hr", label: "Recursos humanos", icon: "👥", accent: "#0ea5e9" },
-          { href: "/erp/finance/viatics", label: "Viáticos", icon: "✈️", accent: "#f59e0b" },
+          { href: "/erp/approvals", label: "Aprobaciones", desc: "Solicitudes pendientes" },
+          { href: "/erp/invoicing", label: "Facturación", desc: "CFDI y cobranza" },
+          { href: "/erp/hr", label: "Recursos humanos", desc: "Equipo y nómina" },
+          { href: "/erp/finance/viatics", label: "Viáticos", desc: "Gastos y analytics" },
         ]
       : [
-          { href: "/erp/approvals", label: "Aprobaciones", icon: "🛡️", accent: "#ef4444" },
-          { href: "/erp/users", label: "Roles y accesos", icon: "🧑‍💼", accent: "#0ea5e9" },
-          { href: "/erp/architecture", label: "Arquitectura", icon: "🗺️", accent: "#0ea5e9" },
-          { href: "/erp/audit", label: "Audit log", icon: "🔍", accent: "#0ea5e9" },
+          { href: "/erp/approvals", label: "Aprobaciones", desc: "Solicitudes pendientes" },
+          { href: "/erp/bi", label: "Business Intelligence", desc: "Márgenes y ROI" },
+          { href: "/erp/accounting", label: "Contabilidad", desc: "Estados financieros" },
+          { href: "/erp/users", label: "Roles y accesos", desc: "Gobierno de usuarios" },
         ];
 
   const kpis = data?.headlineKpis;
@@ -147,249 +166,192 @@ export default function ExecutivePage() {
 
   const alerts: DashboardAlert[] = data?.alerts ?? [];
   const criticalAlerts = alerts.filter((a) => a.level === "critical");
-  const hasCritical = criticalAlerts.length > 0;
 
   return (
-    <>
-      <PageHeader
-        eyebrow="ERP · CEO"
-        title="Vista ejecutiva"
-        subtitle={`Bienvenido, ${user.nombre || user.email}`}
-        variant="hero"
-        meta={
-          <>
-            <Tag variant="positive" dot>Live</Tag>
-            {hasCritical && <Tag variant="danger" dot>{criticalAlerts.length} críticas</Tag>}
-          </>
+    <DashPage>
+      <DashHero
+        eyebrow="ERP · Vista ejecutiva"
+        title={`Buen día, ${(user.nombre || user.email).split(" ")[0]}`}
+        subtitle={
+          data
+            ? `Snapshot del grupo · actualizado ${new Date(data.generatedAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
+            : "Consultando el estado del grupo…"
         }
         actions={
           <>
-            <Button variant="ghost" iconLeft="🔄" onClick={() => {
-              setLoading(true);
-              fetch(buildApiUrl("executive/c-level"), { headers: { Authorization: `Bearer ${token}` } })
-                .then((r) => r.json() as Promise<DashboardData>)
-                .then(setData)
-                .catch((e) => setError(e instanceof Error ? e.message : "Error"))
-                .finally(() => setLoading(false));
-            }}>
-              Actualizar
-            </Button>
+            {criticalAlerts.length > 0 && <DashPill tone="danger">{criticalAlerts.length} alertas críticas</DashPill>}
+            <Button variant="ghost" onClick={load}>Actualizar</Button>
             <Link href="/erp/calendar" style={{ textDecoration: "none" }}>
-              <Button variant="primary" iconLeft="📅" iconRight="→">
-                Vista del mes
-              </Button>
+              <Button variant="primary" iconRight="→">Vista del mes</Button>
             </Link>
           </>
         }
       />
 
-      {/* ── Alertas operativas ─────────────────────────────────────── */}
-      {(loading || alerts.length > 0) && (
-        <Section eyebrow="Mesa del CEO" title="Requiere tu atención" subtitle="Eventos que impactan operación o finanzas" tone="accent">
-          {loading && <EmptyState icon="⏳" title="Cargando alertas…" description="Consultando estado operativo." />}
-          {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} />}
-          {!loading && !error && alerts.length === 0 && (
-            <EmptyState icon="✅" title="Sin alertas activas" description="Todo operando con normalidad." />
-          )}
-          {!loading && !error && alerts.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {alerts.map((a, i) => {
-                const color = a.level === "critical" ? "var(--danger)" : a.level === "warning" ? "var(--warning)" : "var(--primary)";
-                const urgencyLabel = a.level === "critical" ? "Crítico" : a.level === "warning" ? "Importante" : "Info";
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      position: "relative",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 14,
-                      padding: "14px 16px 14px 20px",
-                      background: `linear-gradient(135deg, color-mix(in srgb, ${color} 9%, var(--surface)) 0%, var(--surface) 70%)`,
-                      border: `1px solid color-mix(in srgb, ${color} 32%, var(--border))`,
-                      borderRadius: 14,
-                      boxShadow: "var(--nx-panel-elev-1)",
-                    }}
-                  >
-                    <span style={{ position: "absolute", left: 0, top: 12, bottom: 12, width: 3, borderRadius: "0 3px 3px 0", background: color }} />
-                    <span style={{ width: 44, height: 44, borderRadius: 12, background: `color-mix(in srgb, ${color} 16%, var(--surface))`, border: `1px solid color-mix(in srgb, ${color} 28%, var(--border))`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
-                      {a.icon}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 9.5, fontWeight: 700, padding: "2px 7px", borderRadius: 5, display: "inline-block", marginBottom: 3, background: `color-mix(in srgb, ${color} 16%, transparent)`, color, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                        {urgencyLabel}
-                      </div>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text-primary)" }}>{a.title}</div>
-                      <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3, lineHeight: 1.45 }}>{a.message}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Section>
+      {error && !loading && (
+        <DashPanel title="No se pudo cargar" subtitle={error}>
+          <Button size="sm" variant="secondary" onClick={load}>Reintentar</Button>
+        </DashPanel>
       )}
 
-      {/* ── KPIs financieros ──────────────────────────────────────── */}
-      <Section eyebrow="$" title="KPIs financieros" subtitle={data ? `Actualizado ${new Date(data.generatedAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}` : "Cargando…"}>
-        {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando datos financieros." />}
-        {!loading && error && <EmptyState icon="⚠️" title="Error" description={error} />}
-        {!loading && !error && kpis && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-            <KpiCard
-              label="Ingresos del mes"
-              value={<Money value={kpis.revenueMtd} compact />}
-              hint={`vs ${kpis.revenuePrevMonth > 0 ? new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" }).format(kpis.revenuePrevMonth) : "$0"} mes pasado`}
-              trend={{ direction: momDir, value: momLabel }}
-              variant={momDir === "up" ? "positive" : momDir === "down" ? "danger" : "default"}
-              icon="💰"
-            />
-            <KpiCard
-              label="Pipeline activo"
-              value={<Money value={kpis.pipelineValue} compact />}
-              hint={`${kpis.pipelineCount} oportunidades en curso`}
-              variant="accent"
-              icon="🎯"
-            />
-            <KpiCard
-              label="Saldo en bancos"
-              value={<Money value={kpis.cashOnHand} compact />}
-              icon="🏦"
-            />
-            <KpiCard
-              label="Cuentas por cobrar"
-              value={<Money value={kpis.arOutstanding} compact />}
-              hint={fin?.overdueInvoices ? `${fin.overdueInvoices} facturas vencidas` : undefined}
-              variant={fin && fin.overdueInvoices > 0 ? "warning" : "default"}
-              icon="⏳"
-            />
-          </div>
-        )}
-      </Section>
+      {/* ── Franja financiera principal ─────────────────────── */}
+      <StatStrip
+        stats={[
+          {
+            label: "Ingresos del mes",
+            value: loading ? "…" : <Money value={kpis?.revenueMtd ?? 0} compact />,
+            delta: loading ? undefined : { direction: momDir, value: momLabel },
+            sub: loading ? undefined : `vs ${fmtCompact(kpis?.revenuePrevMonth ?? 0)} mes anterior · YTD ${fmtCompact(kpis?.revenueYtd ?? 0)}`,
+            big: true,
+          },
+          {
+            label: "Pipeline activo",
+            value: loading ? "…" : <Money value={kpis?.pipelineValue ?? 0} compact />,
+            sub: loading ? undefined : `${kpis?.pipelineCount ?? 0} oportunidades en curso`,
+            tone: "accent",
+          },
+          {
+            label: "Saldo en bancos",
+            value: loading ? "…" : <Money value={kpis?.cashOnHand ?? 0} compact />,
+            sub: loading ? undefined : `Capital de trabajo ${fmtCompact(kpis?.workingCapital ?? 0)}`,
+          },
+          {
+            label: "Cuentas por cobrar",
+            value: loading ? "…" : <Money value={kpis?.arOutstanding ?? 0} compact />,
+            sub: loading
+              ? undefined
+              : fin && fin.overdueInvoices > 0
+              ? `${fin.overdueInvoices} facturas vencidas`
+              : `Por pagar ${fmtCompact(kpis?.apOutstanding ?? 0)}`,
+            tone: fin && fin.overdueInvoices > 0 ? "warning" : "default",
+          },
+        ]}
+      />
 
-      {/* ── KPIs operativos ───────────────────────────────────────── */}
-      {!loading && !error && ops && (
-        <Section eyebrow="OPS" title="Operación" subtitle="Estado del equipo de campo y proyectos">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-            <KpiCard label="Proyectos activos" value={ops.activeProjects} icon="🏗️" variant={ops.activeProjects > 0 ? "accent" : "default"} />
-            <KpiCard label="OTs abiertas" value={ops.otOpen} icon="🔧" />
-            <KpiCard label="OTs vencidas" value={ops.otOverdue} icon="⏰" variant={ops.otOverdue > 0 ? "danger" : "default"} />
-            <KpiCard label="OTs cerradas (mes)" value={ops.otCompletedMtd} icon="✅" />
-            <KpiCard label="Tickets abiertos" value={ops.ticketsOpen} icon="🎫" variant={ops.ticketsOpen > 0 ? "warning" : "default"} />
-            {maint && (
-              <KpiCard label="Contratos activos" value={maint.activeContracts} icon="📑" />
-            )}
-          </div>
-          {ops && ops.otOpen + ops.otOverdue + ops.otCompletedMtd > 0 && (() => {
-            const total = ops.otOpen + ops.otOverdue + ops.otCompletedMtd;
-            return (
-              <div style={{ marginTop: 14, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución de OTs</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                  {([
-                    { label: "Completadas", count: ops.otCompletedMtd, color: "var(--success)" },
-                    { label: "Abiertas", count: ops.otOpen, color: "var(--primary)" },
-                    { label: "Vencidas", count: ops.otOverdue, color: "var(--danger)" },
-                  ] as { label: string; count: number; color: string }[]).filter((r) => r.count > 0).map((r) => (
-                    <div key={r.label} style={{ display: "grid", gridTemplateColumns: "90px 1fr 36px", gap: 10, alignItems: "center" }}>
-                      <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{r.label}</span>
-                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${(r.count / total) * 100}%`, background: r.color, borderRadius: 3 }} />
-                      </div>
-                      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{r.count}</span>
-                    </div>
-                  ))}
-                </div>
+      <DashGrid>
+        {/* ── Operación ───────────────────────────────────────── */}
+        <DashCol span={8}>
+          <DashPanel
+            title="Operación"
+            subtitle="Proyectos, órdenes de trabajo y soporte"
+            action="Centro OPS"
+            actionHref="/ops/dashboard"
+          >
+            <MiniStatGrid
+              items={[
+                { label: "Proyectos activos", value: loading ? "…" : ops?.activeProjects ?? 0, tone: "accent" },
+                { label: "OTs abiertas", value: loading ? "…" : ops?.otOpen ?? 0 },
+                { label: "OTs vencidas", value: loading ? "…" : ops?.otOverdue ?? 0, tone: ops && ops.otOverdue > 0 ? "danger" : "default" },
+                { label: "Cerradas (mes)", value: loading ? "…" : ops?.otCompletedMtd ?? 0, tone: "positive" },
+                { label: "Tickets abiertos", value: loading ? "…" : ops?.ticketsOpen ?? 0, tone: ops && ops.ticketsOpen > 0 ? "warning" : "default" },
+                { label: "Contratos activos", value: loading ? "…" : maint?.activeContracts ?? 0 },
+              ]}
+            />
+            {!loading && ops && ops.otOpen + ops.otOverdue + ops.otCompletedMtd > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <BarList
+                  items={[
+                    { label: "Completadas (mes)", value: ops.otCompletedMtd, color: "var(--success)" },
+                    { label: "Abiertas", value: ops.otOpen, color: "var(--panel-accent, var(--primary))" },
+                    { label: "Vencidas", value: ops.otOverdue, color: "var(--danger)" },
+                  ].filter((r) => r.value > 0)}
+                />
               </div>
-            );
-          })()}
-        </Section>
-      )}
-
-      {/* ── Ventas y compras ──────────────────────────────────────── */}
-      {!loading && !error && data && (
-        <Section eyebrow="CRM · Compras" title="Comercial y abastecimiento" subtitle="Leads, licitaciones y órdenes de compra">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-            <KpiCard label="Leads calientes" value={data.sales.hotLeads} icon="🔥" variant={data.sales.hotLeads >= 5 ? "warning" : "default"} />
-            <KpiCard label="Licitaciones abiertas" value={data.sales.tendersOpen} icon="📋" />
-            <KpiCard label="Licitaciones ganadas" value={data.sales.tendersWon} icon="🏆" variant={data.sales.tendersWon > 0 ? "positive" : "default"} />
-            {proc && (
-              <>
-                <KpiCard label="Requisiciones pend." value={proc.pendingRequisitions} icon="📝" variant={proc.pendingRequisitions > 0 ? "warning" : "default"} />
-                <KpiCard label="OC pendientes" value={proc.pendingPOs} icon="🛒" variant={proc.pendingPOs > 0 ? "warning" : "default"} />
-                <KpiCard label="Stock crítico" value={proc.lowStockItems} icon="📦" variant={proc.lowStockItems > 0 ? "danger" : "default"} />
-              </>
             )}
-          </div>
-        </Section>
-      )}
+          </DashPanel>
+        </DashCol>
 
-      {/* ── Top vendedores ────────────────────────────────────────── */}
-      {!loading && !error && data && data.topSellers.length > 0 && (() => {
-        const maxRev = Math.max(...data.topSellers.map((s) => s.revenue), 1);
-        const fmt = (v: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" }).format(v);
-        return (
-          <Section eyebrow="Ventas" title="Top vendedores del mes" subtitle="Por ingresos de oportunidades cerradas">
-            <div style={{ display: "grid", gap: 10 }}>
-              {data.topSellers.map((s, i) => (
-                <div key={s.ownerId} style={{ display: "grid", gridTemplateColumns: "24px 140px 1fr 70px 80px", gap: 10, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-tertiary)", textAlign: "center" }}>#{i + 1}</span>
-                  <span style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.ownerName}</span>
-                  <div style={{ position: "relative", height: 16, background: "var(--surface-2)", borderRadius: 4, overflow: "hidden" }}>
-                    <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(s.revenue / maxRev) * 100}%`, background: i === 0 ? "var(--warning)" : "color-mix(in srgb, var(--primary) 60%, transparent)", borderRadius: 4 }} />
-                  </div>
-                  <span style={{ fontSize: 11, color: "var(--text-secondary)", textAlign: "right" }}>{s.wonCount} opp.</span>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--primary)", textAlign: "right" }}>{fmt(s.revenue)}</span>
-                </div>
+        {/* ── Alertas ─────────────────────────────────────────── */}
+        <DashCol span={4}>
+          <DashPanel
+            title="Requiere tu atención"
+            subtitle="Eventos que impactan operación o finanzas"
+          >
+            {loading && <DashEmpty title="Cargando alertas…" />}
+            {!loading && alerts.length === 0 && (
+              <DashEmpty title="Sin alertas activas" description="Todo operando con normalidad." />
+            )}
+            {!loading &&
+              alerts.slice(0, 6).map((a, i) => (
+                <AlertRow key={i} level={a.level} title={a.title} message={a.message} />
+              ))}
+          </DashPanel>
+        </DashCol>
+
+        {/* ── Top vendedores ──────────────────────────────────── */}
+        <DashCol span={6}>
+          <DashPanel
+            title="Top vendedores del mes"
+            subtitle="Ingresos por oportunidades cerradas"
+            action="Ver BI"
+            actionHref="/erp/bi"
+          >
+            {loading && <DashEmpty title="Cargando…" />}
+            {!loading && (!data || data.topSellers.length === 0) && (
+              <DashEmpty title="Sin cierres este mes" description="Aún no hay oportunidades ganadas en el periodo." />
+            )}
+            {!loading &&
+              data &&
+              data.topSellers.map((s, i) => (
+                <ListRow
+                  key={s.ownerId}
+                  leading={<RankIndex n={i + 1} />}
+                  title={s.ownerName}
+                  sub={`${s.wonCount} oportunidades ganadas`}
+                  trail={<Money value={s.revenue} compact bold />}
+                />
+              ))}
+          </DashPanel>
+        </DashCol>
+
+        {/* ── Comercial y abastecimiento ──────────────────────── */}
+        <DashCol span={6}>
+          <DashPanel
+            title="Comercial y abastecimiento"
+            subtitle="Leads, licitaciones y compras"
+            action="Pipeline"
+            actionHref="/crm/pipeline"
+          >
+            <MiniStatGrid
+              items={[
+                { label: "Leads calientes", value: loading ? "…" : data?.sales.hotLeads ?? 0, tone: data && data.sales.hotLeads >= 5 ? "warning" : "default" },
+                { label: "Licitaciones abiertas", value: loading ? "…" : data?.sales.tendersOpen ?? 0 },
+                { label: "Licitaciones ganadas", value: loading ? "…" : data?.sales.tendersWon ?? 0, tone: "positive" },
+                { label: "Requisiciones pend.", value: loading ? "…" : proc?.pendingRequisitions ?? 0, tone: proc && proc.pendingRequisitions > 0 ? "warning" : "default" },
+                { label: "OC pendientes", value: loading ? "…" : proc?.pendingPOs ?? 0, tone: proc && proc.pendingPOs > 0 ? "warning" : "default" },
+                { label: "Stock crítico", value: loading ? "…" : proc?.lowStockItems ?? 0, tone: proc && proc.lowStockItems > 0 ? "danger" : "default" },
+              ]}
+            />
+          </DashPanel>
+        </DashCol>
+      </DashGrid>
+
+      {/* ── Empresa + accesos ─────────────────────────────────── */}
+      <DashGrid>
+        <DashCol span={5}>
+          <StatStrip
+            stats={[
+              {
+                label: "Facturado (mes)",
+                value: loading ? "…" : <Money value={fin?.invoicedMtd ?? 0} compact />,
+                sub: loading ? undefined : `${fin?.invoicesCountMtd ?? 0} facturas emitidas`,
+                tone: "positive",
+              },
+              { label: "Colaboradores", value: loading ? "…" : data?.teamSize ?? 0 },
+              { label: "Clientes activos", value: loading ? "…" : data?.clientsCount ?? 0 },
+            ]}
+          />
+        </DashCol>
+        <DashCol span={7}>
+          <DashPanel title="Accesos rápidos" subtitle="Lo que más usas — un clic" flush>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 4 }}>
+              {shortcuts.map((s) => (
+                <ListRow key={s.href} href={s.href} title={s.label} sub={s.desc} trail="→" />
               ))}
             </div>
-          </Section>
-        );
-      })()}
-
-      {/* ── Equipo y clientes ─────────────────────────────────────── */}
-      {!loading && !error && data && (
-        <Section eyebrow="Empresa" title="Equipo y cartera" subtitle="Tamaño del equipo activo y clientes en plataforma">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-            <KpiCard label="Total colaboradores" value={data.teamSize} icon="👥" variant="accent" />
-            <KpiCard label="Clientes activos" value={data.clientsCount} icon="🤝" />
-            {fin && (
-              <KpiCard label="Facturado (mes)" value={<Money value={fin.invoicedMtd} compact />} hint={`${fin.invoicesCountMtd} facturas emitidas`} icon="🧾" variant="positive" />
-            )}
-          </div>
-        </Section>
-      )}
-
-      {/* ── Atajos rápidos ────────────────────────────────────────── */}
-      <Section eyebrow="Saltos" title="Atajos rápidos" subtitle="Lo que más usas — un clic">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
-          {shortcuts.map((a) => (
-            <Link
-              key={a.href}
-              href={a.href}
-              style={{
-                position: "relative",
-                padding: "14px 14px",
-                background: "var(--surface)",
-                border: "1px solid var(--nx-panel-hairline)",
-                borderRadius: 12,
-                textDecoration: "none",
-                color: "var(--text-primary)",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                boxShadow: "var(--nx-panel-elev-1)",
-                overflow: "hidden",
-              }}
-            >
-              <span style={{ width: 34, height: 34, borderRadius: 9, background: `color-mix(in srgb, ${a.accent} 14%, var(--surface))`, color: a.accent, border: `1px solid color-mix(in srgb, ${a.accent} 22%, var(--border))`, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>
-                {a.icon}
-              </span>
-              <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{a.label}</span>
-            </Link>
-          ))}
-        </div>
-      </Section>
-    </>
+          </DashPanel>
+        </DashCol>
+      </DashGrid>
+    </DashPage>
   );
 }

@@ -2,12 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import PageHeader from "@/components/ui/PageHeader";
-import KpiCard from "@/components/ui/KpiCard";
-import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import { Tag, Money } from "@/components/ui/DataTable";
-import EmptyState from "@/components/ui/EmptyState";
+import { Money } from "@/components/ui/DataTable";
+import {
+  DashPage,
+  DashHero,
+  DashGrid,
+  DashCol,
+  StatStrip,
+  DashPanel,
+  BarList,
+  ListRow,
+  DashPill,
+  DashEmpty,
+  RankIndex,
+} from "@/components/dashboard/DashKit";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { filterRowsByScope, getCrmSalesSectionConfig } from "@/lib/section-views";
@@ -96,7 +105,6 @@ export default function CrmDashboardPage() {
   );
   const enCierre = visibleOpps.filter((o) => isHotOpportunityStage(o.stage)).length;
 
-  // Pipeline por etapa — embudo visual
   const stageBreakdown = useMemo(() => {
     const active = visibleOpps.filter((o) => !isClosedOpportunityStage(o.stage));
     return PIPELINE_STAGES
@@ -113,9 +121,6 @@ export default function CrmDashboardPage() {
       .filter((s) => s.count > 0);
   }, [visibleOpps]);
 
-  const maxCount = useMemo(() => Math.max(1, ...stageBreakdown.map((s) => s.count)), [stageBreakdown]);
-
-  // Ganadas este mes
   const wonThisMonth = useMemo(() => {
     const now = new Date();
     return visibleOpps.filter((o) => {
@@ -125,14 +130,13 @@ export default function CrmDashboardPage() {
     });
   }, [visibleOpps]);
 
-  // Desempeño por vendedor — solo visible en vista de equipo
   const byRep = useMemo(() => {
-    if (cfg.defaultScope !== 'team') return [];
+    if (cfg.defaultScope !== "team") return [];
     const map = new Map<number, { nombre: string; pipeline: number; count: number; hot: number }>();
     for (const o of visibleOpps) {
       if (isClosedOpportunityStage(o.stage)) continue;
       const id = o.ownerId ?? 0;
-      const nombre = o.owner?.nombre ?? 'Sin asignar';
+      const nombre = o.owner?.nombre ?? "Sin asignar";
       const cur = map.get(id) ?? { nombre, pipeline: 0, count: 0, hot: 0 };
       cur.pipeline += Number(o.value ?? 0);
       cur.count += 1;
@@ -143,162 +147,215 @@ export default function CrmDashboardPage() {
   }, [visibleOpps, cfg.defaultScope]);
 
   const activeOpps = visibleOpps.filter((o) => !isClosedOpportunityStage(o.stage));
+  const fmtCompact = (v: number) =>
+    new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" }).format(v);
 
   return (
-    <>
-      <PageHeader
+    <DashPage>
+      <DashHero
         eyebrow="CRM · Pipeline comercial"
-        title={cfg.defaultScope === 'team' ? 'Pipeline del equipo' : 'Cierra el mes'}
-        subtitle={cfg.defaultScope === 'team' ? 'Métricas consolidadas del equipo — pipeline, actividades y conversión.' : 'Tu pipeline, tus métricas y los próximos seguimientos en un solo lugar.'}
-        variant="hero"
-        meta={
-          <>
-            <Tag variant="accent" dot>{visibleOpps.length} oportunidades activas</Tag>
-            {metrics && <Tag variant="positive">{metrics.conversionRate}% conversión</Tag>}
-            {wonThisMonth.length > 0 && <Tag variant="positive">🏆 {wonThisMonth.length} ganadas este mes</Tag>}
-          </>
-        }
+        title={cfg.defaultScope === "team" ? "Pipeline del equipo" : "Cierra el mes"}
+        subtitle={cfg.defaultScope === "team"
+          ? "Métricas consolidadas del equipo — pipeline, actividades y conversión."
+          : "Tu pipeline, tus métricas y los próximos seguimientos en un solo lugar."}
         actions={
           <>
-            <Link href="/crm/leads" style={{ textDecoration: "none" }}><Button variant="secondary" iconLeft="✨">Nuevo lead</Button></Link>
-            <Link href="/crm/pipeline" style={{ textDecoration: "none" }}><Button variant="primary" iconLeft="📊" iconRight="→">Ver pipeline</Button></Link>
+            {wonThisMonth.length > 0 && <DashPill tone="positive">{wonThisMonth.length} ganadas este mes</DashPill>}
+            <Link href="/crm/leads" style={{ textDecoration: "none" }}><Button variant="secondary">Nuevo lead</Button></Link>
+            <Link href="/crm/pipeline" style={{ textDecoration: "none" }}><Button variant="primary" iconRight="→">Ver pipeline</Button></Link>
           </>
         }
       />
 
-      {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando tu pipeline comercial." />}
-      {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-
-      {!loading && !error && (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 24 }}>
-            <KpiCard label="Pipeline total" value={<Money value={pipelineTotal} compact />} hint={`${activeOpps.length} oportunidades activas`} icon="🎯" variant="accent" />
-            <KpiCard label="Cerrado este mes" value={<Money value={metrics?.totalRevenue ?? 0} compact />} hint="Ingreso facturado" icon="📈" variant="positive" />
-            <KpiCard label="En negociación/cierre" value={enCierre} hint="Oportunidades calientes" icon="🔥" />
-            <KpiCard label="Tasa de conversión" value={`${metrics?.conversionRate ?? 0}%`} hint="Este mes" icon="⚡" />
-          </div>
-
-          {byRep.length > 0 && (
-            <Section eyebrow="Equipo" title="Desempeño por vendedor" subtitle="Pipeline activo por rep — excluye oportunidades cerradas">
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {byRep.map((rep, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-tertiary)", width: 20, textAlign: "center" }}>#{i + 1}</span>
-                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{rep.nombre}</span>
-                    <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{rep.count} opp.</span>
-                    {rep.hot > 0 && <Tag variant="warning">{rep.hot} 🔥</Tag>}
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--primary)" }}>
-                      <Money value={rep.pipeline} compact />
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
-
-          {stageBreakdown.length > 0 && (
-            <Section eyebrow="Embudo" title="Pipeline por etapa" subtitle="Distribución de oportunidades activas en el ciclo de venta">
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {stageBreakdown.map((s) => (
-                  <div key={s.stage} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ width: 150, fontSize: 12, color: "var(--text-secondary)", flexShrink: 0, textAlign: "right" }}>{s.label}</span>
-                    <div style={{ flex: 1, position: "relative", height: 28, background: "var(--surface-2)", borderRadius: 6, overflow: "hidden" }}>
-                      <div style={{ width: `${(s.count / maxCount) * 100}%`, height: "100%", background: "color-mix(in srgb, var(--primary) 50%, transparent)", borderRadius: 6, transition: "width 500ms ease", minWidth: 4 }} />
-                      <span style={{ position: "absolute", left: 10, top: 0, bottom: 0, display: "flex", alignItems: "center", fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>
-                        {s.count} opp.
-                      </span>
-                    </div>
-                    <span style={{ width: 100, fontSize: 12, fontWeight: 700, color: "var(--primary)", textAlign: "right", flexShrink: 0 }}>
-                      <Money value={s.value} compact />
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
-
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
-            <Section title={cfg.defaultScope === 'team' ? 'Top oportunidades del equipo' : 'Mis oportunidades activas'}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {activeOpps.slice(0, 6).map((o) => (
-                  <Link key={o.id} href={`/crm/opportunities/${o.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{o.client?.name ?? o.clientName ?? o.title}</div>
-                        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                          {formatOpportunityStage(o.stage)}{o.owner?.nombre ? ` · ${o.owner.nombre}` : ""}
-                        </div>
-                      </div>
-                      <Money value={Number(o.value ?? 0)} />
-                    </div>
-                  </Link>
-                ))}
-                {activeOpps.length === 0 && <EmptyState icon="🎯" title="Sin oportunidades" description="Crea tu primera oportunidad desde el pipeline." />}
-              </div>
-              {wonThisMonth.length > 0 && (
-                <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", marginBottom: 8 }}>🏆 Ganadas este mes</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {wonThisMonth.slice(0, 3).map((o) => (
-                      <Link key={o.id} href={`/crm/opportunities/${o.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", background: "color-mix(in srgb, #10b981 8%, var(--surface))", border: "1px solid color-mix(in srgb, #10b981 20%, var(--border))", borderRadius: 8 }}>
-                          <span style={{ flex: 1, fontSize: 12.5, fontWeight: 600 }}>{o.client?.name ?? o.clientName ?? o.title}</span>
-                          <Money value={Number(o.value ?? 0)} />
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </Section>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <Section title="Tu agenda de hoy">
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {agenda.map((a) => (
-                    <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, borderLeftWidth: 3, borderLeftColor: TYPE_COLOR[a.activityType] ?? "var(--border)" }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 12.5 }}>{a.subject}</div>
-                        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{a.lead?.name ?? a.opportunity?.title ?? ""}</div>
-                      </div>
-                      <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{new Date(a.dueDate).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}</span>
-                    </div>
-                  ))}
-                  {agenda.length === 0 && <EmptyState icon="🎉" title="Sin pendientes hoy" description="Tu agenda está libre." />}
-                </div>
-                <div style={{ marginTop: 10, textAlign: "right" }}>
-                  <Link href="/crm/activities" style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>Ver actividades →</Link>
-                </div>
-              </Section>
-
-              {recentLeads.length > 0 && (
-                <Section eyebrow="Leads" title="Recientes" subtitle="Últimos leads capturados">
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {recentLeads.map((l) => (
-                      <Link key={l.id} href={`/crm/leads/${l.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</div>
-                            {l.source && <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{l.source}</div>}
-                          </div>
-                          {l.createdAt && (
-                            <span style={{ fontSize: 10.5, color: "var(--text-tertiary)", flexShrink: 0 }}>
-                              {new Date(l.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
-                            </span>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                  <div style={{ marginTop: 10, textAlign: "right" }}>
-                    <Link href="/crm/leads" style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>Ver todos →</Link>
-                  </div>
-                </Section>
-              )}
-            </div>
-          </div>
-        </>
+      {error && !loading && (
+        <DashPanel title="No se pudo cargar" subtitle={error}>
+          <Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>
+        </DashPanel>
       )}
-    </>
+
+      <StatStrip
+        stats={[
+          {
+            label: "Pipeline total",
+            value: loading ? "…" : <Money value={pipelineTotal} compact />,
+            sub: loading ? undefined : `${activeOpps.length} oportunidades activas`,
+            tone: "accent",
+            big: true,
+          },
+          {
+            label: "Cerrado este mes",
+            value: loading ? "…" : <Money value={metrics?.totalRevenue ?? 0} compact />,
+            sub: "Ingreso facturado",
+            tone: "positive",
+          },
+          {
+            label: "En negociación / cierre",
+            value: loading ? "…" : enCierre,
+            sub: "Oportunidades calientes",
+            tone: enCierre > 0 ? "warning" : "default",
+          },
+          {
+            label: "Tasa de conversión",
+            value: loading ? "…" : `${metrics?.conversionRate ?? 0}%`,
+            sub: "Este mes",
+          },
+        ]}
+      />
+
+      <DashGrid>
+        <DashCol span={7}>
+          <DashPanel
+            title="Pipeline por etapa"
+            subtitle="Oportunidades activas en el ciclo de venta"
+            action="Ver pipeline"
+            actionHref="/crm/pipeline"
+          >
+            {loading && <DashEmpty title="Cargando…" />}
+            {!loading && stageBreakdown.length === 0 && (
+              <DashEmpty title="Sin oportunidades activas" description="Crea tu primera oportunidad desde el pipeline." />
+            )}
+            {!loading && stageBreakdown.length > 0 && (
+              <BarList
+                items={stageBreakdown.map((s) => ({
+                  label: s.label,
+                  value: s.count,
+                  display: `${s.count} · ${fmtCompact(s.value)}`,
+                }))}
+              />
+            )}
+          </DashPanel>
+        </DashCol>
+
+        <DashCol span={5}>
+          <DashPanel
+            title="Tu agenda de hoy"
+            subtitle="Seguimientos y actividades pendientes"
+            action="Ver actividades"
+            actionHref="/crm/activities"
+          >
+            {loading && <DashEmpty title="Cargando…" />}
+            {!loading && agenda.length === 0 && (
+              <DashEmpty title="Sin pendientes hoy" description="Tu agenda está libre." />
+            )}
+            {!loading &&
+              agenda.slice(0, 6).map((a) => (
+                <ListRow
+                  key={a.id}
+                  accent={TYPE_COLOR[a.activityType] ?? "var(--border)"}
+                  title={a.subject}
+                  sub={a.lead?.name ?? a.opportunity?.title ?? ""}
+                  trail={new Date(a.dueDate).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                />
+              ))}
+          </DashPanel>
+        </DashCol>
+
+        <DashCol span={7}>
+          <DashPanel
+            title={cfg.defaultScope === "team" ? "Top oportunidades del equipo" : "Mis oportunidades activas"}
+            subtitle="Ordenadas por relevancia"
+            action="Ver todas"
+            actionHref="/crm/opportunities"
+          >
+            {loading && <DashEmpty title="Cargando…" />}
+            {!loading && activeOpps.length === 0 && (
+              <DashEmpty title="Sin oportunidades" description="Crea tu primera oportunidad desde el pipeline." />
+            )}
+            {!loading &&
+              activeOpps.slice(0, 6).map((o) => (
+                <ListRow
+                  key={o.id}
+                  href={`/crm/opportunities/${o.id}`}
+                  title={o.client?.name ?? o.clientName ?? o.title}
+                  sub={`${formatOpportunityStage(o.stage)}${o.owner?.nombre ? ` · ${o.owner.nombre}` : ""}`}
+                  trail={<Money value={Number(o.value ?? 0)} compact bold />}
+                />
+              ))}
+            {!loading && wonThisMonth.length > 0 && (
+              <div style={{ marginTop: 8, paddingTop: 10, borderTop: "1px solid var(--nx-panel-hairline, var(--border))" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-tertiary)", marginBottom: 6 }}>
+                  Ganadas este mes
+                </div>
+                {wonThisMonth.slice(0, 3).map((o) => (
+                  <ListRow
+                    key={o.id}
+                    href={`/crm/opportunities/${o.id}`}
+                    accent="var(--success)"
+                    title={o.client?.name ?? o.clientName ?? o.title}
+                    trail={<Money value={Number(o.value ?? 0)} compact bold />}
+                  />
+                ))}
+              </div>
+            )}
+          </DashPanel>
+        </DashCol>
+
+        <DashCol span={5}>
+          {byRep.length > 0 ? (
+            <DashPanel title="Desempeño por vendedor" subtitle="Pipeline activo por rep">
+              {byRep.slice(0, 6).map((rep, i) => (
+                <ListRow
+                  key={i}
+                  leading={<RankIndex n={i + 1} />}
+                  title={rep.nombre}
+                  sub={`${rep.count} oportunidades${rep.hot > 0 ? ` · ${rep.hot} en cierre` : ""}`}
+                  trail={<Money value={rep.pipeline} compact bold />}
+                />
+              ))}
+            </DashPanel>
+          ) : (
+            <DashPanel
+              title="Leads recientes"
+              subtitle="Últimos leads capturados"
+              action="Ver todos"
+              actionHref="/crm/leads"
+            >
+              {loading && <DashEmpty title="Cargando…" />}
+              {!loading && recentLeads.length === 0 && (
+                <DashEmpty title="Sin leads recientes" description="Captura tu primer lead para verlo aquí." />
+              )}
+              {!loading &&
+                recentLeads.map((l) => (
+                  <ListRow
+                    key={l.id}
+                    href={`/crm/leads/${l.id}`}
+                    title={l.name}
+                    sub={l.source ?? undefined}
+                    trail={l.createdAt
+                      ? new Date(l.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })
+                      : undefined}
+                  />
+                ))}
+            </DashPanel>
+          )}
+        </DashCol>
+
+        {byRep.length > 0 && recentLeads.length > 0 && (
+          <DashCol span={12}>
+            <DashPanel
+              title="Leads recientes"
+              subtitle="Últimos leads capturados"
+              action="Ver todos"
+              actionHref="/crm/leads"
+              flush
+            >
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 4 }}>
+                {recentLeads.map((l) => (
+                  <ListRow
+                    key={l.id}
+                    href={`/crm/leads/${l.id}`}
+                    title={l.name}
+                    sub={l.source ?? undefined}
+                    trail={l.createdAt
+                      ? new Date(l.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })
+                      : undefined}
+                  />
+                ))}
+              </div>
+            </DashPanel>
+          </DashCol>
+        )}
+      </DashGrid>
+    </DashPage>
   );
 }
