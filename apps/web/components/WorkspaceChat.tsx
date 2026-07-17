@@ -2,8 +2,26 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { io, type Socket } from "socket.io-client";
-import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
+import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 import styles from "./WorkspaceChat.module.css";
+
+type Attachment = { url: string; name: string; mime: string; size: number };
+
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
+
+function isImageAttachment(name: string) {
+  return IMAGE_EXT.test(name);
+}
+
+function attachmentHref(url: string) {
+  return `${getApiAssetOrigin()}${url}`;
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 type ChannelKind = "PUBLIC" | "PRIVATE" | "DIRECT";
 
@@ -23,6 +41,9 @@ type Channel = {
   lastMessagePreview?: string | null;
   unread?: boolean;
   unreadCount?: number;
+  /** Vista por jerarquía (dueño / supervisor), no membresía propia */
+  supervised?: boolean;
+  readOnly?: boolean;
 };
 
 type Reaction = { emoji: string; count: number; userIds: number[] };
@@ -183,9 +204,14 @@ export default function WorkspaceChat({
     if (typeof window === "undefined") return true;
     return localStorage.getItem("nexara.chat.sound") !== "0";
   });
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
+  const [threadAttachment, setThreadAttachment] = useState<Attachment | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const threadFileInputRef = useRef<HTMLInputElement | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const activeIdRef = useRef<number | null>(null);
   const threadRootRef = useRef<Message | null>(null);
@@ -479,24 +505,64 @@ export default function WorkspaceChat({
     }
   };
 
+  const uploadFile = async (file: File): Promise<Attachment | null> => {
+    if (file.size > 20 * 1024 * 1024) {
+      setError("El archivo excede el límite de 20 MB");
+      return null;
+    }
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(buildApiUrl("chat/upload"), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+      return (await res.json()) as Attachment;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo subir el archivo");
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const onPickFile = async (file: File | undefined, isThread: boolean) => {
+    if (!file) return;
+    const result = await uploadFile(file);
+    if (!result) return;
+    if (isThread) setThreadAttachment(result);
+    else setAttachment(result);
+  };
+
   const send = async (parentId?: number | null) => {
     if (!activeId || sending) return;
     const text = (parentId ? threadDraft : draft).trim();
-    if (!text) return;
+    const att = parentId ? threadAttachment : attachment;
+    if (!text && !att) return;
     setSending(true);
     try {
       const msg = await apiFetch(`chat/channels/${activeId}/messages`, token, {
         method: "POST",
-        body: JSON.stringify({ body: text, parentId: parentId ?? null }),
+        body: JSON.stringify({
+          body: text,
+          parentId: parentId ?? null,
+          attachmentUrl: att?.url ?? null,
+          attachmentName: att?.name ?? null,
+        }),
       });
       if (parentId) {
         setThreadDraft("");
+        setThreadAttachment(null);
         setThreadReplies((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
         setMessages((prev) =>
           prev.map((m) => (m.id === parentId ? { ...m, replyCount: (m.replyCount ?? 0) + 1 } : m)),
         );
       } else {
         setDraft("");
+        setAttachment(null);
         setMentionOpen(false);
         setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
         nearBottomRef.current = true;
@@ -782,7 +848,37 @@ export default function WorkspaceChat({
                   </div>
                 </div>
               ) : (
-                <div className={styles.msgBody}>{renderRichText(m.body)}</div>
+                m.body && m.body !== `Archivo: ${m.attachmentName}` && (
+                  <div className={styles.msgBody}>{renderRichText(m.body)}</div>
+                )
+              )}
+
+              {m.attachmentUrl && editingId !== m.id && (
+                isImageAttachment(m.attachmentName ?? "") ? (
+                  <a
+                    href={attachmentHref(m.attachmentUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={styles.msgAttachmentImageLink}
+                  >
+                    <img
+                      src={attachmentHref(m.attachmentUrl)}
+                      alt={m.attachmentName ?? "Adjunto"}
+                      className={styles.msgAttachmentImage}
+                    />
+                  </a>
+                ) : (
+                  <a
+                    href={attachmentHref(m.attachmentUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={styles.msgAttachmentFile}
+                  >
+                    <span className={styles.attachChipIcon}>📄</span>
+                    <span className={styles.attachChipName}>{m.attachmentName ?? "Archivo"}</span>
+                    <span className={styles.msgAttachmentDownload}>Descargar</span>
+                  </a>
+                )
               )}
 
               {m.reactions?.length > 0 && (
@@ -792,7 +888,12 @@ export default function WorkspaceChat({
                       key={r.emoji}
                       type="button"
                       className={`${styles.reaction} ${mineReaction(r.emoji) ? styles.reactionMine : ""}`}
-                      onClick={() => void react(m.id, r.emoji)}
+                      onClick={() => {
+                        if (detail?.readOnly) return;
+                        void react(m.id, r.emoji);
+                      }}
+                      disabled={detail?.readOnly}
+                      style={detail?.readOnly ? { cursor: "default" } : undefined}
                     >
                       <span>{r.emoji}</span>
                       <span>{r.count}</span>
@@ -801,6 +902,7 @@ export default function WorkspaceChat({
                 </div>
               )}
 
+              {!detail?.readOnly && (
               <div className={styles.msgActions}>
                 <button type="button" className={styles.actionBtn} onClick={() => void react(m.id, "👍")}>
                   👍
@@ -834,6 +936,7 @@ export default function WorkspaceChat({
                   </>
                 )}
               </div>
+              )}
 
               {!m.parentId && m.replyCount > 0 && (
                 <button type="button" className={styles.threadHint} onClick={() => void openThread(m)}>
@@ -881,7 +984,10 @@ export default function WorkspaceChat({
       ) : (
         <span className={styles.channelPrefix}>{channelPrefix(c.kind)}</span>
       )}
-      <span className={styles.channelLabel}>{c.name}</span>
+      <span className={styles.channelLabel}>
+        {c.name}
+        {c.supervised ? <span className={styles.superviseTag}>Sup</span> : null}
+      </span>
       <span className={styles.channelMeta}>
         {(c.unreadCount ?? 0) > 0 && activeId !== c.id && (
           <span className={styles.unreadBadge}>{c.unreadCount! > 99 ? "99+" : c.unreadCount}</span>
@@ -990,9 +1096,22 @@ export default function WorkspaceChat({
                   <div className={styles.channelTitle}>
                     <span>{channelPrefix(detail?.kind ?? "PUBLIC")}</span>
                     <span>{detail?.name ?? "…"}</span>
+                    {detail?.supervised ? (
+                      <span className={styles.supervisePill} title="Vista de supervisión (solo lectura)">
+                        Supervisión
+                      </span>
+                    ) : null}
                   </div>
-                  <div className={styles.channelTopic} onClick={() => void editTopic()} title="Editar tema">
-                    {detail?.topic || "Añadir tema…"}
+                  <div
+                    className={styles.channelTopic}
+                    onClick={() => {
+                      if (detail?.readOnly) return;
+                      void editTopic();
+                    }}
+                    title={detail?.readOnly ? "Solo lectura" : "Editar tema"}
+                    style={detail?.readOnly ? { cursor: "default" } : undefined}
+                  >
+                    {detail?.topic || (detail?.readOnly ? "Sin tema" : "Añadir tema…")}
                   </div>
                 </div>
                 <div className={styles.headerMeta}>
@@ -1110,6 +1229,12 @@ export default function WorkspaceChat({
               </div>
 
               <div className={styles.composerWrap}>
+                {detail?.readOnly ? (
+                  <div className={styles.superviseBanner} role="status">
+                    Vista de supervisión — puedes leer esta conversación, pero no publicar ni editar.
+                  </div>
+                ) : (
+                  <>
                 <div className={styles.typingLine}>
                   {typingLabel ? (
                     <>
@@ -1146,12 +1271,44 @@ export default function WorkspaceChat({
                       ))}
                     </div>
                   )}
+                  {(attachment || uploading) && (
+                    <div className={styles.attachChip}>
+                      {uploading && !attachment ? (
+                        <span className={styles.attachChipName}>Subiendo…</span>
+                      ) : attachment ? (
+                        <>
+                          {isImageAttachment(attachment.name) ? (
+                            <img
+                              src={attachmentHref(attachment.url)}
+                              alt={attachment.name}
+                              className={styles.attachChipThumb}
+                            />
+                          ) : (
+                            <span className={styles.attachChipIcon}>📎</span>
+                          )}
+                          <span className={styles.attachChipName}>{attachment.name}</span>
+                          <span className={styles.attachChipSize}>{formatFileSize(attachment.size)}</span>
+                          <button
+                            type="button"
+                            className={styles.attachChipRemove}
+                            onClick={() => setAttachment(null)}
+                          >
+                            ×
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
+                  )}
                   <textarea
                     className={styles.composerTextarea}
                     placeholder={`Mensaje a ${channelPrefix(detail?.kind ?? "PUBLIC")}${detail?.name ?? "canal"}`}
                     value={draft}
                     rows={2}
                     onChange={(e) => onDraftChange(e.target.value)}
+                    onPaste={(e) => {
+                      const file = Array.from(e.clipboardData?.files ?? [])[0];
+                      if (file) void onPickFile(file, false);
+                    }}
                     onKeyDown={(e) => {
                       if (mentionOpen && mentionCandidates.length) {
                         if (e.key === "ArrowDown") {
@@ -1181,17 +1338,39 @@ export default function WorkspaceChat({
                     }}
                   />
                   <div className={styles.composerBar}>
-                    <span className={styles.composerHint}>Enter envía · Shift+Enter nueva línea · @ menciona</span>
+                    <div className={styles.composerBarLeft}>
+                      <button
+                        type="button"
+                        className={styles.attachBtn}
+                        title="Adjuntar archivo"
+                        disabled={uploading}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        📎
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        hidden
+                        onChange={(e) => {
+                          void onPickFile(e.target.files?.[0], false);
+                          e.target.value = "";
+                        }}
+                      />
+                      <span className={styles.composerHint}>Enter envía · Shift+Enter nueva línea · @ menciona</span>
+                    </div>
                     <button
                       type="button"
                       className={styles.sendBtn}
-                      disabled={sending || !draft.trim()}
+                      disabled={sending || uploading || (!draft.trim() && !attachment)}
                       onClick={() => void send()}
                     >
                       Enviar
                     </button>
                   </div>
                 </div>
+                  </>
+                )}
               </div>
             </>
           )}
@@ -1211,7 +1390,7 @@ export default function WorkspaceChat({
                   {(detail?.members ?? []).map((m) => (
                     <div key={m.id} className={styles.memberRow}>
                       <span className={styles.presenceWrap}>
-                        <span className={`${styles.avatar} ${avatarHue(m.id)}`} style={{ marginTop: 0 }}>
+                        <span className={`${styles.avatar} ${avatarHue(m.id)}`}>
                           {initials(m.nombre)}
                         </span>
                         <span
@@ -1221,7 +1400,7 @@ export default function WorkspaceChat({
                           style={{ borderColor: "var(--surface)" }}
                         />
                       </span>
-                      <div>
+                      <div className={styles.memberMeta}>
                         <div className={styles.memberName}>{m.nombre}</div>
                         <div className={styles.memberEmail}>{m.email}</div>
                       </div>
@@ -1257,13 +1436,50 @@ export default function WorkspaceChat({
                   {renderMessageList(threadReplies)}
                 </div>
                 <div className={styles.composerWrap}>
+                  {detail?.readOnly ? (
+                    <div className={styles.superviseBanner} role="status">
+                      Solo lectura en supervisión
+                    </div>
+                  ) : (
                   <div className={styles.composer}>
+                    {(threadAttachment || uploading) && (
+                      <div className={styles.attachChip}>
+                        {threadAttachment ? (
+                          <>
+                            {isImageAttachment(threadAttachment.name) ? (
+                              <img
+                                src={attachmentHref(threadAttachment.url)}
+                                alt={threadAttachment.name}
+                                className={styles.attachChipThumb}
+                              />
+                            ) : (
+                              <span className={styles.attachChipIcon}>📎</span>
+                            )}
+                            <span className={styles.attachChipName}>{threadAttachment.name}</span>
+                            <span className={styles.attachChipSize}>{formatFileSize(threadAttachment.size)}</span>
+                            <button
+                              type="button"
+                              className={styles.attachChipRemove}
+                              onClick={() => setThreadAttachment(null)}
+                            >
+                              ×
+                            </button>
+                          </>
+                        ) : (
+                          <span className={styles.attachChipName}>Subiendo…</span>
+                        )}
+                      </div>
+                    )}
                     <textarea
                       className={styles.composerTextarea}
                       placeholder="Responder en el hilo…"
                       value={threadDraft}
                       rows={2}
                       onChange={(e) => setThreadDraft(e.target.value)}
+                      onPaste={(e) => {
+                        const file = Array.from(e.clipboardData?.files ?? [])[0];
+                        if (file) void onPickFile(file, true);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
@@ -1272,17 +1488,38 @@ export default function WorkspaceChat({
                       }}
                     />
                     <div className={styles.composerBar}>
-                      <span className={styles.composerHint}>Respuesta al hilo</span>
+                      <div className={styles.composerBarLeft}>
+                        <button
+                          type="button"
+                          className={styles.attachBtn}
+                          title="Adjuntar archivo"
+                          disabled={uploading}
+                          onClick={() => threadFileInputRef.current?.click()}
+                        >
+                          📎
+                        </button>
+                        <input
+                          ref={threadFileInputRef}
+                          type="file"
+                          hidden
+                          onChange={(e) => {
+                            void onPickFile(e.target.files?.[0], true);
+                            e.target.value = "";
+                          }}
+                        />
+                        <span className={styles.composerHint}>Respuesta al hilo</span>
+                      </div>
                       <button
                         type="button"
                         className={styles.sendBtn}
-                        disabled={sending || !threadDraft.trim()}
+                        disabled={sending || uploading || (!threadDraft.trim() && !threadAttachment)}
                         onClick={() => void send(threadRoot.id)}
                       >
                         Responder
                       </button>
                     </div>
                   </div>
+                  )}
                 </div>
               </>
             )}
