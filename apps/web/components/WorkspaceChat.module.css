@@ -568,6 +568,26 @@
   background: linear-gradient(90deg, transparent, var(--nx-line), transparent);
 }
 
+.newDivider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 12px;
+  color: var(--nx-danger);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.newDivider::before,
+.newDivider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: color-mix(in srgb, var(--nx-danger) 40%, transparent);
+}
+
 .msg {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr);
@@ -744,6 +764,36 @@
 .actionBtn:hover {
   background: var(--surface-2, #f4f6f8);
   color: var(--foreground, #111);
+}
+
+.emojiPicker {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px;
+  padding: 6px;
+  width: 210px;
+  border: 1px solid var(--nx-line);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  z-index: 5;
+}
+
+.emojiPickerItem {
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 17px;
+  line-height: 1;
+  padding: 5px 0;
+  cursor: pointer;
+}
+
+.emojiPickerItem:hover {
+  background: var(--surface-2, #f4f6f8);
 }
 
 .reactions {

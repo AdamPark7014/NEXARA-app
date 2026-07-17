@@ -778,6 +778,45 @@ export class ChatService {
     return this.getChannel(channelId, userId);
   }
 
+  async addMember(channelId: number, userId: number, targetUserId: number) {
+    const access = await this.assertChannelAccess(channelId, userId, { write: true });
+    if (
+      access.channel.kind !== ChatChannelKind.PUBLIC &&
+      access.channel.kind !== ChatChannelKind.PRIVATE
+    ) {
+      throw new BadRequestException('Este tipo de conversación no admite invitaciones');
+    }
+    const target = await this.prisma.user.findFirst({
+      where: { id: targetUserId, isActive: true },
+      select: { id: true },
+    });
+    if (!target) throw new NotFoundException('Usuario no encontrado');
+
+    await this.prisma.chatChannelMember.upsert({
+      where: { channelId_userId: { channelId, userId: targetUserId } },
+      create: { channelId, userId: targetUserId, role: 'member' },
+      update: {},
+    });
+
+    this.realtime.emitToRoom(this.room(channelId), 'chat:members-changed', { channelId });
+    this.realtime.emitToUser(targetUserId, 'chat:members-changed', { channelId });
+    return this.getChannel(channelId, userId);
+  }
+
+  async leaveChannel(channelId: number, userId: number) {
+    const channel = await this.prisma.chatChannel.findUnique({ where: { id: channelId } });
+    if (!channel) throw new NotFoundException('Canal no encontrado');
+    if (channel.kind === ChatChannelKind.DIRECT) {
+      throw new BadRequestException('No puedes salir de un mensaje directo');
+    }
+    if (channel.slug === 'general' || channel.slug === 'anuncios') {
+      throw new BadRequestException('No puedes salir de un canal general de la organización');
+    }
+    await this.prisma.chatChannelMember.deleteMany({ where: { channelId, userId } });
+    this.realtime.emitToRoom(this.room(channelId), 'chat:members-changed', { channelId });
+    return { ok: true };
+  }
+
   async searchMessages(userId: number, q: string, channelId?: number) {
     const query = (q ?? '').trim();
     if (query.length < 2) return { messages: [] };

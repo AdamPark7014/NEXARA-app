@@ -67,6 +67,20 @@ export class ChatController {
     return this.chat.updateTopic(id, user.id, body.topic ?? '');
   }
 
+  @Post('channels/:id/members')
+  addMember(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { id: number },
+    @Body() body: { userId: number },
+  ) {
+    return this.chat.addMember(id, user.id, Number(body.userId));
+  }
+
+  @Delete('channels/:id/leave')
+  leaveChannel(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { id: number }) {
+    return this.chat.leaveChannel(id, user.id);
+  }
+
   @Get('channels/:id/messages')
   listMessages(
     @Param('id', ParseIntPipe) id: number,

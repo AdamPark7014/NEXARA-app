@@ -23,6 +23,12 @@ function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const EMOJI_PICKER_LIST = [
+  "👍", "👎", "❤️", "🔥", "🎉", "😀", "😂", "😅", "😮", "😢",
+  "😡", "🙏", "👏", "🙌", "💯", "✅", "❌", "👀", "🚀", "🤔",
+  "😍", "🥳", "😴", "🤝", "💡", "⚠️", "📌", "⭐", "🎯", "☕",
+];
+
 type ChannelKind = "PUBLIC" | "PRIVATE" | "DIRECT";
 
 type ChatUser = { id: number; nombre: string; email: string };
@@ -35,7 +41,7 @@ type Channel = {
   topic?: string | null;
   description?: string | null;
   peer?: ChatUser | null;
-  members?: Array<ChatUser & { role?: string }>;
+  members?: Array<ChatUser & { role?: string; lastReadAt?: string | null }>;
   memberCount: number;
   lastMessageAt?: string | null;
   lastMessagePreview?: string | null;
@@ -207,6 +213,13 @@ export default function WorkspaceChat({
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [threadAttachment, setThreadAttachment] = useState<Attachment | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [emojiPickerFor, setEmojiPickerFor] = useState<number | null>(null);
+  const [showInvite, setShowInvite] = useState(false);
+  const [unreadBoundary, setUnreadBoundary] = useState<{ channelId: number; before: string } | null>(null);
+  const [notifyOn, setNotifyOn] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("nexara.chat.notify") === "1";
+  });
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<HTMLDivElement | null>(null);
@@ -231,6 +244,46 @@ export default function WorkspaceChat({
   useEffect(() => {
     localStorage.setItem("nexara.chat.sound", soundOn ? "1" : "0");
   }, [soundOn]);
+
+  useEffect(() => {
+    localStorage.setItem("nexara.chat.notify", notifyOn ? "1" : "0");
+  }, [notifyOn]);
+
+  const toggleNotify = () => {
+    if (notifyOn) {
+      setNotifyOn(false);
+      return;
+    }
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission === "granted") {
+      setNotifyOn(true);
+      return;
+    }
+    void Notification.requestPermission().then((perm) => {
+      if (perm === "granted") setNotifyOn(true);
+    });
+  };
+
+  const notify = useCallback(
+    (msg: Message) => {
+      if (!notifyOn || typeof window === "undefined") return;
+      if (document.visibilityState === "visible") return;
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
+      try {
+        const n = new Notification(`${msg.author.nombre} · NEXARA Chat`, {
+          body: msg.attachmentName ? `📎 ${msg.attachmentName}` : msg.body.slice(0, 140),
+          tag: `nexara-chat-${msg.channelId}`,
+        });
+        n.onclick = () => {
+          window.focus();
+          n.close();
+        };
+      } catch {
+        /* ignore */
+      }
+    },
+    [notifyOn],
+  );
 
   const playPing = useCallback(() => {
     if (!soundOn || typeof window === "undefined") return;
@@ -309,7 +362,11 @@ export default function WorkspaceChat({
           const ids = new Set(prev.map((m) => m.id));
           return [...batch.filter((m) => !ids.has(m.id)), ...prev];
         });
-        if (ch) setDetail(ch);
+        if (ch) {
+          setDetail(ch);
+          const self = ch.members?.find((m: ChatUser & { lastReadAt?: string | null }) => m.id === currentUserId);
+          setUnreadBoundary(self?.lastReadAt ? { channelId, before: self.lastReadAt } : null);
+        }
         await apiFetch(`chat/channels/${channelId}/read`, token, { method: "PATCH" });
         setChannels((prev) =>
           prev.map((c) => (c.id === channelId ? { ...c, unread: false, unreadCount: 0 } : c)),
@@ -320,7 +377,7 @@ export default function WorkspaceChat({
         setLoadingMessages(false);
       }
     },
-    [token],
+    [token, currentUserId],
   );
 
   useEffect(() => {
@@ -356,9 +413,14 @@ export default function WorkspaceChat({
     socket.emit("chat:presence", { status: "online" });
 
     socket.on("chat:message", (msg: Message) => {
+      const isMine = msg.authorId === currentUserId;
       if (msg.channelId === activeIdRef.current && !msg.parentId) {
         setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
         void apiFetch(`chat/channels/${msg.channelId}/read`, token, { method: "PATCH" });
+        if (!isMine) {
+          playPing();
+          notify(msg);
+        }
       } else if (
         msg.channelId === activeIdRef.current &&
         threadRootRef.current &&
@@ -366,7 +428,10 @@ export default function WorkspaceChat({
       ) {
         setThreadReplies((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
       } else {
-        playPing();
+        if (!isMine) {
+          playPing();
+          notify(msg);
+        }
         setChannels((prev) =>
           prev.map((c) =>
             c.id === msg.channelId
@@ -428,6 +493,15 @@ export default function WorkspaceChat({
       setChannels((prev) => prev.map((c) => (c.id === payload.id ? { ...c, topic: payload.topic } : c)));
     });
 
+    socket.on("chat:members-changed", (payload: { channelId: number }) => {
+      if (payload.channelId === activeIdRef.current) {
+        void apiFetch(`chat/channels/${payload.channelId}`, token)
+          .then((ch) => ch && setDetail(ch))
+          .catch(() => {});
+      }
+      void loadChannels();
+    });
+
     const onVis = () => {
       socket.emit("chat:presence", { status: document.visibilityState === "visible" ? "online" : "away" });
     };
@@ -439,7 +513,7 @@ export default function WorkspaceChat({
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [token, currentUserId, playPing]);
+  }, [token, currentUserId, playPing, notify]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -453,11 +527,22 @@ export default function WorkspaceChat({
         setSwitcherOpen(false);
         setSearchOpen(false);
         setMentionOpen(false);
+        setEmojiPickerFor(null);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    if (emojiPickerFor == null) return;
+    const onClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-emoji-picker]")) setEmojiPickerFor(null);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [emojiPickerFor]);
 
   useEffect(() => {
     const socket = socketRef.current;
@@ -701,6 +786,33 @@ export default function WorkspaceChat({
     }
   };
 
+  const addMemberToChannel = async (userId: number) => {
+    if (!activeId) return;
+    try {
+      const ch = await apiFetch(`chat/channels/${activeId}/members`, token, {
+        method: "POST",
+        body: JSON.stringify({ userId }),
+      });
+      setDetail(ch);
+      setShowInvite(false);
+      await loadChannels();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo invitar al usuario");
+    }
+  };
+
+  const leaveCurrentChannel = async () => {
+    if (!activeId || !detail) return;
+    if (!window.confirm(`¿Salir de ${detail.name}?`)) return;
+    try {
+      await apiFetch(`chat/channels/${activeId}/leave`, token, { method: "DELETE" });
+      setActiveId(null);
+      await loadChannels();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo salir del canal");
+    }
+  };
+
   const onScrollMessages = () => {
     const el = messagesRef.current;
     if (!el) return;
@@ -787,15 +899,37 @@ export default function WorkspaceChat({
     [channels],
   );
 
-  const renderMessageList = (list: Message[], opts?: { compactStart?: boolean }) => {
+  const baseTitleRef = useRef<string>("");
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!baseTitleRef.current) baseTitleRef.current = document.title;
+    const base = baseTitleRef.current;
+    document.title = totalUnread > 0 ? `(${totalUnread > 99 ? "99+" : totalUnread}) ${base}` : base;
+    return () => {
+      document.title = base;
+    };
+  }, [totalUnread]);
+
+  const renderMessageList = (
+    list: Message[],
+    opts?: { compactStart?: boolean; showUnreadDivider?: boolean },
+  ) => {
     let lastAuthor: number | null = null;
     let lastDay: string | null = null;
     let lastTs = 0;
+    let dividerShown = false;
+    const boundaryTs =
+      opts?.showUnreadDivider && unreadBoundary && unreadBoundary.channelId === activeId
+        ? new Date(unreadBoundary.before).getTime()
+        : null;
     return list.map((m) => {
       const dk = dayKey(m.createdAt);
       const showDay = dk !== lastDay;
       lastDay = dk;
       const ts = new Date(m.createdAt).getTime();
+      const showUnreadDivider =
+        boundaryTs != null && !dividerShown && ts > boundaryTs && m.authorId !== currentUserId;
+      if (showUnreadDivider) dividerShown = true;
       const compact =
         !showDay &&
         lastAuthor === m.authorId &&
@@ -810,6 +944,11 @@ export default function WorkspaceChat({
       return (
         <div key={m.id}>
           {showDay && <div className={styles.dayDivider}>{dayLabel(m.createdAt)}</div>}
+          {showUnreadDivider && (
+            <div className={styles.newDivider}>
+              <span>Mensajes nuevos</span>
+            </div>
+          )}
           <div
             className={`${styles.msg} ${compact ? styles.msgCompact : ""} ${
               highlightId === m.id ? styles.msgHighlight : ""
@@ -903,7 +1042,7 @@ export default function WorkspaceChat({
               )}
 
               {!detail?.readOnly && (
-              <div className={styles.msgActions}>
+              <div className={styles.msgActions} data-emoji-picker>
                 <button type="button" className={styles.actionBtn} onClick={() => void react(m.id, "👍")}>
                   👍
                 </button>
@@ -913,6 +1052,31 @@ export default function WorkspaceChat({
                 <button type="button" className={styles.actionBtn} onClick={() => void react(m.id, "👀")}>
                   👀
                 </button>
+                <button
+                  type="button"
+                  className={styles.actionBtn}
+                  title="Más emojis"
+                  onClick={() => setEmojiPickerFor((cur) => (cur === m.id ? null : m.id))}
+                >
+                  +
+                </button>
+                {emojiPickerFor === m.id && (
+                  <div className={styles.emojiPicker} data-emoji-picker>
+                    {EMOJI_PICKER_LIST.map((e) => (
+                      <button
+                        key={e}
+                        type="button"
+                        className={styles.emojiPickerItem}
+                        onClick={() => {
+                          void react(m.id, e);
+                          setEmojiPickerFor(null);
+                        }}
+                      >
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {!m.parentId && (
                   <button type="button" className={styles.actionBtn} onClick={() => void openThread(m)}>
                     Responder
@@ -1125,6 +1289,14 @@ export default function WorkspaceChat({
                   </button>
                   <button
                     type="button"
+                    className={`${styles.iconBtn} ${notifyOn ? styles.iconBtnActive : ""}`}
+                    title={notifyOn ? "Notificaciones activadas" : "Activar notificaciones del navegador"}
+                    onClick={toggleNotify}
+                  >
+                    {notifyOn ? "🔔" : "🔕"}
+                  </button>
+                  <button
+                    type="button"
                     className={`${styles.iconBtn} ${searchOpen ? styles.iconBtnActive : ""}`}
                     title="Buscar en canal"
                     onClick={() => setSearchOpen((v) => !v)}
@@ -1145,6 +1317,19 @@ export default function WorkspaceChat({
                   {typeof detail?.memberCount === "number" && (
                     <span className={styles.pill}>{detail.memberCount}</span>
                   )}
+                  {detail?.kind !== "DIRECT" &&
+                    detail?.slug !== "general" &&
+                    detail?.slug !== "anuncios" &&
+                    !detail?.readOnly && (
+                      <button
+                        type="button"
+                        className={styles.iconBtn}
+                        title="Salir del canal"
+                        onClick={() => void leaveCurrentChannel()}
+                      >
+                        Salir
+                      </button>
+                    )}
                 </div>
               </header>
 
@@ -1210,7 +1395,7 @@ export default function WorkspaceChat({
                     </div>
                   </div>
                 )}
-                {renderMessageList(messages)}
+                {renderMessageList(messages, { showUnreadDivider: true })}
                 <div ref={bottomRef} />
                 {showJump && (
                   <button
@@ -1382,9 +1567,23 @@ export default function WorkspaceChat({
               <>
                 <div className={styles.panelHead}>
                   <div className={styles.panelTitle}>Miembros</div>
-                  <button type="button" className={styles.panelClose} onClick={() => setShowMembers(false)}>
-                    ×
-                  </button>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    {detail?.kind !== "DIRECT" && !detail?.readOnly && (
+                      <button
+                        type="button"
+                        className={styles.actionBtn}
+                        onClick={() => {
+                          setShowInvite(true);
+                          void searchColleagues("");
+                        }}
+                      >
+                        + Invitar
+                      </button>
+                    )}
+                    <button type="button" className={styles.panelClose} onClick={() => setShowMembers(false)}>
+                      ×
+                    </button>
+                  </div>
                 </div>
                 <div className={styles.panelBody}>
                   {(detail?.members ?? []).map((m) => (
@@ -1594,6 +1793,55 @@ export default function WorkspaceChat({
             </div>
             <div className={styles.modalActions}>
               <button type="button" className={styles.actionBtn} onClick={() => setShowDm(false)}>
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showInvite && (
+        <div className={styles.modalBackdrop} onClick={() => setShowInvite(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalTitle}>Invitar a {detail?.name ?? "el canal"}</div>
+            <input
+              className={styles.modalInput}
+              placeholder="Buscar compañero…"
+              value={colleagueQ}
+              onChange={(e) => void searchColleagues(e.target.value)}
+              autoFocus
+            />
+            <div className={styles.colleagueList}>
+              {colleagues
+                .filter((u) => !(detail?.members ?? []).some((m) => m.id === u.id))
+                .map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    className={styles.colleagueBtn}
+                    onClick={() => void addMemberToChannel(u.id)}
+                  >
+                    <span className={styles.presenceWrap}>
+                      <div className={`${styles.avatar} ${avatarHue(u.id)}`} style={{ width: 32, height: 32, fontSize: 11, marginTop: 0 }}>
+                        {initials(u.nombre)}
+                      </div>
+                      <span
+                        className={`${styles.presenceDot} ${presence[u.id] === "online" ? styles.presenceOnline : ""}`}
+                        style={{ borderColor: "var(--surface)" }}
+                      />
+                    </span>
+                    <div className={styles.colleagueMeta}>
+                      <div className={styles.colleagueName}>{u.nombre}</div>
+                      <div className={styles.colleagueEmail}>{u.email}</div>
+                    </div>
+                  </button>
+                ))}
+              {colleagues.length === 0 && (
+                <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", padding: 8 }}>Sin resultados</div>
+              )}
+            </div>
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.actionBtn} onClick={() => setShowInvite(false)}>
                 Cerrar
               </button>
             </div>
