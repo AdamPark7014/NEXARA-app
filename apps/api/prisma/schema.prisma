@@ -1063,6 +1063,7 @@ model VehicleAsset {
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
   controles           VehicleControl[]
+  viaticos            Viatico[]
   assignedTo          User?            @relation("VehicleAssetAssigned", fields: [assignedToId], references: [id])
 }
 
@@ -1098,6 +1099,9 @@ model Viatico {
   usuarioId          Int
   actividadId        Int?
   projectId          Int?
+  vehicleId          Int?
+  /// COMBUSTIBLE | CASETA | HOSPEDAJE | ALIMENTACION | TRANSPORTE | OTROS
+  categoria          String?       @db.VarChar(40)
   montoSolicitado    Decimal       @db.Decimal(10, 2)
   motivo             String?       @db.VarChar(255)
   ticketEvidenciaUrl String?
@@ -1110,7 +1114,10 @@ model Viatico {
   Activity           Activity?     @relation(fields: [actividadId], references: [id])
   User               User          @relation(fields: [usuarioId], references: [id])
   project            SalesProject? @relation(fields: [projectId], references: [id])
+  vehicle            VehicleAsset? @relation(fields: [vehicleId], references: [id])
 
+  @@index([projectId, fechaSolicitud])
+  @@index([categoria, fechaSolicitud])
   @@map("viaticos")
 }
 

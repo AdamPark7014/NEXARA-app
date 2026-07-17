@@ -106,7 +106,6 @@ fun ConsoleViaticsScreen(
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        fun r(k: String, va: String) { if (va.isNotBlank()) item { Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Text(k, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(0.4f)); Text(va, modifier = Modifier.weight(0.6f)) } } }
                         if (!v.actividad?.anNumber.isNullOrBlank()) DetailLine("Actividad (AN)", v.actividad!!.anNumber)
                         if (!v.usuario?.nombre.isNullOrBlank()) DetailLine("Empleado", v.usuario!!.nombre)
                         DetailLine("Razón de gasto", v.razonGasto ?: "—")

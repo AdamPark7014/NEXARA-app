@@ -554,7 +554,6 @@ fun MaintenanceContractsScreen() {
                         item {
                             Card(Modifier.fillMaxWidth()) {
                                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    fun r(k: String, v: String) { if (v.isNotBlank()) item { DetailLine(k, v) } }
                                     DetailLine("Número", erpStr(c, "contractNumber", "number", "folio"))
                                     DetailLine("Nombre", erpStr(c, "name", "title"))
                                     DetailLine("Cliente", erpStr(c, "clientName", "cliente"))

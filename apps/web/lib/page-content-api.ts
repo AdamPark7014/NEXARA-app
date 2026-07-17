@@ -358,12 +358,36 @@ export const DEFAULT_PAGE_VISUALS: Record<PageVisualSection, PageVisualsContent>
 
 // ── Helpers de URL ───────────────────────────────────────────────────────────
 
-/** Resuelve URL de media de página (API relativa, /images/… o absoluta). */
+/**
+ * Resuelve URL de media de página para el navegador.
+ * Nunca emitir hosts internos Docker (`nexara-api`) — en SSR `buildApiUrl`
+ * usaría API_INTERNAL_URL y las <img> quedarían rotas en el HTML público.
+ */
 export function resolvePageMediaUrl(url: string): string {
   if (!url) return "";
-  if (/^https?:\/\//i.test(url)) return url;
-  if (url.startsWith("/images/")) return url;
-  return buildApiUrl(url.replace(/^\//, ""));
+  if (/^https?:\/\//i.test(url)) {
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.toLowerCase();
+      if (
+        host === "nexara-api" ||
+        host === "localhost" ||
+        host === "127.0.0.1" ||
+        host.endsWith(".internal")
+      ) {
+        const path = parsed.pathname.replace(/^\/api(?=\/)/, "") || "/";
+        if (path.startsWith("/uploads/") || path.startsWith("/images/")) return path;
+        return `/api${path.startsWith("/") ? path : `/${path}`}`;
+      }
+    } catch {
+      /* keep absolute */
+    }
+    return url;
+  }
+  if (url.startsWith("/images/") || url.startsWith("/uploads/")) return url;
+  const path = url.replace(/^\//, "");
+  // Rutas API relativas (hero-slides, studio/page-content/media, …)
+  return `/api/${path}`;
 }
 
 export function mergePageVisuals(

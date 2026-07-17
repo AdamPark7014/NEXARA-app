@@ -72,6 +72,7 @@ apps/mobile-native/android/**/*.aab
 apps/mobile-native/android/key.properties
 apps/mobile-native/android/**/*.jks
 apps/mobile-native/android/**/*.keystore
+!apps/mobile-native/android/key.properties.example
 
 # iOS nativo (apps/mobile-native/ios) — derivados de Xcode / SwiftPM
 apps/mobile-native/ios/**/build/

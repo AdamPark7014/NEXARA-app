@@ -5,26 +5,26 @@ import { useUser } from "@/components/UserContext";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import KpiCard from "@/components/ui/KpiCard";
+import FileDropzone from "@/components/ui/FileDropzone";
 import { Tag, Money } from "@/components/ui/DataTable";
 import { listViaticsForActivity, type ViaticoRow } from "@/lib/ops-activities-api";
 import { DetailError, DetailSection, formatDateTime } from "@/components/detail/DetailFrame";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
-import { buildApiUrl } from "@/lib/api-base";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac";
+import { postViatico } from "@/lib/viatics-api";
+import { buildApiUrl } from "@/lib/api-base";
 
-const CONCEPTOS = ["Gasolina", "Caseta", "Alimentos", "Hospedaje", "Herramientas", "Transporte", "Material", "Otro"];
-
-async function apiFetch(path: string, token: string, init: RequestInit = {}) {
-  const res = await fetch(buildApiUrl(path), {
-    ...init,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init.headers as Record<string, string> ?? {}) },
-  });
-  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
-  if (res.status === 204) return null;
-  const t = await res.text();
-  return t ? JSON.parse(t) : null;
-}
+const CONCEPTOS = [
+  { label: "Gasolina", categoria: "COMBUSTIBLE" },
+  { label: "Caseta", categoria: "CASETA" },
+  { label: "Alimentos", categoria: "ALIMENTACION" },
+  { label: "Hospedaje", categoria: "HOSPEDAJE" },
+  { label: "Transporte", categoria: "TRANSPORTE" },
+  { label: "Herramientas", categoria: "OTROS" },
+  { label: "Material", categoria: "OTROS" },
+  { label: "Otro", categoria: "OTROS" },
+] as const;
 
 const EMPTY_FORM = { concepto: "", montoSolicitado: "", motivo: "" };
 
@@ -35,18 +35,24 @@ export default function ActivityViaticsPage() {
   const v2 = resolveV2RoleKey(user);
 
   const canCreate =
-    user?.isSuperAdmin ||
-    v2 === ROLES.ING_CAMPO ||
-    v2 === ROLES.ING_SOPORTE ||
-    v2 === ROLES.COORD_OPERACIONES;
+    !user?.isSuperAdmin &&
+    v2 !== ROLES.CEO &&
+    (v2 === ROLES.ING_CAMPO ||
+      v2 === ROLES.ING_SOPORTE ||
+      v2 === ROLES.COORD_OPERACIONES ||
+      v2 === ROLES.ADMINISTRATIVO ||
+      v2 === ROLES.COORD_ADMIN);
 
   const [viatics, setViatics] = useState<ViaticoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [viaticError, setViaticError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [vehicles, setVehicles] = useState<{ id: number; nombre: string; placas?: string | null }[]>([]);
+  const [vehicleId, setVehicleId] = useState("");
 
   const load = useCallback(async () => {
     if (!token || !id) return;
@@ -60,22 +66,55 @@ export default function ActivityViaticsPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (!token) return;
+    void fetch(buildApiUrl("vehicles/inventory"), {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (res) => {
+        if (!res.ok) return [];
+        const data = await res.json();
+        return Array.isArray(data) ? data : (data?.data ?? []);
+      })
+      .then((rows: { id: number; nombre?: string; placas?: string | null }[]) => {
+        setVehicles(
+          rows.map((v) => ({
+            id: v.id,
+            nombre: v.nombre || `Vehículo #${v.id}`,
+            placas: v.placas,
+          })),
+        );
+      })
+      .catch(() => setVehicles([]));
+  }, [token]);
+
   const submit = async () => {
     if (!token || !id || !form.concepto || !form.montoSolicitado) return;
+    if (!evidenceFile) {
+      setSaveErr("Debes adjuntar el ticket o comprobante");
+      return;
+    }
     setSaving(true);
     setSaveErr(null);
     try {
-      await apiFetch("viatics", token, {
-        method: "POST",
-        body: JSON.stringify({
-          actividadId: id,
-          concepto: form.concepto,
+      const cat =
+        CONCEPTOS.find((c) => c.label === form.concepto)?.categoria ?? "OTROS";
+      await postViatico(
+        token,
+        {
+          usuarioId: user?.id,
+          actividadId: Number(id),
+          motivo: (form.motivo || form.concepto).trim(),
           montoSolicitado: parseFloat(form.montoSolicitado),
-          motivo: form.motivo || undefined,
-        }),
-      });
+          categoria: cat,
+          vehicleId: vehicleId ? Number(vehicleId) : null,
+        },
+        evidenceFile,
+      );
       setShowForm(false);
       setForm({ ...EMPTY_FORM });
+      setEvidenceFile(null);
+      setVehicleId("");
       void load();
     } catch (e) {
       setSaveErr(e instanceof Error ? e.message : "Error al solicitar viático");
@@ -96,8 +135,14 @@ export default function ActivityViaticsPage() {
 
   const totalMonto = viatics.reduce((s, v) => s + (Number(v.montoSolicitado) || 0), 0);
 
-  const aprobados = viatics.filter((v) => v.estatus === "APROBADO").length;
-  const pendientes = viatics.filter((v) => v.estatus === "PENDIENTE" || !v.estatus).length;
+  const aprobados = viatics.filter((v) => {
+    const s = (v.estatus ?? "").toLowerCase();
+    return s === "aprobado" || s === "pagado";
+  }).length;
+  const pendientes = viatics.filter((v) => {
+    const s = (v.estatus ?? "Pendiente").toLowerCase();
+    return s === "pendiente" || s.includes("aprobado_coordinador");
+  }).length;
 
   return (
     <>
@@ -142,7 +187,7 @@ export default function ActivityViaticsPage() {
           )}
           {canCreate && (
             <Button size="sm" variant="primary" iconLeft="+"
-              onClick={() => { setShowForm(true); setSaveErr(null); setForm({ ...EMPTY_FORM }); }}
+              onClick={() => { setShowForm(true); setSaveErr(null); setForm({ ...EMPTY_FORM }); setEvidenceFile(null); setVehicleId(""); }}
               style={{ marginLeft: "auto" }}>
               Solicitar viático
             </Button>
@@ -201,7 +246,7 @@ export default function ActivityViaticsPage() {
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Concepto *</span>
                 <select value={form.concepto} onChange={(e) => setForm((f) => ({ ...f, concepto: e.target.value }))} style={inp} autoFocus>
                   <option value="">— Seleccionar —</option>
-                  {CONCEPTOS.map((c) => <option key={c} value={c}>{c}</option>)}
+                  {CONCEPTOS.map((c) => <option key={c.label} value={c.label}>{c.label}</option>)}
                 </select>
               </label>
 
@@ -219,6 +264,24 @@ export default function ActivityViaticsPage() {
                   style={{ ...inp, resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }} />
               </label>
 
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Vehículo (opcional)</span>
+                <select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)} style={inp}>
+                  <option value="">— Sin vehículo —</option>
+                  {vehicles.map((v) => (
+                    <option key={v.id} value={v.id}>{v.nombre}{v.placas ? ` · ${v.placas}` : ""}</option>
+                  ))}
+                </select>
+              </label>
+
+              <FileDropzone
+                file={evidenceFile}
+                onFile={setEvidenceFile}
+                label="Ticket / comprobante"
+                required
+                hint="Obligatorio · PDF o imagen"
+              />
+
               {saveErr && (
                 <div style={{ padding: "8px 12px", background: "var(--state-danger-bg, #fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
                   {saveErr}
@@ -228,7 +291,7 @@ export default function ActivityViaticsPage() {
 
             <div style={{ display: "flex", gap: 10, marginTop: 22, justifyContent: "flex-end" }}>
               <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void submit()} disabled={saving || !form.concepto || !form.montoSolicitado}>
+              <Button variant="primary" onClick={() => void submit()} disabled={saving || !form.concepto || !form.montoSolicitado || !evidenceFile}>
                 {saving ? "Enviando…" : "Solicitar"}
               </Button>
             </div>

@@ -46,12 +46,30 @@ const apiFetch = async (path: string, token: string, init: RequestInit = {}) => 
   return text ? JSON.parse(text) : null;
 };
 
-/** Resuelve la URL final de la imagen — soporta rutas API, estáticas y absolutas. */
+/** Resuelve la URL final de la imagen — same-origin /api (nunca host Docker interno). */
 export function resolveHeroImageUrl(imageUrl: string): string {
   if (!imageUrl) return "";
-  if (/^https?:\/\//i.test(imageUrl)) return imageUrl;
-  if (imageUrl.startsWith("/images/")) return imageUrl;
-  return buildApiUrl(imageUrl.replace(/^\//, ""));
+  if (/^https?:\/\//i.test(imageUrl)) {
+    try {
+      const parsed = new URL(imageUrl);
+      const host = parsed.hostname.toLowerCase();
+      if (
+        host === "nexara-api" ||
+        host === "localhost" ||
+        host === "127.0.0.1" ||
+        host.endsWith(".internal")
+      ) {
+        const path = parsed.pathname.replace(/^\/api(?=\/)/, "") || "/";
+        if (path.startsWith("/uploads/") || path.startsWith("/images/")) return path;
+        return `/api${path.startsWith("/") ? path : `/${path}`}`;
+      }
+    } catch {
+      /* keep */
+    }
+    return imageUrl;
+  }
+  if (imageUrl.startsWith("/images/") || imageUrl.startsWith("/uploads/")) return imageUrl;
+  return `/api/${imageUrl.replace(/^\//, "")}`;
 }
 
 // ── Público (sin auth) ───────────────────────────────────────────────

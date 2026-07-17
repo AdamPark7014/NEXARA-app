@@ -40,7 +40,9 @@
     "deploy:migrate": "bash deploy/nexara.sh migrate",
     "deploy:validate": "bash deploy/nexara.sh validate",
     "apk:install": "pwsh -ExecutionPolicy Bypass -File scripts/install-apk-windows.ps1",
-    "apk:build-install": "pwsh -ExecutionPolicy Bypass -File scripts/install-apk-windows.ps1 -Build"
+    "apk:build-install": "pwsh -ExecutionPolicy Bypass -File scripts/install-apk-windows.ps1 -Build",
+    "mobile:android:preview": "pwsh -ExecutionPolicy Bypass -File scripts/preview-android-emulator.ps1",
+    "mobile:android:play-aab": "pwsh -ExecutionPolicy Bypass -File scripts/build-play-aab.ps1"
   },
   "prisma": {
     "seed": "node apps/api/prisma/seed.js"
