@@ -14,6 +14,7 @@ import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog"
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToCsv } from "@/lib/export-csv";
+import WorkspaceChat from "@/components/WorkspaceChat";
 
 interface DocCategory { id: number; name: string }
 interface ManagedDoc {
@@ -46,6 +47,10 @@ export default function DocumentsPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getErpGovernanceSectionConfig(user, "documents"), [user]);
   const token = user?.token ?? "";
+  const userId = Number(user?.id ?? 0);
+
+  const [view, setView] = useState<"files" | "chat">("chat");
+  const [chatDocId, setChatDocId] = useState<number | null>(null);
 
   const [docs, setDocs] = useState<ManagedDoc[]>([]);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
@@ -126,6 +131,11 @@ export default function DocumentsPage() {
     }
   };
 
+  const openDocChat = (d: ManagedDoc) => {
+    setChatDocId(d.id);
+    setView("chat");
+  };
+
   const submit = async () => {
     if (!token || !form.title) return;
     setSaving(true);
@@ -174,6 +184,17 @@ export default function DocumentsPage() {
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
 
+  const tabBtn = (active: boolean): React.CSSProperties => ({
+    border: "1px solid var(--border)",
+    background: active ? "var(--foreground)" : "var(--surface)",
+    color: active ? "var(--background, #fff)" : "var(--text-secondary)",
+    fontWeight: 700,
+    fontSize: 12.5,
+    padding: "8px 14px",
+    borderRadius: 999,
+    cursor: "pointer",
+  });
+
   const columns: Column<ManagedDoc>[] = [
     { key: "documentNumber", label: "Folio", render: (d) => <code style={{ fontSize: 11.5 }}>{d.documentNumber}</code>, width: 120 },
     {
@@ -206,6 +227,7 @@ export default function DocumentsPage() {
       key: "acciones" as keyof ManagedDoc, label: "",
       render: (d) => (
         <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); openDocChat(d); }}>Chat</Button>
           {d.fileUrl && <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); window.open(buildApiUrl(d.fileUrl!), "_blank"); }}>Ver</Button>}
           {cfg.canCreate && d.status !== "APPROVED" && d.status !== "ARCHIVED" && d.status !== "OBSOLETE" && (
             <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void openEdit(d); }}>Editar</Button>
@@ -218,24 +240,43 @@ export default function DocumentsPage() {
           )}
         </div>
       ),
-      width: 200,
+      width: 260,
     },
   ];
 
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Logística"
-        title="Gestión documental"
-        subtitle="Repositorio único de contratos, manuales, certificados y actas. Versionado y aprobación incluidos."
+        eyebrow="ERP · Colaboración"
+        title="Documentos & Workspace"
+        subtitle="Repositorio documental con chat profesional: canales, hilos, DMs y salas por documento."
         actions={
           <>
-            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo documento</Button>}
+            <div style={{ display: "flex", gap: 6, marginRight: 4 }}>
+              <button type="button" style={tabBtn(view === "chat")} onClick={() => setView("chat")}>Workspace</button>
+              <button type="button" style={tabBtn(view === "files")} onClick={() => setView("files")}>Archivo</button>
+            </div>
+            {view === "files" && (
+              <>
+                <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
+                {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo documento</Button>}
+              </>
+            )}
           </>
         }
       />
 
+      {view === "chat" && token && userId > 0 && (
+        <WorkspaceChat
+          token={token}
+          currentUserId={userId}
+          currentUserName={user?.nombre ?? "Tú"}
+          openDocumentId={chatDocId}
+        />
+      )}
+
+      {view === "files" && (
+        <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 14 }}>
         <KpiCard label="Total documentos" value={docs.length} icon="📂" />
         <KpiCard label="Pendientes de aprobar" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" />
@@ -310,6 +351,8 @@ export default function DocumentsPage() {
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
         {!loading && !error && <DataTable columns={columns} rows={filtered} rowKey={(d) => d.id} emptyTitle="Sin documentos" emptyDescription="Sube el primer documento al repositorio." />}
       </Section>
+        </>
+      )}
 
       {showForm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => { setShowForm(false); setEditing(null); }}>
