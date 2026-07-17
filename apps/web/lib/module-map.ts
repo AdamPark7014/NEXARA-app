@@ -35,6 +35,7 @@ export type ModuleId =
   | "hr"
   | "attendance"
   | "documents"
+  | "chat"
   | "bi"
   | "web";
 
@@ -337,13 +338,28 @@ export const MODULE_MAP: Record<ModuleId, ModuleNode> = {
     icon: "📂",
     purpose: "Repositorio central de contratos, manuales, fichas y compliance.",
     inputs: ["quotes", "vehicles", "procurement"],
-    outputs: [],
+    outputs: ["chat"],
     owners: [
       ORG_ROLE_KEYS.ADMIN_STAFF,
       ORG_ROLE_KEYS.DIRECTOR_ADMIN,
       ORG_ROLE_KEYS.HR_SPECIALIST,
     ],
     panels: ["console"],
+  },
+  chat: {
+    id: "chat",
+    name: "Chat corporativo",
+    icon: "💬",
+    purpose: "Colaboración en tiempo real: canales, DMs, hilos y salas por documento.",
+    inputs: ["documents", "hr"],
+    outputs: [],
+    owners: [
+      ORG_ROLE_KEYS.ADMIN_STAFF,
+      ORG_ROLE_KEYS.DIRECTOR_ADMIN,
+      ORG_ROLE_KEYS.SALES_MANAGER,
+      ORG_ROLE_KEYS.PROJECT_MANAGER,
+    ],
+    panels: ["console", "operacion", "ventas"],
   },
   bi: {
     id: "bi",
@@ -423,6 +439,7 @@ export const MODULE_DEFAULT_ROUTE: Record<ModuleId, { panel: PanelSlug; path: st
   hr: { panel: "console", path: "/erp/hr" },
   attendance: { panel: "people", path: "/erp/hr/attendance" },
   documents: { panel: "console", path: "/erp/documents" },
+  chat: { panel: "console", path: "/erp/chat" },
   bi: { panel: "console", path: "/erp/analytics/bi" },
   web: { panel: "web", path: "/studio/dashboard" },
 };

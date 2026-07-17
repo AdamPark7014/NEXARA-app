@@ -51,6 +51,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.ARQUITECTO]: [
     '/ops/**',
     '/erp/dashboard',
+    '/erp/chat',
     '/erp/calendar',
     '/erp/notifications-center',
     '/erp/my-profile',
@@ -63,6 +64,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.DIR_OPERACIONES]: [
     '/erp',
     '/erp/dashboard',
+    '/erp/chat',
     '/erp/executive',
     '/erp/approvals',
     '/erp/architecture',
@@ -106,6 +108,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.COORD_ADMIN]: [
     '/erp',
     '/erp/dashboard',
+    '/erp/chat',
     '/erp/approvals',
     '/erp/companies',
     '/erp/calendar',
@@ -145,6 +148,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.ADMINISTRATIVO]: [
     '/erp',
     '/erp/dashboard',
+    '/erp/chat',
     '/erp/approvals',
     '/erp/companies',
     '/erp/calendar',
@@ -160,6 +164,8 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── COORD OPERACIONES — supervisa campo / project manager ────────────
   [ROLES.COORD_OPERACIONES]: [
     '/ops/**',
+    '/ops/chat',
+    '/erp/chat',
     '/erp/calendar',
     '/erp/notifications-center',
     '/erp/my-profile',
@@ -170,6 +176,8 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── ING. CAMPO — solo lo suyo ────────────────────────────────────────
   [ROLES.ING_CAMPO]: [
     '/ops/**',
+    '/ops/chat',
+    '/erp/chat',
     '/erp/notifications-center',
     '/erp/my-profile',
     '/erp/calendar',
@@ -189,8 +197,10 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/ops/tools',
     '/ops/tools/**',
     '/ops/dashboard',
+    '/ops/chat',
     '/ops/support',
     '/ops/support/**',
+    '/erp/chat',
     '/erp/notifications-center',
     '/erp/my-profile',
     '/erp/calendar',
@@ -204,7 +214,9 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── COORD VENTAS — gerente comercial ─────────────────────────────────
   [ROLES.COORD_VENTAS]: [
     '/crm/**',
+    '/crm/chat',
     '/erp/dashboard',
+    '/erp/chat',
     '/erp/notifications-center',
     '/erp/my-profile',
     ...SELF_ATTENDANCE_PATHS,
@@ -213,6 +225,8 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   // ─── VENDEDOR — su pipeline ──────────────────────────────────────────
   [ROLES.VENDEDOR]: [
     '/crm/**',
+    '/crm/chat',
+    '/erp/chat',
     '/erp/notifications-center',
     '/erp/my-profile',
     ...SELF_ATTENDANCE_PATHS,
@@ -225,6 +239,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/crm/products/**',
     '/crm/templates',
     '/crm/templates/**',
+    '/erp/chat',
     '/erp/calendar',
     '/erp/notifications-center',
     '/erp/my-profile',
@@ -236,6 +251,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/studio/**',
     '/crm/quotes/**',
     '/crm/products/**',
+    '/erp/chat',
     '/erp/calendar',
     '/erp/notifications-center',
     '/erp/my-profile',
@@ -246,6 +262,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.RH]: [
     '/erp',
     '/erp/dashboard',
+    '/erp/chat',
     '/erp/hr/**',
     '/erp/finance/employee-payments',
     '/erp/calendar',
@@ -259,6 +276,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.CONTABILIDAD]: [
     '/erp',
     '/erp/dashboard',
+    '/erp/chat',
     '/erp/accounting',
     '/erp/banking',
     '/erp/invoicing',

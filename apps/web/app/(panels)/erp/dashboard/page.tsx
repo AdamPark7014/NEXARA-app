@@ -93,6 +93,7 @@ const ALL_SHORTCUTS: Record<string, { href: string; icon: string; title: string;
     { href: "/crm/quotes", icon: "📋", title: "Cotizaciones CRM", desc: "Propuestas comerciales para revisión", accent: "#10b981" },
   ],
   administrativo: [
+    { href: "/erp/chat", icon: "💬", title: "Chat", desc: "Canales, DMs y colaboración en vivo", accent: "#1264a3" },
     { href: "/erp/approvals", icon: "🛡️", title: "Aprobaciones", desc: "Firma y autorización de solicitudes", accent: "#ef4444" },
     { href: "/erp/documents", icon: "📂", title: "Documentos", desc: "Archivos corporativos", accent: "#0ea5e9" },
     { href: "/erp/finance/viatics", icon: "✈️", title: "Mis viáticos", desc: "Solicitudes y reembolsos", accent: "#f59e0b" },

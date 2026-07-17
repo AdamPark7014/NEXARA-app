@@ -164,12 +164,14 @@ export type ModuleId =
   | "warehouse"
   | "procurement"
   | "documents"
+  | "chat"
   | "bi"
   | "architecture"
   | "news"
   // CRM
   | "crm-leads"
   | "crm-dashboard"
+  | "crm-chat"
   | "crm-opportunities"
   | "crm-pipeline"
   | "crm-clients"
@@ -184,6 +186,7 @@ export type ModuleId =
   | "crm-reports"
   // OPS
   | "ops-dashboard"
+  | "ops-chat"
   | "ops-activities"
   | "ops-my-activities"
   | "ops-evidences"
@@ -303,6 +306,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "dashboard", panel: PANELS.ERP, path: "/dashboard",
     label: "Resumen general", description: "Tu día en NEXARA",
     icon: "🏠", allowedRoles: ANY_INTERNAL,
+    group: "Tablero", visible: true,
+  },
+  chat: {
+    id: "chat", panel: PANELS.ERP, path: "/chat",
+    label: "Chat", description: "Canales, DMs y colaboración en tiempo real",
+    icon: "💬", allowedRoles: ANY_INTERNAL,
     group: "Tablero", visible: true,
   },
   approvals: {
@@ -495,6 +504,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     icon: "📈", allowedRoles: SALES_TEAM,
     group: "Pipeline", visible: true,
   },
+  "crm-chat": {
+    id: "crm-chat", panel: PANELS.CRM, path: "/chat",
+    label: "Chat", description: "Canales y mensajes del equipo",
+    icon: "💬", allowedRoles: SALES_TEAM,
+    group: "Pipeline", visible: true,
+  },
   "crm-leads": {
     id: "crm-leads", panel: PANELS.CRM, path: "/leads",
     label: "Leads", description: "Prospectos sin calificar",
@@ -587,6 +602,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "ops-dashboard", panel: PANELS.OPS, path: "/dashboard",
     label: "Hoy en operaciones", description: "OT abiertas, alertas y SLA",
     icon: "🚀", allowedRoles: OPS_TEAM,
+    group: "Tablero", visible: true,
+  },
+  "ops-chat": {
+    id: "ops-chat", panel: PANELS.OPS, path: "/chat",
+    label: "Chat", description: "Canales y mensajes del equipo",
+    icon: "💬", allowedRoles: OPS_TEAM,
     group: "Tablero", visible: true,
   },
   "ops-projects": {
@@ -854,6 +875,8 @@ export function canAccessUrl(
 
   // 2) Rutas personales `/[panel]/my-profile` / `/[panel]/calendar` siempre permitidas
   if (/^\/(erp|crm|ops|studio|lab)\/(my-profile|calendar)(\/|$)/.test(normalized)) return true;
+  // Chat corporativo — disponible en paneles principales
+  if (/^\/(erp|crm|ops)\/chat(\/|$)/.test(normalized)) return true;
 
   return false;
 }
