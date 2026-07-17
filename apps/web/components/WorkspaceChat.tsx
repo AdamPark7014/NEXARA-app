@@ -97,7 +97,8 @@ function channelPrefix(kind: ChannelKind) {
 
 function renderRichText(text: string): ReactNode[] {
   const nodes: ReactNode[] = [];
-  const pattern = /(`[^`]+`|https?:\/\/[^\s]+|@[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]+)/g;
+  const pattern =
+    /(`[^`]+`|\*\*[^*\n]+\*\*|\*[^*\s][^*\n]*\*|_[^_\s][^_\n]*_|https?:\/\/[^\s]+|@[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]+)/g;
   let last = 0;
   let match: RegExpExecArray | null;
   let key = 0;
@@ -106,6 +107,12 @@ function renderRichText(text: string): ReactNode[] {
     const token = match[0];
     if (token.startsWith("`") && token.endsWith("`")) {
       nodes.push(<code key={key++}>{token.slice(1, -1)}</code>);
+    } else if (token.startsWith("**") && token.endsWith("**")) {
+      nodes.push(<strong key={key++}>{token.slice(2, -2)}</strong>);
+    } else if (token.startsWith("*") && token.endsWith("*")) {
+      nodes.push(<strong key={key++}>{token.slice(1, -1)}</strong>);
+    } else if (token.startsWith("_") && token.endsWith("_")) {
+      nodes.push(<em key={key++}>{token.slice(1, -1)}</em>);
     } else if (token.startsWith("http")) {
       nodes.push(
         <a key={key++} href={token} target="_blank" rel="noreferrer">
@@ -1167,7 +1174,7 @@ export default function WorkspaceChat({
                     }}
                   />
                   <div className={styles.composerBar}>
-                    <span className={styles.composerHint}>Enter envía · Shift+Enter línea · @ menciona</span>
+                    <span className={styles.composerHint}>Enter envía · Shift+Enter línea · @ menciona · *negrita* · `código`</span>
                     <button
                       type="button"
                       className={styles.sendBtn}

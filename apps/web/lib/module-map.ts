@@ -350,8 +350,8 @@ export const MODULE_MAP: Record<ModuleId, ModuleNode> = {
     id: "chat",
     name: "Chat corporativo",
     icon: "💬",
-    purpose: "Colaboración en tiempo real: canales, DMs, hilos y salas por documento.",
-    inputs: ["documents", "hr"],
+    purpose: "Colaboración en tiempo real: canales, mensajes directos e hilos.",
+    inputs: ["hr"],
     outputs: [],
     owners: [
       ORG_ROLE_KEYS.ADMIN_STAFF,
