@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,11 +9,21 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ChatService } from './chat.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+
+type MulterFile = {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+};
 
 @Controller('chat')
 @UseGuards(AuthGuard('jwt'))
@@ -127,5 +138,14 @@ export class ChatController {
   @Get('colleagues')
   colleagues(@CurrentUser() user: { id: number }, @Query('q') q?: string) {
     return this.chat.listColleagues(user.id, q);
+  }
+
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 20 * 1024 * 1024 } }))
+  upload(@UploadedFile() file?: MulterFile) {
+    if (!file) {
+      throw new BadRequestException('Archivo requerido');
+    }
+    return this.chat.saveAttachment(file);
   }
 }

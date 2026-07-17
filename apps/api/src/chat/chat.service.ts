@@ -5,8 +5,24 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ChatChannelKind, ChatMessageKind, Prisma } from '@prisma/client';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
+import { getOrgTier, ORG_ROLE_KEYS, ORG_TIER, type OrgRoleKey } from '../common/org-roles.js';
+import { isSuperAdminEmail } from '../common/platform-accounts.js';
+import { resolveUploadsDir } from '../common/uploads-path.js';
+
+type UploadedChatFile = {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+};
+
+const BLOCKED_ATTACHMENT_EXT = new Set([
+  '.exe', '.bat', '.cmd', '.com', '.msi', '.scr', '.ps1', '.sh', '.vbs', '.js', '.jar', '.app',
+]);
 
 const authorSelect = {
   id: true,
@@ -71,12 +87,52 @@ export class ChatService {
           isArchived: false,
         },
       });
+      await this.syncOrgChannelMembers(channel.id);
+    }
+  }
+
+  /** Une a todos los usuarios activos al canal org y saca a los inactivos. */
+  async syncOrgChannelMembers(channelId: number) {
+    const activeUsers = await this.prisma.user.findMany({
+      where: { isActive: true },
+      select: { id: true },
+    });
+    if (activeUsers.length) {
+      await this.prisma.chatChannelMember.createMany({
+        data: activeUsers.map((u) => ({
+          channelId,
+          userId: u.id,
+          role: 'member',
+        })),
+        skipDuplicates: true,
+      });
+    }
+    await this.prisma.chatChannelMember.deleteMany({
+      where: {
+        channelId,
+        user: { isActive: false },
+      },
+    });
+  }
+
+  /** Alta de un usuario nuevo en canales org (#general, #anuncios). */
+  async addUserToOrgChannels(userId: number) {
+    const channels = await this.prisma.chatChannel.findMany({
+      where: { slug: { in: ['general', 'anuncios'] }, isArchived: false },
+      select: { id: true },
+    });
+    for (const ch of channels) {
       await this.prisma.chatChannelMember.upsert({
-        where: { channelId_userId: { channelId: channel.id, userId } },
-        create: { channelId: channel.id, userId, role: 'member' },
+        where: { channelId_userId: { channelId: ch.id, userId } },
+        create: { channelId: ch.id, userId, role: 'member' },
         update: {},
       });
     }
+  }
+
+  /** Baja de chat al desactivar / eliminar usuario. */
+  async removeUserMemberships(userId: number) {
+    await this.prisma.chatChannelMember.deleteMany({ where: { userId } });
   }
 
   private room(channelId: number) {
@@ -88,7 +144,61 @@ export class ChatService {
     return clean.length > 140 ? `${clean.slice(0, 137)}…` : clean;
   }
 
-  private async assertChannelAccess(channelId: number, userId: number) {
+  /** IDs de reportes directos e indirectos (árbol managerId). */
+  private async listDescendantIds(userId: number): Promise<number[]> {
+    const rows = await this.prisma.user.findMany({
+      where: { isActive: true },
+      select: { id: true, managerId: true },
+    });
+    const byManager = new Map<number, number[]>();
+    for (const r of rows) {
+      if (r.managerId == null) continue;
+      const list = byManager.get(r.managerId) ?? [];
+      list.push(r.id);
+      byManager.set(r.managerId, list);
+    }
+    const out: number[] = [];
+    const queue = [...(byManager.get(userId) ?? [])];
+    const seen = new Set<number>();
+    while (queue.length) {
+      const id = queue.shift()!;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push(id);
+      for (const child of byManager.get(id) ?? []) queue.push(child);
+    }
+    return out;
+  }
+
+  private async resolveChatScope(userId: number): Promise<{
+    isOmniscient: boolean;
+    reportIds: number[];
+  }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        role: { select: { orgRoleKey: true, nivelAutoridad: true } },
+      },
+    });
+    const orgKey = (user?.role?.orgRoleKey as OrgRoleKey | null) ?? null;
+    const tier =
+      user?.role?.nivelAutoridad ??
+      getOrgTier(orgKey, isSuperAdminEmail(user?.email));
+    const isOmniscient =
+      tier >= ORG_TIER.EXECUTIVE ||
+      orgKey === ORG_ROLE_KEYS.CEO ||
+      isSuperAdminEmail(user?.email);
+    const reportIds = isOmniscient ? [] : await this.listDescendantIds(userId);
+    return { isOmniscient, reportIds };
+  }
+
+  private async assertChannelAccess(
+    channelId: number,
+    userId: number,
+    opts?: { write?: boolean },
+  ) {
+    const write = Boolean(opts?.write);
     const channel = await this.prisma.chatChannel.findUnique({
       where: { id: channelId },
       include: {
@@ -104,31 +214,73 @@ export class ChatService {
           data: { channelId, userId, role: 'member' },
         });
       }
-      return channel;
+      return { channel, supervised: false, readOnly: false };
     }
-    if (!channel.members.length) {
-      throw new ForbiddenException('No tienes acceso a este canal');
+
+    const isMember = channel.members.length > 0;
+    if (isMember) {
+      return { channel, supervised: false, readOnly: false };
     }
-    return channel;
+
+    // Supervisión jerárquica: lectura de privadas/DMs del equipo (sin publicar).
+    const scope = await this.resolveChatScope(userId);
+    if (scope.isOmniscient) {
+      if (write) throw new ForbiddenException('Solo lectura en supervisión');
+      return { channel, supervised: true, readOnly: true };
+    }
+    if (scope.reportIds.length) {
+      const teamHit = await this.prisma.chatChannelMember.findFirst({
+        where: {
+          channelId,
+          userId: { in: scope.reportIds },
+        },
+        select: { id: true },
+      });
+      if (teamHit) {
+        if (write) throw new ForbiddenException('Solo lectura en supervisión');
+        return { channel, supervised: true, readOnly: true };
+      }
+    }
+
+    throw new ForbiddenException('No tienes acceso a este canal');
   }
 
   async listChannels(userId: number) {
     await this.ensureDefaults(userId);
+    const scope = await this.resolveChatScope(userId);
+
+    const where: Prisma.ChatChannelWhereInput = {
+      isArchived: false,
+      kind: { not: ChatChannelKind.DOCUMENT },
+    };
+
+    if (scope.isOmniscient) {
+      // Dueño / CEO: todas las conversaciones
+    } else if (scope.reportIds.length) {
+      where.OR = [
+        { kind: ChatChannelKind.PUBLIC },
+        { members: { some: { userId } } },
+        { members: { some: { userId: { in: scope.reportIds } } } },
+      ];
+    } else {
+      where.OR = [
+        { kind: ChatChannelKind.PUBLIC },
+        { members: { some: { userId } } },
+      ];
+    }
 
     const channels = await this.prisma.chatChannel.findMany({
-      where: {
-        isArchived: false,
-        kind: { not: ChatChannelKind.DOCUMENT },
-        OR: [
-          { kind: ChatChannelKind.PUBLIC },
-          { members: { some: { userId } } },
-        ],
-      },
+      where,
       include: {
         members: {
+          where: { user: { isActive: true } },
           include: { user: { select: authorSelect } },
         },
-        _count: { select: { members: true } },
+        _count: {
+          select: {
+            members: { where: { user: { isActive: true } } },
+          },
+        },
       },
       orderBy: [{ kind: 'asc' }, { lastMessageAt: 'desc' }, { name: 'asc' }],
     });
@@ -136,24 +288,34 @@ export class ChatService {
     const withCounts = await Promise.all(
       channels.map(async (ch) => {
         const membership = ch.members.find((m) => m.userId === userId) ?? null;
+        const supervised = !membership && ch.kind !== ChatChannelKind.PUBLIC;
         const since = membership?.lastReadAt ?? membership?.joinedAt ?? null;
-        const unreadCount = since
-          ? await this.prisma.chatMessage.count({
-              where: {
-                channelId: ch.id,
-                deletedAt: null,
-                parentId: null,
-                authorId: { not: userId },
-                createdAt: { gt: since },
-              },
-            })
-          : 0;
+        const unreadCount =
+          since && !supervised
+            ? await this.prisma.chatMessage.count({
+                where: {
+                  channelId: ch.id,
+                  deletedAt: null,
+                  parentId: null,
+                  authorId: { not: userId },
+                  createdAt: { gt: since },
+                },
+              })
+            : 0;
 
         let displayName = ch.name;
         let peer: { id: number; nombre: string; email: string } | null = null;
         if (ch.kind === ChatChannelKind.DIRECT) {
-          peer = ch.members.find((m) => m.userId !== userId)?.user ?? null;
-          if (peer) displayName = peer.nombre || peer.email;
+          if (membership) {
+            peer = ch.members.find((m) => m.userId !== userId)?.user ?? null;
+            if (peer) displayName = peer.nombre || peer.email;
+          } else {
+            const others = ch.members.map((m) => m.user).filter(Boolean);
+            peer = others[0] ?? null;
+            displayName =
+              others.map((u) => u.nombre || u.email).filter(Boolean).join(' · ') ||
+              ch.name;
+          }
         }
 
         return {
@@ -170,6 +332,8 @@ export class ChatService {
           unread: unreadCount > 0,
           unreadCount,
           lastReadAt: membership?.lastReadAt ?? null,
+          supervised,
+          readOnly: supervised,
         };
       }),
     );
@@ -182,19 +346,28 @@ export class ChatService {
   }
 
   async getChannel(channelId: number, userId: number) {
-    const channel = await this.assertChannelAccess(channelId, userId);
+    const access = await this.assertChannelAccess(channelId, userId);
+    const channel = access.channel;
     const members = await this.prisma.chatChannelMember.findMany({
-      where: { channelId },
+      where: { channelId, user: { isActive: true } },
       include: { user: { select: authorSelect } },
       orderBy: { joinedAt: 'asc' },
-      take: 100,
+      take: 200,
     });
 
     let displayName = channel.name;
     let peer: { id: number; nombre: string; email: string } | null = null;
     if (channel.kind === ChatChannelKind.DIRECT) {
-      peer = members.find((m) => m.userId !== userId)?.user ?? null;
-      if (peer) displayName = peer.nombre || peer.email;
+      if (!access.supervised) {
+        peer = members.find((m) => m.userId !== userId)?.user ?? null;
+        if (peer) displayName = peer.nombre || peer.email;
+      } else {
+        const others = members.map((m) => m.user).filter(Boolean);
+        peer = others[0] ?? null;
+        displayName =
+          others.map((u) => u.nombre || u.email).filter(Boolean).join(' · ') ||
+          channel.name;
+      }
     }
 
     return {
@@ -207,6 +380,8 @@ export class ChatService {
       peer,
       lastMessageAt: channel.lastMessageAt,
       memberCount: members.length,
+      supervised: access.supervised,
+      readOnly: access.readOnly,
       members: members.map((m) => ({
         id: m.user.id,
         nombre: m.user.nombre,
@@ -376,7 +551,8 @@ export class ChatService {
   }
 
   async postMessage(channelId: number, userId: number, input: PostMessageInput) {
-    const channel = await this.assertChannelAccess(channelId, userId);
+    const access = await this.assertChannelAccess(channelId, userId, { write: true });
+    const channel = access.channel;
     const body = (input.body ?? '').trim();
     if (!body && !input.attachmentUrl) {
       throw new BadRequestException('El mensaje no puede estar vacío');
@@ -443,7 +619,8 @@ export class ChatService {
   }
 
   async markRead(channelId: number, userId: number) {
-    await this.assertChannelAccess(channelId, userId);
+    const access = await this.assertChannelAccess(channelId, userId);
+    if (access.readOnly) return { ok: true };
     await this.prisma.chatChannelMember.upsert({
       where: { channelId_userId: { channelId, userId } },
       create: { channelId, userId, role: 'member', lastReadAt: new Date() },
@@ -460,7 +637,7 @@ export class ChatService {
       where: { id: messageId, deletedAt: null },
     });
     if (!message) throw new NotFoundException('Mensaje no encontrado');
-    await this.assertChannelAccess(message.channelId, userId);
+    await this.assertChannelAccess(message.channelId, userId, { write: true });
 
     const existing = await this.prisma.chatMessageReaction.findUnique({
       where: {
@@ -521,7 +698,7 @@ export class ChatService {
     });
     if (!message) throw new NotFoundException('Mensaje no encontrado');
     if (message.authorId !== userId) throw new ForbiddenException('Solo puedes editar tus mensajes');
-    await this.assertChannelAccess(message.channelId, userId);
+    await this.assertChannelAccess(message.channelId, userId, { write: true });
 
     const updated = await this.prisma.chatMessage.update({
       where: { id: messageId },
@@ -557,7 +734,7 @@ export class ChatService {
     });
     if (!message) throw new NotFoundException('Mensaje no encontrado');
     if (message.authorId !== userId) throw new ForbiddenException('Solo puedes eliminar tus mensajes');
-    await this.assertChannelAccess(message.channelId, userId);
+    await this.assertChannelAccess(message.channelId, userId, { write: true });
 
     await this.prisma.chatMessage.update({
       where: { id: messageId },
@@ -588,7 +765,7 @@ export class ChatService {
   }
 
   async updateTopic(channelId: number, userId: number, topic: string) {
-    await this.assertChannelAccess(channelId, userId);
+    await this.assertChannelAccess(channelId, userId, { write: true });
     const clean = (topic ?? '').trim().slice(0, 500);
     const channel = await this.prisma.chatChannel.update({
       where: { id: channelId },
@@ -606,17 +783,30 @@ export class ChatService {
     if (query.length < 2) return { messages: [] };
     if (channelId) await this.assertChannelAccess(channelId, userId);
 
+    const scope = await this.resolveChatScope(userId);
+    const where: Prisma.ChatChannelWhereInput = {
+      isArchived: false,
+      kind: { not: ChatChannelKind.DOCUMENT },
+    };
+    if (!scope.isOmniscient) {
+      if (scope.reportIds.length) {
+        where.OR = [
+          { kind: ChatChannelKind.PUBLIC },
+          { members: { some: { userId } } },
+          { members: { some: { userId: { in: scope.reportIds } } } },
+        ];
+      } else {
+        where.OR = [
+          { kind: ChatChannelKind.PUBLIC },
+          { members: { some: { userId } } },
+        ];
+      }
+    }
+
     const accessible = channelId
       ? [{ id: channelId }]
       : await this.prisma.chatChannel.findMany({
-          where: {
-            isArchived: false,
-            kind: { not: ChatChannelKind.DOCUMENT },
-            OR: [
-              { kind: ChatChannelKind.PUBLIC },
-              { members: { some: { userId } } },
-            ],
-          },
+          where,
           select: { id: true },
           take: 200,
         });
@@ -645,6 +835,37 @@ export class ChatService {
         ...this.serializeMessage(m),
         channel: m.channel,
       })),
+    };
+  }
+
+  async saveAttachment(file: UploadedChatFile) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('Archivo vacío o inválido');
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      throw new BadRequestException('El archivo excede el límite de 20 MB');
+    }
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (BLOCKED_ATTACHMENT_EXT.has(ext)) {
+      throw new BadRequestException('Tipo de archivo no permitido');
+    }
+
+    const uploadDir = resolveUploadsDir('chat');
+    await fs.mkdir(uploadDir, { recursive: true });
+
+    const safeBase = file.originalname
+      .replace(/[^a-zA-Z0-9._-]/g, '-')
+      .replace(/-+/g, '-')
+      .slice(0, 100);
+    const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeBase || 'archivo'}`;
+    const filepath = path.join(uploadDir, filename);
+    await fs.writeFile(filepath, file.buffer);
+
+    return {
+      url: `/uploads/chat/${filename}`,
+      name: file.originalname,
+      mime: file.mimetype,
+      size: file.size,
     };
   }
 }
