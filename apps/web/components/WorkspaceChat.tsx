@@ -1181,7 +1181,7 @@ export default function WorkspaceChat({
                     }}
                   />
                   <div className={styles.composerBar}>
-                    <span className={styles.composerHint}>Enter envía · Shift+Enter línea · @ menciona · *negrita* · `código`</span>
+                    <span className={styles.composerHint}>Enter envía · Shift+Enter nueva línea · @ menciona</span>
                     <button
                       type="button"
                       className={styles.sendBtn}

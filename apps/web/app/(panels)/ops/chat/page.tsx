@@ -17,10 +17,23 @@ export default function OpsChatPage() {
   }
 
   return (
-    <WorkspaceChat
-      token={token}
-      currentUserId={userId}
-      currentUserName={user?.nombre ?? "Tú"}
-    />
+    <div
+      style={{
+        width: "100%",
+        maxWidth: "none",
+        height: "100%",
+        minHeight: 0,
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        alignSelf: "stretch",
+      }}
+    >
+      <WorkspaceChat
+        token={token}
+        currentUserId={userId}
+        currentUserName={user?.nombre ?? "Tú"}
+      />
+    </div>
   );
 }

@@ -44,6 +44,9 @@ ENV NEXT_PUBLIC_CONTACT_PHONE=${NEXT_PUBLIC_CONTACT_PHONE}
 ENV NEXT_PUBLIC_CONTACT_EMAIL=${NEXT_PUBLIC_CONTACT_EMAIL}
 ENV NEXT_PUBLIC_CITY=${NEXT_PUBLIC_CITY}
 ENV NEXT_PUBLIC_STATE=${NEXT_PUBLIC_STATE}
+# CACHEBUST invalida la capa COPY cuando el rebuild debe forzar fuentes nuevas
+ARG CACHEBUST=1
+RUN echo "web-cachebust=${CACHEBUST}"
 COPY . .
 RUN --mount=type=cache,target=/app/apps/web/.next/cache npm run build --workspace=apps/web
 
