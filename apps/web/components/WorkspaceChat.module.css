@@ -1,4 +1,13 @@
-/* NEXARA Chat — calm Slack-like workspace */
+/* NEXARA Chat — full-bleed workspace (desktop + mobile) */
+
+.fill {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 
 .shell {
   --nx-rail: #141a22;
@@ -22,30 +31,32 @@
   --nx-font-body: var(--nx-font-body, "Manrope", ui-sans-serif, system-ui, sans-serif);
 
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
-  height: calc(100vh - 72px);
-  min-height: 520px;
-  margin: -8px -8px -24px;
-  border: 1px solid var(--nx-line);
-  border-radius: 14px;
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  width: 100%;
+  max-width: none;
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
   background: var(--surface, #fff);
   font-family: var(--nx-font);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset;
 }
 
 .shellWithPanel {
-  grid-template-columns: 248px minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(260px, 320px);
 }
 
 .shellBleed {
-  margin: -24px;
-  height: calc(100vh - 56px);
-  min-height: 560px;
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
   border-radius: 0;
-  border-left: 0;
-  border-right: 0;
-  border-bottom: 0;
+  border: 0;
 }
 
 /* ── Sidebar ── */
@@ -458,9 +469,11 @@
 }
 
 .messagesInner {
-  max-width: 860px;
+  max-width: min(1100px, 100%);
   margin: 0 auto;
   padding: 0 8px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .loadOlder {
@@ -735,7 +748,7 @@
 .composerWrap {
   padding: 8px 18px 16px;
   flex-shrink: 0;
-  max-width: 896px;
+  max-width: min(1100px, 100%);
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
@@ -1207,22 +1220,69 @@
   color: rgba(255, 255, 255, 0.55);
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 900px) {
   .shell,
   .shellWithPanel,
   .shellBleed {
     grid-template-columns: 1fr;
-    height: calc(100vh - 56px);
-    margin: -16px;
+    grid-template-rows: minmax(160px, 34vh) minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+    margin: 0;
+  }
+
+  .shellWithPanel {
+    grid-template-rows: minmax(140px, 28vh) minmax(0, 1fr) minmax(200px, 36vh);
   }
 
   .sidebar {
-    max-height: 220px;
+    max-height: none;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .sidePanel {
     border-left: 0;
     border-top: 1px solid var(--nx-line);
-    max-height: 360px;
+    max-height: none;
+  }
+
+  .channelHeader {
+    padding: 8px 14px;
+  }
+
+  .headerMeta .iconBtn {
+    padding: 0 8px;
+    font-size: 11px;
+  }
+
+  .composerWrap {
+    padding: 8px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .messagesInner {
+    padding: 0 2px;
+  }
+}
+
+@media (max-width: 560px) {
+  .shell,
+  .shellWithPanel,
+  .shellBleed {
+    grid-template-rows: minmax(140px, 30vh) minmax(0, 1fr);
+  }
+
+  .workspaceHead {
+    padding: 12px 12px 8px;
+  }
+
+  .channelTitle {
+    font-size: 14px;
+  }
+
+  .msg {
+    grid-template-columns: 34px minmax(0, 1fr);
+    padding: 5px 12px;
+    gap: 8px;
   }
 }
