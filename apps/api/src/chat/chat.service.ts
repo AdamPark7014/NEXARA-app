@@ -30,18 +30,27 @@ export class ChatService {
   ) {}
 
   async ensureDefaults(userId: number) {
+    // Soft-retire the old DMS channel so Chat is not tied to Documents.
+    await this.prisma.chatChannel.updateMany({
+      where: { slug: 'documentos', isArchived: false },
+      data: {
+        isArchived: true,
+        topic: 'Archivado — usar Chat general',
+      },
+    });
+
     const defaults = [
       {
         slug: 'general',
         name: 'general',
-        topic: 'Conversación general del equipo',
+        topic: 'Conversación del equipo',
         description: 'Canal abierto para toda la organización',
       },
       {
-        slug: 'documentos',
-        name: 'documentos',
-        topic: 'Discusión sobre el repositorio documental',
-        description: 'Preguntas, revisiones y anuncios del DMS',
+        slug: 'anuncios',
+        name: 'anuncios',
+        topic: 'Avisos importantes del equipo',
+        description: 'Comunicados y novedades',
       },
     ];
 
@@ -56,7 +65,11 @@ export class ChatService {
           description: d.description,
           createdById: userId,
         },
-        update: {},
+        update: {
+          topic: d.topic,
+          description: d.description,
+          isArchived: false,
+        },
       });
       await this.prisma.chatChannelMember.upsert({
         where: { channelId_userId: { channelId: channel.id, userId } },
@@ -80,13 +93,12 @@ export class ChatService {
       where: { id: channelId },
       include: {
         members: { where: { userId }, take: 1 },
-        document: { select: { id: true, title: true, documentNumber: true, fileUrl: true, status: true } },
       },
     });
-    if (!channel || channel.isArchived) {
+    if (!channel || channel.isArchived || channel.kind === ChatChannelKind.DOCUMENT) {
       throw new NotFoundException('Canal no encontrado');
     }
-    if (channel.kind === ChatChannelKind.PUBLIC || channel.kind === ChatChannelKind.DOCUMENT) {
+    if (channel.kind === ChatChannelKind.PUBLIC) {
       if (!channel.members.length) {
         await this.prisma.chatChannelMember.create({
           data: { channelId, userId, role: 'member' },
@@ -106,17 +118,15 @@ export class ChatService {
     const channels = await this.prisma.chatChannel.findMany({
       where: {
         isArchived: false,
+        kind: { not: ChatChannelKind.DOCUMENT },
         OR: [
-          { kind: { in: [ChatChannelKind.PUBLIC, ChatChannelKind.DOCUMENT] } },
+          { kind: ChatChannelKind.PUBLIC },
           { members: { some: { userId } } },
         ],
       },
       include: {
         members: {
           include: { user: { select: authorSelect } },
-        },
-        document: {
-          select: { id: true, title: true, documentNumber: true, fileUrl: true, status: true },
         },
         _count: { select: { members: true } },
       },
@@ -153,8 +163,6 @@ export class ChatService {
           name: displayName,
           topic: ch.topic,
           description: ch.description,
-          documentId: ch.documentId,
-          document: ch.document,
           peer,
           memberCount: ch._count.members,
           lastMessageAt: ch.lastMessageAt,
@@ -196,8 +204,6 @@ export class ChatService {
       name: displayName,
       topic: channel.topic,
       description: channel.description,
-      documentId: channel.documentId,
-      document: channel.document,
       peer,
       lastMessageAt: channel.lastMessageAt,
       memberCount: members.length,
@@ -246,38 +252,6 @@ export class ChatService {
       },
     });
 
-    return this.getChannel(channel.id, userId);
-  }
-
-  async ensureDocumentChannel(documentId: number, userId: number) {
-    const doc = await this.prisma.managedDocument.findUnique({
-      where: { id: documentId },
-      select: { id: true, title: true, documentNumber: true, fileUrl: true, status: true },
-    });
-    if (!doc) throw new NotFoundException('Documento no encontrado');
-
-    let channel = await this.prisma.chatChannel.findUnique({
-      where: { documentId },
-    });
-    if (!channel) {
-      channel = await this.prisma.chatChannel.create({
-        data: {
-          kind: ChatChannelKind.DOCUMENT,
-          name: doc.title.slice(0, 120),
-          topic: `Discusión · ${doc.documentNumber}`,
-          description: `Sala vinculada al documento ${doc.documentNumber}`,
-          documentId: doc.id,
-          createdById: userId,
-          members: { create: { userId, role: 'member' } },
-        },
-      });
-    } else {
-      await this.prisma.chatChannelMember.upsert({
-        where: { channelId_userId: { channelId: channel.id, userId } },
-        create: { channelId: channel.id, userId, role: 'member' },
-        update: {},
-      });
-    }
     return this.getChannel(channel.id, userId);
   }
 
@@ -637,8 +611,9 @@ export class ChatService {
       : await this.prisma.chatChannel.findMany({
           where: {
             isArchived: false,
+            kind: { not: ChatChannelKind.DOCUMENT },
             OR: [
-              { kind: { in: [ChatChannelKind.PUBLIC, ChatChannelKind.DOCUMENT] } },
+              { kind: ChatChannelKind.PUBLIC },
               { members: { some: { userId } } },
             ],
           },

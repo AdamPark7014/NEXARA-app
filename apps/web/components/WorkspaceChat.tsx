@@ -5,7 +5,7 @@ import { io, type Socket } from "socket.io-client";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import styles from "./WorkspaceChat.module.css";
 
-type ChannelKind = "PUBLIC" | "PRIVATE" | "DIRECT" | "DOCUMENT";
+type ChannelKind = "PUBLIC" | "PRIVATE" | "DIRECT";
 
 type ChatUser = { id: number; nombre: string; email: string };
 
@@ -16,14 +16,6 @@ type Channel = {
   name: string;
   topic?: string | null;
   description?: string | null;
-  documentId?: number | null;
-  document?: {
-    id: number;
-    title: string;
-    documentNumber: string;
-    fileUrl?: string | null;
-    status?: string;
-  } | null;
   peer?: ChatUser | null;
   members?: Array<ChatUser & { role?: string }>;
   memberCount: number;
@@ -100,7 +92,6 @@ function dayLabel(iso: string) {
 function channelPrefix(kind: ChannelKind) {
   if (kind === "DIRECT") return "";
   if (kind === "PRIVATE") return "🔒";
-  if (kind === "DOCUMENT") return "📄";
   return "#";
 }
 
@@ -138,14 +129,12 @@ type Props = {
   token: string;
   currentUserId: number;
   currentUserName?: string;
-  openDocumentId?: number | null;
 };
 
 export default function WorkspaceChat({
   token,
   currentUserId,
   currentUserName = "Tú",
-  openDocumentId,
 }: Props) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -183,15 +172,6 @@ export default function WorkspaceChat({
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [switcherQ, setSwitcherQ] = useState("");
   const [switcherIndex, setSwitcherIndex] = useState(0);
-  const [starred, setStarred] = useState<number[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const raw = localStorage.getItem("nexara.chat.starred");
-      return raw ? (JSON.parse(raw) as number[]) : [];
-    } catch {
-      return [];
-    }
-  });
   const [soundOn, setSoundOn] = useState(() => {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("nexara.chat.sound") !== "0";
@@ -214,10 +194,6 @@ export default function WorkspaceChat({
   useEffect(() => {
     threadRootRef.current = threadRoot;
   }, [threadRoot]);
-
-  useEffect(() => {
-    localStorage.setItem("nexara.chat.starred", JSON.stringify(starred));
-  }, [starred]);
 
   useEffect(() => {
     localStorage.setItem("nexara.chat.sound", soundOn ? "1" : "0");
@@ -259,7 +235,9 @@ export default function WorkspaceChat({
     setError(null);
     try {
       const data = await apiFetch("chat/channels", token);
-      const list: Channel[] = Array.isArray(data) ? data : [];
+      const list: Channel[] = (Array.isArray(data) ? data : []).filter(
+        (c: Channel) => c.kind === "PUBLIC" || c.kind === "PRIVATE" || c.kind === "DIRECT",
+      );
       setChannels(list);
       setActiveId((prev) => {
         if (prev && list.some((c) => c.id === prev)) return prev;
@@ -315,19 +293,6 @@ export default function WorkspaceChat({
   useEffect(() => {
     void loadChannels();
   }, [loadChannels]);
-
-  useEffect(() => {
-    if (!openDocumentId || !token) return;
-    void (async () => {
-      try {
-        const ch = await apiFetch(`chat/documents/${openDocumentId}/channel`, token, { method: "POST" });
-        await loadChannels();
-        if (ch?.id) setActiveId(ch.id);
-      } catch {
-        /* optional */
-      }
-    })();
-  }, [openDocumentId, token, loadChannels]);
 
   useEffect(() => {
     if (!activeId) return;
@@ -713,21 +678,15 @@ export default function WorkspaceChat({
     const match = (c: Channel) =>
       !q ||
       c.name.toLowerCase().includes(q) ||
-      (c.document?.documentNumber ?? "").toLowerCase().includes(q) ||
       (c.lastMessagePreview ?? "").toLowerCase().includes(q);
     const publics = channels.filter((c) => (c.kind === "PUBLIC" || c.kind === "PRIVATE") && match(c));
-    const docs = channels.filter((c) => c.kind === "DOCUMENT" && match(c));
     const dms = channels.filter((c) => c.kind === "DIRECT" && match(c));
-    const stars = channels.filter((c) => starred.includes(c.id) && match(c));
-    return { publics, docs, dms, stars };
-  }, [channels, sidebarFilter, starred]);
+    return { publics, dms };
+  }, [channels, sidebarFilter]);
 
   const switcherItems = useMemo(() => {
     const q = switcherQ.trim().toLowerCase();
     const ranked = [...channels].sort((a, b) => {
-      const as = starred.includes(a.id) ? 1 : 0;
-      const bs = starred.includes(b.id) ? 1 : 0;
-      if (as !== bs) return bs - as;
       const au = a.unreadCount ?? 0;
       const bu = b.unreadCount ?? 0;
       if (au !== bu) return bu - au;
@@ -738,14 +697,9 @@ export default function WorkspaceChat({
       (c) =>
         !q ||
         c.name.toLowerCase().includes(q) ||
-        (c.slug ?? "").includes(q) ||
-        (c.document?.documentNumber ?? "").toLowerCase().includes(q),
+        (c.slug ?? "").includes(q),
     ).slice(0, 12);
-  }, [channels, switcherQ, starred]);
-
-  const toggleStar = (id: number) => {
-    setStarred((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  };
+  }, [channels, switcherQ]);
 
   const typingLabel = useMemo(() => {
     const names = Object.values(typingUsers).map((t) => t.nombre);
@@ -887,7 +841,7 @@ export default function WorkspaceChat({
     });
   };
 
-  const panelOpen = Boolean(threadRoot || showMembers || detail?.document);
+  const panelOpen = Boolean(threadRoot || showMembers);
   const shellClass = [
     styles.shell,
     styles.shellBleed,
@@ -920,11 +874,8 @@ export default function WorkspaceChat({
       ) : (
         <span className={styles.channelPrefix}>{channelPrefix(c.kind)}</span>
       )}
-      <span className={styles.channelLabel}>
-        {c.kind === "DOCUMENT" ? c.document?.documentNumber ?? c.name : c.name}
-      </span>
+      <span className={styles.channelLabel}>{c.name}</span>
       <span className={styles.channelMeta}>
-        {starred.includes(c.id) && <span aria-hidden style={{ opacity: 0.55, fontSize: 10 }}>★</span>}
         {(c.unreadCount ?? 0) > 0 && activeId !== c.id && (
           <span className={styles.unreadBadge}>{c.unreadCount! > 99 ? "99+" : c.unreadCount}</span>
         )}
@@ -956,7 +907,7 @@ export default function WorkspaceChat({
                 title="Buscar canal (Ctrl+K)"
                 onClick={() => setSwitcherOpen(true)}
               >
-                ⌕
+                Buscar
               </button>
               <button
                 type="button"
@@ -967,15 +918,14 @@ export default function WorkspaceChat({
                   void searchColleagues("");
                 }}
               >
-                ✎
+                DM
               </button>
             </div>
           </div>
 
           <div className={styles.sidebarSearch}>
-            <span aria-hidden>⌕</span>
             <input
-              placeholder="Filtrar…"
+              placeholder="Filtrar canales…"
               value={sidebarFilter}
               onChange={(e) => setSidebarFilter(e.target.value)}
               onKeyDown={(e) => {
@@ -985,18 +935,10 @@ export default function WorkspaceChat({
                 }
               }}
             />
-            <span className={styles.kbd}>⌘K</span>
+            <span className={styles.kbd}>Ctrl+K</span>
           </div>
 
           <div className={styles.sidebarScroll}>
-            {filteredChannels.stars.length > 0 && (
-              <>
-                <div className={styles.sectionLabel}>
-                  <span>Favoritos</span>
-                </div>
-                {filteredChannels.stars.map(channelRow)}
-              </>
-            )}
             <div className={styles.sectionLabel}>
               <span>Canales</span>
               <button type="button" className={styles.sectionAction} title="Nuevo canal" onClick={() => setShowNewChannel(true)}>
@@ -1005,15 +947,6 @@ export default function WorkspaceChat({
             </div>
             {loadingChannels && <div className={styles.loadingLine}>Cargando…</div>}
             {filteredChannels.publics.map(channelRow)}
-
-            {filteredChannels.docs.length > 0 && (
-              <>
-                <div className={styles.sectionLabel}>
-                  <span>Documentos</span>
-                </div>
-                {filteredChannels.docs.map(channelRow)}
-              </>
-            )}
 
             <div className={styles.sectionLabel}>
               <span>Mensajes directos</span>
@@ -1054,19 +987,11 @@ export default function WorkspaceChat({
                 <div className={styles.headerMeta}>
                   <button
                     type="button"
-                    className={`${styles.iconBtn} ${starred.includes(activeId) ? styles.iconBtnActive : ""}`}
-                    title={starred.includes(activeId) ? "Quitar de favoritos" : "Marcar favorito"}
-                    onClick={() => toggleStar(activeId)}
-                  >
-                    ★
-                  </button>
-                  <button
-                    type="button"
                     className={`${styles.iconBtn} ${soundOn ? styles.iconBtnActive : ""}`}
                     title={soundOn ? "Sonido activado" : "Sonido desactivado"}
                     onClick={() => setSoundOn((v) => !v)}
                   >
-                    {soundOn ? "🔔" : "🔕"}
+                    {soundOn ? "Sonido" : "Mute"}
                   </button>
                   <button
                     type="button"
@@ -1074,7 +999,7 @@ export default function WorkspaceChat({
                     title="Buscar en canal"
                     onClick={() => setSearchOpen((v) => !v)}
                   >
-                    ⌕
+                    Buscar
                   </button>
                   <button
                     type="button"
@@ -1085,7 +1010,7 @@ export default function WorkspaceChat({
                       setThreadRoot(null);
                     }}
                   >
-                    👤
+                    Miembros
                   </button>
                   {typeof detail?.memberCount === "number" && (
                     <span className={styles.pill}>{detail.memberCount}</span>
@@ -1096,7 +1021,6 @@ export default function WorkspaceChat({
               {searchOpen && (
                 <>
                   <div className={styles.searchBar}>
-                    <span>⌕</span>
                     <input
                       autoFocus
                       placeholder="Buscar mensajes en este canal…"
@@ -1150,7 +1074,7 @@ export default function WorkspaceChat({
                 {!loadingMessages && messages.length === 0 && (
                   <div className={styles.emptyMain}>
                     <h3>Canal listo</h3>
-                    <p>Escribe el primer mensaje. Enter envía · @ menciona · `código`.</p>
+                    <p>Escribe el primer mensaje. Enter envía, Shift+Enter nueva línea, @ menciona.</p>
                   </div>
                 )}
                 {renderMessageList(messages)}
@@ -1243,7 +1167,7 @@ export default function WorkspaceChat({
                     }}
                   />
                   <div className={styles.composerBar}>
-                    <span className={styles.composerHint}>Enter · Shift+Enter · @ · `code`</span>
+                    <span className={styles.composerHint}>Enter envía · Shift+Enter línea · @ menciona</span>
                     <button
                       type="button"
                       className={styles.sendBtn}
@@ -1261,27 +1185,6 @@ export default function WorkspaceChat({
 
         {panelOpen && (
           <aside className={styles.sidePanel}>
-            {detail?.document && (
-              <div className={styles.docCard}>
-                <div className={styles.docCardLabel}>Documento vinculado</div>
-                <div className={styles.docCardTitle}>{detail.document.title}</div>
-                <div className={styles.docCardMeta}>
-                  {detail.document.documentNumber}
-                  {detail.document.status ? ` · ${detail.document.status}` : ""}
-                </div>
-                {detail.document.fileUrl && (
-                  <button
-                    type="button"
-                    className={styles.actionBtn}
-                    style={{ marginTop: 8, opacity: 1, border: "1px solid var(--border)" }}
-                    onClick={() => window.open(buildApiUrl(detail.document!.fileUrl!), "_blank")}
-                  >
-                    Abrir archivo
-                  </button>
-                )}
-              </div>
-            )}
-
             {showMembers && (
               <>
                 <div className={styles.panelHead}>
@@ -1486,7 +1389,6 @@ export default function WorkspaceChat({
                   {(c.unreadCount ?? 0) > 0 && (
                     <span className={styles.unreadBadge}>{c.unreadCount}</span>
                   )}
-                  {starred.includes(c.id) && <span style={{ opacity: 0.6 }}>★</span>}
                 </button>
               ))}
               {switcherItems.length === 0 && (

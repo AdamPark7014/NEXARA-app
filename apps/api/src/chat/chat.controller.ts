@@ -10,24 +10,21 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { ChatService } from './chat.service.js';
-import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
-import { PERMISSIONS } from '../common/permissions.js';
 
 @Controller('chat')
-@UseGuards(RbacGuard)
+@UseGuards(AuthGuard('jwt'))
 export class ChatController {
   constructor(private readonly chat: ChatService) {}
 
   @Get('channels')
-  @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_VIEW] })
   listChannels(@CurrentUser() user: { id: number }) {
     return this.chat.listChannels(user.id);
   }
 
   @Post('channels')
-  @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_VIEW] })
   createChannel(
     @CurrentUser() user: { id: number },
     @Body()
@@ -37,7 +34,6 @@ export class ChatController {
   }
 
   @Get('search')
-  @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_VIEW] })
   search(
     @CurrentUser() user: { id: number },
     @Query('q') q?: string,
@@ -47,13 +43,11 @@ export class ChatController {
   }
 
   @Get('channels/:id')
-  @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_VIEW] })
   getChannel(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { id: number }) {
     return this.chat.getChannel(id, user.id);
   }
 
   @Patch('channels/:id/topic')
-  @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_VIEW] })
   updateTopic(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: { id: number },
@@ -63,7 +57,6 @@ export class ChatController {
   }
 
   @Get('channels/:id/messages')
-  @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_VIEW] })
   listMessages(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: { id: number },
@@ -84,7 +77,6 @@ export class ChatController {
   }
 
   @Post('channels/:id/messages')
-  @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_VIEW] })
   postMessage(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: { id: number },
@@ -100,28 +92,16 @@ export class ChatController {
   }
 
   @Patch('channels/:id/read')
-  @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_VIEW] })
   markRead(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { id: number }) {
     return this.chat.markRead(id, user.id);
   }
 
-  @Post('documents/:documentId/channel')
-  @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_VIEW] })
-  ensureDocumentChannel(
-    @Param('documentId', ParseIntPipe) documentId: number,
-    @CurrentUser() user: { id: number },
-  ) {
-    return this.chat.ensureDocumentChannel(documentId, user.id);
-  }
-
   @Post('dm')
-  @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_VIEW] })
   openDm(@CurrentUser() user: { id: number }, @Body() body: { userId: number }) {
     return this.chat.openDirect(user.id, Number(body.userId));
   }
 
   @Patch('messages/:id')
-  @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_VIEW] })
   editMessage(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: { id: number },
@@ -131,13 +111,11 @@ export class ChatController {
   }
 
   @Delete('messages/:id')
-  @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_VIEW] })
   deleteMessage(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { id: number }) {
     return this.chat.deleteMessage(id, user.id);
   }
 
   @Post('messages/:id/reactions')
-  @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_VIEW] })
   react(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: { id: number },
@@ -147,7 +125,6 @@ export class ChatController {
   }
 
   @Get('colleagues')
-  @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_VIEW] })
   colleagues(@CurrentUser() user: { id: number }, @Query('q') q?: string) {
     return this.chat.listColleagues(user.id, q);
   }
