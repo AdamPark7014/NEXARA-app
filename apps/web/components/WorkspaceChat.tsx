@@ -976,8 +976,11 @@ export default function WorkspaceChat({
         <section className={styles.main}>
           {!activeId ? (
             <div className={styles.emptyMain}>
-              <h3>Chat NEXARA</h3>
-              <p>Selecciona un canal o abre un DM. Ctrl+K para saltar al instante.</p>
+              <div>
+                <div className={styles.emptyMark}>N</div>
+                <h3>Chat del equipo</h3>
+                <p>Elige un canal a la izquierda o abre un mensaje directo para empezar.</p>
+              </div>
             </div>
           ) : (
             <>
@@ -1080,8 +1083,11 @@ export default function WorkspaceChat({
                 {loadingMessages && <div className={styles.loadingLine}>Cargando…</div>}
                 {!loadingMessages && messages.length === 0 && (
                   <div className={styles.emptyMain}>
-                    <h3>Canal listo</h3>
-                    <p>Escribe el primer mensaje. Enter envía, Shift+Enter nueva línea, @ menciona.</p>
+                    <div>
+                      <div className={styles.emptyMark}>#</div>
+                      <h3>Canal listo</h3>
+                      <p>Escribe el primer mensaje. Enter envía, Shift+Enter nueva línea.</p>
+                    </div>
                   </div>
                 )}
                 {renderMessageList(messages)}
