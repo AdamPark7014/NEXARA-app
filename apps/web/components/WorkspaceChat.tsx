@@ -895,6 +895,7 @@ export default function WorkspaceChat({
 
   return (
     <>
+      <div className={styles.fill}>
       <div className={shellClass}>
         <aside className={styles.sidebar}>
           <div className={styles.workspaceHead}>
@@ -1287,6 +1288,7 @@ export default function WorkspaceChat({
             )}
           </aside>
         )}
+      </div>
       </div>
 
       {showNewChannel && (

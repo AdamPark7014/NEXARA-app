@@ -317,6 +317,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
     router.replace("/login");
   };
 
+  const isChatRoute = Boolean(pathname && /\/chat(\/|$)/.test(pathname));
+
   // Panel completo sin permiso (p.ej. administrativo en /crm o diseño en /erp sin rutas)
   if (!isSuperAdmin && user && !canAccessPanel) {
     return (
@@ -336,6 +338,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
       className={styles.shell}
       data-mobile-open={mobileOpen ? "true" : "false"}
       data-collapsed={collapsed ? "true" : "false"}
+      data-chat={isChatRoute ? "true" : "false"}
       style={{ "--panel-accent": panelMeta.accent } as React.CSSProperties}
     >
       {/* ───────── SIDEBAR ───────── */}
@@ -621,8 +624,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
       </header>
 
       {/* ───────── MAIN ───────── */}
-      <main className={styles.main}>
-        <div className={styles.contentInner}>
+      <main className={`${styles.main}${isChatRoute ? ` ${styles.mainFullBleed}` : ""}`}>
+        <div className={`${styles.contentInner}${isChatRoute ? ` ${styles.contentInnerFullBleed}` : ""}`}>
           {children}
         </div>
       </main>

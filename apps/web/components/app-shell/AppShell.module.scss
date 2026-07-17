@@ -916,6 +916,7 @@
   overflow-x: hidden;
   position: relative;
   z-index: 1;
+  min-height: 0;
 }
 
 @media (max-width: 1024px) {
@@ -929,6 +930,35 @@
   margin: 0 auto;
   width: 100%;
   animation: pageIn 380ms var(--nx-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+/* Chat: usar todo el viewport del panel (sin card centrada ni padding) */
+.mainFullBleed {
+  padding: 0;
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.contentInnerFullBleed {
+  max-width: none !important;
+  margin: 0 !important;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  animation: none;
+}
+
+.shell[data-chat="true"] {
+  /* Evita scroll doble: el chat maneja su propio overflow */
+  overflow: hidden;
+  height: 100vh;
+  height: 100dvh;
 }
 
 @keyframes pageIn {
