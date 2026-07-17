@@ -786,7 +786,7 @@ export default function WorkspaceChat({
           <div
             className={`${styles.msg} ${compact ? styles.msgCompact : ""} ${
               highlightId === m.id ? styles.msgHighlight : ""
-            }`}
+            } ${mine ? styles.msgMine : ""}`}
             id={`msg-${m.id}`}
           >
             {compact ? (
@@ -888,7 +888,13 @@ export default function WorkspaceChat({
   };
 
   const panelOpen = Boolean(threadRoot || showMembers || detail?.document);
-  const shellClass = panelOpen ? `${styles.shell} ${styles.shellWithPanel}` : styles.shell;
+  const shellClass = [
+    styles.shell,
+    styles.shellBleed,
+    panelOpen ? styles.shellWithPanel : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const channelRow = (c: Channel) => (
     <button
@@ -902,7 +908,7 @@ export default function WorkspaceChat({
     >
       {c.kind === "DIRECT" ? (
         <span className={styles.presenceWrap}>
-          <span className={`${styles.avatar} ${avatarHue(c.peer?.id ?? c.id)}`} style={{ width: 22, height: 22, fontSize: 9, borderRadius: 5, marginTop: 0 }}>
+          <span className={`${styles.avatar} ${styles.avatarSm} ${avatarHue(c.peer?.id ?? c.id)}`}>
             {initials(c.name)}
           </span>
           <span
@@ -917,9 +923,14 @@ export default function WorkspaceChat({
       <span className={styles.channelLabel}>
         {c.kind === "DOCUMENT" ? c.document?.documentNumber ?? c.name : c.name}
       </span>
-      {starred.includes(c.id) && <span aria-hidden style={{ opacity: 0.7, fontSize: 11 }}>★</span>}
-      {(c.unreadCount ?? 0) > 0 && activeId !== c.id && (
-        <span className={styles.unreadBadge}>{c.unreadCount! > 99 ? "99+" : c.unreadCount}</span>
+      <span className={styles.channelMeta}>
+        {starred.includes(c.id) && <span aria-hidden style={{ opacity: 0.55, fontSize: 10 }}>★</span>}
+        {(c.unreadCount ?? 0) > 0 && activeId !== c.id && (
+          <span className={styles.unreadBadge}>{c.unreadCount! > 99 ? "99+" : c.unreadCount}</span>
+        )}
+      </span>
+      {c.lastMessagePreview && activeId !== c.id && (
+        <span className={styles.previewLine}>{c.lastMessagePreview}</span>
       )}
     </button>
   );
@@ -931,21 +942,42 @@ export default function WorkspaceChat({
           <div className={styles.workspaceHead}>
             <div className={styles.workspaceName}>
               <span className={styles.liveDot} />
-              NEXARA Workspace
-              {totalUnread > 0 && <span className={styles.unreadBadge}>{totalUnread > 99 ? "99+" : totalUnread}</span>}
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                NEXARA
+              </span>
+              {totalUnread > 0 && (
+                <span className={styles.unreadBadge}>{totalUnread > 99 ? "99+" : totalUnread}</span>
+              )}
             </div>
-            <div className={styles.workspaceSub}>Canales · documentos · DMs · Ctrl+K</div>
+            <div className={styles.headActions}>
+              <button
+                type="button"
+                className={styles.headIcon}
+                title="Buscar canal (Ctrl+K)"
+                onClick={() => setSwitcherOpen(true)}
+              >
+                ⌕
+              </button>
+              <button
+                type="button"
+                className={styles.headIcon}
+                title="Nuevo mensaje"
+                onClick={() => {
+                  setShowDm(true);
+                  void searchColleagues("");
+                }}
+              >
+                ✎
+              </button>
+            </div>
           </div>
 
           <div className={styles.sidebarSearch}>
             <span aria-hidden>⌕</span>
             <input
-              placeholder="Filtrar o Ctrl+K…"
+              placeholder="Filtrar…"
               value={sidebarFilter}
               onChange={(e) => setSidebarFilter(e.target.value)}
-              onFocus={() => {
-                /* hint */
-              }}
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
                   e.preventDefault();
@@ -953,15 +985,7 @@ export default function WorkspaceChat({
                 }
               }}
             />
-            <button
-              type="button"
-              className={styles.sectionAction}
-              title="Cambiar canal (Ctrl+K)"
-              onClick={() => setSwitcherOpen(true)}
-              style={{ color: "var(--chat-sidebar-muted)" }}
-            >
-              ⌘K
-            </button>
+            <span className={styles.kbd}>⌘K</span>
           </div>
 
           <div className={styles.sidebarScroll}>
@@ -1012,22 +1036,19 @@ export default function WorkspaceChat({
         <section className={styles.main}>
           {!activeId ? (
             <div className={styles.emptyMain}>
-              <h3>Bienvenido al workspace</h3>
-              <p>
-                Canales, hilos, reacciones, búsqueda y salas por documento — colaboración en tiempo real
-                para el equipo NEXARA.
-              </p>
+              <h3>Chat NEXARA</h3>
+              <p>Selecciona un canal o abre un DM. Ctrl+K para saltar al instante.</p>
             </div>
           ) : (
             <>
               <header className={styles.channelHeader}>
-                <div>
+                <div className={styles.channelTitleBlock}>
                   <div className={styles.channelTitle}>
                     <span>{channelPrefix(detail?.kind ?? "PUBLIC")}</span>
                     <span>{detail?.name ?? "…"}</span>
                   </div>
                   <div className={styles.channelTopic} onClick={() => void editTopic()} title="Editar tema">
-                    {detail?.topic || "Añadir un tema…"}
+                    {detail?.topic || "Añadir tema…"}
                   </div>
                 </div>
                 <div className={styles.headerMeta}>
@@ -1064,10 +1085,10 @@ export default function WorkspaceChat({
                       setThreadRoot(null);
                     }}
                   >
-                    👥
+                    👤
                   </button>
                   {typeof detail?.memberCount === "number" && (
-                    <span className={styles.pill}>{detail.memberCount} miembros</span>
+                    <span className={styles.pill}>{detail.memberCount}</span>
                   )}
                 </div>
               </header>
@@ -1113,6 +1134,7 @@ export default function WorkspaceChat({
               )}
 
               <div className={styles.messages} ref={messagesRef} onScroll={onScrollMessages}>
+                <div className={styles.messagesInner}>
                 {hasMore && (
                   <button
                     type="button"
@@ -1121,17 +1143,14 @@ export default function WorkspaceChat({
                       if (messages[0]) void loadMessages(activeId, { beforeId: messages[0].id, append: true });
                     }}
                   >
-                    Cargar mensajes anteriores
+                    Cargar anteriores
                   </button>
                 )}
-                {loadingMessages && <div className={styles.loadingLine}>Cargando conversación…</div>}
+                {loadingMessages && <div className={styles.loadingLine}>Cargando…</div>}
                 {!loadingMessages && messages.length === 0 && (
                   <div className={styles.emptyMain}>
-                    <h3>Este canal está listo</h3>
-                    <p>
-                      Escribe el primer mensaje. Usa @para mencionar, `código` para snippets y Enter para
-                      enviar.
-                    </p>
+                    <h3>Canal listo</h3>
+                    <p>Escribe el primer mensaje. Enter envía · @ menciona · `código`.</p>
                   </div>
                 )}
                 {renderMessageList(messages)}
@@ -1146,9 +1165,10 @@ export default function WorkspaceChat({
                       setShowJump(false);
                     }}
                   >
-                    ↓ Ir al más reciente
+                    ↓ Recientes
                   </button>
                 )}
+                </div>
               </div>
 
               <div className={styles.composerWrap}>
@@ -1223,9 +1243,7 @@ export default function WorkspaceChat({
                     }}
                   />
                   <div className={styles.composerBar}>
-                    <span className={styles.composerHint}>
-                      Enter enviar · Shift+Enter línea · @ mencionar · `código`
-                    </span>
+                    <span className={styles.composerHint}>Enter · Shift+Enter · @ · `code`</span>
                     <button
                       type="button"
                       className={styles.sendBtn}
