@@ -531,6 +531,7 @@ model User {
   chatChannelsCreated     ChatChannel[]          @relation("ChatChannelCreator")
   chatMemberships         ChatChannelMember[]    @relation("ChatChannelMember")
   chatMessagesAuthored    ChatMessage[]          @relation("ChatMessageAuthor")
+  chatMessagesPinned      ChatMessage[]          @relation("ChatMessagePinner")
   chatReactions           ChatMessageReaction[]  @relation("ChatReactionUser")
   workflowStepsApprover   WorkflowStep[]         @relation("WorkflowStepApprover")
   workflowsStarted        WorkflowInstance[]     @relation("WorkflowStarter")
@@ -4120,18 +4121,22 @@ model ChatMessage {
   body            String                @db.Text
   attachmentUrl   String?               @db.VarChar(500)
   attachmentName  String?               @db.VarChar(255)
+  pinnedAt        DateTime?
+  pinnedById      Int?
   editedAt        DateTime?
   deletedAt       DateTime?
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
   channel         ChatChannel           @relation(fields: [channelId], references: [id], onDelete: Cascade)
   author          User                  @relation("ChatMessageAuthor", fields: [authorId], references: [id])
+  pinnedBy        User?                 @relation("ChatMessagePinner", fields: [pinnedById], references: [id], onDelete: SetNull)
   parent          ChatMessage?          @relation("ChatThread", fields: [parentId], references: [id], onDelete: Cascade)
   replies         ChatMessage[]         @relation("ChatThread")
   reactions       ChatMessageReaction[]
 
   @@index([channelId, createdAt])
   @@index([parentId, createdAt])
+  @@index([channelId, pinnedAt])
   @@map("chat_messages")
 }
 
