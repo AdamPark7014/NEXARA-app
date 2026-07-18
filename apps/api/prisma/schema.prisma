@@ -1825,6 +1825,9 @@ enum NotificationType {
   MARGIN_ALERT
   SLA_ALERT
   STOCK_ALERT
+
+  // Chat
+  CHAT_MENTION
 }
 
 model Notification {
