@@ -1517,8 +1517,26 @@
   background: var(--nx-accent-soft);
 }
 
-.colleagueMeta { min-width: 0; }
-.colleagueName { font-size: 13px; font-weight: 700; }
+/* El avatar del modal es de 32px — no heredar los 22px de .presenceWrap del sidebar */
+.colleagueBtn .presenceWrap {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.colleagueMeta {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.colleagueName {
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .colleagueEmail {
   font-size: 11.5px;
   color: var(--text-tertiary, #98a2b3);
