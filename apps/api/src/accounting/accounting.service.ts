@@ -1482,7 +1482,6 @@ export class AccountingService {
       bankName: string;
       accountNumber: string;
       clabe: string;
-      currentBalance: number;
       isActive: boolean;
     }>,
   ) {
@@ -1495,7 +1494,6 @@ export class AccountingService {
         bankName: dto.bankName?.trim() ?? undefined,
         accountNumber: dto.accountNumber?.trim() ?? undefined,
         clabe: dto.clabe !== undefined ? (dto.clabe?.trim() || null) : undefined,
-        currentBalance: dto.currentBalance !== undefined ? new Prisma.Decimal(dto.currentBalance) : undefined,
         isActive: dto.isActive ?? undefined,
       },
     });
@@ -1549,19 +1547,38 @@ export class AccountingService {
   }
 
   async reconcileTransaction(transactionId: number, dto: { matchedAmount: number; notes?: string }, userId: number) {
-    const tx = await this.prisma.bankTransaction.findUnique({ where: { id: transactionId } });
-    if (!tx) throw new NotFoundException('Transacción no encontrada');
-    return this.prisma.bankReconciliation.create({
-      data: {
-        bankAccountId: tx.bankAccountId,
-        bankTransactionId: transactionId,
-        status: 'MATCHED',
-        matchedAmount: new Prisma.Decimal(dto.matchedAmount),
-        notes: dto.notes?.trim() || null,
-        reconciledAt: new Date(),
-        reconciledById: userId,
-      },
+    const tx = await this.prisma.bankTransaction.findUnique({
+      where: { id: transactionId },
+      include: { reconciliation: true },
     });
+    if (!tx) throw new NotFoundException('Transacción no encontrada');
+    if (tx.reconciliation) {
+      throw new BadRequestException('Esta transacción ya está conciliada');
+    }
+    const matched = Number(dto.matchedAmount);
+    if (!Number.isFinite(matched) || Math.abs(matched - Number(tx.amount)) > 0.01) {
+      throw new BadRequestException(
+        `El monto conciliado (${matched}) no coincide con la transacción (${Number(tx.amount)})`,
+      );
+    }
+    try {
+      return await this.prisma.bankReconciliation.create({
+        data: {
+          bankAccountId: tx.bankAccountId,
+          bankTransactionId: transactionId,
+          status: 'MATCHED',
+          matchedAmount: new Prisma.Decimal(matched),
+          notes: dto.notes?.trim() || null,
+          reconciledAt: new Date(),
+          reconciledById: userId,
+        },
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new BadRequestException('Esta transacción ya está conciliada');
+      }
+      throw err;
+    }
   }
 
   // ── Cost Centers ──────────────────────────────────────────────────

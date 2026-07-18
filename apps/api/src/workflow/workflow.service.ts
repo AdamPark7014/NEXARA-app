@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 
@@ -194,6 +194,22 @@ export class WorkflowService {
     });
     if (!approval) throw new NotFoundException('Aprobación no encontrada');
     if (approval.status !== 'PENDING') throw new BadRequestException('Esta aprobación ya fue decidida');
+
+    const actor = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, roleId: true, roleKey: true, role: { select: { nombre: true, accesoConsoleAdmin: true } } },
+    });
+    const isElevated =
+      actor?.roleKey === 'super_admin' ||
+      Boolean(actor?.role?.accesoConsoleAdmin) ||
+      (actor?.role?.nombre || '').toLowerCase().includes('super');
+    const isApprover =
+      isElevated ||
+      approval.step.approverUserId === userId ||
+      (approval.step.approverRoleId != null && approval.step.approverRoleId === actor?.roleId);
+    if (!isApprover) {
+      throw new ForbiddenException('No eres el aprobador de este paso');
+    }
 
     await this.prisma.workflowApproval.update({
       where: { id: approvalId },

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { WorkflowService } from './workflow.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -7,6 +7,11 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 
 const VIEW = [PERMISSIONS.WORKFLOW_VIEW, PERMISSIONS.WORKFLOW_MANAGE, PERMISSIONS.CONSOLE_ADMIN];
 const MANAGE = [PERMISSIONS.WORKFLOW_MANAGE, PERMISSIONS.CONSOLE_ADMIN];
+const DECIDE = [
+  PERMISSIONS.WORKFLOW_VIEW,
+  PERMISSIONS.WORKFLOW_MANAGE,
+  PERMISSIONS.CONSOLE_ADMIN,
+];
 
 @Controller('workflow')
 @UseGuards(AuthGuard('jwt'), RbacGuard)
@@ -26,6 +31,7 @@ export class WorkflowController {
   }
 
   @Post('request')
+  @RBAC({ anyPermissions: VIEW })
   request(@Body() dto: any, @CurrentUser() user: any) {
     return this.service.requestApproval({
       entityType: dto.entityType,
@@ -36,11 +42,13 @@ export class WorkflowController {
   }
 
   @Get('my-pending')
+  @RBAC({ anyPermissions: VIEW })
   myPending(@CurrentUser() user: any) {
     return this.service.listMyPending(user.id);
   }
 
   @Get('instances/:id')
+  @RBAC({ anyPermissions: VIEW })
   getInstance(@Param('id', ParseIntPipe) id: number) {
     return this.service.getInstance(id);
   }
@@ -55,11 +63,15 @@ export class WorkflowController {
   }
 
   @Post('approvals/:id/decide')
+  @RBAC({ anyPermissions: DECIDE })
   decide(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { decision: 'APPROVED' | 'REJECTED'; comments?: string },
     @CurrentUser() user: any,
   ) {
+    if (!body?.decision || !['APPROVED', 'REJECTED'].includes(body.decision)) {
+      throw new ForbiddenException('Decisión inválida');
+    }
     return this.service.decide(id, user.id, body.decision, body.comments);
   }
 }
