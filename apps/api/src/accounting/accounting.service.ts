@@ -317,20 +317,9 @@ export class AccountingService {
         throw new BadRequestException('Ya está contabilizado');
       }
 
-      for (const line of entry.lines) {
-        if (line.debit.greaterThan(0)) {
-          await tx.account.update({
-            where: { id: line.debitAccountId },
-            data: { balance: { increment: line.debit } },
-          });
-        }
-        if (line.credit.greaterThan(0) && line.creditAccountId) {
-          await tx.account.update({
-            where: { id: line.creditAccountId },
-            data: { balance: { decrement: line.credit } },
-          });
-        }
-      }
+      // Debe/Haber se aplican sobre debitAccountId (misma convención que trial balance).
+      await this.applyLineBalances(tx, entry.lines, 1);
+      await this.refreshBudgetActuals(tx, entry.lines, entry.date, 1);
 
       return tx.journalEntry.findUniqueOrThrow({
         where: { id },
@@ -343,6 +332,57 @@ export class AccountingService {
       .notifyJournalEntryPosted(postedByUserId, updated.id, entry.entryNumber, desc)
       .catch(() => undefined);
     return updated;
+  }
+
+  /**
+   * Aplica movimiento neto (+debe − haber) a Account.balance sobre debitAccountId.
+   * creditAccountId es metadato de contraparte; los reportes ya usan solo debitAccount.
+   */
+  private async applyLineBalances(
+    tx: Prisma.TransactionClient,
+    lines: Array<{ debitAccountId: number; debit: Prisma.Decimal; credit: Prisma.Decimal }>,
+    sign: 1 | -1,
+  ) {
+    for (const line of lines) {
+      const delta = line.debit.minus(line.credit);
+      if (delta.equals(0)) continue;
+      const signed = sign === 1 ? delta : delta.negated();
+      await tx.account.update({
+        where: { id: line.debitAccountId },
+        data: { balance: { increment: signed } },
+      });
+    }
+  }
+
+  /** Actualiza Budget.actualAmount por centro de costo del asiento. */
+  private async refreshBudgetActuals(
+    tx: Prisma.TransactionClient,
+    lines: Array<{ costCenterId: number | null; debit: Prisma.Decimal; credit: Prisma.Decimal }>,
+    entryDate: Date,
+    sign: 1 | -1,
+  ) {
+    const byCc = new Map<number, Prisma.Decimal>();
+    for (const line of lines) {
+      if (!line.costCenterId) continue;
+      const delta = line.debit.minus(line.credit);
+      if (delta.equals(0)) continue;
+      const signed = sign === 1 ? delta : delta.negated();
+      byCc.set(line.costCenterId, (byCc.get(line.costCenterId) ?? new Prisma.Decimal(0)).plus(signed));
+    }
+    if (byCc.size === 0) return;
+
+    const year = entryDate.getFullYear();
+    const month = entryDate.getMonth() + 1;
+    for (const [costCenterId, delta] of byCc) {
+      await tx.budget.updateMany({
+        where: { costCenterId, year, month },
+        data: { actualAmount: { increment: delta } },
+      });
+      await tx.budget.updateMany({
+        where: { costCenterId, year, month: null },
+        data: { actualAmount: { increment: delta } },
+      });
+    }
   }
 
   private async ensureDefaultAccounts() {
@@ -385,23 +425,32 @@ export class AccountingService {
     const existing = await this.prisma.journalEntry.findFirst({ where: { reference } });
     if (existing) return existing;
 
-    const entry = await this.createJournalEntry(
-      {
-        date,
-        description,
-        reference,
-        lines: lines.map((line) => ({
-          debitAccountId: line.debitAccountId,
-          creditAccountId: line.creditAccountId,
-          description: line.label,
-          debit: line.debit,
-          credit: line.credit,
-        })),
-      },
-      userId,
-    );
+    try {
+      const entry = await this.createJournalEntry(
+        {
+          date,
+          description,
+          reference,
+          lines: lines.map((line) => ({
+            debitAccountId: line.debitAccountId,
+            creditAccountId: line.creditAccountId,
+            description: line.label,
+            debit: line.debit,
+            credit: line.credit,
+          })),
+        },
+        userId,
+      );
 
-    return this.postJournalEntry(entry.id, userId);
+      return this.postJournalEntry(entry.id, userId);
+    } catch (err) {
+      // Carrera: otro request creó el mismo reference (unique)
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const raced = await this.prisma.journalEntry.findFirst({ where: { reference } });
+        if (raced) return raced;
+      }
+      throw err;
+    }
   }
 
   private async autoJournalForStampedInvoice(
@@ -522,20 +571,8 @@ export class AccountingService {
         include: { lines: true },
       });
 
-      for (const line of reversal.lines) {
-        if (line.debit.greaterThan(0)) {
-          await tx.account.update({
-            where: { id: line.debitAccountId },
-            data: { balance: { increment: line.debit } },
-          });
-        }
-        if (line.credit.greaterThan(0) && line.creditAccountId) {
-          await tx.account.update({
-            where: { id: line.creditAccountId },
-            data: { balance: { decrement: line.credit } },
-          });
-        }
-      }
+      await this.applyLineBalances(tx, reversal.lines, 1);
+      await this.refreshBudgetActuals(tx, reversal.lines, reversal.date, 1);
 
       return reversal;
     });
@@ -909,6 +946,9 @@ export class AccountingService {
     if (!invoice || invoice.deletedAt) throw new NotFoundException('Factura no encontrada');
     if (invoice.isCancelled) throw new BadRequestException('La factura está cancelada');
     if (invoice.cfdiUuid) throw new BadRequestException('La factura ya está timbrada');
+    if (invoice.status === 'STAMPING') {
+      throw new BadRequestException('Timbrado en curso; espera un momento e intenta de nuevo');
+    }
     if (invoice.status !== 'DRAFT') {
       throw new BadRequestException('Solo facturas en borrador pueden timbrarse');
     }
@@ -933,8 +973,6 @@ export class AccountingService {
       );
     }
 
-    // Tras las validaciones, TS sigue viendo estos campos como `string | null`
-    // (Prisma optional), pero el flujo asegura que existen. Casteo explícito.
     const emisorRfc = invoice.emisorRfc as string;
     const receptorRfc = invoice.receptorRfc as string;
     const issuerProfile = await this.getInvoiceIssuerProfile();
@@ -942,62 +980,97 @@ export class AccountingService {
       cfdiErrors.push('CP fiscal del emisor (LugarExpedicion — configurar en perfil de empresa o ajustes fiscales)');
     }
 
-    const stamp = await this.pacService.stamp({
-      invoiceNumber: invoice.invoiceNumber,
-      serie: invoice.cfdiSerie,
-      folio: invoice.cfdiFolio,
-      total: Number(invoice.totalAmount),
-      subtotal: Number(invoice.subtotal),
-      taxTotal: Number(invoice.taxAmount),
-      currency: invoice.currency || 'MXN',
-      exchangeRate: invoice.exchangeRate ? Number(invoice.exchangeRate) : null,
-      paymentForm: invoice.satPaymentForm || 'FP99',
-      paymentMethod: invoice.satPaymentMethod || 'PUE',
-      cfdiUsage: invoice.cfdiUsage || 'G03',
-      tipoComprobante: invoice.cfdiRelatedUuids && invoice.cfdiRelationType === '01' ? 'E' : 'I',
-      relatedUuids: invoice.cfdiRelatedUuids?.split(',').map((u) => u.trim()).filter(Boolean),
-      relationType: invoice.cfdiRelationType || undefined,
-      emisor: {
-        rfc: emisorRfc,
-        name: invoice.emisorName || 'Emisor',
-        regime: invoice.emisorRegime || 'R601',
-        zipCode: issuerProfile.emisorZipCode,
-      },
-      receptor: {
-        rfc: receptorRfc,
-        name: invoice.receptorName || 'Receptor',
-        zipCode: invoice.receptorZipCode,
-        regime: invoice.receptorRegime,
-      },
-      items: invoice.items.map((item) => ({
-        description: item.description,
-        quantity: Number(item.quantity),
-        unitPrice: Number(item.unitPrice),
-        discount: Number(item.discount),
-        taxRate: Number(item.taxRate),
-        satProductKey: item.satProductKey,
-        satUnitKey: item.satUnitKey,
-        unitName: item.unitName,
-        ivaRetAmount: item.ivaRetAmount ? Number(item.ivaRetAmount) : undefined,
-        isrRetAmount: item.isrRetAmount ? Number(item.isrRetAmount) : undefined,
-        iepsAmount: item.iepsAmount ? Number(item.iepsAmount) : undefined,
-        iepsRate: item.iepsRate ? Number(item.iepsRate) : undefined,
-      })),
+    // Claim atómico DRAFT → STAMPING para evitar doble timbrado concurrente.
+    const claim = await this.prisma.invoice.updateMany({
+      where: { id, status: 'DRAFT', cfdiUuid: null, isCancelled: false },
+      data: { status: 'STAMPING' },
     });
+    if (claim.count === 0) {
+      const current = await this.prisma.invoice.findUnique({ where: { id } });
+      if (current?.cfdiUuid) throw new BadRequestException('La factura ya está timbrada');
+      throw new BadRequestException('No se pudo iniciar el timbrado (conflicto concurrente)');
+    }
 
-    const updated = await this.prisma.invoice.update({
-      where: { id },
+    let stamp: Awaited<ReturnType<PacService['stamp']>>;
+    try {
+      stamp = await this.pacService.stamp({
+        invoiceNumber: invoice.invoiceNumber,
+        serie: invoice.cfdiSerie,
+        folio: invoice.cfdiFolio,
+        total: Number(invoice.totalAmount),
+        subtotal: Number(invoice.subtotal),
+        taxTotal: Number(invoice.taxAmount),
+        currency: invoice.currency || 'MXN',
+        exchangeRate: invoice.exchangeRate ? Number(invoice.exchangeRate) : null,
+        paymentForm: invoice.satPaymentForm || 'FP99',
+        paymentMethod: invoice.satPaymentMethod || 'PUE',
+        cfdiUsage: invoice.cfdiUsage || 'G03',
+        tipoComprobante: invoice.cfdiRelatedUuids && invoice.cfdiRelationType === '01' ? 'E' : 'I',
+        relatedUuids: invoice.cfdiRelatedUuids?.split(',').map((u) => u.trim()).filter(Boolean),
+        relationType: invoice.cfdiRelationType || undefined,
+        emisor: {
+          rfc: emisorRfc,
+          name: invoice.emisorName || 'Emisor',
+          regime: invoice.emisorRegime || 'R601',
+          zipCode: issuerProfile.emisorZipCode,
+        },
+        receptor: {
+          rfc: receptorRfc,
+          name: invoice.receptorName || 'Receptor',
+          zipCode: invoice.receptorZipCode,
+          regime: invoice.receptorRegime,
+        },
+        items: invoice.items.map((item) => ({
+          description: item.description,
+          quantity: Number(item.quantity),
+          unitPrice: Number(item.unitPrice),
+          discount: Number(item.discount),
+          taxRate: Number(item.taxRate),
+          satProductKey: item.satProductKey,
+          satUnitKey: item.satUnitKey,
+          unitName: item.unitName,
+          ivaRetAmount: item.ivaRetAmount ? Number(item.ivaRetAmount) : undefined,
+          isrRetAmount: item.isrRetAmount ? Number(item.isrRetAmount) : undefined,
+          iepsAmount: item.iepsAmount ? Number(item.iepsAmount) : undefined,
+          iepsRate: item.iepsRate ? Number(item.iepsRate) : undefined,
+        })),
+      });
+    } catch (err) {
+      await this.prisma.invoice.updateMany({
+        where: { id, status: 'STAMPING', cfdiUuid: null },
+        data: { status: 'DRAFT' },
+      });
+      throw err;
+    }
+
+    const persist = await this.prisma.invoice.updateMany({
+      where: { id, status: 'STAMPING', cfdiUuid: null },
       data: {
         cfdiUuid: stamp.uuid,
         cfdiStampDate: stamp.stampedAt,
         satCertNumber: stamp.satCertNumber,
         status: 'SENT',
         cfdiSerie: invoice.cfdiSerie || 'A',
-        cfdiFolio: invoice.cfdiFolio || invoice.invoiceNumber.replace(/[^0-9]/g, '').slice(0, 12) || String(invoice.id),
+        cfdiFolio:
+          invoice.cfdiFolio ||
+          invoice.invoiceNumber.replace(/[^0-9]/g, '').slice(0, 12) ||
+          String(invoice.id),
         cfdiXml: stamp.xml || invoice.cfdiXml,
         pdfUrl: stamp.pdfUrl || invoice.pdfUrl,
         createdById: invoice.createdById ?? userId,
       },
+    });
+    if (persist.count === 0) {
+      const existing = await this.prisma.invoice.findUnique({
+        where: { id },
+        include: { items: { include: { product: true } }, client: true, supplier: true, payments: true },
+      });
+      if (existing?.cfdiUuid) return { ...existing, pacProvider: stamp.provider };
+      throw new BadRequestException('No se pudo persistir el timbrado');
+    }
+
+    const updated = await this.prisma.invoice.findUniqueOrThrow({
+      where: { id },
       include: { items: { include: { product: true } }, client: true, supplier: true, payments: true },
     });
 
@@ -1228,21 +1301,40 @@ export class AccountingService {
     operationNumber?: string;
     stampComplement?: boolean;
   }, userId: number) {
-    const invoice = await this.prisma.invoice.findUnique({ where: { id: dto.invoiceId } });
-    if (!invoice) throw new NotFoundException('Factura no encontrada');
-
-    if (dto.bankAccountId) {
-      const bankAccount = await this.prisma.bankAccount.findUnique({ where: { id: dto.bankAccountId } });
-      if (!bankAccount) {
-        throw new NotFoundException('Cuenta bancaria no encontrada');
-      }
+    if (!Number.isFinite(dto.amount) || dto.amount <= 0) {
+      throw new BadRequestException('El monto del pago debe ser mayor a cero');
     }
 
-    const newPaid = Number(invoice.paidAmount) + dto.amount;
-    const newStatus = newPaid >= Number(invoice.totalAmount) ? 'PAID' : 'PARTIALLY_PAID';
-    const isDebit = invoice.type === 'ACCOUNTS_PAYABLE';
+    const speiKey = dto.speiTrackingKey?.trim() || null;
+    if (speiKey) {
+      const dup = await this.prisma.payment.findFirst({ where: { speiTrackingKey: speiKey } });
+      if (dup) throw new BadRequestException('La clave de rastreo SPEI ya está registrada');
+    }
 
-    const [payment] = await this.prisma.$transaction(async (tx) => {
+    const [payment, invoice] = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM invoices WHERE id = ${dto.invoiceId} FOR UPDATE`;
+      const locked = await tx.invoice.findUnique({ where: { id: dto.invoiceId } });
+      if (!locked) throw new NotFoundException('Factura no encontrada');
+      if (locked.isCancelled) throw new BadRequestException('La factura está cancelada');
+      if (locked.deletedAt) throw new NotFoundException('Factura no encontrada');
+
+      if (dto.bankAccountId) {
+        const bankAccount = await tx.bankAccount.findUnique({ where: { id: dto.bankAccountId } });
+        if (!bankAccount) {
+          throw new NotFoundException('Cuenta bancaria no encontrada');
+        }
+      }
+
+      const newPaid = Number(locked.paidAmount) + dto.amount;
+      const total = Number(locked.totalAmount);
+      if (newPaid > total + 0.01) {
+        throw new BadRequestException(
+          `El pago excede el saldo pendiente (pagado ${Number(locked.paidAmount).toFixed(2)} de ${total.toFixed(2)})`,
+        );
+      }
+      const newStatus = newPaid >= total - 0.01 ? 'PAID' : 'PARTIALLY_PAID';
+      const isDebit = locked.type === 'ACCOUNTS_PAYABLE';
+
       const createdPayment = await tx.payment.create({
         data: {
           invoiceId: dto.invoiceId,
@@ -1256,30 +1348,33 @@ export class AccountingService {
           satPaymentForm: this.normalizeSatPaymentForm(
             dto.satPaymentForm || this.methodToSatPaymentForm(dto.method),
           ) as any,
-          speiTrackingKey: dto.speiTrackingKey?.trim() || null,
+          speiTrackingKey: speiKey,
           exchangeRate: dto.exchangeRate ? new Prisma.Decimal(dto.exchangeRate) : null,
           operationNumber: dto.operationNumber?.trim() || null,
         },
       });
 
-      await tx.invoice.update({
-        where: { id: dto.invoiceId },
+      const paidClaim = await tx.invoice.updateMany({
+        where: { id: dto.invoiceId, paidAmount: locked.paidAmount },
         data: { paidAmount: new Prisma.Decimal(newPaid), status: newStatus },
       });
+      if (paidClaim.count === 0) {
+        throw new BadRequestException('Conflicto al registrar el pago; reintenta');
+      }
 
       if (dto.bankAccountId) {
         await tx.bankTransaction.create({
           data: {
             bankAccountId: dto.bankAccountId,
             transactionDate: new Date(dto.paymentDate),
-            description: `Pago factura ${invoice.invoiceNumber}`,
+            description: `Pago factura ${locked.invoiceNumber}`,
             amount: new Prisma.Decimal(dto.amount),
             isDebit,
             externalRef: dto.reference?.trim() || dto.operationNumber?.trim() || null,
-            speiTrackingKey: dto.speiTrackingKey?.trim() || null,
-            concept: dto.notes?.trim() || `Pago ${invoice.invoiceNumber}`,
-            counterpartyName: invoice.receptorName?.trim() || null,
-            counterpartyRfc: invoice.receptorRfc?.trim() || null,
+            speiTrackingKey: speiKey,
+            concept: dto.notes?.trim() || `Pago ${locked.invoiceNumber}`,
+            counterpartyName: locked.receptorName?.trim() || null,
+            counterpartyRfc: locked.receptorRfc?.trim() || null,
           },
         });
 
@@ -1294,7 +1389,7 @@ export class AccountingService {
         });
       }
 
-      return [createdPayment] as const;
+      return [createdPayment, locked] as const;
     });
 
     const amountLabel = `${invoice.currency} ${dto.amount.toLocaleString('es-MX', {
@@ -1786,10 +1881,22 @@ export class AccountingService {
       }],
     });
 
-    await this.prisma.payment.update({
-      where: { id: paymentId },
+    const claim = await this.prisma.payment.updateMany({
+      where: { id: paymentId, cfdiPaymentUuid: null },
       data: { cfdiPaymentUuid: stamp.uuid },
     });
+    if (claim.count === 0) {
+      const existing = await this.prisma.payment.findUnique({ where: { id: paymentId } });
+      if (existing?.cfdiPaymentUuid) {
+        return {
+          paymentId,
+          cfdiPaymentUuid: existing.cfdiPaymentUuid,
+          xml: stamp.xml,
+          provider: stamp.provider,
+        };
+      }
+      throw new BadRequestException('No se pudo persistir el complemento de pago');
+    }
 
     return { paymentId, cfdiPaymentUuid: stamp.uuid, xml: stamp.xml, provider: stamp.provider };
   }
