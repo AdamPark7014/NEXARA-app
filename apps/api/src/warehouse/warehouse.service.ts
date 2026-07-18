@@ -99,6 +99,11 @@ export class WarehouseService {
   }
 
   async updateStockConfig(id: number, dto: { reorderPoint?: number; minStock?: number; maxStock?: number; valuationMethod?: string }) {
+    for (const [key, value] of Object.entries({ reorderPoint: dto.reorderPoint, minStock: dto.minStock, maxStock: dto.maxStock })) {
+      if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
+        throw new BadRequestException(`${key} debe ser un número mayor o igual a cero`);
+      }
+    }
     return this.prisma.stockLevel.update({
       where: { id },
       data: {
@@ -135,36 +140,48 @@ export class WarehouseService {
     if (normalizedType === 'TRANSFER' && (!dto.fromWarehouseId || !dto.toWarehouseId)) {
       throw new BadRequestException('Transferencias requieren almacén origen y destino');
     }
+    if (!dto.fromWarehouseId && !dto.toWarehouseId) {
+      throw new BadRequestException('El movimiento requiere almacén de origen y/o destino');
+    }
 
-    const movementNumber = await this.generateMovementNumber();
-    const totalCost = (dto.quantity || 0) * (dto.unitCost || 0);
+    const quantity = Number(dto.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new BadRequestException('La cantidad debe ser mayor a cero');
+    }
+    const unitCost = Number(dto.unitCost) > 0 ? Number(dto.unitCost) : 0;
+    const totalCost = quantity * unitCost;
 
-    const movement = await this.prisma.stockMovement.create({
-      data: {
-        movementNumber,
-        type: normalizedType as any,
-        productId: dto.productId,
-        fromWarehouseId: dto.fromWarehouseId ?? null,
-        toWarehouseId: dto.toWarehouseId ?? null,
-        quantity: new Prisma.Decimal(dto.quantity),
-        unitCost: new Prisma.Decimal(dto.unitCost || 0),
-        totalCost: new Prisma.Decimal(totalCost),
-        lotId: dto.lotId ?? null,
-        reference: dto.reference?.trim() || null,
-        notes: dto.notes?.trim() || null,
-        purchaseOrderId: dto.purchaseOrderId ?? null,
-        createdById: userId,
-      },
-      include: { product: true, fromWarehouse: true, toWarehouse: true },
+    // Todo el movimiento — validación de stock disponible, ajuste de niveles y
+    // registro del folio — corre en una sola transacción para que nunca quede
+    // un StockMovement sin su contraparte en StockLevel (o viceversa).
+    const movement = await this.prisma.$transaction(async (tx) => {
+      if (dto.fromWarehouseId) {
+        await this.decrementStockLevel(tx, dto.productId, dto.fromWarehouseId, quantity);
+      }
+      if (dto.toWarehouseId) {
+        await this.incrementStockLevel(tx, dto.productId, dto.toWarehouseId, quantity, unitCost);
+      }
+
+      const movementNumber = await this.generateMovementNumber();
+      return tx.stockMovement.create({
+        data: {
+          movementNumber,
+          type: normalizedType as any,
+          productId: dto.productId,
+          fromWarehouseId: dto.fromWarehouseId ?? null,
+          toWarehouseId: dto.toWarehouseId ?? null,
+          quantity: new Prisma.Decimal(quantity),
+          unitCost: new Prisma.Decimal(unitCost),
+          totalCost: new Prisma.Decimal(totalCost),
+          lotId: dto.lotId ?? null,
+          reference: dto.reference?.trim() || null,
+          notes: dto.notes?.trim() || null,
+          purchaseOrderId: dto.purchaseOrderId ?? null,
+          createdById: userId,
+        },
+        include: { product: true, fromWarehouse: true, toWarehouse: true },
+      });
     });
-
-    // Update stock levels
-    if (dto.fromWarehouseId) {
-      await this.upsertStockLevel(dto.productId, dto.fromWarehouseId, -dto.quantity, dto.unitCost || 0);
-    }
-    if (dto.toWarehouseId) {
-      await this.upsertStockLevel(dto.productId, dto.toWarehouseId, dto.quantity, dto.unitCost || 0);
-    }
 
     const productLabel = movement.product?.name?.trim() || movement.product?.sku?.trim() || `Producto #${dto.productId}`;
     void this.notificationHierarchy
@@ -174,26 +191,69 @@ export class WarehouseService {
     return movement;
   }
 
-  private async upsertStockLevel(productId: number, warehouseId: number, quantityDelta: number, unitCost: number) {
-    const existing = await this.prisma.stockLevel.findFirst({
+  /**
+   * Descuenta stock de forma atómica: valida disponible (quantity - reservedQty)
+   * y aplica el decremento en la misma condición WHERE para que dos movimientos
+   * concurrentes no puedan ambos leer el mismo saldo y sobregirarlo.
+   */
+  private async decrementStockLevel(
+    tx: Prisma.TransactionClient,
+    productId: number,
+    warehouseId: number,
+    quantity: number,
+  ) {
+    const level = await tx.stockLevel.findFirst({
       where: { productId, warehouseId, locationId: null },
     });
+    const available = level ? Number(level.quantity) - Number(level.reservedQty) : 0;
+    if (available < quantity) {
+      throw new BadRequestException(
+        `Stock insuficiente en el almacén de origen: disponible ${available}, solicitado ${quantity}`,
+      );
+    }
 
+    const result = await tx.stockLevel.updateMany({
+      where: { id: level!.id, quantity: { gte: quantity } },
+      data: { quantity: { decrement: quantity } },
+    });
+    if (result.count === 0) {
+      throw new BadRequestException(
+        'Stock insuficiente en el almacén de origen (otro movimiento lo consumió al mismo tiempo)',
+      );
+    }
+  }
+
+  /**
+   * Incrementa stock de forma atómica cuando ya existe el StockLevel (increment
+   * a nivel de fila evita perder incrementos concurrentes). El alta inicial de
+   * un StockLevel para un par producto/almacén nunca antes visto es un caso
+   * extremadamente raro de correr en paralelo; si ocurre, el índice único falla
+   * la transacción en vez de corromper datos.
+   */
+  private async incrementStockLevel(
+    tx: Prisma.TransactionClient,
+    productId: number,
+    warehouseId: number,
+    quantity: number,
+    unitCost: number,
+  ) {
+    const existing = await tx.stockLevel.findFirst({
+      where: { productId, warehouseId, locationId: null },
+    });
     if (existing) {
-      const newQty = Number(existing.quantity) + quantityDelta;
-      await this.prisma.stockLevel.update({
+      await tx.stockLevel.update({
         where: { id: existing.id },
         data: {
-          quantity: new Prisma.Decimal(Math.max(0, newQty)),
-          unitCost: unitCost > 0 ? new Prisma.Decimal(unitCost) : undefined,
+          quantity: { increment: quantity },
+          ...(unitCost > 0 ? { unitCost: new Prisma.Decimal(unitCost) } : {}),
         },
       });
     } else {
-      await this.prisma.stockLevel.create({
+      await tx.stockLevel.create({
         data: {
           productId,
           warehouseId,
-          quantity: new Prisma.Decimal(Math.max(0, quantityDelta)),
+          quantity: new Prisma.Decimal(quantity),
           unitCost: new Prisma.Decimal(unitCost),
         },
       });

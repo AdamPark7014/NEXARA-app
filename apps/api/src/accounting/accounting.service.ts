@@ -304,27 +304,40 @@ export class AccountingService {
     if (entry.status === 'POSTED') throw new BadRequestException('Ya está contabilizado');
     if (entry.fiscalPeriod?.isClosed) throw new BadRequestException('Periodo fiscal cerrado');
 
-    // Update account balances
-    for (const line of entry.lines) {
-      if (line.debit.greaterThan(0)) {
-        await this.prisma.account.update({
-          where: { id: line.debitAccountId },
-          data: { balance: { increment: line.debit } },
-        });
+    // Todo corre en una sola transacción: la "reclamación" del asiento vía
+    // updateMany con status distinto de POSTED en el WHERE hace que dos
+    // clics/solicitudes concurrentes de "Contabilizar" no puedan ambas pasar
+    // el chequeo y duplicar el efecto en los saldos de cuentas.
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.journalEntry.updateMany({
+        where: { id, status: { not: 'POSTED' } },
+        data: { status: 'POSTED', postedAt: new Date() },
+      });
+      if (claim.count === 0) {
+        throw new BadRequestException('Ya está contabilizado');
       }
-      if (line.credit.greaterThan(0) && line.creditAccountId) {
-        await this.prisma.account.update({
-          where: { id: line.creditAccountId },
-          data: { balance: { decrement: line.credit } },
-        });
-      }
-    }
 
-    const updated = await this.prisma.journalEntry.update({
-      where: { id },
-      data: { status: 'POSTED', postedAt: new Date() },
-      include: { lines: { include: { debitAccount: true, creditAccount: true } } },
+      for (const line of entry.lines) {
+        if (line.debit.greaterThan(0)) {
+          await tx.account.update({
+            where: { id: line.debitAccountId },
+            data: { balance: { increment: line.debit } },
+          });
+        }
+        if (line.credit.greaterThan(0) && line.creditAccountId) {
+          await tx.account.update({
+            where: { id: line.creditAccountId },
+            data: { balance: { decrement: line.credit } },
+          });
+        }
+      }
+
+      return tx.journalEntry.findUniqueOrThrow({
+        where: { id },
+        include: { lines: { include: { debitAccount: true, creditAccount: true } } },
+      });
     });
+
     const desc = entry.description?.trim() || 'Sin descripción';
     void this.notificationHierarchy
       .notifyJournalEntryPosted(postedByUserId, updated.id, entry.entryNumber, desc)
@@ -468,32 +481,64 @@ export class AccountingService {
     if (original.status !== 'POSTED') throw new BadRequestException('Solo se pueden revertir asientos contabilizados');
 
     const entryNumber = await this.generateEntryNumber();
-    const reversal = await this.prisma.journalEntry.create({
-      data: {
-        entryNumber,
-        date: new Date(),
-        description: `Reversa de ${original.entryNumber}: ${original.description}`,
-        status: 'POSTED',
-        reversalOfId: original.id,
-        totalDebit: original.totalCredit,
-        totalCredit: original.totalDebit,
-        createdById: userId,
-        postedAt: new Date(),
-        lines: {
-          create: original.lines.map((line) => ({
-            debitAccountId: line.debitAccountId,
-            creditAccountId: line.creditAccountId,
-            description: `Reversa: ${line.description || ''}`,
-            debit: line.credit,
-            credit: line.debit,
-          })),
-        },
-      },
-      include: { lines: true },
-    });
 
-    await this.prisma.journalEntry.update({ where: { id }, data: { status: 'REVERSED' } });
-    return reversal;
+    // Transacción: (1) reclama el original atómicamente (evita reversas
+    // duplicadas por doble clic / reintento concurrente), (2) crea la
+    // contrapóliza, (3) aplica el ajuste de saldo por cuenta — el paso que
+    // faltaba antes: la reversa se creaba ya POSTED pero nunca tocaba
+    // Account.balance, así que el saldo mostrado en Catálogo de Cuentas
+    // quedaba permanentemente desfasado del original que sí se revirtió.
+    return this.prisma.$transaction(async (tx) => {
+      const claim = await tx.journalEntry.updateMany({
+        where: { id, status: 'POSTED' },
+        data: { status: 'REVERSED' },
+      });
+      if (claim.count === 0) {
+        throw new BadRequestException('Este asiento ya fue revertido o no está contabilizado');
+      }
+
+      const reversal = await tx.journalEntry.create({
+        data: {
+          entryNumber,
+          date: new Date(),
+          description: `Reversa de ${original.entryNumber}: ${original.description}`,
+          status: 'POSTED',
+          reversalOfId: original.id,
+          totalDebit: original.totalCredit,
+          totalCredit: original.totalDebit,
+          createdById: userId,
+          postedAt: new Date(),
+          lines: {
+            create: original.lines.map((line) => ({
+              debitAccountId: line.debitAccountId,
+              creditAccountId: line.creditAccountId,
+              description: `Reversa: ${line.description || ''}`,
+              debit: line.credit,
+              credit: line.debit,
+              costCenterId: line.costCenterId,
+            })),
+          },
+        },
+        include: { lines: true },
+      });
+
+      for (const line of reversal.lines) {
+        if (line.debit.greaterThan(0)) {
+          await tx.account.update({
+            where: { id: line.debitAccountId },
+            data: { balance: { increment: line.debit } },
+          });
+        }
+        if (line.credit.greaterThan(0) && line.creditAccountId) {
+          await tx.account.update({
+            where: { id: line.creditAccountId },
+            data: { balance: { decrement: line.credit } },
+          });
+        }
+      }
+
+      return reversal;
+    });
   }
 
   // ── Trial Balance / Reports ───────────────────────────────────────

@@ -286,13 +286,23 @@ export class ViaticosService {
     };
     const trail = appendTrail(viatico.approvalTrail as TrailEntry[] | null, trailEntry);
 
+    // Reclama el registro condicionado a su estatus/paso ya leídos: si otra
+    // aprobación/rechazo concurrente ya lo movió, esta actualización afecta 0
+    // filas en vez de aplicarse igual sobre un estado obsoleto y duplicar el
+    // avance del flujo (p. ej. dos clics rápidos en "Aprobar").
+    const claimWhere = { id, estatus: viatico.estatus, approvalStep: viatico.approvalStep };
+
     if (action === 'reject') {
-      const updated = await this.prisma['viatico'].update({
-        where: { id },
+      const claim = await this.prisma['viatico'].updateMany({
+        where: claimWhere,
         data: { estatus: 'Rechazado', approvalTrail: trail },
+      });
+      if (claim.count === 0) throw new BadRequestException('Este viático ya fue actualizado por otra solicitud');
+      const updated = await this.prisma['viatico'].findUnique({
+        where: { id },
         include: { User: { select: { id: true, nombre: true } } },
       });
-      if (updated.usuarioId) {
+      if (updated?.usuarioId) {
         await this.notificationHierarchy.notifyViaticReview(updated.usuarioId, id, 'rejected', 0);
       }
       return updated;
@@ -301,28 +311,36 @@ export class ViaticosService {
     const nextStep = step + 1;
     if (isTerminalApproved(nextStep, chain)) {
       const contabilidadRef = `VIAT-${id}-${new Date().toISOString().slice(0, 10)}`;
-      const updated = await this.prisma['viatico'].update({
-        where: { id },
+      const claim = await this.prisma['viatico'].updateMany({
+        where: claimWhere,
         data: {
           approvalStep: nextStep,
           approvalTrail: trail,
           estatus: 'Aprobado',
           contabilidadRef,
         },
+      });
+      if (claim.count === 0) throw new BadRequestException('Este viático ya fue actualizado por otra solicitud');
+      const updated = await this.prisma['viatico'].findUnique({
+        where: { id },
         include: {
           User: { select: { id: true, nombre: true } },
           Activity: { select: { anNumber: true } },
         },
       });
-      if (updated.usuarioId) {
+      if (updated?.usuarioId) {
         await this.notificationHierarchy.notifyViaticReview(updated.usuarioId, id, 'approved', amount);
       }
       return updated;
     }
 
-    return this.prisma['viatico'].update({
-      where: { id },
+    const claim = await this.prisma['viatico'].updateMany({
+      where: claimWhere,
       data: { approvalStep: nextStep, approvalTrail: trail, estatus: 'Pendiente' },
+    });
+    if (claim.count === 0) throw new BadRequestException('Este viático ya fue actualizado por otra solicitud');
+    return this.prisma['viatico'].findUnique({
+      where: { id },
       include: { User: { select: { id: true, nombre: true } } },
     });
   }
