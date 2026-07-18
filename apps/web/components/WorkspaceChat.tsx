@@ -80,6 +80,10 @@ type Message = {
   replyCount: number;
   reactions: Reaction[];
   channel?: { id: number; name: string; kind: ChannelKind; slug: string | null };
+  /** Optimistic client id until server ack */
+  clientMsgId?: string;
+  pending?: boolean;
+  failed?: boolean;
 };
 
 const FAVORITES_KEY = "nexara.chat.favorites";
@@ -399,6 +403,15 @@ export default function WorkspaceChat({
     }
   }, [soundOn]);
 
+  const playPingRef = useRef(playPing);
+  const notifyRef = useRef(notify);
+  useEffect(() => {
+    playPingRef.current = playPing;
+  }, [playPing]);
+  useEffect(() => {
+    notifyRef.current = notify;
+  }, [notify]);
+
   const selectChannel = useCallback((id: number) => {
     if (activeId != null) {
       draftsRef.current[activeId] = draft;
@@ -520,23 +533,36 @@ export default function WorkspaceChat({
     socket.on("chat:message", (msg: Message) => {
       const isMine = msg.authorId === currentUserId;
       const isMuted = mutedIdsRef.current.has(msg.channelId);
+      const mergeIncoming = (prev: Message[]) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        const withoutOptimistic = prev.filter(
+          (m) =>
+            !(
+              m.pending &&
+              m.authorId === msg.authorId &&
+              m.parentId === msg.parentId &&
+              m.body === msg.body
+            ),
+        );
+        return [...withoutOptimistic, msg];
+      };
       if (msg.channelId === activeIdRef.current && !msg.parentId) {
-        setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+        setMessages(mergeIncoming);
         void apiFetch(`chat/channels/${msg.channelId}/read`, token, { method: "PATCH" });
         if (!isMine && !isMuted) {
-          playPing();
-          notify(msg);
+          playPingRef.current();
+          notifyRef.current(msg);
         }
       } else if (
         msg.channelId === activeIdRef.current &&
         threadRootRef.current &&
         msg.parentId === threadRootRef.current.id
       ) {
-        setThreadReplies((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+        setThreadReplies(mergeIncoming);
       } else {
         if (!isMine && !isMuted) {
-          playPing();
-          notify(msg);
+          playPingRef.current();
+          notifyRef.current(msg);
         }
         setChannels((prev) =>
           prev.map((c) =>
@@ -616,6 +642,13 @@ export default function WorkspaceChat({
       void loadChannels();
     });
 
+    const gapFill = () => {
+      const chId = activeIdRef.current;
+      if (chId != null) void loadMessages(chId);
+    };
+    socket.on("connect", gapFill);
+    socket.on("reconnect", gapFill);
+
     const onVis = () => {
       socket.emit("chat:presence", { status: document.visibilityState === "visible" ? "online" : "away" });
     };
@@ -623,11 +656,13 @@ export default function WorkspaceChat({
 
     return () => {
       document.removeEventListener("visibilitychange", onVis);
+      socket.off("connect", gapFill);
+      socket.off("reconnect", gapFill);
       socket.emit("chat:presence", { status: "away" });
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [token, currentUserId, playPing, notify]);
+  }, [token, currentUserId, loadChannels, loadMessages]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -742,7 +777,39 @@ export default function WorkspaceChat({
     const text = (parentId ? threadDraft : draft).trim();
     const att = parentId ? threadAttachment : attachment;
     if (!text && !att) return;
+    const clientMsgId = `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimistic: Message = {
+      id: -Math.floor(Math.random() * 1e9),
+      clientMsgId,
+      pending: true,
+      channelId: activeId,
+      authorId: currentUserId,
+      parentId: parentId ?? null,
+      kind: "TEXT",
+      body: text || (att?.name ? `Archivo: ${att.name}` : ""),
+      attachmentUrl: att?.url ?? null,
+      attachmentName: att?.name ?? null,
+      createdAt: new Date().toISOString(),
+      author: { id: currentUserId, nombre: currentUserName, email: "" },
+      replyCount: 0,
+      reactions: [],
+    };
     setSending(true);
+    if (parentId) {
+      setThreadDraft("");
+      setThreadAttachment(null);
+      setThreadReplies((prev) => [...prev, optimistic]);
+    } else {
+      setDraft("");
+      if (activeId != null) {
+        draftsRef.current[activeId] = "";
+        persistDrafts();
+      }
+      setAttachment(null);
+      setMentionOpen(false);
+      setMessages((prev) => [...prev, optimistic]);
+      nearBottomRef.current = true;
+    }
     try {
       const msg = await apiFetch(`chat/channels/${activeId}/messages`, token, {
         method: "POST",
@@ -753,23 +820,17 @@ export default function WorkspaceChat({
           attachmentName: att?.name ?? null,
         }),
       });
+      const replaceOptimistic = (prev: Message[]) => {
+        const without = prev.filter((m) => m.clientMsgId !== clientMsgId && m.id !== msg.id);
+        return [...without, msg];
+      };
       if (parentId) {
-        setThreadDraft("");
-        setThreadAttachment(null);
-        setThreadReplies((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+        setThreadReplies(replaceOptimistic);
         setMessages((prev) =>
           prev.map((m) => (m.id === parentId ? { ...m, replyCount: (m.replyCount ?? 0) + 1 } : m)),
         );
       } else {
-        setDraft("");
-        if (activeId != null) {
-          draftsRef.current[activeId] = "";
-          persistDrafts();
-        }
-        setAttachment(null);
-        setMentionOpen(false);
-        setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
-        nearBottomRef.current = true;
+        setMessages(replaceOptimistic);
       }
       setChannels((prev) =>
         prev.map((c) =>
@@ -785,6 +846,10 @@ export default function WorkspaceChat({
         ),
       );
     } catch (e) {
+      const markFailed = (prev: Message[]) =>
+        prev.map((m) => (m.clientMsgId === clientMsgId ? { ...m, pending: false, failed: true } : m));
+      if (parentId) setThreadReplies(markFailed);
+      else setMessages(markFailed);
       setError(e instanceof Error ? e.message : "No se pudo enviar");
     } finally {
       setSending(false);

@@ -9,6 +9,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { getOrgTier, ORG_ROLE_KEYS, ORG_TIER, type OrgRoleKey } from '../common/org-roles.js';
 import { isSuperAdminEmail } from '../common/platform-accounts.js';
 import { resolveUploadsDir } from '../common/uploads-path.js';
@@ -43,6 +44,7 @@ export class ChatService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeGateway,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async ensureDefaults(userId: number) {
@@ -631,7 +633,53 @@ export class ChatService {
       });
     }
 
+    void this.notifyUserMentions({
+      body: message.body,
+      channelId,
+      channelName: channel.name,
+      messageId: message.id,
+      authorId: userId,
+      authorName: message.author?.nombre ?? 'Alguien',
+    }).catch(() => undefined);
+
     return payload;
+  }
+
+  /** Notifica a usuarios mencionados con tokens `[@nombre](user:id)`. */
+  private async notifyUserMentions(opts: {
+    body: string;
+    channelId: number;
+    channelName: string;
+    messageId: number;
+    authorId: number;
+    authorName: string;
+  }) {
+    const ids = new Set<number>();
+    const re = /\]\(user:(\d+)\)/g;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(opts.body))) {
+      const id = Number(match[1]);
+      if (Number.isFinite(id) && id > 0 && id !== opts.authorId) ids.add(id);
+    }
+    if (ids.size === 0) return;
+
+    const preview = this.preview(opts.body).slice(0, 140);
+    await Promise.all(
+      [...ids].map((userId) =>
+        this.notifications.createNotification({
+          userId,
+          type: 'CHAT_MENTION',
+          category: 'chat',
+          title: `${opts.authorName} te mencionó en #${opts.channelName}`,
+          message: preview || 'Te mencionaron en el chat',
+          triggerUserId: opts.authorId,
+          relatedEntityId: opts.messageId,
+          entityType: 'chat_message',
+          relatedUrl: `/erp/chat?channel=${opts.channelId}&msg=${opts.messageId}`,
+          priority: 'normal',
+        } as any),
+      ),
+    );
   }
 
   async markRead(channelId: number, userId: number) {
