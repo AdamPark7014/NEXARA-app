@@ -56,6 +56,14 @@ type Channel = {
 
 type Reaction = { emoji: string; count: number; userIds: number[] };
 
+type MentionEntity = {
+  kind: "USER" | "ACTIVITY" | "EVIDENCE";
+  id: number;
+  label: string;
+  subtitle: string;
+  href?: string;
+};
+
 type Message = {
   id: number;
   channelId: number;
@@ -151,14 +159,30 @@ function channelPrefix(kind: ChannelKind) {
 function renderRichText(text: string): ReactNode[] {
   const nodes: ReactNode[] = [];
   const pattern =
-    /(`[^`]+`|\*\*[^*\n]+\*\*|\*[^*\s][^*\n]*\*|_[^_\s][^_\n]*_|https?:\/\/[^\s]+|@[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]+)/g;
+    /(\[[^\]\n]+\]\((?:\/[^)\s]*|user:\d+)\)|`[^`]+`|\*\*[^*\n]+\*\*|\*[^*\s][^*\n]*\*|_[^_\s][^_\n]*_|https?:\/\/[^\s]+|@[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]+)/g;
   let last = 0;
   let match: RegExpExecArray | null;
   let key = 0;
   while ((match = pattern.exec(text)) !== null) {
     if (match.index > last) nodes.push(text.slice(last, match.index));
     const token = match[0];
-    if (token.startsWith("`") && token.endsWith("`")) {
+    const entityLink = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (entityLink) {
+      const [, label, href] = entityLink;
+      if (href.startsWith("user:")) {
+        nodes.push(
+          <span key={key++} className={styles.mention}>
+            {label}
+          </span>,
+        );
+      } else {
+        nodes.push(
+          <a key={key++} href={href} className={`${styles.mention} ${styles.entityMention}`}>
+            {label}
+          </a>,
+        );
+      }
+    } else if (token.startsWith("`") && token.endsWith("`")) {
       nodes.push(<code key={key++}>{token.slice(1, -1)}</code>);
     } else if (token.startsWith("**") && token.endsWith("**")) {
       nodes.push(<strong key={key++}>{token.slice(2, -2)}</strong>);
@@ -250,6 +274,12 @@ export default function WorkspaceChat({
   const [pinned, setPinned] = useState<Message[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [showPins, setShowPins] = useState(false);
+  const [entityPickerOpen, setEntityPickerOpen] = useState(false);
+  const [entityKind, setEntityKind] = useState<MentionEntity["kind"]>("ACTIVITY");
+  const [entityTarget, setEntityTarget] = useState<"main" | "thread">("main");
+  const [entityQ, setEntityQ] = useState("");
+  const [entityResults, setEntityResults] = useState<MentionEntity[]>([]);
+  const [entityLoading, setEntityLoading] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<HTMLDivElement | null>(null);
@@ -287,6 +317,20 @@ export default function WorkspaceChat({
   useEffect(() => {
     mutedIdsRef.current = new Set(channels.filter((c) => c.muted).map((c) => c.id));
   }, [channels]);
+
+  useEffect(() => {
+    if (!entityPickerOpen) return;
+    const timer = window.setTimeout(() => {
+      setEntityLoading(true);
+      const qs = new URLSearchParams({ kind: entityKind });
+      if (entityQ.trim()) qs.set("q", entityQ.trim());
+      void apiFetch(`chat/mentions?${qs}`, token)
+        .then((data) => setEntityResults(Array.isArray(data) ? data : []))
+        .catch(() => setEntityResults([]))
+        .finally(() => setEntityLoading(false));
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [entityPickerOpen, entityKind, entityQ, token]);
 
   const persistDrafts = useCallback(() => {
     saveJson(DRAFTS_KEY, draftsRef.current);
@@ -598,6 +642,7 @@ export default function WorkspaceChat({
         setSearchOpen(false);
         setMentionOpen(false);
         setEmojiPickerFor(null);
+        setEntityPickerOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -773,18 +818,6 @@ export default function WorkspaceChat({
     }
   };
 
-  const removeMessage = async (messageId: number) => {
-    if (!window.confirm("¿Eliminar este mensaje?")) return;
-    try {
-      await apiFetch(`chat/messages/${messageId}`, token, { method: "DELETE" });
-      setMessages((prev) => prev.filter((m) => m.id !== messageId));
-      setThreadReplies((prev) => prev.filter((m) => m.id !== messageId));
-      setPinned((prev) => prev.filter((m) => m.id !== messageId));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo eliminar");
-    }
-  };
-
   const togglePin = async (messageId: number) => {
     try {
       const updated = await apiFetch(`chat/messages/${messageId}/pin`, token, { method: "POST" });
@@ -861,6 +894,39 @@ export default function WorkspaceChat({
     } catch {
       setColleagues([]);
     }
+  };
+
+  const openEntityPicker = (
+    kind: MentionEntity["kind"],
+    target: "main" | "thread" = "main",
+  ) => {
+    setEntityKind(kind);
+    setEntityTarget(target);
+    setEntityQ("");
+    setEntityResults([]);
+    setEntityPickerOpen(true);
+  };
+
+  const insertEntityMention = (entity: MentionEntity) => {
+    const cleanLabel = entity.label.replace(/[\[\]\(\)]/g, "").trim();
+    const token =
+      entity.kind === "USER"
+        ? `[@${cleanLabel}](user:${entity.id})`
+        : `[${entity.kind === "ACTIVITY" ? "📋" : "📷"} ${cleanLabel}](${entity.href ?? "/"})`;
+
+    if (entityTarget === "thread") {
+      setThreadDraft((prev) => `${prev}${prev && !/\s$/.test(prev) ? " " : ""}${token} `);
+    } else {
+      setDraft((prev) => {
+        const next = `${prev}${prev && !/\s$/.test(prev) ? " " : ""}${token} `;
+        if (activeId != null) {
+          draftsRef.current[activeId] = next;
+          persistDrafts();
+        }
+        return next;
+      });
+    }
+    setEntityPickerOpen(false);
   };
 
   const openDm = async (userId: number) => {
@@ -1075,6 +1141,7 @@ export default function WorkspaceChat({
       lastAuthor = m.authorId;
       lastTs = ts;
       const mine = m.authorId === currentUserId;
+      const canEdit = mine && Date.now() - ts <= 60 * 60 * 1000;
       const mineReaction = (emoji: string) =>
         m.reactions.some((r) => r.emoji === emoji && r.userIds.includes(currentUserId));
 
@@ -1228,22 +1295,18 @@ export default function WorkspaceChat({
                 >
                   {m.pinnedAt ? "📌" : "Pin"}
                 </button>
-                {mine && (
-                  <>
-                    <button
-                      type="button"
-                      className={styles.actionBtn}
-                      onClick={() => {
-                        setEditingId(m.id);
-                        setEditDraft(m.body);
-                      }}
-                    >
-                      Editar
-                    </button>
-                    <button type="button" className={styles.actionBtn} onClick={() => void removeMessage(m.id)}>
-                      Eliminar
-                    </button>
-                  </>
+                {canEdit && (
+                  <button
+                    type="button"
+                    className={styles.actionBtn}
+                    title="Disponible durante 1 hora después de enviar"
+                    onClick={() => {
+                      setEditingId(m.id);
+                      setEditDraft(m.body);
+                    }}
+                  >
+                    Editar
+                  </button>
                 )}
               </div>
               )}
@@ -1785,7 +1848,31 @@ export default function WorkspaceChat({
                           e.target.value = "";
                         }}
                       />
-                      <span className={styles.composerHint}>Enter envía · Shift+Enter nueva línea · @ menciona</span>
+                      <button
+                        type="button"
+                        className={styles.mentionToolBtn}
+                        title="Mencionar persona"
+                        onClick={() => openEntityPicker("USER")}
+                      >
+                        👤
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.mentionToolBtn}
+                        title="Mencionar actividad"
+                        onClick={() => openEntityPicker("ACTIVITY")}
+                      >
+                        📋
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.mentionToolBtn}
+                        title="Mencionar evidencia"
+                        onClick={() => openEntityPicker("EVIDENCE")}
+                      >
+                        📷
+                      </button>
+                      <span className={styles.composerHint}>Enter envía · @ menciona</span>
                     </div>
                     <button
                       type="button"
@@ -1954,6 +2041,30 @@ export default function WorkspaceChat({
                             e.target.value = "";
                           }}
                         />
+                        <button
+                          type="button"
+                          className={styles.mentionToolBtn}
+                          title="Mencionar persona"
+                          onClick={() => openEntityPicker("USER", "thread")}
+                        >
+                          👤
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.mentionToolBtn}
+                          title="Mencionar actividad"
+                          onClick={() => openEntityPicker("ACTIVITY", "thread")}
+                        >
+                          📋
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.mentionToolBtn}
+                          title="Mencionar evidencia"
+                          onClick={() => openEntityPicker("EVIDENCE", "thread")}
+                        >
+                          📷
+                        </button>
                         <span className={styles.composerHint}>Respuesta al hilo</span>
                       </div>
                       <button
@@ -2090,6 +2201,78 @@ export default function WorkspaceChat({
             </div>
             <div className={styles.modalActions}>
               <button type="button" className={styles.actionBtn} onClick={() => setShowInvite(false)}>
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {entityPickerOpen && (
+        <div className={styles.modalBackdrop} onClick={() => setEntityPickerOpen(false)}>
+          <div className={`${styles.modal} ${styles.entityPickerModal}`} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalTitle}>Mencionar en el mensaje</div>
+            <div className={styles.entityTabs}>
+              {(
+                [
+                  ["USER", "👤 Personas"],
+                  ["ACTIVITY", "📋 Actividades"],
+                  ["EVIDENCE", "📷 Evidencias"],
+                ] as Array<[MentionEntity["kind"], string]>
+              ).map(([kind, label]) => (
+                <button
+                  key={kind}
+                  type="button"
+                  className={`${styles.entityTab} ${entityKind === kind ? styles.entityTabActive : ""}`}
+                  onClick={() => {
+                    setEntityKind(kind);
+                    setEntityQ("");
+                    setEntityResults([]);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <input
+              className={styles.modalInput}
+              placeholder={
+                entityKind === "USER"
+                  ? "Buscar por nombre o correo…"
+                  : entityKind === "ACTIVITY"
+                    ? "Buscar por AN, título o estado…"
+                    : "Buscar evidencia, actividad o comentario…"
+              }
+              value={entityQ}
+              onChange={(e) => setEntityQ(e.target.value)}
+              autoFocus
+            />
+            <div className={styles.entityResults}>
+              {entityLoading && <div className={styles.loadingLine}>Buscando…</div>}
+              {!entityLoading &&
+                entityResults.map((entity) => (
+                  <button
+                    key={`${entity.kind}-${entity.id}`}
+                    type="button"
+                    className={styles.entityResult}
+                    onClick={() => insertEntityMention(entity)}
+                  >
+                    <span className={styles.entityResultIcon}>
+                      {entity.kind === "USER" ? "👤" : entity.kind === "ACTIVITY" ? "📋" : "📷"}
+                    </span>
+                    <span className={styles.entityResultText}>
+                      <strong>{entity.label}</strong>
+                      <small>{entity.subtitle}</small>
+                    </span>
+                    <span className={styles.entityResultAdd}>Mencionar</span>
+                  </button>
+                ))}
+              {!entityLoading && entityResults.length === 0 && (
+                <div className={styles.entityEmpty}>No hay resultados disponibles.</div>
+              )}
+            </div>
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.actionBtn} onClick={() => setEntityPickerOpen(false)}>
                 Cerrar
               </button>
             </div>

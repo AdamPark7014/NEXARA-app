@@ -149,11 +149,6 @@ export class ChatController {
     return this.chat.editMessage(id, user.id, body.body ?? '');
   }
 
-  @Delete('messages/:id')
-  deleteMessage(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { id: number }) {
-    return this.chat.deleteMessage(id, user.id);
-  }
-
   @Post('messages/:id/pin')
   togglePin(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { id: number }) {
     return this.chat.togglePin(id, user.id);
@@ -171,6 +166,15 @@ export class ChatController {
   @Get('colleagues')
   colleagues(@CurrentUser() user: { id: number }, @Query('q') q?: string) {
     return this.chat.listColleagues(user.id, q);
+  }
+
+  @Get('mentions')
+  mentions(
+    @CurrentUser() user: { id: number },
+    @Query('q') q?: string,
+    @Query('kind') kind?: 'USER' | 'ACTIVITY' | 'EVIDENCE',
+  ) {
+    return this.chat.searchMentionables(user.id, q ?? '', kind);
   }
 
   @Post('upload')

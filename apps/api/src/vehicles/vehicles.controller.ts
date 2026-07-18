@@ -402,16 +402,7 @@ export class VehiclesController {
       res.attachment('vehiculos.xlsx');
       return res.send(Buffer.from(buffer));
     }
-    if (format === 'csv') {
-      const csv = this.vehiclesService.toCSV(data);
-      res.header('Content-Type', 'text/csv');
-      res.attachment('vehiculos.csv');
-      return res.send(csv);
-    } else {
-      res.header('Content-Type', 'application/json');
-      res.attachment('vehiculos.json');
-      return res.send(JSON.stringify(data, null, 2));
-    }
+    throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON están deshabilitados.');
   }
 
   // Importar vehículos desde archivo JSON

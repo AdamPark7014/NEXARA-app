@@ -121,14 +121,7 @@ export class ViaticosController {
       res.attachment('viaticos.xlsx');
       return res.send(Buffer.from(buffer));
     }
-    if (format === 'csv') {
-      res.header('Content-Type', 'text/csv; charset=utf-8');
-      res.attachment('viaticos.csv');
-      return res.send(this.viaticosService.toCSV(data));
-    }
-    res.header('Content-Type', 'application/json');
-    res.attachment('viaticos.json');
-    return res.send(JSON.stringify(data, null, 2));
+    throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON están deshabilitados.');
   }
 
   @Post('import')

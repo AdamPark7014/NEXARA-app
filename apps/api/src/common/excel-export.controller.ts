@@ -31,7 +31,7 @@ export class ExcelExportController {
     @Query('fields') fields?: string,
   ) {
     const MODEL_MAP: Record<string, keyof PrismaService> = {
-      viatic: 'expense',
+      viatic: 'viatico',
       vehicle: 'vehicleControl',
       activity: 'activity',
       evidence: 'evidence',
