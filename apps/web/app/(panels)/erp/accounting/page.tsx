@@ -391,11 +391,12 @@ export default function AccountingPage() {
   }, [token, budgetVsActualCostCenter, budgetVsActualYear]);
 
   useEffect(() => {
-    if (tab === "cuentas") {
-      void loadAccounts();
-      void loadPeriods();
-    }
-  }, [tab, loadAccounts, loadPeriods]);
+    if (tab === "cuentas" || tab === "presupuestos") void loadAccounts();
+  }, [tab, loadAccounts]);
+
+  useEffect(() => {
+    if (tab === "cuentas") void loadPeriods();
+  }, [tab, loadPeriods]);
 
   useEffect(() => {
     if (tab === "balanza") void loadTrialBalance();
