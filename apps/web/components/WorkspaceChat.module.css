@@ -710,6 +710,8 @@
   position: relative;
   border-radius: 10px;
   transition: background 0.12s ease;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 72px;
 }
 
 .msg:hover {
@@ -1766,35 +1768,79 @@
   color: var(--text-secondary, #445668);
 }
 
+.mobileBack {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .shell,
   .shellWithPanel,
   .shellBleed {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(160px, 34vh) minmax(0, 1fr);
+    grid-template-rows: 1fr;
     height: 100%;
     min-height: 0;
     margin: 0;
   }
 
-  .shellWithPanel {
-    grid-template-rows: minmax(140px, 28vh) minmax(0, 1fr) minmax(200px, 36vh);
+  .mobileBack {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary, #445668);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 0;
+    margin: 0 0 4px;
+    cursor: pointer;
+    flex-shrink: 0;
   }
 
-  .sidebar {
+  .mobileBack:hover {
+    color: var(--nx-accent);
+  }
+
+  .mobilePaneList .main,
+  .mobilePaneList .sidePanel {
+    display: none !important;
+  }
+
+  .mobilePaneList .sidebar {
+    display: flex;
     max-height: none;
     border-right: 0;
-    border-bottom: 1px solid var(--nx-panel-hairline, var(--border));
+    border-bottom: 0;
   }
 
-  .sidePanel {
+  .mobilePaneChat .sidebar,
+  .mobilePaneChat .sidePanel {
+    display: none !important;
+  }
+
+  .mobilePaneChat .main {
+    display: flex;
+    min-height: 0;
+  }
+
+  .mobilePanePanel .sidebar,
+  .mobilePanePanel .main {
+    display: none !important;
+  }
+
+  .mobilePanePanel .sidePanel {
+    display: flex !important;
     border-left: 0;
-    border-top: 1px solid var(--nx-line);
+    border-top: 0;
     max-height: none;
+    min-height: 0;
   }
 
   .channelHeader {
     padding: 8px 14px;
+    flex-wrap: wrap;
   }
 
   .headerMeta .iconBtn {
@@ -1809,15 +1855,14 @@
   .messagesInner {
     padding: 0 2px;
   }
+
+  .panelHead {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
 }
 
 @media (max-width: 560px) {
-  .shell,
-  .shellWithPanel,
-  .shellBleed {
-    grid-template-rows: minmax(140px, 30vh) minmax(0, 1fr);
-  }
-
   .workspaceHead {
     padding: 12px 12px 8px;
   }

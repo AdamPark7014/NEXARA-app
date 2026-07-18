@@ -100,11 +100,13 @@ export class ChatController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: { id: number },
     @Query('beforeId') beforeId?: string,
+    @Query('aroundId') aroundId?: string,
     @Query('limit') limit?: string,
     @Query('parentId') parentId?: string,
   ) {
     return this.chat.listMessages(id, user.id, {
       beforeId: beforeId ? Number(beforeId) : undefined,
+      aroundId: aroundId ? Number(aroundId) : undefined,
       limit: limit ? Number(limit) : undefined,
       parentId:
         parentId === undefined

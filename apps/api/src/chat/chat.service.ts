@@ -498,10 +498,51 @@ export class ChatService {
     return { ...detail, name: display, peer: other, self: me };
   }
 
-  async listMessages(channelId: number, userId: number, opts?: { beforeId?: number; limit?: number; parentId?: number | null }) {
+  async listMessages(
+    channelId: number,
+    userId: number,
+    opts?: { beforeId?: number; aroundId?: number; limit?: number; parentId?: number | null },
+  ) {
     await this.assertChannelAccess(channelId, userId);
     const limit = Math.min(Math.max(opts?.limit ?? 50, 1), 100);
     const parentId = opts?.parentId === undefined ? null : opts.parentId;
+
+    const include = {
+      author: { select: authorSelect },
+      reactions: {
+        include: { user: { select: { id: true, nombre: true } } },
+      },
+      _count: { select: { replies: true } },
+    } as const;
+
+    if (opts?.aroundId != null && Number.isFinite(opts.aroundId)) {
+      const aroundId = opts.aroundId;
+      const half = Math.max(1, Math.floor(limit / 2));
+      const baseWhere: Prisma.ChatMessageWhereInput = {
+        channelId,
+        deletedAt: null,
+        parentId,
+      };
+      const [olderOrEq, newer] = await Promise.all([
+        this.prisma.chatMessage.findMany({
+          where: { ...baseWhere, id: { lte: aroundId } },
+          include,
+          orderBy: { id: 'desc' },
+          take: half + 1,
+        }),
+        this.prisma.chatMessage.findMany({
+          where: { ...baseWhere, id: { gt: aroundId } },
+          include,
+          orderBy: { id: 'asc' },
+          take: half,
+        }),
+      ]);
+      const rows = [...olderOrEq.reverse(), ...newer];
+      return {
+        messages: rows.map((m) => this.serializeMessage(m)),
+        hasMore: olderOrEq.length === half + 1,
+      };
+    }
 
     const where: Prisma.ChatMessageWhereInput = {
       channelId,
@@ -512,13 +553,7 @@ export class ChatService {
 
     const rows = await this.prisma.chatMessage.findMany({
       where,
-      include: {
-        author: { select: authorSelect },
-        reactions: {
-          include: { user: { select: { id: true, nombre: true } } },
-        },
-        _count: { select: { replies: true } },
-      },
+      include,
       orderBy: { createdAt: 'desc' },
       take: limit,
     });
