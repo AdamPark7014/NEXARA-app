@@ -332,6 +332,10 @@ export class ChatService {
           unread: unreadCount > 0,
           unreadCount,
           lastReadAt: membership?.lastReadAt ?? null,
+          muted:
+            membership?.mutedUntil != null &&
+            membership.mutedUntil.getTime() > Date.now(),
+          mutedUntil: membership?.mutedUntil ?? null,
           supervised,
           readOnly: supervised,
         };
@@ -382,6 +386,16 @@ export class ChatService {
       memberCount: members.length,
       supervised: access.supervised,
       readOnly: access.readOnly,
+      muted:
+        !access.supervised &&
+        members.some(
+          (m) =>
+            m.userId === userId &&
+            m.mutedUntil != null &&
+            m.mutedUntil.getTime() > Date.now(),
+        ),
+      mutedUntil:
+        members.find((m) => m.userId === userId)?.mutedUntil ?? null,
       members: members.map((m) => ({
         id: m.user.id,
         nombre: m.user.nombre,
@@ -520,6 +534,7 @@ export class ChatService {
     body: string;
     attachmentUrl: string | null;
     attachmentName: string | null;
+    pinnedAt?: Date | null;
     editedAt: Date | null;
     createdAt: Date;
     author: { id: number; nombre: string; email: string };
@@ -542,6 +557,7 @@ export class ChatService {
       body: m.body,
       attachmentUrl: m.attachmentUrl,
       attachmentName: m.attachmentName,
+      pinnedAt: m.pinnedAt ?? null,
       editedAt: m.editedAt,
       createdAt: m.createdAt,
       author: m.author,
@@ -815,6 +831,63 @@ export class ChatService {
     await this.prisma.chatChannelMember.deleteMany({ where: { channelId, userId } });
     this.realtime.emitToRoom(this.room(channelId), 'chat:members-changed', { channelId });
     return { ok: true };
+  }
+
+  async setChannelMuted(channelId: number, userId: number, muted: boolean) {
+    const access = await this.assertChannelAccess(channelId, userId);
+    if (access.supervised || access.readOnly) {
+      throw new ForbiddenException('No puedes silenciar una conversación en solo lectura');
+    }
+    const mutedUntil = muted ? new Date('2099-12-31T00:00:00.000Z') : null;
+    await this.prisma.chatChannelMember.upsert({
+      where: { channelId_userId: { channelId, userId } },
+      create: { channelId, userId, role: 'member', mutedUntil },
+      update: { mutedUntil },
+    });
+    return this.getChannel(channelId, userId);
+  }
+
+  async listPinnedMessages(channelId: number, userId: number) {
+    await this.assertChannelAccess(channelId, userId);
+    const rows = await this.prisma.chatMessage.findMany({
+      where: {
+        channelId,
+        deletedAt: null,
+        pinnedAt: { not: null },
+      },
+      include: {
+        author: { select: authorSelect },
+        reactions: { include: { user: { select: { id: true, nombre: true } } } },
+        _count: { select: { replies: true } },
+      },
+      orderBy: { pinnedAt: 'desc' },
+      take: 50,
+    });
+    return { messages: rows.map((m) => this.serializeMessage(m)) };
+  }
+
+  async togglePin(messageId: number, userId: number) {
+    const message = await this.prisma.chatMessage.findFirst({
+      where: { id: messageId, deletedAt: null },
+    });
+    if (!message) throw new NotFoundException('Mensaje no encontrado');
+    await this.assertChannelAccess(message.channelId, userId, { write: true });
+
+    const updated = await this.prisma.chatMessage.update({
+      where: { id: messageId },
+      data: message.pinnedAt
+        ? { pinnedAt: null, pinnedById: null }
+        : { pinnedAt: new Date(), pinnedById: userId },
+      include: {
+        author: { select: authorSelect },
+        reactions: { include: { user: { select: { id: true, nombre: true } } } },
+        _count: { select: { replies: true } },
+      },
+    });
+
+    const payload = this.serializeMessage(updated);
+    this.realtime.emitToRoom(this.room(message.channelId), 'chat:message-updated', payload);
+    return payload;
   }
 
   async searchMessages(userId: number, q: string, channelId?: number) {

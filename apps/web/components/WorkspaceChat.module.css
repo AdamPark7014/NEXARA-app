@@ -446,6 +446,120 @@
   opacity: 0.9;
 }
 
+.muteTag {
+  margin-left: 6px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.starBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text-tertiary, #98a2b3);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+
+.channelBtn:hover .starBtn,
+.channelBtnActive .starBtn,
+.starBtnOn {
+  opacity: 1;
+}
+
+.starBtnOn {
+  color: #eab308;
+}
+
+.starBtn:hover {
+  color: #ca8a04;
+}
+
+.channelDescription {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--text-tertiary, #98a2b3);
+  line-height: 1.35;
+  max-width: 52ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pinsBar {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--nx-line, #e6ebf0);
+  background: color-mix(in srgb, #eab308 6%, var(--surface, #fff));
+  max-height: 160px;
+  overflow: auto;
+  padding: 8px 16px 10px;
+}
+
+.pinsBarHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--text-secondary, #667085);
+}
+
+.pinItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: inherit;
+}
+
+.pinItem:hover {
+  background: color-mix(in srgb, var(--panel-accent, #0ea5e9) 8%, transparent);
+}
+
+.pinItemAuthor {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary, #667085);
+}
+
+.pinItemBody {
+  font-size: 12.5px;
+  color: var(--text-primary, #101828);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.pinnedBadge {
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.roleBadge {
+  margin-left: 6px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, #eab308 16%, transparent);
+  color: #a16207;
+}
+
 .superviseBanner {
   margin: 0 16px 14px;
   padding: 10px 12px;
@@ -855,6 +969,28 @@
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
+  position: relative;
+}
+
+.composerDragOver {
+  outline: 2px dashed color-mix(in srgb, var(--panel-accent, #0ea5e9) 55%, transparent);
+  outline-offset: -4px;
+  border-radius: 12px;
+}
+
+.dropOverlay {
+  position: absolute;
+  inset: 4px;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel-accent, #0ea5e9) 10%, var(--surface, #fff));
+  border: 1px dashed color-mix(in srgb, var(--panel-accent, #0ea5e9) 50%, transparent);
+  color: var(--panel-accent, #0ea5e9);
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: none;
 }
 
 .typingLine {

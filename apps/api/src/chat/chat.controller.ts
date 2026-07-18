@@ -81,6 +81,20 @@ export class ChatController {
     return this.chat.leaveChannel(id, user.id);
   }
 
+  @Patch('channels/:id/mute')
+  setMuted(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { id: number },
+    @Body() body: { muted?: boolean },
+  ) {
+    return this.chat.setChannelMuted(id, user.id, Boolean(body?.muted));
+  }
+
+  @Get('channels/:id/pins')
+  listPins(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { id: number }) {
+    return this.chat.listPinnedMessages(id, user.id);
+  }
+
   @Get('channels/:id/messages')
   listMessages(
     @Param('id', ParseIntPipe) id: number,
@@ -138,6 +152,11 @@ export class ChatController {
   @Delete('messages/:id')
   deleteMessage(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { id: number }) {
     return this.chat.deleteMessage(id, user.id);
+  }
+
+  @Post('messages/:id/pin')
+  togglePin(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { id: number }) {
+    return this.chat.togglePin(id, user.id);
   }
 
   @Post('messages/:id/reactions')

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { io, type Socket } from "socket.io-client";
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 import styles from "./WorkspaceChat.module.css";
@@ -47,6 +47,8 @@ type Channel = {
   lastMessagePreview?: string | null;
   unread?: boolean;
   unreadCount?: number;
+  muted?: boolean;
+  mutedUntil?: string | null;
   /** Vista por jerarquía (dueño / supervisor), no membresía propia */
   supervised?: boolean;
   readOnly?: boolean;
@@ -63,6 +65,7 @@ type Message = {
   body: string;
   attachmentUrl?: string | null;
   attachmentName?: string | null;
+  pinnedAt?: string | null;
   editedAt?: string | null;
   createdAt: string;
   author: ChatUser;
@@ -70,6 +73,29 @@ type Message = {
   reactions: Reaction[];
   channel?: { id: number; name: string; kind: ChannelKind; slug: string | null };
 };
+
+const FAVORITES_KEY = "nexara.chat.favorites";
+const DRAFTS_KEY = "nexara.chat.drafts";
+
+function loadJson<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveJson(key: string, value: unknown) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* ignore quota */
+  }
+}
 
 async function apiFetch(path: string, token: string, init: RequestInit = {}) {
   const res = await fetch(buildApiUrl(path), {
@@ -220,6 +246,10 @@ export default function WorkspaceChat({
     if (typeof window === "undefined") return false;
     return localStorage.getItem("nexara.chat.notify") === "1";
   });
+  const [starredIds, setStarredIds] = useState<number[]>(() => loadJson<number[]>(FAVORITES_KEY, []));
+  const [pinned, setPinned] = useState<Message[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+  const [showPins, setShowPins] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<HTMLDivElement | null>(null);
@@ -230,7 +260,8 @@ export default function WorkspaceChat({
   const threadRootRef = useRef<Message | null>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nearBottomRef = useRef(true);
-  const draftsRef = useRef<Record<number, string>>({});
+  const draftsRef = useRef<Record<number, string>>(loadJson<Record<number, string>>(DRAFTS_KEY, {}));
+  const mutedIdsRef = useRef<Set<number>>(new Set());
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
@@ -248,6 +279,23 @@ export default function WorkspaceChat({
   useEffect(() => {
     localStorage.setItem("nexara.chat.notify", notifyOn ? "1" : "0");
   }, [notifyOn]);
+
+  useEffect(() => {
+    saveJson(FAVORITES_KEY, starredIds);
+  }, [starredIds]);
+
+  useEffect(() => {
+    mutedIdsRef.current = new Set(channels.filter((c) => c.muted).map((c) => c.id));
+  }, [channels]);
+
+  const persistDrafts = useCallback(() => {
+    saveJson(DRAFTS_KEY, draftsRef.current);
+  }, []);
+
+  const toggleStar = (id: number, e?: ReactMouseEvent) => {
+    e?.stopPropagation();
+    setStarredIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
 
   const toggleNotify = () => {
     if (notifyOn) {
@@ -308,12 +356,15 @@ export default function WorkspaceChat({
   }, [soundOn]);
 
   const selectChannel = useCallback((id: number) => {
-    if (activeId != null) draftsRef.current[activeId] = draft;
+    if (activeId != null) {
+      draftsRef.current[activeId] = draft;
+      persistDrafts();
+    }
     setActiveId(id);
     setDraft(draftsRef.current[id] ?? "");
     setSwitcherOpen(false);
     setSwitcherQ("");
-  }, [activeId, draft]);
+  }, [activeId, draft, persistDrafts]);
 
   const loadChannels = useCallback(async () => {
     if (!token) return;
@@ -367,6 +418,14 @@ export default function WorkspaceChat({
           const self = ch.members?.find((m: ChatUser & { lastReadAt?: string | null }) => m.id === currentUserId);
           setUnreadBoundary(self?.lastReadAt ? { channelId, before: self.lastReadAt } : null);
         }
+        if (!opts?.append) {
+          try {
+            const pins = await apiFetch(`chat/channels/${channelId}/pins`, token);
+            setPinned(Array.isArray(pins?.messages) ? pins.messages : []);
+          } catch {
+            setPinned([]);
+          }
+        }
         await apiFetch(`chat/channels/${channelId}/read`, token, { method: "PATCH" });
         setChannels((prev) =>
           prev.map((c) => (c.id === channelId ? { ...c, unread: false, unreadCount: 0 } : c)),
@@ -391,6 +450,8 @@ export default function WorkspaceChat({
     setShowMembers(false);
     setSearchHits([]);
     setSearchQ("");
+    setShowPins(false);
+    setPinned([]);
     void loadMessages(activeId);
   }, [activeId, loadMessages]);
 
@@ -414,10 +475,11 @@ export default function WorkspaceChat({
 
     socket.on("chat:message", (msg: Message) => {
       const isMine = msg.authorId === currentUserId;
+      const isMuted = mutedIdsRef.current.has(msg.channelId);
       if (msg.channelId === activeIdRef.current && !msg.parentId) {
         setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
         void apiFetch(`chat/channels/${msg.channelId}/read`, token, { method: "PATCH" });
-        if (!isMine) {
+        if (!isMine && !isMuted) {
           playPing();
           notify(msg);
         }
@@ -428,7 +490,7 @@ export default function WorkspaceChat({
       ) {
         setThreadReplies((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
       } else {
-        if (!isMine) {
+        if (!isMine && !isMuted) {
           playPing();
           notify(msg);
         }
@@ -452,6 +514,13 @@ export default function WorkspaceChat({
       setMessages((prev) => prev.map((m) => (m.id === msg.id ? msg : m)));
       setThreadReplies((prev) => prev.map((m) => (m.id === msg.id ? msg : m)));
       if (threadRootRef.current?.id === msg.id) setThreadRoot(msg);
+      setPinned((prev) => {
+        const exists = prev.some((m) => m.id === msg.id);
+        if (msg.pinnedAt) {
+          return exists ? prev.map((m) => (m.id === msg.id ? msg : m)) : [msg, ...prev];
+        }
+        return prev.filter((m) => m.id !== msg.id);
+      });
     });
 
     socket.on("chat:message-deleted", (payload: { id: number; channelId: number; parentId: number | null }) => {
@@ -460,6 +529,7 @@ export default function WorkspaceChat({
       } else {
         setMessages((prev) => prev.filter((m) => m.id !== payload.id));
       }
+      setPinned((prev) => prev.filter((m) => m.id !== payload.id));
     });
 
     socket.on("chat:channel-activity", (payload: { channelId: number; preview?: string; at?: string }) => {
@@ -647,6 +717,10 @@ export default function WorkspaceChat({
         );
       } else {
         setDraft("");
+        if (activeId != null) {
+          draftsRef.current[activeId] = "";
+          persistDrafts();
+        }
         setAttachment(null);
         setMentionOpen(false);
         setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
@@ -705,9 +779,58 @@ export default function WorkspaceChat({
       await apiFetch(`chat/messages/${messageId}`, token, { method: "DELETE" });
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
       setThreadReplies((prev) => prev.filter((m) => m.id !== messageId));
+      setPinned((prev) => prev.filter((m) => m.id !== messageId));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo eliminar");
     }
+  };
+
+  const togglePin = async (messageId: number) => {
+    try {
+      const updated = await apiFetch(`chat/messages/${messageId}/pin`, token, { method: "POST" });
+      setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+      setThreadReplies((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+      setPinned((prev) => {
+        if (updated.pinnedAt) {
+          const exists = prev.some((m) => m.id === updated.id);
+          return exists ? prev.map((m) => (m.id === updated.id ? updated : m)) : [updated, ...prev];
+        }
+        return prev.filter((m) => m.id !== updated.id);
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo fijar el mensaje");
+    }
+  };
+
+  const toggleChannelMute = async () => {
+    if (!activeId || detail?.readOnly) return;
+    const next = !detail?.muted;
+    try {
+      const ch = await apiFetch(`chat/channels/${activeId}/mute`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ muted: next }),
+      });
+      setDetail(ch);
+      setChannels((prev) =>
+        prev.map((c) => (c.id === activeId ? { ...c, muted: ch.muted, mutedUntil: ch.mutedUntil } : c)),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo silenciar el canal");
+    }
+  };
+
+  const jumpToMessage = (msg: Message) => {
+    setHighlightId(msg.id);
+    setShowPins(false);
+    requestAnimationFrame(() => {
+      document.getElementById(`msg-${msg.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
+
+  const onFilesDropped = async (files: FileList | File[], isThread = false) => {
+    const list = Array.from(files);
+    if (!list.length) return;
+    await onPickFile(list[0], isThread);
   };
 
   const createChannel = async () => {
@@ -836,6 +959,10 @@ export default function WorkspaceChat({
 
   const onDraftChange = (value: string) => {
     setDraft(value);
+    if (activeId != null) {
+      draftsRef.current[activeId] = value;
+      persistDrafts();
+    }
     emitTyping();
     const at = value.lastIndexOf("@");
     if (at >= 0 && (at === 0 || /\s/.test(value[at - 1] ?? ""))) {
@@ -855,6 +982,10 @@ export default function WorkspaceChat({
     const at = draft.lastIndexOf("@");
     const next = `${draft.slice(0, at)}@${user.nombre.split(" ")[0]} `;
     setDraft(next);
+    if (activeId != null) {
+      draftsRef.current[activeId] = next;
+      persistDrafts();
+    }
     setMentionOpen(false);
   };
 
@@ -864,10 +995,16 @@ export default function WorkspaceChat({
       !q ||
       c.name.toLowerCase().includes(q) ||
       (c.lastMessagePreview ?? "").toLowerCase().includes(q);
+    const starredSet = new Set(starredIds);
     const publics = channels.filter((c) => (c.kind === "PUBLIC" || c.kind === "PRIVATE") && match(c));
     const dms = channels.filter((c) => c.kind === "DIRECT" && match(c));
-    return { publics, dms };
-  }, [channels, sidebarFilter]);
+    const starred = channels.filter((c) => starredSet.has(c.id) && match(c));
+    return {
+      starred,
+      publics: publics.filter((c) => !starredSet.has(c.id)),
+      dms,
+    };
+  }, [channels, sidebarFilter, starredIds]);
 
   const switcherItems = useMemo(() => {
     const q = switcherQ.trim().toLowerCase();
@@ -970,6 +1107,7 @@ export default function WorkspaceChat({
                   <span className={styles.msgTime} style={{ opacity: 1 }}>
                     {formatClock(m.createdAt)}
                   </span>
+                  {m.pinnedAt && <span className={styles.pinnedBadge} title="Fijado">📌</span>}
                   {m.editedAt && <span className={styles.edited}>(editado)</span>}
                 </div>
               )}
@@ -1082,6 +1220,14 @@ export default function WorkspaceChat({
                     Responder
                   </button>
                 )}
+                <button
+                  type="button"
+                  className={styles.actionBtn}
+                  title={m.pinnedAt ? "Quitar pin" : "Fijar mensaje"}
+                  onClick={() => void togglePin(m.id)}
+                >
+                  {m.pinnedAt ? "📌" : "Pin"}
+                </button>
                 {mine && (
                   <>
                     <button
@@ -1150,9 +1296,25 @@ export default function WorkspaceChat({
       )}
       <span className={styles.channelLabel}>
         {c.name}
+        {c.muted ? <span className={styles.muteTag} title="Silenciado">🔇</span> : null}
         {c.supervised ? <span className={styles.superviseTag}>Sup</span> : null}
       </span>
       <span className={styles.channelMeta}>
+        <span
+          role="button"
+          tabIndex={0}
+          className={`${styles.starBtn} ${starredIds.includes(c.id) ? styles.starBtnOn : ""}`}
+          title={starredIds.includes(c.id) ? "Quitar de favoritos" : "Añadir a favoritos"}
+          onClick={(e) => toggleStar(c.id, e)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggleStar(c.id);
+            }
+          }}
+        >
+          {starredIds.includes(c.id) ? "★" : "☆"}
+        </span>
         {(c.unreadCount ?? 0) > 0 && activeId !== c.id && (
           <span className={styles.unreadBadge}>{c.unreadCount! > 99 ? "99+" : c.unreadCount}</span>
         )}
@@ -1217,6 +1379,14 @@ export default function WorkspaceChat({
           </div>
 
           <div className={styles.sidebarScroll}>
+            {filteredChannels.starred.length > 0 && (
+              <>
+                <div className={styles.sectionLabel}>
+                  <span>Favoritos</span>
+                </div>
+                {filteredChannels.starred.map(channelRow)}
+              </>
+            )}
             <div className={styles.sectionLabel}>
               <span>Canales</span>
               <button type="button" className={styles.sectionAction} title="Nuevo canal" onClick={() => setShowNewChannel(true)}>
@@ -1277,6 +1447,9 @@ export default function WorkspaceChat({
                   >
                     {detail?.topic || (detail?.readOnly ? "Sin tema" : "Añadir tema…")}
                   </div>
+                  {detail?.description ? (
+                    <div className={styles.channelDescription}>{detail.description}</div>
+                  ) : null}
                 </div>
                 <div className={styles.headerMeta}>
                   <button
@@ -1285,8 +1458,18 @@ export default function WorkspaceChat({
                     title={soundOn ? "Sonido activado" : "Sonido desactivado"}
                     onClick={() => setSoundOn((v) => !v)}
                   >
-                    {soundOn ? "Sonido" : "Mute"}
+                    {soundOn ? "Sonido" : "Sin sonido"}
                   </button>
+                  {!detail?.readOnly && (
+                    <button
+                      type="button"
+                      className={`${styles.iconBtn} ${detail?.muted ? styles.iconBtnActive : ""}`}
+                      title={detail?.muted ? "Reactivar notificaciones del canal" : "Silenciar canal"}
+                      onClick={() => void toggleChannelMute()}
+                    >
+                      {detail?.muted ? "🔇" : "Silenciar"}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={`${styles.iconBtn} ${notifyOn ? styles.iconBtnActive : ""}`}
@@ -1295,6 +1478,16 @@ export default function WorkspaceChat({
                   >
                     {notifyOn ? "🔔" : "🔕"}
                   </button>
+                  {pinned.length > 0 && (
+                    <button
+                      type="button"
+                      className={`${styles.iconBtn} ${showPins ? styles.iconBtnActive : ""}`}
+                      title="Mensajes fijados"
+                      onClick={() => setShowPins((v) => !v)}
+                    >
+                      📌 {pinned.length}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={`${styles.iconBtn} ${searchOpen ? styles.iconBtnActive : ""}`}
@@ -1332,6 +1525,30 @@ export default function WorkspaceChat({
                     )}
                 </div>
               </header>
+
+              {showPins && pinned.length > 0 && (
+                <div className={styles.pinsBar}>
+                  <div className={styles.pinsBarHead}>
+                    <strong>Fijados</strong>
+                    <button type="button" className={styles.actionBtn} onClick={() => setShowPins(false)}>
+                      Cerrar
+                    </button>
+                  </div>
+                  {pinned.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={styles.pinItem}
+                      onClick={() => jumpToMessage(p)}
+                    >
+                      <span className={styles.pinItemAuthor}>{p.author.nombre}</span>
+                      <span className={styles.pinItemBody}>
+                        {p.attachmentName ? `📎 ${p.attachmentName}` : p.body.slice(0, 120)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {searchOpen && (
                 <>
@@ -1413,13 +1630,39 @@ export default function WorkspaceChat({
                 </div>
               </div>
 
-              <div className={styles.composerWrap}>
+              <div
+                className={`${styles.composerWrap} ${dragOver ? styles.composerDragOver : ""}`}
+                onDragEnter={(e) => {
+                  if (detail?.readOnly) return;
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragOver={(e) => {
+                  if (detail?.readOnly) return;
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragLeave={(e) => {
+                  if (e.currentTarget === e.target) setDragOver(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  if (detail?.readOnly) return;
+                  void onFilesDropped(e.dataTransfer.files, false);
+                }}
+              >
                 {detail?.readOnly ? (
                   <div className={styles.superviseBanner} role="status">
                     Vista de supervisión — puedes leer esta conversación, pero no publicar ni editar.
                   </div>
                 ) : (
                   <>
+                {dragOver && (
+                  <div className={styles.dropOverlay} aria-hidden>
+                    Suelta el archivo para adjuntarlo
+                  </div>
+                )}
                 <div className={styles.typingLine}>
                   {typingLabel ? (
                     <>
@@ -1600,7 +1843,12 @@ export default function WorkspaceChat({
                         />
                       </span>
                       <div className={styles.memberMeta}>
-                        <div className={styles.memberName}>{m.nombre}</div>
+                        <div className={styles.memberName}>
+                          {m.nombre}
+                          {m.role === "owner" ? (
+                            <span className={styles.roleBadge}>Owner</span>
+                          ) : null}
+                        </div>
                         <div className={styles.memberEmail}>{m.email}</div>
                       </div>
                       {m.id !== currentUserId && (
