@@ -284,6 +284,11 @@ export default function WorkspaceChat({
   const [entityQ, setEntityQ] = useState("");
   const [entityResults, setEntityResults] = useState<MentionEntity[]>([]);
   const [entityLoading, setEntityLoading] = useState(false);
+  const [mobilePane, setMobilePane] = useState<"list" | "chat" | "panel">("list");
+  const deepChannelRef = useRef<number | null>(null);
+  const deepMsgRef = useRef<number | null>(null);
+  const deepLinkBootstrapped = useRef(false);
+  const skipAutoScrollRef = useRef(false);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<HTMLDivElement | null>(null);
@@ -297,6 +302,29 @@ export default function WorkspaceChat({
   const draftsRef = useRef<Record<number, string>>(loadJson<Record<number, string>>(DRAFTS_KEY, {}));
   const mutedIdsRef = useRef<Set<number>>(new Set());
   const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const syncChatUrl = useCallback((channelId: number | null, msgId?: number | null) => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (channelId != null) url.searchParams.set("channel", String(channelId));
+    else url.searchParams.delete("channel");
+    if (msgId != null) url.searchParams.set("msg", String(msgId));
+    else url.searchParams.delete("msg");
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    if (next !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.replaceState(null, "", next);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (deepLinkBootstrapped.current || typeof window === "undefined") return;
+    deepLinkBootstrapped.current = true;
+    const sp = new URLSearchParams(window.location.search);
+    const ch = Number(sp.get("channel"));
+    const msg = Number(sp.get("msg"));
+    if (Number.isFinite(ch) && ch > 0) deepChannelRef.current = ch;
+    if (Number.isFinite(msg) && msg > 0) deepMsgRef.current = msg;
+  }, []);
 
   useEffect(() => {
     activeIdRef.current = activeId;
@@ -421,7 +449,12 @@ export default function WorkspaceChat({
     setDraft(draftsRef.current[id] ?? "");
     setSwitcherOpen(false);
     setSwitcherQ("");
-  }, [activeId, draft, persistDrafts]);
+    setThreadRoot(null);
+    setShowMembers(false);
+    setMobilePane("chat");
+    deepMsgRef.current = null;
+    syncChatUrl(id, null);
+  }, [activeId, draft, persistDrafts, syncChatUrl]);
 
   const loadChannels = useCallback(async () => {
     if (!token) return;
@@ -434,16 +467,25 @@ export default function WorkspaceChat({
       );
       setChannels(list);
       setActiveId((prev) => {
+        const deep = deepChannelRef.current;
+        if (deep && list.some((c) => c.id === deep)) {
+          deepChannelRef.current = null;
+          setMobilePane("chat");
+          syncChatUrl(deep, deepMsgRef.current);
+          return deep;
+        }
         if (prev && list.some((c) => c.id === prev)) return prev;
         const general = list.find((c) => c.slug === "general");
-        return general?.id ?? list[0]?.id ?? null;
+        const next = general?.id ?? list[0]?.id ?? null;
+        if (next) syncChatUrl(next, deepMsgRef.current);
+        return next;
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar el chat");
     } finally {
       setLoadingChannels(false);
     }
-  }, [token]);
+  }, [token, syncChatUrl]);
 
   // keep draft restore when activeId set from loadChannels initial pick
   useEffect(() => {
@@ -454,11 +496,15 @@ export default function WorkspaceChat({
   }, [activeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadMessages = useCallback(
-    async (channelId: number, opts?: { beforeId?: number; append?: boolean }) => {
+    async (channelId: number, opts?: { beforeId?: number; aroundId?: number; append?: boolean }) => {
       if (!opts?.append) setLoadingMessages(true);
       try {
         const qs = new URLSearchParams({ limit: "60" });
         if (opts?.beforeId) qs.set("beforeId", String(opts.beforeId));
+        const around =
+          opts?.aroundId ??
+          (!opts?.append && deepMsgRef.current != null ? deepMsgRef.current : undefined);
+        if (around != null && !opts?.beforeId) qs.set("aroundId", String(around));
         const [msgs, ch] = await Promise.all([
           apiFetch(`chat/channels/${channelId}/messages?${qs}`, token),
           opts?.append ? Promise.resolve(null) : apiFetch(`chat/channels/${channelId}`, token),
@@ -513,6 +559,26 @@ export default function WorkspaceChat({
   }, [activeId, loadMessages]);
 
   useEffect(() => {
+    const target = deepMsgRef.current;
+    if (target == null || loadingMessages || !activeId) return;
+    if (!messages.some((m) => m.id === target)) {
+      deepMsgRef.current = null;
+      return;
+    }
+    deepMsgRef.current = null;
+    skipAutoScrollRef.current = true;
+    setHighlightId(target);
+    syncChatUrl(activeId, target);
+    nearBottomRef.current = false;
+    requestAnimationFrame(() => {
+      document.getElementById(`msg-${target}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    const t = window.setTimeout(() => setHighlightId((cur) => (cur === target ? null : cur)), 2800);
+    return () => window.clearTimeout(t);
+  }, [messages, loadingMessages, activeId, syncChatUrl]);
+
+  useEffect(() => {
+    if (skipAutoScrollRef.current || deepMsgRef.current != null) return;
     if (!nearBottomRef.current) {
       setShowJump(true);
       return;
@@ -678,6 +744,12 @@ export default function WorkspaceChat({
         setMentionOpen(false);
         setEmojiPickerFor(null);
         setEntityPickerOpen(false);
+        setShowNewChannel(false);
+        setShowDm(false);
+        setShowInvite(false);
+        setThreadRoot(null);
+        setShowMembers(false);
+        setMobilePane((pane) => (pane === "panel" ? "chat" : pane));
       }
     };
     window.addEventListener("keydown", onKey);
@@ -729,6 +801,8 @@ export default function WorkspaceChat({
   const openThread = async (msg: Message) => {
     setThreadRoot(msg);
     setShowMembers(false);
+    setMobilePane("panel");
+    syncChatUrl(msg.channelId, msg.id);
     try {
       const data = await apiFetch(
         `chat/channels/${msg.channelId}/messages?parentId=${msg.id}&limit=100`,
@@ -920,9 +994,12 @@ export default function WorkspaceChat({
   const jumpToMessage = (msg: Message) => {
     setHighlightId(msg.id);
     setShowPins(false);
+    setMobilePane("chat");
+    if (activeId) syncChatUrl(activeId, msg.id);
     requestAnimationFrame(() => {
       document.getElementById(`msg-${msg.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
+    window.setTimeout(() => setHighlightId((cur) => (cur === msg.id ? null : cur)), 2800);
   };
 
   const onFilesDropped = async (files: FileList | File[], isThread = false) => {
@@ -945,7 +1022,7 @@ export default function WorkspaceChat({
       setNewChannelName("");
       setNewChannelPrivate(false);
       await loadChannels();
-      if (ch?.id) setActiveId(ch.id);
+      if (ch?.id) selectChannel(ch.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo crear el canal");
     }
@@ -1002,7 +1079,7 @@ export default function WorkspaceChat({
       });
       setShowDm(false);
       await loadChannels();
-      if (ch?.id) setActiveId(ch.id);
+      if (ch?.id) selectChannel(ch.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo abrir el DM");
     }
@@ -1394,9 +1471,19 @@ export default function WorkspaceChat({
     styles.shell,
     styles.shellBleed,
     panelOpen ? styles.shellWithPanel : "",
+    mobilePane === "list" ? styles.mobilePaneList : "",
+    mobilePane === "chat" ? styles.mobilePaneChat : "",
+    mobilePane === "panel" ? styles.mobilePanePanel : "",
   ]
     .filter(Boolean)
     .join(" ");
+
+  const closeSidePanel = () => {
+    setThreadRoot(null);
+    setShowMembers(false);
+    setMobilePane("chat");
+    if (activeId) syncChatUrl(activeId, null);
+  };
 
   const channelRow = (c: Channel) => (
     <button
@@ -1554,6 +1641,14 @@ export default function WorkspaceChat({
           ) : (
             <>
               <header className={styles.channelHeader}>
+                <button
+                  type="button"
+                  className={styles.mobileBack}
+                  aria-label="Volver a la lista de canales"
+                  onClick={() => setMobilePane("list")}
+                >
+                  ← Canales
+                </button>
                 <div className={styles.channelTitleBlock}>
                   <div className={styles.channelTitle}>
                     <span>{channelPrefix(detail?.kind ?? "PUBLIC")}</span>
@@ -1628,8 +1723,14 @@ export default function WorkspaceChat({
                     type="button"
                     className={`${styles.iconBtn} ${showMembers ? styles.iconBtnActive : ""}`}
                     title="Miembros"
+                    aria-label="Ver miembros del canal"
+                    aria-pressed={showMembers}
                     onClick={() => {
-                      setShowMembers((v) => !v);
+                      setShowMembers((v) => {
+                        const next = !v;
+                        setMobilePane(next ? "panel" : "chat");
+                        return next;
+                      });
                       setThreadRoot(null);
                     }}
                   >
@@ -1961,6 +2062,14 @@ export default function WorkspaceChat({
             {showMembers && (
               <>
                 <div className={styles.panelHead}>
+                  <button
+                    type="button"
+                    className={styles.mobileBack}
+                    aria-label="Volver al canal"
+                    onClick={closeSidePanel}
+                  >
+                    ← Chat
+                  </button>
                   <div className={styles.panelTitle}>Miembros</div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     {detail?.kind !== "DIRECT" && !detail?.readOnly && (
@@ -1975,7 +2084,7 @@ export default function WorkspaceChat({
                         + Invitar
                       </button>
                     )}
-                    <button type="button" className={styles.panelClose} onClick={() => setShowMembers(false)}>
+                    <button type="button" className={styles.panelClose} aria-label="Cerrar panel" onClick={closeSidePanel}>
                       ×
                     </button>
                   </div>
@@ -2022,8 +2131,16 @@ export default function WorkspaceChat({
             {threadRoot && (
               <>
                 <div className={styles.panelHead}>
+                  <button
+                    type="button"
+                    className={styles.mobileBack}
+                    aria-label="Volver al canal"
+                    onClick={closeSidePanel}
+                  >
+                    ← Chat
+                  </button>
                   <div className={styles.panelTitle}>Hilo</div>
-                  <button type="button" className={styles.panelClose} onClick={() => setThreadRoot(null)}>
+                  <button type="button" className={styles.panelClose} aria-label="Cerrar hilo" onClick={closeSidePanel}>
                     ×
                   </button>
                 </div>
@@ -2152,9 +2269,21 @@ export default function WorkspaceChat({
       </div>
 
       {showNewChannel && (
-        <div className={styles.modalBackdrop} onClick={() => setShowNewChannel(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalTitle}>Crear canal</div>
+        <div
+          className={styles.modalBackdrop}
+          role="presentation"
+          onClick={() => setShowNewChannel(false)}
+        >
+          <div
+            className={styles.modal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chat-modal-new-channel"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalTitle} id="chat-modal-new-channel">
+              Crear canal
+            </div>
             <input
               className={styles.modalInput}
               placeholder="nombre-del-canal"
@@ -2183,9 +2312,17 @@ export default function WorkspaceChat({
       )}
 
       {showDm && (
-        <div className={styles.modalBackdrop} onClick={() => setShowDm(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalTitle}>Mensaje directo</div>
+        <div className={styles.modalBackdrop} role="presentation" onClick={() => setShowDm(false)}>
+          <div
+            className={styles.modal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chat-modal-dm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalTitle} id="chat-modal-dm">
+              Mensaje directo
+            </div>
             <input
               className={styles.modalInput}
               placeholder="Buscar compañero…"
@@ -2225,9 +2362,17 @@ export default function WorkspaceChat({
       )}
 
       {showInvite && (
-        <div className={styles.modalBackdrop} onClick={() => setShowInvite(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalTitle}>Invitar a {detail?.name ?? "el canal"}</div>
+        <div className={styles.modalBackdrop} role="presentation" onClick={() => setShowInvite(false)}>
+          <div
+            className={styles.modal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chat-modal-invite"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalTitle} id="chat-modal-invite">
+              Invitar a {detail?.name ?? "el canal"}
+            </div>
             <input
               className={styles.modalInput}
               placeholder="Buscar compañero…"
@@ -2274,9 +2419,17 @@ export default function WorkspaceChat({
       )}
 
       {entityPickerOpen && (
-        <div className={styles.modalBackdrop} onClick={() => setEntityPickerOpen(false)}>
-          <div className={`${styles.modal} ${styles.entityPickerModal}`} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalTitle}>Mencionar en el mensaje</div>
+        <div className={styles.modalBackdrop} role="presentation" onClick={() => setEntityPickerOpen(false)}>
+          <div
+            className={`${styles.modal} ${styles.entityPickerModal}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chat-modal-entity"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalTitle} id="chat-modal-entity">
+              Mencionar en el mensaje
+            </div>
             <div className={styles.entityTabs}>
               {(
                 [
@@ -2346,9 +2499,17 @@ export default function WorkspaceChat({
       )}
 
       {switcherOpen && (
-        <div className={styles.modalBackdrop} onClick={() => setSwitcherOpen(false)}>
-          <div className={`${styles.modal} ${styles.switcher}`} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalTitle}>Ir a canal</div>
+        <div className={styles.modalBackdrop} role="presentation" onClick={() => setSwitcherOpen(false)}>
+          <div
+            className={`${styles.modal} ${styles.switcher}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chat-modal-switcher"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalTitle} id="chat-modal-switcher">
+              Ir a canal
+            </div>
             <input
               className={styles.modalInput}
               placeholder="Escribe para filtrar…"
