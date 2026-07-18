@@ -28,22 +28,34 @@ export class ExpensesController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   create(@CurrentUser() user: any, @Body() body: CreateExpenseDto & Record<string, unknown>) {
+    const elevated =
+      user.isSuperAdmin ||
+      user.permissions?.includes(PERMISSIONS.CONTABILIDAD_MANAGE) ||
+      user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN);
+    const usuarioId =
+      elevated && body.usuarioId != null ? Number(body.usuarioId) : Number(user.id);
+
     if (body.concepto && body.monto !== undefined) {
       return this.expensesService.createAdministrative({
-        usuarioId: Number(body.usuarioId ?? user.id),
+        usuarioId,
         concepto: String(body.concepto),
         monto: Number(body.monto),
         categoria: body.categoria ? String(body.categoria) : undefined,
-        estado: body.estado ? String(body.estado) : undefined,
+        // No aceptar estado forged en create — siempre borrador/pendiente
+        estado: 'BORRADOR',
         esRecurrente: Boolean(body.esRecurrente),
         fecha: body.fecha ? String(body.fecha) : undefined,
         actividadId: body.actividadId ? Number(body.actividadId) : undefined,
       });
     }
-    if (!user.isSuperAdmin && body.usuarioId !== user.id) {
+    if (!elevated && body.usuarioId != null && Number(body.usuarioId) !== Number(user.id)) {
       throw new ForbiddenException('Solo puedes crear tus propios gastos');
     }
-    return this.expensesService.create(body);
+    return this.expensesService.create({
+      ...body,
+      usuarioId,
+      estatusPago: 'Pendiente',
+    } as CreateExpenseDto);
   }
 
   @Get()
@@ -73,16 +85,18 @@ export class ExpensesController {
     @Body() body: UpdateExpenseDto & Record<string, unknown>,
   ) {
     if (body.concepto !== undefined || body.monto !== undefined || body.categoria !== undefined) {
+      const { estado: _estado, ...rest } = body as any;
       return this.expensesService.updateAdministrative(+id, {
-        concepto: body.concepto ? String(body.concepto) : undefined,
-        monto: body.monto !== undefined ? Number(body.monto) : undefined,
-        categoria: body.categoria ? String(body.categoria) : undefined,
-        estado: body.estado ? String(body.estado) : undefined,
-        esRecurrente: body.esRecurrente !== undefined ? Boolean(body.esRecurrente) : undefined,
-        fecha: body.fecha ? String(body.fecha) : undefined,
+        concepto: rest.concepto ? String(rest.concepto) : undefined,
+        monto: rest.monto !== undefined ? Number(rest.monto) : undefined,
+        categoria: rest.categoria ? String(rest.categoria) : undefined,
+        // estado/estatusPago solo por flujos de aprobación dedicados (si existen)
+        esRecurrente: rest.esRecurrente !== undefined ? Boolean(rest.esRecurrente) : undefined,
+        fecha: rest.fecha ? String(rest.fecha) : undefined,
       });
     }
-    return this.expensesService.update(+id, body);
+    const { estatusPago: _e, usuarioId: _u, ...safe } = body as UpdateExpenseDto & Record<string, unknown>;
+    return this.expensesService.update(+id, safe as UpdateExpenseDto);
   }
 
   @Delete(':id')

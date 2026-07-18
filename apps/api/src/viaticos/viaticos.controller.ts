@@ -45,15 +45,19 @@ export class ViaticosController {
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_VIEW, PERMISSIONS.VIATICS_MANAGE] })
   analytics(
+    @CurrentUser() user: any,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('projectId') projectId?: string,
   ) {
-    return this.viaticosService.analytics({
-      from: from || undefined,
-      to: to || undefined,
-      projectId: projectId ? Number(projectId) : undefined,
-    });
+    return this.viaticosService.analytics(
+      {
+        from: from || undefined,
+        to: to || undefined,
+        projectId: projectId ? Number(projectId) : undefined,
+      },
+      user,
+    );
   }
 
   @Get('report.pdf')
@@ -73,6 +77,7 @@ export class ViaticosController {
         projectId: projectId ? Number(projectId) : undefined,
       },
       user?.nombre ?? null,
+      user,
     );
     res!.header('Content-Type', 'application/pdf');
     res!.header(
@@ -95,7 +100,13 @@ export class ViaticosController {
     }
     return this.viaticosService.create(
       {
-        usuarioId: body.usuarioId ? Number(body.usuarioId) : user.id,
+        usuarioId: (() => {
+          const elevated =
+            user.isSuperAdmin ||
+            user.permissions?.includes(PERMISSIONS.VIATICS_MANAGE) ||
+            user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN);
+          return elevated && body.usuarioId ? Number(body.usuarioId) : user.id;
+        })(),
         actividadId: body.actividadId ? Number(body.actividadId) : null,
         projectId: body.projectId ? Number(body.projectId) : null,
         vehicleId: body.vehicleId ? Number(body.vehicleId) : null,
@@ -103,7 +114,7 @@ export class ViaticosController {
         montoSolicitado: Number(body.montoSolicitado),
         motivo: body.motivo ?? body.concepto,
         ticketEvidenciaUrl,
-        estatus: body.estatus ?? 'Pendiente',
+        estatus: 'Pendiente',
       },
       user,
     );
@@ -145,8 +156,8 @@ export class ViaticosController {
   @Get(':id')
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_VIEW, PERMISSIONS.VIATICS_MANAGE] })
-  findOne(@Param('id') id: string) {
-    return this.viaticosService.findOne(+id);
+  findOne(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.viaticosService.findOne(+id, user);
   }
 
   @Patch(':id/approve')
@@ -173,8 +184,9 @@ export class ViaticosController {
   @RBAC({ permissions: [PERMISSIONS.VIATICS_MANAGE] })
   @UseInterceptors(FileInterceptor('ticketEvidencia', { dest: getUploadSubdir(__dirname, 'viatics') }))
   update(@Param('id') id: string, @Body() body: any, @UploadedFile() file?: any) {
-    const data: Record<string, unknown> = { ...body };
+    const data: Record<string, unknown> = {};
     if (file) data.ticketEvidenciaUrl = `/uploads/viatics/${file.filename}`;
+    if (body.ticketEvidenciaUrl !== undefined) data.ticketEvidenciaUrl = body.ticketEvidenciaUrl;
     if (body.motivo !== undefined || body.concepto !== undefined) {
       data.motivo = body.motivo ?? body.concepto;
     }

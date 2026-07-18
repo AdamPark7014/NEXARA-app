@@ -49,6 +49,32 @@ export class ViaticosService {
       : Number(viatico.montoSolicitado) || 0;
   }
 
+  /** Scope de listado/detalle/reportes según rol del actor. */
+  private buildListWhere(currentUser?: any): Record<string, unknown> {
+    if (!currentUser || currentUser.isSuperAdmin) {
+      return { deletedAt: null };
+    }
+    if (
+      currentUser.permissions?.includes('CONSOLE_ADMIN') ||
+      currentUser.permissions?.includes('viatics.manage')
+    ) {
+      const role = this.resolveActorRole(currentUser);
+      if (!currentUser.departmentId || role === ROLES.CEO || role === ROLES.DIR_ADMIN || role === ROLES.CONTABILIDAD) {
+        return { deletedAt: null };
+      }
+      return {
+        deletedAt: null,
+        User: {
+          AND: [
+            { departmentId: currentUser.departmentId },
+            { role: { accesoConsoleAdmin: false } },
+          ],
+        },
+      };
+    }
+    return { deletedAt: null, usuarioId: currentUser.id };
+  }
+
   private assertCanRequest(actor: any) {
     const role = this.resolveActorRole(actor);
     if (actor?.isSuperAdmin || (role && CEO_NO_REQUEST.has(role))) {
@@ -139,7 +165,7 @@ export class ViaticosService {
         ticketEvidenciaUrl: dto.ticketEvidenciaUrl,
         approvalStep: 0,
         approvalTrail: [],
-        estatus: dto.estatus ?? 'Pendiente',
+        estatus: 'Pendiente',
       },
       include: {
         User: { select: { nombre: true, id: true } },
@@ -175,31 +201,7 @@ export class ViaticosService {
       project: { select: { id: true, name: true } },
       vehicle: { select: { id: true, nombre: true, placas: true } },
     };
-    let where: any = { deletedAt: null };
-
-    if (currentUser?.isSuperAdmin) {
-      where = { deletedAt: null };
-    } else if (
-      currentUser?.permissions?.includes('CONSOLE_ADMIN') ||
-      currentUser?.permissions?.includes('viatics.manage')
-    ) {
-      const role = this.resolveActorRole(currentUser);
-      if (!currentUser.departmentId || role === ROLES.CEO || role === ROLES.DIR_ADMIN || role === ROLES.CONTABILIDAD) {
-        where = { deletedAt: null };
-      } else {
-        where = {
-          deletedAt: null,
-          User: {
-            AND: [
-              { departmentId: currentUser.departmentId },
-              { role: { accesoConsoleAdmin: false } },
-            ],
-          },
-        };
-      }
-    } else {
-      where = { deletedAt: null, usuarioId: currentUser?.id };
-    }
+    const where = this.buildListWhere(currentUser);
 
     const mapRow = (row: any) => ({
       ...row,
@@ -247,9 +249,10 @@ export class ViaticosService {
     return data.map((row: any) => ({ ...row, actividad: row.Activity, usuario: row.User }));
   }
 
-  findOne(id: number) {
-    return this.prisma['viatico'].findUnique({
-      where: { id },
+  async findOne(id: number, currentUser?: any) {
+    const where = { id, ...this.buildListWhere(currentUser) };
+    const row = await this.prisma['viatico'].findFirst({
+      where,
       include: {
         Activity: true,
         User: true,
@@ -257,6 +260,11 @@ export class ViaticosService {
         vehicle: { select: { id: true, nombre: true, placas: true } },
       },
     });
+    if (!row && currentUser) {
+      const exists = await this.prisma['viatico'].findUnique({ where: { id }, select: { id: true } });
+      if (exists) throw new ForbiddenException('No tienes acceso a este viático');
+    }
+    return row;
   }
 
   async approveOrReject(id: number, actor: any, action: 'approve' | 'reject', note?: string) {
@@ -360,16 +368,31 @@ export class ViaticosService {
     const currentViatico = await this.findOne(id);
     if (!currentViatico) throw new BadRequestException('Viático no encontrado');
 
-    const data: Record<string, unknown> = { ...dto };
-    if (dto.categoria !== undefined) data.categoria = this.normalizeCategory(dto.categoria);
-    if (dto.vehicleId !== undefined) {
-      data.vehicleId = dto.vehicleId ? Number(dto.vehicleId) : null;
+    // Solo campos editables — estatus/approval/usuarioId solo vía approve/pagado.
+    const allowed = [
+      'categoria',
+      'motivo',
+      'montoSolicitado',
+      'ticketEvidenciaUrl',
+      'projectId',
+      'actividadId',
+      'vehicleId',
+    ] as const;
+    const data: Record<string, unknown> = {};
+    for (const key of allowed) {
+      if (dto[key] !== undefined) data[key] = dto[key];
     }
-    if (dto.projectId !== undefined) {
-      data.projectId = dto.projectId ? Number(dto.projectId) : null;
+    if (data.categoria !== undefined) {
+      data.categoria = this.normalizeCategory(data.categoria as string | null | undefined);
     }
-    if (dto.actividadId !== undefined) {
-      data.actividadId = dto.actividadId ? Number(dto.actividadId) : null;
+    if (data.vehicleId !== undefined) {
+      data.vehicleId = data.vehicleId ? Number(data.vehicleId) : null;
+    }
+    if (data.projectId !== undefined) {
+      data.projectId = data.projectId ? Number(data.projectId) : null;
+    }
+    if (data.actividadId !== undefined) {
+      data.actividadId = data.actividadId ? Number(data.actividadId) : null;
     }
 
     const nextActividadId =
@@ -386,7 +409,7 @@ export class ViaticosService {
       );
     }
 
-    const updatedViatico = await this.prisma['viatico'].update({
+    return this.prisma['viatico'].update({
       where: { id },
       data,
       include: {
@@ -394,29 +417,14 @@ export class ViaticosService {
         Activity: { select: { anNumber: true } },
       },
     });
-
-    if (dto.estatus && currentViatico.estatus !== dto.estatus) {
-      const amount = this.amountOf(updatedViatico);
-      if (['Aprobado', 'APPROVED', 'Pagado'].includes(dto.estatus) && updatedViatico.usuarioId) {
-        await this.notificationHierarchy.notifyViaticReview(
-          updatedViatico.usuarioId,
-          id,
-          'approved',
-          amount,
-        );
-      } else if (['Rechazado', 'REJECTED'].includes(dto.estatus) && updatedViatico.usuarioId) {
-        await this.notificationHierarchy.notifyViaticReview(updatedViatico.usuarioId, id, 'rejected', 0);
-      }
-    }
-    return updatedViatico;
   }
 
   remove(id: number) {
     return this.prisma['viatico'].delete({ where: { id } });
   }
 
-  async analytics(filters: { from?: string; to?: string; projectId?: number }) {
-    const where: Record<string, unknown> = { deletedAt: null };
+  async analytics(filters: { from?: string; to?: string; projectId?: number }, currentUser?: any) {
+    const where: Record<string, unknown> = { ...this.buildListWhere(currentUser) };
     if (filters.projectId) where.projectId = filters.projectId;
     if (filters.from || filters.to) {
       where.fechaSolicitud = {
@@ -500,9 +508,10 @@ export class ViaticosService {
   async reportPdf(
     filters: { from?: string; to?: string; projectId?: number },
     preparedBy?: string | null,
+    currentUser?: any,
   ) {
-    const analytics = await this.analytics(filters);
-    const where: Record<string, unknown> = { deletedAt: null };
+    const analytics = await this.analytics(filters, currentUser);
+    const where: Record<string, unknown> = { ...this.buildListWhere(currentUser) };
     if (filters.projectId) where.projectId = filters.projectId;
     if (filters.from || filters.to) {
       where.fechaSolicitud = {
