@@ -1,41 +1,96 @@
 "use client";
 
+import { useEffect, useId, useRef, useState } from "react";
 import Button from "./Button";
 
 export interface ConfirmState {
   message: string;
+  title?: string;
   confirmLabel?: string;
+  /** When true, confirm uses danger (red) styling. Default true. */
+  danger?: boolean;
   fn: () => void | Promise<void>;
 }
 
 interface Props {
   state: ConfirmState | null;
   onClose: () => void;
-  /** Set to true when the action is destructive (red confirm button). Default: true */
+  /** Fallback danger when state.danger is undefined. Default: true */
   danger?: boolean;
 }
 
 /**
- * Lightweight inline confirmation dialog.
+ * Confirmation dialog with in-flight lock, Esc, and basic focus trap.
  * Usage:
- *   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
- *   // To trigger: setConfirmState({ message: "¿Eliminar X?", fn: () => doDelete() });
- *   // In JSX: <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
+ *   setConfirmState({ message: "¿…?", confirmLabel: "Confirmar", danger: false, fn: async () => { … } });
+ *   <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
  */
 export default function ConfirmDialog({ state, onClose, danger = true }: Props) {
+  const titleId = useId();
+  const msgId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const confirmBtnRef = useRef<HTMLButtonElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  const isDanger = state?.danger ?? danger;
+
+  useEffect(() => {
+    if (!state) {
+      setBusy(false);
+      return;
+    }
+    const prev = document.activeElement as HTMLElement | null;
+    confirmBtnRef.current?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !busy) {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !panelRef.current) return;
+      const focusable = panelRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      prev?.focus?.();
+    };
+  }, [state, busy, onClose]);
+
   if (!state) return null;
 
-  const handleConfirm = () => {
-    void Promise.resolve(state.fn());
-    onClose();
+  const handleConfirm = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await Promise.resolve(state.fn());
+    } finally {
+      setBusy(false);
+      onClose();
+    }
   };
 
   return (
     <>
-      {/* Backdrop */}
       <div
         role="presentation"
-        onClick={onClose}
+        onClick={() => {
+          if (!busy) onClose();
+        }}
         style={{
           position: "fixed",
           inset: 0,
@@ -45,11 +100,12 @@ export default function ConfirmDialog({ state, onClose, danger = true }: Props) 
         }}
       />
 
-      {/* Dialog */}
       <div
+        ref={panelRef}
         role="alertdialog"
         aria-modal="true"
-        aria-labelledby="confirm-dialog-msg"
+        aria-labelledby={state.title ? titleId : msgId}
+        aria-describedby={msgId}
         style={{
           position: "fixed",
           top: "50%",
@@ -64,8 +120,21 @@ export default function ConfirmDialog({ state, onClose, danger = true }: Props) 
           boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
         }}
       >
+        {state.title ? (
+          <h2
+            id={titleId}
+            style={{
+              margin: "0 0 10px",
+              fontSize: 16,
+              fontWeight: 700,
+              color: "var(--text-primary)",
+            }}
+          >
+            {state.title}
+          </h2>
+        ) : null}
         <p
-          id="confirm-dialog-msg"
+          id={msgId}
           style={{
             margin: "0 0 22px",
             fontSize: 14.5,
@@ -78,14 +147,16 @@ export default function ConfirmDialog({ state, onClose, danger = true }: Props) 
         </p>
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
             Cancelar
           </Button>
           <Button
-            variant={danger ? "danger" : "primary"}
-            onClick={handleConfirm}
+            ref={confirmBtnRef}
+            variant={isDanger ? "danger" : "primary"}
+            onClick={() => void handleConfirm()}
+            disabled={busy}
           >
-            {state.confirmLabel ?? (danger ? "Eliminar" : "Confirmar")}
+            {busy ? "Procesando…" : state.confirmLabel ?? (isDanger ? "Eliminar" : "Confirmar")}
           </Button>
         </div>
       </div>

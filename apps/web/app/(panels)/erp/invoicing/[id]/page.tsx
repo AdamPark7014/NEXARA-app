@@ -12,6 +12,8 @@ import { Tag, Money } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { toast } from "@/components/Toast";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import Modal from "@/components/ui/Modal";
 
 interface InvoiceLine {
   id: number;
@@ -116,6 +118,7 @@ export default function InvoiceDetailPage() {
   const [cancelReason, setCancelReason] = useState("02");
   const [substitutionUuid, setSubstitutionUuid] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const load = useCallback(async () => {
     if (!token || !id) return;
@@ -189,16 +192,26 @@ export default function InvoiceDetailPage() {
     } finally { setPaying(false); }
   };
 
-  const stampInvoice = async () => {
-    if (!token || !id) return;
-    setStamping(true);
-    try {
-      await apiFetch(`accounting/invoices/${id}/stamp`, token, { method: "POST" });
-      toast.success("Factura timbrada ante el PAC");
-      void load();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al timbrar");
-    } finally { setStamping(false); }
+  const stampInvoice = () => {
+    if (!token || !id || !invoice) return;
+    setConfirmState({
+      title: "Timbrar CFDI",
+      message: `¿Timbrar la factura ${invoice.invoiceNumber} ante el PAC? Se generará el UUID fiscal.`,
+      confirmLabel: "Timbrar",
+      danger: false,
+      fn: async () => {
+        setStamping(true);
+        try {
+          await apiFetch(`accounting/invoices/${id}/stamp`, token, { method: "POST" });
+          toast.success("Factura timbrada ante el PAC");
+          void load();
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Error al timbrar");
+        } finally {
+          setStamping(false);
+        }
+      },
+    });
   };
 
   const checkSatStatus = async () => {
@@ -496,82 +509,86 @@ export default function InvoiceDetailPage() {
         </Section>
       )}
 
-      {showCancel && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowCancel(false)}>
-          <div style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 420, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Cancelar CFDI ante el SAT</div>
-            <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo SAT</span>
-              <select value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} style={inp}>
-                <option value="01">01 — Comprobante emitido con errores (con relación)</option>
-                <option value="02">02 — Comprobante emitido con errores (sin relación)</option>
-                <option value="03">03 — No se llevó a cabo la operación</option>
-                <option value="04">04 — Operación nominativa en factura global</option>
-              </select>
-            </label>
-            {cancelReason === "01" && (
-              <label style={{ display: "grid", gap: 4, marginTop: 12 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>UUID sustituto *</span>
-                <input value={substitutionUuid} onChange={(e) => setSubstitutionUuid(e.target.value)} placeholder="UUID del CFDI que sustituye" style={inp} />
-              </label>
-            )}
-            <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setShowCancel(false)}>Cerrar</Button>
-              <Button variant="primary" onClick={() => void cancelInvoice()} disabled={cancelling}>
-                {cancelling ? "Cancelando…" : "Confirmar cancelación"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={showCancel}
+        onClose={() => setShowCancel(false)}
+        title="Cancelar CFDI ante el SAT"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowCancel(false)}>Cerrar</Button>
+            <Button variant="primary" onClick={() => void cancelInvoice()} disabled={cancelling}>
+              {cancelling ? "Cancelando…" : "Confirmar cancelación"}
+            </Button>
+          </>
+        }
+      >
+        <label style={{ display: "grid", gap: 4 }}>
+          <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo SAT</span>
+          <select value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} style={inp}>
+            <option value="01">01 — Comprobante emitido con errores (con relación)</option>
+            <option value="02">02 — Comprobante emitido con errores (sin relación)</option>
+            <option value="03">03 — No se llevó a cabo la operación</option>
+            <option value="04">04 — Operación nominativa en factura global</option>
+          </select>
+        </label>
+        {cancelReason === "01" && (
+          <label style={{ display: "grid", gap: 4, marginTop: 12 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>UUID sustituto *</span>
+            <input value={substitutionUuid} onChange={(e) => setSubstitutionUuid(e.target.value)} placeholder="UUID del CFDI que sustituye" style={inp} />
+          </label>
+        )}
+      </Modal>
 
-      {showPayment && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowPayment(false)}>
-          <div style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 420, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Registrar pago</div>
-            <div style={{ display: "grid", gap: 12 }}>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Monto (MXN) *</span>
-                <input type="number" min="0.01" step="0.01" value={payForm.amount} onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))} style={inp} autoFocus />
-              </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Fecha de pago</span>
-                <input type="date" value={payForm.paymentDate} onChange={(e) => setPayForm((f) => ({ ...f, paymentDate: e.target.value }))} style={inp} />
-              </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Método</span>
-                <select value={payForm.method} onChange={(e) => setPayForm((f) => ({ ...f, method: e.target.value }))} style={inp}>
-                  <option value="SPEI">SPEI / Transferencia</option>
-                  <option value="CASH">Efectivo</option>
-                  <option value="CHECK">Cheque</option>
-                  <option value="CARD">Tarjeta</option>
-                </select>
-              </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Referencia</span>
-                <input value={payForm.reference} onChange={(e) => setPayForm((f) => ({ ...f, reference: e.target.value }))} placeholder="Número de transferencia" style={inp} />
-              </label>
-              {invoice.satPaymentMethod === "PPD" && (
-                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text-secondary)" }}>
-                  <input
-                    type="checkbox"
-                    checked={payForm.stampComplement}
-                    onChange={(e) => setPayForm((f) => ({ ...f, stampComplement: e.target.checked }))}
-                  />
-                  Timbrar complemento de pago al registrar
-                </label>
-              )}
-              {payErr && <p style={{ color: "var(--danger)", fontSize: 12, margin: 0 }}>{payErr}</p>}
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setShowPayment(false)}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void submitPayment()} disabled={paying}>
-                {paying ? "Registrando…" : "Registrar pago"}
-              </Button>
-            </div>
-          </div>
+      <Modal
+        open={showPayment}
+        onClose={() => setShowPayment(false)}
+        title="Registrar pago"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowPayment(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void submitPayment()} disabled={paying}>
+              {paying ? "Registrando…" : "Registrar pago"}
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: "grid", gap: 12 }}>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Monto (MXN) *</span>
+            <input type="number" min="0.01" step="0.01" value={payForm.amount} onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))} style={inp} autoFocus />
+          </label>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Fecha de pago</span>
+            <input type="date" value={payForm.paymentDate} onChange={(e) => setPayForm((f) => ({ ...f, paymentDate: e.target.value }))} style={inp} />
+          </label>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Método</span>
+            <select value={payForm.method} onChange={(e) => setPayForm((f) => ({ ...f, method: e.target.value }))} style={inp}>
+              <option value="SPEI">SPEI / Transferencia</option>
+              <option value="CASH">Efectivo</option>
+              <option value="CHECK">Cheque</option>
+              <option value="CARD">Tarjeta</option>
+            </select>
+          </label>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Referencia</span>
+            <input value={payForm.reference} onChange={(e) => setPayForm((f) => ({ ...f, reference: e.target.value }))} placeholder="Número de transferencia" style={inp} />
+          </label>
+          {invoice?.satPaymentMethod === "PPD" && (
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text-secondary)" }}>
+              <input
+                type="checkbox"
+                checked={payForm.stampComplement}
+                onChange={(e) => setPayForm((f) => ({ ...f, stampComplement: e.target.checked }))}
+              />
+              Timbrar complemento de pago al registrar
+            </label>
+          )}
+          {payErr && <p style={{ color: "var(--danger)", fontSize: 12, margin: 0 }}>{payErr}</p>}
         </div>
-      )}
+      </Modal>
+
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

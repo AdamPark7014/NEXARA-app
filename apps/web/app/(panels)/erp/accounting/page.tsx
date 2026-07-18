@@ -483,19 +483,31 @@ export default function AccountingPage() {
     }
   };
 
-  const postEntry = async (id: number) => {
+  const postEntry = (id: number) => {
     if (!token) return;
-    try {
-      const updated = await apiFetch(`accounting/journal-entries/${id}/post`, token, { method: "PATCH" });
-      setItems(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
-    } catch (e) {
-      toast.error(formatApiError(e, "No se pudo contabilizar"));
-    }
+    setConfirmState({
+      title: "Contabilizar póliza",
+      message: "¿Contabilizar esta póliza? Actualizará saldos de cuentas y no podrá editarse.",
+      confirmLabel: "Contabilizar",
+      danger: false,
+      fn: async () => {
+        try {
+          const updated = await apiFetch(`accounting/journal-entries/${id}/post`, token, { method: "PATCH" });
+          setItems((prev) => prev.map((e) => (e.id === id ? { ...e, ...updated } : e)));
+        } catch (e) {
+          toast.error(formatApiError(e, "No se pudo contabilizar"));
+        }
+      },
+    });
   };
 
   const reverseEntry = async (id: number) => {
     if (!token) return;
-    setConfirmState({ message: "¿Reversar esta póliza? Se generará una contrapóliza.", confirmLabel: "Reversar", fn: async () => {
+    setConfirmState({
+      message: "¿Reversar esta póliza? Se generará una contrapóliza.",
+      confirmLabel: "Reversar",
+      danger: true,
+      fn: async () => {
     try {
       const updated = await apiFetch(`accounting/journal-entries/${id}/reverse`, token, { method: "POST" });
       setItems(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));

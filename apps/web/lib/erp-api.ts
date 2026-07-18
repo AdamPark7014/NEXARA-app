@@ -83,3 +83,21 @@ export const erpModalBox: React.CSSProperties = {
   border: "1px solid var(--border)",
   overflow: "hidden",
 };
+
+/** Tag variants for finance statuses (invoices, journal, viatics, payments). */
+export function financeStatusVariant(
+  status: string | null | undefined,
+): "default" | "positive" | "warning" | "danger" | "accent" {
+  const s = (status || "").toUpperCase();
+  if (["PAID", "PAGADO", "POSTED", "CONTABILIZADA", "APROBADO", "APROBADA", "MATCHED", "SENT", "ACTIVE"].includes(s)) {
+    return "positive";
+  }
+  if (["DRAFT", "BORRADOR", "PENDING", "PENDIENTE", "PARTIALLY_PAID", "STAMPING"].includes(s)) {
+    return "warning";
+  }
+  if (["CANCELLED", "CANCELADA", "REJECTED", "RECHAZADO", "OVERDUE", "REVERSED"].includes(s)) {
+    return "danger";
+  }
+  if (["PPD", "PUE"].includes(s)) return "accent";
+  return "default";
+}

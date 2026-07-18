@@ -15,6 +15,7 @@ import { useUser } from "@/components/UserContext";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import Modal from "@/components/ui/Modal";
 import { toast } from "@/components/Toast";
 
 interface InvoiceRow {
@@ -165,12 +166,22 @@ export default function InvoicingPage() {
   const canceladas = items.filter((f) => f.status === "CANCELLED").length;
   const vencidas = items.filter((f) => f.status === "OVERDUE").length;
 
-  const stamp = async (inv: InvoiceRow) => {
+  const stamp = (inv: InvoiceRow) => {
     if (!token) return;
-    try {
-      await apiFetch(`accounting/invoices/${inv.id}/stamp`, token, { method: "POST" });
-      void load();
-    } catch (e) { toast.error(`Error al timbrar: ${e instanceof Error ? e.message : "desconocido"}`); }
+    setConfirmState({
+      title: "Timbrar CFDI",
+      message: `¿Timbrar la factura ${inv.invoiceNumber} ante el PAC? Esta acción genera el UUID fiscal.`,
+      confirmLabel: "Timbrar",
+      danger: false,
+      fn: async () => {
+        try {
+          await apiFetch(`accounting/invoices/${inv.id}/stamp`, token, { method: "POST" });
+          void load();
+        } catch (e) {
+          toast.error(`Error al timbrar: ${e instanceof Error ? e.message : "desconocido"}`);
+        }
+      },
+    });
   };
 
   const cancel = async (inv: InvoiceRow) => {
@@ -637,13 +648,22 @@ export default function InvoicingPage() {
         {!loading && !error && <DataTable columns={columns} rows={visibleItems} rowKey={(f) => f.id} emptyTitle="Sin facturas" emptyDescription="Las facturas se generan desde un proyecto de ventas cerrado." />}
       </Section>
 
-      {paymentTarget && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
-          onClick={() => setPaymentTarget(null)}>
-          <div style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.28)", border: "1px solid var(--border)" }}
-            onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Registrar pago</div>
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 18 }}>
+      <Modal
+        open={!!paymentTarget}
+        onClose={() => setPaymentTarget(null)}
+        title="Registrar pago"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setPaymentTarget(null)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void submitPayment()} disabled={paying}>
+              {paying ? "Registrando…" : "Registrar pago"}
+            </Button>
+          </>
+        }
+      >
+        {paymentTarget && (
+          <>
+            <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 14 }}>
               {paymentTarget.invoiceNumber} · saldo pendiente{" "}
               <Money value={Math.max(0, Number(paymentTarget.totalAmount) - Number(paymentTarget.paidAmount ?? 0))} />
             </div>
@@ -690,13 +710,10 @@ export default function InvoicingPage() {
                 {paymentErr}
               </div>
             )}
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-              <Button variant="secondary" onClick={() => setPaymentTarget(null)}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void submitPayment()} disabled={paying}>{paying ? "Registrando…" : "Registrar pago"}</Button>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
+
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
