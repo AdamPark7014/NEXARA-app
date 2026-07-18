@@ -43,6 +43,79 @@ type HrState =
 const TIPO_CONTRATO = ["Planta", "Honorarios", "Contratista"] as const;
 const ESTADOS_RRHH = ["Activo", "Vacaciones", "Incidencia", "Baja"] as const;
 
+const TABS = [
+  { key: "plantilla", label: "Plantilla" },
+  { key: "permisos", label: "Solicitudes de permiso" },
+  { key: "evaluaciones", label: "Evaluaciones de desempeño" },
+  { key: "dashboard", label: "Dashboard" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
+const LEAVE_TYPE_LABEL: Record<string, string> = {
+  VACATION: "Vacaciones",
+  SICK: "Enfermedad",
+  PERSONAL: "Personal",
+  MATERNITY: "Maternidad",
+  PATERNITY: "Paternidad",
+  BEREAVEMENT: "Duelo",
+  UNPAID: "Sin goce de sueldo",
+};
+const LEAVE_TYPES = Object.keys(LEAVE_TYPE_LABEL);
+
+const LEAVE_STATUS_LABEL: Record<string, string> = {
+  PENDING: "Pendiente",
+  APPROVED: "Aprobado",
+  REJECTED: "Rechazado",
+  CANCELLED: "Cancelado",
+};
+
+const REVIEW_PERIOD_LABEL: Record<string, string> = {
+  MONTHLY: "Mensual",
+  QUARTERLY: "Trimestral",
+  SEMI_ANNUAL: "Semestral",
+  ANNUAL: "Anual",
+};
+const REVIEW_PERIODS = Object.keys(REVIEW_PERIOD_LABEL);
+
+const REVIEW_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Borrador",
+  SUBMITTED: "Enviada",
+  ACKNOWLEDGED: "Confirmada",
+};
+
+type LeaveRequest = {
+  id: number;
+  type: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+  reason?: string | null;
+  rejectionReason?: string | null;
+  createdAt: string;
+  user?: { id: number; nombre: string; email?: string } | null;
+  approvedBy?: { id: number; nombre: string } | null;
+};
+
+type PerformanceReview = {
+  id: number;
+  period: string;
+  reviewDate: string;
+  overallRating: number;
+  strengths?: string | null;
+  areasOfImprovement?: string | null;
+  goals?: string | null;
+  comments?: string | null;
+  status: string;
+  user?: { id: number; nombre: string } | null;
+  reviewer?: { id: number; nombre: string } | null;
+};
+
+type HrDashboard = { pendingLeaves: number; approvedLeavesThisMonth: number; totalReviews: number; avgRating: number };
+
+const emptyLeaveForm = { userId: "", type: "VACATION", startDate: "", endDate: "", reason: "" };
+const emptyReviewForm = { userId: "", period: "ANNUAL", reviewDate: new Date().toISOString().slice(0, 10), overallRating: 3, strengths: "", areasOfImprovement: "", goals: "", comments: "" };
+
 async function apiFetch(path: string, token: string, init: RequestInit = {}) {
   const res = await fetch(buildApiUrl(path), {
     ...init,
@@ -85,6 +158,27 @@ export default function HrPage() {
   const [createForm, setCreateForm] = useState({ ...emptyCreateForm });
   const [createErr, setCreateErr] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+
+  const [tab, setTab] = useState<TabKey>("plantilla");
+
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
+  const [leavesLoading, setLeavesLoading] = useState(false);
+  const [leaveStatusFilter, setLeaveStatusFilter] = useState("");
+  const [leaveTypeFilter, setLeaveTypeFilter] = useState("");
+  const [showLeaveForm, setShowLeaveForm] = useState(false);
+  const [leaveForm, setLeaveForm] = useState({ ...emptyLeaveForm });
+  const [leaveSaving, setLeaveSaving] = useState(false);
+  const [leaveSaveErr, setLeaveSaveErr] = useState<string | null>(null);
+
+  const [reviews, setReviews] = useState<PerformanceReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewForm, setReviewForm] = useState({ ...emptyReviewForm });
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewSaveErr, setReviewSaveErr] = useState<string | null>(null);
+
+  const [dashboard, setDashboard] = useState<HrDashboard | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
 
   const fetchStaff = useCallback(async () => {
     if (!user?.token) return;
@@ -232,6 +326,181 @@ export default function HrPage() {
   } });
   };
 
+  // ── Solicitudes de permiso ──────────────────────────────────────────
+  const loadLeaves = useCallback(async () => {
+    if (!user?.token) return;
+    setLeavesLoading(true);
+    try {
+      const qs = new URLSearchParams();
+      if (leaveStatusFilter) qs.set("status", leaveStatusFilter);
+      if (leaveTypeFilter) qs.set("type", leaveTypeFilter);
+      const data = await apiFetch(`hr/leaves?${qs}`, user.token);
+      setLeaves(Array.isArray(data) ? data : (data?.data ?? []));
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : "No se pudieron cargar las solicitudes de permiso");
+      setLeaves([]);
+    } finally {
+      setLeavesLoading(false);
+    }
+  }, [user?.token, leaveStatusFilter, leaveTypeFilter]);
+
+  const saveLeave = async () => {
+    if (!user?.token || !leaveForm.userId || !leaveForm.startDate || !leaveForm.endDate) {
+      setLeaveSaveErr("Empleado, fecha de inicio y fecha de fin son obligatorios.");
+      return;
+    }
+    setLeaveSaving(true);
+    setLeaveSaveErr(null);
+    try {
+      const created = await apiFetch("hr/leaves", user.token, {
+        method: "POST",
+        body: JSON.stringify({
+          userId: Number(leaveForm.userId),
+          type: leaveForm.type,
+          startDate: leaveForm.startDate,
+          endDate: leaveForm.endDate,
+          reason: leaveForm.reason.trim() || undefined,
+        }),
+      });
+      setLeaves((prev) => [created, ...prev]);
+      setShowLeaveForm(false);
+      setLeaveForm({ ...emptyLeaveForm });
+    } catch (e) {
+      setLeaveSaveErr(e instanceof Error ? e.message : "No se pudo crear la solicitud");
+    } finally {
+      setLeaveSaving(false);
+    }
+  };
+
+  const approveLeave = async (leave: LeaveRequest) => {
+    if (!user?.token) return;
+    try {
+      const updated = await apiFetch(`hr/leaves/${leave.id}/approve`, user.token, { method: "PATCH" });
+      setLeaves((prev) => prev.map((l) => (l.id === leave.id ? { ...l, ...updated } : l)));
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : "No se pudo aprobar la solicitud");
+    }
+  };
+
+  const rejectLeave = (leave: LeaveRequest) => {
+    setConfirmState({
+      message: `¿Rechazar la solicitud de ${leave.user?.nombre ?? "este empleado"}?`,
+      confirmLabel: "Rechazar",
+      fn: async () => {
+        if (!user?.token) return;
+        try {
+          const updated = await apiFetch(`hr/leaves/${leave.id}/reject`, user.token, {
+            method: "PATCH",
+            body: JSON.stringify({ rejectionReason: "Rechazada desde RRHH" }),
+          });
+          setLeaves((prev) => prev.map((l) => (l.id === leave.id ? { ...l, ...updated } : l)));
+        } catch (e) {
+          setActionErr(e instanceof Error ? e.message : "No se pudo rechazar la solicitud");
+        }
+      },
+    });
+  };
+
+  // ── Evaluaciones de desempeño ─────────────────────────────────────────
+  const loadReviews = useCallback(async () => {
+    if (!user?.token) return;
+    setReviewsLoading(true);
+    try {
+      const data = await apiFetch("hr/reviews", user.token);
+      setReviews(Array.isArray(data) ? data : (data?.data ?? []));
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : "No se pudieron cargar las evaluaciones");
+      setReviews([]);
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, [user?.token]);
+
+  const saveReview = async () => {
+    if (!user?.token || !reviewForm.userId || !reviewForm.reviewDate) {
+      setReviewSaveErr("Empleado y fecha de evaluación son obligatorios.");
+      return;
+    }
+    setReviewSaving(true);
+    setReviewSaveErr(null);
+    try {
+      const created = await apiFetch("hr/reviews", user.token, {
+        method: "POST",
+        body: JSON.stringify({
+          userId: Number(reviewForm.userId),
+          period: reviewForm.period,
+          reviewDate: reviewForm.reviewDate,
+          overallRating: Number(reviewForm.overallRating),
+          strengths: reviewForm.strengths.trim() || undefined,
+          areasOfImprovement: reviewForm.areasOfImprovement.trim() || undefined,
+          goals: reviewForm.goals.trim() || undefined,
+          comments: reviewForm.comments.trim() || undefined,
+        }),
+      });
+      setReviews((prev) => [created, ...prev]);
+      setShowReviewForm(false);
+      setReviewForm({ ...emptyReviewForm, reviewDate: new Date().toISOString().slice(0, 10) });
+    } catch (e) {
+      setReviewSaveErr(e instanceof Error ? e.message : "No se pudo crear la evaluación");
+    } finally {
+      setReviewSaving(false);
+    }
+  };
+
+  const submitReview = async (review: PerformanceReview) => {
+    if (!user?.token) return;
+    try {
+      const updated = await apiFetch(`hr/reviews/${review.id}/submit`, user.token, { method: "PATCH" });
+      setReviews((prev) => prev.map((r) => (r.id === review.id ? { ...r, ...updated } : r)));
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : "No se pudo enviar la evaluación");
+    }
+  };
+
+  const acknowledgeReview = async (review: PerformanceReview) => {
+    if (!user?.token) return;
+    try {
+      const updated = await apiFetch(`hr/reviews/${review.id}/acknowledge`, user.token, { method: "PATCH" });
+      setReviews((prev) => prev.map((r) => (r.id === review.id ? { ...r, ...updated } : r)));
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : "No se pudo confirmar la evaluación");
+    }
+  };
+
+  // ── Dashboard ─────────────────────────────────────────────────────
+  const loadDashboard = useCallback(async () => {
+    if (!user?.token) return;
+    setDashboardLoading(true);
+    try {
+      const data = await apiFetch("hr/dashboard", user.token);
+      setDashboard(data);
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : "No se pudo cargar el dashboard");
+      setDashboard(null);
+    } finally {
+      setDashboardLoading(false);
+    }
+  }, [user?.token]);
+
+  useEffect(() => {
+    if (tab === "permisos") void loadLeaves();
+  }, [tab, loadLeaves]);
+
+  // Precarga silenciosa para el contador de pendientes en la pestaña.
+  useEffect(() => {
+    if (user?.token) void loadLeaves();
+  }, [user?.token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (tab === "evaluaciones") void loadReviews();
+  }, [tab, loadReviews]);
+
+  useEffect(() => {
+    if (tab === "dashboard") void loadDashboard();
+  }, [tab, loadDashboard]);
+
+  const pendingLeavesCount = useMemo(() => leaves.filter((l) => l.status === "PENDING").length, [leaves]);
+
   const columns: Column<HrEmpleado>[] = [
     {
       key: "id", label: "ID",
@@ -310,6 +579,70 @@ export default function HrPage() {
   ];
 
   const inp: React.CSSProperties = { padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
+  const label: React.CSSProperties = { fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 };
+  const formCard: React.CSSProperties = { background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 };
+
+  const leaveColumns: Column<LeaveRequest>[] = [
+    { key: "user", label: "Empleado", render: (l) => (
+      <div>
+        <div style={{ fontWeight: 700, fontSize: 13 }}>{l.user?.nombre ?? "—"}</div>
+        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{LEAVE_TYPE_LABEL[l.type] ?? l.type}</div>
+      </div>
+    ) },
+    { key: "range", label: "Fechas", render: (l) => (
+      <span style={{ fontSize: 12.5 }}>
+        {new Date(l.startDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })} — {new Date(l.endDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
+      </span>
+    ), width: 160 },
+    { key: "days", label: "Días", render: (l) => <strong style={{ fontSize: 13 }}>{l.days}</strong>, width: 60, numeric: true },
+    { key: "reason", label: "Motivo", accessor: (l) => l.reason ?? "—" },
+    { key: "status", label: "Estado", width: 220, render: (l) => (
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <Tag variant={l.status === "APPROVED" ? "positive" : l.status === "REJECTED" ? "danger" : l.status === "CANCELLED" ? "default" : "warning"}>
+          {LEAVE_STATUS_LABEL[l.status] ?? l.status}
+        </Tag>
+        {l.status === "PENDING" && cfg.canEdit && (
+          <>
+            <button onClick={() => void approveLeave(l)} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>Aprobar</button>
+            <button onClick={() => rejectLeave(l)} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>Rechazar</button>
+          </>
+        )}
+      </div>
+    ) },
+  ];
+
+  const reviewColumns: Column<PerformanceReview>[] = [
+    { key: "user", label: "Empleado", render: (r) => (
+      <div>
+        <div style={{ fontWeight: 700, fontSize: 13 }}>{r.user?.nombre ?? "—"}</div>
+        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Evaluador: {r.reviewer?.nombre ?? "—"}</div>
+      </div>
+    ) },
+    { key: "period", label: "Periodo", render: (r) => (
+      <div>
+        <Tag variant="default">{REVIEW_PERIOD_LABEL[r.period] ?? r.period}</Tag>
+        <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 3 }}>{new Date(r.reviewDate).toLocaleDateString("es-MX")}</div>
+      </div>
+    ), width: 130 },
+    { key: "overallRating", label: "Calificación", render: (r) => (
+      <span style={{ fontSize: 13, fontWeight: 700, color: r.overallRating >= 4 ? "var(--success)" : r.overallRating >= 3 ? "var(--text-primary)" : "var(--danger)" }}>
+        {"★".repeat(Math.round(r.overallRating))}{"☆".repeat(5 - Math.round(r.overallRating))} <span style={{ fontWeight: 400, color: "var(--text-tertiary)" }}>({r.overallRating})</span>
+      </span>
+    ), width: 150 },
+    { key: "status", label: "Estado", width: 220, render: (r) => (
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <Tag variant={r.status === "ACKNOWLEDGED" ? "positive" : r.status === "SUBMITTED" ? "accent" : "default"}>
+          {REVIEW_STATUS_LABEL[r.status] ?? r.status}
+        </Tag>
+        {r.status === "DRAFT" && cfg.canEdit && (
+          <button onClick={() => void submitReview(r)} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>Enviar</button>
+        )}
+        {r.status === "SUBMITTED" && (
+          <button onClick={() => void acknowledgeReview(r)} style={{ fontSize: 11, background: "var(--primary)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>Confirmar recibido</button>
+        )}
+      </div>
+    ) },
+  ];
 
   if (!cfg.canAccess) return null;
 
@@ -339,6 +672,19 @@ export default function HrPage() {
         }
       />
 
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18, borderBottom: "1px solid var(--border)", paddingBottom: 12 }}>
+        {TABS.map((t) => (
+          <Button key={t.key} size="sm" variant={tab === t.key ? "primary" : "secondary"} onClick={() => setTab(t.key)}>
+            {t.label}
+            {t.key === "permisos" && pendingLeavesCount > 0 && (
+              <span style={{ marginLeft: 6, background: "var(--danger)", color: "#fff", borderRadius: 999, padding: "1px 6px", fontSize: 10.5 }}>{pendingLeavesCount}</span>
+            )}
+          </Button>
+        ))}
+      </div>
+
+      {tab === "plantilla" && (
+      <>
       {state.kind === "ready" && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 14 }}>
@@ -441,6 +787,160 @@ export default function HrPage() {
           <DataTable columns={columns} rows={filtered} rowKey={(e) => e.id} onRowClick={(e) => openEdit(e)} />
         )}
       </Section>
+      </>
+      )}
+
+      {tab === "permisos" && (
+        <Section
+          title="Solicitudes de permiso"
+          subtitle="Vacaciones, incapacidades y otros permisos, con flujo de aprobación."
+          actions={
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <select value={leaveStatusFilter} onChange={(e) => setLeaveStatusFilter(e.target.value)} style={{ ...inp, width: 150 }}>
+                <option value="">Todos los estados</option>
+                {Object.entries(LEAVE_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+              <select value={leaveTypeFilter} onChange={(e) => setLeaveTypeFilter(e.target.value)} style={{ ...inp, width: 150 }}>
+                <option value="">Todos los tipos</option>
+                {LEAVE_TYPES.map((t) => <option key={t} value={t}>{LEAVE_TYPE_LABEL[t]}</option>)}
+              </select>
+              {cfg.canCreate && (
+                <Button variant="primary" size="sm" iconLeft="+" onClick={() => { setLeaveForm({ ...emptyLeaveForm }); setLeaveSaveErr(null); setShowLeaveForm(true); }}>
+                  Nueva solicitud
+                </Button>
+              )}
+            </div>
+          }
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 16 }}>
+            <KpiCard label="Pendientes de aprobar" value={pendingLeavesCount} variant={pendingLeavesCount > 0 ? "warning" : "positive"} icon="⏳" />
+            <KpiCard label="Aprobadas" value={leaves.filter((l) => l.status === "APPROVED").length} variant="positive" icon="✅" />
+            <KpiCard label="Rechazadas" value={leaves.filter((l) => l.status === "REJECTED").length} icon="🚫" />
+          </div>
+          {showLeaveForm && (
+            <div style={formCard}>
+              <div>
+                <label style={label}>Empleado</label>
+                <select value={leaveForm.userId} onChange={(e) => setLeaveForm((f) => ({ ...f, userId: e.target.value }))} style={inp}>
+                  <option value="">— Seleccionar —</option>
+                  {state.kind === "ready" && state.items.map((emp) => <option key={emp.id} value={emp.id}>{emp.nombre}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={label}>Tipo de permiso</label>
+                <select value={leaveForm.type} onChange={(e) => setLeaveForm((f) => ({ ...f, type: e.target.value }))} style={inp}>
+                  {LEAVE_TYPES.map((t) => <option key={t} value={t}>{LEAVE_TYPE_LABEL[t]}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={label}>Fecha de inicio</label>
+                <input type="date" value={leaveForm.startDate} onChange={(e) => setLeaveForm((f) => ({ ...f, startDate: e.target.value }))} style={inp} />
+              </div>
+              <div>
+                <label style={label}>Fecha de fin</label>
+                <input type="date" value={leaveForm.endDate} onChange={(e) => setLeaveForm((f) => ({ ...f, endDate: e.target.value }))} style={inp} />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={label}>Motivo (opcional)</label>
+                <input value={leaveForm.reason} onChange={(e) => setLeaveForm((f) => ({ ...f, reason: e.target.value }))} style={inp} />
+              </div>
+              {leaveSaveErr && (
+                <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--danger)" }}>{leaveSaveErr}</div>
+              )}
+              <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <Button variant="ghost" onClick={() => { setShowLeaveForm(false); setLeaveSaveErr(null); }}>Cancelar</Button>
+                <Button variant="primary" onClick={() => void saveLeave()} disabled={leaveSaving}>{leaveSaving ? "Guardando…" : "Crear solicitud"}</Button>
+              </div>
+            </div>
+          )}
+          {leavesLoading ? (
+            <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+          ) : (
+            <DataTable columns={leaveColumns} rows={leaves} rowKey={(l) => l.id} emptyTitle="Sin solicitudes" emptyDescription="No hay solicitudes de permiso registradas con estos filtros." />
+          )}
+        </Section>
+      )}
+
+      {tab === "evaluaciones" && (
+        <Section
+          title="Evaluaciones de desempeño"
+          subtitle="Ciclo de evaluación con calificación general, fortalezas, áreas de mejora y metas."
+          actions={cfg.canCreate ? (
+            <Button variant="primary" size="sm" iconLeft="+" onClick={() => { setReviewForm({ ...emptyReviewForm, reviewDate: new Date().toISOString().slice(0, 10) }); setReviewSaveErr(null); setShowReviewForm(true); }}>
+              Nueva evaluación
+            </Button>
+          ) : undefined}
+        >
+          {showReviewForm && (
+            <div style={formCard}>
+              <div>
+                <label style={label}>Empleado</label>
+                <select value={reviewForm.userId} onChange={(e) => setReviewForm((f) => ({ ...f, userId: e.target.value }))} style={inp}>
+                  <option value="">— Seleccionar —</option>
+                  {state.kind === "ready" && state.items.map((emp) => <option key={emp.id} value={emp.id}>{emp.nombre}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={label}>Periodo</label>
+                <select value={reviewForm.period} onChange={(e) => setReviewForm((f) => ({ ...f, period: e.target.value }))} style={inp}>
+                  {REVIEW_PERIODS.map((p) => <option key={p} value={p}>{REVIEW_PERIOD_LABEL[p]}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={label}>Fecha de evaluación</label>
+                <input type="date" value={reviewForm.reviewDate} onChange={(e) => setReviewForm((f) => ({ ...f, reviewDate: e.target.value }))} style={inp} />
+              </div>
+              <div>
+                <label style={label}>Calificación general (1–5)</label>
+                <input type="number" min={1} max={5} step="0.5" value={reviewForm.overallRating} onChange={(e) => setReviewForm((f) => ({ ...f, overallRating: +e.target.value }))} style={inp} />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={label}>Fortalezas</label>
+                <input value={reviewForm.strengths} onChange={(e) => setReviewForm((f) => ({ ...f, strengths: e.target.value }))} style={inp} />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={label}>Áreas de mejora</label>
+                <input value={reviewForm.areasOfImprovement} onChange={(e) => setReviewForm((f) => ({ ...f, areasOfImprovement: e.target.value }))} style={inp} />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={label}>Metas</label>
+                <input value={reviewForm.goals} onChange={(e) => setReviewForm((f) => ({ ...f, goals: e.target.value }))} style={inp} />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={label}>Comentarios</label>
+                <input value={reviewForm.comments} onChange={(e) => setReviewForm((f) => ({ ...f, comments: e.target.value }))} style={inp} />
+              </div>
+              {reviewSaveErr && (
+                <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--danger)" }}>{reviewSaveErr}</div>
+              )}
+              <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <Button variant="ghost" onClick={() => { setShowReviewForm(false); setReviewSaveErr(null); }}>Cancelar</Button>
+                <Button variant="primary" onClick={() => void saveReview()} disabled={reviewSaving}>{reviewSaving ? "Guardando…" : "Crear evaluación"}</Button>
+              </div>
+            </div>
+          )}
+          {reviewsLoading ? (
+            <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+          ) : (
+            <DataTable columns={reviewColumns} rows={reviews} rowKey={(r) => r.id} emptyTitle="Sin evaluaciones" emptyDescription="Registra la primera evaluación de desempeño." />
+          )}
+        </Section>
+      )}
+
+      {tab === "dashboard" && (
+        <Section title="Dashboard de RRHH" subtitle="Resumen de permisos y evaluaciones de toda la organización.">
+          {dashboardLoading ? (
+            <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+          ) : dashboard ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
+              <KpiCard label="Permisos pendientes" value={dashboard.pendingLeaves} variant={dashboard.pendingLeaves > 0 ? "warning" : "positive"} icon="⏳" />
+              <KpiCard label="Aprobados este mes" value={dashboard.approvedLeavesThisMonth} variant="positive" icon="✅" />
+              <KpiCard label="Evaluaciones totales" value={dashboard.totalReviews} icon="📋" />
+              <KpiCard label="Calificación promedio" value={dashboard.avgRating.toFixed(1)} hint="Sobre 5" variant={dashboard.avgRating >= 4 ? "positive" : dashboard.avgRating >= 3 ? "default" : "warning"} icon="⭐" />
+            </div>
+          ) : null}
+        </Section>
+      )}
 
       {editing && (
         <div
