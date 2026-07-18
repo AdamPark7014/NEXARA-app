@@ -836,6 +836,17 @@
   padding: 0 4px;
 }
 
+.msgBody .entityMention {
+  display: inline;
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--nx-accent) 35%, transparent);
+}
+
+.msgBody .entityMention:hover {
+  background: color-mix(in srgb, var(--nx-accent) 18%, transparent);
+  border-bottom-color: var(--nx-accent);
+}
+
 .edited {
   font-size: 11px;
   color: var(--text-tertiary, #98a2b3);
@@ -1100,6 +1111,21 @@
 .attachBtn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.mentionToolBtn {
+  border: 0;
+  background: transparent;
+  border-radius: 7px;
+  padding: 5px 6px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mentionToolBtn:hover {
+  background: var(--surface-2, #f4f6f8);
 }
 
 .attachChip {
@@ -1489,6 +1515,107 @@
 .modalInput:focus {
   border-color: color-mix(in srgb, var(--nx-accent) 50%, var(--nx-line));
   box-shadow: 0 0 0 3px var(--nx-accent-soft);
+}
+
+.entityPickerModal {
+  width: 560px;
+}
+
+.entityTabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.entityTab {
+  border: 1px solid var(--nx-line);
+  background: var(--surface, #fff);
+  color: var(--text-secondary, #667085);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.entityTab:hover,
+.entityTabActive {
+  border-color: color-mix(in srgb, var(--nx-accent) 45%, var(--nx-line));
+  background: var(--nx-accent-soft);
+  color: var(--nx-accent);
+}
+
+.entityResults {
+  min-height: 160px;
+  max-height: 330px;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  margin-bottom: 12px;
+}
+
+.entityResult {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--foreground, #111);
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.entityResult:hover {
+  background: var(--nx-accent-soft);
+}
+
+.entityResultIcon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--surface-2, #f4f6f8);
+}
+
+.entityResultText {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.entityResultText strong,
+.entityResultText small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entityResultText strong {
+  font-size: 13px;
+}
+
+.entityResultText small {
+  color: var(--text-tertiary, #98a2b3);
+  font-size: 11.5px;
+}
+
+.entityResultAdd {
+  color: var(--nx-accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.entityEmpty {
+  padding: 30px 12px;
+  text-align: center;
+  color: var(--text-tertiary, #98a2b3);
+  font-size: 12.5px;
 }
 
 .colleagueList {

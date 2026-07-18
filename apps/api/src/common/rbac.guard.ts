@@ -19,15 +19,11 @@ type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
  *
  * Estrategia:
  *   1. Super admin → bypass total.
- *   2. Si user tiene `roleKey` v2 y la URL está EXPLÍCITAMENTE en `url-matrix`
- *      → respeta ese veredicto (allow/deny).
- *   3. Si url-matrix no contempla la URL para ese rol (regla no encontrada)
- *      → cae al modelo legacy (`@RBAC()` + permisos + flags).
+ *   2. Si user tiene `roleKey` v2 y la URL está EXPLÍCITAMENTE en `url-matrix`:
+ *      - deny → Forbidden inmediato
+ *      - allow → AÚN debe satisfacer `@RBAC()` (AND, no bypass)
+ *   3. Si url-matrix no contempla la URL para ese rol → solo `@RBAC()` legacy.
  *   4. Si user NO tiene `roleKey` v2 → solo modelo legacy.
- *
- * Esto permite migración progresiva: cada vez que añades una URL al matrix
- * para un rol v2, el endpoint queda gobernado por v2. El resto sigue
- * funcionando con el modelo legacy hasta que termines de cubrir todo.
  */
 @Injectable()
 export class RbacGuard extends AuthGuard('jwt') {
@@ -50,31 +46,31 @@ export class RbacGuard extends AuthGuard('jwt') {
       return true;
     }
 
-    // 2) Modelo RBAC v2 — si el rol y la URL están en la matriz, manda.
+    // 2) Modelo RBAC v2 — matrix allow MUST still satisfy @RBAC permissions.
     const v2Role = this.resolveV2Role(user);
+    let matrixAllowed = false;
     if (v2Role) {
       const method = (request.method as HttpMethod) ?? 'GET';
       const url = request.originalUrl || request.url || '';
       const result = checkUrlAccess(v2Role, url, method);
       if (result.matchedRule) {
-        // La matriz cubre esta URL → veredicto definitivo.
         if (!result.allowed) {
           this.logger.warn(`[v2 DENY] role=${v2Role} ${method} ${url}`);
           throw new ForbiddenException(`Tu rol (${v2Role}) no puede acceder a ${method} ${url}`);
         }
+        matrixAllowed = true;
         (request as { rbac?: unknown }).rbac = {
           role: v2Role,
           scope: result.scope,
           rule: result.matchedRule,
           source: 'v2',
         };
-        return true;
+        // No early-return: keep evaluating decorator permissions below.
       }
-      // Si la matriz NO cubre esta URL para este rol → no podemos negar
-      // todavía (rompería endpoints no migrados). Pasamos al modelo legacy.
+      // Si la matriz NO cubre esta URL → cae al modelo legacy.
     }
 
-    // 3) Modelo legacy — flags + permisos + decorator @RBAC
+    // 3) Permisos del decorator @RBAC — siempre se evalúan si existen.
     const permissions: string[] = user.permissions || [];
     const isConsoleAdmin = Boolean(
       user.admin ||
@@ -116,7 +112,9 @@ export class RbacGuard extends AuthGuard('jwt') {
         throw new ForbiddenException('Solo puedes gestionar tu propio departamento');
       }
     }
-    (request as { rbac?: unknown }).rbac = { source: 'legacy' };
+    if (!matrixAllowed) {
+      (request as { rbac?: unknown }).rbac = { source: 'legacy' };
+    }
     return true;
   }
 

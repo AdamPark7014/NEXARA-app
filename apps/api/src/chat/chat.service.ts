@@ -704,6 +704,128 @@ export class ChatService {
     });
   }
 
+  async searchMentionables(
+    userId: number,
+    q: string,
+    kind?: 'USER' | 'ACTIVITY' | 'EVIDENCE',
+  ) {
+    const query = (q ?? '').trim().slice(0, 100);
+    const scope = await this.resolveChatScope(userId);
+    const scopedUserIds = [userId, ...scope.reportIds];
+    const activityScope: Prisma.ActivityWhereInput = scope.isOmniscient
+      ? {}
+      : {
+          OR: [
+            { responsableId: { in: scopedUserIds } },
+            { creadoPorId: { in: scopedUserIds } },
+          ],
+        };
+
+    const [users, activities, evidences] = await Promise.all([
+      !kind || kind === 'USER'
+        ? this.prisma.user.findMany({
+            where: {
+              isActive: true,
+              ...(query
+                ? {
+                    OR: [
+                      { nombre: { contains: query, mode: 'insensitive' as const } },
+                      { email: { contains: query, mode: 'insensitive' as const } },
+                    ],
+                  }
+                : {}),
+            },
+            select: { id: true, nombre: true, email: true },
+            orderBy: { nombre: 'asc' },
+            take: 20,
+          })
+        : Promise.resolve([]),
+      !kind || kind === 'ACTIVITY'
+        ? this.prisma.activity.findMany({
+            where: {
+              AND: [
+                activityScope,
+                ...(query
+                  ? [
+                      {
+                        OR: [
+                          { anNumber: { contains: query, mode: 'insensitive' as const } },
+                          { titulo: { contains: query, mode: 'insensitive' as const } },
+                          { estatus: { contains: query, mode: 'insensitive' as const } },
+                        ],
+                      },
+                    ]
+                  : []),
+              ],
+            },
+            select: { id: true, anNumber: true, titulo: true, estatus: true },
+            orderBy: { fechaAsignacion: 'desc' },
+            take: 20,
+          })
+        : Promise.resolve([]),
+      !kind || kind === 'EVIDENCE'
+        ? this.prisma.evidence.findMany({
+            where: {
+              actividad: activityScope,
+              ...(query
+                ? {
+                    OR: [
+                      { tipoEvidencia: { contains: query, mode: 'insensitive' as const } },
+                      { comentarios: { contains: query, mode: 'insensitive' as const } },
+                      {
+                        actividad: {
+                          AND: [
+                            activityScope,
+                            {
+                              OR: [
+                                { anNumber: { contains: query, mode: 'insensitive' as const } },
+                                { titulo: { contains: query, mode: 'insensitive' as const } },
+                              ],
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  }
+                : {}),
+            },
+            select: {
+              id: true,
+              tipoEvidencia: true,
+              estatus: true,
+              actividadId: true,
+              actividad: { select: { anNumber: true, titulo: true } },
+            },
+            orderBy: { subidoEn: 'desc' },
+            take: 20,
+          })
+        : Promise.resolve([]),
+    ]);
+
+    return [
+      ...users.map((u) => ({
+        kind: 'USER' as const,
+        id: u.id,
+        label: u.nombre,
+        subtitle: u.email,
+      })),
+      ...activities.map((a) => ({
+        kind: 'ACTIVITY' as const,
+        id: a.id,
+        label: `${a.anNumber} · ${a.titulo}`,
+        subtitle: a.estatus,
+        href: `/ops/activities/${a.id}`,
+      })),
+      ...evidences.map((e) => ({
+        kind: 'EVIDENCE' as const,
+        id: e.id,
+        label: `Evidencia #${e.id} · ${e.tipoEvidencia}`,
+        subtitle: `${e.actividad.anNumber} · ${e.actividad.titulo} · ${e.estatus}`,
+        href: `/ops/activities/${e.actividadId}/evidences`,
+      })),
+    ];
+  }
+
   async editMessage(messageId: number, userId: number, body: string) {
     const clean = (body ?? '').trim();
     if (!clean) throw new BadRequestException('El mensaje no puede estar vacío');
@@ -714,6 +836,10 @@ export class ChatService {
     });
     if (!message) throw new NotFoundException('Mensaje no encontrado');
     if (message.authorId !== userId) throw new ForbiddenException('Solo puedes editar tus mensajes');
+    const editDeadline = message.createdAt.getTime() + 60 * 60 * 1000;
+    if (Date.now() > editDeadline) {
+      throw new ForbiddenException('Los mensajes solo se pueden editar durante la primera hora');
+    }
     await this.assertChannelAccess(message.channelId, userId, { write: true });
 
     const updated = await this.prisma.chatMessage.update({
@@ -742,42 +868,6 @@ export class ChatService {
     const payload = this.serializeMessage(updated);
     this.realtime.emitToRoom(this.room(updated.channelId), 'chat:message-updated', payload);
     return payload;
-  }
-
-  async deleteMessage(messageId: number, userId: number) {
-    const message = await this.prisma.chatMessage.findFirst({
-      where: { id: messageId, deletedAt: null },
-    });
-    if (!message) throw new NotFoundException('Mensaje no encontrado');
-    if (message.authorId !== userId) throw new ForbiddenException('Solo puedes eliminar tus mensajes');
-    await this.assertChannelAccess(message.channelId, userId, { write: true });
-
-    await this.prisma.chatMessage.update({
-      where: { id: messageId },
-      data: { deletedAt: new Date(), body: '' },
-    });
-
-    this.realtime.emitToRoom(this.room(message.channelId), 'chat:message-deleted', {
-      id: messageId,
-      channelId: message.channelId,
-      parentId: message.parentId,
-    });
-
-    if (!message.parentId) {
-      const latest = await this.prisma.chatMessage.findFirst({
-        where: { channelId: message.channelId, deletedAt: null, parentId: null },
-        orderBy: { createdAt: 'desc' },
-      });
-      await this.prisma.chatChannel.update({
-        where: { id: message.channelId },
-        data: {
-          lastMessageAt: latest?.createdAt ?? null,
-          lastMessagePreview: latest ? this.preview(latest.body) : null,
-        },
-      });
-    }
-
-    return { ok: true, id: messageId };
   }
 
   async updateTopic(channelId: number, userId: number, topic: string) {
