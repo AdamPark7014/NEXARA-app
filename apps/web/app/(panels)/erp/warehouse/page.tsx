@@ -10,13 +10,46 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getErpInventorySectionConfig } from "@/lib/section-views";
-import { listStockLevels, mapStockLevelToRow, updateStockLevelConfig, listWarehouses, listCatalogProducts, createStockMovement } from "@/lib/stock-api";
+import {
+  listStockLevels,
+  mapStockLevelToRow,
+  updateStockLevelConfig,
+  listWarehouses,
+  listCatalogProducts,
+  createStockMovement,
+  listStockMovements,
+  listLots,
+  createLot,
+  getStockValuation,
+  type StockMovementRow,
+  type LotRow,
+  type ValuationRow,
+} from "@/lib/stock-api";
 import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToCsv } from "@/lib/export-csv";
 
 type StockRow = ReturnType<typeof mapStockLevelToRow>;
+
+const TABS = [
+  { key: "inventario", label: "Inventario" },
+  { key: "movimientos", label: "Movimientos" },
+  { key: "lotes", label: "Lotes y caducidad" },
+  { key: "valuacion", label: "Valuación" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
+const MOVEMENT_TYPE_LABEL: Record<string, string> = {
+  RECEIPT: "Entrada",
+  DISPATCH: "Salida",
+  TRANSFER: "Traspaso",
+  ADJUSTMENT: "Ajuste",
+  RETURN: "Devolución",
+  SCRAP: "Merma",
+  PRODUCTION_IN: "Entrada producción",
+  PRODUCTION_OUT: "Salida producción",
+};
 
 export default function WarehousePage() {
   const { user } = useUser();
@@ -42,6 +75,24 @@ export default function WarehousePage() {
   const [showWarehouseForm, setShowWarehouseForm] = useState(false);
   const [warehouseForm, setWarehouseForm] = useState({ name: "", code: "", address: "", city: "" });
   const [savingWarehouse, setSavingWarehouse] = useState(false);
+
+  const [tab, setTab] = useState<TabKey>("inventario");
+
+  const [movements, setMovements] = useState<StockMovementRow[]>([]);
+  const [movementsLoading, setMovementsLoading] = useState(false);
+  const [movementTypeFilter, setMovementTypeFilter] = useState("");
+  const [movementWarehouseFilter, setMovementWarehouseFilter] = useState("");
+
+  const [lots, setLots] = useState<LotRow[]>([]);
+  const [lotsLoading, setLotsLoading] = useState(false);
+  const [showLotForm, setShowLotForm] = useState(false);
+  const [lotForm, setLotForm] = useState({ lotNumber: "", productId: "", expirationDate: "", manufacturingDate: "", notes: "" });
+  const [savingLot, setSavingLot] = useState(false);
+  const [lotSaveErr, setLotSaveErr] = useState<string | null>(null);
+
+  const [valuation, setValuation] = useState<ValuationRow[]>([]);
+  const [valuationLoading, setValuationLoading] = useState(false);
+  const [valuationWarehouseFilter, setValuationWarehouseFilter] = useState("");
 
   const loadWarehouses = useCallback(() => {
     if (!token) return;
@@ -114,6 +165,7 @@ export default function WarehousePage() {
       setShowMovementForm(false);
       setMovement({ type: "RECEIPT", productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "" });
       void load();
+      if (tab === "movimientos") void loadMovements();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al registrar entrada");
     } finally {
@@ -137,6 +189,88 @@ export default function WarehousePage() {
       toast.error(formatApiError(e, "No se pudo actualizar el mínimo de stock"));
     }
   };
+
+  const loadMovements = useCallback(async () => {
+    if (!token) return;
+    setMovementsLoading(true);
+    try {
+      const rows = await listStockMovements(token, {
+        type: movementTypeFilter || undefined,
+        warehouseId: movementWarehouseFilter ? Number(movementWarehouseFilter) : undefined,
+      });
+      setMovements(rows);
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudieron cargar los movimientos"));
+      setMovements([]);
+    } finally {
+      setMovementsLoading(false);
+    }
+  }, [token, movementTypeFilter, movementWarehouseFilter]);
+
+  const loadLots = useCallback(async () => {
+    if (!token) return;
+    setLotsLoading(true);
+    try {
+      const rows = await listLots(token);
+      setLots(rows);
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudieron cargar los lotes"));
+      setLots([]);
+    } finally {
+      setLotsLoading(false);
+    }
+  }, [token]);
+
+  const saveLot = async () => {
+    if (!token || !lotForm.lotNumber.trim() || !lotForm.productId) {
+      setLotSaveErr("Número de lote y producto son obligatorios.");
+      return;
+    }
+    setSavingLot(true);
+    setLotSaveErr(null);
+    try {
+      const created = await createLot(token, {
+        lotNumber: lotForm.lotNumber.trim(),
+        productId: Number(lotForm.productId),
+        expirationDate: lotForm.expirationDate || undefined,
+        manufacturingDate: lotForm.manufacturingDate || undefined,
+        notes: lotForm.notes.trim() || undefined,
+      });
+      setLots((prev) => [created, ...prev]);
+      setShowLotForm(false);
+      setLotForm({ lotNumber: "", productId: "", expirationDate: "", manufacturingDate: "", notes: "" });
+    } catch (e) {
+      setLotSaveErr(formatApiError(e, "No se pudo crear el lote"));
+    } finally {
+      setSavingLot(false);
+    }
+  };
+
+  const loadValuation = useCallback(async () => {
+    if (!token) return;
+    setValuationLoading(true);
+    try {
+      const rows = await getStockValuation(token, valuationWarehouseFilter ? Number(valuationWarehouseFilter) : undefined);
+      setValuation(rows);
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo cargar la valuación"));
+      setValuation([]);
+    } finally {
+      setValuationLoading(false);
+    }
+  }, [token, valuationWarehouseFilter]);
+
+  useEffect(() => {
+    if (tab === "movimientos") void loadMovements();
+  }, [tab, loadMovements]);
+
+  useEffect(() => {
+    if (tab === "lotes") void loadLots();
+  }, [tab, loadLots]);
+
+  useEffect(() => {
+    if (tab === "valuacion") void loadValuation();
+  }, [tab, loadValuation]);
 
   const sinStock = items.filter((s) => s.existencia === 0).length;
   const bajoMinimo = items.filter((s) => s.existencia > 0 && s.existencia < s.minimo).length;
@@ -225,6 +359,72 @@ export default function WarehousePage() {
     },
   ];
 
+  const movementColumns: Column<StockMovementRow>[] = [
+    { key: "movementNumber", label: "Folio", render: (m) => <code style={{ fontSize: 11.5 }}>{m.movementNumber}</code>, width: 120 },
+    { key: "type", label: "Tipo", render: (m) => (
+      <Tag variant={m.type === "RECEIPT" || m.type === "PRODUCTION_IN" || m.type === "RETURN" ? "positive" : m.type === "SCRAP" ? "danger" : "default"}>
+        {MOVEMENT_TYPE_LABEL[m.type] ?? m.type}
+      </Tag>
+    ), width: 130 },
+    { key: "product", label: "Producto", render: (m) => (
+      <div>
+        <div style={{ fontSize: 13 }}>{m.product?.name ?? "—"}</div>
+        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{m.product?.sku}{m.lot ? ` · Lote ${m.lot.lotNumber}` : ""}</div>
+      </div>
+    ) },
+    { key: "route", label: "Origen → Destino", render: (m) => (
+      <span style={{ fontSize: 12 }}>{m.fromWarehouse?.name ?? "—"} → {m.toWarehouse?.name ?? "—"}</span>
+    ), width: 200 },
+    { key: "quantity", label: "Cantidad", render: (m) => <strong style={{ fontSize: 13 }}>{Number(m.quantity)}</strong>, width: 90, numeric: true },
+    { key: "totalCost", label: "Costo total", render: (m) => <Money value={Number(m.totalCost ?? 0)} compact />, width: 110, numeric: true },
+    { key: "createdAt", label: "Fecha", render: (m) => (
+      <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{new Date(m.createdAt).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+    ), width: 140 },
+    { key: "createdBy", label: "Registró", accessor: (m) => m.createdBy?.nombre ?? "—", width: 130 },
+  ];
+
+  const today = new Date();
+  const lotColumns: Column<LotRow>[] = [
+    { key: "lotNumber", label: "Lote", render: (l) => <code style={{ fontSize: 12 }}>{l.lotNumber}</code>, width: 130 },
+    { key: "product", label: "Producto", render: (l) => (
+      <div>
+        <div style={{ fontSize: 13 }}>{l.product?.name ?? "—"}</div>
+        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{l.product?.sku}</div>
+      </div>
+    ) },
+    { key: "manufacturingDate", label: "Fabricación", render: (l) => l.manufacturingDate ? <span style={{ fontSize: 12 }}>{new Date(l.manufacturingDate).toLocaleDateString("es-MX")}</span> : <span style={{ color: "var(--text-tertiary)" }}>—</span>, width: 120 },
+    { key: "expirationDate", label: "Caducidad", width: 150, render: (l) => {
+      if (!l.expirationDate) return <span style={{ color: "var(--text-tertiary)" }}>Sin caducidad</span>;
+      const exp = new Date(l.expirationDate);
+      const days = Math.floor((exp.getTime() - today.getTime()) / 86400000);
+      const variant = days < 0 ? "danger" : days <= 30 ? "warning" : "positive";
+      const text = days < 0 ? `Vencido hace ${Math.abs(days)}d` : days <= 30 ? `Vence en ${days}d` : exp.toLocaleDateString("es-MX");
+      return <Tag variant={variant}>{text}</Tag>;
+    } },
+    { key: "notes", label: "Notas", accessor: (l) => l.notes ?? "—" },
+  ];
+
+  const valuationColumns: Column<ValuationRow>[] = [
+    { key: "product", label: "Producto", render: (v) => (
+      <div>
+        <div style={{ fontSize: 13 }}>{v.product?.name ?? "—"}</div>
+        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{v.product?.sku}</div>
+      </div>
+    ) },
+    { key: "warehouse", label: "Almacén", accessor: (v) => v.warehouse?.name ?? "—", width: 150 },
+    { key: "quantity", label: "Cantidad", render: (v) => Number(v.quantity), width: 90, numeric: true },
+    { key: "availableQty", label: "Disponible", render: (v) => Number(v.availableQty), width: 100, numeric: true },
+    { key: "unitCost", label: "Costo unit.", render: (v) => <Money value={Number(v.unitCost ?? 0)} compact />, width: 110, numeric: true },
+    { key: "totalValue", label: "Valor total", render: (v) => <Money value={v.totalValue} compact />, width: 130, numeric: true },
+  ];
+
+  const totalValuation = useMemo(() => valuation.reduce((s, v) => s + v.totalValue, 0), [valuation]);
+  const expiringLotsCount = useMemo(() => lots.filter((l) => {
+    if (!l.expirationDate) return false;
+    const days = Math.floor((new Date(l.expirationDate).getTime() - Date.now()) / 86400000);
+    return days <= 30;
+  }).length, [lots]);
+
   return (
     <>
       <PageHeader
@@ -260,36 +460,15 @@ export default function WarehousePage() {
         </Link>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 20 }}>
-        <KpiCard label="Sin stock" value={sinStock} variant={sinStock > 0 ? "danger" : "positive"} hint={sinStock > 0 ? "Requieren reposición urgente" : "Todo disponible"} icon="📦" />
-        <KpiCard label="Bajo mínimo" value={bajoMinimo} variant={bajoMinimo > 0 ? "warning" : "positive"} hint={bajoMinimo > 0 ? "Por debajo del punto de reorden" : "Niveles OK"} icon="⚠️" />
-        <KpiCard label="Valor inventario" value={<Money value={valorTotal} compact />} hint={`${items.length} SKUs en catálogo`} variant="accent" icon="💰" />
-        <KpiCard label="Almacenes" value={warehouses.length} hint="Ubicaciones configuradas" icon="🏭" />
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18, borderBottom: "1px solid var(--border)", paddingBottom: 12 }}>
+        {TABS.map((t) => (
+          <Button key={t.key} size="sm" variant={tab === t.key ? "primary" : "secondary"} onClick={() => setTab(t.key)}>
+            {t.label}
+          </Button>
+        ))}
       </div>
 
-      {items.length > 0 && (() => {
-        const byCategory = Object.entries(
-          items.reduce<Record<string, number>>((acc, s) => { const k = s.categoria || "Sin categoría"; acc[k] = (acc[k] ?? 0) + 1; return acc; }, {})
-        ).sort((a, b) => b[1] - a[1]).slice(0, 6);
-        return (
-          <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>SKUs por categoría</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {byCategory.map(([cat, count]) => (
-                <div key={cat} style={{ display: "grid", gridTemplateColumns: "130px 1fr 36px", gap: 10, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{cat}</span>
-                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(count / items.length) * 100}%`, background: "var(--primary)", borderRadius: 3, transition: "width .4s" }} />
-                  </div>
-                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ── Nuevo almacén ── */}
+      {/* ── Nuevo almacén (disponible desde cualquier pestaña) ── */}
       {showWarehouseForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
           <p style={{ margin: "0 0 14px", fontWeight: 700, fontSize: 13 }}>Nuevo almacén</p>
@@ -320,18 +499,7 @@ export default function WarehousePage() {
         </div>
       )}
 
-      {showForm && editing && (
-        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <p style={{ fontSize: 13, margin: "0 0 12px", fontWeight: 600 }}>{editing.nombre}</p>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Stock mínimo / reorden</label>
-          <input type="number" min={0} value={minimo} onChange={(e) => setMinimo(+e.target.value)} style={{ ...inp, maxWidth: 200 }} />
-          <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-            <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={save}>Guardar</Button>
-          </div>
-        </div>
-      )}
-
+      {/* ── Entrada/salida de stock (disponible desde cualquier pestaña) ── */}
       {showMovementForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
           <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>{movement.type === "RECEIPT" ? "Entrada de inventario" : "Salida de inventario"}</p>
@@ -375,6 +543,49 @@ export default function WarehousePage() {
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
             <Button variant="ghost" onClick={() => setShowMovementForm(false)}>Cancelar</Button>
             <Button variant="primary" onClick={() => void saveMovement()} disabled={savingMovement}>{savingMovement ? "Registrando…" : movement.type === "RECEIPT" ? "Registrar entrada" : "Registrar salida"}</Button>
+          </div>
+        </div>
+      )}
+
+      {tab === "inventario" && (
+      <>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 20 }}>
+        <KpiCard label="Sin stock" value={sinStock} variant={sinStock > 0 ? "danger" : "positive"} hint={sinStock > 0 ? "Requieren reposición urgente" : "Todo disponible"} icon="📦" />
+        <KpiCard label="Bajo mínimo" value={bajoMinimo} variant={bajoMinimo > 0 ? "warning" : "positive"} hint={bajoMinimo > 0 ? "Por debajo del punto de reorden" : "Niveles OK"} icon="⚠️" />
+        <KpiCard label="Valor inventario" value={<Money value={valorTotal} compact />} hint={`${items.length} SKUs en catálogo`} variant="accent" icon="💰" />
+        <KpiCard label="Almacenes" value={warehouses.length} hint="Ubicaciones configuradas" icon="🏭" />
+      </div>
+
+      {items.length > 0 && (() => {
+        const byCategory = Object.entries(
+          items.reduce<Record<string, number>>((acc, s) => { const k = s.categoria || "Sin categoría"; acc[k] = (acc[k] ?? 0) + 1; return acc; }, {})
+        ).sort((a, b) => b[1] - a[1]).slice(0, 6);
+        return (
+          <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>SKUs por categoría</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+              {byCategory.map(([cat, count]) => (
+                <div key={cat} style={{ display: "grid", gridTemplateColumns: "130px 1fr 36px", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{cat}</span>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(count / items.length) * 100}%`, background: "var(--primary)", borderRadius: 3, transition: "width .4s" }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {showForm && editing && (
+        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+          <p style={{ fontSize: 13, margin: "0 0 12px", fontWeight: 600 }}>{editing.nombre}</p>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Stock mínimo / reorden</label>
+          <input type="number" min={0} value={minimo} onChange={(e) => setMinimo(+e.target.value)} style={{ ...inp, maxWidth: 200 }} />
+          <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+            <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={save}>Guardar</Button>
           </div>
         </div>
       )}
@@ -430,6 +641,121 @@ export default function WarehousePage() {
           <DataTable columns={columns} rows={visibleItems} rowKey={(s) => s.id} emptyTitle="Sin stock registrado" emptyDescription="Configura almacenes y niveles de inventario en el backend." />
         ) : null}
       </Section>
+      </>
+      )}
+
+      {tab === "movimientos" && (
+        <Section
+          title="Movimientos de inventario"
+          subtitle="Historial de entradas, salidas, traspasos y ajustes registrados en el almacén."
+          actions={
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <select value={movementWarehouseFilter} onChange={(e) => setMovementWarehouseFilter(e.target.value)} style={{ ...inp, width: 170 }}>
+                <option value="">Todos los almacenes</option>
+                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+              <select value={movementTypeFilter} onChange={(e) => setMovementTypeFilter(e.target.value)} style={{ ...inp, width: 150 }}>
+                <option value="">Todos los tipos</option>
+                {Object.entries(MOVEMENT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+              {cfg.canCreate && (
+                <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowMovementForm(true)}>Registrar movimiento</Button>
+              )}
+            </div>
+          }
+        >
+          {movementsLoading ? (
+            <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+          ) : (
+            <DataTable columns={movementColumns} rows={movements} rowKey={(m) => m.id} emptyTitle="Sin movimientos" emptyDescription="Registra una entrada o salida de inventario para ver el historial aquí." />
+          )}
+        </Section>
+      )}
+
+      {tab === "lotes" && (
+        <Section
+          title="Lotes y caducidad"
+          subtitle="Trazabilidad por lote de fabricación, con alerta cuando se acerca la fecha de caducidad."
+          actions={cfg.canCreate ? (
+            <Button variant="primary" size="sm" iconLeft="+" onClick={() => { setLotForm({ lotNumber: "", productId: "", expirationDate: "", manufacturingDate: "", notes: "" }); setShowLotForm(true); }}>
+              Nuevo lote
+            </Button>
+          ) : undefined}
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 16 }}>
+            <KpiCard label="Lotes registrados" value={lots.length} icon="🧾" />
+            <KpiCard
+              label="Por vencer / vencidos"
+              value={expiringLotsCount}
+              variant={expiringLotsCount > 0 ? "warning" : "positive"}
+              hint="Caducidad en 30 días o menos"
+              icon={expiringLotsCount > 0 ? "⏰" : "✅"}
+            />
+          </div>
+          {showLotForm && (
+            <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Número de lote</label>
+                <input value={lotForm.lotNumber} onChange={(e) => setLotForm((f) => ({ ...f, lotNumber: e.target.value }))} placeholder="LOTE-2026-001" style={inp} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Producto</label>
+                <select value={lotForm.productId} onChange={(e) => setLotForm((f) => ({ ...f, productId: e.target.value }))} style={inp}>
+                  <option value="">— Seleccionar —</option>
+                  {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Fecha de fabricación (opcional)</label>
+                <input type="date" value={lotForm.manufacturingDate} onChange={(e) => setLotForm((f) => ({ ...f, manufacturingDate: e.target.value }))} style={inp} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Fecha de caducidad (opcional)</label>
+                <input type="date" value={lotForm.expirationDate} onChange={(e) => setLotForm((f) => ({ ...f, expirationDate: e.target.value }))} style={inp} />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Notas (opcional)</label>
+                <input value={lotForm.notes} onChange={(e) => setLotForm((f) => ({ ...f, notes: e.target.value }))} style={inp} />
+              </div>
+              {lotSaveErr && (
+                <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--danger)" }}>{lotSaveErr}</div>
+              )}
+              <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <Button variant="ghost" onClick={() => { setShowLotForm(false); setLotSaveErr(null); }}>Cancelar</Button>
+                <Button variant="primary" onClick={() => void saveLot()} disabled={savingLot}>{savingLot ? "Guardando…" : "Crear lote"}</Button>
+              </div>
+            </div>
+          )}
+          {lotsLoading ? (
+            <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+          ) : (
+            <DataTable columns={lotColumns} rows={lots} rowKey={(l) => l.id} emptyTitle="Sin lotes" emptyDescription="Registra el primer lote para trazabilidad y control de caducidad." />
+          )}
+        </Section>
+      )}
+
+      {tab === "valuacion" && (
+        <Section
+          title="Valuación de inventario"
+          subtitle="Costo unitario y valor total por producto y almacén, según el método de valuación configurado."
+          actions={
+            <select value={valuationWarehouseFilter} onChange={(e) => setValuationWarehouseFilter(e.target.value)} style={{ ...inp, width: 200 }}>
+              <option value="">Todos los almacenes</option>
+              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
+          }
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 16 }}>
+            <KpiCard label="Valor total en valuación" value={<Money value={totalValuation} compact />} variant="accent" icon="💰" />
+            <KpiCard label="SKUs valuados" value={valuation.length} icon="📦" />
+          </div>
+          {valuationLoading ? (
+            <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+          ) : (
+            <DataTable columns={valuationColumns} rows={valuation} rowKey={(v) => v.id} emptyTitle="Sin datos de valuación" emptyDescription="No hay niveles de stock configurados para este almacén." />
+          )}
+        </Section>
+      )}
     </>
   );
 }

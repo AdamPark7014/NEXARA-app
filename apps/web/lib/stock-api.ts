@@ -6,6 +6,7 @@ export type StockLevelRow = {
   reservedQty?: number | string;
   reorderPoint?: number | string;
   minStock?: number | string;
+  unitCost?: number | string;
   product?: {
     id: number;
     name: string;
@@ -88,4 +89,76 @@ export async function createStockMovement(
   payload: { type: string; productId: number; fromWarehouseId?: number; toWarehouseId?: number; quantity: number; unitCost?: number; reference?: string; notes?: string },
 ) {
   return stockRequest<unknown>("stock/movements", token, { method: "POST", body: JSON.stringify(payload) }, "No se pudo registrar el movimiento");
+}
+
+export type StockMovementRow = {
+  id: number;
+  movementNumber: string;
+  type: string;
+  quantity: number | string;
+  unitCost?: number | string;
+  totalCost?: number | string;
+  reference?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  product?: { id: number; name: string; sku: string } | null;
+  fromWarehouse?: { id: number; name: string } | null;
+  toWarehouse?: { id: number; name: string } | null;
+  lot?: { id: number; lotNumber: string } | null;
+  createdBy?: { id: number; nombre: string } | null;
+};
+
+export async function listStockMovements(
+  token: string,
+  filters?: { productId?: number; warehouseId?: number; type?: string; from?: string; to?: string },
+) {
+  const qs = new URLSearchParams();
+  if (filters?.productId) qs.set("productId", String(filters.productId));
+  if (filters?.warehouseId) qs.set("warehouseId", String(filters.warehouseId));
+  if (filters?.type) qs.set("type", filters.type);
+  if (filters?.from) qs.set("from", filters.from);
+  if (filters?.to) qs.set("to", filters.to);
+  const raw = await stockRequest<StockMovementRow[] | { data: StockMovementRow[] }>(
+    `stock/movements?${qs}`,
+    token,
+    {},
+    "No se pudieron cargar los movimientos",
+  );
+  return unwrapArray(raw);
+}
+
+export type LotRow = {
+  id: number;
+  lotNumber: string;
+  expirationDate?: string | null;
+  manufacturingDate?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  product?: { id: number; name: string; sku: string } | null;
+};
+
+export async function listLots(token: string, productId?: number) {
+  const qs = productId ? `?productId=${productId}` : "";
+  const raw = await stockRequest<LotRow[] | { data: LotRow[] }>(`stock/lots${qs}`, token, {}, "No se pudieron cargar los lotes");
+  return unwrapArray(raw);
+}
+
+export async function createLot(
+  token: string,
+  payload: { lotNumber: string; productId: number; expirationDate?: string; manufacturingDate?: string; notes?: string },
+) {
+  return stockRequest<LotRow>("stock/lots", token, { method: "POST", body: JSON.stringify(payload) }, "No se pudo crear el lote");
+}
+
+export type ValuationRow = StockLevelRow & { totalValue: number; availableQty: number };
+
+export async function getStockValuation(token: string, warehouseId?: number) {
+  const qs = warehouseId ? `?warehouseId=${warehouseId}` : "";
+  const raw = await stockRequest<ValuationRow[] | { data: ValuationRow[] }>(
+    `stock/valuation${qs}`,
+    token,
+    {},
+    "No se pudo cargar la valuación",
+  );
+  return unwrapArray(raw);
 }
