@@ -2082,6 +2082,7 @@ enum JournalEntryStatus {
 
 enum InvoiceStatus {
   DRAFT
+  STAMPING
   SENT
   PARTIALLY_PAID
   PAID
@@ -2257,6 +2258,7 @@ model JournalEntry {
   createdBy      User?              @relation("JournalEntryCreator", fields: [createdById], references: [id])
   lines          JournalEntryLine[]
 
+  @@unique([reference])
   @@index([date])
   @@index([status])
   @@map("journal_entries")
@@ -2353,7 +2355,7 @@ model Invoice {
 
   @@index([type, status])
   @@index([dueDate])
-  @@index([cfdiUuid])
+  @@unique([cfdiUuid])
   @@index([emisorRfc])
   @@index([receptorRfc])
   @@map("invoices")
@@ -2413,6 +2415,8 @@ model Payment {
   bankAccount     BankAccount?    @relation(fields: [bankAccountId], references: [id])
   createdBy       User?           @relation("PaymentCreator", fields: [createdById], references: [id])
 
+  @@unique([cfdiPaymentUuid])
+  @@unique([speiTrackingKey])
   @@index([invoiceId])
   @@map("payments")
 }
@@ -2467,7 +2471,7 @@ model BankTransaction {
   reconciliation    BankReconciliation?
 
   @@index([bankAccountId, transactionDate])
-  @@index([speiTrackingKey])
+  @@unique([speiTrackingKey])
   @@map("bank_transactions")
 }
 
