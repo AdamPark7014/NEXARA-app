@@ -14,6 +14,8 @@ import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToCsv } from "@/lib/export-csv";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import Modal from "@/components/ui/Modal";
 
 interface BankAccount {
   id: number;
@@ -81,6 +83,7 @@ export default function BankingPage() {
   const [showTxForm, setShowTxForm] = useState(false);
   const [txForm, setTxForm] = useState({ ...emptyTxForm });
   const [savingTx, setSavingTx] = useState(false);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -179,12 +182,30 @@ export default function BankingPage() {
     } finally { setSavingTx(false); }
   };
 
-  const reconcile = async (tx: BankTransaction) => {
+  const reconcile = (tx: BankTransaction) => {
     if (!token) return;
-    try {
-      await apiFetch(`accounting/banking/transactions/${tx.id}/reconcile`, token, { method: "PATCH", body: JSON.stringify({ status: "MATCHED" }) });
-      setTxs((prev) => prev.map((t) => (t.id === tx.id ? { ...t, reconciled: true, reconciliationStatus: "MATCHED" } : t)));
-    } catch (e) { toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    const amount = Number(tx.amount);
+    setConfirmState({
+      title: "Conciliar movimiento",
+      message: `¿Marcar como conciliado el movimiento de ${amount.toLocaleString("es-MX", { style: "currency", currency: "MXN" })}?`,
+      confirmLabel: "Conciliar",
+      danger: false,
+      fn: async () => {
+        try {
+          await apiFetch(`accounting/banking/transactions/${tx.id}/reconcile`, token, {
+            method: "PATCH",
+            body: JSON.stringify({ matchedAmount: amount }),
+          });
+          setTxs((prev) =>
+            prev.map((t) =>
+              t.id === tx.id ? { ...t, reconciled: true, reconciliationStatus: "MATCHED" } : t,
+            ),
+          );
+        } catch (e) {
+          toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+        }
+      },
+    });
   };
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
@@ -340,60 +361,68 @@ export default function BankingPage() {
         </>
       )}
 
-      {showTxForm && selected && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowTxForm(false)}>
-          <div style={{ background: "var(--surface)", borderRadius: 16, padding: 28, width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Registrar movimiento · {selected.name}</div>
-            <div style={{ display: "grid", gap: 14 }}>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Fecha</span>
-                <input type="date" value={txForm.transactionDate} onChange={(e) => setTxForm((f) => ({ ...f, transactionDate: e.target.value }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Descripción</span>
-                <input value={txForm.description} onChange={(e) => setTxForm((f) => ({ ...f, description: e.target.value }))} placeholder="SPEI recibido, comisión bancaria…" style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Monto ($)</span>
-                <input type="number" min={0} step="0.01" value={txForm.amount} onChange={(e) => setTxForm((f) => ({ ...f, amount: Number(e.target.value) }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Tipo</span>
-                <select value={txForm.isDebit ? "debit" : "credit"} onChange={(e) => setTxForm((f) => ({ ...f, isDebit: e.target.value === "debit" }))} style={inp}>
-                  <option value="debit">Cargo (salida)</option>
-                  <option value="credit">Abono (entrada)</option>
-                </select></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Contraparte</span>
-                <input value={txForm.counterpartyName} onChange={(e) => setTxForm((f) => ({ ...f, counterpartyName: e.target.value }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Concepto</span>
-                <input value={txForm.concept} onChange={(e) => setTxForm((f) => ({ ...f, concept: e.target.value }))} style={inp} /></label>
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setShowTxForm(false)}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void importTransaction()} disabled={savingTx || !txForm.description.trim() || !txForm.amount}>
-                {savingTx ? "Guardando…" : "Registrar"}
-              </Button>
-            </div>
-          </div>
+      <Modal
+        open={showTxForm && !!selected}
+        onClose={() => setShowTxForm(false)}
+        title={selected ? `Registrar movimiento · ${selected.name}` : "Registrar movimiento"}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowTxForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void importTransaction()} disabled={savingTx || !txForm.description.trim() || !txForm.amount}>
+              {savingTx ? "Guardando…" : "Registrar"}
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: "grid", gap: 14 }}>
+          <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Fecha</span>
+            <input type="date" value={txForm.transactionDate} onChange={(e) => setTxForm((f) => ({ ...f, transactionDate: e.target.value }))} style={inp} /></label>
+          <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Descripción</span>
+            <input value={txForm.description} onChange={(e) => setTxForm((f) => ({ ...f, description: e.target.value }))} placeholder="SPEI recibido, comisión bancaria…" style={inp} /></label>
+          <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Monto ($)</span>
+            <input type="number" min={0} step="0.01" value={txForm.amount} onChange={(e) => setTxForm((f) => ({ ...f, amount: Number(e.target.value) }))} style={inp} /></label>
+          <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Tipo</span>
+            <select value={txForm.isDebit ? "debit" : "credit"} onChange={(e) => setTxForm((f) => ({ ...f, isDebit: e.target.value === "debit" }))} style={inp}>
+              <option value="debit">Cargo (salida)</option>
+              <option value="credit">Abono (entrada)</option>
+            </select></label>
+          <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Contraparte</span>
+            <input value={txForm.counterpartyName} onChange={(e) => setTxForm((f) => ({ ...f, counterpartyName: e.target.value }))} style={inp} /></label>
+          <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Concepto</span>
+            <input value={txForm.concept} onChange={(e) => setTxForm((f) => ({ ...f, concept: e.target.value }))} style={inp} /></label>
         </div>
-      )}
+      </Modal>
 
-      {showForm && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowForm(false)}>
-          <div style={{ background: "var(--surface)", borderRadius: 16, padding: 28, width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>{editingAccount ? "Editar cuenta bancaria" : "Nueva cuenta bancaria"}</div>
-            <div style={{ display: "grid", gap: 14 }}>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Nombre / alias</span>
-                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Cuenta operativa MXN" style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Banco</span>
-                <input value={form.bankName} onChange={(e) => setForm((f) => ({ ...f, bankName: e.target.value }))} placeholder="Banorte" style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Número de cuenta</span>
-                <input value={form.accountNumber} onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>CLABE</span>
-                <input value={form.clabe} onChange={(e) => setForm((f) => ({ ...f, clabe: e.target.value }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Saldo inicial</span>
-                <input type="number" value={form.currentBalance} onChange={(e) => setForm((f) => ({ ...f, currentBalance: Number(e.target.value) }))} style={inp} /></label>
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void saveAccount()} disabled={saving || !form.name || !form.bankName}>{saving ? "Guardando…" : editingAccount ? "Guardar cambios" : "Crear cuenta"}</Button>
-            </div>
-          </div>
+      <Modal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        title={editingAccount ? "Editar cuenta bancaria" : "Nueva cuenta bancaria"}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void saveAccount()} disabled={saving || !form.name || !form.bankName}>
+              {saving ? "Guardando…" : editingAccount ? "Guardar cambios" : "Crear cuenta"}
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: "grid", gap: 14 }}>
+          <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Nombre / alias</span>
+            <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Cuenta operativa MXN" style={inp} /></label>
+          <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Banco</span>
+            <input value={form.bankName} onChange={(e) => setForm((f) => ({ ...f, bankName: e.target.value }))} placeholder="Banorte" style={inp} /></label>
+          <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Número de cuenta</span>
+            <input value={form.accountNumber} onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value }))} style={inp} /></label>
+          <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>CLABE</span>
+            <input value={form.clabe} onChange={(e) => setForm((f) => ({ ...f, clabe: e.target.value }))} style={inp} /></label>
+          {!editingAccount && (
+            <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Saldo inicial</span>
+              <input type="number" value={form.currentBalance} onChange={(e) => setForm((f) => ({ ...f, currentBalance: Number(e.target.value) }))} style={inp} /></label>
+          )}
         </div>
-      )}
+      </Modal>
+
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }
