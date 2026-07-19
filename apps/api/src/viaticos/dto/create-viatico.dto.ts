@@ -1,9 +1,13 @@
 export class CreateViaticoDto {
-  // TODO: Define los campos según tu modelo de Viatico en Prisma
-  // Ejemplo:
-  // montoSolicitado: number;
-  // razonGasto: string;
-  // usuarioId: number;
-  // actividadId: number;
-  // ...
+  usuarioId?: number;
+  actividadId?: number | null;
+  projectId?: number | null;
+  vehicleId?: number | null;
+  /** COMBUSTIBLE | CASETA | HOSPEDAJE | ALIMENTACION | TRANSPORTE | OTROS */
+  categoria?: string;
+  montoSolicitado!: number | string;
+  motivo?: string;
+  concepto?: string;
+  ticketEvidenciaUrl?: string;
+  comprobante?: string;
 }

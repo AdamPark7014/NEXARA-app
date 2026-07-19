@@ -1,3 +1,4 @@
+import type { Response } from 'express';
 import {
   Controller,
   Get,
@@ -9,7 +10,12 @@ import {
   UseGuards,
   ForbiddenException,
   Query,
+  Res,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ExpensesService } from './expenses.service.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CreateExpenseDto } from './dto/create-expense.dto.js';
@@ -18,16 +24,61 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { getUploadSubdir } from '../common/upload-paths.js';
 
 @Controller('expenses')
 @UseGuards(UrlAccessGuard)
 export class ExpensesController {
   constructor(private readonly expensesService: ExpensesService) {}
 
+  @Get('analytics')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
+  analytics(
+    @CurrentUser() user: any,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const departmentId = user.isSuperAdmin || user.permissions?.includes(PERMISSIONS.CONTABILIDAD_MANAGE)
+      ? undefined
+      : user.departmentId;
+    return this.expensesService.analytics({ from, to }, departmentId);
+  }
+
+  @Get('report.pdf')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
+  async reportPdf(
+    @CurrentUser() user: any,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Res() res?: Response,
+  ) {
+    const departmentId = user.isSuperAdmin || user.permissions?.includes(PERMISSIONS.CONTABILIDAD_MANAGE)
+      ? undefined
+      : user.departmentId;
+    const buffer = await this.expensesService.reportPdf(
+      { from, to },
+      user?.nombre ?? null,
+      departmentId,
+    );
+    res!.header('Content-Type', 'application/pdf');
+    res!.header(
+      'Content-Disposition',
+      `attachment; filename="gastos-${from || 'inicio'}-${to || 'hoy'}.pdf"`,
+    );
+    return res!.send(buffer);
+  }
+
   @Post()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
-  create(@CurrentUser() user: any, @Body() body: CreateExpenseDto & Record<string, unknown>) {
+  @UseInterceptors(FileInterceptor('ticketEvidencia', { dest: getUploadSubdir(__dirname, 'expenses') }))
+  create(
+    @CurrentUser() user: any,
+    @Body() body: CreateExpenseDto & Record<string, unknown>,
+    @UploadedFile() file?: any,
+  ) {
     const elevated =
       user.isSuperAdmin ||
       user.permissions?.includes(PERMISSIONS.CONTABILIDAD_MANAGE) ||
@@ -35,16 +86,22 @@ export class ExpensesController {
     const usuarioId =
       elevated && body.usuarioId != null ? Number(body.usuarioId) : Number(user.id);
 
+    const ticketEvidenciaUrl = file
+      ? `/uploads/expenses/${file.filename}`
+      : body.ticketEvidenciaUrl
+        ? String(body.ticketEvidenciaUrl)
+        : null;
+
     if (body.concepto && body.monto !== undefined) {
       return this.expensesService.createAdministrative({
         usuarioId,
+        createdById: user.id,
         concepto: String(body.concepto),
         monto: Number(body.monto),
         categoria: body.categoria ? String(body.categoria) : undefined,
-        // No aceptar estado forged en create — siempre borrador/pendiente
-        estado: 'BORRADOR',
-        esRecurrente: Boolean(body.esRecurrente),
+        esRecurrente: Boolean(body.esRecurrente === true || body.esRecurrente === 'true'),
         fecha: body.fecha ? String(body.fecha) : undefined,
+        ticketEvidenciaUrl,
         actividadId: body.actividadId ? Number(body.actividadId) : undefined,
       });
     }
@@ -54,6 +111,7 @@ export class ExpensesController {
     return this.expensesService.create({
       ...body,
       usuarioId,
+      ticketEvidenciaUrl: ticketEvidenciaUrl || undefined,
       estatusPago: 'Pendiente',
     } as CreateExpenseDto);
   }
@@ -62,11 +120,14 @@ export class ExpensesController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
-    if (user.isSuperAdmin) {
+    if (
+      user.isSuperAdmin ||
+      user.permissions?.includes(PERMISSIONS.CONTABILIDAD_MANAGE) ||
+      user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)
+    ) {
       return this.expensesService.findAll(query);
-    } else {
-      return this.expensesService.findByDepartment(user.departmentId, query);
     }
+    return this.expensesService.findByDepartment(user.departmentId, query);
   }
 
   @Get(':id')
@@ -76,23 +137,56 @@ export class ExpensesController {
     return this.expensesService.findOne(+id);
   }
 
+  @Patch(':id/approve')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
+  approve(
+    @Param('id') id: string,
+    @Body() body: { action?: 'approve' | 'reject'; note?: string },
+  ) {
+    const action = body.action === 'reject' ? 'reject' : 'approve';
+    return this.expensesService.approveOrReject(+id, action, body.note);
+  }
+
+  @Patch(':id/pagado')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
+  markPagado(@Param('id') id: string) {
+    return this.expensesService.markPagado(+id);
+  }
+
   @Patch(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
+  @UseInterceptors(FileInterceptor('ticketEvidencia', { dest: getUploadSubdir(__dirname, 'expenses') }))
   update(
     @CurrentUser() _user: any,
     @Param('id') id: string,
     @Body() body: UpdateExpenseDto & Record<string, unknown>,
+    @UploadedFile() file?: any,
   ) {
-    if (body.concepto !== undefined || body.monto !== undefined || body.categoria !== undefined) {
-      const { estado: _estado, ...rest } = body as any;
+    const ticketEvidenciaUrl = file
+      ? `/uploads/expenses/${file.filename}`
+      : body.ticketEvidenciaUrl
+        ? String(body.ticketEvidenciaUrl)
+        : undefined;
+
+    if (
+      body.concepto !== undefined ||
+      body.monto !== undefined ||
+      body.categoria !== undefined ||
+      ticketEvidenciaUrl !== undefined
+    ) {
       return this.expensesService.updateAdministrative(+id, {
-        concepto: rest.concepto ? String(rest.concepto) : undefined,
-        monto: rest.monto !== undefined ? Number(rest.monto) : undefined,
-        categoria: rest.categoria ? String(rest.categoria) : undefined,
-        // estado/estatusPago solo por flujos de aprobación dedicados (si existen)
-        esRecurrente: rest.esRecurrente !== undefined ? Boolean(rest.esRecurrente) : undefined,
-        fecha: rest.fecha ? String(rest.fecha) : undefined,
+        concepto: body.concepto ? String(body.concepto) : undefined,
+        monto: body.monto !== undefined ? Number(body.monto) : undefined,
+        categoria: body.categoria ? String(body.categoria) : undefined,
+        esRecurrente:
+          body.esRecurrente !== undefined
+            ? Boolean(body.esRecurrente === true || body.esRecurrente === 'true')
+            : undefined,
+        fecha: body.fecha ? String(body.fecha) : undefined,
+        ticketEvidenciaUrl,
       });
     }
     const { estatusPago: _e, usuarioId: _u, ...safe } = body as UpdateExpenseDto & Record<string, unknown>;

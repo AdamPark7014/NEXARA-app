@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
@@ -13,10 +12,17 @@ import { filterRowsByScope, getErpViaticsAdminSectionConfig } from "@/lib/sectio
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import { buildApiUrl } from "@/lib/api-base";
-import { approveViatico, markViaticoPagado, postViatico } from "@/lib/viatics-api";
+import { approveViatico, markViaticoPagado, patchViatico, postViatico } from "@/lib/viatics-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FileDropzone from "@/components/ui/FileDropzone";
+import Modal from "@/components/ui/Modal";
+import {
+  FinanceField,
+  FinanceFormGrid,
+  FinanceModuleShell,
+  financeInputStyle,
+} from "@/components/finance/FinanceModuleShell";
 
 interface Viatico {
   id: number;
@@ -207,7 +213,6 @@ export default function ViaticosPage() {
   const pendientes = visibleItems.filter((v) => v.estatus === "Pendiente").length;
   const contabilidadItems = visibleItems.filter((v) => v.estatus === "Aprobado" || v.estatus === "Pagado");
   const aprobados = contabilidadItems.length;
-  const totalMonto = visibleItems.reduce((s, v) => s + (Number(v.montoSolicitado) || 0), 0);
   const pendienteMonto = visibleItems
     .filter((v) => v.estatus !== "Rechazado")
     .reduce((s, v) => s + (Number(v.montoSolicitado) || 0), 0);
@@ -224,6 +229,7 @@ export default function ViaticosPage() {
   };
   const openEdit = (v: Viatico) => {
     setSelected(v);
+    setEvidenceFile(null);
     setForm({
       concepto: v.concepto ?? v.motivo ?? "",
       montoSolicitado: Number(v.montoSolicitado) || 0,
@@ -236,32 +242,64 @@ export default function ViaticosPage() {
     setMode("edit");
   };
 
-  const submitEdit = async () => {
+  const runApprove = async (action: "approve" | "reject" | "pagado") => {
     if (!token || !selected) return;
     setSaving(true);
     try {
-      const updated = await apiFetch(`viatics/${selected.id}`, token, {
-        method: "PATCH",
-        body: JSON.stringify({
+      if (action === "pagado") await markViaticoPagado(token, selected.id);
+      else await approveViatico(token, selected.id, action, approveForm.comentariosAdmin || undefined);
+      void load();
+      setMode(null);
+      toast.success(action === "reject" ? "Viático rechazado" : action === "pagado" ? "Marcado como pagado" : "Viático aprobado");
+    } catch (e) {
+      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitEdit = async () => {
+    if (!token || !selected) return;
+    if (!form.projectId && !form.actividadId) {
+      toast.error("Liga la solicitud a un proyecto o una actividad.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await patchViatico(
+        token,
+        selected.id,
+        {
           motivo: form.concepto.trim(),
           montoSolicitado: form.montoSolicitado,
-          ticketEvidenciaUrl: form.comprobante.trim() || undefined,
+          comprobanteUrl: form.comprobante.trim() || undefined,
           categoria: form.categoria,
           projectId: form.projectId ? Number(form.projectId) : null,
           actividadId: form.actividadId ? Number(form.actividadId) : null,
           vehicleId: form.vehicleId ? Number(form.vehicleId) : null,
-        }),
-      });
-      setItems((prev) => prev.map((v) => (v.id === selected.id ? {
-        ...v,
-        ...(updated ?? {}),
-        concepto: updated?.motivo ?? form.concepto,
-        comprobante: updated?.ticketEvidenciaUrl ?? form.comprobante,
-      } : v)));
+        },
+        evidenceFile,
+      );
+      setItems((prev) =>
+        prev.map((v) =>
+          v.id === selected.id
+            ? {
+                ...v,
+                ...(updated ?? {}),
+                concepto: updated?.motivo ?? form.concepto,
+                comprobante: updated?.ticketEvidenciaUrl ?? form.comprobante,
+              }
+            : v,
+        ),
+      );
       setMode(null);
+      setEvidenceFile(null);
+      toast.success("Viático actualizado");
     } catch (e) {
       toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const submitCreate = async () => {
@@ -318,24 +356,6 @@ export default function ViaticosPage() {
     }
   };
 
-  const submitApprove = async () => {
-    if (!token || !selected) return;
-    setSaving(true);
-    try {
-      if (approveForm.estatus === "Pagado") {
-        await markViaticoPagado(token, selected.id);
-      } else if (approveForm.estatus === "Rechazado") {
-        await approveViatico(token, selected.id, "reject", approveForm.comentariosAdmin || undefined);
-      } else {
-        await approveViatico(token, selected.id, "approve", approveForm.comentariosAdmin || undefined);
-      }
-      void load();
-      setMode(null);
-    } catch (e) {
-      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
-    } finally { setSaving(false); }
-  };
-
   const softDelete = async (v: Viatico) => {
     if (!token) return;
     setConfirmState({ message: `¿Cancelar viático "${v.concepto ?? v.motivo}"?`, confirmLabel: "Cancelar viático", fn: async () => {
@@ -355,10 +375,7 @@ export default function ViaticosPage() {
     return "warning";
   };
 
-  const inp: React.CSSProperties = {
-    width: "100%", padding: "8px 12px", border: "1px solid var(--border)",
-    borderRadius: 8, background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13,
-  };
+  const inp = financeInputStyle;
 
   const columns: Column<Viatico>[] = [
     {
@@ -410,10 +427,13 @@ export default function ViaticosPage() {
             <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); openEdit(v); }}>Editar</Button>
           )}
           {cfg.canApprove && v.estatus === "Pendiente" && (
-            <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openApprove(v); }}>Autorizar</Button>
+            <>
+              <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openApprove(v); }}>Autorizar</Button>
+              <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); setSelected(v); setApproveForm({ estatus: "Rechazado", comentariosAdmin: "" }); setMode("approve"); }}>Rechazar</Button>
+            </>
           )}
           {cfg.canApprove && v.estatus === "Aprobado" && (
-            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelected(v); setApproveForm({ estatus: "Pagado", comentariosAdmin: "" }); setMode("approve"); }}>Marcar pagado</Button>
+            <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); void (async () => { setSelected(v); try { await markViaticoPagado(token, v.id); void load(); toast.success("Marcado como pagado"); } catch (err) { toast.error(err instanceof Error ? err.message : "Error"); } })(); }}>Marcar pagado</Button>
           )}
           {cfg.canDelete && (
             <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void softDelete(v); }}>✕</Button>
@@ -425,62 +445,42 @@ export default function ViaticosPage() {
   ];
 
   return (
-    <>
-      <PageHeader
-        eyebrow="ERP · Finanzas"
-        title={cfg.title}
-        subtitle={cfg.subtitle}
-        variant="hero"
-        actions={
-          <>
-            <Button variant="ghost" iconLeft="📄" onClick={() => void downloadPdf()}>PDF control</Button>
-            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {cfg.canCreate && (
-              <Button variant="primary" iconLeft="💸" onClick={openCreate}>Solicitar viático</Button>
-            )}
-          </>
-        }
-      />
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Pendientes" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" />
-        <KpiCard label="Aprobados" value={aprobados} variant="positive" icon="✅" />
-        <KpiCard label="Total registros" value={items.length} variant="default" icon="📋" />
-        {canViewAll && (
-          <KpiCard label="Monto pendiente" value={<Money value={pendienteMonto} compact />} variant={pendienteMonto > 10000 ? "warning" : "default"} icon="💰" />
-        )}
-      </div>
-
-      {items.length > 0 && (() => {
-        const byStatus: Record<string, number> = {};
-        for (const v of items) { const s = v.estatus ?? "Sin estatus"; byStatus[s] = (byStatus[s] ?? 0) + 1; }
-        const statusColors: Record<string, string> = {
-          Pendiente: "var(--warning)", Aprobado: "var(--success)", Pagado: "var(--primary)",
-          Rechazado: "var(--danger)", Aprobado_Coordinador: "color-mix(in srgb, var(--success) 60%, var(--warning))",
-        };
-        const total = items.length;
-        return (
-          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por estatus</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              {Object.entries(byStatus).sort((a, b) => b[1] - a[1]).map(([s, count]) => (
-                <div key={s} style={{ display: "grid", gridTemplateColumns: "130px 1fr 36px", gap: 10, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{s.replace("_", " ")}</span>
-                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: statusColors[s] ?? "var(--primary)", borderRadius: 3 }} />
-                  </div>
-                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-      <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-        <Button size="sm" variant={tab === "contabilidad" ? "primary" : "secondary"} onClick={() => setTab("contabilidad")}>Contabilidad (aprobados)</Button>
-        <Button size="sm" variant={tab === "todos" ? "primary" : "secondary"} onClick={() => setTab("todos")}>Todos</Button>
-        <Button size="sm" variant={tab === "analytics" ? "primary" : "secondary"} onClick={() => setTab("analytics")}>Analytics</Button>
-      </div>
+    <FinanceModuleShell
+      eyebrow="ERP · Finanzas"
+      title={cfg.title}
+      subtitle={cfg.subtitle}
+      actions={
+        <>
+          <Button variant="ghost" iconLeft="📄" onClick={() => void downloadPdf()}>PDF control</Button>
+          <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
+          {cfg.canCreate && (
+            <Button variant="primary" iconLeft="💸" onClick={openCreate}>Solicitar viático</Button>
+          )}
+        </>
+      }
+      kpis={
+        <>
+          <KpiCard label="Pendientes" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" />
+          <KpiCard label="Aprobados" value={aprobados} variant="positive" icon="✅" />
+          <KpiCard label="Total registros" value={items.length} icon="📋" />
+          {canViewAll ? (
+            <KpiCard
+              label="Monto pendiente"
+              value={<Money value={pendienteMonto} compact />}
+              variant={pendienteMonto > 10000 ? "warning" : "default"}
+              icon="💰"
+            />
+          ) : null}
+        </>
+      }
+      tabs={[
+        { id: "contabilidad", label: "Contabilidad" },
+        { id: "todos", label: "Todos" },
+        { id: "analytics", label: "Analytics" },
+      ]}
+      activeTab={tab}
+      onTabChange={(id) => setTab(id as typeof tab)}
+    >
       <FilterToolbar
         search={{ value: filter, onChange: setFilter, placeholder: "Buscar por concepto, solicitante, folio…" }}
         selects={tab === "todos" ? [{
@@ -491,8 +491,8 @@ export default function ViaticosPage() {
           allowAll: true,
         }] : []}
         onClear={() => { setFilter(""); setFilterEstatus(""); }}
-        resultCount={loading ? null : filtered.length}
-        rightActions={filtered.length > 0 ? (
+        resultCount={loading || tab === "analytics" ? null : filtered.length}
+        rightActions={filtered.length > 0 && tab !== "analytics" ? (
           <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(filtered, [
             { key: "id", label: "ID" },
             { key: "concepto", label: "Concepto" },
@@ -508,14 +508,12 @@ export default function ViaticosPage() {
         {tab === "analytics" ? (
           <div style={{ display: "grid", gap: 16 }}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "end" }}>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Desde</span>
+              <FinanceField label="Desde">
                 <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inp} />
-              </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Hasta</span>
+              </FinanceField>
+              <FinanceField label="Hasta">
                 <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inp} />
-              </label>
+              </FinanceField>
               <Button size="sm" variant="secondary" onClick={() => void loadAnalytics()}>Aplicar</Button>
               <Button size="sm" variant="primary" onClick={() => void downloadPdf()}>Descargar PDF</Button>
             </div>
@@ -550,181 +548,175 @@ export default function ViaticosPage() {
           </div>
         ) : (
           <>
-        {highlightId && (
-          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
-            Mostrando viático <strong>#{highlightId}</strong> desde enlace directo.
-          </p>
-        )}
-        {loading && <EmptyState icon="⏳" title="Cargando viáticos…" description="Consultando solicitudes desde la API." />}
-        {!loading && error && (
-          <EmptyState
-            icon="⚠️"
-            title="No se pudo cargar"
-            description={error}
-            action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
-          />
-        )}
-        {!loading && !error && (
-          <DataTable
-            columns={columns}
-            rows={filtered}
-            rowKey={(v) => v.id}
-            emptyTitle="Sin viáticos"
-            emptyDescription={cfg.canCreate ? "Solicita tu primer viático con el botón de arriba." : "No hay viáticos registrados."}
-          />
-        )}
+            {loading && <EmptyState icon="⏳" title="Cargando viáticos…" description="Consultando solicitudes desde la API." />}
+            {!loading && error && (
+              <EmptyState
+                icon="⚠️"
+                title="No se pudo cargar"
+                description={error}
+                action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+              />
+            )}
+            {!loading && !error && (
+              <DataTable
+                columns={columns}
+                rows={filtered}
+                rowKey={(v) => v.id}
+                emptyTitle="Sin viáticos"
+                emptyDescription={cfg.canCreate ? "Solicita tu primer viático con el botón de arriba." : "No hay viáticos registrados."}
+              />
+            )}
           </>
         )}
       </Section>
 
-      {/* Modal crear */}
-      {mode === "create" && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
-          onClick={() => setMode(null)}>
-          <div style={{ background: "var(--surface)", borderRadius: 16, padding: 28, width: 460, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }}
-            onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Solicitar viático</div>
-            <div style={{ display: "grid", gap: 14 }}>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Categoría</span>
-                <select value={form.categoria} onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))} style={inp}>
-                  {["COMBUSTIBLE", "CASETA", "HOSPEDAJE", "ALIMENTACION", "TRANSPORTE", "OTROS"].map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Proyecto (ventas)</span>
-                <select value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))} style={inp}>
-                  <option value="">— Opcional si hay actividad —</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>ID actividad OPS</span>
-                <input value={form.actividadId} onChange={(e) => setForm((f) => ({ ...f, actividadId: e.target.value }))}
-                  placeholder="Ej. 128" style={inp} />
-              </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Vehículo (opcional)</span>
-                <select value={form.vehicleId} onChange={(e) => setForm((f) => ({ ...f, vehicleId: e.target.value }))} style={inp}>
-                  <option value="">— Sin vehículo —</option>
-                  {vehicles.map((v) => (
-                    <option key={v.id} value={v.id}>{v.nombre}{v.placas ? ` · ${v.placas}` : ""}</option>
-                  ))}
-                </select>
-              </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Concepto / descripción</span>
-                <input value={form.concepto} onChange={(e) => setForm((f) => ({ ...f, concepto: e.target.value }))}
-                  placeholder="Ej: Hospedaje 1 noche + viáticos Puebla" style={inp} />
-              </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Monto solicitado ($)</span>
-                <input type="number" min={0} value={form.montoSolicitado}
-                  onChange={(e) => setForm((f) => ({ ...f, montoSolicitado: +e.target.value }))} style={inp} />
-              </label>
-              <FileDropzone
-                file={evidenceFile}
-                onFile={setEvidenceFile}
-                label="Ticket / comprobante"
-                required
-                hint="Obligatorio · PDF o imagen"
-              />
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>URL comprobante (alternativa)</span>
-                <input value={form.comprobante} onChange={(e) => setForm((f) => ({ ...f, comprobante: e.target.value }))}
-                  placeholder="Solo si no subes archivo" style={inp} />
-              </label>
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setMode(null)}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void submitCreate()} disabled={saving || !form.concepto || (!evidenceFile && !form.comprobante.trim())}>
-                {saving ? "Enviando…" : "Enviar solicitud"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={mode === "create"}
+        onClose={() => setMode(null)}
+        title="Solicitar viático"
+        maxWidth={520}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setMode(null)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void submitCreate()} disabled={saving || !form.concepto || (!evidenceFile && !form.comprobante.trim())}>
+              {saving ? "Enviando…" : "Enviar solicitud"}
+            </Button>
+          </>
+        }
+      >
+        <FinanceFormGrid>
+          <FinanceField label="Categoría">
+            <select value={form.categoria} onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))} style={inp}>
+              {["COMBUSTIBLE", "CASETA", "HOSPEDAJE", "ALIMENTACION", "TRANSPORTE", "OTROS"].map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </FinanceField>
+          <FinanceField label="Proyecto (ventas)">
+            <select value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))} style={inp}>
+              <option value="">— Opcional si hay actividad —</option>
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </FinanceField>
+          <FinanceField label="ID actividad OPS">
+            <input value={form.actividadId} onChange={(e) => setForm((f) => ({ ...f, actividadId: e.target.value }))} placeholder="Ej. 128" style={inp} />
+          </FinanceField>
+          <FinanceField label="Vehículo (opcional)">
+            <select value={form.vehicleId} onChange={(e) => setForm((f) => ({ ...f, vehicleId: e.target.value }))} style={inp}>
+              <option value="">— Sin vehículo —</option>
+              {vehicles.map((v) => <option key={v.id} value={v.id}>{v.nombre}{v.placas ? ` · ${v.placas}` : ""}</option>)}
+            </select>
+          </FinanceField>
+          <FinanceField label="Concepto / descripción">
+            <input value={form.concepto} onChange={(e) => setForm((f) => ({ ...f, concepto: e.target.value }))} placeholder="Ej: Hospedaje 1 noche + viáticos Puebla" style={inp} />
+          </FinanceField>
+          <FinanceField label="Monto solicitado ($)">
+            <input type="number" min={0} value={form.montoSolicitado} onChange={(e) => setForm((f) => ({ ...f, montoSolicitado: +e.target.value }))} style={inp} />
+          </FinanceField>
+          <FileDropzone file={evidenceFile} onFile={setEvidenceFile} label="Ticket / comprobante" required hint="Obligatorio · PDF o imagen" />
+          <FinanceField label="URL comprobante (alternativa)">
+            <input value={form.comprobante} onChange={(e) => setForm((f) => ({ ...f, comprobante: e.target.value }))} placeholder="Solo si no subes archivo" style={inp} />
+          </FinanceField>
+        </FinanceFormGrid>
+      </Modal>
 
-      {/* Modal editar pendiente */}
-      {mode === "edit" && selected && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
-          onClick={() => setMode(null)}>
-          <div style={{ background: "var(--surface)", borderRadius: 16, padding: 28, width: 460, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }}
-            onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Editar viático #{selected.id}</div>
-            <div style={{ display: "grid", gap: 14 }}>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Concepto / descripción</span>
-                <input value={form.concepto} onChange={(e) => setForm((f) => ({ ...f, concepto: e.target.value }))} style={inp} />
-              </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Monto solicitado ($)</span>
-                <input type="number" min={0} value={form.montoSolicitado} onChange={(e) => setForm((f) => ({ ...f, montoSolicitado: +e.target.value }))} style={inp} />
-              </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>URL comprobante</span>
-                <input value={form.comprobante} onChange={(e) => setForm((f) => ({ ...f, comprobante: e.target.value }))} style={inp} />
-              </label>
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setMode(null)}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void submitEdit()} disabled={saving || !form.concepto.trim()}>
-                {saving ? "Guardando…" : "Guardar cambios"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={mode === "edit" && !!selected}
+        onClose={() => setMode(null)}
+        title={selected ? `Editar viático #${selected.id}` : "Editar"}
+        maxWidth={520}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setMode(null)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void submitEdit()} disabled={saving || !form.concepto.trim()}>
+              {saving ? "Guardando…" : "Guardar cambios"}
+            </Button>
+          </>
+        }
+      >
+        <FinanceFormGrid>
+          <FinanceField label="Categoría">
+            <select value={form.categoria} onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))} style={inp}>
+              {["COMBUSTIBLE", "CASETA", "HOSPEDAJE", "ALIMENTACION", "TRANSPORTE", "OTROS"].map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </FinanceField>
+          <FinanceField label="Proyecto (ventas)">
+            <select value={form.projectId} onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))} style={inp}>
+              <option value="">— Opcional si hay actividad —</option>
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </FinanceField>
+          <FinanceField label="ID actividad OPS">
+            <input value={form.actividadId} onChange={(e) => setForm((f) => ({ ...f, actividadId: e.target.value }))} style={inp} />
+          </FinanceField>
+          <FinanceField label="Vehículo (opcional)">
+            <select value={form.vehicleId} onChange={(e) => setForm((f) => ({ ...f, vehicleId: e.target.value }))} style={inp}>
+              <option value="">— Sin vehículo —</option>
+              {vehicles.map((v) => <option key={v.id} value={v.id}>{v.nombre}{v.placas ? ` · ${v.placas}` : ""}</option>)}
+            </select>
+          </FinanceField>
+          <FinanceField label="Concepto / descripción">
+            <input value={form.concepto} onChange={(e) => setForm((f) => ({ ...f, concepto: e.target.value }))} style={inp} />
+          </FinanceField>
+          <FinanceField label="Monto solicitado ($)">
+            <input type="number" min={0} value={form.montoSolicitado} onChange={(e) => setForm((f) => ({ ...f, montoSolicitado: +e.target.value }))} style={inp} />
+          </FinanceField>
+          <FileDropzone file={evidenceFile} onFile={setEvidenceFile} label="Nuevo comprobante (opcional)" hint="PDF o imagen" />
+          <FinanceField label="URL comprobante">
+            <input value={form.comprobante} onChange={(e) => setForm((f) => ({ ...f, comprobante: e.target.value }))} style={inp} />
+          </FinanceField>
+        </FinanceFormGrid>
+      </Modal>
 
-      {/* Modal aprobar */}
-      {mode === "approve" && selected && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
-          onClick={() => setMode(null)}>
-          <div style={{ background: "var(--surface)", borderRadius: 16, padding: 28, width: 460, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }}
-            onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Revisar viático</div>
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 6 }}>
+      <Modal
+        open={mode === "approve" && !!selected}
+        onClose={() => setMode(null)}
+        title="Revisar viático"
+        maxWidth={480}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setMode(null)}>Cancelar</Button>
+            {approveForm.estatus === "Rechazado" ? (
+              <Button variant="danger" onClick={() => void runApprove("reject")} disabled={saving}>
+                {saving ? "Guardando…" : "Confirmar rechazo"}
+              </Button>
+            ) : (
+              <Button variant="primary" onClick={() => void runApprove(approveForm.estatus === "Pagado" ? "pagado" : "approve")} disabled={saving}>
+                {saving ? "Guardando…" : approveForm.estatus === "Pagado" ? "Marcar pagado" : "Aprobar"}
+              </Button>
+            )}
+          </>
+        }
+      >
+        {selected && (
+          <FinanceFormGrid>
+            <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
               {selected.usuario?.nombre} — <strong>{selected.concepto}</strong>
             </div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: "var(--accent)", marginBottom: 20 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "var(--accent)" }}>
               ${Number(selected.montoSolicitado || 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
             </div>
-            <div style={{ display: "grid", gap: 14 }}>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Decisión</span>
-                <select value={approveForm.estatus} onChange={(e) => setApproveForm((f) => ({ ...f, estatus: e.target.value }))} style={inp}>
-                  <option value="Aprobado">✅ Aprobar</option>
-                  <option value="Rechazado">❌ Rechazar</option>
-                  <option value="Pagado">💳 Marcar como pagado</option>
-                </select>
-              </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Comentarios</span>
-                <textarea value={approveForm.comentariosAdmin}
-                  onChange={(e) => setApproveForm((f) => ({ ...f, comentariosAdmin: e.target.value }))}
-                  placeholder="Motivo del rechazo, notas de pago, etc."
-                  rows={3}
-                  style={{ ...inp, resize: "vertical" }} />
-              </label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Button size="sm" variant={approveForm.estatus === "Aprobado" ? "primary" : "secondary"} onClick={() => setApproveForm((f) => ({ ...f, estatus: "Aprobado" }))}>Aprobar</Button>
+              <Button size="sm" variant={approveForm.estatus === "Rechazado" ? "danger" : "secondary"} onClick={() => setApproveForm((f) => ({ ...f, estatus: "Rechazado" }))}>Rechazar</Button>
+              <Button size="sm" variant={approveForm.estatus === "Pagado" ? "primary" : "secondary"} onClick={() => setApproveForm((f) => ({ ...f, estatus: "Pagado" }))}>Marcar pagado</Button>
             </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setMode(null)}>Cancelar</Button>
-              <Button
-                variant={approveForm.estatus === "Rechazado" ? "danger" : "primary"}
-                onClick={() => void submitApprove()}
-                disabled={saving}
-              >
-                {saving ? "Guardando…" : approveForm.estatus === "Rechazado" ? "Rechazar" : "Confirmar"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+            <FinanceField label="Comentarios">
+              <textarea
+                value={approveForm.comentariosAdmin}
+                onChange={(e) => setApproveForm((f) => ({ ...f, comentariosAdmin: e.target.value }))}
+                placeholder="Motivo del rechazo, notas de pago, etc."
+                rows={3}
+                style={{ ...inp, resize: "vertical" }}
+              />
+            </FinanceField>
+          </FinanceFormGrid>
+        )}
+      </Modal>
+
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-    </>
+    </FinanceModuleShell>
   );
 }
