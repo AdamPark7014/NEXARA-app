@@ -1,6 +1,20 @@
 import PDFDocument from 'pdfkit';
-import fs from 'fs';
-import path from 'path';
+import {
+  PDF_COLORS,
+  PDF_CONTENT_START_Y,
+  PDF_MODULE_ACCENTS,
+  drawInfoCard,
+  drawKpiCards,
+  drawNexaraFooter,
+  drawNexaraHeader,
+  drawSectionTitle,
+  drawSummaryBox,
+  drawTableHeader,
+  drawTableRow,
+  loadNexaraLogo,
+  pdfMoney,
+  type PdfTableContext,
+} from '../common/pdf/nexara-pdf-theme';
 
 export type ViaticsReportRow = {
   id: number;
@@ -29,144 +43,140 @@ export type ViaticsReportPayload = {
   rows: ViaticsReportRow[];
 };
 
-const formatMoney = (value: number, currency: string) =>
-  new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: 2,
-  }).format(value || 0);
-
-const loadLogo = () => {
-  const candidates = [
-    path.resolve(process.cwd(), '../web/public/logo-nexara.png'),
-    path.resolve(process.cwd(), '../../apps/web/public/logo-nexara.png'),
-    path.resolve(process.cwd(), 'apps/web/public/logo-nexara.png'),
-    path.resolve(process.cwd(), 'src/assets/logo-nexara.png'),
-  ];
-  for (const filePath of candidates) {
-    try {
-      if (fs.existsSync(filePath)) return fs.readFileSync(filePath);
-    } catch {
-      /* next */
-    }
-  }
-  return null;
-};
+const ACCENT = PDF_MODULE_ACCENTS.viatics;
 
 export function generateViaticsReportPdf(payload: ViaticsReportPayload): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'LETTER', margin: 48 });
+    const doc = new PDFDocument({ size: 'A4', margin: 40 });
     const chunks: Buffer[] = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    const logo = loadLogo();
-    if (logo) {
-      try {
-        doc.image(logo, 48, 40, { width: 110 });
-      } catch {
-        /* skip */
-      }
-    }
+    const margin = doc.page.margins.left;
+    const contentWidth = doc.page.width - margin * 2;
+    const logo = loadNexaraLogo();
 
-    doc
-      .fontSize(16)
-      .fillColor('#0f1c2e')
-      .text(payload.title, 48, logo ? 56 : 48, { align: 'right' });
-    doc
-      .fontSize(10)
-      .fillColor('#667085')
-      .text(payload.periodLabel, { align: 'right' })
-      .text(`Generado: ${payload.generatedAt}`, { align: 'right' });
-    if (payload.preparedBy) {
-      doc.text(`Preparado por: ${payload.preparedBy}`, { align: 'right' });
-    }
+    const header = () =>
+      drawNexaraHeader(doc, {
+        docTitle: payload.title || 'Control de viáticos',
+        docSubtitle: 'Reporte financiero de gastos de viaje',
+        accent: ACCENT,
+        logo,
+        meta: [
+          { label: 'Periodo', value: payload.periodLabel },
+          { label: 'Generado', value: payload.generatedAt },
+          ...(payload.preparedBy ? [{ label: 'Preparado por', value: payload.preparedBy }] : []),
+        ],
+      });
 
-    doc.moveDown(2);
-    doc
-      .moveTo(48, doc.y)
-      .lineTo(564, doc.y)
-      .strokeColor('#e6ebf0')
-      .stroke();
-    doc.moveDown(1);
+    header();
 
-    const kpiY = doc.y;
-    const box = (x: number, label: string, value: string) => {
-      doc.roundedRect(x, kpiY, 160, 52, 6).fillAndStroke('#f4f6f8', '#e6ebf0');
-      doc.fillColor('#667085').fontSize(8).text(label, x + 10, kpiY + 10, { width: 140 });
-      doc.fillColor('#0f1c2e').fontSize(12).text(value, x + 10, kpiY + 26, { width: 140 });
+    // ── KPIs ─────────────────────────────────────────────────
+    drawSectionTitle(doc, 'Resumen del periodo');
+    const kpiHeight = drawKpiCards(doc, doc.y, [
+      { label: 'Total solicitado', value: pdfMoney(payload.totalSolicitado, payload.currency), accent: ACCENT },
+      { label: 'Aprobado', value: pdfMoney(payload.totalAprobado, payload.currency), accent: '#2F855A' },
+      { label: 'Pagado', value: pdfMoney(payload.totalPagado, payload.currency), accent: PDF_COLORS.blue },
+    ]);
+    doc.y += kpiHeight + 18;
+
+    // ── Desgloses en tarjetas (proyecto / persona / categoría) ─
+    drawSectionTitle(doc, 'Desglose de gasto');
+
+    const toLines = (items: { name: string; total: number; count: number }[]) =>
+      items.length
+        ? items.slice(0, 6).map((it) => ({
+            label: `${it.count} reg.`,
+            value: `${it.name} — ${pdfMoney(it.total, payload.currency)}`,
+          }))
+        : [{ label: '—', value: 'Sin datos en el periodo' }];
+
+    const gap = 14;
+    const cardWidth = (contentWidth - gap * 2) / 3;
+    const breakdownY = doc.y;
+    const h1 = drawInfoCard(doc, margin, breakdownY, cardWidth, toLines(payload.byProject), {
+      title: 'Por proyecto',
+      labelWidth: 40,
+    });
+    const h2 = drawInfoCard(doc, margin + cardWidth + gap, breakdownY, cardWidth, toLines(payload.byPerson), {
+      title: 'Por persona',
+      labelWidth: 40,
+    });
+    const h3 = drawInfoCard(doc, margin + (cardWidth + gap) * 2, breakdownY, cardWidth, toLines(payload.byCategory), {
+      title: 'Por categoría',
+      labelWidth: 40,
+    });
+    doc.y = breakdownY + Math.max(h1, h2, h3) + 16;
+
+    // ── Tabla de detalle ─────────────────────────────────────
+    drawSectionTitle(doc, 'Detalle de solicitudes');
+
+    const columns = [
+      { label: 'ID', width: 34 },
+      { label: 'Fecha', width: 62 },
+      { label: 'Solicitante', width: 105 },
+      { label: 'Proyecto / Motivo', width: 130 },
+      { label: 'Categoría', width: 70 },
+      { label: 'Monto', width: 62, align: 'right' as const },
+      { label: 'Estatus', width: 52 },
+    ];
+    const ctx: PdfTableContext = {
+      columns,
+      headerAccent: PDF_COLORS.navy,
+      onNewPage: () => {
+        header();
+        drawSectionTitle(doc, 'Detalle de solicitudes (continuación)');
+      },
     };
-    box(48, 'Total solicitado', formatMoney(payload.totalSolicitado, payload.currency));
-    box(220, 'Aprobado', formatMoney(payload.totalAprobado, payload.currency));
-    box(392, 'Pagado', formatMoney(payload.totalPagado, payload.currency));
-    doc.y = kpiY + 68;
 
-    const section = (title: string, items: { name: string; total: number; count: number }[]) => {
-      doc.fillColor('#0f1c2e').fontSize(11).text(title);
-      doc.moveDown(0.4);
-      if (!items.length) {
-        doc.fillColor('#98a2b3').fontSize(9).text('Sin datos en el periodo.');
-        doc.moveDown(0.8);
-        return;
-      }
-      for (const item of items.slice(0, 8)) {
-        doc
-          .fillColor('#344054')
-          .fontSize(9)
-          .text(
-            `${item.name}  ·  ${item.count} reg.  ·  ${formatMoney(item.total, payload.currency)}`,
-            { width: 500 },
-          );
-      }
-      doc.moveDown(0.9);
-    };
+    drawTableHeader(doc, doc.y, columns);
+    doc.y += 30;
 
-    section('Gasto por proyecto', payload.byProject);
-    section('Gasto por persona', payload.byPerson);
-    section('Gasto por categoría', payload.byCategory);
-
-    doc.fillColor('#0f1c2e').fontSize(11).text('Detalle de solicitudes');
-    doc.moveDown(0.5);
-
-    const headerY = doc.y;
-    doc.fillColor('#667085').fontSize(8);
-    doc.text('ID', 48, headerY, { width: 28 });
-    doc.text('Fecha', 78, headerY, { width: 58 });
-    doc.text('Solicitante', 138, headerY, { width: 90 });
-    doc.text('Proyecto', 230, headerY, { width: 90 });
-    doc.text('Cat.', 322, headerY, { width: 60 });
-    doc.text('Monto', 384, headerY, { width: 70 });
-    doc.text('Estatus', 456, headerY, { width: 60 });
-    doc.y = headerY + 14;
-    doc.moveTo(48, doc.y).lineTo(564, doc.y).strokeColor('#e6ebf0').stroke();
-    doc.moveDown(0.3);
-
-    for (const row of payload.rows.slice(0, 40)) {
-      if (doc.y > 720) {
-        doc.addPage();
-      }
-      const y = doc.y;
-      doc.fillColor('#0f1c2e').fontSize(8);
-      doc.text(String(row.id), 48, y, { width: 28 });
-      doc.text(row.fecha, 78, y, { width: 58 });
-      doc.text(row.solicitante.slice(0, 22), 138, y, { width: 90 });
-      doc.text(row.proyecto.slice(0, 22), 230, y, { width: 90 });
-      doc.text(row.categoria.slice(0, 12), 322, y, { width: 60 });
-      doc.text(formatMoney(row.monto, payload.currency), 384, y, { width: 70 });
-      doc.text(row.estatus.slice(0, 12), 456, y, { width: 60 });
-      doc.y = y + 14;
+    if (!payload.rows.length) {
+      doc.fillColor(PDF_COLORS.muted).fontSize(9).font('Helvetica').text('Sin solicitudes en el periodo.', margin + 6, doc.y);
+      doc.y += 18;
     }
 
-    doc
-      .fontSize(8)
-      .fillColor('#98a2b3')
-      .text(
-        'NEXARA · Control de viáticos — documento generado automáticamente.',
-        48,
-        740,
-        { align: 'center', width: 516 },
+    payload.rows.forEach((row, index) => {
+      const proyectoMotivo = [row.proyecto, row.motivo].filter((v) => v && v !== '-').join(' · ');
+      drawTableRow(
+        doc,
+        [
+          String(row.id),
+          row.fecha,
+          row.solicitante,
+          proyectoMotivo || '-',
+          row.categoria,
+          pdfMoney(row.monto, payload.currency),
+          row.estatus,
+        ],
+        index,
+        ctx,
+        { boldColumns: [5] },
       );
+    });
+
+    // ── Resumen financiero al pie (como cotizaciones) ────────
+    const summaryWidth = 240;
+    const summaryRows: Array<[string, string]> = [
+      ['Total solicitado', pdfMoney(payload.totalSolicitado, payload.currency)],
+      ['Aprobado', pdfMoney(payload.totalAprobado, payload.currency)],
+      ['Pagado', pdfMoney(payload.totalPagado, payload.currency)],
+      ['Pendiente por pagar', pdfMoney(Math.max(0, payload.totalAprobado - payload.totalPagado), payload.currency)],
+    ];
+    const summaryHeight = 12 * 2 + summaryRows.length * 16 + 10;
+    if (doc.y + summaryHeight + 40 > doc.page.height - 60) {
+      doc.addPage();
+      header();
+      doc.y = PDF_CONTENT_START_Y;
+    }
+    const summaryY = doc.y + 8;
+    drawSummaryBox(doc, margin + contentWidth - summaryWidth, summaryY, summaryWidth, 'Resumen financiero', summaryRows, {
+      highlightIndex: summaryRows.length - 1,
+    });
+
+    drawNexaraFooter(doc, 'NEXARA · Control de viáticos — documento generado automáticamente, información confidencial.');
 
     doc.end();
   });

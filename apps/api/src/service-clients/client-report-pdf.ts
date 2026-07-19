@@ -1,6 +1,21 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
+import {
+  PDF_COLORS,
+  PDF_CONTENT_START_Y,
+  PDF_MODULE_ACCENTS,
+  type PdfTableContext,
+  drawInfoCard,
+  drawKpiCards,
+  drawNexaraFooter,
+  drawNexaraHeader,
+  drawSectionTitle,
+  drawTableHeader,
+  drawTableRow,
+  loadNexaraLogo,
+  pdfText,
+} from '../common/pdf/nexara-pdf-theme';
 
 export type ClientReportActivity = {
   anNumber: string;
@@ -46,8 +61,7 @@ const formatDuration = (minutes?: number | null) => {
   if (!minutes || Number.isNaN(minutes)) return '-';
   const hours = Math.floor(minutes / 60);
   const mins = Math.round(minutes % 60);
-  if (hours <= 0) return `${mins} min`;
-  return `${hours} h ${mins} min`;
+  return hours <= 0 ? `${mins} min` : `${hours} h ${mins} min`;
 };
 
 const formatTicketType = (value?: string | null) => {
@@ -58,15 +72,12 @@ const formatTicketType = (value?: string | null) => {
   return value || '-';
 };
 
-const loadLogo = (relativePath: string) => {
+const loadImage = (filePath: string) => {
   try {
-    if (fs.existsSync(relativePath)) {
-      return fs.readFileSync(relativePath);
-    }
+    return fs.existsSync(filePath) ? fs.readFileSync(filePath) : null;
   } catch {
     return null;
   }
-  return null;
 };
 
 const resolveExistingUpload = (relativeUploadPath: string) => {
@@ -81,409 +92,215 @@ const resolveExistingUpload = (relativeUploadPath: string) => {
     path.resolve(__dirname, '..', '..', '..', 'uploads', cleaned),
     path.resolve(__dirname, '..', '..', '..', '..', 'uploads', cleaned),
   ];
-
   for (const candidate of candidates) {
     try {
-      if (fs.existsSync(candidate)) {
-        return candidate;
-      }
+      if (fs.existsSync(candidate)) return candidate;
     } catch {
       // Continue checking remaining candidate paths.
     }
   }
-
-  return null;
-};
-
-const resolveLogoPath = (logoUrl?: string | null) => {
-  if (!logoUrl) return null;
-  const raw = logoUrl.trim();
-  if (!raw) return null;
-  const sanitized = raw.replace(/\\+/g, '/').replace(/[?#].*$/, '');
-
-  if (sanitized.startsWith('/uploads/')) {
-    return resolveExistingUpload(sanitized.replace(/^\/uploads\//, ''));
-  }
-
-  if (/^https?:\/\//i.test(sanitized)) {
-    try {
-      const parsed = new URL(sanitized);
-      if (parsed.pathname.startsWith('/uploads/')) {
-        return resolveExistingUpload(parsed.pathname.replace(/^\/uploads\//, ''));
-      }
-    } catch {
-      return null;
-    }
-  }
-
   return null;
 };
 
 const resolveUploadPath = (fileUrl?: string | null) => {
   if (!fileUrl) return null;
-  const raw = fileUrl.trim();
+  const raw = fileUrl.trim().replace(/\\+/g, '/').replace(/[?#].*$/, '');
   if (!raw) return null;
-
-  const sanitizedRaw = raw
-    .replace(/\\+/g, '/')
-    .replace(/[?#].*$/, '')
-    .trim();
-
-  if (!sanitizedRaw) return null;
-
-  if (sanitizedRaw.startsWith('/uploads/')) {
-    return resolveExistingUpload(sanitizedRaw.replace(/^\/uploads\//, ''));
-  }
-
-  if (sanitizedRaw.startsWith('/activities/')) {
-    return resolveExistingUpload(sanitizedRaw.replace(/^\//, ''));
-  }
-
-  if (sanitizedRaw.startsWith('activities/')) {
-    return resolveExistingUpload(sanitizedRaw);
-  }
-
-  if (/^https?:\/\//i.test(sanitizedRaw)) {
+  if (raw.startsWith('/uploads/')) return resolveExistingUpload(raw.replace(/^\/uploads\//, ''));
+  if (raw.startsWith('/api/uploads/')) return resolveExistingUpload(raw.replace(/^\/api\/uploads\//, ''));
+  if (raw.startsWith('/activities/')) return resolveExistingUpload(raw.replace(/^\//, ''));
+  if (raw.startsWith('activities/')) return resolveExistingUpload(raw);
+  if (/^https?:\/\//i.test(raw)) {
     try {
-      const parsed = new URL(sanitizedRaw);
-      if (parsed.pathname.startsWith('/uploads/')) {
-        return resolveExistingUpload(parsed.pathname.replace(/^\/uploads\//, ''));
-      }
-      if (parsed.pathname.startsWith('/activities/')) {
-        return resolveExistingUpload(parsed.pathname.replace(/^\//, ''));
-      }
+      const pathname = new URL(raw).pathname;
+      if (pathname.startsWith('/uploads/')) return resolveExistingUpload(pathname.replace(/^\/uploads\//, ''));
+      if (pathname.startsWith('/activities/')) return resolveExistingUpload(pathname.replace(/^\//, ''));
     } catch {
       return null;
     }
   }
-
-  if (sanitizedRaw.startsWith('/api/uploads/')) {
-    return resolveExistingUpload(sanitizedRaw.replace(/^\/api\/uploads\//, ''));
-  }
-
   return null;
 };
 
-const getMapsUrl = (lat?: number | null, lng?: number | null) => {
-  if (!lat || !lng) return null;
-  return `https://www.google.com/maps?q=${lat},${lng}`;
-};
+const getMapsUrl = (lat?: number | null, lng?: number | null) =>
+  lat && lng ? `https://www.google.com/maps?q=${lat},${lng}` : null;
 
 export const generateClientReportPdf = async (payload: ClientReportPayload): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 40 });
     const chunks: Buffer[] = [];
-
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', (error) => reject(error));
-
-    const colors = {
-      navy: '#0B1F3A',
-      blue: '#1F6BBA',
-      lightBlue: '#E3F2FD',
-      softGray: '#F5F7FB',
-      text: '#1F2A37',
-      muted: '#5B6B7A',
-      line: '#D9E2EC',
-    };
+    doc.on('error', reject);
 
     const margin = doc.page.margins.left;
-    const pageWidth = doc.page.width;
-    const contentWidth = pageWidth - margin * 2;
-
-    const nexaraLogo = loadLogo(path.resolve(process.cwd(), '../web/public/logo-nexara.png'))
-      || loadLogo(path.resolve(process.cwd(), '../../apps/web/public/logo-nexara.png'));
-    const clientLogoPath = resolveLogoPath(payload.clientLogoUrl);
-    const clientLogo = clientLogoPath ? loadLogo(clientLogoPath) : null;
+    const contentWidth = doc.page.width - margin * 2;
+    const accent = PDF_MODULE_ACCENTS.maintenance;
+    const logo = loadNexaraLogo();
+    const clientLogoPath = resolveUploadPath(payload.clientLogoUrl);
+    const clientLogo = clientLogoPath ? loadImage(clientLogoPath) : null;
 
     const drawHeader = () => {
-      doc.save();
-      doc.rect(0, 0, pageWidth, 120).fill(colors.lightBlue);
-      doc.rect(0, 0, pageWidth, 6).fill(colors.blue);
-      doc.restore();
-
-      const logoBox = { x: margin, y: 22, w: 120, h: 64 };
-      if (nexaraLogo) {
-        doc.image(nexaraLogo, logoBox.x, logoBox.y, { fit: [logoBox.w, logoBox.h] });
-      }
-
-      const rightColumnWidth = 190;
-      const infoX = pageWidth - margin - rightColumnWidth;
-      const clientBox = {
-        x: pageWidth - margin - 80,
-        y: 16,
-        w: 80,
-        h: 52,
-      };
-      if (clientLogo) {
-        doc.image(clientLogo, clientBox.x, clientBox.y, { fit: [clientBox.w, clientBox.h] });
-      }
-
-      const titleX = margin + logoBox.w + 12;
-      const titleWidth = infoX - titleX - 12;
-
-      doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(20).text('Reporte de Tickets', titleX, 30, {
-        width: Math.max(140, titleWidth),
+      drawNexaraHeader(doc, {
+        docTitle: 'Reporte de tickets',
+        docSubtitle: 'Resumen ejecutivo de atención',
+        accent,
+        logo,
+        meta: [
+          { label: 'Cliente', value: payload.clientName },
+          { label: 'Generado', value: formatDateTime(payload.generatedAt) },
+          { label: 'Total', value: String(payload.totalTickets) },
+          { label: 'Finalizados', value: String(payload.closedTickets) },
+        ],
       });
-      doc.fontSize(10).font('Helvetica').fillColor(colors.muted).text('Resumen ejecutivo de atención', titleX, 56, {
-        width: Math.max(140, titleWidth),
-      });
-
-      doc.fillColor(colors.text).fontSize(9);
-      doc.text(`Cliente: ${payload.clientName}`, infoX, 72, { width: rightColumnWidth, align: 'right' });
-      doc.text(`Generado: ${formatDateTime(payload.generatedAt)}`, infoX, 84, { width: rightColumnWidth, align: 'right' });
-      doc.text(`Total: ${payload.totalTickets}`, infoX, 96, { width: rightColumnWidth, align: 'right' });
-      doc.text(`Finalizados: ${payload.closedTickets}`, infoX, 108, { width: rightColumnWidth, align: 'right' });
+      drawNexaraFooter(doc);
+      doc.y = PDF_CONTENT_START_Y;
     };
 
-    const drawSectionTitle = (label: string) => {
-      doc.moveDown(0.6);
-      doc.fillColor(colors.navy).fontSize(12).font('Helvetica-Bold').text(label, margin, doc.y);
-      doc.moveDown(0.2);
-    };
-
-    const ensurePageSpace = (requiredHeight: number, sectionToRepeat?: string) => {
-      if (doc.y + requiredHeight <= doc.page.height - 60) return;
+    const addPage = (section?: string) => {
       doc.addPage();
       drawHeader();
-      doc.y = 140;
-      if (sectionToRepeat) {
-        drawSectionTitle(sectionToRepeat);
-      }
+      if (section) drawSectionTitle(doc, section);
     };
 
-    const drawSummaryCard = (x: number, y: number, width: number) => {
-      const padding = 12;
-      const rows = [
-        ['Total tickets', String(payload.totalTickets)],
-        ['Finalizados', String(payload.closedTickets)],
-        ['Promedio de atención', formatDuration(payload.avgDurationMin)],
-      ];
-
-      const height = padding * 2 + rows.length * 18;
-      doc.save();
-      doc.roundedRect(x, y, width, height, 8).fill(colors.softGray);
-      doc.restore();
-
-      let cursorY = y + padding;
-      rows.forEach(([label, value]) => {
-        doc.fillColor(colors.muted).fontSize(9).text(label, x + padding, cursorY, { width: width - padding * 2 });
-        doc.fillColor(colors.text).fontSize(11).font('Helvetica-Bold').text(value, x + padding, cursorY, {
-          align: 'right',
-          width: width - padding * 2,
-        });
-        cursorY += 18;
-      });
-      return height;
-    };
-
-    const drawTableHeader = (y: number, columns: Array<{ label: string; width: number }>) => {
-      doc.save();
-      doc.rect(margin, y, contentWidth, 24).fill(colors.navy);
-      doc.restore();
-      doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold');
-      let x = margin + 6;
-      columns.forEach((col) => {
-        doc.text(col.label, x, y + 7, { width: col.width - 8 });
-        x += col.width;
-      });
+    const ensurePageSpace = (height: number, section?: string) => {
+      if (doc.y + height > doc.page.height - 60) addPage(section);
     };
 
     drawHeader();
-    doc.y = 140;
+    drawSectionTitle(doc, 'Resumen');
+    const summaryY = doc.y;
+    if (clientLogo) {
+      try {
+        doc.image(clientLogo, margin, summaryY, { fit: [86, 46] });
+        doc.y = summaryY + 52;
+      } catch {
+        // Keep rendering when a client logo is corrupt.
+      }
+    }
+    const kpiY = doc.y;
+    const kpiHeight = drawKpiCards(doc, kpiY, [
+      { label: 'Total tickets', value: String(payload.totalTickets), accent },
+      { label: 'Finalizados', value: String(payload.closedTickets), accent },
+      { label: 'Promedio de atención', value: formatDuration(payload.avgDurationMin), accent },
+    ]);
+    doc.y = kpiY + kpiHeight + 16;
 
-    drawSectionTitle('Resumen');
-    const summaryHeight = drawSummaryCard(margin, doc.y, contentWidth);
-    doc.y += summaryHeight + 16;
-
-    drawSectionTitle('Detalle de tickets');
-
+    drawSectionTitle(doc, 'Detalle de tickets');
     const header = ['AN', 'Sucursal', 'Estatus', 'Prioridad', 'Eficiencia', 'Atendió', 'Inicio', 'Cierre', 'Dur.'];
     const baseWidths = [44, 92, 56, 56, 56, 78, 64, 64, 50];
     const totalBaseWidth = baseWidths.reduce((acc, value) => acc + value, 0);
     const scale = contentWidth / totalBaseWidth;
-    const colWidths = baseWidths.map((value) => Math.max(40, Math.floor(value * scale)));
-    const widthDiff = contentWidth - colWidths.reduce((acc, value) => acc + value, 0);
-    colWidths[colWidths.length - 1] += widthDiff;
-    const columns = header.map((label, index) => ({ label, width: colWidths[index] }));
-
-    const drawRow = (row: string[], rowIndex: number) => {
-      const rowY = doc.y;
-      const cellPadding = 4;
-      doc.font('Helvetica').fontSize(8).fillColor(colors.text);
-      const heights = row.map((value, index) => doc.heightOfString(value, {
-        width: colWidths[index] - cellPadding * 2,
-        align: 'left',
-      }));
-      const rowHeight = Math.max(20, ...heights) + cellPadding * 2;
-
-      if (rowIndex % 2 === 1) {
-        doc.save();
-        doc.rect(margin, rowY, contentWidth, rowHeight).fill(colors.softGray).opacity(0.5);
-        doc.restore();
-      }
-
-      let x = margin;
-      row.forEach((value, index) => {
-        doc.save();
-        doc.rect(x, rowY, colWidths[index], rowHeight).stroke(colors.line);
-        doc.restore();
-        doc.text(value, x + cellPadding, rowY + cellPadding - 1, {
-          width: colWidths[index] - cellPadding * 2,
-          align: 'left',
-        });
-        x += colWidths[index];
-      });
-      doc.y = rowY + rowHeight;
+    const widths = baseWidths.map((value) => Math.max(40, Math.floor(value * scale)));
+    widths[widths.length - 1] += contentWidth - widths.reduce((acc, value) => acc + value, 0);
+    const columns = header.map((label, index) => ({ label, width: widths[index] }));
+    const tableCtx: PdfTableContext = {
+      columns,
+      fontSize: 7.5,
+      headerAccent: PDF_COLORS.navy,
+      onNewPage: () => {
+        drawHeader();
+      },
     };
-
-    const headerY = doc.y;
-    drawTableHeader(headerY, columns);
-    doc.save();
-    doc.rect(margin, headerY, contentWidth, 24).stroke(colors.line);
-    let gridX = margin;
-    columns.forEach((col) => {
-      doc.rect(gridX, headerY, col.width, 24).stroke(colors.line);
-      gridX += col.width;
-    });
-    doc.restore();
-    doc.y = headerY + 26;
-
+    drawTableHeader(doc, doc.y, columns, tableCtx.headerAccent);
+    doc.y += 28;
     payload.activities.forEach((activity, index) => {
-      drawRow([
+      drawTableRow(doc, [
         activity.anNumber || '-',
         activity.branchName || '-',
         activity.estatus || '-',
         activity.prioridad || '-',
         activity.eficiencia || '-',
         activity.responsableName || '-',
-        formatDateTime(activity.startedAt || activity.assignedAt || null),
-        formatDateTime(activity.finishedAt || null),
+        formatDateTime(activity.startedAt || activity.assignedAt),
+        formatDateTime(activity.finishedAt),
         formatDuration(activity.durationMin),
-      ], index);
-
-      if (doc.y > doc.page.height - 120) {
-        doc.addPage();
-        drawHeader();
-        doc.y = 140;
-        drawSectionTitle('Detalle de tickets');
-        const repeatHeaderY = doc.y;
-        drawTableHeader(repeatHeaderY, columns);
-        doc.save();
-        doc.rect(margin, repeatHeaderY, contentWidth, 24).stroke(colors.line);
-        let headerX = margin;
-        columns.forEach((col) => {
-          doc.rect(headerX, repeatHeaderY, col.width, 24).stroke(colors.line);
-          headerX += col.width;
-        });
-        doc.restore();
-        doc.y = repeatHeaderY + 26;
-      }
+      ], index, tableCtx, { boldColumns: [0] });
     });
 
-    drawSectionTitle('Detalle completo por ticket');
+    ensurePageSpace(120, 'Detalle completo por ticket');
+    drawSectionTitle(doc, 'Detalle completo por ticket');
     payload.activities.forEach((activity) => {
-      ensurePageSpace(120, 'Detalle completo por ticket');
-
-      const cardY = doc.y;
-      const cardPadding = 12;
-      const lineHeight = 14;
-
-      const detailLines = [
-        `Ticket: ${activity.anNumber || '-'} · ${activity.titulo || 'Sin titulo'}`,
-        `Flujo: ${formatTicketType(activity.ticketType)} · Estatus: ${activity.estatus || '-'} · Prioridad: ${activity.prioridad || '-'}`,
-        `Sucursal: ${activity.branchName || '-'}${activity.branchCity ? ` · ${activity.branchCity}` : ''}${activity.branchState ? `, ${activity.branchState}` : ''}`,
-        `Atendio: ${activity.responsableName || '-'} · Inicio: ${formatDateTime(activity.startedAt || activity.assignedAt || null)} · Cierre: ${formatDateTime(activity.finishedAt || null)}`,
-        `Duracion: ${formatDuration(activity.durationMin)} · Eficiencia: ${activity.eficiencia || '-'}`,
-      ];
-
-      const detailHeight = cardPadding * 2 + detailLines.length * lineHeight;
-      doc.save();
-      doc.roundedRect(margin, cardY, contentWidth, detailHeight, 8).fill(colors.softGray);
-      doc.restore();
-
-      let lineY = cardY + cardPadding;
-      detailLines.forEach((line, index) => {
-        doc
-          .fillColor(index === 0 ? colors.navy : colors.text)
-          .font(index === 0 ? 'Helvetica-Bold' : 'Helvetica')
-          .fontSize(index === 0 ? 10 : 9)
-          .text(line, margin + cardPadding, lineY, { width: contentWidth - cardPadding * 2 });
-        lineY += lineHeight;
-      });
-
-      doc.y = cardY + detailHeight + 10;
+      ensurePageSpace(130, 'Detalle completo por ticket');
+      const height = drawInfoCard(doc, margin, doc.y, contentWidth, [
+        { label: 'Ticket', value: `${activity.anNumber || '-'} · ${activity.titulo || 'Sin titulo'}` },
+        { label: 'Flujo', value: formatTicketType(activity.ticketType) },
+        { label: 'Estado', value: `${activity.estatus || '-'} · Prioridad: ${activity.prioridad || '-'}` },
+        {
+          label: 'Sucursal',
+          value: `${activity.branchName || '-'}${activity.branchCity ? ` · ${activity.branchCity}` : ''}${activity.branchState ? `, ${activity.branchState}` : ''}`,
+        },
+        {
+          label: 'Atendió',
+          value: `${activity.responsableName || '-'} · Inicio: ${formatDateTime(activity.startedAt || activity.assignedAt)} · Cierre: ${formatDateTime(activity.finishedAt)}`,
+        },
+        { label: 'Resultado', value: `Duración: ${formatDuration(activity.durationMin)} · Eficiencia: ${activity.eficiencia || '-'}` },
+      ], { title: activity.anNumber || 'Ticket', labelWidth: 68 });
+      doc.y += height + 10;
     });
 
-    drawSectionTitle('Evidencias por ticket');
-    const thumbSize = 96;
+    ensurePageSpace(160, 'Evidencias por ticket');
+    drawSectionTitle(doc, 'Evidencias por ticket');
+    const tileWidth = 160;
+    const tileHeight = 120;
+    const tileGap = 10;
+    const captionHeight = 26;
+    const tileColumns = Math.max(1, Math.floor((contentWidth + tileGap) / (tileWidth + tileGap)));
+
     payload.activities.forEach((activity) => {
       const evidences = activity.evidences || [];
       if (!evidences.length) return;
-
-      ensurePageSpace(140, 'Evidencias por ticket');
-
-      doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(10).text(`${activity.anNumber} · ${activity.titulo || ''}`, margin, doc.y, {
-        width: contentWidth,
-      });
+      ensurePageSpace(160, 'Evidencias por ticket');
+      doc.fillColor(PDF_COLORS.navy).font('Helvetica-Bold').fontSize(10)
+        .text(`${activity.anNumber} · ${activity.titulo || ''}`, margin, doc.y, { width: contentWidth });
       doc.moveDown(0.3);
-
-      const tileWidth = 160;
-      const tileHeight = 120;
-      const tileGap = 10;
-      const captionHeight = 26;
-      const columns = Math.max(1, Math.floor((contentWidth + tileGap) / (tileWidth + tileGap)));
       let x = margin;
       let y = doc.y;
       let col = 0;
 
       evidences.forEach((evidence) => {
         if (y + tileHeight + captionHeight > doc.page.height - 60) {
-          doc.addPage();
-          drawHeader();
-          doc.y = 140;
-          drawSectionTitle('Evidencias por ticket');
-          doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(10).text(`${activity.anNumber} · ${activity.titulo || ''}`, margin, doc.y, {
-            width: contentWidth,
-          });
+          addPage('Evidencias por ticket');
+          doc.fillColor(PDF_COLORS.navy).font('Helvetica-Bold').fontSize(10)
+            .text(`${activity.anNumber} · ${activity.titulo || ''}`, margin, doc.y, { width: contentWidth });
           doc.moveDown(0.3);
           x = margin;
           y = doc.y;
           col = 0;
         }
-
         const evidencePath = resolveUploadPath(evidence.archivoUrl);
         const isPdf = evidence.archivoUrl.toLowerCase().endsWith('.pdf');
-
         if (evidencePath && !isPdf) {
           try {
             doc.image(evidencePath, x, y, { fit: [tileWidth, tileHeight], align: 'center', valign: 'center' });
-            doc.rect(x, y, tileWidth, tileHeight).stroke(colors.line);
+            doc.rect(x, y, tileWidth, tileHeight).stroke(PDF_COLORS.line);
           } catch {
-            doc.rect(x, y, tileWidth, tileHeight).stroke(colors.muted);
-            doc.fontSize(8).fillColor(colors.muted).text('No se pudo cargar', x + 6, y + 54, { width: tileWidth - 12, align: 'center' });
+            doc.rect(x, y, tileWidth, tileHeight).stroke(PDF_COLORS.muted);
+            doc.fillColor(PDF_COLORS.muted).font('Helvetica').fontSize(8)
+              .text('No se pudo cargar', x + 6, y + 54, { width: tileWidth - 12, align: 'center' });
           }
         } else {
-          doc.rect(x, y, tileWidth, tileHeight).fill(colors.softGray);
-          doc.fillColor(colors.muted).fontSize(8).text(isPdf ? 'PDF adjunto' : 'Sin evidencia', x + 6, y + 54, { width: tileWidth - 12, align: 'center' });
+          doc.rect(x, y, tileWidth, tileHeight).fill(PDF_COLORS.softGray);
+          doc.fillColor(PDF_COLORS.muted).font('Helvetica').fontSize(8)
+            .text(isPdf ? 'PDF adjunto' : 'Sin evidencia', x + 6, y + 54, {
+              width: tileWidth - 12,
+              align: 'center',
+            });
         }
-
-        doc.fillColor(colors.text).fontSize(7).text(evidence.tipoEvidencia, x, y + tileHeight + 4, { width: tileWidth });
-
+        doc.fillColor(PDF_COLORS.text).font('Helvetica').fontSize(7)
+          .text(pdfText(evidence.tipoEvidencia), x, y + tileHeight + 4, { width: tileWidth });
         const mapsUrl = evidence.tipoEvidencia === 'Foto llegada'
           ? getMapsUrl(evidence.latitud, evidence.longitud)
           : null;
         if (mapsUrl) {
-          doc.fillColor(colors.blue).fontSize(7).text('Ver llegada', x, y + tileHeight + 14, {
+          doc.fillColor(accent).font('Helvetica').fontSize(7).text('Ver llegada', x, y + tileHeight + 14, {
             width: tileWidth,
             link: mapsUrl,
             underline: true,
           });
         }
-
         col += 1;
-        if (col >= columns) {
+        if (col >= tileColumns) {
           col = 0;
           x = margin;
           y += tileHeight + captionHeight;
@@ -491,14 +308,10 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
           x += tileWidth + tileGap;
         }
       });
-
-      if (col > 0) {
-        y += tileHeight + captionHeight;
-      }
+      if (col > 0) y += tileHeight + captionHeight;
       doc.y = y + 8;
     });
 
     doc.end();
   });
 };
-
