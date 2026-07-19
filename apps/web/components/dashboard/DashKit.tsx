@@ -48,7 +48,7 @@ export function DashHero({
 }) {
   return (
     <header className={styles.hero}>
-      <div>
+      <div className={styles.heroCopy}>
         <span className={styles.heroEyebrow}>{eyebrow}</span>
         <h1 className={styles.heroTitle}>{title}</h1>
         {subtitle && <p className={styles.heroSub}>{subtitle}</p>}
@@ -94,9 +94,10 @@ export function StatStrip({
     big?: boolean;
   }>;
 }) {
+  const cols = Math.min(6, Math.max(2, stats.length));
   return (
-    <div className={styles.card}>
-      <div className={styles.strip}>
+    <div className={styles.surface}>
+      <div className={styles.strip} data-cols={cols}>
         {stats.map((s, i) => (
           <div key={i} className={`${styles.stripCell} ${TONE_CLASS[s.tone ?? "default"]}`}>
             <span className={styles.statLabel}>{s.label}</span>
