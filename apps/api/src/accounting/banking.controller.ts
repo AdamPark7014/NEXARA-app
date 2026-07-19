@@ -4,6 +4,13 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import {
+  CreateBankAccountDto,
+  ImportBankTransactionsDto,
+  ReconcileTransactionDto,
+  UpdateBankAccountDto,
+} from './dto/banking.dto.js';
+import { ListBankTransactionsQueryDto } from './dto/list-query.dto.js';
 
 @Controller('accounting/banking')
 @UseGuards(UrlAccessGuard)
@@ -13,7 +20,7 @@ export class BankingController {
   @Post('accounts')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.BANKING_MANAGE] })
-  createAccount(@Body() dto: any) {
+  createAccount(@Body() dto: CreateBankAccountDto) {
     return this.service.createBankAccount(dto);
   }
 
@@ -34,25 +41,21 @@ export class BankingController {
   @Patch('accounts/:id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.BANKING_MANAGE] })
-  updateAccount(@Param('id') id: string, @Body() dto: any) {
+  updateAccount(@Param('id') id: string, @Body() dto: UpdateBankAccountDto) {
     return this.service.updateBankAccount(+id, dto);
   }
 
   @Get('accounts/:id/transactions')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.BANKING_VIEW] })
-  listTransactions(
-    @Param('id') id: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
-    return this.service.listBankTransactions(+id, { from, to });
+  listTransactions(@Param('id') id: string, @Query() query: ListBankTransactionsQueryDto) {
+    return this.service.listBankTransactions(+id, { from: query.from, to: query.to }, query);
   }
 
   @Post('accounts/:id/transactions/import')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.BANKING_MANAGE] })
-  importTransactions(@Param('id') id: string, @Body() dto: { transactions: any[] }) {
+  importTransactions(@Param('id') id: string, @Body() dto: ImportBankTransactionsDto) {
     return this.service.importBankTransactions(+id, dto.transactions);
   }
 
@@ -66,7 +69,11 @@ export class BankingController {
   @Patch('transactions/:id/reconcile')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.BANKING_RECONCILE] })
-  reconcile(@Param('id') id: string, @CurrentUser() user: any, @Body() dto: any) {
+  reconcile(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: number },
+    @Body() dto: ReconcileTransactionDto,
+  ) {
     return this.service.reconcileTransaction(+id, dto, user.id);
   }
 }

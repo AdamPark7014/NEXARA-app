@@ -256,7 +256,7 @@ export default function AccountingPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch("accounting/journal-entries", token);
+      const data = await apiFetch("accounting/journal-entries?limit=100", token);
       setItems(Array.isArray(data) ? data : (data.data ?? []));
     } catch (e) {
       setError(formatApiError(e, "No se pudieron cargar las pólizas"));

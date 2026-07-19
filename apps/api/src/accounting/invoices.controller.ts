@@ -5,6 +5,14 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import {
+  CancelInvoiceDto,
+  CreateCreditNoteDto,
+  CreateInvoiceDto,
+  RegisterPaymentDto,
+  UpdateInvoiceDraftDto,
+} from './dto/invoice.dto.js';
+import { ListInvoicesQueryDto } from './dto/list-query.dto.js';
 
 @Controller('accounting/invoices')
 @UseGuards(UrlAccessGuard)
@@ -14,20 +22,18 @@ export class InvoicesController {
   @Post()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
-  create(@CurrentUser() user: any, @Body() dto: any) {
+  create(@CurrentUser() user: { id: number }, @Body() dto: CreateInvoiceDto) {
     return this.service.createInvoice(dto, user.id);
   }
 
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
-  findAll(
-    @Query('type') type?: string,
-    @Query('status') status?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
-    return this.service.listInvoices({ type, status, from, to });
+  findAll(@Query() query: ListInvoicesQueryDto) {
+    return this.service.listInvoices(
+      { type: query.type, status: query.status, from: query.from, to: query.to },
+      query,
+    );
   }
 
   @Get('dashboard')
@@ -125,14 +131,18 @@ export class InvoicesController {
   @Patch(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
-  updateDraft(@Param('id') id: string, @Body() dto: any) {
+  updateDraft(@Param('id') id: string, @Body() dto: UpdateInvoiceDraftDto) {
     return this.service.updateInvoiceDraft(+id, dto);
   }
 
   @Post(':id/payments')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
-  registerPayment(@Param('id') id: string, @CurrentUser() user: any, @Body() dto: any) {
+  registerPayment(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: number },
+    @Body() dto: RegisterPaymentDto,
+  ) {
     return this.service.registerPayment({ ...dto, invoiceId: +id }, user.id);
   }
 
@@ -146,7 +156,11 @@ export class InvoicesController {
   @Post(':id/credit-note')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
-  createCreditNote(@Param('id') id: string, @CurrentUser() user: any, @Body() dto: any) {
+  createCreditNote(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: number },
+    @Body() dto: CreateCreditNoteDto,
+  ) {
     return this.service.createCreditNote(+id, dto, user.id);
   }
 
@@ -160,7 +174,11 @@ export class InvoicesController {
   @Patch(':id/cancel')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
-  cancel(@Param('id') id: string, @CurrentUser() user: any, @Body() dto: any) {
+  cancel(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: number },
+    @Body() dto: CancelInvoiceDto,
+  ) {
     return this.service.cancelInvoice(+id, dto, user.id);
   }
 

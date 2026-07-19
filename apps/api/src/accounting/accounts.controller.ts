@@ -6,6 +6,12 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { generateFinancialReportsPdf } from './accounting-reports-pdf.js';
+import {
+  CreateAccountDto,
+  CreateCostCenterDto,
+  CreateFiscalPeriodDto,
+  UpdateAccountDto,
+} from './dto/account.dto.js';
 
 @Controller('accounting/accounts')
 @UseGuards(UrlAccessGuard)
@@ -15,7 +21,7 @@ export class AccountsController {
   @Post()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_MANAGE] })
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateAccountDto) {
     return this.service.createAccount(dto);
   }
 
@@ -60,7 +66,7 @@ export class AccountsController {
   @Post('cost-centers')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_MANAGE] })
-  createCostCenter(@Body() dto: any) {
+  createCostCenter(@Body() dto: CreateCostCenterDto) {
     return this.service.createCostCenter(dto);
   }
 
@@ -74,7 +80,7 @@ export class AccountsController {
   @Post('fiscal-periods')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_MANAGE] })
-  createPeriod(@Body() dto: any) {
+  createPeriod(@Body() dto: CreateFiscalPeriodDto) {
     return this.service.createFiscalPeriod(dto);
   }
 
@@ -125,7 +131,7 @@ export class AccountsController {
   @Patch(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_MANAGE] })
-  update(@Param('id') id: string, @Body() dto: any) {
+  update(@Param('id') id: string, @Body() dto: UpdateAccountDto) {
     return this.service.updateAccount(+id, dto);
   }
 }

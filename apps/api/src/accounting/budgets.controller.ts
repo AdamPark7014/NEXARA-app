@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { AccountingService } from './accounting.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { CreateBudgetDto } from './dto/account.dto.js';
 
 @Controller('accounting/budgets')
 @UseGuards(UrlAccessGuard)
@@ -12,7 +13,7 @@ export class BudgetsController {
   @Post()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_MANAGE] })
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateBudgetDto) {
     return this.service.createBudget(dto);
   }
 

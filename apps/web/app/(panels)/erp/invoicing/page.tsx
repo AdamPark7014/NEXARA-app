@@ -102,8 +102,9 @@ export default function InvoicingPage() {
     setLoading(true); setError(null);
     try {
       const apiType = apiTypeParam(filter);
-      const qs = apiType ? `?type=${apiType}` : "";
-      const data = await apiFetch(`accounting/invoices${qs}`, token);
+      const params = new URLSearchParams({ limit: "100" });
+      if (apiType) params.set("type", apiType);
+      const data = await apiFetch(`accounting/invoices?${params}`, token);
       setItems(Array.isArray(data) ? data : (data?.data ?? []));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar facturación");
