@@ -71,6 +71,9 @@ const loadLogo = () => {
   const candidates = [
     path.resolve(process.cwd(), '../web/public/logo-nexara.png'),
     path.resolve(process.cwd(), '../../apps/web/public/logo-nexara.png'),
+    // Producción (Docker): el API no incluye apps/web — usar assets propios
+    path.resolve(process.cwd(), 'dist/assets/logo-nexara.png'),
+    path.resolve(process.cwd(), 'src/assets/logo-nexara.png'),
   ];
 
   for (const filePath of candidates) {
@@ -118,14 +121,18 @@ export const generateCotizacionPdf = (payload: CotizacionPdfPayload): Promise<Bu
       doc.restore();
 
       if (logo) {
-        doc.image(logo, margin, 26, { width: 120 });
+        doc.image(logo, margin, 24, { fit: [76, 76] });
       }
 
-      doc.fillColor(colors.navy).fontSize(22).font('Helvetica-Bold').text('Cotización', margin + 140, 30, {
+      const nameX = margin + (logo ? 90 : 0);
+      doc.fillColor(colors.navy).fontSize(21).font('Helvetica-Bold').text('NEXARA', nameX, 28, {
         width: 240,
       });
-      doc.fontSize(11).font('Helvetica').fillColor(colors.muted).text('Propuesta comercial de tecnología', margin + 140, 58, {
-        width: 260,
+      doc.fillColor(colors.navy).fontSize(13).font('Helvetica-Bold').text('Cotización', nameX, 56, {
+        width: 240,
+      });
+      doc.fontSize(9).font('Helvetica').fillColor(colors.muted).text('Propuesta comercial de tecnología', nameX, 74, {
+        width: 240,
       });
 
       const rightX = margin + contentWidth - 200;

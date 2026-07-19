@@ -13,7 +13,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
 import StudioFileInput from "@/components/studio/StudioFileInput";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { STUDIO_IMAGE_SPECS, studioImageHintLine } from "@/lib/studio-image-specs";
 import { toast } from "@/components/Toast";
 
@@ -288,14 +288,14 @@ export default function StudioCasesPage() {
           return true;
         }).length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(items, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(items, [
             { key: "titulo", label: "Título" },
             { key: "cliente", label: "Cliente" },
             { key: "vertical", label: "Vertical" },
             { key: "impacto", label: "Impacto" },
             { key: "publicado", label: "Publicado", format: (v) => v ? "Sí" : "No" },
             { key: "slug", label: "Slug" },
-          ], "casos-estudio")}>CSV</Button>
+          ], "casos-estudio")}>Excel</Button>
         ) : undefined}
       />
 

@@ -8,7 +8,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
@@ -216,14 +216,14 @@ export default function ReportsPage() {
               onClear={() => { setSearchQ(""); setFilterStatus(""); }}
               resultCount={loading ? null : visibleVendors.length}
               rightActions={vendors.length > 0 ? (
-                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleVendors, [
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleVendors, [
                   { key: "userName", label: "Ejecutivo" },
                   { key: "revenue", label: "Ingreso (MXN)" },
                   { key: "opportunities", label: "Oportunidades" },
                   { key: "conversionRate", label: "Conversión (%)", format: (v) => `${String(v)}%` },
                   { key: "attainmentRevenue", label: "% Cuota", format: (v) => `${Number(v).toFixed(1)}%` },
                   { key: "status", label: "Semáforo" },
-                ], `reporte-ejecutivos-${period}`)}>CSV</Button>
+                ], `reporte-ejecutivos-${period}`)}>Excel</Button>
               ) : undefined}
             />
             <DataTable

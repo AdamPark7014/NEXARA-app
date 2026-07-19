@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import dynamic from "next/dynamic";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -519,7 +519,7 @@ function TeamLunchView({ token, dateFilter }: { token: string; dateFilter: strin
         onClear={() => { setSearchQ(""); setFilterStatus(""); }}
         resultCount={loading ? null : visibleItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems.map((b) => ({
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems.map((b) => ({
             nombre: b.user?.nombre ?? "",
             departamento: b.user?.department?.nombre ?? "",
             estado: b.status === "IN_PROGRESS" ? "En comida" : "Completada",
@@ -535,7 +535,7 @@ function TeamLunchView({ token, dateFilter }: { token: string; dateFilter: strin
             { key: "salida", label: "Salida" },
             { key: "duracion", label: "Duración (min)" },
             { key: "tardanza", label: "Tardanza" },
-          ], `comidas-${dateFilter}`)}>CSV</Button>
+          ], `comidas-${dateFilter}`)}>Excel</Button>
         ) : undefined}
       />
       <Section

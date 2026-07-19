@@ -12,7 +12,7 @@ import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface ServiceClient {
   id: number;
@@ -296,13 +296,13 @@ export default function ServiceClientsPage() {
         onClear={() => { setSearchQ(""); setFilterEstado(""); }}
         resultCount={loading ? null : visibleItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
             { key: "nombre", label: "Cliente" },
             { key: "contacto", label: "Contacto" },
             { key: "telefono", label: "Teléfono" },
             { key: "direccion", label: "Dirección" },
             { key: "estado", label: "Estado" },
-          ], "clientes-servicio")}>CSV</Button>
+          ], "clientes-servicio")}>Excel</Button>
         ) : undefined}
       />
 

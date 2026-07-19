@@ -12,7 +12,7 @@ import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { toast } from "@/components/Toast";
 
 interface Contract {
@@ -424,7 +424,7 @@ export default function MaintenanceContractsPage() {
           onClear={() => { setSearchQ(""); setFilterStatus(""); }}
           resultCount={loading ? null : visibleContracts.length}
           rightActions={items.length > 0 ? (
-            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleContracts, [
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleContracts, [
               { key: "contractNumber", label: "Folio" },
               { key: "title", label: "Contrato" },
               { key: "client", label: "Cliente", format: (v) => (v as Contract["client"])?.name ?? "—" },
@@ -432,7 +432,7 @@ export default function MaintenanceContractsPage() {
               { key: "monthlyFee", label: "Cuota mensual (MXN)" },
               { key: "status", label: "Estado" },
               { key: "nextVisitDate", label: "Próx. visita", format: (v) => v ? String(v).slice(0, 10) : "—" },
-            ], "contratos-mantenimiento")}>CSV</Button>
+            ], "contratos-mantenimiento")}>Excel</Button>
           ) : undefined}
         />
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando contratos de mantenimiento." />}

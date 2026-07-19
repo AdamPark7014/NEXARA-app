@@ -13,7 +13,7 @@ import { useUser } from "@/components/UserContext";
 import { getCrmCatalogSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { createCatalogProduct, listCatalogProducts, listCatalogCategories, type CatalogProduct } from "@/lib/catalog-api";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 const MARGIN = 1.35;
 
@@ -362,14 +362,14 @@ export default function ProductsPage() {
         onClear={() => { setSearch(""); setFilterCat(""); }}
         resultCount={loading ? null : filtered.length}
         rightActions={filtered.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(filtered, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(filtered, [
             { key: "sku", label: "SKU" },
             { key: "name", label: "Nombre" },
             { key: "category", label: "Categoría" },
             { key: "price", label: "Precio", format: (v) => `${Number(v).toFixed(2)}` },
             { key: "unitName", label: "Unidad" },
             { key: "activo", label: "Activo", format: (v) => v ? "Sí" : "No" },
-          ], "catalogo-productos")}>CSV</Button>
+          ], "catalogo-productos")}>Excel</Button>
         ) : undefined}
       />
 

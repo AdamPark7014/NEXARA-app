@@ -14,7 +14,7 @@ import { getAttendanceSectionConfig } from "@/lib/user-access";
 import { attendanceMapUrl } from "@/lib/gps-map-links";
 import AttendanceGpsDayPanel from "@/components/AttendanceGpsDayPanel";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 const AttendanceForm = dynamic(() => import("@/components/AttendanceForm"), { ssr: false });
 
@@ -513,14 +513,14 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
         rightActions={
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {members.length > 0 && (
-              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleMembers, [
+              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleMembers, [
                 { key: "nombre", label: "Nombre" },
                 { key: "department", label: "Departamento" },
                 { key: "roleName", label: "Rol" },
                 { key: "estado", label: "Estado" },
                 { key: "checkIn", label: "Entrada", format: (v) => v ? String(v).slice(11, 16) : "—" },
                 { key: "checkOut", label: "Salida", format: (v) => v ? String(v).slice(11, 16) : "—" },
-              ], `asistencia-${dateFilter}`)}>CSV</Button>
+              ], `asistencia-${dateFilter}`)}>Excel</Button>
             )}
             <button style={btnStyle(view === "grid")}  onClick={() => setView("grid")}>Tarjetas</button>
             <button style={btnStyle(view === "table")} onClick={() => setView("table")}>Tabla</button>

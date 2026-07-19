@@ -13,7 +13,7 @@ import { getErpInventorySectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 type ProcTab = "orders" | "requisitions" | "receipts";
 
@@ -731,21 +731,21 @@ export default function ProcurementPage() {
         onClear={() => { setSearchQ(""); setFilterPoStatus(""); setFilterReqStatus(""); }}
         resultCount={loading ? null : tab === "orders" ? visibleOrders.length : tab === "requisitions" ? visibleReqs.length : visibleReceipts.length}
         rightActions={tab === "orders" && orders.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleOrders, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleOrders, [
             { key: "poNumber", label: "OC" },
             { key: "supplier", label: "Proveedor", format: (v) => (v as PurchaseOrder["supplier"])?.name ?? "—" },
             { key: "totalAmount", label: "Monto" },
             { key: "status", label: "Estado", format: (v) => PO_STATUS[String(v ?? "")] ?? String(v ?? "") },
             { key: "expectedDate", label: "Entrega est.", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "ordenes-compra")}>CSV</Button>
+          ], "ordenes-compra")}>Excel</Button>
         ) : tab === "requisitions" && requisitions.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleReqs, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleReqs, [
             { key: "reqNumber", label: "Folio" },
             { key: "title", label: "Título" },
             { key: "priority", label: "Prioridad" },
             { key: "status", label: "Estado", format: (v) => REQ_STATUS[String(v ?? "")] ?? String(v ?? "") },
             { key: "requestedBy", label: "Solicitó", format: (v) => (v as Requisition["requestedBy"])?.nombre ?? "—" },
-          ], "requisiciones")}>CSV</Button>
+          ], "requisiciones")}>Excel</Button>
         ) : undefined}
       />
 

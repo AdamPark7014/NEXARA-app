@@ -13,7 +13,7 @@ import { canAccessMaintenanceContracts, getOpsTeamSectionConfig } from "@/lib/se
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface WorkOrder {
   id: number;
@@ -285,14 +285,14 @@ export default function MaintenancePage() {
         onClear={() => { setSearchQ(""); setFilterStatus(""); setFilterPriority(""); }}
         resultCount={loading ? null : visibleItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
             { key: "id", label: "ID" },
             { key: "title", label: "Trabajo" },
             { key: "priority", label: "Prioridad" },
             { key: "status", label: "Estado" },
             { key: "estimatedCost", label: "Costo est." },
             { key: "scheduledAt", label: "Programada", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "mantenimiento-ots")}>CSV</Button>
+          ], "mantenimiento-ots")}>Excel</Button>
         ) : undefined}
       />
 

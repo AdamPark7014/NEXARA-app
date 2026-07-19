@@ -14,7 +14,7 @@ import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { createOperationalProject, formatOperationalProjectStatus, listOperationalProjects, type OperationalProject } from "@/lib/ops-operational-api";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface ServiceClient { id: number; name: string }
 
@@ -300,13 +300,13 @@ export default function OpsProjectsPage() {
         onClear={() => { setSearchQ(""); setFilterStatus(""); }}
         resultCount={loading ? null : displayItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(displayItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(displayItems, [
             { key: "title", label: "Proyecto" },
             { key: "client", label: "Cliente", format: (v) => (v as OperationalProject["client"])?.name ?? "—" },
             { key: "vendor", label: "Responsable", format: (v) => (v as OperationalProject["vendor"])?.nombre ?? "—" },
             { key: "status", label: "Estado", format: (v) => formatOperationalProjectStatus(String(v ?? "")) },
             { key: "startDate", label: "Inicio", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "proyectos-operativos")}>CSV</Button>
+          ], "proyectos-operativos")}>Excel</Button>
         ) : undefined}
       />
 

@@ -11,7 +11,7 @@ import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface CompanyProfile {
   id: number;
@@ -221,13 +221,13 @@ export default function CompaniesPage() {
         onClear={() => { setSearchQ(""); setFilterActive(""); }}
         resultCount={loading ? null : visibleItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
             { key: "legalName", label: "Razón social" },
             { key: "tradeName", label: "Nombre comercial" },
             { key: "rfc", label: "RFC" },
             { key: "contactEmail", label: "Email" },
             { key: "isActive", label: "Estado", format: (v) => v ? "Activa" : "Inactiva" },
-          ], "empresas")}>CSV</Button>
+          ], "empresas")}>Excel</Button>
         ) : undefined}
       />
       <Section title={loading ? "Cargando…" : `${visibleItems.length} empresas`}>

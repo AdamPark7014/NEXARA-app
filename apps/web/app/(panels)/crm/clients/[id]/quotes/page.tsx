@@ -9,7 +9,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import EmptyState from "@/components/ui/EmptyState";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { useClientDetail } from "@/components/crm/ClientDetailShell";
 import { useUser } from "@/components/UserContext";
 import { listSalesQuotes, type SalesQuote } from "@/lib/sales-api";
@@ -130,13 +130,13 @@ export default function ClientQuotesPage() {
             onClear={() => { setSearchQ(""); setFilterStatus(""); }}
             resultCount={visibleQuotes.length}
             rightActions={
-              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleQuotes, [
+              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleQuotes, [
                 { key: "quoteNumber", label: "Número" },
                 { key: "projectName", label: "Proyecto" },
                 { key: "status", label: "Estado", format: (v) => STATUS_LABEL[String(v)] ?? String(v) },
                 { key: "total", label: "Total" },
                 { key: "issueDate", label: "Fecha", format: (v) => v ? new Date(String(v)).toLocaleDateString("es-MX") : "" },
-              ], "cotizaciones-cliente")}>CSV</Button>
+              ], "cotizaciones-cliente")}>Excel</Button>
             }
           />
         )}

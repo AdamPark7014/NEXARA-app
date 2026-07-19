@@ -11,7 +11,7 @@ import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import {
   createSalesClient,
   listSalesClients,
@@ -318,14 +318,14 @@ export default function ClientsPage() {
         onClear={() => { setSearchQ(""); setFilterStatus(""); setFilterIndustry(""); }}
         resultCount={loading ? null : visibleItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
             { key: "name", label: "Nombre" },
             { key: "legalName", label: "Razón social" },
             { key: "taxId", label: "RFC" },
             { key: "industry", label: "Industria" },
             { key: "status", label: "Estado" },
             { key: "billingEmail", label: "Email" },
-          ], "clientes")}>CSV</Button>
+          ], "clientes")}>Excel</Button>
         ) : undefined}
       />
 

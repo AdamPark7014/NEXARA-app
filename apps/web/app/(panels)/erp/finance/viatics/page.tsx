@@ -11,7 +11,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { filterRowsByScope, getErpViaticsAdminSectionConfig } from "@/lib/section-views";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { buildApiUrl } from "@/lib/api-base";
 import { approveViatico, markViaticoPagado, postViatico } from "@/lib/viatics-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
@@ -493,14 +493,14 @@ export default function ViaticosPage() {
         onClear={() => { setFilter(""); setFilterEstatus(""); }}
         resultCount={loading ? null : filtered.length}
         rightActions={filtered.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(filtered, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(filtered, [
             { key: "id", label: "ID" },
             { key: "concepto", label: "Concepto" },
             { key: "usuario", label: "Solicitante", format: (v) => (v as Viatico["usuario"])?.nombre ?? "—" },
             { key: "montoSolicitado", label: "Monto" },
             { key: "estatus", label: "Estatus" },
             { key: "fechaSolicitud", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "viaticos")}>CSV</Button>
+          ], "viaticos")}>Excel</Button>
         ) : undefined}
       />
 

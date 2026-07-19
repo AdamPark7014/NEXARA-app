@@ -12,7 +12,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface ContactMsg {
   id: number;
@@ -270,14 +270,14 @@ export default function StudioContactsPage() {
         onClear={() => { setSearchQ(""); setFilterStatus(""); }}
         resultCount={loading ? null : visibleItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
             { key: "name", label: "Nombre" },
             { key: "email", label: "Email" },
             { key: "company", label: "Empresa" },
             { key: "source", label: "Canal" },
             { key: "status", label: "Estado", format: (v) => STATUS_LABEL[String(v ?? "")] ?? String(v ?? "") },
             { key: "createdAt", label: "Recibido", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "mensajes-contacto")}>CSV</Button>
+          ], "mensajes-contacto")}>Excel</Button>
         ) : undefined}
       />
 

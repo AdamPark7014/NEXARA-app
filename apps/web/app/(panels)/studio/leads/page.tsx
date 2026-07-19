@@ -9,7 +9,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
@@ -204,7 +204,7 @@ export default function StudioLeadsPage() {
               onClear={() => { setSearchQ(""); setFilterStatus(""); setFilterSource(""); }}
               resultCount={visibleMessages.length}
               rightActions={messages.length > 0 ? (
-                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleMessages, [
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleMessages, [
                   { key: "id", label: "ID" },
                   { key: "name", label: "Nombre" },
                   { key: "email", label: "Email" },
@@ -213,7 +213,7 @@ export default function StudioLeadsPage() {
                   { key: "status", label: "Estado" },
                   { key: "createdAt", label: "Recibido", format: (v) => v ? String(v).slice(0, 16).replace("T", " ") : "" },
                   { key: "message", label: "Mensaje" },
-                ], "leads-studio")}>CSV</Button>
+                ], "leads-studio")}>Excel</Button>
               ) : undefined}
             />
 

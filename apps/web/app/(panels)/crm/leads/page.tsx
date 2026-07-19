@@ -12,7 +12,7 @@ import { useUser } from "@/components/UserContext";
 import { filterRowsByScope, getCrmSalesSectionConfig } from "@/lib/section-views";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import {
   createSalesLead,
   createSalesClient,
@@ -412,7 +412,7 @@ export default function LeadsPage() {
         onClear={() => { setSearchQ(""); setFilterStatus(""); setFilterSource(""); }}
         resultCount={loading ? null : visibleItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
             { key: "name", label: "Nombre" },
             { key: "company", label: "Empresa" },
             { key: "email", label: "Email" },
@@ -420,7 +420,7 @@ export default function LeadsPage() {
             { key: "status", label: "Estado", format: (v) => formatLeadStatus(String(v ?? "")) },
             { key: "source", label: "Fuente" },
             { key: "score", label: "Score" },
-          ], "leads")}>CSV</Button>
+          ], "leads")}>Excel</Button>
         ) : undefined}
       />
 

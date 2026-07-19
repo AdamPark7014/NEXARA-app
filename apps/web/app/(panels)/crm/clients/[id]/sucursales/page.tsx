@@ -6,7 +6,7 @@ import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { useClientDetail } from "@/components/crm/ClientDetailShell";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -217,14 +217,14 @@ export default function ClientBranchesPage() {
           onClear={() => { setSearchQ(""); setFilterActive(""); }}
           resultCount={visibleBranches.length}
           rightActions={
-            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleBranches, [
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleBranches, [
               { key: "branchNumber", label: "Número" },
               { key: "name", label: "Nombre" },
               { key: "address", label: "Dirección" },
               { key: "city", label: "Ciudad" },
               { key: "state", label: "Estado" },
               { key: "isActive", label: "Activa", format: (v) => v ? "Sí" : "No" },
-            ], "sucursales-cliente")}>CSV</Button>
+            ], "sucursales-cliente")}>Excel</Button>
           }
         />
       )}

@@ -12,7 +12,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface CrmActivity {
   id: number;
@@ -301,13 +301,13 @@ export default function AgendaPage() {
             rightActions={
               <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => {
                 const all = [...agenda.overdue, ...agenda.pendingToday, ...agenda.upcoming, ...agenda.recentlyCompleted];
-                exportToCsv(all, [
+                exportToExcel(all, [
                   { key: "activityType", label: "Tipo" },
                   { key: "subject", label: "Asunto" },
                   { key: "status", label: "Estado" },
                   { key: "dueDate", label: "Fecha", format: (v) => new Date(String(v)).toLocaleString("es-MX") },
                 ], "agenda-crm");
-              }}>CSV</Button>
+              }}>Excel</Button>
             }
           />
 

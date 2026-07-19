@@ -13,7 +13,7 @@ import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface Performance {
   targetId: number;
@@ -201,13 +201,13 @@ export default function TargetsPage() {
             onClear={() => setSearchQ("")}
             resultCount={visiblePerf.length}
             rightActions={perf.performance.length > 0 ? (
-              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visiblePerf, [
+              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visiblePerf, [
                 { key: "ownerName", label: "Ejecutivo" },
                 { key: "revenueTarget", label: "Meta" },
                 { key: "revenueAchieved", label: "Logrado" },
                 { key: "attainmentPct", label: "% Cumplimiento", format: (v) => `${v}%` },
                 { key: "commission", label: "Comisión" },
-              ], "cuotas-equipo")}>CSV</Button>
+              ], "cuotas-equipo")}>Excel</Button>
             ) : undefined}
           />
           <Section title={`Cuotas · ${perf.year}-${String(perf.performance[0]?.month ?? now.getMonth() + 1).padStart(2, "0")}`}>

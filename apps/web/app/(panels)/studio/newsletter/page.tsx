@@ -11,6 +11,7 @@ import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import FilterToolbar from "@/components/FilterToolbar";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface Subscriber {
   id: number;
@@ -60,13 +61,12 @@ export default function StudioNewsletterPage() {
   }, [subs]);
 
   const exportCsv = () => {
-    const rows = [["email", "name", "source", "subscribedAt"], ...subs.map((s) => [s.email, s.name ?? "", s.source ?? "", s.subscribedAt])];
-    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "newsletter-subscribers.csv"; a.click();
-    URL.revokeObjectURL(url);
+    exportToExcel(subs, [
+      { key: "email", label: "Email" },
+      { key: "name", label: "Nombre", format: (v) => (v ? String(v) : "") },
+      { key: "source", label: "Origen", format: (v) => (v ? String(v) : "web") },
+      { key: "subscribedAt", label: "Suscrito", format: (v) => (v ? new Date(String(v)).toLocaleString("es-MX") : "") },
+    ], "newsletter-suscriptores", "Suscriptores Newsletter");
   };
 
   const columns: Column<Subscriber>[] = [
@@ -115,7 +115,7 @@ export default function StudioNewsletterPage() {
         onClear={() => { setSearch(""); void load(); }}
         resultCount={loading ? null : subs.length}
         rightActions={subs.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={exportCsv}>CSV</Button>
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={exportCsv}>Excel</Button>
         ) : undefined}
       />
 

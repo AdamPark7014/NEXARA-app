@@ -9,7 +9,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 
@@ -188,7 +188,7 @@ export default function CalendarPage() {
         onClear={() => { setSearchQ(""); setFilterSource(""); }}
         resultCount={loading ? null : visibleEvents.length}
         rightActions={events.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleEvents, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleEvents, [
             { key: "id", label: "ID" },
             { key: "source", label: "Origen" },
             { key: "type", label: "Tipo" },
@@ -196,7 +196,7 @@ export default function CalendarPage() {
             { key: "ownerName", label: "Responsable" },
             { key: "start", label: "Inicio", format: (v) => v ? String(v).slice(0, 16).replace("T", " ") : "" },
             { key: "end", label: "Fin", format: (v) => v ? String(v).slice(0, 16).replace("T", " ") : "" },
-          ], "calendario")}>CSV</Button>
+          ], "calendario")}>Excel</Button>
         ) : undefined}
       />
 

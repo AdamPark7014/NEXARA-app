@@ -5,6 +5,7 @@ import styles from './BranchesForm.module.css';
 import { io, Socket } from 'socket.io-client';
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from '@/lib/api-base';
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { exportToExcel } from "@/lib/export-excel";
 
 export type Branch = {
   id: number;
@@ -353,41 +354,23 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
     return 0;
   });
 
-  // Función para exportar a CSV
+  // Exporta a Excel con identidad NEXARA
   const handleExportCSV = () => {
     if (sortedBranches.length === 0) {
       setError('No hay sucursales para exportar');
       return;
     }
 
-    const headers = ['Nombre', 'Número', 'Ciudad', 'Estado', 'País', 'Dirección', 'Usuario', 'Estado'];
-    const rows = sortedBranches.map((branch) => [
-      branch.name || '',
-      branch.branchNumber || '',
-      branch.city || '',
-      branch.state || '',
-      branch.country || '',
-      branch.address || '',
-      branch.portalEmail || '',
-      branch.isActive !== false ? 'Activa' : 'Inactiva',
-    ]);
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((row) =>
-        row
-          .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
-          .join(',')
-      ),
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `sucursales-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    exportToExcel(sortedBranches, [
+      { key: 'name', label: 'Nombre', format: (v) => String(v ?? '') },
+      { key: 'branchNumber', label: 'Número', format: (v) => String(v ?? '') },
+      { key: 'city', label: 'Ciudad', format: (v) => String(v ?? '') },
+      { key: 'state', label: 'Estado', format: (v) => String(v ?? '') },
+      { key: 'country', label: 'País', format: (v) => String(v ?? '') },
+      { key: 'address', label: 'Dirección', format: (v) => String(v ?? '') },
+      { key: 'portalEmail', label: 'Usuario', format: (v) => String(v ?? '') },
+      { key: 'isActive', label: 'Estatus', format: (v) => (v !== false ? 'Activa' : 'Inactiva') },
+    ], `sucursales-${new Date().toISOString().split('T')[0]}`, 'Sucursales');
   };
 
   const handleSortChange = (field: SortField) => {
@@ -650,7 +633,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
               onClick={handleExportCSV}
               type="button"
             >
-              📥 Exportar CSV
+              📥 Exportar Excel
             </button>
           </div>
 

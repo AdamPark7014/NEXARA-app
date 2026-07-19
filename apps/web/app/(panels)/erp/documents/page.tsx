@@ -13,7 +13,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface DocCategory { id: number; name: string }
 interface ManagedDoc {
@@ -295,13 +295,13 @@ export default function DocumentsPage() {
         onClear={() => { setSearch(""); setFilterStatus(""); setFilterCategory(""); }}
         resultCount={loading ? null : filtered.length}
         rightActions={docs.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(filtered, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(filtered, [
             { key: "documentNumber", label: "Folio" },
             { key: "title", label: "Título" },
             { key: "category", label: "Categoría", format: (v) => (v as ManagedDoc["category"])?.name ?? "—" },
             { key: "status", label: "Estado", format: (v) => String(v ?? "").replace(/_/g, " ") },
             { key: "createdAt", label: "Creado", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "documentos")}>CSV</Button>
+          ], "documentos")}>Excel</Button>
         ) : undefined}
       />
 

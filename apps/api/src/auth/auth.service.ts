@@ -381,6 +381,13 @@ export class AuthService {
       set.add(PERMISSIONS.CLIENTS_MANAGE);
       set.add(PERMISSIONS.CATALOG_VIEW);
     }
+
+    // Dirección: CEO y directores consultan cotizaciones (detalle + PDF)
+    if (roleKey === 'ceo' || roleKey === 'dir_admin' || roleKey === 'dir_operaciones') {
+      set.add(PERMISSIONS.COTIZACIONES_ACCESS);
+      set.add(PERMISSIONS.SALES_VIEW);
+      set.add(PERMISSIONS.CATALOG_VIEW);
+    }
     if (roleKey === 'coord_ventas') {
       set.add(PERMISSIONS.SALES_REPORTS_VIEW);
       set.add(PERMISSIONS.SALES_TARGETS_VIEW);

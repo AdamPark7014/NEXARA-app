@@ -8,7 +8,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import { Tag, Money } from "@/components/ui/DataTable";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { useClientDetail } from "@/components/crm/ClientDetailShell";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -227,13 +227,13 @@ export default function ClientServicesPage() {
           onClear={() => { setSearchQ(""); setFilterStatus(""); }}
           resultCount={visibleContracts.length}
           rightActions={
-            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleContracts, [
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleContracts, [
               { key: "contractNumber", label: "Número" },
               { key: "title", label: "Nombre" },
               { key: "frequency", label: "Frecuencia", format: (v) => FREQ_LABEL[String(v)] ?? String(v) },
               { key: "monthlyFee", label: "Cuota mensual" },
               { key: "status", label: "Estado", format: (v) => STATUS_LABEL[String(v)] ?? String(v) },
-            ], "contratos-servicio")}>CSV</Button>
+            ], "contratos-servicio")}>Excel</Button>
           }
         />
       )}

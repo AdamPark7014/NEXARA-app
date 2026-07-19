@@ -28,7 +28,7 @@ import {
 import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 type StockRow = ReturnType<typeof mapStockLevelToRow>;
 
@@ -606,7 +606,7 @@ export default function WarehousePage() {
         onClear={() => { setSearchQ(""); setFilterEstado(""); }}
         resultCount={loading ? null : visibleItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
             { key: "sku", label: "SKU" },
             { key: "nombre", label: "Producto" },
             { key: "categoria", label: "Categoría" },
@@ -614,7 +614,7 @@ export default function WarehousePage() {
             { key: "minimo", label: "Mínimo" },
             { key: "costo", label: "Precio ref." },
             { key: "ubicacion", label: "Ubicación" },
-          ], "inventario")}>CSV</Button>
+          ], "inventario")}>Excel</Button>
         ) : undefined}
       />
 

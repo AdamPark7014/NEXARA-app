@@ -9,7 +9,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import { DetailError, DetailSection, formatDate } from "@/components/detail/DetailFrame";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { useClientDetail } from "@/components/crm/ClientDetailShell";
 import { useUser } from "@/components/UserContext";
 import { listClientInvoices, type ClientInvoiceRow } from "@/lib/sales-api";
@@ -125,14 +125,14 @@ export default function ClientInvoicesPage() {
               onClear={() => { setSearchQ(""); setFilterStatus(""); }}
               resultCount={visibleInvoices.length}
               rightActions={
-                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleInvoices, [
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleInvoices, [
                   { key: "invoiceNumber", label: "Número" },
                   { key: "status", label: "Estado" },
                   { key: "totalAmount", label: "Total" },
                   { key: "currency", label: "Moneda" },
                   { key: "issueDate", label: "Fecha", format: (v) => v ? new Date(String(v)).toLocaleDateString("es-MX") : "" },
                   { key: "cfdiUuid", label: "UUID" },
-                ], "facturas-cliente")}>CSV</Button>
+                ], "facturas-cliente")}>Excel</Button>
               }
             />
             {visibleInvoices.length === 0 ? (

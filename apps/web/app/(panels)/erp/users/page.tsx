@@ -24,7 +24,7 @@ import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 /* ─── tipos ─────────────────────────────────────────────────────────── */
 interface ApiUser {
@@ -461,14 +461,14 @@ export default function UsersPage() {
         onClear={() => { setUserSearch(""); setFilterActive(""); }}
         resultCount={loading ? null : visibleUsers.length}
         rightActions={users.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleUsers, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleUsers, [
             { key: "nombre", label: "Nombre" },
             { key: "email", label: "Email" },
             { key: "role", label: "Rol", format: (v) => (v as ApiUser["role"])?.nombre ?? "—" },
             { key: "department", label: "Área", format: (v) => (v as ApiUser["department"])?.nombre ?? "—" },
             { key: "isActive", label: "Estado", format: (v) => v ? "Activo" : "Inactivo" },
             { key: "lastLoginAt", label: "Último acceso", format: (v) => v ? new Date(String(v)).toLocaleDateString("es-MX") : "Nunca" },
-          ], "usuarios")}>CSV</Button>
+          ], "usuarios")}>Excel</Button>
         ) : undefined}
       />
 

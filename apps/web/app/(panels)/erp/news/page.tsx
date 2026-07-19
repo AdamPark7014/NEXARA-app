@@ -11,7 +11,7 @@ import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { toast } from "@/components/Toast";
 
 type Tab = "comunicados" | "newsletter";
@@ -371,7 +371,7 @@ export default function ComunicacionesInternasPage() {
             onClear={() => { setComSearch(""); setComEstado(""); setComPrioridad(""); }}
             resultCount={loading ? null : visibleComunicados.length}
             rightActions={items.length > 0 ? (
-              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleComunicados, [
+              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleComunicados, [
                 { key: "id", label: "ID" },
                 { key: "titulo", label: "Título" },
                 { key: "audiencia", label: "Audiencia" },
@@ -380,7 +380,7 @@ export default function ComunicacionesInternasPage() {
                 { key: "lecturas", label: "Lecturas" },
                 { key: "autor", label: "Autor", format: (v) => (v as Comunicado["autor"])?.nombre ?? "—" },
                 { key: "sentAt", label: "Enviado", format: (v) => v ? String(v).slice(0, 10) : "—" },
-              ], "comunicados-internos")}>CSV</Button>
+              ], "comunicados-internos")}>Excel</Button>
             ) : undefined}
           />
           {loading ? (

@@ -10,7 +10,7 @@ import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { getHrSectionConfig } from "@/lib/section-views";
@@ -756,14 +756,14 @@ export default function HrPage() {
         onClear={() => { setFilter(""); setFilterDept(""); setFilterEstado(""); }}
         resultCount={state.kind === "ready" ? filtered.length : null}
         rightActions={state.kind === "ready" && filtered.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(filtered, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(filtered, [
             { key: "nombre", label: "Nombre" },
             { key: "email", label: "Email" },
             { key: "puesto", label: "Puesto" },
             { key: "department", label: "Área", format: (v) => (v as HrEmpleado["department"])?.nombre ?? "—" },
             { key: "estadoRRHH", label: "Estado" },
             { key: "tipoContrato", label: "Contrato" },
-          ], "plantilla")}>CSV</Button>
+          ], "plantilla")}>Excel</Button>
         ) : undefined}
       />
 

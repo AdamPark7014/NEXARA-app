@@ -13,7 +13,7 @@ import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface TicketRequest {
   id: number;
@@ -252,7 +252,7 @@ export default function SupportInboxPage() {
         onClear={() => { setSearchQ(""); setStatusFilter(""); setUrgencyFilter(""); }}
         resultCount={loading ? null : visibleItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
             { key: "id", label: "Ticket", format: (v) => `T-${String(v)}` },
             { key: "client", label: "Cliente", format: (v) => (v as TicketRequest["client"])?.name ?? "—" },
             { key: "description", label: "Descripción" },
@@ -260,7 +260,7 @@ export default function SupportInboxPage() {
             { key: "status", label: "Estado" },
             { key: "createdAt", label: "Abierto", format: (v) => v ? String(v).slice(0, 10) : "" },
             { key: "dueAt", label: "Vence", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "tickets-soporte")}>CSV</Button>
+          ], "tickets-soporte")}>Excel</Button>
         ) : undefined}
       />
 
