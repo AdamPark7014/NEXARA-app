@@ -29,6 +29,11 @@ export type FilterToolbarProps = {
     onChange: (value: string) => void;
     placeholder?: string;
   };
+  dates?: Array<{
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+  }>;
   selects?: Array<{
     label: string;
     value: string;
@@ -55,6 +60,7 @@ export type FilterToolbarProps = {
 
 export default function FilterToolbar({
   search,
+  dates = [],
   selects = [],
   toggles = [],
   rightActions,
@@ -63,6 +69,7 @@ export default function FilterToolbar({
 }: FilterToolbarProps) {
   const hasAny =
     (search && search.value.trim().length > 0) ||
+    dates.some((d) => d.value !== "") ||
     selects.some((s) => s.value !== "" && s.value !== "all") ||
     toggles.some((t) => t.value);
 
@@ -97,6 +104,36 @@ export default function FilterToolbar({
           }}
         />
       )}
+
+      {dates.map((date, i) => (
+        <label
+          key={i}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 12,
+            color: "var(--text-secondary)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span>{date.label}</span>
+          <input
+            type="date"
+            value={date.value}
+            onChange={(e) => date.onChange(e.target.value)}
+            aria-label={date.label}
+            style={{
+              padding: "7px 9px",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              background: "var(--bg-secondary)",
+              color: "var(--text-primary)",
+              fontSize: 12,
+            }}
+          />
+        </label>
+      ))}
 
       {selects.map((sel, i) => (
         <select
