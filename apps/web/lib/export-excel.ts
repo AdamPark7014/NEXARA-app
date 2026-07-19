@@ -18,6 +18,15 @@ export type ExcelColumn<T extends object> = {
   format?: (val: T[keyof T], row: T) => string;
 };
 
+export type ExcelExportOptions = {
+  /** Título del reporte (default: filename legible) */
+  title?: string;
+  /** Subtítulo bajo el título, p.ej. el periodo cubierto */
+  subtitle?: string;
+  /** Filas de resumen (label/value) mostradas antes de la tabla */
+  summaryRows?: Array<{ label: string; value: string | number }>;
+};
+
 const isCurrencyKey = (key: string) => {
   const k = key.toLowerCase();
   return k.includes("total") || k.includes("monto") || k.includes("precio") ||
@@ -32,15 +41,16 @@ const isCurrencyKey = (key: string) => {
  * @param rows    - Array de objetos planos a exportar
  * @param columns - Definición de columnas: { key, label, format? }
  * @param filename - Nombre del archivo sin extensión (se añade .xlsx)
- * @param title   - Título opcional del reporte (default: filename legible)
+ * @param titleOrOptions - Título del reporte, u opciones { title, subtitle, summaryRows }
  */
 export function exportToExcel<T extends object>(
   rows: T[],
   columns: ExcelColumn<T>[],
   filename: string,
-  title?: string,
+  titleOrOptions?: string | ExcelExportOptions,
 ): void {
-  void buildAndDownload(rows, columns, filename, title).catch((err) => {
+  const options = typeof titleOrOptions === "string" ? { title: titleOrOptions } : (titleOrOptions ?? {});
+  void buildAndDownload(rows, columns, filename, options).catch((err) => {
     console.error("exportToExcel failed:", err);
   });
 }
@@ -49,8 +59,9 @@ async function buildAndDownload<T extends object>(
   rows: T[],
   columns: ExcelColumn<T>[],
   filename: string,
-  title?: string,
+  options: ExcelExportOptions,
 ): Promise<void> {
+  const { title, subtitle, summaryRows } = options;
   const ExcelJS = (await import("exceljs")).default;
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "NEXARA";
@@ -72,9 +83,14 @@ async function buildAndDownload<T extends object>(
   }
   if (colCount > 1) ws.mergeCells(1, 1, 1, colCount);
 
-  // Fila 2: metadatos
+  // Fila 2: metadatos (+ subtítulo/periodo si se indica)
+  const metaText = [
+    subtitle,
+    `Generado: ${new Date().toLocaleString("es-MX")}`,
+    `${rows.length} registro${rows.length === 1 ? "" : "s"}`,
+  ].filter(Boolean).join(" · ");
   const metaRow = ws.getRow(2);
-  metaRow.getCell(1).value = `Generado: ${new Date().toLocaleString("es-MX")} · ${rows.length} registro${rows.length === 1 ? "" : "s"}`;
+  metaRow.getCell(1).value = metaText;
   metaRow.height = 20;
   metaRow.getCell(1).font = { name: "Segoe UI", size: 10, color: { argb: NX.muted } };
   metaRow.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
@@ -85,8 +101,31 @@ async function buildAndDownload<T extends object>(
 
   ws.getRow(3).height = 6;
 
-  // Fila 4: encabezados
-  const headerRowIdx = 4;
+  // Filas de resumen ejecutivo (antes de la tabla)
+  let nextRow = 4;
+  if (summaryRows && summaryRows.length > 0) {
+    summaryRows.forEach(({ label, value }) => {
+      const r = ws.getRow(nextRow);
+      r.getCell(1).value = label;
+      r.getCell(1).font = { name: "Segoe UI", size: 10, bold: true, color: { argb: NX.navy } };
+      r.getCell(1).alignment = { vertical: "middle", horizontal: "left" };
+      r.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: NX.tealSoft } };
+      const valueCell = r.getCell(2);
+      valueCell.value = value;
+      valueCell.font = { name: "Segoe UI", size: 10, color: { argb: NX.text } };
+      valueCell.alignment = { vertical: "middle", horizontal: typeof value === "number" ? "right" : "left" };
+      if (typeof value === "number" && isCurrencyKey(label)) {
+        valueCell.numFmt = '"$"#,##0.00';
+      }
+      r.height = 18;
+      nextRow += 1;
+    });
+    ws.getRow(nextRow).height = 6;
+    nextRow += 1;
+  }
+
+  // Encabezados de la tabla
+  const headerRowIdx = nextRow;
   const headerRow = ws.getRow(headerRowIdx);
   columns.forEach((col, i) => {
     const cell = headerRow.getCell(i + 1);

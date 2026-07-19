@@ -14,6 +14,7 @@ import { getCrmSalesSectionConfig } from "@/lib/section-views";
 import { formatQuoteStatus, listSalesQuotes, createSalesQuote, listSalesClients, type SalesQuote, type SalesClient } from "@/lib/sales-api";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import { buildApiUrl } from "@/lib/api-base";
 
 // ─── Inline styles ────────────────────────────────────────────────────────────
 
@@ -65,6 +66,8 @@ export default function QuotesPage() {
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
   const [lines, setLines] = useState<LineItem[]>([emptyItem()]);
+  const [pdfBusyId, setPdfBusyId] = useState<number | null>(null);
+  const [pdfErr, setPdfErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -169,6 +172,69 @@ export default function QuotesPage() {
 
   const fmtMXN = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+  // Descarga el PDF dinámico de la cotización (mismo endpoint que el detalle)
+  const downloadQuotePdf = async (q: SalesQuote) => {
+    if (!token || pdfBusyId !== null) return;
+    setPdfBusyId(q.id);
+    setPdfErr(null);
+    try {
+      const res = await fetch(buildApiUrl(`cotizaciones/${q.id}/pdf`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `cotizacion-${q.quoteNumber ?? q.id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setPdfErr(`No se pudo descargar el PDF de ${q.quoteNumber}: ${e instanceof Error ? e.message : "error desconocido"}`);
+    } finally {
+      setPdfBusyId(null);
+    }
+  };
+
+  // Resumen Excel de todas las cotizaciones del periodo cargado
+  const exportQuotesExcel = () => {
+    if (items.length === 0) return;
+    const dates = items
+      .map((q) => new Date(q.issueDate).getTime())
+      .filter((t) => Number.isFinite(t));
+    const fmtDay = (t: number) => new Date(t).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+    const periodo = dates.length > 0 ? `Periodo: ${fmtDay(Math.min(...dates))} — ${fmtDay(Math.max(...dates))}` : undefined;
+
+    const aprobadas = items.filter((q) => q.status === "APPROVED");
+    const valorTotal = items.reduce((s, q) => s + Number(q.total ?? 0), 0);
+    const valorAprobado = aprobadas.reduce((s, q) => s + Number(q.total ?? 0), 0);
+    const countBy = (s: string) => items.filter((q) => q.status === s).length;
+
+    exportToExcel(items, [
+      { key: "quoteNumber", label: "Folio" },
+      { key: "issueDate", label: "Emisión", format: (v) => (v ? String(v).slice(0, 10) : "") },
+      { key: "clientCompany", label: "Cliente" },
+      { key: "clientName", label: "Contacto" },
+      { key: "projectName", label: "Proyecto" },
+      { key: "total", label: "Total" },
+      { key: "status", label: "Estado", format: (v) => formatStatus(String(v ?? "")) },
+      { key: "validUntil", label: "Vigencia", format: (v) => (v ? String(v).slice(0, 10) : "") },
+    ], `cotizaciones-${new Date().toISOString().slice(0, 10)}`, {
+      title: "RESUMEN DE COTIZACIONES",
+      subtitle: periodo,
+      summaryRows: [
+        { label: "Cotizaciones en el periodo", value: items.length },
+        { label: "Borrador", value: countBy("DRAFT") },
+        { label: "Enviadas", value: countBy("SENT") },
+        { label: "Aprobadas", value: aprobadas.length },
+        { label: "Rechazadas", value: countBy("REJECTED") },
+        { label: "Valor total cotizado", value: valorTotal },
+        { label: "Valor aprobado", value: valorAprobado },
+        { label: "Tasa de aprobación", value: items.length > 0 ? `${Math.round((aprobadas.length / items.length) * 100)}%` : "0%" },
+      ],
+    });
+  };
+
   const columns: Column<SalesQuote>[] = [
     {
       key: "quoteNumber", label: "Cotización",
@@ -219,6 +285,23 @@ export default function QuotesPage() {
         return <Tag variant={v}>{formatStatus(s)}</Tag>;
       },
       width: 100,
+    },
+    {
+      key: "id", label: "PDF", align: "center",
+      render: (q) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          iconLeft="📄"
+          loading={pdfBusyId === q.id}
+          disabled={pdfBusyId !== null && pdfBusyId !== q.id}
+          onClick={() => void downloadQuotePdf(q)}
+          title={`Descargar PDF de ${q.quoteNumber}`}
+        >
+          PDF
+        </Button>
+      ),
+      width: 90,
     },
   ];
 
@@ -408,17 +491,15 @@ export default function QuotesPage() {
         onClear={() => { setSearchQ(""); setFilterStatus(""); }}
         resultCount={loading ? null : highlighted.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(highlighted, [
-            { key: "quoteNumber", label: "Folio" },
-            { key: "clientCompany", label: "Cliente" },
-            { key: "projectName", label: "Proyecto" },
-            { key: "total", label: "Total" },
-            { key: "status", label: "Estado", format: (v) => formatStatus(String(v ?? "")) },
-            { key: "issueDate", label: "Emisión", format: (v) => v ? String(v).slice(0, 10) : "" },
-            { key: "validUntil", label: "Vigencia", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "cotizaciones")}>Excel</Button>
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={exportQuotesExcel}>Excel</Button>
         ) : undefined}
       />
+
+      {pdfErr && (
+        <p style={{ margin: "10px 0", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 12 }}>
+          {pdfErr}
+        </p>
+      )}
 
       <Section title={loading ? "Cargando…" : `${highlighted.length} cotización${highlighted.length === 1 ? "" : "es"}`}>
         {loading && <EmptyState icon="⏳" title="Cargando cotizaciones…" description="Consultando documentos." />}
