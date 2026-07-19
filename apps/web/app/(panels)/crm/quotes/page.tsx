@@ -36,6 +36,21 @@ const emptyForm = {
   validDays: 15, notes: "",
 };
 
+const toDateInput = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getCurrentMonthPeriod = () => {
+  const today = new Date();
+  return {
+    from: toDateInput(new Date(today.getFullYear(), today.getMonth(), 1)),
+    to: toDateInput(today),
+  };
+};
+
 function calcLine(it: LineItem) {
   const sub = it.qty * it.unitPrice;
   const disc = sub * (it.discount / 100);
@@ -60,6 +75,8 @@ export default function QuotesPage() {
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [periodFrom, setPeriodFrom] = useState("");
+  const [periodTo, setPeriodTo] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -84,6 +101,12 @@ export default function QuotesPage() {
   }, [token]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    const currentMonth = getCurrentMonthPeriod();
+    setPeriodFrom(currentMonth.from);
+    setPeriodTo(currentMonth.to);
+  }, []);
 
   useEffect(() => {
     if (showForm && token && !clients.length) {
@@ -151,8 +174,15 @@ export default function QuotesPage() {
     } finally { setSaving(false); }
   };
 
+  const periodItems = useMemo(() => items.filter((quote) => {
+    const issueDay = String(quote.issueDate ?? "").slice(0, 10);
+    if (periodFrom && issueDay < periodFrom) return false;
+    if (periodTo && issueDay > periodTo) return false;
+    return true;
+  }), [items, periodFrom, periodTo]);
+
   const highlighted = useMemo(() => {
-    let rows = items;
+    let rows = periodItems;
     if (searchQ.trim()) {
       const q = searchQ.toLowerCase();
       rows = rows.filter((qt) =>
@@ -168,7 +198,7 @@ export default function QuotesPage() {
       rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
     }
     return rows;
-  }, [items, highlightId, searchQ, filterStatus]);
+  }, [periodItems, highlightId, searchQ, filterStatus]);
 
   const fmtMXN = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -198,19 +228,19 @@ export default function QuotesPage() {
 
   // Resumen Excel de todas las cotizaciones del periodo cargado
   const exportQuotesExcel = () => {
-    if (items.length === 0) return;
-    const dates = items
-      .map((q) => new Date(q.issueDate).getTime())
-      .filter((t) => Number.isFinite(t));
-    const fmtDay = (t: number) => new Date(t).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
-    const periodo = dates.length > 0 ? `Periodo: ${fmtDay(Math.min(...dates))} — ${fmtDay(Math.max(...dates))}` : undefined;
+    if (periodItems.length === 0) return;
+    const formatPeriodDay = (value: string) =>
+      new Date(`${value}T12:00:00`).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+    const periodo = periodFrom && periodTo
+      ? `Periodo: ${formatPeriodDay(periodFrom)} — ${formatPeriodDay(periodTo)}`
+      : undefined;
 
-    const aprobadas = items.filter((q) => q.status === "APPROVED");
-    const valorTotal = items.reduce((s, q) => s + Number(q.total ?? 0), 0);
+    const aprobadas = periodItems.filter((q) => q.status === "APPROVED");
+    const valorTotal = periodItems.reduce((s, q) => s + Number(q.total ?? 0), 0);
     const valorAprobado = aprobadas.reduce((s, q) => s + Number(q.total ?? 0), 0);
-    const countBy = (s: string) => items.filter((q) => q.status === s).length;
+    const countBy = (s: string) => periodItems.filter((q) => q.status === s).length;
 
-    exportToExcel(items, [
+    exportToExcel(periodItems, [
       { key: "quoteNumber", label: "Folio" },
       { key: "issueDate", label: "Emisión", format: (v) => (v ? String(v).slice(0, 10) : "") },
       { key: "clientCompany", label: "Cliente" },
@@ -223,14 +253,14 @@ export default function QuotesPage() {
       title: "RESUMEN DE COTIZACIONES",
       subtitle: periodo,
       summaryRows: [
-        { label: "Cotizaciones en el periodo", value: items.length },
+        { label: "Cotizaciones en el periodo", value: periodItems.length },
         { label: "Borrador", value: countBy("DRAFT") },
         { label: "Enviadas", value: countBy("SENT") },
         { label: "Aprobadas", value: aprobadas.length },
         { label: "Rechazadas", value: countBy("REJECTED") },
         { label: "Valor total cotizado", value: valorTotal },
         { label: "Valor aprobado", value: valorAprobado },
-        { label: "Tasa de aprobación", value: items.length > 0 ? `${Math.round((aprobadas.length / items.length) * 100)}%` : "0%" },
+        { label: "Tasa de aprobación", value: `${Math.round((aprobadas.length / periodItems.length) * 100)}%` },
       ],
     });
   };
@@ -320,24 +350,24 @@ export default function QuotesPage() {
       />
 
       {/* ── KPIs ─────────────────────────────────────────────────────────── */}
-      {!loading && items.length > 0 && (() => {
-        const aprobadas = items.filter((q) => q.status === "APPROVED");
+      {!loading && periodItems.length > 0 && (() => {
+        const aprobadas = periodItems.filter((q) => q.status === "APPROVED");
         const valorAprobado = aprobadas.reduce((s, q) => s + Number(q.total ?? 0), 0);
-        const valorTotal = items.reduce((s, q) => s + Number(q.total ?? 0), 0);
-        const tasaAprobacion = items.length > 0 ? Math.round((aprobadas.length / items.length) * 100) : 0;
+        const valorTotal = periodItems.reduce((s, q) => s + Number(q.total ?? 0), 0);
+        const tasaAprobacion = Math.round((aprobadas.length / periodItems.length) * 100);
         const byStatus = [
-          { label: "Borrador", count: items.filter((q) => q.status === "DRAFT").length, color: "var(--text-tertiary)" },
-          { label: "Enviada", count: items.filter((q) => q.status === "SENT").length, color: "var(--primary)" },
+          { label: "Borrador", count: periodItems.filter((q) => q.status === "DRAFT").length, color: "var(--text-tertiary)" },
+          { label: "Enviada", count: periodItems.filter((q) => q.status === "SENT").length, color: "var(--primary)" },
           { label: "Aprobada", count: aprobadas.length, color: "var(--success)" },
-          { label: "Rechazada", count: items.filter((q) => q.status === "REJECTED").length, color: "var(--danger)" },
+          { label: "Rechazada", count: periodItems.filter((q) => q.status === "REJECTED").length, color: "var(--danger)" },
         ].filter((x) => x.count > 0);
         return (
           <>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 14 }}>
-              <KpiCard label="Total" value={items.length} icon="📋" />
+              <KpiCard label="Total" value={periodItems.length} icon="📋" />
               <KpiCard label="Aprobadas" value={aprobadas.length} variant="positive" icon="✅" hint={`${tasaAprobacion}% aprobación`} />
               <KpiCard label="Valor aprobado" value={<Money value={valorAprobado} compact />} variant="positive" icon="💰" hint={`de ${new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" }).format(valorTotal)} total`} />
-              <KpiCard label="Rechazadas" value={items.filter((q) => q.status === "REJECTED").length} variant="danger" icon="❌" />
+              <KpiCard label="Rechazadas" value={periodItems.filter((q) => q.status === "REJECTED").length} variant="danger" icon="❌" />
             </div>
             {byStatus.length > 0 && (
               <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
@@ -347,7 +377,7 @@ export default function QuotesPage() {
                     <div key={label} style={{ display: "grid", gridTemplateColumns: "90px 1fr 36px", gap: 10, alignItems: "center" }}>
                       <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{label}</span>
                       <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${(count / items.length) * 100}%`, background: color, borderRadius: 3 }} />
+                        <div style={{ height: "100%", width: `${(count / periodItems.length) * 100}%`, background: color, borderRadius: 3 }} />
                       </div>
                       <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
                     </div>
@@ -475,6 +505,10 @@ export default function QuotesPage() {
 
       <FilterToolbar
         search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por folio, cliente o proyecto…" }}
+        dates={[
+          { label: "Desde", value: periodFrom, onChange: setPeriodFrom },
+          { label: "Hasta", value: periodTo, onChange: setPeriodTo },
+        ]}
         selects={[{
           label: "Estado",
           value: filterStatus,
@@ -488,9 +522,15 @@ export default function QuotesPage() {
           ],
           allowAll: true,
         }]}
-        onClear={() => { setSearchQ(""); setFilterStatus(""); }}
+        onClear={() => {
+          const currentMonth = getCurrentMonthPeriod();
+          setSearchQ("");
+          setFilterStatus("");
+          setPeriodFrom(currentMonth.from);
+          setPeriodTo(currentMonth.to);
+        }}
         resultCount={loading ? null : highlighted.length}
-        rightActions={items.length > 0 ? (
+        rightActions={periodItems.length > 0 ? (
           <Button variant="ghost" size="sm" iconLeft="⬇" onClick={exportQuotesExcel}>Excel</Button>
         ) : undefined}
       />
