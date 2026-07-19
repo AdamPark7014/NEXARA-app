@@ -351,8 +351,13 @@ export class ExcelImportService {
       throw new BadRequestException({ message: 'No hay datos válidos', errors });
     }
 
+    if (model === 'viatic') {
+      throw new BadRequestException(
+        'Importación masiva de viáticos deshabilitada — usa el flujo de solicitud con evidencia.',
+      );
+    }
+
     const MODEL_MAP: Record<string, keyof PrismaService> = {
-      viatic: 'expense',
       vehicle: 'vehicleControl',
       activity: 'activity',
       evidence: 'evidence',

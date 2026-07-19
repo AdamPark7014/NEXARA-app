@@ -22,8 +22,9 @@ import { ViaticosService } from './viaticos.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
-import { ExcelImportService } from '../common/excel-import.service.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
+import { CreateViaticoDto } from './dto/create-viatico.dto.js';
+import { UpdateViaticoDto } from './dto/update-viatico.dto.js';
 
 @Controller('viatics')
 @UseGuards(UrlAccessGuard)
@@ -31,7 +32,6 @@ export class ViaticosController {
   constructor(
     private readonly viaticosService: ViaticosService,
     private readonly excelExport: ExcelExportService,
-    private readonly excelImport: ExcelImportService,
   ) {}
 
   @Get()
@@ -91,7 +91,7 @@ export class ViaticosController {
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_MANAGE, PERMISSIONS.VIATICS_CREATE] })
   @UseInterceptors(FileInterceptor('ticketEvidencia', { dest: getUploadSubdir(__dirname, 'viatics') }))
-  create(@CurrentUser() user: any, @Body() body: any, @UploadedFile() file?: any) {
+  create(@CurrentUser() user: any, @Body() body: CreateViaticoDto, @UploadedFile() file?: any) {
     const ticketEvidenciaUrl = file
       ? `/uploads/viatics/${file.filename}`
       : body.ticketEvidenciaUrl ?? body.comprobante ?? null;
@@ -139,18 +139,11 @@ export class ViaticosController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_IMPORT] })
   @UseInterceptors(FileInterceptor('file'))
-  async import(@UploadedFile() file: any, @Res() res: Response) {
-    if (!file) {
-      return res.status(HttpStatus.BAD_REQUEST).json({ message: 'Archivo requerido' });
-    }
-    try {
-      const result = await this.excelImport.importExcel('viatic', file.buffer);
-      return res.json(result);
-    } catch (e) {
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .json({ message: e instanceof Error ? e.message : 'Archivo inválido o error de importación' });
-    }
+  async import(@UploadedFile() _file: any, @Res() res: Response) {
+    return res.status(HttpStatus.BAD_REQUEST).json({
+      message:
+        'Importación masiva de viáticos deshabilitada — usa el flujo de solicitud con evidencia.',
+    });
   }
 
   @Get(':id')
@@ -183,10 +176,11 @@ export class ViaticosController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_MANAGE] })
   @UseInterceptors(FileInterceptor('ticketEvidencia', { dest: getUploadSubdir(__dirname, 'viatics') }))
-  update(@Param('id') id: string, @Body() body: any, @UploadedFile() file?: any) {
+  update(@Param('id') id: string, @Body() body: UpdateViaticoDto, @UploadedFile() file?: any) {
     const data: Record<string, unknown> = {};
     if (file) data.ticketEvidenciaUrl = `/uploads/viatics/${file.filename}`;
     if (body.ticketEvidenciaUrl !== undefined) data.ticketEvidenciaUrl = body.ticketEvidenciaUrl;
+    if (body.comprobante !== undefined) data.ticketEvidenciaUrl = body.comprobante;
     if (body.motivo !== undefined || body.concepto !== undefined) {
       data.motivo = body.motivo ?? body.concepto;
     }

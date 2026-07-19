@@ -1,7 +1,11 @@
 export class UpdateViaticoDto {
-  // TODO: Define los campos actualizables según tu modelo de Viatico en Prisma
-  // Ejemplo:
-  // montoSolicitado?: number;
-  // razonGasto?: string;
-  // ...
+  actividadId?: number | null;
+  projectId?: number | null;
+  vehicleId?: number | null;
+  categoria?: string;
+  montoSolicitado?: number | string;
+  motivo?: string;
+  concepto?: string;
+  ticketEvidenciaUrl?: string;
+  comprobante?: string;
 }

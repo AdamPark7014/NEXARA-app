@@ -5,4 +5,7 @@ export class CreateEmployeePaymentDto {
   totalMinutes?: number;
   amount!: string | number;
   note?: string;
+  concepto?: string;
+  /** Borrador | Pagado */
+  status?: string;
 }
