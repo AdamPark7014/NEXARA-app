@@ -4,6 +4,8 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { CreateJournalEntryDto } from './dto/journal-entry.dto.js';
+import { ListJournalEntriesQueryDto } from './dto/list-query.dto.js';
 
 @Controller('accounting/journal-entries')
 @UseGuards(UrlAccessGuard)
@@ -13,15 +15,18 @@ export class JournalEntriesController {
   @Post()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_MANAGE] })
-  create(@CurrentUser() user: any, @Body() dto: any) {
+  create(@CurrentUser() user: { id: number }, @Body() dto: CreateJournalEntryDto) {
     return this.service.createJournalEntry(dto, user.id);
   }
 
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_VIEW] })
-  findAll(@Query('status') status?: string, @Query('from') from?: string, @Query('to') to?: string) {
-    return this.service.listJournalEntries({ status, from, to });
+  findAll(@Query() query: ListJournalEntriesQueryDto) {
+    return this.service.listJournalEntries(
+      { status: query.status, from: query.from, to: query.to },
+      query,
+    );
   }
 
   @Get(':id')
@@ -34,14 +39,14 @@ export class JournalEntriesController {
   @Patch(':id/post')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_POST] })
-  post(@Param('id') id: string, @CurrentUser() user: any) {
+  post(@Param('id') id: string, @CurrentUser() user: { id: number }) {
     return this.service.postJournalEntry(+id, user.id);
   }
 
   @Post(':id/reverse')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_POST] })
-  reverse(@Param('id') id: string, @CurrentUser() user: any) {
+  reverse(@Param('id') id: string, @CurrentUser() user: { id: number }) {
     return this.service.reverseJournalEntry(+id, user.id);
   }
 }

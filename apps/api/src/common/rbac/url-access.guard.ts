@@ -51,15 +51,17 @@ export class UrlAccessGuard extends AuthGuard('jwt') {
     const url = req.originalUrl || req.url || '';
 
     const result = checkUrlAccess(role, url, method);
-    // Solo aplicar deny cuando hay regla explícita en la matriz (igual que RbacGuard v2).
-    // Sin regla → dejar pasar; @RBAC() en el handler valida permisos legacy.
-    if (result.matchedRule) {
-      if (!result.allowed) {
-        this.logger.warn(`[DENY] role=${role} ${method} ${url}`);
-        throw new ForbiddenException(`Tu rol (${role}) no puede acceder a ${method} ${url}`);
-      }
-      (req as any).rbac = { role, scope: result.scope, rule: result.matchedRule };
+    // Whitelist: sin match (o deny) → Forbidden. No fallthrough a legacy.
+    if (!result.allowed) {
+      this.logger.warn(`[DENY] role=${role} ${method} ${url}`);
+      throw new ForbiddenException(`Tu rol (${role}) no puede acceder a ${method} ${url}`);
     }
+    (req as { rbac?: unknown }).rbac = {
+      role,
+      scope: result.scope,
+      rule: result.matchedRule,
+      source: 'v2',
+    };
     return true;
   }
 

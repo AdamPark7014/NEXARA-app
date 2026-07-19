@@ -279,14 +279,18 @@ export class AccountingService {
       if (filters.to) where.date.lte = new Date(filters.to);
     }
     const include = { lines: { include: { debitAccount: true, creditAccount: true } }, createdBy: { select: { id: true, nombre: true } } };
-    if (query?.limit) {
-      const [data, total] = await Promise.all([
-        this.prisma.journalEntry.findMany({ where, include, orderBy: { date: 'desc' }, skip: query.skip, take: query.take }),
-        this.prisma.journalEntry.count({ where }),
-      ]);
-      return buildPaginatedResponse(data, total, query);
-    }
-    return this.prisma.journalEntry.findMany({ where, include, orderBy: { date: 'desc' } });
+    const pageQuery = query ?? Object.assign(new PaginationQueryDto(), { page: 1, limit: 50 });
+    const [data, total] = await Promise.all([
+      this.prisma.journalEntry.findMany({
+        where,
+        include,
+        orderBy: { date: 'desc' },
+        skip: pageQuery.skip,
+        take: pageQuery.take,
+      }),
+      this.prisma.journalEntry.count({ where }),
+    ]);
+    return buildPaginatedResponse(data, total, pageQuery);
   }
 
   async getJournalEntry(id: number) {
@@ -1089,14 +1093,18 @@ export class AccountingService {
       if (filters.to) where.issueDate.lte = new Date(filters.to);
     }
     const include = { items: true, client: true, supplier: true, payments: true };
-    if (query?.limit) {
-      const [data, total] = await Promise.all([
-        this.prisma.invoice.findMany({ where, include, orderBy: { issueDate: 'desc' }, skip: query.skip, take: query.take }),
-        this.prisma.invoice.count({ where }),
-      ]);
-      return buildPaginatedResponse(data, total, query);
-    }
-    return this.prisma.invoice.findMany({ where, include, orderBy: { issueDate: 'desc' } });
+    const pageQuery = query ?? Object.assign(new PaginationQueryDto(), { page: 1, limit: 50 });
+    const [data, total] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where,
+        include,
+        orderBy: { issueDate: 'desc' },
+        skip: pageQuery.skip,
+        take: pageQuery.take,
+      }),
+      this.prisma.invoice.count({ where }),
+    ]);
+    return buildPaginatedResponse(data, total, pageQuery);
   }
 
   async getInvoice(id: number) {
@@ -1532,18 +1540,29 @@ export class AccountingService {
     });
   }
 
-  async listBankTransactions(bankAccountId: number, filters?: { from?: string; to?: string }) {
+  async listBankTransactions(
+    bankAccountId: number,
+    filters?: { from?: string; to?: string },
+    query?: PaginationQueryDto,
+  ) {
     const where: any = { bankAccountId };
     if (filters?.from || filters?.to) {
       where.transactionDate = {};
       if (filters.from) where.transactionDate.gte = new Date(filters.from);
       if (filters.to) where.transactionDate.lte = new Date(filters.to);
     }
-    return this.prisma.bankTransaction.findMany({
-      where,
-      include: { reconciliation: true },
-      orderBy: { transactionDate: 'desc' },
-    });
+    const pageQuery = query ?? Object.assign(new PaginationQueryDto(), { page: 1, limit: 50 });
+    const [data, total] = await Promise.all([
+      this.prisma.bankTransaction.findMany({
+        where,
+        include: { reconciliation: true },
+        orderBy: { transactionDate: 'desc' },
+        skip: pageQuery.skip,
+        take: pageQuery.take,
+      }),
+      this.prisma.bankTransaction.count({ where }),
+    ]);
+    return buildPaginatedResponse(data, total, pageQuery);
   }
 
   async reconcileTransaction(transactionId: number, dto: { matchedAmount: number; notes?: string }, userId: number) {

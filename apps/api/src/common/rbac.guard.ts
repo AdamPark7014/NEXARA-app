@@ -19,11 +19,10 @@ type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
  *
  * Estrategia:
  *   1. Super admin → bypass total.
- *   2. Si user tiene `roleKey` v2 y la URL está EXPLÍCITAMENTE en `url-matrix`:
- *      - deny → Forbidden inmediato
+ *   2. Si user tiene `roleKey` v2:
+ *      - url-matrix deny / sin match → Forbidden (deny-by-default)
  *      - allow → AÚN debe satisfacer `@RBAC()` (AND, no bypass)
- *   3. Si url-matrix no contempla la URL para ese rol → solo `@RBAC()` legacy.
- *   4. Si user NO tiene `roleKey` v2 → solo modelo legacy.
+ *   3. Si user NO tiene `roleKey` v2 → solo modelo legacy (`@RBAC`).
  */
 @Injectable()
 export class RbacGuard extends AuthGuard('jwt') {
@@ -46,28 +45,25 @@ export class RbacGuard extends AuthGuard('jwt') {
       return true;
     }
 
-    // 2) Modelo RBAC v2 — matrix allow MUST still satisfy @RBAC permissions.
+    // 2) Modelo RBAC v2 — whitelist + AND con @RBAC.
     const v2Role = this.resolveV2Role(user);
     let matrixAllowed = false;
     if (v2Role) {
       const method = (request.method as HttpMethod) ?? 'GET';
       const url = request.originalUrl || request.url || '';
       const result = checkUrlAccess(v2Role, url, method);
-      if (result.matchedRule) {
-        if (!result.allowed) {
-          this.logger.warn(`[v2 DENY] role=${v2Role} ${method} ${url}`);
-          throw new ForbiddenException(`Tu rol (${v2Role}) no puede acceder a ${method} ${url}`);
-        }
-        matrixAllowed = true;
-        (request as { rbac?: unknown }).rbac = {
-          role: v2Role,
-          scope: result.scope,
-          rule: result.matchedRule,
-          source: 'v2',
-        };
-        // No early-return: keep evaluating decorator permissions below.
+      if (!result.allowed) {
+        this.logger.warn(`[v2 DENY] role=${v2Role} ${method} ${url}`);
+        throw new ForbiddenException(`Tu rol (${v2Role}) no puede acceder a ${method} ${url}`);
       }
-      // Si la matriz NO cubre esta URL → cae al modelo legacy.
+      matrixAllowed = true;
+      (request as { rbac?: unknown }).rbac = {
+        role: v2Role,
+        scope: result.scope,
+        rule: result.matchedRule,
+        source: 'v2',
+      };
+      // No early-return: keep evaluating decorator permissions below.
     }
 
     // 3) Permisos del decorator @RBAC — siempre se evalúan si existen.

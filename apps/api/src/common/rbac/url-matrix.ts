@@ -50,6 +50,15 @@ export const OPS_OPERATIONAL_PROJECTS_URL_RULES: UrlRule[] = [
   { path: '/api/operational-projects/**', scope: 'write' },
 ];
 
+/** APIs de sesión propias — todo rol autenticado (deny-by-default no las bloquea). */
+export const SHARED_SESSION_URL_RULES: UrlRule[] = [
+  { path: '/api/notifications/**', scope: 'write' },
+  { path: '/api/user-preferences/**', scope: 'write' },
+  { path: '/api/users/me', methods: ['GET', 'PATCH'], scope: 'write' },
+  { path: '/api/users/profile/**', scope: 'write' },
+  { path: '/api/devices/**', methods: ['GET', 'POST', 'PATCH', 'DELETE'], scope: 'write' },
+];
+
 /**
  * Matriz Rol → reglas de URL.
  */
@@ -475,6 +484,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/cvs/**', scope: 'write' },
     { path: '/api/fines/**', scope: 'write' },
     { path: '/api/lunch-breaks/**', scope: 'write' },
+    { path: '/api/users', methods: ['GET'], scope: 'read' },
+    { path: '/api/documents/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -501,6 +512,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/ventas/proyectos/**', methods: ['GET'], scope: 'read' },
     { path: '/api/expenses/**', scope: 'write' },
     { path: '/api/employee-payments/**', methods: ['GET', 'POST'], scope: 'write' },
+    ...SELF_ATTENDANCE_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -573,7 +585,7 @@ export function checkUrlAccess(
   // Normaliza: quita query, trailing slash, y mapea paths legacy → canónicos.
   const path = normalizeUrlToCanonical(url);
 
-  const rules = URL_MATRIX[role] ?? [];
+  const rules = [...(URL_MATRIX[role] ?? []), ...SHARED_SESSION_URL_RULES];
   for (const rule of rules) {
     if (rule.methods && !rule.methods.includes(method)) continue;
     if (regexFor(rule.path).test(path)) {

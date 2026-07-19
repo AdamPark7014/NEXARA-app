@@ -104,8 +104,8 @@ export default function BankingPage() {
     if (!token || !selected) return;
     setLoadingTx(true);
     setTxError(null);
-    apiFetch(`accounting/banking/accounts/${selected.id}/transactions`, token)
-      .then((data) => setTxs(Array.isArray(data) ? data : []))
+    apiFetch(`accounting/banking/accounts/${selected.id}/transactions?limit=100`, token)
+      .then((data) => setTxs(Array.isArray(data) ? data : (data?.data ?? [])))
       .catch((e) => {
         setTxError(formatApiError(e, "No se pudieron cargar los movimientos"));
         setTxs([]);
@@ -174,8 +174,8 @@ export default function BankingPage() {
       });
       setShowTxForm(false);
       setTxForm({ ...emptyTxForm });
-      const data = await apiFetch(`accounting/banking/accounts/${selected.id}/transactions`, token);
-      setTxs(Array.isArray(data) ? data : []);
+      const data = await apiFetch(`accounting/banking/accounts/${selected.id}/transactions?limit=100`, token);
+      setTxs(Array.isArray(data) ? data : (data?.data ?? []));
       void load();
     } catch (e) {
       toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
