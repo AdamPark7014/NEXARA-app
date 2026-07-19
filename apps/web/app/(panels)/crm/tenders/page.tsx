@@ -15,7 +15,7 @@ import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface Tender {
   id: number;
@@ -326,7 +326,7 @@ export default function TendersPage() {
         onClear={() => { setSearchQ(""); setFilterStatus(""); }}
         resultCount={loading ? null : visibleItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
             { key: "tenderNumber", label: "Folio" },
             { key: "title", label: "Título" },
             { key: "conveningEntity", label: "Convocante" },
@@ -334,7 +334,7 @@ export default function TendersPage() {
             { key: "ourBidAmount", label: "Propuesta" },
             { key: "budgetCeiling", label: "Presupuesto base" },
             { key: "submissionDeadline", label: "Cierre", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "licitaciones")}>CSV</Button>
+          ], "licitaciones")}>Excel</Button>
         ) : undefined}
       />
 

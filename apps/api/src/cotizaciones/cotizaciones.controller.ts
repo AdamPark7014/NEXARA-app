@@ -60,7 +60,8 @@ export class CotizacionesController {
   }
 
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  // Quien puede ver la cotización (SALES_VIEW) también puede descargar su PDF
+  @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS] })
   @Get(':id/pdf')
   async downloadPdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
     const pdf = await this.cotizacionesService.getPdfBuffer(id);

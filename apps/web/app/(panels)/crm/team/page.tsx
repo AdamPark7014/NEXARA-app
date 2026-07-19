@@ -13,7 +13,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface Performance {
   targetId: number;
@@ -131,14 +131,14 @@ export default function TeamPage() {
         onClear={() => setSearchQ("")}
         resultCount={loading ? null : visibleRows.length}
         rightActions={rows.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleRows, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleRows, [
             { key: "ownerName", label: "Ejecutivo" },
             { key: "opportunitiesCreated", label: "Oportunidades" },
             { key: "newClientsAchieved", label: "Clientes nuevos" },
             { key: "revenueAchieved", label: "Vendido" },
             { key: "attainmentPct", label: "% Cuota", format: (v) => `${v}%` },
             { key: "reachedBonus", label: "Bono", format: (v) => v ? "Sí" : "No" },
-          ], "equipo-ventas")}>CSV</Button>
+          ], "equipo-ventas")}>Excel</Button>
         ) : undefined}
       />
       <Section title={loading ? "Cargando…" : `${visibleRows.length} ejecutivos`}>

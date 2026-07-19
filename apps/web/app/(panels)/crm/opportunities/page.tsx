@@ -13,7 +13,7 @@ import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { filterRowsByScope, getCrmSalesSectionConfig } from "@/lib/section-views";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import {
   ALL_OPPORTUNITY_STAGES,
   createSalesOpportunity,
@@ -365,7 +365,7 @@ export default function OpportunitiesPage() {
         onClear={() => { setSearchQ(""); setFilterStage(""); }}
         resultCount={loading ? null : visibleItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
             { key: "title", label: "Título" },
             { key: "clientName", label: "Cliente" },
             { key: "stage", label: "Etapa", format: (v) => formatOpportunityStage(String(v ?? "")) },
@@ -373,7 +373,7 @@ export default function OpportunitiesPage() {
             { key: "probability", label: "Probabilidad (%)" },
             { key: "owner", label: "Responsable", format: (v) => (v as SalesOpportunity["owner"])?.nombre ?? "—" },
             { key: "expectedCloseDate", label: "Cierre esperado", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "oportunidades")}>CSV</Button>
+          ], "oportunidades")}>Excel</Button>
         ) : undefined}
       />
 

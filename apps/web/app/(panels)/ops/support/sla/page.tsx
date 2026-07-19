@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
@@ -194,13 +194,13 @@ export default function SupportSlaPage() {
               onClear={() => { setSearchQ(""); setFilterPriority(""); setFilterType(""); }}
               resultCount={visibleBreaches.length}
               rightActions={stats.breaches.length > 0 ? (
-                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleBreaches, [
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleBreaches, [
                   { key: "anNumber", label: "Ticket" },
                   { key: "titulo", label: "Título" },
                   { key: "priority", label: "Prioridad" },
                   { key: "type", label: "Tipo SLA", format: (v) => typeLabel[String(v)] ?? String(v) },
                   { key: "hoursLate", label: "Horas retraso" },
-                ], "sla-incumplimientos")}>CSV</Button>
+                ], "sla-incumplimientos")}>Excel</Button>
               ) : undefined}
             />
             <DataTable

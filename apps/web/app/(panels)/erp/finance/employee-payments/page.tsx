@@ -13,7 +13,7 @@ import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 
@@ -189,13 +189,13 @@ export default function EmployeePaymentsPage() {
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
             {items.length > 0 && (
-              <Button variant="ghost" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+              <Button variant="ghost" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
                 { key: "user", label: "Empleado", format: (v) => (v as Payment["user"])?.nombre ?? "—" },
                 { key: "periodFrom", label: "Periodo desde", format: (v) => v ? new Date(String(v)).toLocaleDateString("es-MX") : "" },
                 { key: "periodTo", label: "Periodo hasta", format: (v) => v ? new Date(String(v)).toLocaleDateString("es-MX") : "" },
                 { key: "amount", label: "Monto ($)" },
                 { key: "note", label: "Concepto" },
-              ], "pagos-personal")}>Exportar CSV</Button>
+              ], "pagos-personal")}>Exportar Excel</Button>
             )}
             {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={openNew}>Registrar pago</Button>}
           </>

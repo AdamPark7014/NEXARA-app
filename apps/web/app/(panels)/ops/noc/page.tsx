@@ -10,7 +10,7 @@ import { Tag } from "@/components/ui/DataTable";
 import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { resolveV2RoleKey } from "@/lib/user-access";
@@ -158,7 +158,7 @@ export default function NocPage() {
             onClear={() => { setSearchQ(""); setFilterStatus(""); }}
             resultCount={loading ? null : visibleDevices.length}
             rightActions={devices.length > 0 ? (
-              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleDevices, [
+              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleDevices, [
                 { key: "clientName", label: "Cliente" },
                 { key: "name", label: "Dispositivo" },
                 { key: "type", label: "Tipo" },
@@ -166,7 +166,7 @@ export default function NocPage() {
                 { key: "status", label: "Estado" },
                 { key: "uptimePct30d", label: "Uptime 30d (%)", format: (v) => typeof v === "number" ? v.toFixed(2) : "" },
                 { key: "lastSeen", label: "Última vez activo", format: (v) => v ? String(v).slice(0, 19).replace("T", " ") : "" },
-              ], "noc-dispositivos")}>CSV</Button>
+              ], "noc-dispositivos")}>Excel</Button>
             ) : undefined}
           />
 

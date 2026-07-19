@@ -10,7 +10,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Money, Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { getBiSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
@@ -217,14 +217,14 @@ export default function BiPage() {
               onClear={() => {}}
               resultCount={margin.length}
               rightActions={margin.length > 0 ? (
-                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(margin, [
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(margin, [
                   { key: "projectType", label: "Línea de negocio" },
                   { key: "count", label: "Proyectos" },
                   { key: "budget", label: "Presupuesto (MXN)" },
                   { key: "cost", label: "Costo (MXN)" },
                   { key: "margin", label: "Margen (MXN)" },
                   { key: "marginPercent", label: "% Margen", format: (v) => `${String(v)}%` },
-                ], `bi-margen-${period}`)}>CSV</Button>
+                ], `bi-margen-${period}`)}>Excel</Button>
               ) : undefined}
             />
             <DataTable columns={marginCols} rows={margin} rowKey={(r) => r.projectType} emptyTitle="Sin datos" emptyDescription="No hay proyectos con presupuesto registrado." />
@@ -249,13 +249,13 @@ export default function BiPage() {
               onClear={() => setEngSearch("")}
               resultCount={visibleEngineers.length}
               rightActions={engineers.length > 0 ? (
-                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleEngineers, [
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleEngineers, [
                   { key: "engineerName", label: "Ingeniero" },
                   { key: "totalActivities", label: "OT (90d)" },
                   { key: "completed", label: "Cerradas" },
                   { key: "completionRate", label: "% Cierre", format: (v) => `${String(v)}%` },
                   { key: "avgDurationMin", label: "Min/OT prom." },
-                ], "bi-ingenieros")}>CSV</Button>
+                ], "bi-ingenieros")}>Excel</Button>
               ) : undefined}
             />
             <DataTable columns={engCols} rows={visibleEngineers} rowKey={(r) => r.engineerId} emptyTitle="Sin datos" emptyDescription="No hay actividades cerradas en los últimos 90 días." />
@@ -267,13 +267,13 @@ export default function BiPage() {
               onClear={() => setClientSearch("")}
               resultCount={visibleClients.length}
               rightActions={clientsRoi.length > 0 ? (
-                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleClients, [
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleClients, [
                   { key: "clientName", label: "Cliente" },
                   { key: "projects", label: "Proyectos" },
                   { key: "revenue", label: "Ingreso (MXN)" },
                   { key: "cost", label: "Costo (MXN)" },
                   { key: "roi", label: "ROI (%)", format: (v) => `${String(v)}%` },
-                ], `bi-clientes-roi-${period}`)}>CSV</Button>
+                ], `bi-clientes-roi-${period}`)}>Excel</Button>
               ) : undefined}
             />
             <DataTable columns={clientCols} rows={visibleClients} rowKey={(r) => r.clientId} emptyTitle="Sin datos" emptyDescription="No hay proyectos facturados en el periodo seleccionado." />

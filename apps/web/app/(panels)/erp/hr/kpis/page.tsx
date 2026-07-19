@@ -8,7 +8,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
 import { getHrSubmoduleConfig } from "@/lib/section-views";
@@ -155,13 +155,13 @@ export default function HrKpisPage() {
               onClear={() => setSearchQ("")}
               resultCount={visibleEngineers.length}
               rightActions={engineers.length > 0 ? (
-                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleEngineers, [
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleEngineers, [
                   { key: "engineerName", label: "Ingeniero" },
                   { key: "totalActivities", label: "OT (90d)" },
                   { key: "completed", label: "Cerradas" },
                   { key: "completionRate", label: "% Cierre", format: (v) => `${String(v)}%` },
                   { key: "avgDurationMin", label: "Duración promedio (min)" },
-                ], "kpis-ingenieros")}>CSV</Button>
+                ], "kpis-ingenieros")}>Excel</Button>
               ) : undefined}
             />
             <DataTable columns={columns} rows={visibleEngineers} rowKey={(r) => r.engineerId} emptyTitle="Sin datos" emptyDescription="No hay actividades cerradas en los últimos 90 días." />

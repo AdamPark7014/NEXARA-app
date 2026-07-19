@@ -9,7 +9,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import { DetailError } from "@/components/detail/DetailFrame";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { useOpsProjectDetail } from "@/components/ops/OpsProjectDetailShell";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -221,11 +221,11 @@ export default function OpsProjectActivitiesPage() {
           onClear={() => { setSearchQ(""); setFilterStatus(""); }}
           resultCount={visibleActivities.length}
           rightActions={
-            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleActivities, [
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleActivities, [
               { key: "anNumber", label: "OT#" },
               { key: "titulo", label: "Título" },
               { key: "estatus", label: "Estado" },
-            ], "actividades-proyecto")}>CSV</Button>
+            ], "actividades-proyecto")}>Excel</Button>
           }
         />
       )}

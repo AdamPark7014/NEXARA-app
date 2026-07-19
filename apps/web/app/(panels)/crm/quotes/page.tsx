@@ -13,7 +13,7 @@ import { useUser } from "@/components/UserContext";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
 import { formatQuoteStatus, listSalesQuotes, createSalesQuote, listSalesClients, type SalesQuote, type SalesClient } from "@/lib/sales-api";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 // ─── Inline styles ────────────────────────────────────────────────────────────
 
@@ -408,7 +408,7 @@ export default function QuotesPage() {
         onClear={() => { setSearchQ(""); setFilterStatus(""); }}
         resultCount={loading ? null : highlighted.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(highlighted, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(highlighted, [
             { key: "quoteNumber", label: "Folio" },
             { key: "clientCompany", label: "Cliente" },
             { key: "projectName", label: "Proyecto" },
@@ -416,7 +416,7 @@ export default function QuotesPage() {
             { key: "status", label: "Estado", format: (v) => formatStatus(String(v ?? "")) },
             { key: "issueDate", label: "Emisión", format: (v) => v ? String(v).slice(0, 10) : "" },
             { key: "validUntil", label: "Vigencia", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "cotizaciones")}>CSV</Button>
+          ], "cotizaciones")}>Excel</Button>
         ) : undefined}
       />
 

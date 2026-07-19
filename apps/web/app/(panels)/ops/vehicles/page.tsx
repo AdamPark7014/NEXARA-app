@@ -15,7 +15,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface Vehicle {
   id: number;
@@ -388,12 +388,12 @@ export default function VehiclesPage() {
         onClear={() => { setSearchQ(""); setFilterEstado(""); }}
         resultCount={loading ? null : visibleVehicles.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleVehicles, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleVehicles, [
             { key: "nombre", label: "Vehículo" },
             { key: "placas", label: "Placas" },
             { key: "estatus", label: "Estado" },
             { key: "notas", label: "Notas" },
-          ], "vehiculos")}>CSV</Button>
+          ], "vehiculos")}>Excel</Button>
         ) : undefined}
       />
 

@@ -9,7 +9,7 @@ import { Tag } from "@/components/ui/DataTable";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { resolveV2RoleKey } from "@/lib/user-access";
@@ -204,7 +204,7 @@ export default function AuditPage() {
         onClear={() => { setQuery(""); setSevFilter(""); setPanelFilter(""); }}
         resultCount={loading ? null : filtered.length}
         rightActions={rows.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(filtered, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(filtered, [
             { key: "id", label: "ID" },
             { key: "user", label: "Usuario", format: (v) => (v as AuditRow["user"])?.nombre ?? "Sistema" },
             { key: "action", label: "Acción" },
@@ -212,7 +212,7 @@ export default function AuditPage() {
             { key: "entityId", label: "ID Entidad" },
             { key: "ipAddress", label: "IP" },
             { key: "createdAt", label: "Fecha", format: (v) => v ? String(v).slice(0, 19).replace("T", " ") : "" },
-          ], "audit-log")}>CSV</Button>
+          ], "audit-log")}>Excel</Button>
         ) : undefined}
       />
 

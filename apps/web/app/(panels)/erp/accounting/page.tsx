@@ -15,7 +15,7 @@ import { formatApiError } from "@/lib/erp-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface JournalEntry {
   id: number;
@@ -997,7 +997,7 @@ export default function AccountingPage() {
             onClear={() => { setSearchQ(""); setFilterTipo(""); }}
             resultCount={loading ? null : visibleItems.length}
             rightActions={items.length > 0 ? (
-              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
                 { key: "reference", label: "Referencia", format: (v, e) => String(v ?? `P-${e.id}`) },
                 { key: "description", label: "Concepto" },
                 { key: "type", label: "Tipo" },
@@ -1005,7 +1005,7 @@ export default function AccountingPage() {
                 { key: "totalCredit", label: "Abono" },
                 { key: "status", label: "Estado" },
                 { key: "date", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
-              ], "polizas-contables")}>CSV</Button>
+              ], "polizas-contables")}>Excel</Button>
             ) : undefined}
           />
 

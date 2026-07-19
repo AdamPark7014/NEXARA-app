@@ -13,7 +13,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import Modal from "@/components/ui/Modal";
 
@@ -340,14 +340,14 @@ export default function BankingPage() {
                 onClear={() => { setTxSearch(""); setTxFilterType(""); }}
                 resultCount={loadingTx ? null : visibleTxs.length}
                 rightActions={txs.length > 0 ? (
-                  <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleTxs, [
+                  <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleTxs, [
                     { key: "transactionDate", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
                     { key: "description", label: "Descripción" },
                     { key: "counterpartyName", label: "Contraparte" },
                     { key: "amount", label: "Monto" },
                     { key: "isDebit", label: "Tipo", format: (v) => v ? "Cargo" : "Abono" },
                     { key: "reconciliationStatus", label: "Estado" },
-                  ], `movimientos-${selected.name.toLowerCase().replace(/\s+/g, "-")}`)}>CSV</Button>
+                  ], `movimientos-${selected.name.toLowerCase().replace(/\s+/g, "-")}`)}>Excel</Button>
                 ) : undefined}
               />
               {loadingTx

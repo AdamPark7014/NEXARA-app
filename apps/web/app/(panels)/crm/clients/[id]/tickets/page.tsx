@@ -9,7 +9,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { useClientDetail } from "@/components/crm/ClientDetailShell";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -234,14 +234,14 @@ export default function ClientTicketsPage() {
           onClear={() => { setSearchQ(""); setFilterStatus(""); setFilterUrgency(""); }}
           resultCount={visibleTickets.length}
           rightActions={
-            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleTickets, [
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleTickets, [
               { key: "id", label: "ID" },
               { key: "description", label: "Descripción" },
               { key: "status", label: "Estado" },
               { key: "urgency", label: "Urgencia" },
               { key: "requestType", label: "Tipo" },
               { key: "createdAt", label: "Fecha", format: (v) => v ? new Date(String(v)).toLocaleDateString("es-MX") : "" },
-            ], "tickets-cliente")}>CSV</Button>
+            ], "tickets-cliente")}>Excel</Button>
           }
         />
       )}

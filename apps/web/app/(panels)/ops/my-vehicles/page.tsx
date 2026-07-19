@@ -13,7 +13,7 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { getVehiclesSectionConfig } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface VehicleRequest {
   id: number;
@@ -150,7 +150,7 @@ export default function MyVehiclesPage() {
           <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10, display: "flex", flexDirection: "column", gap: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Distribución por aprobación</span>
-              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(items, [
+              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(items, [
                 { key: "id", label: "ID" },
                 { key: "nombreVehiculo", label: "Vehículo" },
                 { key: "placasVehiculo", label: "Placas" },
@@ -158,7 +158,7 @@ export default function MyVehiclesPage() {
                 { key: "entregaEstatus", label: "Estatus entrega" },
                 { key: "fechaInicioAprobada", label: "Inicio aprobado", format: (v) => v ? String(v).slice(0, 10) : "" },
                 { key: "fechaFinAprobada", label: "Fin aprobado", format: (v) => v ? String(v).slice(0, 10) : "" },
-              ], "mis-vehiculos")}>CSV</Button>
+              ], "mis-vehiculos")}>Excel</Button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               {Object.entries(byStatus).sort((a, b) => b[1] - a[1]).map(([s, count]) => (

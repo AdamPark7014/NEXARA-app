@@ -13,7 +13,7 @@ import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface OrderTemplate {
   id: number;
@@ -267,13 +267,13 @@ export default function TemplatesPage() {
         onClear={() => setSearchQ("")}
         resultCount={loading ? null : visibleItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
             { key: "name", label: "Plantilla" },
             { key: "companyName", label: "Empresa" },
             { key: "companyEmail", label: "Email" },
             { key: "companyRfc", label: "RFC" },
             { key: "isDefault", label: "Predeterminada", format: (v) => v ? "Sí" : "No" },
-          ], "plantillas-cotizacion")}>CSV</Button>
+          ], "plantillas-cotizacion")}>Excel</Button>
         ) : undefined}
       />
       <Section title={loading ? "Cargando…" : `${visibleItems.length} plantilla${visibleItems.length === 1 ? "" : "s"}`}>

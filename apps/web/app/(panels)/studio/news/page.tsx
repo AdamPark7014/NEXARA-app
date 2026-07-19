@@ -12,7 +12,7 @@ import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import StudioFileInput from "@/components/studio/StudioFileInput";
 import StudioImageHint from "@/components/studio/StudioImageHint";
 import {
@@ -217,14 +217,14 @@ export default function StudioNewsPage() {
           onClear={() => { setSearchQ(""); setFilterStatus(""); }}
           resultCount={loading ? null : visibleItems.length}
           rightActions={items.length > 0 ? (
-            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
               { key: "id", label: "ID" },
               { key: "title", label: "Título" },
               { key: "slug", label: "Slug" },
               { key: "status", label: "Estado" },
               { key: "publishedAt", label: "Publicado", format: (v) => v ? String(v).slice(0, 10) : "—" },
               { key: "createdAt", label: "Creado", format: (v) => v ? String(v).slice(0, 10) : "" },
-            ], "blog-noticias")}>CSV</Button>
+            ], "blog-noticias")}>Excel</Button>
           ) : undefined}
         />
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando el blog público." />}

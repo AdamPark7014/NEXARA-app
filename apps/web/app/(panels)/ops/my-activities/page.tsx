@@ -16,7 +16,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { activityStatusVariant, isActivityCompleted, isActivityInProgress } from "@/lib/activity-status";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import {
   canStartActivity,
   fieldActionLabel,
@@ -264,14 +264,14 @@ export default function MyActivitiesPage() {
         onClear={() => setSearchQ("")}
         resultCount={loading ? null : visibleItems.length}
         rightActions={
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
             { key: "anNumber", label: "OT" },
             { key: "titulo", label: "Título" },
             { key: "estatus", label: "Estado" },
             { key: "client", label: "Cliente", format: (v) => (v as { name: string } | null)?.name ?? "" },
             { key: "branchAddress", label: "Dirección" },
             { key: "fechaEntregaEsperada", label: "Fecha esperada", format: (v) => v ? new Date(String(v)).toLocaleDateString("es-MX") : "" },
-          ], `mis-actividades-${rangeTab}`)}>CSV</Button>
+          ], `mis-actividades-${rangeTab}`)}>Excel</Button>
         }
       />
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>

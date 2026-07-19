@@ -15,7 +15,7 @@ import { getActivitiesCanonicalPath, resolveV2RoleKey } from "@/lib/user-access"
 import { ROLES } from "@/lib/rbac";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface Snapshot {
   id: number;
@@ -340,7 +340,7 @@ export default function AssetsPage() {
         onClear={() => { setSearchQ(""); setFilterStatus(""); }}
         resultCount={loading ? null : visibleItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
             { key: "client", label: "Cliente", format: (v) => (v as Snapshot["client"])?.name ?? "—" },
             { key: "branch", label: "Sucursal", format: (v) => (v as Snapshot["branch"])?.name ?? "—" },
             { key: "title", label: "Título" },
@@ -348,7 +348,7 @@ export default function AssetsPage() {
             { key: "deltaCount", label: "Diferencia" },
             { key: "status", label: "Estado" },
             { key: "updatedAt", label: "Actualizado", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "inventarios-campo")}>CSV</Button>
+          ], "inventarios-campo")}>Excel</Button>
         ) : undefined}
       />
       <Section title={loading ? "Cargando…" : `${visibleItems.length} inventarios`}>

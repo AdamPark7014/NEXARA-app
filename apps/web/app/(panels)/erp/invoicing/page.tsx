@@ -10,7 +10,7 @@ import Button from "@/components/ui/Button";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
@@ -625,13 +625,13 @@ export default function InvoicingPage() {
         onClear={() => { setSearchQ(""); setFilter(""); setFilterStatus(""); }}
         resultCount={loading ? null : visibleItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
             { key: "invoiceNumber", label: "Folio" },
             { key: "receptorName", label: "Cliente/Receptor", format: (v) => v ? String(v) : "—" },
             { key: "totalAmount", label: "Total" },
             { key: "status", label: "Estado" },
             { key: "issueDate", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "facturas")}>CSV</Button>
+          ], "facturas")}>Excel</Button>
         ) : undefined}
       />
 

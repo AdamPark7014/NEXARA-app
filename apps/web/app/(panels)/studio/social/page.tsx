@@ -14,7 +14,7 @@ import StudioImageHint from "@/components/studio/StudioImageHint";
 import { getSocialImageSpec, studioImageHintLine } from "@/lib/studio-image-specs";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface SocialPost {
   id: number;
@@ -288,13 +288,13 @@ export default function StudioSocialPage() {
         onClear={() => { setSearchQ(""); setFilterRed(""); setFilterEstado(""); }}
         resultCount={loading ? null : visibleItems.length}
         rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(visibleItems, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
             { key: "id", label: "ID" },
             { key: "red", label: "Red" },
             { key: "titulo", label: "Título" },
             { key: "estado", label: "Estado" },
             { key: "cuando", label: "Publicación", format: (v) => v ? String(v).slice(0, 16).replace("T", " ") : "" },
-          ], "social-posts")}>CSV</Button>
+          ], "social-posts")}>Excel</Button>
         ) : undefined}
       />
 

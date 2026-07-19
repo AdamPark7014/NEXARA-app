@@ -13,7 +13,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
-import { exportToCsv } from "@/lib/export-csv";
+import { exportToExcel } from "@/lib/export-excel";
 
 interface KbCategory { id: number; name: string; slug: string }
 interface KbArticle {
@@ -283,14 +283,14 @@ export default function KbPage() {
         onClear={() => { setSearch(""); setFilterStatus(""); setFilterVisibility(""); }}
         resultCount={loading ? null : filtered.length}
         rightActions={articles.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToCsv(filtered, [
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(filtered, [
             { key: "title", label: "Título" },
             { key: "category", label: "Categoría", format: (v) => (v as KbArticle["category"])?.name ?? "—" },
             { key: "status", label: "Estado" },
             { key: "visibility", label: "Visibilidad" },
             { key: "viewCount", label: "Vistas" },
             { key: "tags", label: "Tags" },
-          ], "knowledge-base")}>CSV</Button>
+          ], "knowledge-base")}>Excel</Button>
         ) : undefined}
       />
 
