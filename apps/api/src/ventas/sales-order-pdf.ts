@@ -1,5 +1,19 @@
-import PDFDocument from "pdfkit";
-import { Readable } from "stream";
+import PDFDocument from 'pdfkit';
+import {
+  PDF_COLORS,
+  PDF_MODULE_ACCENTS,
+  drawInfoCard,
+  drawNexaraFooter,
+  drawNexaraHeader,
+  drawSectionTitle,
+  drawSummaryBox,
+  drawTableHeader,
+  drawTableRow,
+  loadNexaraLogo,
+  pdfMoney,
+  pdfText,
+  type PdfTableContext,
+} from '../common/pdf/nexara-pdf-theme';
 
 export interface SalesOrderPayload {
   orderId: string;
@@ -23,139 +37,129 @@ export interface SalesOrderPayload {
   quoteSummary?: string;
 }
 
+const ACCENT = PDF_MODULE_ACCENTS.crm;
+
+const fmtDate = (value?: Date | null) =>
+  value ? value.toLocaleDateString('es-MX') : '-';
+
 export const generateSalesOrderPdf = (payload: SalesOrderPayload): Buffer => {
-  const doc = new PDFDocument({ size: "letter", margin: 40 });
+  const doc = new PDFDocument({ size: 'A4', margin: 40 });
   const buffers: Buffer[] = [];
 
-  doc.on("data", (data) => buffers.push(data));
+  doc.on('data', (data) => buffers.push(data));
 
-  // Header with branding
-  doc.fontSize(24).font("Helvetica-Bold").text("ORDEN DE COMPRA", { align: "center" });
-  doc.fontSize(10).font("Helvetica").text("Nexara Software", { align: "center" });
-  doc.moveDown(0.5);
-  doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-  doc.moveDown(1);
+  const margin = doc.page.margins.left;
+  const contentWidth = doc.page.width - margin * 2;
+  const logo = loadNexaraLogo();
 
-  // Order details section
-  doc.fontSize(11).font("Helvetica-Bold").text("DETALLES DE LA ORDEN", { underline: true });
-  doc.fontSize(10).font("Helvetica");
-  doc.moveDown(0.3);
+  const header = () =>
+    drawNexaraHeader(doc, {
+      docTitle: 'Orden de venta',
+      docSubtitle: 'Documento comercial de cierre de proyecto',
+      accent: ACCENT,
+      logo,
+      meta: [
+        { label: 'Folio', value: pdfText(payload.orderId) },
+        { label: 'Fecha', value: fmtDate(payload.orderDate) },
+        ...(payload.quoteNumber
+          ? [{ label: 'Cotización', value: pdfText(payload.quoteNumber) }]
+          : []),
+      ],
+    });
 
-  const detailsData = [
-    ["No. de Orden", payload.orderId, "Fecha", payload.orderDate.toLocaleDateString("es-MX")],
-    ["Proyecto", payload.projectName, "Fecha Entrega", payload.deliveryDate?.toLocaleDateString("es-MX") || "Por confirmar"],
+  header();
+
+  drawSectionTitle(doc, 'Cliente y proyecto');
+
+  const infoY = doc.y;
+  const leftWidth = (contentWidth - 20) * 0.55;
+  const rightWidth = contentWidth - leftWidth - 20;
+
+  const clientHeight = drawInfoCard(doc, margin, infoY, leftWidth, [
+    { label: 'Empresa', value: pdfText(payload.clientCompany) },
+    { label: 'Contacto', value: pdfText(payload.clientName) },
+    { label: 'Email', value: pdfText(payload.clientEmail) },
+    { label: 'Teléfono', value: pdfText(payload.clientPhone) },
+    { label: 'Dirección', value: pdfText(payload.clientAddress) },
+  ]);
+
+  const projectHeight = drawInfoCard(doc, margin + leftWidth + 20, infoY, rightWidth, [
+    { label: 'Proyecto', value: pdfText(payload.projectName) },
+    { label: 'Entrega', value: fmtDate(payload.deliveryDate) },
+    { label: 'Pago', value: pdfText(payload.paymentTerms) },
+    { label: 'Cotización', value: pdfText(payload.quoteNumber) },
+  ]);
+
+  doc.y = infoY + Math.max(clientHeight, projectHeight) + 16;
+
+  drawSectionTitle(doc, 'Conceptos y partidas');
+
+  const columns = [
+    { label: 'Concepto', width: 280 },
+    { label: 'Importe', width: contentWidth - 280, align: 'right' as const },
   ];
 
-  let startY = doc.y;
-  detailsData.forEach((row) => {
-    doc.text(row[0], 60, startY, { width: 80 });
-    doc.font("Helvetica-Bold").text(row[1], 140, startY, { width: 100 });
-    doc.font("Helvetica").text(row[2], 260, startY, { width: 80 });
-    doc.font("Helvetica-Bold").text(row[3], 340, startY, { width: 150 });
-    startY = doc.y + 5;
-  });
-  doc.moveDown(1.5);
+  const tableCtx: PdfTableContext = {
+    columns,
+    headerAccent: PDF_COLORS.navy,
+    onNewPage: header,
+  };
 
-  // Client information
-  doc.fontSize(11).font("Helvetica-Bold").text("INFORMACIÓN DEL CLIENTE", { underline: true });
-  doc.fontSize(9).font("Helvetica");
-  doc.moveDown(0.2);
+  drawTableHeader(doc, doc.y, columns);
+  doc.y += 28;
 
-  const clientInfo = [
-    `Empresa: ${payload.clientCompany || "N/A"}`,
-    `Contacto: ${payload.clientName || "N/A"}`,
-    `Email: ${payload.clientEmail || "N/A"}`,
-    `Teléfono: ${payload.clientPhone || "N/A"}`,
-    `Dirección: ${payload.clientAddress || "N/A"}`,
+  const lineItems: Array<[string, number]> = [
+    ['Presupuesto total', Number(payload.budget)],
+    ['Costo de productos', Number(payload.costProducts)],
+    ['Costo de viáticos', Number(payload.costViaticos)],
+    ['Costo operativo', Number(payload.costOperativo)],
   ];
 
-  clientInfo.forEach((line) => {
-    doc.text(`• ${line}`, { lineGap: 2 });
-  });
-  doc.moveDown(1);
-
-  // Financial summary - in a nice card layout
-  doc.fontSize(11).font("Helvetica-Bold").text("RESUMEN FINANCIERO", { underline: true });
-  doc.moveDown(0.3);
-
-  const lineArr = [
-    {
-      label: "Presupuesto Total",
-      value: formatCurrency(Number(payload.budget)),
-    },
-    {
-      label: "Costo Productos",
-      value: formatCurrency(Number(payload.costProducts)),
-    },
-    {
-      label: "Costo Viaticos",
-      value: formatCurrency(Number(payload.costViaticos)),
-    },
-    {
-      label: "Costo Operativo",
-      value: formatCurrency(Number(payload.costOperativo)),
-    },
-  ];
-
-  const cardX = 60;
-  const cardY = doc.y;
-  const cardHeight = 25 + lineArr.length * 15;
-
-  doc.rect(cardX, cardY, 500, cardHeight).stroke();
-
-  let lineY = cardY + 10;
-  lineArr.forEach((item) => {
-    doc.font("Helvetica").fontSize(9).text(item.label, cardX + 10, lineY, { width: 200 });
-    doc.font("Helvetica-Bold").fontSize(9).text(item.value, cardX + 300, lineY, { width: 190, align: "right" });
-    lineY += 15;
+  lineItems.forEach(([label, amount], index) => {
+    drawTableRow(doc, [label, pdfMoney(amount)], index, tableCtx, {
+      boldColumns: index === 0 ? [0, 1] : [1],
+    });
   });
 
-  // Total margin - highlighted
-  const totalY = lineY + 5;
-  doc.font("Helvetica-Bold").fontSize(11).text("MARGEN LIBRE", cardX + 10, totalY);
-  doc.font("Helvetica-Bold").fontSize(12).fillColor("#16a96e").text(formatCurrency(Number(payload.margin)), cardX + 300, totalY, { width: 190, align: "right" }).fillColor("#000");
+  doc.moveDown(0.8);
 
-  doc.moveDown(4);
+  const summaryWidth = 240;
+  const summaryY = doc.y + 6;
+  const summaryHeight = drawSummaryBox(
+    doc,
+    margin + contentWidth - summaryWidth,
+    summaryY,
+    summaryWidth,
+    'Resumen financiero',
+    [
+      ['Presupuesto', pdfMoney(Number(payload.budget))],
+      ['Costo productos', pdfMoney(Number(payload.costProducts))],
+      ['Costo viáticos', pdfMoney(Number(payload.costViaticos))],
+      ['Costo operativo', pdfMoney(Number(payload.costOperativo))],
+      ['Margen libre', pdfMoney(Number(payload.margin))],
+    ],
+    { highlightIndex: 4 },
+  );
 
-  // Terms & conditions
-  if (payload.paymentTerms) {
-    doc.fontSize(10).font("Helvetica-Bold").text("CONDICIONES DE PAGO", { underline: true });
-    doc.fontSize(9).font("Helvetica").text(payload.paymentTerms, { align: "left" });
-    doc.moveDown(0.5);
-  }
+  doc.y = summaryY + summaryHeight + 14;
 
-  // Quote reference
-  if (payload.quoteNumber) {
-    doc.fontSize(9).font("Helvetica").text(`Cotización Base: ${payload.quoteNumber}`);
-    doc.moveDown(0.5);
-  }
-
-  // Footer
-  doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-  doc.moveDown(0.5);
-  doc.fontSize(8).font("Helvetica").text("Documento generado automáticamente por Nexara Software. ", { align: "center" });
-  doc.text(`Fecha: ${new Date().toLocaleString("es-MX")}`, { align: "center" });
-
-  if (payload.preparedBy) {
-    doc.moveDown(1);
-    doc.fontSize(9).font("Helvetica").text(`Preparado por: ${payload.preparedBy}`);
-    if (payload.preparedRole) {
-      doc.fontSize(8).font("Helvetica").text(payload.preparedRole);
+  if (payload.quoteSummary || payload.paymentTerms || payload.preparedBy) {
+    drawSectionTitle(doc, 'Términos y notas');
+    doc.fillColor(PDF_COLORS.text).fontSize(10).font('Helvetica');
+    if (payload.paymentTerms) doc.text(`Términos de pago: ${payload.paymentTerms}`);
+    if (payload.quoteSummary) doc.text(`Resumen cotización: ${payload.quoteSummary}`);
+    if (payload.preparedBy) {
+      doc
+        .fillColor(PDF_COLORS.muted)
+        .fontSize(9)
+        .text(
+          `Preparado por: ${payload.preparedBy}${payload.preparedRole ? ` · ${payload.preparedRole}` : ''}`,
+        );
     }
   }
 
+  drawNexaraFooter(doc, 'NEXARA · Orden de venta — información confidencial.');
   doc.end();
 
   return Buffer.concat(buffers);
 };
-
-const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "MXN",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-};
-
-

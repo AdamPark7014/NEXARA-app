@@ -1,13 +1,29 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs/promises';
 import path from 'path';
+import {
+  PDF_COLORS,
+  PDF_CONTENT_START_Y,
+  PDF_MODULE_ACCENTS,
+  drawInfoCard,
+  drawKpiCards,
+  drawNexaraFooter,
+  drawNexaraHeader,
+  drawSectionTitle,
+  drawTableHeader,
+  drawTableRow,
+  loadNexaraLogo,
+  type PdfTableContext,
+} from '../common/pdf/nexara-pdf-theme';
 
 type InventoryReportInput = {
   snapshot: any;
   items: any[];
 };
 
-const toLabel = (value?: string | null) => (value && value.trim() ? value : '-');
+const ACCENT = PDF_MODULE_ACCENTS.warehouse;
+
+const toLabel = (value?: string | null) => (value && String(value).trim() ? String(value) : '-');
 
 const cleanUrl = (value?: string | null) => String(value || '').trim();
 
@@ -49,15 +65,9 @@ const resolveImageBuffer = async (url?: string | null): Promise<Buffer | null> =
   }
 };
 
-const ensureSpace = (doc: PDFKit.PDFDocument, minHeight = 90) => {
-  if (doc.y + minHeight > doc.page.height - doc.page.margins.bottom) {
-    doc.addPage();
-  }
-};
-
 export const generateInventoryReportPdf = ({ snapshot, items }: InventoryReportInput): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    const doc = new PDFDocument({ size: 'A4', margin: 40 });
     const chunks: Buffer[] = [];
 
     doc.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
@@ -65,73 +75,202 @@ export const generateInventoryReportPdf = ({ snapshot, items }: InventoryReportI
     doc.on('error', reject);
 
     (async () => {
-      doc.fontSize(18).fillColor('#0f172a').text('Reporte de Inventario y Mantenimiento', { align: 'left' });
-      doc.moveDown(0.5);
-      doc.fontSize(10).fillColor('#475569').text(`Folio: INV-${snapshot.id}`);
-      doc.text(`Cliente: ${toLabel(snapshot.client?.name)}`);
-      doc.text(`Sucursal: ${toLabel(snapshot.branch?.name)} (${toLabel(snapshot.branch?.branchNumber)})`);
-      doc.text(`Estado: ${toLabel(snapshot.status)}`);
-      doc.text(`Equipos previos: ${snapshot.previousCount ?? 0}`);
-      doc.text(`Equipos actuales: ${snapshot.currentCount ?? 0}`);
-      doc.text(`Diferencia: ${snapshot.deltaCount ?? 0}`);
-      doc.text(`Actualizado: ${snapshot.updatedAt ? new Date(snapshot.updatedAt).toLocaleString('es-MX') : '-'}`);
-      doc.moveDown();
+      const margin = doc.page.margins.left;
+      const contentWidth = doc.page.width - margin * 2;
+      const logo = loadNexaraLogo();
 
-      const groups = new Map<string, any[]>();
-      for (const item of items) {
-        const group = item.groupName || 'GENERAL';
-        if (!groups.has(group)) groups.set(group, []);
-        groups.get(group)!.push(item);
+      const header = () =>
+        drawNexaraHeader(doc, {
+          docTitle: 'Reporte de inventario',
+          docSubtitle: 'Inventario y mantenimiento de equipos',
+          accent: ACCENT,
+          logo,
+          meta: [
+            { label: 'Folio', value: `INV-${snapshot.id}` },
+            { label: 'Estado', value: toLabel(snapshot.status) },
+            {
+              label: 'Actualizado',
+              value: snapshot.updatedAt
+                ? new Date(snapshot.updatedAt).toLocaleString('es-MX')
+                : '-',
+            },
+          ],
+        });
+
+      header();
+
+      drawSectionTitle(doc, 'Resumen');
+      const kpiHeight = drawKpiCards(doc, doc.y, [
+        {
+          label: 'Equipos previos',
+          value: String(snapshot.previousCount ?? 0),
+          accent: ACCENT,
+        },
+        {
+          label: 'Equipos actuales',
+          value: String(snapshot.currentCount ?? 0),
+          accent: ACCENT,
+        },
+        {
+          label: 'Diferencia',
+          value: String(snapshot.deltaCount ?? 0),
+          accent: ACCENT,
+        },
+      ]);
+      doc.y += kpiHeight + 16;
+
+      const infoY = doc.y;
+      const leftWidth = (contentWidth - 20) * 0.55;
+      const rightWidth = contentWidth - leftWidth - 20;
+      const clientH = drawInfoCard(doc, margin, infoY, leftWidth, [
+        { label: 'Cliente', value: toLabel(snapshot.client?.name) },
+        { label: 'Sucursal', value: toLabel(snapshot.branch?.name) },
+        { label: 'No. sucursal', value: toLabel(snapshot.branch?.branchNumber) },
+      ]);
+      const metaH = drawInfoCard(doc, margin + leftWidth + 20, infoY, rightWidth, [
+        { label: 'Estado', value: toLabel(snapshot.status) },
+        { label: 'Folio', value: `INV-${snapshot.id}` },
+        {
+          label: 'Items',
+          value: String(items?.length ?? 0),
+        },
+      ]);
+      doc.y = infoY + Math.max(clientH, metaH) + 16;
+
+      drawSectionTitle(doc, 'Detalle de equipos');
+
+      const columns = [
+        { label: 'Sección / Equipo', width: 150 },
+        { label: 'Estado', width: 70 },
+        { label: 'Comparativa', width: 80 },
+        { label: 'Serie (antes→después)', width: 130 },
+        { label: 'Modelo', width: contentWidth - 150 - 70 - 80 - 130 },
+      ];
+
+      const tableCtx: PdfTableContext = {
+        columns,
+        headerAccent: PDF_COLORS.navy,
+        onNewPage: header,
+        fontSize: 8,
+      };
+
+      drawTableHeader(doc, doc.y, columns);
+      doc.y += 28;
+
+      const list = items ?? [];
+      list.forEach((item, index) => {
+        const sectionEquip = `${toLabel(item.sectionName)} · ${toLabel(item.equipmentName)}`;
+        const serial = `${toLabel(item.serialBefore)} → ${toLabel(item.serialAfter)}`;
+        const model = `${toLabel(item.modelBefore)} → ${toLabel(item.modelAfter)}`;
+        drawTableRow(
+          doc,
+          [
+            sectionEquip,
+            toLabel(item.itemStatus),
+            toLabel(item.compareState),
+            serial,
+            model,
+          ],
+          index,
+          tableCtx,
+        );
+      });
+
+      if (list.length === 0) {
+        doc
+          .fillColor(PDF_COLORS.muted)
+          .fontSize(10)
+          .font('Helvetica')
+          .text('Sin equipos registrados en este snapshot.', margin, doc.y);
+        doc.moveDown();
       }
 
-      for (const [groupName, groupItems] of groups.entries()) {
-        ensureSpace(doc, 40);
-        doc.fillColor('#0f6ad6').fontSize(13).text(groupName);
-        doc.fillColor('#111').fontSize(9).moveDown(0.25);
+      const hasPhotos = list.some(
+        (item) =>
+          item.beforePanoramicPhotoUrl ||
+          item.beforeCloseupPhotoUrl ||
+          item.afterPanoramicPhotoUrl ||
+          item.afterCloseupPhotoUrl ||
+          item.maintenanceStickerPhotoUrl,
+      );
 
-        for (const item of groupItems) {
-          ensureSpace(doc, 220);
-          doc.roundedRect(doc.page.margins.left, doc.y, doc.page.width - doc.page.margins.left * 2, 18, 6).fillOpacity(0.05).fillAndStroke('#0f6ad6', '#93c5fd').fillOpacity(1);
-          doc.fillColor('#0f172a').fontSize(10).text(
-            `${toLabel(item.sectionName)} · ${toLabel(item.equipmentName)} · Estado: ${toLabel(item.itemStatus)} · Comparativa: ${toLabel(item.compareState)}`,
-            doc.page.margins.left + 8,
-            doc.y - 14,
-          );
-          doc.moveDown(0.6);
+      if (hasPhotos) {
+        doc.moveDown(0.6);
+        drawSectionTitle(doc, 'Evidencia fotográfica');
 
-          doc.fillColor('#334155').fontSize(9).text(`Antes -> Serie: ${toLabel(item.serialBefore)} | Modelo: ${toLabel(item.modelBefore)}`);
-          doc.text(`Después -> Serie: ${toLabel(item.serialAfter)} | Modelo: ${toLabel(item.modelAfter)}`);
-          if (item.maintenanceActions) doc.text(`Trabajo realizado: ${item.maintenanceActions}`);
-          if (item.maintenanceComments) doc.text(`Comentarios técnicos: ${item.maintenanceComments}`);
-          if (item.notes) doc.text(`Notas: ${item.notes}`);
-          doc.moveDown(0.4);
-
+        for (const item of list) {
           const photoEntries = [
             { label: 'Panorámica ANTES', value: item.beforePanoramicPhotoUrl },
             { label: 'Serie/modelo ANTES', value: item.beforeCloseupPhotoUrl },
             { label: 'Panorámica DESPUÉS', value: item.afterPanoramicPhotoUrl },
             { label: 'Serie/modelo DESPUÉS', value: item.afterCloseupPhotoUrl },
             { label: 'Sticker mantenimiento', value: item.maintenanceStickerPhotoUrl },
-          ];
+          ].filter((e) => cleanUrl(e.value));
 
-          const originY = doc.y;
+          if (photoEntries.length === 0) continue;
+
+          if (doc.y + 40 > doc.page.height - 80) {
+            doc.addPage();
+            header();
+            doc.y = PDF_CONTENT_START_Y;
+          }
+
+          doc
+            .fillColor(PDF_COLORS.navy)
+            .fontSize(10)
+            .font('Helvetica-Bold')
+            .text(
+              `${toLabel(item.sectionName)} · ${toLabel(item.equipmentName)}`,
+              margin,
+              doc.y,
+              { width: contentWidth },
+            );
+          doc.moveDown(0.3);
+
+          if (item.maintenanceActions) {
+            doc
+              .fillColor(PDF_COLORS.text)
+              .fontSize(8)
+              .font('Helvetica')
+              .text(`Trabajo: ${item.maintenanceActions}`, { width: contentWidth });
+          }
+          if (item.maintenanceComments) {
+            doc
+              .fillColor(PDF_COLORS.muted)
+              .fontSize(8)
+              .font('Helvetica')
+              .text(`Comentarios: ${item.maintenanceComments}`, { width: contentWidth });
+          }
+
           const cardWidth = 162;
           const cardHeight = 108;
           const gap = 10;
+          const originY = doc.y + 4;
 
           for (let index = 0; index < photoEntries.length; index += 1) {
             const row = Math.floor(index / 3);
             const col = index % 3;
-            const x = doc.page.margins.left + col * (cardWidth + gap);
-            const y = originY + row * (cardHeight + 20);
+            let x = margin + col * (cardWidth + gap);
+            let y = originY + row * (cardHeight + 20);
 
-            if (y + cardHeight + 24 > doc.page.height - doc.page.margins.bottom) {
+            if (y + cardHeight + 24 > doc.page.height - 60) {
               doc.addPage();
+              header();
+              doc.y = PDF_CONTENT_START_Y;
+              x = margin + col * (cardWidth + gap);
+              y = PDF_CONTENT_START_Y;
             }
 
             const entry = photoEntries[index];
-            doc.fontSize(8).fillColor('#475569').text(entry.label, x, y, { width: cardWidth, ellipsis: true });
-            doc.roundedRect(x, y + 10, cardWidth, cardHeight, 4).stroke('#cbd5e1');
+            doc
+              .fontSize(8)
+              .fillColor(PDF_COLORS.muted)
+              .font('Helvetica')
+              .text(entry.label, x, y, { width: cardWidth, ellipsis: true });
+
+            doc.save();
+            doc.roundedRect(x, y + 10, cardWidth, cardHeight, 4).stroke(PDF_COLORS.line);
+            doc.restore();
 
             const imageBuffer = await resolveImageBuffer(entry.value);
             if (imageBuffer) {
@@ -142,20 +281,31 @@ export const generateInventoryReportPdf = ({ snapshot, items }: InventoryReportI
                   valign: 'center',
                 });
               } catch {
-                doc.fontSize(8).fillColor('#94a3b8').text('Imagen inválida', x + 8, y + 50, { width: cardWidth - 16, align: 'center' });
+                doc
+                  .fontSize(8)
+                  .fillColor(PDF_COLORS.muted)
+                  .text('Imagen inválida', x + 8, y + 50, {
+                    width: cardWidth - 16,
+                    align: 'center',
+                  });
               }
             } else {
-              doc.fontSize(8).fillColor('#94a3b8').text('Sin imagen', x + 8, y + 50, { width: cardWidth - 16, align: 'center' });
+              doc
+                .fontSize(8)
+                .fillColor(PDF_COLORS.muted)
+                .text('Sin imagen', x + 8, y + 50, {
+                  width: cardWidth - 16,
+                  align: 'center',
+                });
             }
           }
 
           doc.y = originY + Math.ceil(photoEntries.length / 3) * (cardHeight + 20);
           doc.moveDown(0.4);
         }
-
-        doc.moveDown(0.4);
       }
 
+      drawNexaraFooter(doc, 'NEXARA · Reporte de inventario — información confidencial.');
       doc.end();
     })().catch(reject);
   });

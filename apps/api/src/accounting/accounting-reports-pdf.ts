@@ -1,6 +1,20 @@
 import PDFDocument from 'pdfkit';
-import fs from 'fs';
-import path from 'path';
+import {
+  PDF_CONTENT_START_Y,
+  PDF_MODULE_ACCENTS,
+  drawKpiCards,
+  drawNexaraFooter,
+  drawNexaraHeader,
+  drawSectionTitle,
+  drawSummaryBox,
+  drawTableHeader,
+  drawTableRow,
+  loadNexaraLogo,
+  pdfMoney,
+  pdfTruncate,
+  type PdfTableColumn,
+  type PdfTableContext,
+} from '../common/pdf/nexara-pdf-theme';
 
 export type FinancialReportPayload = {
   fromDate?: string;
@@ -58,27 +72,6 @@ const formatDate = (date: string | Date | null | undefined): string => {
   return d.toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' });
 };
 
-const formatMoney = (value: number) =>
-  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 2 }).format(value || 0);
-
-const truncate = (text: string | null | undefined, max: number) => {
-  if (!text) return '-';
-  return text.length <= max ? text : text.slice(0, max - 3) + '...';
-};
-
-const loadLogo = (): Buffer | null => {
-  const candidates = [
-    path.resolve(process.cwd(), '../web/public/logo-nexara.png'),
-    path.resolve(process.cwd(), '../../apps/web/public/logo-nexara.png'),
-  ];
-  for (const filePath of candidates) {
-    try {
-      if (fs.existsSync(filePath)) return fs.readFileSync(filePath);
-    } catch { /* ignore */ }
-  }
-  return null;
-};
-
 export const generateFinancialReportsPdf = (payload: FinancialReportPayload): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
     // NO usar bufferPages: true - causa que se creen páginas fantasma
@@ -89,350 +82,188 @@ export const generateFinancialReportsPdf = (payload: FinancialReportPayload): Pr
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    const colors = {
-      navy: '#0B1F3A',
-      blue: '#1F6BBA',
-      lightBlue: '#E3F2FD',
-      softGray: '#F5F7FB',
-      text: '#1F2A37',
-      muted: '#5B6B7A',
-      line: '#D9E2EC',
-      success: '#166534',
-      successBg: '#DCFCE7',
-      warning: '#92400E',
-      warningBg: '#FEF3C7',
-      danger: '#991B1B',
-      dangerBg: '#FEE2E2',
+    const accent = PDF_MODULE_ACCENTS.erp;
+    const logo = loadNexaraLogo();
+    const margin = doc.page.margins.left;
+    const contentWidth = doc.page.width - margin * 2;
+    const footerNote = 'NEXARA · Reportes financieros — información confidencial.';
+
+    const from = payload.fromDate ? formatDate(payload.fromDate) : '-';
+    const to = payload.toDate ? formatDate(payload.toDate) : formatDate(new Date());
+    const asOf = payload.asOfDate ? formatDate(payload.asOfDate) : formatDate(new Date());
+
+    const drawPage = (docTitle: string, docSubtitle: string) => {
+      drawNexaraHeader(doc, {
+        docTitle,
+        docSubtitle,
+        accent,
+        logo,
+        meta: [
+          { label: 'Periodo', value: `${from} - ${to}` },
+          { label: 'Corte', value: asOf },
+          { label: 'Generado', value: formatDate(new Date()) },
+        ],
+      });
+      drawNexaraFooter(doc, footerNote);
+      doc.y = PDF_CONTENT_START_Y;
     };
 
-    const margin = 40;
-    const pageWidth = 612; // A4 width in points
-    const pageHeight = 792; // A4 height in points
-    const contentWidth = pageWidth - margin * 2;
-    const logo = loadLogo();
-    const totalPages = 3; // Siempre son 3 páginas
-
-    const drawHeader = () => {
-      doc.save();
-      doc.rect(0, 0, pageWidth, 100).fill('#FFFFFF');
-      doc.restore();
-
-      if (logo) {
-        doc.image(logo, margin, 12, { width: 32, height: 32 });
+    const ensureBlockSpace = (needed: number, redraw: () => void) => {
+      if (doc.y + needed > doc.page.height - 60) {
+        doc.addPage();
+        redraw();
       }
-
-      const titleX = margin + (logo ? 40 : 0);
-      const metaX = titleX + 260;
-
-      doc.fillColor(colors.navy).fontSize(20).font('Helvetica-Bold')
-        .text('Reportes Financieros', titleX, 20, { width: 260 });
-      doc.fontSize(10).font('Helvetica').fillColor(colors.muted)
-        .text('Balance general, estado de resultados y balanza de comprobación', titleX, 46, { width: 260 });
-
-      const from = payload.fromDate ? formatDate(payload.fromDate) : '-';
-      const to = payload.toDate ? formatDate(payload.toDate) : formatDate(new Date());
-      const asOf = payload.asOfDate ? formatDate(payload.asOfDate) : formatDate(new Date());
-
-      doc.save();
-      doc.roundedRect(metaX - 12, 12, 182, 76, 6).fill('#FFFFFF');
-      doc.restore();
-
-      doc.fillColor(colors.text).fontSize(9).font('Helvetica-Bold')
-        .text('Período (Resultados)', metaX, 20, { width: 150, align: 'left' });
-      doc.fillColor(colors.text).fontSize(10).font('Helvetica')
-        .text(`${from} -`, metaX, 33, { width: 150, align: 'left', lineBreak: true })
-        .text(`${to}`, metaX, 45, { width: 150, align: 'left' });
-
-      doc.fillColor(colors.text).fontSize(9).font('Helvetica-Bold')
-        .text('Corte (Balance)', metaX + 92, 20, { width: 70, align: 'left' });
-      doc.fillColor(colors.text).fontSize(10).font('Helvetica')
-        .text(asOf, metaX + 92, 33, { width: 70, align: 'left' });
-
-      doc.fillColor(colors.text).fontSize(9).font('Helvetica-Bold')
-        .text('Generado', metaX + 92, 58, { width: 70, align: 'left' });
-      doc.fillColor(colors.text).fontSize(10).font('Helvetica')
-        .text(formatDate(new Date()), metaX + 92, 71, { width: 70, align: 'left' });
     };
 
-    const drawSectionTitle = (label: string) => {
-      doc.moveDown(0.6);
-      doc.fillColor(colors.navy).fontSize(12).font('Helvetica-Bold').text(label, margin, doc.y);
-      doc.moveDown(0.2);
-    };
+    const accountCols: PdfTableColumn[] = [
+      { label: 'Código', width: 90 },
+      { label: 'Concepto', width: 295 },
+      { label: 'Monto', width: 130, align: 'right' },
+    ];
 
-    const drawKpiGrid = (y: number) => {
-      const cardW = (contentWidth - 10) / 2;
-      const cardH = 50;
-      const gap = 10;
-
-      const kpis = [
-        { label: 'Activos', value: formatMoney(payload.balanceSheet.totalAssets), valueFill: colors.blue, bg: colors.lightBlue },
-        { label: 'Pasivos', value: formatMoney(payload.balanceSheet.totalLiabilities), valueFill: colors.danger, bg: colors.dangerBg },
-        { label: 'Capital', value: formatMoney(payload.balanceSheet.totalEquity), valueFill: colors.success, bg: colors.successBg },
-        { label: 'Utilidad Neta', value: formatMoney(payload.incomeStatement.netIncome), valueFill: payload.incomeStatement.netIncome >= 0 ? colors.success : colors.danger, bg: payload.incomeStatement.netIncome >= 0 ? colors.successBg : colors.dangerBg },
-      ];
-
-      kpis.forEach((kpi, i) => {
-        const col = i % 2;
-        const row = Math.floor(i / 2);
-        const x = margin + col * (cardW + gap);
-        const cy = y + row * (cardH + gap);
-
-        doc.save();
-        doc.roundedRect(x, cy, cardW, cardH, 6).fill(kpi.bg);
-        doc.restore();
-        doc.fillColor(kpi.valueFill).fontSize(18).font('Helvetica-Bold')
-          .text(kpi.value, x + 14, cy + 10, { width: cardW - 28 });
-        doc.fillColor(colors.muted).fontSize(9).font('Helvetica')
-          .text(kpi.label, x + 14, cy + 32, { width: cardW - 28 });
-      });
-
-      return 2 * (cardH + gap) - gap;
-    };
-
-    const drawTableHeader = (y: number, cols: Array<{ label: string; width: number }>) => {
-      doc.save();
-      doc.rect(margin, y - 4, contentWidth, 24).fill(colors.navy);
-      doc.restore();
-
-      let x = margin + 6;
-      doc.fillColor('#FFFFFF').fontSize(9).font('Helvetica-Bold');
-      cols.forEach((col) => {
-        doc.text(col.label, x, y, { width: col.width - 8 });
-        x += col.width;
+    const drawAccountTable = (
+      rows: Array<{ code: string; name: string; amount: number }>,
+      ctx: PdfTableContext,
+    ) => {
+      drawTableHeader(doc, doc.y, ctx.columns, ctx.headerAccent);
+      doc.y += 28;
+      rows.forEach((row, index) => {
+        drawTableRow(doc, [row.code, pdfTruncate(row.name, 60), pdfMoney(row.amount)], index, ctx, {
+          boldColumns: [2],
+        });
       });
     };
 
-    const addFooter = (pageNum: number) => {
-      doc.save();
-      doc.rect(0, pageHeight - 28, pageWidth, 28).fill(colors.lightBlue);
-      doc.restore();
-      doc.fillColor(colors.muted).fontSize(8).font('Helvetica')
-        .text(
-          `NEXARA  |  Reportes Financieros  |  Página ${pageNum} de ${totalPages}  |  Generado: ${new Date().toLocaleString('es-MX')}`,
-          margin, pageHeight - 18, { width: contentWidth, align: 'center' },
-        );
-    };
+    const summaryWidth = 250;
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PAGE 1: BALANCE GENERAL
+    // PÁGINA 1: BALANCE GENERAL
     // ═══════════════════════════════════════════════════════════════════════
-    drawHeader();
-    doc.y = 140;
+    const balancePage = () => drawPage('Balance general', 'Posición financiera al corte');
+    doc.font('Helvetica');
+    balancePage();
 
-    drawSectionTitle('Resumen Ejecutivo');
-    const kpiGridY = doc.y;
-    const kpiGridH = drawKpiGrid(kpiGridY);
-    doc.y = kpiGridY + kpiGridH + 18;
+    drawSectionTitle(doc, 'Resumen ejecutivo');
+    const kpiY = doc.y;
+    const kpiRowHeight = drawKpiCards(doc, kpiY, [
+      { label: 'Activos', value: pdfMoney(payload.balanceSheet.totalAssets), accent },
+      { label: 'Pasivos', value: pdfMoney(payload.balanceSheet.totalLiabilities), accent },
+    ]);
+    drawKpiCards(doc, kpiY + kpiRowHeight + 12, [
+      { label: 'Capital', value: pdfMoney(payload.balanceSheet.totalEquity), accent },
+      { label: 'Utilidad neta', value: pdfMoney(payload.incomeStatement.netIncome), accent },
+    ]);
+    doc.y = kpiY + kpiRowHeight * 2 + 12 + 18;
 
-    drawSectionTitle('Balance General');
-    const bsCols = [
+    const balanceCtx: PdfTableContext = { columns: accountCols, onNewPage: balancePage };
+    const balanceSections = [
+      { title: 'Activos', rows: payload.balanceSheet.assets ?? [] },
+      { title: 'Pasivos', rows: payload.balanceSheet.liabilities ?? [] },
+      { title: 'Capital', rows: payload.balanceSheet.equity ?? [] },
+    ];
+
+    balanceSections.forEach((section) => {
+      ensureBlockSpace(100, balancePage);
+      drawSectionTitle(doc, section.title);
+      drawAccountTable(
+        section.rows.map((row) => ({ code: row.code, name: row.name, amount: row.balance })),
+        balanceCtx,
+      );
+      doc.y += 6;
+    });
+
+    ensureBlockSpace(130, balancePage);
+    const balanceSummaryY = doc.y + 6;
+    drawSummaryBox(
+      doc,
+      margin + contentWidth - summaryWidth,
+      balanceSummaryY,
+      summaryWidth,
+      'Resumen del balance',
+      [
+        ['Total activos', pdfMoney(payload.balanceSheet.totalAssets)],
+        ['Total pasivos', pdfMoney(payload.balanceSheet.totalLiabilities)],
+        ['Total capital', pdfMoney(payload.balanceSheet.totalEquity)],
+        ['Cuadre', payload.balanceSheet.balanceCheck ? 'Cuadrado' : 'No cuadra'],
+      ],
+      { highlightIndex: 3 },
+    );
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PÁGINA 2: ESTADO DE RESULTADOS
+    // ═══════════════════════════════════════════════════════════════════════
+    const incomePage = () => drawPage('Estado de resultados', 'Ingresos y gastos del periodo');
+    doc.addPage();
+    incomePage();
+
+    const incomeCtx: PdfTableContext = { columns: accountCols, onNewPage: incomePage };
+
+    drawSectionTitle(doc, 'Ingresos');
+    drawAccountTable(
+      (payload.incomeStatement.revenue ?? []).map((row) => ({ code: row.code, name: row.name, amount: row.amount })),
+      incomeCtx,
+    );
+    doc.y += 6;
+
+    ensureBlockSpace(100, incomePage);
+    drawSectionTitle(doc, 'Gastos');
+    drawAccountTable(
+      (payload.incomeStatement.expenses ?? []).map((row) => ({ code: row.code, name: row.name, amount: row.amount })),
+      incomeCtx,
+    );
+    doc.y += 6;
+
+    ensureBlockSpace(110, incomePage);
+    const incomeSummaryY = doc.y + 6;
+    drawSummaryBox(
+      doc,
+      margin + contentWidth - summaryWidth,
+      incomeSummaryY,
+      summaryWidth,
+      'Resumen del periodo',
+      [
+        ['Total ingresos', pdfMoney(payload.incomeStatement.totalRevenue)],
+        ['Total gastos', pdfMoney(payload.incomeStatement.totalExpenses)],
+        ['Utilidad neta', pdfMoney(payload.incomeStatement.netIncome)],
+      ],
+      { highlightIndex: 2 },
+    );
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PÁGINA 3: BALANZA DE COMPROBACIÓN
+    // ═══════════════════════════════════════════════════════════════════════
+    const trialPage = () => drawPage('Balanza de comprobación', 'Movimientos y saldos por cuenta');
+    doc.addPage();
+    trialPage();
+
+    const trialCols: PdfTableColumn[] = [
       { label: 'Código', width: 60 },
-      { label: 'Concepto', width: 200 },
-      { label: 'Monto', width: 90 },
+      { label: 'Cuenta', width: 195 },
+      { label: 'Debe', width: 85, align: 'right' },
+      { label: 'Haber', width: 85, align: 'right' },
+      { label: 'Saldo', width: 90, align: 'right' },
     ];
+    const trialCtx: PdfTableContext = { columns: trialCols, onNewPage: trialPage };
 
-    doc.fillColor(colors.navy).fontSize(10).font('Helvetica-Bold').text('ACTIVOS', margin, doc.y);
-    doc.moveDown(0.3);
-
-    if (payload.balanceSheet.assets?.length > 0) {
-      payload.balanceSheet.assets.forEach((asset, idx) => {
-        const y = doc.y;
-        doc.save();
-        if (idx % 2 === 0) {
-          doc.rect(margin, y - 4, contentWidth, 16).fill(colors.softGray);
-        }
-        doc.restore();
-
-        doc.fillColor(colors.text).fontSize(9).font('Helvetica');
-        let x = margin + 6;
-        doc.text(asset.code, x, y, { width: bsCols[0].width - 8 });
-        x += bsCols[0].width;
-        doc.text(truncate(asset.name, 32), x, y, { width: bsCols[1].width - 8 });
-        x += bsCols[1].width;
-        doc.text(formatMoney(asset.balance), x, y, { width: bsCols[2].width - 8, align: 'right' });
-        doc.moveDown(0.8);
-      });
-    }
-
-    doc.fillColor(colors.blue).fontSize(10).font('Helvetica-Bold')
-      .text(`Total Activos: ${formatMoney(payload.balanceSheet.totalAssets)}`, margin, doc.y, { align: 'right' });
-    doc.moveDown(0.5);
-
-    doc.fillColor(colors.navy).fontSize(10).font('Helvetica-Bold').text('PASIVOS', margin, doc.y);
-    doc.moveDown(0.3);
-
-    if (payload.balanceSheet.liabilities?.length > 0) {
-      payload.balanceSheet.liabilities.forEach((liability, idx) => {
-        const y = doc.y;
-        doc.save();
-        if (idx % 2 === 0) {
-          doc.rect(margin, y - 4, contentWidth, 16).fill(colors.softGray);
-        }
-        doc.restore();
-
-        doc.fillColor(colors.text).fontSize(9).font('Helvetica');
-        let x = margin + 6;
-        doc.text(liability.code, x, y, { width: bsCols[0].width - 8 });
-        x += bsCols[0].width;
-        doc.text(truncate(liability.name, 32), x, y, { width: bsCols[1].width - 8 });
-        x += bsCols[1].width;
-        doc.text(formatMoney(liability.balance), x, y, { width: bsCols[2].width - 8, align: 'right' });
-        doc.moveDown(0.8);
-      });
-    }
-
-    doc.fillColor(colors.danger).fontSize(10).font('Helvetica-Bold')
-      .text(`Total Pasivos: ${formatMoney(payload.balanceSheet.totalLiabilities)}`, margin, doc.y, { align: 'right' });
-    doc.moveDown(0.5);
-
-    doc.fillColor(colors.navy).fontSize(10).font('Helvetica-Bold').text('CAPITAL', margin, doc.y);
-    doc.moveDown(0.3);
-
-    if (payload.balanceSheet.equity?.length > 0) {
-      payload.balanceSheet.equity.forEach((eq, idx) => {
-        const y = doc.y;
-        doc.save();
-        if (idx % 2 === 0) {
-          doc.rect(margin, y - 4, contentWidth, 16).fill(colors.softGray);
-        }
-        doc.restore();
-
-        doc.fillColor(colors.text).fontSize(9).font('Helvetica');
-        let x = margin + 6;
-        doc.text(eq.code, x, y, { width: bsCols[0].width - 8 });
-        x += bsCols[0].width;
-        doc.text(truncate(eq.name, 32), x, y, { width: bsCols[1].width - 8 });
-        x += bsCols[1].width;
-        doc.text(formatMoney(eq.balance), x, y, { width: bsCols[2].width - 8, align: 'right' });
-        doc.moveDown(0.8);
-      });
-    }
-
-    doc.fillColor(colors.success).fontSize(10).font('Helvetica-Bold')
-      .text(`Total Capital: ${formatMoney(payload.balanceSheet.totalEquity)}`, margin, doc.y, { align: 'right' });
-    doc.moveDown(0.5);
-
-    doc.fillColor(payload.balanceSheet.balanceCheck ? colors.success : colors.danger).fontSize(10).font('Helvetica-Bold')
-      .text(`Cuadre: ${payload.balanceSheet.balanceCheck ? '✓ Cuadrado' : '✗ No cuadra'}`, margin, doc.y, { align: 'right' });
-
-    addFooter(1);
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // PAGE 2: ESTADO DE RESULTADOS
-    // ═══════════════════════════════════════════════════════════════════════
-    doc.addPage();
-    drawHeader();
-    doc.y = 140;
-
-    drawSectionTitle('Estado de Resultados');
-
-    doc.fillColor(colors.navy).fontSize(10).font('Helvetica-Bold').text('INGRESOS', margin, doc.y);
-    doc.moveDown(0.3);
-
-    if (payload.incomeStatement.revenue?.length > 0) {
-      payload.incomeStatement.revenue.forEach((rev, idx) => {
-        const y = doc.y;
-        doc.save();
-        if (idx % 2 === 0) {
-          doc.rect(margin, y - 4, contentWidth, 16).fill(colors.softGray);
-        }
-        doc.restore();
-
-        doc.fillColor(colors.text).fontSize(9).font('Helvetica');
-        let x = margin + 6;
-        doc.text(rev.code, x, y, { width: bsCols[0].width - 8 });
-        x += bsCols[0].width;
-        doc.text(truncate(rev.name, 32), x, y, { width: bsCols[1].width - 8 });
-        x += bsCols[1].width;
-        doc.fillColor(colors.success).text(formatMoney(rev.amount), x, y, { width: bsCols[2].width - 8, align: 'right' });
-        doc.moveDown(0.8);
-      });
-    }
-
-    doc.fillColor(colors.success).fontSize(10).font('Helvetica-Bold')
-      .text(`Total Ingresos: ${formatMoney(payload.incomeStatement.totalRevenue)}`, margin, doc.y, { align: 'right' });
-    doc.moveDown(0.5);
-
-    doc.fillColor(colors.navy).fontSize(10).font('Helvetica-Bold').text('GASTOS', margin, doc.y);
-    doc.moveDown(0.3);
-
-    if (payload.incomeStatement.expenses?.length > 0) {
-      payload.incomeStatement.expenses.forEach((exp, idx) => {
-        const y = doc.y;
-        doc.save();
-        if (idx % 2 === 0) {
-          doc.rect(margin, y - 4, contentWidth, 16).fill(colors.softGray);
-        }
-        doc.restore();
-
-        doc.fillColor(colors.text).fontSize(9).font('Helvetica');
-        let x = margin + 6;
-        doc.text(exp.code, x, y, { width: bsCols[0].width - 8 });
-        x += bsCols[0].width;
-        doc.text(truncate(exp.name, 32), x, y, { width: bsCols[1].width - 8 });
-        x += bsCols[1].width;
-        doc.fillColor(colors.danger).text(formatMoney(exp.amount), x, y, { width: bsCols[2].width - 8, align: 'right' });
-        doc.moveDown(0.8);
-      });
-    }
-
-    doc.fillColor(colors.danger).fontSize(10).font('Helvetica-Bold')
-      .text(`Total Gastos: ${formatMoney(payload.incomeStatement.totalExpenses)}`, margin, doc.y, { align: 'right' });
-    doc.moveDown(0.5);
-
-    const netIncomeColor = payload.incomeStatement.netIncome >= 0 ? colors.success : colors.danger;
-    doc.fillColor(netIncomeColor).fontSize(12).font('Helvetica-Bold')
-      .text(`UTILIDAD NETA: ${formatMoney(payload.incomeStatement.netIncome)}`, margin, doc.y, { align: 'right' });
-
-    addFooter(2);
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // PAGE 3: TRIAL BALANCE
-    // ═══════════════════════════════════════════════════════════════════════
-    doc.addPage();
-    drawHeader();
-    doc.y = 140;
-
-    drawSectionTitle('Balanza de Comprobación');
-
-    const tbCols = [
-      { label: 'Código', width: 50 },
-      { label: 'Cuenta', width: 160 },
-      { label: 'Debe', width: 70 },
-      { label: 'Haber', width: 70 },
-      { label: 'Saldo', width: 80 },
-    ];
-
-    drawTableHeader(doc.y, tbCols);
+    drawSectionTitle(doc, 'Cuentas');
+    drawTableHeader(doc, doc.y, trialCols);
     doc.y += 28;
 
-    if (payload.trialBalance?.length > 0) {
-      payload.trialBalance.forEach((account, i) => {
-        const y = doc.y;
-
-        doc.save();
-        if (i % 2 === 0) doc.rect(margin, y - 4, contentWidth, 16).fill(colors.softGray);
-        else doc.rect(margin, y - 4, contentWidth, 16).fill('#ffffff');
-        doc.restore();
-
-        doc.fillColor(colors.text).fontSize(9).font('Helvetica');
-        let x = margin + 6;
-        doc.text(account.code, x, y, { width: tbCols[0].width - 8 });
-        x += tbCols[0].width;
-        doc.text(truncate(account.name, 24), x, y, { width: tbCols[1].width - 8 });
-        x += tbCols[1].width;
-        doc.text(formatMoney(account.debit), x, y, { width: tbCols[2].width - 8, align: 'right' });
-        x += tbCols[2].width;
-        doc.text(formatMoney(account.credit), x, y, { width: tbCols[3].width - 8, align: 'right' });
-        x += tbCols[3].width;
-        doc.text(formatMoney(account.balance), x, y, { width: tbCols[4].width - 8, align: 'right' });
-
-        doc.moveDown(0.8);
-      });
-    }
-
-    addFooter(3);
+    (payload.trialBalance ?? []).forEach((account, index) => {
+      drawTableRow(
+        doc,
+        [
+          account.code,
+          pdfTruncate(account.name, 40),
+          pdfMoney(account.debit),
+          pdfMoney(account.credit),
+          pdfMoney(account.balance),
+        ],
+        index,
+        trialCtx,
+        { boldColumns: [4] },
+      );
+    });
 
     doc.end();
   });

@@ -1,6 +1,21 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
+import {
+  PDF_COLORS,
+  PDF_CONTENT_START_Y,
+  PDF_MODULE_ACCENTS,
+  type PdfTableContext,
+  drawInfoCard,
+  drawNexaraFooter,
+  drawNexaraHeader,
+  drawSectionTitle,
+  drawSummaryBox,
+  drawTableHeader,
+  drawTableRow,
+  loadNexaraLogo,
+  pdfText,
+} from '../common/pdf/nexara-pdf-theme';
 
 export type ServiceSheetPayload = {
   anNumber: string;
@@ -40,240 +55,164 @@ const formatDateTime = (value?: Date | null) => {
   });
 };
 
-const loadLogo = (relativePath: string) => {
+const loadImage = (filePath: string) => {
   try {
-    if (fs.existsSync(relativePath)) {
-      return fs.readFileSync(relativePath);
-    }
+    return fs.existsSync(filePath) ? fs.readFileSync(filePath) : null;
   } catch {
     return null;
   }
-  return null;
 };
 
 const resolveLogoPath = (logoUrl?: string | null) => {
-  if (!logoUrl) return null;
-  if (logoUrl.startsWith('/uploads/')) {
-    return path.resolve(process.cwd(), `.${logoUrl}`);
-  }
-  return null;
+  if (!logoUrl?.startsWith('/uploads/')) return null;
+  const relative = logoUrl.replace(/^\/uploads\//, '');
+  const candidates = [
+    path.resolve(process.cwd(), 'uploads', relative),
+    path.resolve(process.cwd(), 'apps', 'api', 'uploads', relative),
+    path.resolve(process.cwd(), '..', 'uploads', relative),
+  ];
+  return candidates.find((candidate) => {
+    try {
+      return fs.existsSync(candidate);
+    } catch {
+      return false;
+    }
+  }) || null;
 };
 
 export const generateServiceSheetPdf = async (payload: ServiceSheetPayload): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 40 });
     const chunks: Buffer[] = [];
-
     doc.on('data', (chunk) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', (error) => reject(error));
-
-    const colors = {
-      navy: '#0B1F3A',
-      blue: '#1F6BBA',
-      lightBlue: '#E3F2FD',
-      softGray: '#F5F7FB',
-      text: '#1F2A37',
-      muted: '#5B6B7A',
-      line: '#D9E2EC',
-    };
+    doc.on('error', reject);
 
     const margin = doc.page.margins.left;
-    const pageWidth = doc.page.width;
-    const contentWidth = pageWidth - margin * 2;
-
-    const nexaraLogo = loadLogo(path.resolve(process.cwd(), '../web/public/logo-nexara.png'))
-      || loadLogo(path.resolve(process.cwd(), '../../apps/web/public/logo-nexara.png'));
+    const contentWidth = doc.page.width - margin * 2;
+    const accent = PDF_MODULE_ACCENTS.ops;
+    const logo = loadNexaraLogo();
     const clientLogoPath = resolveLogoPath(payload.clientLogoUrl);
-    const clientLogo = clientLogoPath ? loadLogo(clientLogoPath) : null;
+    const clientLogo = clientLogoPath ? loadImage(clientLogoPath) : null;
 
     const drawHeader = () => {
-      doc.save();
-      doc.rect(0, 0, pageWidth, 120).fill(colors.lightBlue);
-      doc.rect(0, 0, pageWidth, 6).fill(colors.blue);
-      doc.restore();
-
-      const logoBox = { x: margin, y: 22, w: 120, h: 64 };
-      if (nexaraLogo) {
-        doc.image(nexaraLogo, logoBox.x, logoBox.y, { fit: [logoBox.w, logoBox.h] });
-      }
-
-      const clientBox = { x: pageWidth - margin - 90, y: 22, w: 90, h: 64 };
-      if (clientLogo) {
-        doc.image(clientLogo, clientBox.x, clientBox.y, { fit: [clientBox.w, clientBox.h] });
-      }
-
-      const infoWidth = 180;
-      const infoX = pageWidth - margin - infoWidth;
-      const titleX = margin + logoBox.w + 12;
-      const titleWidth = infoX - titleX - 12;
-
-      doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(20).text('Hoja de Servicio', titleX, 30, {
-        width: Math.max(140, titleWidth),
+      drawNexaraHeader(doc, {
+        docTitle: 'Hoja de servicio',
+        docSubtitle: 'Mantenimiento preventivo/correctivo',
+        accent,
+        logo,
+        meta: [
+          { label: 'Ticket', value: payload.anNumber },
+          { label: 'Cliente', value: pdfText(payload.clientName) },
+          { label: 'Tipo', value: pdfText(payload.ticketType) },
+        ],
       });
-      doc.fontSize(10).font('Helvetica').fillColor(colors.muted).text('Mantenimiento preventivo/correctivo', titleX, 56, {
-        width: Math.max(140, titleWidth),
-      });
-
-      doc.fillColor(colors.text).fontSize(9);
-      doc.text(`Ticket: ${payload.anNumber}`, infoX, 28, { width: infoWidth, align: 'right' });
-      doc.text(`Cliente: ${payload.clientName || '-'}`, infoX, 42, { width: infoWidth, align: 'right' });
-      doc.text(`Tipo: ${payload.ticketType || '-'}`, infoX, 56, { width: infoWidth, align: 'right' });
+      drawNexaraFooter(doc);
+      doc.y = PDF_CONTENT_START_Y;
     };
 
-    const drawSectionTitle = (label: string) => {
-      doc.moveDown(0.6);
-      doc.fillColor(colors.navy).fontSize(12).font('Helvetica-Bold').text(label, margin, doc.y);
-      doc.moveDown(0.2);
+    const addPage = (section?: string) => {
+      doc.addPage();
+      drawHeader();
+      if (section) drawSectionTitle(doc, section);
     };
 
-    const drawInfoCard = (
-      x: number,
-      y: number,
-      width: number,
-      lines: Array<{ label: string; value: string }>,
-    ) => {
-      const padding = 10;
-      const labelWidth = 80;
-      const valueWidth = width - padding * 2 - labelWidth - 2;
-      const rowGap = 6;
-      const rowHeights = lines.map((line) => {
-        const valueHeight = doc.heightOfString(line.value || '-', { width: valueWidth });
-        return Math.max(14, valueHeight);
-      });
-      const contentHeight = rowHeights.reduce((acc, h) => acc + h, 0) + rowGap * (lines.length - 1);
-      const height = padding * 2 + contentHeight;
-      doc.save();
-      doc.roundedRect(x, y, width, height, 8).fill(colors.softGray);
-      doc.restore();
-
-      let cursorY = y + padding;
-      lines.forEach((line, index) => {
-        const rowHeight = rowHeights[index];
-        doc.fillColor(colors.muted).fontSize(9).font('Helvetica').text(line.label, x + padding, cursorY, {
-          width: labelWidth,
-        });
-        doc.fillColor(colors.text).fontSize(10).font('Helvetica').text(line.value || '-', x + padding + labelWidth + 2, cursorY, {
-          width: valueWidth,
-        });
-        cursorY += rowHeight + rowGap;
-      });
-      return height;
-    };
-
-    const drawTableHeader = (y: number, columns: Array<{ label: string; width: number }>) => {
-      doc.save();
-      doc.rect(margin, y, contentWidth, 24).fill(colors.navy);
-      doc.restore();
-      doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold');
-      let x = margin + 6;
-      columns.forEach((col) => {
-        doc.text(col.label, x, y + 7, { width: col.width - 8 });
-        x += col.width;
-      });
+    const ensurePageSpace = (height: number, section?: string) => {
+      if (doc.y + height > doc.page.height - 60) addPage(section);
     };
 
     drawHeader();
-    doc.y = 140;
-
-    drawSectionTitle('Datos de servicio');
-
+    drawSectionTitle(doc, 'Datos de servicio');
     const infoY = doc.y;
     const leftWidth = (contentWidth - 20) * 0.55;
     const rightWidth = contentWidth - leftWidth - 20;
-
-    const serviceLines = [
-      { label: 'Sucursal', value: payload.branchName || '-' },
-      { label: 'No. sucursal', value: payload.branchNumber || '-' },
+    const serviceHeight = drawInfoCard(doc, margin, infoY, leftWidth, [
+      { label: 'Sucursal', value: pdfText(payload.branchName) },
+      { label: 'No. sucursal', value: pdfText(payload.branchNumber) },
       { label: 'Ciudad/Estado', value: [payload.branchCity, payload.branchState].filter(Boolean).join(', ') || '-' },
-      { label: 'Dirección', value: payload.branchAddress || '-' },
-    ];
-
-    const scheduleLines = [
+      { label: 'Dirección', value: pdfText(payload.branchAddress) },
+    ], { labelWidth: 80 });
+    const scheduleHeight = drawInfoCard(doc, margin + leftWidth + 20, infoY, rightWidth, [
       { label: 'Inicio', value: formatDateTime(payload.startedAt) },
       { label: 'Término', value: formatDateTime(payload.finishedAt) },
-      { label: 'Gerente', value: payload.managerName || '-' },
-      { label: 'Cargo', value: payload.managerRole || '-' },
-    ];
-
-    const serviceHeight = drawInfoCard(margin, infoY, leftWidth, serviceLines);
-    const scheduleHeight = drawInfoCard(margin + leftWidth + 20, infoY, rightWidth, scheduleLines);
+      { label: 'Gerente', value: pdfText(payload.managerName) },
+      { label: 'Cargo', value: pdfText(payload.managerRole) },
+    ], { labelWidth: 58 });
+    if (clientLogo) {
+      try {
+        doc.image(clientLogo, margin + 8, infoY + serviceHeight - 38, { fit: [72, 26] });
+      } catch {
+        // Keep rendering when a client logo is corrupt.
+      }
+    }
     doc.y = infoY + Math.max(serviceHeight, scheduleHeight) + 16;
 
-    drawSectionTitle('Trabajo realizado');
-    doc.fillColor(colors.text).fontSize(10).text(payload.workSummary || '-', {
-      width: contentWidth,
-    });
+    drawSectionTitle(doc, 'Trabajo realizado');
+    doc.fillColor(PDF_COLORS.text).font('Helvetica').fontSize(10)
+      .text(pdfText(payload.workSummary), margin, doc.y, { width: contentWidth });
 
-    drawSectionTitle('Equipos atendidos');
+    drawSectionTitle(doc, 'Equipos atendidos');
     const equipment = payload.equipmentList || [];
     const columns = [
       { label: '#', width: 24 },
-      { label: 'Equipo', width: 150 },
-      { label: 'Modelo', width: 110 },
-      { label: 'Serie', width: 110 },
-      { label: 'Actividad', width: 160 },
+      { label: 'Equipo', width: 140 },
+      { label: 'Modelo', width: 100 },
+      { label: 'Serie', width: 100 },
+      { label: 'Actividad', width: 151 },
     ];
-    drawTableHeader(doc.y, columns);
+    const tableCtx: PdfTableContext = {
+      columns,
+      headerAccent: PDF_COLORS.navy,
+      fontSize: 9,
+      onNewPage: () => {
+        drawHeader();
+      },
+    };
+    drawTableHeader(doc, doc.y, columns, tableCtx.headerAccent);
     doc.y += 28;
-    if (equipment.length === 0) {
-      doc.fillColor(colors.text).fontSize(10).text('Sin equipos registrados.', margin, doc.y);
+    if (!equipment.length) {
+      doc.fillColor(PDF_COLORS.text).font('Helvetica').fontSize(10)
+        .text('Sin equipos registrados.', margin, doc.y);
       doc.moveDown(0.6);
     } else {
       equipment.forEach((item, index) => {
-        doc.fillColor(colors.text).fontSize(9).font('Helvetica');
-        const row = [
+        drawTableRow(doc, [
           String(index + 1),
-          item.name || '-',
-          item.model || '-',
-          item.serial || '-',
-          item.action || '-',
-        ];
-        const cellPaddingY = 4;
-        const heights = row.map((value, colIndex) => doc.heightOfString(value, {
-          width: columns[colIndex].width - 6,
-          align: 'left',
-        }));
-        const rowHeight = Math.max(16, ...heights) + cellPaddingY * 2;
-
-        if (index % 2 === 1) {
-          doc.save();
-          doc.rect(margin, doc.y - 2, contentWidth, rowHeight).fill(colors.softGray).opacity(0.6);
-          doc.restore();
-        }
-
-        let x = margin + 3;
-        row.forEach((value, colIndex) => {
-          doc.text(value, x, doc.y + cellPaddingY - 1, { width: columns[colIndex].width - 6, align: 'left' });
-          x += columns[colIndex].width;
-        });
-        doc.y += rowHeight;
+          pdfText(item.name),
+          pdfText(item.model),
+          pdfText(item.serial),
+          pdfText(item.action),
+        ], index, tableCtx, { boldColumns: [0] });
       });
     }
 
-    drawSectionTitle('Observaciones');
-    doc.fillColor(colors.text).fontSize(10).text(payload.observations || '-', { width: contentWidth });
+    ensurePageSpace(100, 'Observaciones');
+    drawSectionTitle(doc, 'Observaciones');
+    doc.fillColor(PDF_COLORS.text).font('Helvetica').fontSize(10)
+      .text(pdfText(payload.observations), margin, doc.y, { width: contentWidth });
 
-    drawSectionTitle('Firma digital');
-    doc.fillColor(colors.text).fontSize(10).text(`Firmado por: ${payload.signedName || '-'}`);
+    ensurePageSpace(120, 'Firma digital');
+    drawSectionTitle(doc, 'Firma digital');
+    const signatureY = doc.y;
+    const signatureHeight = drawInfoCard(doc, margin, signatureY, contentWidth, [
+      { label: 'Firmado por', value: pdfText(payload.signedName) },
+      { label: 'Gerente', value: pdfText(payload.managerName) },
+      { label: 'Cargo', value: pdfText(payload.managerRole) },
+    ], { title: 'Conformidad del servicio', labelWidth: 80 });
+    doc.y = signatureY + signatureHeight + 12;
 
-    drawSectionTitle('Encuesta de calidad');
+    ensurePageSpace(150, 'Encuesta de calidad');
+    drawSectionTitle(doc, 'Encuesta de calidad');
     const survey = payload.survey || {};
-    const yesNo = (value?: boolean | null) => (value === true ? 'Si' : value === false ? 'No' : '-');
-    const surveyRows = [
-      ['Ingeniero se identifico', yesNo(survey.engineerIdentified)],
+    const yesNo = (value?: boolean | null) => value === true ? 'Sí' : value === false ? 'No' : '-';
+    const surveyHeight = drawSummaryBox(doc, margin, doc.y, contentWidth, 'Evaluación del servicio', [
+      ['Ingeniero se identificó', yesNo(survey.engineerIdentified)],
       ['Atención fue amable', yesNo(survey.friendlyAttention)],
       ['Satisfecho con la solución', yesNo(survey.solutionSatisfied)],
-    ];
-    surveyRows.forEach(([label, value]) => {
-      doc.fillColor(colors.muted).fontSize(9).text(label, margin, doc.y, { width: 170 });
-      doc.fillColor(colors.text).fontSize(10).text(value, margin + 180, doc.y, { width: contentWidth - 180 });
-      doc.moveDown(0.3);
-    });
-    doc.fillColor(colors.muted).fontSize(9).text('Observaciones adicionales', margin, doc.y, { width: 170 });
-    doc.fillColor(colors.text).fontSize(10).text(survey.notes || '-', margin + 180, doc.y, { width: contentWidth - 180 });
+      ['Observaciones adicionales', pdfText(survey.notes)],
+    ]);
+    doc.y += surveyHeight + 8;
 
     doc.end();
   });
 };
-

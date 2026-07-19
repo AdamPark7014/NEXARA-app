@@ -1,4 +1,20 @@
 import PDFDocument from 'pdfkit';
+import {
+  PDF_COLORS,
+  PDF_CONTENT_START_Y,
+  PDF_MODULE_ACCENTS,
+  drawInfoCard,
+  drawNexaraFooter,
+  drawNexaraHeader,
+  drawSectionTitle,
+  drawSummaryBox,
+  drawTableHeader,
+  drawTableRow,
+  loadNexaraLogo,
+  pdfMoney,
+  pdfText,
+  type PdfTableContext,
+} from '../common/pdf/nexara-pdf-theme';
 
 export type ContractPdfPayload = {
   contractNumber: string;
@@ -19,87 +35,174 @@ export type ContractPdfPayload = {
   companyRfc?: string;
 };
 
-const fmtMxn = (n: number) => `$${(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN`;
-const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }) : '—');
+const ACCENT = PDF_MODULE_ACCENTS.maintenance;
+
+const fmtDate = (s?: string | null) =>
+  s
+    ? new Date(s).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })
+    : '-';
 
 export async function generateContractPdf(payload: ContractPdfPayload): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
-      const doc = new PDFDocument({ size: 'LETTER', margin: 50 });
+      const doc = new PDFDocument({ size: 'A4', margin: 40 });
       const chunks: Buffer[] = [];
       doc.on('data', (c) => chunks.push(c));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      // Header
-      doc.fontSize(20).fillColor('#0ea5e9').text(payload.companyName || 'NEXARA Tech', { align: 'right' });
-      doc.fontSize(9).fillColor('#6b7280').text(`RFC: ${payload.companyRfc || ''}`, { align: 'right' });
-      doc.moveDown(2);
+      const margin = doc.page.margins.left;
+      const contentWidth = doc.page.width - margin * 2;
+      const logo = loadNexaraLogo();
 
-      doc.fontSize(16).fillColor('#000').text('CONTRATO DE MANTENIMIENTO', { align: 'center' });
-      doc.fontSize(10).fillColor('#6b7280').text(`No. ${payload.contractNumber}`, { align: 'center' });
-      doc.moveDown(1);
-
-      // Cliente
-      doc.fontSize(11).fillColor('#000').text('CLIENTE', { underline: true });
-      doc.fontSize(10).fillColor('#374151');
-      doc.text(`Nombre: ${payload.clientName || '—'}`);
-      if (payload.clientRfc) doc.text(`RFC: ${payload.clientRfc}`);
-      if (payload.clientAddress) doc.text(`Domicilio: ${payload.clientAddress}`);
-      doc.moveDown(0.5);
-
-      // Objeto
-      doc.fontSize(11).fillColor('#000').text('OBJETO DEL CONTRATO', { underline: true });
-      doc.fontSize(10).fillColor('#374151').text(payload.title);
-      if (payload.scope) {
-        doc.moveDown(0.3);
-        doc.text(`Alcance: ${payload.scope}`, { width: 500 });
-      }
-      doc.moveDown(0.5);
-
-      // Vigencia
-      doc.fontSize(11).fillColor('#000').text('VIGENCIA Y FRECUENCIA', { underline: true });
-      doc.fontSize(10).fillColor('#374151');
-      doc.text(`Inicio: ${fmtDate(payload.startDate)}`);
-      doc.text(`Fin: ${fmtDate(payload.endDate)}`);
-      doc.text(`Frecuencia de visitas: ${payload.frequencyMonths ? `Cada ${payload.frequencyMonths} mes(es)` : 'A demanda'}`);
-      doc.moveDown(0.5);
-
-      // SLA
-      if (payload.slaResponseHours || payload.slaResolutionHours) {
-        doc.fontSize(11).fillColor('#000').text('NIVELES DE SERVICIO (SLA)', { underline: true });
-        doc.fontSize(10).fillColor('#374151');
-        if (payload.slaResponseHours) doc.text(`Tiempo de respuesta: ${payload.slaResponseHours} h`);
-        if (payload.slaResolutionHours) doc.text(`Tiempo de resolución: ${payload.slaResolutionHours} h`);
-        doc.moveDown(0.5);
-      }
-
-      // Monto
-      doc.fontSize(11).fillColor('#000').text('CONTRAPRESTACIÓN', { underline: true });
-      doc.fontSize(10).fillColor('#374151');
-      doc.text(`Monto mensual: ${fmtMxn(payload.monthlyAmount)}`);
-      doc.text(`Estatus: ${payload.status}`);
-      doc.moveDown(0.5);
-
-      // Visitas programadas
-      if (payload.visits && payload.visits.length > 0) {
-        doc.fontSize(11).fillColor('#000').text('CALENDARIO DE VISITAS', { underline: true });
-        doc.fontSize(9).fillColor('#374151');
-        payload.visits.slice(0, 12).forEach((v, idx) => {
-          doc.text(`${idx + 1}. ${fmtDate(v.scheduledDate)} — ${v.description || 'Visita preventiva'} [${v.status}]`);
+      const header = () =>
+        drawNexaraHeader(doc, {
+          docTitle: 'Contrato de mantenimiento',
+          docSubtitle: payload.title,
+          accent: ACCENT,
+          logo,
+          meta: [
+            { label: 'No. contrato', value: pdfText(payload.contractNumber) },
+            { label: 'Inicio', value: fmtDate(payload.startDate) },
+            { label: 'Estatus', value: pdfText(payload.status) },
+          ],
         });
-        doc.moveDown(0.5);
+
+      header();
+
+      drawSectionTitle(doc, 'Cliente y contrato');
+
+      const infoY = doc.y;
+      const leftWidth = (contentWidth - 20) * 0.55;
+      const rightWidth = contentWidth - leftWidth - 20;
+
+      const clientHeight = drawInfoCard(doc, margin, infoY, leftWidth, [
+        { label: 'Nombre', value: pdfText(payload.clientName) },
+        { label: 'RFC', value: pdfText(payload.clientRfc) },
+        { label: 'Domicilio', value: pdfText(payload.clientAddress) },
+      ]);
+
+      const contractHeight = drawInfoCard(doc, margin + leftWidth + 20, infoY, rightWidth, [
+        { label: 'Objeto', value: pdfText(payload.title) },
+        { label: 'Alcance', value: pdfText(payload.scope) },
+        { label: 'Empresa', value: pdfText(payload.companyName || 'NEXARA') },
+        { label: 'RFC emp.', value: pdfText(payload.companyRfc) },
+      ]);
+
+      doc.y = infoY + Math.max(clientHeight, contractHeight) + 16;
+
+      if (payload.slaResponseHours || payload.slaResolutionHours) {
+        drawSectionTitle(doc, 'Niveles de servicio (SLA)');
+        const slaY = doc.y;
+        const slaHeight = drawInfoCard(doc, margin, slaY, contentWidth, [
+          {
+            label: 'Respuesta',
+            value: payload.slaResponseHours ? `${payload.slaResponseHours} h` : '-',
+          },
+          {
+            label: 'Resolución',
+            value: payload.slaResolutionHours ? `${payload.slaResolutionHours} h` : '-',
+          },
+        ]);
+        doc.y = slaY + slaHeight + 16;
       }
 
-      // Firmas
-      doc.moveDown(2);
-      const sigY = doc.y;
-      doc.fontSize(10).fillColor('#000');
-      doc.text('______________________________', 70, sigY);
-      doc.text('Cliente', 70, sigY + 14, { width: 200, align: 'center' });
-      doc.text('______________________________', 330, sigY);
-      doc.text(payload.companyName || 'NEXARA Tech', 330, sigY + 14, { width: 200, align: 'center' });
+      const visits = payload.visits ?? [];
+      if (visits.length > 0) {
+        drawSectionTitle(doc, 'Calendario de visitas');
 
+        const columns = [
+          { label: 'Fecha', width: 160 },
+          { label: 'Descripción', width: 260 },
+          { label: 'Estatus', width: contentWidth - 160 - 260 },
+        ];
+
+        const tableCtx: PdfTableContext = {
+          columns,
+          headerAccent: PDF_COLORS.navy,
+          onNewPage: header,
+        };
+
+        drawTableHeader(doc, doc.y, columns);
+        doc.y += 28;
+
+        visits.forEach((visit, index) => {
+          drawTableRow(
+            doc,
+            [
+              fmtDate(visit.scheduledDate),
+              pdfText(visit.description || 'Visita preventiva'),
+              pdfText(visit.status),
+            ],
+            index,
+            tableCtx,
+          );
+        });
+
+        doc.moveDown(0.8);
+      }
+
+      const summaryWidth = 260;
+      const summaryY = doc.y + 6;
+      if (summaryY + 100 > doc.page.height - 80) {
+        doc.addPage();
+        header();
+        doc.y = PDF_CONTENT_START_Y;
+      }
+
+      const summaryBoxY = doc.y + 6;
+      const summaryHeight = drawSummaryBox(
+        doc,
+        margin + contentWidth - summaryWidth,
+        summaryBoxY,
+        summaryWidth,
+        'Resumen financiero',
+        [
+          ['Monto mensual', pdfMoney(payload.monthlyAmount)],
+          [
+            'Frecuencia',
+            payload.frequencyMonths ? `Cada ${payload.frequencyMonths} mes(es)` : 'A demanda',
+          ],
+          ['Vigencia', `${fmtDate(payload.startDate)} — ${fmtDate(payload.endDate)}`],
+        ],
+        { highlightIndex: 0 },
+      );
+      doc.y = summaryBoxY + summaryHeight + 28;
+
+      if (doc.y + 60 > doc.page.height - 60) {
+        doc.addPage();
+        header();
+        doc.y = PDF_CONTENT_START_Y;
+      }
+
+      drawSectionTitle(doc, 'Firmas');
+      const sigY = doc.y + 24;
+      const colWidth = (contentWidth - 40) / 2;
+
+      doc
+        .strokeColor(PDF_COLORS.line)
+        .moveTo(margin, sigY)
+        .lineTo(margin + colWidth, sigY)
+        .stroke();
+      doc
+        .fillColor(PDF_COLORS.muted)
+        .fontSize(10)
+        .font('Helvetica')
+        .text('Cliente', margin, sigY + 8, { width: colWidth, align: 'center' });
+
+      const rightX = margin + colWidth + 40;
+      doc
+        .strokeColor(PDF_COLORS.line)
+        .moveTo(rightX, sigY)
+        .lineTo(rightX + colWidth, sigY)
+        .stroke();
+      doc
+        .fillColor(PDF_COLORS.muted)
+        .fontSize(10)
+        .font('Helvetica')
+        .text('NEXARA', rightX, sigY + 8, { width: colWidth, align: 'center' });
+
+      drawNexaraFooter(doc, 'NEXARA · Contrato de mantenimiento — información confidencial.');
       doc.end();
     } catch (err) {
       reject(err);
