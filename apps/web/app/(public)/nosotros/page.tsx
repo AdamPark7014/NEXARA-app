@@ -8,24 +8,15 @@ import heroStyles from "../../components/PublicPageHero.module.css";
 import { buildApiUrl } from "@/lib/api-base";
 import { resolveUserAvatarUrl } from "@/lib/user-avatar";
 import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
+import { buildStudioPageMetadata } from "@/lib/page-seo";
 
-const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
-
-export const metadata: Metadata = {
-  title: "Nosotros | Nexara — Equipo de integración tecnológica",
-  description:
-    "Quiénes somos: ingeniería, implementación y soporte tecnológico desde Puebla y Ciudad de México, con cobertura para empresas en todo México.",
-  alternates: { canonical: "/nosotros" },
-  openGraph: {
-    type: "website",
-    url: `${siteUrl}/nosotros`,
-    title: "Nosotros | Nexara",
-    description: "Donde la tecnología se convierte en resultados.",
-    images: [{ url: "/logo-nexara-lockup.png", width: 1200, height: 630, alt: "Equipo Nexara" }],
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildStudioPageMetadata("nosotros");
+}
 
 export const dynamic = "force-dynamic";
+
+const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 
 const principios = [
   {

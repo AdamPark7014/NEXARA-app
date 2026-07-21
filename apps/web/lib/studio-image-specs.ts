@@ -69,6 +69,17 @@ export const STUDIO_IMAGE_SPECS = {
     maxSizeMb: 4,
     usage: "Bandas / figuras a mitad de página",
   },
+  ogSocial: {
+    id: "og_social",
+    label: "Imagen Open Graph / redes",
+    width: 1200,
+    height: 630,
+    ratio: "1.91:1",
+    formats: "JPG, PNG o WEBP",
+    maxSizeMb: 2,
+    usage: "Vista previa al compartir en WhatsApp, Facebook, LinkedIn, X",
+    tip: "1200×630 px. Evita texto fino: se ve pequeño en móviles.",
+  },
   caseCover: {
     id: "case_cover",
     label: "Portada de caso de éxito",
@@ -88,7 +99,7 @@ export const STUDIO_IMAGE_SPECS = {
     ratio: "16:9",
     formats: "JPG, PNG o WEBP",
     maxSizeMb: 4,
-    usage: "Artículo principal en /noticias",
+    usage: "Artículo principal en /blog",
     tip: "La mitad izquierda de la tarjeta es solo imagen.",
   },
   blogCoverCard: {
@@ -99,7 +110,7 @@ export const STUDIO_IMAGE_SPECS = {
     ratio: "16:9",
     formats: "JPG, PNG o WEBP",
     maxSizeMb: 3,
-    usage: "Grid de entradas en /noticias",
+    usage: "Grid de entradas en /blog",
     tip: "Misma proporción que el destacado; se recorta con object-fit: cover.",
   },
   socialInstagramFeed: {

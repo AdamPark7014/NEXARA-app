@@ -126,6 +126,14 @@ const nextConfig = {
   // Support para subdominios
   // El middleware se encarga de la reescritura de URLs
   
+  async redirects() {
+    return [
+      // Studio / copy histórico decía /noticias; canónica SEO = /blog
+      { source: "/noticias", destination: "/blog", permanent: true },
+      { source: "/noticias/:slug", destination: "/blog/:slug", permanent: true },
+    ];
+  },
+
   async rewrites() {
     // API_INTERNAL_URL puede venir como:
     //   - http://nexara-api:3001        (sin /api)

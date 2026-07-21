@@ -159,7 +159,7 @@ export default function StudioNewsPage() {
       <PageHeader
         eyebrow="STUDIO · Contenido"
         title="Noticias y blog"
-        subtitle={`Publicaciones del blog público (SEO) que aparecen en /noticias del sitio. ${studioImageHintLine(BLOG_COVER_SPEC)}`}
+        subtitle={`Publicaciones del blog público (SEO) en /blog. ${studioImageHintLine(BLOG_COVER_SPEC)}`}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>

@@ -1,15 +1,8 @@
-import type { Metadata } from "next";
 import shared from "../_shared/public.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
 import heroStyles from "../../components/PublicPageHero.module.css";
 import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
 import ContactoClient from "./ContactoClient";
-
-export const metadata: Metadata = {
-  title: "Contacto | Nexara",
-  description:
-    "Hablemos de tu proyecto. WhatsApp, teléfono o formulario — respuesta en horario laboral.",
-};
 
 export const dynamic = "force-dynamic";
 

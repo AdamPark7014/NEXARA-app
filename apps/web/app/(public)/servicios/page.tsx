@@ -1,16 +1,16 @@
 import React from "react";
 import Link from "next/link";
+import type { Metadata } from "next";
 import shared from "../_shared/public.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
 import EditorialImage from "../../components/EditorialImage";
 import heroStyles from "../../components/PublicPageHero.module.css";
 import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
+import { buildStudioPageMetadata } from "@/lib/page-seo";
 
-export const metadata = {
-  title: "Servicios | Nexara — CCTV, redes, cómputo y soporte",
-  description:
-    "Seguridad inteligente, conectividad, infraestructura TI, soporte TI y plataformas a medida — soluciones tecnológicas diseñadas para operar desde el primer día.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildStudioPageMetadata("servicios");
+}
 
 export const dynamic = "force-dynamic";
 

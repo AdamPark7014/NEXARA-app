@@ -4,12 +4,6 @@ import shared from "../_shared/public.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
 import heroStyles from "../../components/PublicPageHero.module.css";
 
-export const metadata = {
-  title: "Cobertura | Nexara",
-  description:
-    "Operamos en México con base en Puebla y CDMX. En sitio, remoto e híbrido según urgencia y SLA.",
-};
-
 export const dynamic = "force-dynamic";
 
 const regiones = [

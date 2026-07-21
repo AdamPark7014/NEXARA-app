@@ -24,7 +24,15 @@ export type HomeSection =
   | "page_servicios"
   | "page_soluciones"
   | "page_nosotros"
-  | "page_contacto";
+  | "page_contacto"
+  | "seo_home"
+  | "seo_servicios"
+  | "seo_soluciones"
+  | "seo_nosotros"
+  | "seo_contacto"
+  | "seo_proyectos"
+  | "seo_blog"
+  | "seo_cobertura";
 
 export type PageVisualSection =
   | "page_home"

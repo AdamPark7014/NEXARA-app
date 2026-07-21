@@ -9,9 +9,9 @@
  * Si entras a `/nexara` directo, el middleware redirige 308 a `/` para
  * mantener una sola URL canónica.
  */
-import NexaraHome, { metadata as nexaraMetadata } from "./nexara/page";
+import NexaraHome, { generateMetadata as nexaraGenerateMetadata } from "./nexara/page";
 
-export const metadata = nexaraMetadata;
-export const dynamic = 'force-dynamic';
+export const generateMetadata = nexaraGenerateMetadata;
+export const dynamic = "force-dynamic";
 
 export default NexaraHome;

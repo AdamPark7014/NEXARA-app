@@ -47,7 +47,7 @@ const DEFAULT_SITE_NAME = 'Nexara';
 const DEFAULT_LOCALE = 'es_MX';
 const DEFAULT_TITLE = 'Nexara';
 const DEFAULT_DESCRIPTION = 'Soluciones tecnológicas integrales para operación, servicio y crecimiento.';
-const DEFAULT_IMAGE = '/og-default.jpg';
+const DEFAULT_IMAGE = '/logo-nexara-lockup.png';
 const MAX_SLUG_LENGTH = 120;
 
 function normalizeText(value: string | undefined): string {
