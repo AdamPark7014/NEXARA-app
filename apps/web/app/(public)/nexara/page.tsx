@@ -14,22 +14,11 @@ import {
   type ProcesoItem,
   type CtaContent,
 } from "@/lib/page-content-api";
+import { buildStudioPageMetadata } from "@/lib/page-seo";
 
-const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
-
-export const metadata: Metadata = {
-  title: "Nexara | Soluciones inteligentes para un mundo conectado",
-  description:
-    "Integración tecnológica en México: CCTV, redes, cómputo y soporte TI con disciplina de campo.",
-  alternates: { canonical: "/" },
-  openGraph: {
-    type: "website",
-    url: siteUrl,
-    title: "Nexara | Mundo conectado",
-    description: "CCTV, redes, cómputo y soporte con una sola firma responsable.",
-    images: [{ url: "/logo-nexara-lockup.png", width: 1200, height: 630, alt: "Nexara" }],
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildStudioPageMetadata("home");
+}
 
 export const dynamic = "force-dynamic";
 

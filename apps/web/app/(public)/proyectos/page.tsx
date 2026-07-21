@@ -1,16 +1,17 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
+import type { Metadata } from "next";
 import shared from "../_shared/public.module.css";
 import styles from "./page.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
 import heroStyles from "../../components/PublicPageHero.module.css";
 import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
+import { buildStudioPageMetadata } from "@/lib/page-seo";
 
-export const metadata = {
-  title: "Proyectos | Nexara",
-  description: "Casos y proyectos representativos ejecutados por Nexara en distintos sectores.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildStudioPageMetadata("proyectos");
+}
 export const dynamic = "force-dynamic";
 
 const casos = [

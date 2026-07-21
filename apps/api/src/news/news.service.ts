@@ -112,6 +112,21 @@ export class NewsService {
     return post;
   }
 
+  async findBySlug(slug: string, options?: { includeDrafts?: boolean }) {
+    const safe = slug?.trim().toLowerCase();
+    if (!safe) {
+      throw new NotFoundException('Noticia no encontrada');
+    }
+    const post = await this.db.newsPost.findUnique({ where: { slug: safe } });
+    if (!post) {
+      throw new NotFoundException(`Noticia "${safe}" no encontrada`);
+    }
+    if (!options?.includeDrafts && post.status !== NewsStatus.PUBLISHED) {
+      throw new NotFoundException(`Noticia "${safe}" no encontrada`);
+    }
+    return post;
+  }
+
   async update(id: number, payload: UpdateNewsPostDto) {
     const existing = await this.findOne(id, { includeDrafts: true });
 

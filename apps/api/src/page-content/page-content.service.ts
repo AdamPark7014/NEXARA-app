@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service.js';
 import { UpsertPageContentDto } from './dto/upsert-page-content.dto.js';
 
-/** Secciones válidas del sitio público (copy + visuales). */
+/** Secciones válidas del sitio público (copy + visuales + SEO). */
 export const VALID_SECTIONS = [
   'home_hero',
   'home_metricas',
@@ -16,6 +16,15 @@ export const VALID_SECTIONS = [
   'page_soluciones',
   'page_nosotros',
   'page_contacto',
+  /** Meta title / description / Open Graph editables en Studio. */
+  'seo_home',
+  'seo_servicios',
+  'seo_soluciones',
+  'seo_nosotros',
+  'seo_contacto',
+  'seo_proyectos',
+  'seo_blog',
+  'seo_cobertura',
 ] as const;
 
 export type HomeSection = (typeof VALID_SECTIONS)[number];

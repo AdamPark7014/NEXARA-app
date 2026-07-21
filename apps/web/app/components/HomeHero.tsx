@@ -187,7 +187,7 @@ export default function HomeHero() {
           muted
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
           onError={() => {
             setVideoFailed(true);
           }}

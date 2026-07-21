@@ -1,15 +1,14 @@
 import type { MetadataRoute } from "next";
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx";
-  
+  const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
+
   return {
     host: baseUrl,
     rules: [
       {
         userAgent: "*",
         allow: "/",
-        crawlDelay: 2,
         disallow: [
           "/api/",
           "/_next/",
@@ -18,6 +17,10 @@ export default function robots(): MetadataRoute.Robots {
           "/tickets/",
           "/contabilidad/",
           "/ventas/",
+          "/crm/",
+          "/ops/",
+          "/erp/",
+          "/studio/",
           "/web/",
           "/login",
           "/auth/",
@@ -33,14 +36,32 @@ export default function robots(): MetadataRoute.Robots {
         allow: [
           "/",
           "/servicios",
-          "/soluciones",
+          "/soluciones/",
           "/proyectos",
           "/contacto",
+          "/nosotros",
+          "/blog",
+          "/blog/",
           "/cobertura",
           "/Nexara-Ingenieros",
           "/legal/",
         ],
-        disallow: ["/console/", "/tickets/", "/ventas/", "/contabilidad/", "/web/"],
+        disallow: [
+          "/console/",
+          "/consola/",
+          "/tickets/",
+          "/ventas/",
+          "/crm/",
+          "/ops/",
+          "/erp/",
+          "/studio/",
+          "/contabilidad/",
+          "/web/",
+          "/api/",
+          "/qa/",
+          "/login",
+          "/auth/",
+        ],
       },
       {
         userAgent: "GPTBot",

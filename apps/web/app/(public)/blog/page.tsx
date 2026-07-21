@@ -1,76 +1,26 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
+import type { Metadata } from "next";
 import shared from "../_shared/public.module.css";
 import styles from "./page.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
 import heroStyles from "../../components/PublicPageHero.module.css";
-import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
+import { buildStudioPageMetadata } from "@/lib/page-seo";
+import {
+  fetchPublishedNews,
+  normalizeNewsImageUrl,
+  toPlainExcerpt,
+} from "@/lib/public-news";
 
-export const metadata = {
-  title: "Blog | Nexara",
-  description: "Noticias, guías y notas de campo sobre CCTV, redes, cómputo y soporte TI.",
-};
-
-export const dynamic = "force-dynamic";
-
-type NewsPost = {
-  id: number;
-  slug: string;
-  title: string;
-  summary?: string | null;
-  content: string;
-  coverImageUrl?: string | null;
-  tags: string[];
-  status: "DRAFT" | "PUBLISHED";
-  publishedAt?: string | null;
-  createdAt: string;
-};
-
-function normalizeNewsImageUrl(imageUrl?: string | null): string {
-  if (!imageUrl) return "/images/hero/hero-06.png";
-  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) return imageUrl;
-  const origin = getApiAssetOrigin();
-  if (imageUrl.startsWith("/")) {
-    if (imageUrl.startsWith("/news/image/")) return `${origin}${imageUrl}`;
-    return imageUrl;
-  }
-  return `${origin}/news/image/${imageUrl}`;
+export async function generateMetadata(): Promise<Metadata> {
+  return buildStudioPageMetadata("blog");
 }
 
-function toPlainExcerpt(text?: string | null, fallback = ""): string {
-  const raw = (text || fallback).replace(/\s+/g, " ").trim();
-  if (!raw) return "Contenido disponible pronto.";
-  if (raw.length <= 180) return raw;
-  return `${raw.slice(0, 177)}…`;
-}
-
-async function fetchBlogPosts(): Promise<NewsPost[]> {
-  try {
-    const res = await fetch(buildApiUrl("news?limit=12"), { cache: "no-store" });
-    if (!res.ok) return [];
-
-    const payload = (await res.json()) as
-      | NewsPost[]
-      | { data?: NewsPost[] }
-      | { items?: NewsPost[] };
-
-    const rows = Array.isArray(payload)
-      ? payload
-      : "data" in payload && Array.isArray(payload.data)
-        ? payload.data
-        : "items" in payload && Array.isArray(payload.items)
-          ? payload.items
-          : [];
-
-    return rows.filter((post) => post.status === "PUBLISHED");
-  } catch {
-    return [];
-  }
-}
+export const revalidate = 300;
 
 export default async function BlogPage() {
-  const posts = await fetchBlogPosts();
+  const posts = await fetchPublishedNews(24);
   const [featured, ...rest] = posts;
 
   return (
@@ -93,13 +43,17 @@ export default async function BlogPage() {
           <div className={shared.inner}>
             <header className={shared.sectionHead}>
               <p className={shared.eyebrow}>Destacado</p>
-              <h2 className={shared.sectionTitle}>{featured.title}</h2>
+              <h2 className={shared.sectionTitle}>
+                <Link href={`/blog/${featured.slug}`} className={styles.titleLink}>
+                  {featured.title}
+                </Link>
+              </h2>
               <p className={shared.sectionLead}>
                 {toPlainExcerpt(featured.summary, featured.content)}
               </p>
             </header>
             <article className={styles.featuredRow} data-reveal="up">
-              <div className={styles.featuredMedia}>
+              <Link href={`/blog/${featured.slug}`} className={styles.featuredMedia}>
                 <Image
                   src={normalizeNewsImageUrl(featured.coverImageUrl)}
                   alt={featured.title}
@@ -107,8 +61,9 @@ export default async function BlogPage() {
                   sizes="(max-width: 900px) 100vw, 48vw"
                   className={styles.featuredImage}
                   unoptimized
+                  priority
                 />
-              </div>
+              </Link>
               <div className={styles.featuredBody}>
                 <p className={styles.featuredMeta}>
                   {new Date(featured.publishedAt || featured.createdAt).toLocaleDateString("es-MX")}
@@ -125,6 +80,9 @@ export default async function BlogPage() {
                 <p className={styles.featuredSummary}>
                   {toPlainExcerpt(featured.summary, featured.content)}
                 </p>
+                <Link href={`/blog/${featured.slug}`} className={styles.readMore}>
+                  Leer artículo →
+                </Link>
               </div>
             </article>
           </div>
@@ -164,7 +122,11 @@ export default async function BlogPage() {
                     <p className={styles.postDate}>
                       {new Date(post.publishedAt || post.createdAt).toLocaleDateString("es-MX")}
                     </p>
-                    <h3 className={shared.capTitle}>{post.title}</h3>
+                    <h3 className={shared.capTitle}>
+                      <Link href={`/blog/${post.slug}`} className={styles.titleLink}>
+                        {post.title}
+                      </Link>
+                    </h3>
                     <p className={shared.capText}>{toPlainExcerpt(post.summary, post.content)}</p>
                     {post.tags?.length ? (
                       <div className={styles.tagsRow}>

@@ -5,6 +5,7 @@
  * Permite al diseñador editar:
  * - Textos: Métricas, Servicios, Proceso, Industrias, CTA
  * - Imágenes: hero y slots de Inicio, Servicios, Soluciones, Nosotros, Contacto
+ * - SEO: title, description, Open Graph por página pública
  * Guarda en: PUT /api/studio/page-content/:section
  */
 
@@ -47,8 +48,16 @@ import {
   type PageImageLayout,
   type PageImagePosition,
 } from "@/lib/page-content-api";
+import {
+  PAGE_SEO_KEYS,
+  PAGE_SEO_META,
+  DEFAULT_PAGE_SEO,
+  mergePageSeo,
+  type PageSeoKey,
+  type PageSeoContent,
+} from "@/lib/page-seo";
 
-type EditorMode = "textos" | "imagenes";
+type EditorMode = "textos" | "imagenes" | "seo";
 type ActiveTextTab = "metricas" | "servicios" | "proceso" | "industrias" | "cta";
 
 const TEXT_TABS: { id: ActiveTextTab; label: string; section: HomeSection }[] = [
@@ -105,6 +114,7 @@ export default function StudioPagesPage() {
   const [mode, setMode] = useState<EditorMode>("textos");
   const [activeTextTab, setActiveTextTab] = useState<ActiveTextTab>("metricas");
   const [activeVisualTab, setActiveVisualTab] = useState<PageVisualSection>("page_home");
+  const [activeSeoTab, setActiveSeoTab] = useState<PageSeoKey>("home");
   const [saving, setSaving] = useState(false);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -117,9 +127,14 @@ export default function StudioPagesPage() {
   const [visuals, setVisuals]       = useState<Record<PageVisualSection, PageVisualsContent>>(
     () => structuredClone(DEFAULT_PAGE_VISUALS),
   );
+  const [seoByPage, setSeoByPage] = useState<Record<PageSeoKey, PageSeoContent>>(
+    () => structuredClone(DEFAULT_PAGE_SEO),
+  );
 
   const activeVisual = visuals[activeVisualTab];
   const activeVisualMeta = VISUAL_TABS.find((t) => t.id === activeVisualTab)!;
+  const activeSeo = seoByPage[activeSeoTab];
+  const activeSeoMeta = PAGE_SEO_META[activeSeoTab];
 
   const loadTextContent = useCallback(async () => {
     if (!token) return;
@@ -156,9 +171,28 @@ export default function StudioPagesPage() {
     });
   }, [token]);
 
+  const loadSeoContent = useCallback(async () => {
+    if (!token) return;
+    const results = await Promise.allSettled(
+      PAGE_SEO_KEYS.map((key) => getPageSection(PAGE_SEO_META[key].section, token)),
+    );
+    setSeoByPage((prev) => {
+      const next = { ...prev };
+      PAGE_SEO_KEYS.forEach((key, idx) => {
+        const row = results[idx];
+        const stored =
+          row.status === "fulfilled" && row.value?.content
+            ? (row.value.content as Partial<PageSeoContent>)
+            : null;
+        next[key] = mergePageSeo(key, stored);
+      });
+      return next;
+    });
+  }, [token]);
+
   const loadAll = useCallback(async () => {
-    await Promise.all([loadTextContent(), loadVisualContent()]);
-  }, [loadTextContent, loadVisualContent]);
+    await Promise.all([loadTextContent(), loadVisualContent(), loadSeoContent()]);
+  }, [loadTextContent, loadVisualContent, loadSeoContent]);
 
   useEffect(() => {
     if (isContextReady && token) loadAll();
@@ -168,6 +202,13 @@ export default function StudioPagesPage() {
     setVisuals((prev) => ({
       ...prev,
       [section]: { ...prev[section], ...patch },
+    }));
+  };
+
+  const patchSeo = (key: PageSeoKey, patch: Partial<PageSeoContent>) => {
+    setSeoByPage((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], ...patch },
     }));
   };
 
@@ -214,9 +255,17 @@ export default function StudioPagesPage() {
         else if (activeTextTab === "industrias") content = { items: industrias };
         else                                     content = cta as unknown as Record<string, unknown>;
         await savePageSection(tab.section, content, token, user?.email ?? undefined);
-      } else {
+      } else if (mode === "imagenes") {
         const content = visuals[activeVisualTab] as unknown as Record<string, unknown>;
         await savePageSection(activeVisualTab, content, token, user?.email ?? undefined);
+      } else {
+        const content = seoByPage[activeSeoTab] as unknown as Record<string, unknown>;
+        await savePageSection(
+          PAGE_SEO_META[activeSeoTab].section,
+          content,
+          token,
+          user?.email ?? undefined,
+        );
       }
       const now = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
       setLastSaved(now);
@@ -291,7 +340,9 @@ export default function StudioPagesPage() {
         subtitle={
           mode === "textos"
             ? cfg.subtitle
-            : "Hero y bandas visuales de las páginas públicas. Sube variantes desktop (≥768 px) y móvil (<768 px) cuando quieras un encuadre distinto."
+            : mode === "imagenes"
+              ? "Hero y bandas visuales de las páginas públicas. Sube variantes desktop (≥768 px) y móvil (<768 px) cuando quieras un encuadre distinto."
+              : "Title, description e imagen Open Graph por página. Lo que editas aquí alimenta Google, WhatsApp y redes."
         }
         variant="hero"
         meta={
@@ -307,7 +358,14 @@ export default function StudioPagesPage() {
               variant="secondary"
               iconLeft="Ver"
               onClick={() =>
-                window.open(mode === "imagenes" ? activeVisualMeta.path : "/", "_blank")
+                window.open(
+                  mode === "imagenes"
+                    ? activeVisualMeta.path
+                    : mode === "seo"
+                      ? activeSeoMeta.path
+                      : "/",
+                  "_blank",
+                )
               }
             >
               Ver pagina
@@ -327,7 +385,7 @@ export default function StudioPagesPage() {
             <KpiCard label="Servicios" value={servicios.length} icon="⚙️" hint="Tarjetas de servicios" />
             <KpiCard label="Pasos del proceso" value={proceso.length} icon="🔢" hint="Flujo de trabajo" />
           </>
-        ) : (
+        ) : mode === "imagenes" ? (
           <>
             <KpiCard label="Páginas visuales" value={VISUAL_TABS.length} icon="🖼️" variant="accent" hint="Hero + slots" />
             <KpiCard label="Slots en esta página" value={activeVisual.slots.length} icon="📷" hint={activeVisualMeta.label} />
@@ -337,6 +395,28 @@ export default function StudioPagesPage() {
               value={activeVisual.heroDesktopUrl ? "✓" : "—"}
               icon="🖥️"
               hint={studioImageHintLine(STUDIO_IMAGE_SPECS.pageHeroDesktop)}
+            />
+          </>
+        ) : (
+          <>
+            <KpiCard label="Páginas SEO" value={PAGE_SEO_KEYS.length} icon="🔍" variant="accent" hint="Title + OG" />
+            <KpiCard
+              label="Title"
+              value={activeSeo.title.length}
+              icon="🔤"
+              hint="Caracteres (ideal ≤60)"
+            />
+            <KpiCard
+              label="Description"
+              value={activeSeo.description.length}
+              icon="📝"
+              hint="Ideal 140–160"
+            />
+            <KpiCard
+              label="OG image"
+              value={activeSeo.ogImageUrl ? "✓" : "—"}
+              icon="🖼️"
+              hint={studioImageHintLine(STUDIO_IMAGE_SPECS.ogSocial)}
             />
           </>
         )}
@@ -376,6 +456,9 @@ export default function StudioPagesPage() {
         <button type="button" onClick={() => setMode("imagenes")} style={modeBtn(mode === "imagenes")}>
           Imágenes
         </button>
+        <button type="button" onClick={() => setMode("seo")} style={modeBtn(mode === "seo")}>
+          SEO
+        </button>
       </div>
 
       {mode === "textos" && (
@@ -403,6 +486,21 @@ export default function StudioPagesPage() {
               style={tabBtn(activeVisualTab === tab.id)}
             >
               {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {mode === "seo" && (
+        <div style={{ display: "flex", gap: 8, padding: "0 24px 4px", flexWrap: "wrap" }}>
+          {PAGE_SEO_KEYS.map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setActiveSeoTab(key)}
+              style={tabBtn(activeSeoTab === key)}
+            >
+              {PAGE_SEO_META[key].label}
             </button>
           ))}
         </div>
@@ -760,6 +858,152 @@ export default function StudioPagesPage() {
                 No hay slots en esta página. Usa «Añadir slot» para crear uno.
               </div>
             )}
+          </div>
+        </Section>
+      )}
+
+      {mode === "seo" && (
+        <Section
+          title={`SEO · ${activeSeoMeta.label}`}
+          subtitle={`Ruta pública: ${activeSeoMeta.path}. Title + description + Open Graph. Guarda y espera ~5 min (ISR).`}
+        >
+          <div style={{ display: "grid", gap: 16, maxWidth: 720 }}>
+            <div
+              style={{
+                padding: "12px 14px",
+                borderRadius: 10,
+                border: "1px solid var(--border)",
+                background: "var(--surface-2, var(--surface))",
+                fontSize: 12.5,
+                lineHeight: 1.55,
+                color: "var(--text-secondary)",
+              }}
+            >
+              <strong style={{ color: "var(--text-primary)" }}>Vista Google</strong>
+              <div style={{ marginTop: 8, fontFamily: "Arial, sans-serif" }}>
+                <div style={{ color: "#1a0dab", fontSize: 18, lineHeight: 1.3 }}>
+                  {activeSeo.title || "Título de la página"}
+                </div>
+                <div style={{ color: "#006621", fontSize: 13, marginTop: 2 }}>
+                  nexara.com.mx{activeSeoMeta.path === "/" ? "" : activeSeoMeta.path}
+                </div>
+                <div style={{ color: "#545454", fontSize: 13, marginTop: 4 }}>
+                  {activeSeo.description || "Meta description…"}
+                </div>
+              </div>
+            </div>
+
+            <div style={card}>
+              <label style={lbl}>
+                Title ({activeSeo.title.length}/60)
+                {activeSeo.title.length > 60 && (
+                  <span style={{ color: "var(--warning)", marginLeft: 8 }}>largo para SERP</span>
+                )}
+              </label>
+              <input
+                style={inp}
+                value={activeSeo.title}
+                onChange={(e) => patchSeo(activeSeoTab, { title: e.target.value })}
+                placeholder="Título que aparece en Google"
+              />
+            </div>
+
+            <div style={card}>
+              <label style={lbl}>
+                Meta description ({activeSeo.description.length}/160)
+                {activeSeo.description.length > 160 && (
+                  <span style={{ color: "var(--warning)", marginLeft: 8 }}>puede truncarse</span>
+                )}
+              </label>
+              <textarea
+                style={{ ...inp, minHeight: 88, resize: "vertical" }}
+                value={activeSeo.description}
+                onChange={(e) => patchSeo(activeSeoTab, { description: e.target.value })}
+                placeholder="Resumen persuasivo para el resultado de búsqueda"
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={card}>
+                <label style={lbl}>OG title (opcional)</label>
+                <input
+                  style={inp}
+                  value={activeSeo.ogTitle}
+                  onChange={(e) => patchSeo(activeSeoTab, { ogTitle: e.target.value })}
+                  placeholder="Si vacío → usa Title"
+                />
+              </div>
+              <div style={card}>
+                <label style={lbl}>Keywords (coma)</label>
+                <input
+                  style={inp}
+                  value={activeSeo.keywords}
+                  onChange={(e) => patchSeo(activeSeoTab, { keywords: e.target.value })}
+                  placeholder="cctv Puebla, redes, soporte TI"
+                />
+              </div>
+            </div>
+
+            <div style={card}>
+              <label style={lbl}>OG description (opcional)</label>
+              <textarea
+                style={{ ...inp, minHeight: 64, resize: "vertical" }}
+                value={activeSeo.ogDescription}
+                onChange={(e) => patchSeo(activeSeoTab, { ogDescription: e.target.value })}
+                placeholder="Si vacío → usa meta description"
+              />
+            </div>
+
+            <div style={card}>
+              <label style={lbl}>
+                Imagen Open Graph · {STUDIO_IMAGE_SPECS.ogSocial.width}×{STUDIO_IMAGE_SPECS.ogSocial.height}
+              </label>
+              <input
+                style={inp}
+                value={activeSeo.ogImageUrl}
+                onChange={(e) => patchSeo(activeSeoTab, { ogImageUrl: e.target.value })}
+                placeholder="/logo-nexara-lockup.png o URL subida"
+              />
+              <StudioFileInput
+                spec={STUDIO_IMAGE_SPECS.ogSocial}
+                label="Subir imagen OG"
+                inputStyle={inp}
+                onChange={(file) =>
+                  handleUpload(`seo-${activeSeoTab}-og`, file, (url) =>
+                    patchSeo(activeSeoTab, { ogImageUrl: url }),
+                  )
+                }
+                onError={(msg) => toast.error(msg)}
+              />
+              <ImagePreview url={activeSeo.ogImageUrl} alt={activeSeo.ogTitle || activeSeo.title} />
+            </div>
+
+            <label
+              style={{
+                ...card,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={activeSeo.noIndex}
+                onChange={(e) => patchSeo(activeSeoTab, { noIndex: e.target.checked })}
+              />
+              <span style={{ fontSize: 13 }}>
+                <strong>noindex</strong> — no mostrar esta página en Google (útil para hubs duplicados)
+              </span>
+            </label>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => patchSeo(activeSeoTab, { ...DEFAULT_PAGE_SEO[activeSeoTab] })}
+            >
+              Restaurar defaults NEXARA
+            </Button>
           </div>
         </Section>
       )}

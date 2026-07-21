@@ -6,12 +6,6 @@ import EditorialImage from "../../components/EditorialImage";
 import heroStyles from "../../components/PublicPageHero.module.css";
 import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
 
-export const metadata = {
-  title: "Soluciones por industria | Nexara",
-  description:
-    "Soluciones Nexara por vertical: retail, manufactura, hospitalidad, salud, educación y gobierno.",
-};
-
 export const dynamic = "force-dynamic";
 
 const industrias = [

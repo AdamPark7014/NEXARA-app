@@ -37,6 +37,25 @@ export default function PublicPageHero({
       className={`${styles.hero} ${compact ? styles.compact : ""}`}
       aria-label={eyebrow}
     >
+      {/* Preload LCP: desktop + móvil (el navegador elige por media) */}
+      {imageSrc ? (
+        <link
+          rel="preload"
+          as="image"
+          href={imageSrc}
+          media="(min-width: 768px)"
+          fetchPriority="high"
+        />
+      ) : null}
+      {mobileSrc ? (
+        <link
+          rel="preload"
+          as="image"
+          href={mobileSrc}
+          media="(max-width: 767px)"
+          fetchPriority="high"
+        />
+      ) : null}
       <div
         className={`${styles.media} ${styles.mediaDesktop}`}
         style={{ backgroundImage: `url("${imageSrc}")` }}

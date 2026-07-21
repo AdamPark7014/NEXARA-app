@@ -108,6 +108,11 @@ export class NewsController {
     }
   }
 
+  @Get('by-slug/:slug')
+  findBySlug(@Param('slug') slug: string) {
+    return this.newsService.findBySlug(slug, { includeDrafts: false });
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.newsService.findOne(id, { includeDrafts: false });

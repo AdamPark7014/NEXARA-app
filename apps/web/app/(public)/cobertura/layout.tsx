@@ -1,14 +1,9 @@
 import type { Metadata } from "next";
+import { buildStudioPageMetadata } from "@/lib/page-seo";
 
-export const metadata: Metadata = {
-  title: "Cobertura y clientes",
-  description:
-    "Cobertura de proyectos NEXARA y referencias de clientes en México: CCTV, cómputo, redes y soporte TI.",
-  alternates: {
-    canonical: "/cobertura",
-  },
-  robots: { index: true, follow: true },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildStudioPageMetadata("cobertura");
+}
 
 export default function CoberturaLayout({ children }: { children: React.ReactNode }) {
   return children;

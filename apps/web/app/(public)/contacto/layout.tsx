@@ -1,14 +1,9 @@
 import type { Metadata } from "next";
+import { buildStudioPageMetadata } from "@/lib/page-seo";
 
-export const metadata: Metadata = {
-  title: "Contacto",
-  description:
-    "Contacta a NEXARA para cotizaciones, soporte TI, CCTV, redes y proyectos tecnológicos en Puebla, CDMX y México.",
-  alternates: {
-    canonical: "/contacto",
-  },
-  robots: { index: true, follow: true },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return buildStudioPageMetadata("contacto");
+}
 
 export const dynamic = "force-dynamic";
 

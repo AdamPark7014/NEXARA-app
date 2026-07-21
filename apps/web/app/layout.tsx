@@ -44,6 +44,9 @@ const jetbrainsMono = JetBrains_Mono({
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "";
+const googleSiteVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim() || "";
+const bingSiteVerification = process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION?.trim() || "";
+const defaultOgImage = "/logo-nexara-lockup.png";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -95,7 +98,7 @@ export const metadata: Metadata = {
       "Camaras CCTV, equipo de computo, redes WiFi, soporte TI y ERP industrial para empresas en Puebla, CDMX y Mexico.",
     images: [
       {
-        url: "/logo-nexara.png",
+        url: defaultOgImage,
         width: 1200,
         height: 630,
         alt: "NEXARA",
@@ -107,7 +110,7 @@ export const metadata: Metadata = {
     title: "NEXARA | CCTV, Computo, Redes y Soluciones TI en Mexico",
     description:
       "Camaras CCTV, equipo de computo, redes WiFi, soporte TI y ERP industrial para empresas en Puebla, CDMX y Mexico.",
-    images: ["/logo-nexara.png"],
+    images: [defaultOgImage],
   },
   robots: {
     index: true,
@@ -121,10 +124,16 @@ export const metadata: Metadata = {
     },
   },
   category: "technology",
-  other: {
-    "google-site-verification": process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
-    "msvalidate.01": process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION || "",
-  },
+  ...(googleSiteVerification || bingSiteVerification
+    ? {
+        verification: {
+          ...(googleSiteVerification ? { google: googleSiteVerification } : {}),
+          ...(bingSiteVerification
+            ? { other: { "msvalidate.01": bingSiteVerification } }
+            : {}),
+        },
+      }
+    : {}),
 };
 
 export const viewport: Viewport = {
@@ -145,7 +154,7 @@ export default function RootLayout({
     "@type": "Organization",
     name: "NEXARA",
     url: siteUrl,
-    logo: `${siteUrl}/logo-nexara.png`,
+    logo: `${siteUrl}/logo-nexara-lockup.png`,
     description:
       "NEXARA — Camaras CCTV, equipo de computo, redes WiFi, soporte TI y ERP industrial para empresas en Mexico.",
     contactPoint: {
@@ -164,7 +173,7 @@ export default function RootLayout({
     description:
       "Camaras CCTV, equipo de computo, redes WiFi, soporte TI y ERP industrial para empresas en Puebla, CDMX y toda la Republica Mexicana.",
     url: siteUrl,
-    image: `${siteUrl}/logo-nexara.png`,
+    image: `${siteUrl}/logo-nexara-lockup.png`,
     telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "",
     email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || "",
     address: {
@@ -202,6 +211,15 @@ export default function RootLayout({
     },
   };
 
+  const websiteJson = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "NEXARA",
+    url: siteUrl,
+    inLanguage: "es-MX",
+    publisher: { "@type": "Organization", name: "NEXARA", url: siteUrl },
+  };
+
   return (
     <html
       lang="es-MX"
@@ -218,6 +236,10 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJson) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJson) }}
         />
 
         <Providers>
