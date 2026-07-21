@@ -144,6 +144,13 @@ const nextConfig = {
       { source: "/cctv-cholula", destination: "/cobertura/cholula/camaras-cctv", permanent: true },
       { source: "/cctv-queretaro", destination: "/cobertura/queretaro/camaras-cctv", permanent: true },
       { source: "/cctv-monterrey", destination: "/cobertura/monterrey/camaras-cctv", permanent: true },
+      { source: "/cctv-guadalajara", destination: "/cobertura/guadalajara/camaras-cctv", permanent: true },
+      { source: "/cctv-cancun", destination: "/cobertura/cancun/camaras-cctv", permanent: true },
+      { source: "/cctv-leon", destination: "/cobertura/leon/camaras-cctv", permanent: true },
+      { source: "/cctv-tlaxcala", destination: "/cobertura/tlaxcala/camaras-cctv", permanent: true },
+      { source: "/wifi-empresarial-cdmx", destination: "/cobertura/cdmx/redes-y-conectividad", permanent: true },
+      { source: "/computo-puebla", destination: "/cobertura/puebla/equipo-de-computo", permanent: true },
+      { source: "/computo-cdmx", destination: "/cobertura/cdmx/equipo-de-computo", permanent: true },
     ];
   },
 

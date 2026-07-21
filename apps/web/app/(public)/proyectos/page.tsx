@@ -246,6 +246,18 @@ export default async function ProyectosPage() {
         </div>
       </section>
 
+      <section className={shared.section} data-reveal="up">
+        <div className={shared.inner}>
+          <SeoInterlinkHub
+            title="De caso a cotización"
+            subtitle="Si tu vertical o ciudad ya está en estas rutas, entra directo a la landing y agenda diagnóstico."
+            currentPath="/proyectos"
+            maxIndustries={4}
+            maxServicesPerIndustry={2}
+          />
+        </div>
+      </section>
+
       <section className={shared.sectionTight} data-reveal="up">
         <div className={shared.inner}>
           <div className={shared.ctaBand}>
@@ -258,8 +270,21 @@ export default async function ProyectosPage() {
               <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
                 Iniciar conversación <span className={shared.btnArrow}>→</span>
               </Link>
-              <Link href="/soluciones" className={`${shared.btn} ${shared.btnSecondary}`}>
-                Ver industrias
+              <a
+                href={buildWhatsAppLeadUrl({
+                  industryName: "mi empresa",
+                  serviceName: "CCTV, redes o soporte",
+                  path: "/proyectos",
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${shared.btn} ${shared.btnSecondary}`}
+                data-track-conversion="proyectos_wa"
+              >
+                WhatsApp
+              </a>
+              <Link href="/cobertura/puebla/camaras-cctv" className={`${shared.btn} ${shared.btnSecondary}`}>
+                CCTV Puebla
               </Link>
             </div>
           </div>
