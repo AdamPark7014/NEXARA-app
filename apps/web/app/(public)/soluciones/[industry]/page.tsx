@@ -6,6 +6,8 @@ import styles from "./page.module.css";
 import PublicPageHero from "../../../components/PublicPageHero";
 import heroStyles from "../../../components/PublicPageHero.module.css";
 import { findIndustryLanding, getProgrammaticLandings } from "@/lib/seo/programmatic-landings";
+import { buildWhatsAppLeadUrl, MONEY_SERVICE_SLUGS } from "@/lib/seo/money-pages";
+import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 
 type Params = { industry: string };
 
@@ -144,16 +146,33 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
     return { title: "Soluciones | Nexara", robots: { index: false, follow: false } };
   }
   const path = `/soluciones/${params.industry}`;
+  const title = `${hub.name}: CCTV, redes y soporte TI en México | NEXARA`;
+  const description = `${hub.lead} Cotiza soluciones Nexara para ${hub.name} en Puebla, CDMX y cobertura nacional.`;
   return {
-    title: `${hub.name} | Soluciones Nexara`,
-    description: hub.lead,
+    title: { absolute: title },
+    description,
+    keywords: [
+      `${hub.name} CCTV`,
+      `redes ${hub.name}`,
+      `soporte TI ${hub.name}`,
+      `tecnologia ${hub.name} Mexico`,
+      "Nexara",
+    ],
     alternates: { canonical: path },
     openGraph: {
       type: "website",
+      locale: "es_MX",
       url: `${siteUrl}${path}`,
-      title: `${hub.name} | Nexara`,
-      description: hub.lead,
+      siteName: "NEXARA",
+      title,
+      description,
       images: [{ url: hub.image, width: 1200, height: 630, alt: hub.name }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [hub.image],
     },
   };
 }
@@ -165,9 +184,20 @@ export default function IndustryHubPage({ params }: { params: Params }) {
   const seoIndustry = findIndustryLanding(params.industry);
   const relatedLandings = getProgrammaticLandings()
     .filter((item) => item.industry.slug === params.industry)
-    .slice(0, 6);
+    .sort((a, b) => {
+      const ai = (MONEY_SERVICE_SLUGS as readonly string[]).indexOf(a.service.slug);
+      const bi = (MONEY_SERVICE_SLUGS as readonly string[]).indexOf(b.service.slug);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    })
+    .slice(0, 8);
 
   const outcomes = seoIndustry?.outcomes?.length ? seoIndustry.outcomes : hub.focus.slice(0, 3);
+  const waHref = buildWhatsAppLeadUrl({
+    industryName: hub.name,
+    serviceName: "soluciones tecnológicas",
+    path: `/soluciones/${params.industry}`,
+  });
+  const contactoHref = `/contacto?industry=${params.industry}`;
 
   return (
     <main className={`${shared.page} home-main-flush`} aria-label={`Soluciones ${hub.name}`}>
@@ -182,6 +212,26 @@ export default function IndustryHubPage({ params }: { params: Params }) {
         lead={hub.lead}
         imageSrc={hub.image}
         imageAlt={`Soluciones Nexara para ${hub.name}`}
+        actions={
+          <div className={styles.heroActions}>
+            <Link
+              href={contactoHref}
+              className={`${shared.btn} ${shared.btnPrimary}`}
+              data-track-conversion="industry_hub_hero_cta"
+            >
+              Cotizar {hub.name} <span className={shared.btnArrow}>→</span>
+            </Link>
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${shared.btn} ${shared.btnSecondary}`}
+              data-track-conversion="industry_hub_whatsapp"
+            >
+              WhatsApp
+            </a>
+          </div>
+        }
       />
 
       <section className={shared.section} data-reveal="up">
@@ -261,13 +311,21 @@ export default function IndustryHubPage({ params }: { params: Params }) {
                 >
                   <h3 className={shared.industryCellTitle}>{item.service.name}</h3>
                   <p className={shared.industryCellText}>{item.service.summary}</p>
-                  <span className={shared.industryCellLink}>Ver detalle →</span>
+                  <span className={shared.industryCellLink}>Cotizar →</span>
                 </Link>
               ))}
             </div>
           </div>
         </section>
       ) : null}
+
+      <SeoInterlinkHub
+        title={`Más rutas cerca de ${hub.name}`}
+        subtitle="CCTV, redes y soporte con enlaces listos para indexar."
+        currentPath={`/soluciones/${params.industry}`}
+        maxIndustries={4}
+        maxServicesPerIndustry={3}
+      />
 
       <section className={shared.sectionTight} data-reveal="up">
         <div className={shared.inner}>
@@ -279,15 +337,21 @@ export default function IndustryHubPage({ params }: { params: Params }) {
             </p>
             <div className={shared.ctaActions}>
               <Link
-                href={`/contacto?industry=${params.industry}`}
+                href={contactoHref}
                 className={`${shared.btn} ${shared.btnPrimary}`}
                 data-track-conversion="industry_hub_cta"
               >
                 Hablar con un especialista <span className={shared.btnArrow}>→</span>
               </Link>
-              <Link href="/soluciones" className={`${shared.btn} ${shared.btnSecondary}`}>
-                Todas las industrias
-              </Link>
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${shared.btn} ${shared.btnSecondary}`}
+                data-track-conversion="industry_hub_footer_wa"
+              >
+                WhatsApp
+              </a>
             </div>
           </div>
         </div>

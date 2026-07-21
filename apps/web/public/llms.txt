@@ -8,6 +8,8 @@
 - https://nexara.com.mx/contacto (cotización / leads)
 - https://nexara.com.mx/proyectos (casos)
 - https://nexara.com.mx/cobertura (cobertura geográfica)
+- https://nexara.com.mx/cobertura/puebla
+- https://nexara.com.mx/cobertura/cdmx
 - https://nexara.com.mx/soluciones/retail/camaras-cctv
 - https://nexara.com.mx/soluciones/manufactura/redes-y-conectividad
 - https://nexara.com.mx/soluciones/pymes-y-startups/soporte-ti-pyme

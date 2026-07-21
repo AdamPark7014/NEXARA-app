@@ -125,3 +125,30 @@
 :global(body.dark) .textLink:hover {
   color: color-mix(in srgb, var(--primary) 92%, #eafffb);
 }
+
+.columnTitleLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.columnTitleLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.footerCta {
+  margin: 4px 0 0;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.ctaLink {
+  color: color-mix(in srgb, var(--primary) 90%, var(--foreground));
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.ctaLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

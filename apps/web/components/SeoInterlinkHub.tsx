@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getProgrammaticLandings, INDUSTRY_LANDINGS } from "@/lib/seo/programmatic-landings";
+import { MONEY_SERVICE_SLUGS } from "@/lib/seo/money-pages";
 import styles from "./SeoInterlinkHub.module.css";
 
 type SeoInterlinkHubProps = {
@@ -11,6 +12,11 @@ type SeoInterlinkHubProps = {
   maxServicesPerIndustry?: number;
 };
 
+function moneyRank(serviceSlug: string): number {
+  const idx = (MONEY_SERVICE_SLUGS as readonly string[]).indexOf(serviceSlug);
+  return idx === -1 ? 99 : idx;
+}
+
 export default function SeoInterlinkHub({
   title = "Rutas recomendadas",
   subtitle,
@@ -19,11 +25,13 @@ export default function SeoInterlinkHub({
   maxIndustries = 6,
   maxServicesPerIndustry = 3,
 }: SeoInterlinkHubProps) {
-  const flat = getProgrammaticLandings().map(({ industry, service }) => ({
-    href: `/soluciones/${industry.slug}/${service.slug}`,
-    industry,
-    service,
-  }));
+  const flat = getProgrammaticLandings()
+    .map(({ industry, service }) => ({
+      href: `/soluciones/${industry.slug}/${service.slug}`,
+      industry,
+      service,
+    }))
+    .sort((a, b) => moneyRank(a.service.slug) - moneyRank(b.service.slug));
 
   const filtered = flat.filter((item) => item.href !== currentPath);
 
@@ -51,19 +59,7 @@ export default function SeoInterlinkHub({
     .map((slug) => {
       const group = byIndustry.get(slug);
       if (!group) return null;
-      const items = group.items;
-      const n = items.length;
-      const cap = maxServicesPerIndustry;
-      let links: typeof items;
-      if (n === 0) {
-        links = [];
-      } else if (n <= cap) {
-        links = items;
-      } else {
-        const idx = Math.max(0, order.indexOf(slug));
-        const start = (idx * 3) % n;
-        links = [...items.slice(start), ...items.slice(0, start)].slice(0, cap);
-      }
+      const links = group.items.slice(0, maxServicesPerIndustry);
       return {
         industry: group.industry,
         links,
@@ -97,7 +93,11 @@ export default function SeoInterlinkHub({
       <div className={styles.columns}>
         {columns.map(({ industry, links }) => (
           <div key={industry.slug} className={styles.column}>
-            <h3 className={styles.columnTitle}>{industry.name}</h3>
+            <h3 className={styles.columnTitle}>
+              <Link href={`/soluciones/${industry.slug}`} className={styles.columnTitleLink}>
+                {industry.name}
+              </Link>
+            </h3>
             <ul className={styles.linkList}>
               {links.map((item) => (
                 <li key={item.href}>
@@ -110,6 +110,20 @@ export default function SeoInterlinkHub({
           </div>
         ))}
       </div>
+
+      <p className={styles.footerCta}>
+        <Link href="/contacto" className={styles.ctaLink}>
+          Cotizar con un especialista →
+        </Link>
+        {" · "}
+        <Link href="/cobertura/puebla" className={styles.ctaLink}>
+          Cobertura Puebla
+        </Link>
+        {" · "}
+        <Link href="/cobertura/cdmx" className={styles.ctaLink}>
+          CDMX
+        </Link>
+      </p>
     </section>
   );
 }
