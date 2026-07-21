@@ -7,6 +7,7 @@ import {
   getProgrammaticLandings,
 } from "@/lib/seo/programmatic-landings";
 import { getPageKeywords, categoryFromSlug } from "@/lib/seo/keywords";
+import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { getSolucionHeroImage } from "../../solucionesLandingImagery";
 import shared from "../../../_shared/public.module.css";
 import PublicPageHero from "../../../../components/PublicPageHero";
@@ -20,7 +21,7 @@ type Params = {
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 
-export const revalidate = 3600;
+export const revalidate = 1800;
 
 export function generateStaticParams() {
   return getProgrammaticLandings().map(({ industry, service }) => ({
@@ -41,15 +42,15 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
   }
 
   const path = `/soluciones/${industry.slug}/${service.slug}`;
-  const title = `${service.name} en Puebla y Mexico | Nexara`;
-  const description = `${service.summary} Servicio profesional en Puebla, CDMX y toda la Republica Mexicana. Nexara — tecnologia confiable para tu empresa.`;
+  const title = `${service.name} para ${industry.name} en Puebla y CDMX | NEXARA`;
+  const description = `Cotiza ${service.name} para ${industry.name}: ${service.summary} Instalación y soporte en Puebla, CDMX y toda México. Respuesta en horario laboral.`;
   const ogImage = getSolucionHeroImage(service.slug);
 
   const category = categoryFromSlug(service.slug);
   const pageKeywords = getPageKeywords(category, "Puebla");
 
   return {
-    title,
+    title: { absolute: title },
     description,
     keywords: [
       ...pageKeywords,
@@ -57,13 +58,17 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
       `${service.name} Puebla`,
       `${service.name} CDMX`,
       `${service.name} Mexico`,
+      `cotizar ${service.name}`,
+      `precio ${service.name} Puebla`,
       `soluciones TI para ${industry.name}`,
       "Nexara",
     ],
     alternates: { canonical: path },
     openGraph: {
       type: "website",
+      locale: "es_MX",
       url: `${siteUrl}${path}`,
+      siteName: "NEXARA",
       title,
       description,
       images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
@@ -77,6 +82,27 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
   };
 }
 
+function buildFaqs(industryName: string, serviceName: string) {
+  return [
+    {
+      q: `¿Cuánto cuesta ${serviceName} para ${industryName}?`,
+      a: `Depende del tamaño del sitio, el alcance y el SLA. En Nexara armamos una propuesta por fases con precios claros — sin alcance abierto. Agenda un diagnóstico y te damos rango realista en la primera llamada.`,
+    },
+    {
+      q: `¿Instalan ${serviceName} en Puebla y CDMX?`,
+      a: `Sí. Operamos con base en Puebla y Ciudad de México, con cobertura a toda la República según urgencia y contrato. Levantamos sitio, instalamos y dejamos operación documentada.`,
+    },
+    {
+      q: `¿Cuánto tarda la implementación de ${serviceName}?`,
+      a: `Proyectos típicos van de días a pocas semanas según complejidad. Cerramos alcance, calendario y entregables antes de iniciar — para que tu operación de ${industryName} no quede a medias.`,
+    },
+    {
+      q: `¿Incluyen soporte después de instalar?`,
+      a: `Sí. Nexara no solo instala: dejamos soporte, mantenimiento y mesa de ayuda bajo el mismo contrato cuando lo necesitas. Una sola firma responsable.`,
+    },
+  ];
+}
+
 export default function ProgrammaticLandingPage({ params }: { params: Params }) {
   const industry = findIndustryLanding(params.industry);
   const service = findServiceLanding(params.service);
@@ -87,6 +113,13 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
 
   const landingPath = `/soluciones/${industry.slug}/${service.slug}`;
   const heroImage = getSolucionHeroImage(service.slug);
+  const contactoHref = `/contacto?industry=${industry.slug}&service=${service.slug}`;
+  const waHref = buildWhatsAppLeadUrl({
+    industryName: industry.name,
+    serviceName: service.name,
+    path: landingPath,
+  });
+  const faqs = buildFaqs(industry.name, service.name);
 
   const related = getProgrammaticLandings()
     .filter((item) => item.industry.slug === industry.slug || item.service.slug === service.slug)
@@ -98,17 +131,36 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
     "@type": "Service",
     name: `${service.name} para ${industry.name}`,
     serviceType: service.name,
-    areaServed: "MX",
+    description: service.summary,
+    areaServed: [
+      { "@type": "City", name: "Puebla" },
+      { "@type": "City", name: "Ciudad de México" },
+      { "@type": "Country", name: "Mexico" },
+    ],
     url: `${siteUrl}${landingPath}`,
-    image: heroImage,
+    image: heroImage.startsWith("http") ? heroImage : `${siteUrl}${heroImage}`,
     provider: {
-      "@type": "Organization",
+      "@type": "LocalBusiness",
       name: "NEXARA",
       url: siteUrl,
+      telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "+52-222-696-0350",
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: "Puebla",
+        addressRegion: "Puebla",
+        addressCountry: "MX",
+      },
     },
     audience: {
       "@type": "BusinessAudience",
       audienceType: industry.name,
+    },
+    offers: {
+      "@type": "Offer",
+      url: `${siteUrl}${contactoHref}`,
+      availability: "https://schema.org/InStock",
+      priceCurrency: "MXN",
+      description: `Cotización de ${service.name} para ${industry.name} — diagnóstico sin compromiso.`,
     },
   };
 
@@ -133,6 +185,16 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
     ],
   };
 
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: { "@type": "Answer", text: item.a },
+    })),
+  };
+
   return (
     <main
       className={`${shared.page} home-main-flush`}
@@ -143,6 +205,7 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
 
       <PublicPageHero
         eyebrow={`${industry.name} · ${service.name}`}
@@ -154,7 +217,29 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
         }
         lead={`${industry.painPoint} ${service.summary}`}
         imageSrc={heroImage}
-        imageAlt={`${service.name} — referencia visual`}
+        imageAlt={`${service.name} para ${industry.name} — Nexara Puebla y CDMX`}
+        actions={
+          <div className={styles.heroActions}>
+            <Link
+              href={contactoHref}
+              data-track-conversion="landing_hero_contact"
+              data-landing-path={landingPath}
+              className={`${shared.btn} ${shared.btnPrimary}`}
+            >
+              Cotizar ahora <span className={shared.btnArrow}>→</span>
+            </Link>
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-track-conversion="landing_hero_whatsapp"
+              data-landing-path={landingPath}
+              className={`${shared.btn} ${shared.btnSecondary}`}
+            >
+              WhatsApp
+            </a>
+          </div>
+        }
       />
 
       <nav className={styles.breadcrumbBar} aria-label="Ruta de navegación">
@@ -210,8 +295,27 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
         </div>
       </section>
 
+      <section className={shared.section} data-reveal="up" id="faq">
+        <div className={shared.inner}>
+          <header className={shared.sectionHead}>
+            <p className={shared.eyebrow}>Preguntas frecuentes</p>
+            <h2 className={shared.sectionTitle}>
+              Antes de <span className={shared.sectionTitleAccent}>cotizar</span>
+            </h2>
+          </header>
+          <div className={styles.faqList}>
+            {faqs.map((item) => (
+              <details key={item.q} className={styles.faqItem}>
+                <summary className={styles.faqQuestion}>{item.q}</summary>
+                <p className={styles.faqAnswer}>{item.a}</p>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {related.length > 0 ? (
-        <section className={shared.section} data-reveal="up">
+        <section className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
           <div className={shared.inner}>
             <header className={shared.sectionHead}>
               <p className={shared.eyebrow}>Relacionadas</p>
@@ -239,26 +343,33 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
       <section className={shared.sectionTight} data-reveal="up">
         <div className={shared.inner}>
           <div className={shared.ctaBand}>
-            <p className={shared.ctaEyebrow}>Propuesta</p>
-            <h2 className={shared.ctaTitle}>Para {industry.name}</h2>
+            <p className={shared.ctaEyebrow}>Siguiente paso</p>
+            <h2 className={shared.ctaTitle}>
+              Cotiza {service.name} para {industry.name}
+            </h2>
             <p className={shared.ctaLead}>
-              Te armamos una ruta por fases con objetivos medibles para tu operación.
+              Diagnóstico corto: te decimos qué instalar, qué posponer y qué presupuesto tiene sentido —
+              en Puebla, CDMX o donde operes.
             </p>
             <div className={shared.ctaActions}>
               <Link
-                href={`/contacto?industry=${industry.slug}&service=${service.slug}`}
+                href={contactoHref}
                 data-track-conversion="landing_primary_cta"
                 data-landing-path={landingPath}
                 className={`${shared.btn} ${shared.btnPrimary}`}
               >
                 Hablar con un especialista <span className={shared.btnArrow}>→</span>
               </Link>
-              <Link
-                href={`/soluciones/${industry.slug}`}
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-track-conversion="landing_whatsapp_cta"
+                data-landing-path={landingPath}
                 className={`${shared.btn} ${shared.btnSecondary}`}
               >
-                Volver a {industry.name}
-              </Link>
+                WhatsApp inmediato
+              </a>
             </div>
           </div>
         </div>
