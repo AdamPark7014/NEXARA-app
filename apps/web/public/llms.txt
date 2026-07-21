@@ -10,9 +10,18 @@
 - https://nexara.com.mx/cobertura (cobertura geográfica)
 - https://nexara.com.mx/cobertura/puebla
 - https://nexara.com.mx/cobertura/cdmx
+- https://nexara.com.mx/cobertura/puebla/camaras-cctv
+- https://nexara.com.mx/cobertura/cdmx/camaras-cctv
+- https://nexara.com.mx/cobertura/puebla/redes-y-conectividad
+- https://nexara.com.mx/cobertura/cdmx/soporte-ti-pyme
 - https://nexara.com.mx/soluciones/retail/camaras-cctv
 - https://nexara.com.mx/soluciones/manufactura/redes-y-conectividad
 - https://nexara.com.mx/soluciones/pymes-y-startups/soporte-ti-pyme
+
+Aliases útiles (redirigen a canónicas):
+- https://nexara.com.mx/cctv-puebla
+- https://nexara.com.mx/cctv-cdmx
+- https://nexara.com.mx/soporte-ti-puebla
 
 Contacto comercial: https://nexara.com.mx/contacto
 WhatsApp: https://wa.me/522226960350

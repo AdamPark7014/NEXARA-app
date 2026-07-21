@@ -8,6 +8,8 @@ import PublicPageHero from "../../components/PublicPageHero";
 import heroStyles from "../../components/PublicPageHero.module.css";
 import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
+import SeoInterlinkHub from "@/components/SeoInterlinkHub";
+import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("proyectos");
@@ -86,14 +88,39 @@ function normalizeProjectImageUrl(imageUrl?: string | null): string {
   if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) return imageUrl;
   const origin = getApiAssetOrigin();
   if (imageUrl.startsWith("/")) {
-    if (imageUrl.startsWith("/projects/image/")) return `${origin}${imageUrl}`;
+    if (imageUrl.startsWith("/projects/image/") || imageUrl.startsWith("/case-studies/image/")) {
+      return `${origin}${imageUrl}`;
+    }
     return imageUrl;
   }
-  return `${origin}/projects/image/${imageUrl}`;
+  return `${origin}/case-studies/image/${imageUrl}`;
 }
 
 async function fetchStudioProjects(): Promise<StudioProject[]> {
   try {
+    // Preferir casos de Studio (CaseStudy publicados); fallback a catálogo Project
+    const casesRes = await fetch(buildApiUrl("case-studies/public?limit=12"), { cache: "no-store" });
+    if (casesRes.ok) {
+      const payload = (await casesRes.json()) as any[] | { data?: any[] };
+      const rows = Array.isArray(payload) ? payload : Array.isArray(payload.data) ? payload.data : [];
+      if (rows.length) {
+        return rows.map((c) => ({
+          id: c.id,
+          slug: c.slug,
+          title: c.titulo,
+          sector: c.vertical || "Proyecto",
+          summary: c.descripcion || c.impacto || "",
+          impact: c.impacto || "",
+          services: [],
+          tags: c.cliente ? [c.cliente] : [],
+          highlights: c.impacto ? [c.impacto] : [],
+          gallery: [],
+          mainImage: c.imageUrl || c.cover || null,
+          createdAt: c.createdAt,
+        }));
+      }
+    }
+
     const res = await fetch(buildApiUrl("projects?limit=12"), { cache: "no-store" });
     if (!res.ok) return [];
     const payload = (await res.json()) as StudioProject[] | { data?: StudioProject[] };

@@ -934,7 +934,7 @@ const CRM_SALES_COPY: Record<CrmSalesModule, { manager: { title: string; subtitl
     rep: { title: 'Mi agenda', subtitle: 'Tus llamadas, visitas y seguimientos pendientes.' },
   },
   clients: {
-    manager: { title: 'Clientes', subtitle: 'Cartera de cuentas y contactos del equipo.' },
+    manager: { title: 'Clientes comerciales', subtitle: 'Cartera CRM. Al crear se provisiona automáticamente el cliente operativo.' },
     rep: { title: 'Mis clientes', subtitle: 'Cuentas y contactos que gestionas.' },
   },
     quotes: {
@@ -1446,7 +1446,7 @@ const OPS_TEAM_COPY: Record<OpsTeamModule, { title: string; subtitle: string }> 
   projects: { title: 'Proyectos OPS', subtitle: 'Proyectos de implementación y entrega en sitio.' },
   maintenance: { title: 'Mantenimiento', subtitle: 'Órdenes de mantenimiento preventivo y correctivo.' },
   'maintenance-contracts': { title: 'Contratos de mantenimiento', subtitle: 'Acuerdos de servicio y SLA con clientes.' },
-  'service-clients': { title: 'Clientes de servicio', subtitle: 'Cuentas con contrato de soporte o mantenimiento.' },
+  'service-clients': { title: 'Clientes operativos', subtitle: 'Cuentas de campo/portal. Al crear se vinculan al cliente comercial CRM.' },
   assets: { title: 'Activos en campo', subtitle: 'Equipos instalados por cliente y sucursal.' },
   support: { title: 'Tickets de soporte', subtitle: 'Bandeja de solicitudes y escalaciones del equipo.' },
   'support-sla': { title: 'Cumplimiento de SLA', subtitle: 'Tiempo de respuesta y resolución — últimos 30 días.' },

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import shared from "../_shared/public.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
 import heroStyles from "../../components/PublicPageHero.module.css";
@@ -21,12 +22,14 @@ export default async function ContactoPage() {
             <span className={heroStyles.titleAccent}>proyecto</span>
           </>
         }
-        lead="Respuesta humana en horario laboral, normalmente en menos de 24 horas."
+        lead="Respuesta humana en horario laboral, normalmente en menos de 24 horas. Cotiza CCTV, redes o soporte en Puebla, CDMX y cobertura nacional."
         imageSrc={heroDesktop}
         imageSrcMobile={heroMobile}
         imageAlt={visuals.heroAlt}
       />
-      <ContactoClient visuals={visuals} />
+      <Suspense fallback={<div className={shared.inner} style={{ padding: 40 }}>Cargando formulario…</div>}>
+        <ContactoClient visuals={visuals} />
+      </Suspense>
     </main>
   );
 }

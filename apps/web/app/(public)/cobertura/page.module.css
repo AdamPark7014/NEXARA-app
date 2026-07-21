@@ -89,3 +89,69 @@
   line-height: 1.45;
   color: #9bb0cc;
 }
+
+.breadcrumbBar {
+  max-width: var(--nx-content-width, 1120px);
+  margin: 0 auto;
+  padding: 16px clamp(24px, 4vw, 48px) 0;
+}
+
+.breadcrumb {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 4px;
+  font-size: 0.8rem;
+  color: #6f85a5;
+}
+
+.breadcrumb li {
+  display: inline-flex;
+  align-items: center;
+}
+
+.breadcrumb li:not(:last-child)::after {
+  content: "/";
+  margin-left: 8px;
+  margin-right: 4px;
+  color: rgba(140, 190, 255, 0.35);
+}
+
+.breadcrumb a {
+  color: #9bb0cc;
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  color: #2dd8f2;
+}
+
+.breadcrumb li[aria-current="page"] {
+  color: #eef4ff;
+  font-weight: 500;
+}
+
+.serviceChipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.serviceChip {
+  display: inline-flex;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(140, 190, 255, 0.18);
+  color: #cfe0f7;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.serviceChip:hover {
+  border-color: rgba(45, 216, 242, 0.4);
+  color: #9fecfa;
+}

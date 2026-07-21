@@ -89,7 +89,7 @@ const ALL_SHORTCUTS: Record<string, { href: string; title: string; desc: string 
     { href: "/erp/hr/attendance", title: "Asistencia", desc: "Check-in y ubicaciones del equipo" },
     { href: "/erp/hr/fines", title: "Incidencias", desc: "Multas y faltas de asistencia" },
     { href: "/erp/hr/kpis", title: "KPIs del equipo", desc: "Desempeño individual por área" },
-    { href: "/erp/finance/employee-payments", title: "Nómina", desc: "Pagos y percepciones del personal" },
+    { href: "/erp/finance/employee-payments", title: "Pagos a empleados", desc: "Dispersiones internas (no CFDI nómina)" },
     { href: "/erp/calendar", title: "Calendario", desc: "Eventos corporativos y agenda" },
   ],
   contabilidad: [

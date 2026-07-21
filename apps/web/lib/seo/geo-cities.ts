@@ -1,3 +1,5 @@
+import { findServiceLanding, SERVICE_LANDINGS } from "@/lib/seo/programmatic-landings";
+
 /**
  * Ciudades objetivo para SEO local (intención “CCTV Puebla”, “redes CDMX”, …).
  */
@@ -6,12 +8,21 @@ export type GeoCity = {
   slug: string;
   name: string;
   region: string;
-  /** Cómo operamos ahí */
   mode: "base" | "campo" | "extendida";
   blurb: string;
-  /** Keywords locales cortas */
   keywords: string[];
 };
+
+/** Servicios con búsqueda local más fuerte (ciudad × servicio). */
+export const GEO_SERVICE_SLUGS = [
+  "camaras-cctv",
+  "redes-y-conectividad",
+  "soporte-ti-pyme",
+  "equipo-de-computo",
+  "infraestructura-ti",
+] as const;
+
+export type GeoServiceSlug = (typeof GEO_SERVICE_SLUGS)[number];
 
 export const GEO_CITIES: GeoCity[] = [
   {
@@ -95,13 +106,50 @@ export const GEO_CITIES: GeoCity[] = [
       "Golfo y sureste cercano. Intervenciones programadas de videovigilancia, conectividad y soporte híbrido.",
     keywords: ["cctv Veracruz", "redes Veracruz", "soporte TI Veracruz"],
   },
+  {
+    slug: "cancun",
+    name: "Cancún",
+    region: "Quintana Roo",
+    mode: "extendida",
+    blurb:
+      "Hospitalidad y retail en el Caribe. CCTV, Wi‑Fi de alta densidad y soporte por fases con logística sureste.",
+    keywords: ["cctv Cancun", "wifi hotelero Cancun", "redes Cancun"],
+  },
+  {
+    slug: "leon",
+    name: "León",
+    region: "Guanajuato",
+    mode: "campo",
+    blurb:
+      "Bajío manufacturero y comercial. Redes de piso, CCTV y soporte con base cercana desde Querétaro/Puebla.",
+    keywords: ["cctv Leon Guanajuato", "redes Leon", "soporte TI Bajio"],
+  },
 ];
 
 export function findGeoCity(slug: string): GeoCity | undefined {
   return GEO_CITIES.find((c) => c.slug === slug);
 }
 
-/** Combos servicio×industria más cotizados por ciudad (enlaces a landings existentes). */
+export function isGeoServiceSlug(slug: string): slug is GeoServiceSlug {
+  return (GEO_SERVICE_SLUGS as readonly string[]).includes(slug);
+}
+
+export function getGeoServiceCombos(): {
+  city: GeoCity;
+  serviceSlug: GeoServiceSlug;
+  serviceName: string;
+}[] {
+  const out: { city: GeoCity; serviceSlug: GeoServiceSlug; serviceName: string }[] = [];
+  for (const city of GEO_CITIES) {
+    for (const serviceSlug of GEO_SERVICE_SLUGS) {
+      const service = findServiceLanding(serviceSlug) || SERVICE_LANDINGS.find((s) => s.slug === serviceSlug);
+      if (!service) continue;
+      out.push({ city, serviceSlug, serviceName: service.name });
+    }
+  }
+  return out;
+}
+
 export const GEO_MONEY_LINKS: { industry: string; service: string; label: string }[] = [
   { industry: "retail", service: "camaras-cctv", label: "CCTV para retail" },
   { industry: "manufactura", service: "camaras-cctv", label: "CCTV industrial" },
@@ -111,4 +159,20 @@ export const GEO_MONEY_LINKS: { industry: string; service: string; label: string
   { industry: "pymes-y-startups", service: "soporte-ti-pyme", label: "Soporte TI PyME" },
   { industry: "pymes-y-startups", service: "equipo-de-computo", label: "Equipo de cómputo" },
   { industry: "retail", service: "mesa-de-ayuda-ti", label: "Mesa de ayuda" },
+];
+
+/** Alias de búsqueda popular → URL canónica geo×servicio */
+export const GEO_SEARCH_ALIASES: { source: string; city: string; service: string }[] = [
+  { source: "/cctv-puebla", city: "puebla", service: "camaras-cctv" },
+  { source: "/cctv-cdmx", city: "cdmx", service: "camaras-cctv" },
+  { source: "/camaras-seguridad-puebla", city: "puebla", service: "camaras-cctv" },
+  { source: "/camaras-seguridad-cdmx", city: "cdmx", service: "camaras-cctv" },
+  { source: "/redes-puebla", city: "puebla", service: "redes-y-conectividad" },
+  { source: "/redes-cdmx", city: "cdmx", service: "redes-y-conectividad" },
+  { source: "/wifi-empresarial-puebla", city: "puebla", service: "redes-y-conectividad" },
+  { source: "/soporte-ti-puebla", city: "puebla", service: "soporte-ti-pyme" },
+  { source: "/soporte-ti-cdmx", city: "cdmx", service: "soporte-ti-pyme" },
+  { source: "/cctv-cholula", city: "cholula", service: "camaras-cctv" },
+  { source: "/cctv-queretaro", city: "queretaro", service: "camaras-cctv" },
+  { source: "/cctv-monterrey", city: "monterrey", service: "camaras-cctv" },
 ];

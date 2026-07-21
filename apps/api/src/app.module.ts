@@ -35,6 +35,7 @@ import { EmployeePaymentsModule } from './employee-payments/employee-payments.mo
 import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
 import { ServiceClientsModule } from './service-clients/service-clients.module';
 import { ClientAuthModule } from './client-auth/client-auth.module';
+import { PortalAuthModule } from './portal-auth/portal-auth.module.js';
 import { ClientPortalModule } from './client-portal/client-portal.module';
 import { ServiceSheetsModule } from './service-sheets/service-sheets.module';
 import { ClientTicketRequestsModule } from './client-ticket-requests/client-ticket-requests.module';
@@ -120,6 +121,7 @@ import { InternalComunicadosModule } from './internal-comunicados/internal-comun
     CotizacionesModule,
     ServiceClientsModule,
     ClientAuthModule,
+    PortalAuthModule,
     ClientPortalModule,
     ServiceSheetsModule,
     ClientTicketRequestsModule,

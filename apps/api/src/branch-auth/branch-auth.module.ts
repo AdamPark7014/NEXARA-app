@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module.js';
-import { AuthModule } from '../auth/auth.module.js';
+import { PortalAuthModule } from '../portal-auth/portal-auth.module.js';
 import { BranchAuthController } from './branch-auth.controller.js';
 import { BranchAuthService } from './branch-auth.service.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule],
+  imports: [PortalAuthModule],
   controllers: [BranchAuthController],
   providers: [BranchAuthService],
+  exports: [BranchAuthService],
 })
 export class BranchAuthModule {}

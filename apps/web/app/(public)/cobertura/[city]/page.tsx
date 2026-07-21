@@ -6,10 +6,11 @@ import PublicPageHero from "../../../components/PublicPageHero";
 import heroStyles from "../../../components/PublicPageHero.module.css";
 import styles from "../page.module.css";
 import {
-  GEO_CITIES,
   GEO_MONEY_LINKS,
+  GEO_SERVICE_SLUGS,
   findGeoCity,
 } from "@/lib/seo/geo-cities";
+import { findServiceLanding } from "@/lib/seo/programmatic-landings";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 
 type Params = { city: string };
@@ -165,13 +166,57 @@ export default function CoberturaCityPage({ params }: { params: Params }) {
       <section className={shared.section} data-reveal="up">
         <div className={shared.inner}>
           <header className={shared.sectionHead}>
-            <p className={shared.eyebrow}>{modeLabel}</p>
+            <p className={shared.eyebrow}>Servicios locales</p>
             <h2 className={shared.sectionTitle}>
-              Qué cotizan más en{" "}
+              Cotiza por servicio en{" "}
               <span className={shared.sectionTitleAccent}>{city.name}</span>
             </h2>
             <p className={shared.sectionLead}>
-              Enlaces directos a soluciones listas para indexar y convertir.
+              Páginas dedicadas para búsquedas tipo “CCTV {city.name}” o “redes {city.name}”.
+            </p>
+          </header>
+          <div className={styles.serviceChipRow}>
+            {GEO_SERVICE_SLUGS.map((slug) => {
+              const svc = findServiceLanding(slug);
+              if (!svc) return null;
+              return (
+                <Link
+                  key={slug}
+                  href={`/cobertura/${city.slug}/${slug}`}
+                  className={styles.serviceChip}
+                >
+                  {svc.name}
+                </Link>
+              );
+            })}
+          </div>
+          <div className={shared.industryBoard} data-reveal-stagger style={{ marginTop: 20 }}>
+            {GEO_SERVICE_SLUGS.map((slug) => {
+              const svc = findServiceLanding(slug);
+              if (!svc) return null;
+              const href = `/cobertura/${city.slug}/${slug}`;
+              return (
+                <Link key={href} href={href} className={shared.industryCell} data-reveal="up">
+                  <span className={shared.industryRisk}>{city.name}</span>
+                  <h3 className={shared.industryCellTitle}>{svc.name}</h3>
+                  <p className={shared.industryCellText}>{svc.summary}</p>
+                  <span className={shared.industryCellLink}>Cotizar →</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
+        <div className={shared.inner}>
+          <header className={shared.sectionHead}>
+            <p className={shared.eyebrow}>{modeLabel}</p>
+            <h2 className={shared.sectionTitle}>
+              Combinaciones industria + servicio
+            </h2>
+            <p className={shared.sectionLead}>
+              Enlaces a landings verticales (retail, manufactura, PyMEs…).
             </p>
           </header>
           <div className={shared.industryBoard} data-reveal-stagger>

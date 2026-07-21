@@ -4,6 +4,9 @@ import { Prisma } from '@prisma/client';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { AutoApprovalService } from '../workflow/auto-approval.service.js';
+import { WarehouseService } from '../warehouse/warehouse.service.js';
+import { AccountingService } from '../accounting/accounting.service.js';
+import { AuditService } from '../audit/audit.service.js';
 
 @Injectable()
 export class ProcurementService {
@@ -11,6 +14,9 @@ export class ProcurementService {
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly autoApproval: AutoApprovalService,
+    private readonly warehouse: WarehouseService,
+    private readonly accounting: AccountingService,
+    private readonly audit: AuditService,
   ) {}
 
   // ── Purchase Requisitions ─────────────────────────────────────────
@@ -167,6 +173,13 @@ export class ProcurementService {
     }));
     const subtotal = dto.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
     const taxAmount = dto.items.reduce((s, i) => s + i.quantity * i.unitPrice * ((i.taxRate || 0) / 100), 0);
+    const companyId =
+      (
+        await this.prisma.companyProfile.findFirst({
+          where: { isPrimary: true, isActive: true },
+          select: { id: true },
+        })
+      )?.id ?? null;
 
     const created = await this.prisma.purchaseOrder.create({
       data: {
@@ -183,6 +196,7 @@ export class ProcurementService {
         shippingAddress: dto.shippingAddress?.trim() || null,
         notes: dto.notes?.trim() || null,
         createdById: userId,
+        companyId,
         items: {
           create: items.map((i) => ({
             productId: i.productId ?? null,
@@ -264,15 +278,44 @@ export class ProcurementService {
 
   async createGoodsReceipt(dto: {
     purchaseOrderId: number;
+    warehouseId?: number;
     receiptDate: string;
     notes?: string;
+    createApInvoice?: boolean;
     items: Array<{ purchaseOrderItemId: number; quantityReceived: number; quantityRejected?: number; lotNumber?: string; notes?: string }>;
   }, userId: number) {
+    const po = await this.prisma.purchaseOrder.findUnique({
+      where: { id: dto.purchaseOrderId },
+      include: {
+        items: { include: { product: { select: { id: true, itemType: true } } } },
+      },
+    });
+    if (!po || po.deletedAt) throw new NotFoundException('Orden de compra no encontrada');
+    if (!['CONFIRMED', 'PARTIALLY_RECEIVED'].includes(po.status)) {
+      throw new BadRequestException('Solo se pueden recibir OC confirmadas o parcialmente recibidas');
+    }
+    if (!dto.items?.length) {
+      throw new BadRequestException('La recepción requiere al menos una partida');
+    }
+
+    let warehouseId = dto.warehouseId ? Number(dto.warehouseId) : null;
+    if (warehouseId) {
+      const wh = await this.prisma.warehouse.findFirst({ where: { id: warehouseId, isActive: true } });
+      if (!wh) throw new BadRequestException('Almacén inválido');
+    } else {
+      const fallback = await this.prisma.warehouse.findFirst({
+        where: { isActive: true },
+        orderBy: { id: 'asc' },
+      });
+      warehouseId = fallback?.id ?? null;
+    }
+
     const receiptNumber = await this.generateReceiptNumber();
     const receipt = await this.prisma.goodsReceipt.create({
       data: {
         receiptNumber,
         purchaseOrderId: dto.purchaseOrderId,
+        warehouseId,
         receiptDate: new Date(dto.receiptDate),
         notes: dto.notes?.trim() || null,
         receivedById: userId,
@@ -297,38 +340,120 @@ export class ProcurementService {
       });
     }
 
+    // Stock movements for PRODUCT lines with productId
+    if (warehouseId) {
+      for (const item of dto.items) {
+        const qty = Number(item.quantityReceived) || 0;
+        if (qty <= 0) continue;
+        const poItem = po.items.find((i) => i.id === item.purchaseOrderItemId);
+        if (!poItem?.productId) continue;
+        const itemType = poItem.product?.itemType || 'PRODUCT';
+        if (itemType !== 'PRODUCT') continue;
+
+        await this.warehouse.createStockMovement(
+          {
+            type: 'RECEIPT',
+            productId: poItem.productId,
+            toWarehouseId: warehouseId,
+            quantity: qty,
+            unitCost: Number(poItem.unitPrice) || 0,
+            purchaseOrderId: dto.purchaseOrderId,
+            reference: receipt.receiptNumber,
+            notes: `GR ${receipt.receiptNumber}`,
+          },
+          userId,
+        );
+      }
+    }
+
     // Check if all items fully received → update PO status
-    const po = await this.prisma.purchaseOrder.findUnique({
+    const poAfter = await this.prisma.purchaseOrder.findUnique({
       where: { id: dto.purchaseOrderId },
       include: { items: true },
     });
-    if (po) {
-      const allReceived = po.items.every((i) => Number(i.receivedQty) >= Number(i.quantity));
-      const someReceived = po.items.some((i) => Number(i.receivedQty) > 0);
+    if (poAfter) {
+      const allReceived = poAfter.items.every((i) => Number(i.receivedQty) >= Number(i.quantity));
+      const someReceived = poAfter.items.some((i) => Number(i.receivedQty) > 0);
       await this.prisma.purchaseOrder.update({
         where: { id: dto.purchaseOrderId },
         data: { status: allReceived ? 'RECEIVED' : someReceived ? 'PARTIALLY_RECEIVED' : undefined },
       });
     }
 
-    const poMeta = await this.prisma.purchaseOrder.findUnique({
-      where: { id: dto.purchaseOrderId },
-      select: { poNumber: true, createdById: true },
-    });
-    if (poMeta) {
-      void this.notificationHierarchy
-        .notifyGoodsReceiptPosted(
+    let journalEntry = null as Awaited<ReturnType<AccountingService['postPurchaseReceiptAccrual']>> | null;
+    let apInvoice = null as Awaited<ReturnType<AccountingService['createInvoiceFromGoodsReceipt']>> | null;
+    try {
+      journalEntry = await this.accounting.postPurchaseReceiptAccrual({
+        goodsReceiptId: receipt.id,
+        userId,
+      });
+    } catch (err) {
+      // No bloquear recepción operativa si falla contabilidad; queda auditable
+      await this.audit
+        .log(
+          {
+            entityType: 'GoodsReceipt',
+            entityId: receipt.id,
+            action: 'JOURNAL_FAILED',
+            changes: { error: err instanceof Error ? err.message : String(err) },
+          },
           userId,
-          receipt.id,
-          receipt.receiptNumber,
-          poMeta.poNumber,
-          dto.purchaseOrderId,
-          poMeta.createdById ?? null,
         )
         .catch(() => undefined);
     }
 
-    return receipt;
+    if (dto.createApInvoice !== false) {
+      try {
+        apInvoice = await this.accounting.createInvoiceFromGoodsReceipt(receipt.id, userId);
+      } catch (err) {
+        await this.audit
+          .log(
+            {
+              entityType: 'GoodsReceipt',
+              entityId: receipt.id,
+              action: 'AP_INVOICE_FAILED',
+              changes: { error: err instanceof Error ? err.message : String(err) },
+            },
+            userId,
+          )
+          .catch(() => undefined);
+      }
+    }
+
+    void this.notificationHierarchy
+      .notifyGoodsReceiptPosted(
+        userId,
+        receipt.id,
+        receipt.receiptNumber,
+        po.poNumber,
+        dto.purchaseOrderId,
+        po.createdById ?? null,
+      )
+      .catch(() => undefined);
+
+    await this.audit
+      .log(
+        {
+          entityType: 'GoodsReceipt',
+          entityId: receipt.id,
+          action: 'CREATE',
+          changes: {
+            warehouseId,
+            journalEntryId: journalEntry?.id ?? null,
+            invoiceId: apInvoice?.id ?? null,
+          },
+        },
+        userId,
+      )
+      .catch(() => undefined);
+
+    return {
+      ...receipt,
+      warehouseId,
+      journalEntryId: journalEntry?.id ?? null,
+      journalEntry,
+      apInvoice,
+    };
   }
 
   async listGoodsReceipts(purchaseOrderId?: number) {

@@ -58,6 +58,31 @@
   margin-block: clamp(-8px, -0.5vw, 0);
 }
 
+.geoRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 22px;
+}
+
+.geoChip {
+  display: inline-flex;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(140, 190, 255, 0.16);
+  background: rgba(255, 255, 255, 0.02);
+  color: #cfe0f7;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.geoChip:hover {
+  border-color: rgba(45, 216, 242, 0.4);
+  color: #9fecfa;
+}
+
+
 .visualBridge :global(figure),
 .visualBridge figure {
   max-width: none;

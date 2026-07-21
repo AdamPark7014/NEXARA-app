@@ -6,6 +6,8 @@ import { CreateEmployeePaymentDto } from './dto/create-employee-payment.dto.js';
 import { UpdateEmployeePaymentDto } from './dto/update-employee-payment.dto.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { generateEmployeePaymentsReportPdf } from './employee-payments-report-pdf.js';
+import { AccountingService } from '../accounting/accounting.service.js';
+import { AuditService } from '../audit/audit.service.js';
 
 const STATUS = {
   BORRADOR: 'Borrador',
@@ -15,7 +17,11 @@ const STATUS = {
 
 @Injectable()
 export class EmployeePaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly accounting: AccountingService,
+    private readonly audit: AuditService,
+  ) {}
 
   private toDecimal(value?: string | number | null) {
     if (value === undefined || value === null) return null;
@@ -114,8 +120,16 @@ export class EmployeePaymentsService {
       (dto as any).concepto?.trim() ||
       dto.note?.trim() ||
       'Pago a empleado';
+    const wantsPaid = status === STATUS.PAGADO;
+    const companyId =
+      (
+        await this.prisma.companyProfile.findFirst({
+          where: { isPrimary: true, isActive: true },
+          select: { id: true },
+        })
+      )?.id ?? null;
 
-    return this.prisma.employeePayment.create({
+    const created = await this.prisma.employeePayment.create({
       data: {
         userId,
         periodFrom,
@@ -124,20 +138,31 @@ export class EmployeePaymentsService {
         amount,
         concepto: concepto.slice(0, 255),
         note: dto.note?.trim() || null,
-        status,
-        paidAt: status === STATUS.PAGADO ? new Date() : null,
-        contabilidadRef: status === STATUS.PAGADO ? `PAG-${Date.now()}` : null,
+        status: wantsPaid ? STATUS.BORRADOR : status,
+        paidAt: null,
+        contabilidadRef: null,
+        companyId,
         evidenceUrls,
         createdById: currentUser.id || null,
       },
       include: { user: true, createdBy: true },
     });
+
+    if (wantsPaid && currentUser.id) {
+      return this.markPagado(created.id, currentUser.id);
+    }
+
+    await this.audit
+      .log({ entityType: 'EmployeePayment', entityId: created.id, action: 'CREATE', changes: { status } }, currentUser.id)
+      .catch(() => undefined);
+    return created;
   }
 
   async update(
     id: number,
     dto: UpdateEmployeePaymentDto,
     evidenceUrls?: string[],
+    actorId?: number,
   ) {
     const existing = await this.prisma.employeePayment.findFirst({
       where: { id, deletedAt: null },
@@ -177,7 +202,6 @@ export class EmployeePaymentsService {
       data.status = status;
       if (status === STATUS.PAGADO) {
         data.paidAt = existing.paidAt || new Date();
-        data.contabilidadRef = existing.contabilidadRef || `PAG-${id}-${new Date().toISOString().slice(0, 10)}`;
       }
       if (status === STATUS.ANULADO) {
         data.paidAt = null;
@@ -187,38 +211,80 @@ export class EmployeePaymentsService {
       data.evidenceUrls = [...(existing.evidenceUrls || []), ...evidenceUrls];
     }
 
-    return this.prisma.employeePayment.update({
+    const updated = await this.prisma.employeePayment.update({
       where: { id },
       data,
       include: { user: true, createdBy: true },
     });
+
+    if (dto.status !== undefined && this.normalizeStatus(dto.status) === STATUS.PAGADO && !existing.journalEntryId) {
+      return this.markPagado(id, actorId);
+    }
+
+    await this.audit
+      .log({ entityType: 'EmployeePayment', entityId: id, action: 'UPDATE', changes: dto }, actorId)
+      .catch(() => undefined);
+    return updated;
   }
 
-  async markPagado(id: number) {
+  async markPagado(id: number, actorId?: number) {
     const existing = await this.prisma.employeePayment.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException('Pago no encontrado');
     if (existing.status === STATUS.ANULADO) {
       throw new BadRequestException('No se puede pagar un registro anulado');
     }
-    return this.prisma.employeePayment.update({
+
+    let journalEntryId = existing.journalEntryId;
+    let contabilidadRef = existing.contabilidadRef;
+    if (!journalEntryId && actorId) {
+      const entry = await this.accounting.postOperationalDisbursement({
+        kind: 'payroll',
+        entityId: id,
+        amount: Number(existing.amount),
+        date: existing.paidAt || existing.periodTo,
+        description: `Pago a empleado #${id}: ${existing.concepto || existing.note || 'Pago'}`,
+        userId: actorId,
+      });
+      journalEntryId = entry.id;
+      contabilidadRef = entry.entryNumber;
+    }
+
+    const updated = await this.prisma.employeePayment.update({
       where: { id },
       data: {
         status: STATUS.PAGADO,
-        paidAt: new Date(),
-        contabilidadRef: existing.contabilidadRef || `PAG-${id}-${new Date().toISOString().slice(0, 10)}`,
+        paidAt: existing.paidAt || new Date(),
+        journalEntryId: journalEntryId ?? undefined,
+        contabilidadRef: contabilidadRef || `PAG-${id}-${new Date().toISOString().slice(0, 10)}`,
       },
-      include: { user: true, createdBy: true },
+      include: { user: true, createdBy: true, journalEntry: true },
     });
+    await this.audit
+      .log(
+        {
+          entityType: 'EmployeePayment',
+          entityId: id,
+          action: 'MARK_PAID',
+          changes: { journalEntryId, contabilidadRef },
+        },
+        actorId,
+      )
+      .catch(() => undefined);
+    return updated;
   }
 
-  async remove(id: number) {
+  async remove(id: number, actorId?: number) {
     const existing = await this.prisma.employeePayment.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException('Pago no encontrado');
-    return this.prisma.employeePayment.update({
+    const updated = await this.prisma.employeePayment.update({
       where: { id },
       data: { deletedAt: new Date(), status: STATUS.ANULADO },
       include: { user: true, createdBy: true },
     });
+    await this.audit
+      .log({ entityType: 'EmployeePayment', entityId: id, action: 'DELETE' }, actorId)
+      .catch(() => undefined);
+    return updated;
   }
 
   async analytics(

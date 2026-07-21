@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import shared from "../_shared/public.module.css";
 import styles from "./page.module.css";
 import { buildApiUrl } from "@/lib/api-base";
@@ -9,8 +10,10 @@ import { openExternalUrl } from "@/lib/open-external-url";
 import Map from "@/app/components/Map";
 import EditorialImage from "../../components/EditorialImage";
 import type { PageVisualsContent } from "@/lib/page-content-api";
+import { findGeoCity } from "@/lib/seo/geo-cities";
+import { findServiceLanding } from "@/lib/seo/programmatic-landings";
+import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 
-const WA_URL = "https://wa.me/522226960350?text=Hola%2C%20me%20interesa%20informaci%C3%B3n%20de%20Nexara";
 const WA_LABEL = "+52 222 696 0350";
 const PHONE_LABEL = "+52 220 179 1871";
 const PHONE_TEL = "tel:+522201791871";
@@ -21,10 +24,33 @@ type Props = {
 };
 
 export default function ContactoClient({ visuals }: Props) {
+  const searchParams = useSearchParams();
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const asideImg = visuals.slots[0];
+
+  const leadContext = useMemo(() => {
+    const citySlug = searchParams.get("city") || "";
+    const serviceSlug = searchParams.get("service") || "";
+    const industrySlug = searchParams.get("industry") || "";
+    const city = citySlug ? findGeoCity(citySlug) : undefined;
+    const service = serviceSlug ? findServiceLanding(serviceSlug) : undefined;
+    const parts = [
+      city ? `Ciudad: ${city.name}` : "",
+      service ? `Servicio: ${service.name}` : "",
+      industrySlug ? `Industria: ${industrySlug}` : "",
+    ].filter(Boolean);
+    const prefill = parts.length
+      ? `Hola Nexara,\nMe interesa cotizar${service ? ` ${service.name}` : ""}${city ? ` en ${city.name}` : ""}.\n${parts.join(" · ")}\n\nContexto / sitio:\n`
+      : "";
+    const wa = buildWhatsAppLeadUrl({
+      industryName: city?.name || industrySlug || "mi empresa",
+      serviceName: service?.name || "CCTV, redes o soporte TI",
+      path: "/contacto",
+    });
+    return { prefill, wa, city, service };
+  }, [searchParams]);
 
   useEffect(() => {
     return () => {
@@ -88,7 +114,7 @@ export default function ContactoClient({ visuals }: Props) {
                   <button
                     type="button"
                     className={`${styles.directLink} ${styles.whatsappLink}`}
-                    onClick={() => void openExternalUrl(WA_URL)}
+                    onClick={() => void openExternalUrl(leadContext.wa)}
                     aria-label={`Abrir WhatsApp ${WA_LABEL}`}
                   >
                     <span className={`${styles.directLabel} ${styles.whatsappLabel}`}>
@@ -97,7 +123,11 @@ export default function ContactoClient({ visuals }: Props) {
                       </svg>
                       WhatsApp
                     </span>
-                    <span className={styles.directValue}>Escríbenos por chat</span>
+                    <span className={styles.directValue}>
+                      {(leadContext.city || leadContext.service)
+                        ? `Chat con contexto${leadContext.service ? ` · ${leadContext.service.name}` : ""}${leadContext.city ? ` · ${leadContext.city.name}` : ""}`
+                        : "Escríbenos por chat"}
+                    </span>
                   </button>
                 </li>
                 <li>
@@ -165,6 +195,8 @@ export default function ContactoClient({ visuals }: Props) {
                       name="message"
                       rows={5}
                       required
+                      key={leadContext.prefill || "empty"}
+                      defaultValue={leadContext.prefill || undefined}
                       placeholder="Qué necesitas, sitio y contexto…"
                       disabled={loading}
                     />
@@ -205,6 +237,14 @@ export default function ContactoClient({ visuals }: Props) {
           <div className={styles.mapHeader}>
             <p className={shared.eyebrow}>Ubicación</p>
             <h2 className={styles.mapTitle}>Explanada Puebla, Santiago Momoxpan</h2>
+            <p className={styles.expectNote}>
+              Cobertura{" "}
+              <Link href="/cobertura/puebla/camaras-cctv">CCTV Puebla</Link>
+              {" · "}
+              <Link href="/cobertura/cdmx/camaras-cctv">CCTV CDMX</Link>
+              {" · "}
+              <Link href="/cobertura">más ciudades</Link>
+            </p>
           </div>
           <div className={styles.mapWrap}>
             <Map />

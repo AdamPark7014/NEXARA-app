@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { getProgrammaticLandings, INDUSTRY_LANDINGS } from "@/lib/seo/programmatic-landings";
 import { MONEY_SERVICE_SLUGS } from "@/lib/seo/money-pages";
+import { GEO_CITIES, GEO_SERVICE_SLUGS, findGeoCity } from "@/lib/seo/geo-cities";
+import { findServiceLanding } from "@/lib/seo/programmatic-landings";
 import styles from "./SeoInterlinkHub.module.css";
+
+const GEO_HUB_CITIES = ["puebla", "cdmx", "cholula", "queretaro", "monterrey"] as const;
+const GEO_HUB_SERVICES = ["camaras-cctv", "redes-y-conectividad", "soporte-ti-pyme"] as const;
 
 type SeoInterlinkHubProps = {
   title?: string;
@@ -10,6 +15,8 @@ type SeoInterlinkHubProps = {
   maxItems?: number;
   maxIndustries?: number;
   maxServicesPerIndustry?: number;
+  /** Fila de enlaces ciudad×servicio (intención local). */
+  showGeo?: boolean;
 };
 
 function moneyRank(serviceSlug: string): number {
@@ -24,6 +31,7 @@ export default function SeoInterlinkHub({
   maxItems,
   maxIndustries = 6,
   maxServicesPerIndustry = 3,
+  showGeo = true,
 }: SeoInterlinkHubProps) {
   const flat = getProgrammaticLandings()
     .map(({ industry, service }) => ({
@@ -79,7 +87,25 @@ export default function SeoInterlinkHub({
       .filter((col) => col.links.length > 0);
   }
 
-  if (columns.length === 0) {
+  const geoLinks =
+    showGeo
+      ? GEO_HUB_CITIES.flatMap((citySlug) => {
+          const city = findGeoCity(citySlug) || GEO_CITIES.find((c) => c.slug === citySlug);
+          if (!city) return [];
+          return GEO_HUB_SERVICES.map((serviceSlug) => {
+            const service = findServiceLanding(serviceSlug);
+            if (!service) return null;
+            const href = `/cobertura/${city.slug}/${service.slug}`;
+            if (href === currentPath) return null;
+            return {
+              href,
+              label: `${service.name} ${city.name}`,
+            };
+          }).filter((x): x is { href: string; label: string } => x !== null);
+        }).slice(0, 12)
+      : [];
+
+  if (columns.length === 0 && geoLinks.length === 0) {
     return null;
   }
 
@@ -90,38 +116,59 @@ export default function SeoInterlinkHub({
         {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
       </div>
 
-      <div className={styles.columns}>
-        {columns.map(({ industry, links }) => (
-          <div key={industry.slug} className={styles.column}>
-            <h3 className={styles.columnTitle}>
-              <Link href={`/soluciones/${industry.slug}`} className={styles.columnTitleLink}>
-                {industry.name}
-              </Link>
-            </h3>
-            <ul className={styles.linkList}>
-              {links.map((item) => (
-                <li key={item.href}>
-                  <Link href={item.href} className={styles.textLink}>
-                    {item.service.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
+      {geoLinks.length > 0 ? (
+        <div className={styles.geoStrip} aria-label="Cobertura local">
+          <h3 className={styles.columnTitle}>Por ciudad</h3>
+          <ul className={styles.geoList}>
+            {geoLinks.map((item) => (
+              <li key={item.href}>
+                <Link href={item.href} className={styles.geoChip}>
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {columns.length > 0 ? (
+        <div className={styles.columns}>
+          {columns.map(({ industry, links }) => (
+            <div key={industry.slug} className={styles.column}>
+              <h3 className={styles.columnTitle}>
+                <Link href={`/soluciones/${industry.slug}`} className={styles.columnTitleLink}>
+                  {industry.name}
+                </Link>
+              </h3>
+              <ul className={styles.linkList}>
+                {links.map((item) => (
+                  <li key={item.href}>
+                    <Link href={item.href} className={styles.textLink}>
+                      {item.service.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <p className={styles.footerCta}>
         <Link href="/contacto" className={styles.ctaLink}>
           Cotizar con un especialista →
         </Link>
         {" · "}
-        <Link href="/cobertura/puebla" className={styles.ctaLink}>
-          Cobertura Puebla
+        <Link href="/cobertura/puebla/camaras-cctv" className={styles.ctaLink}>
+          CCTV Puebla
         </Link>
         {" · "}
-        <Link href="/cobertura/cdmx" className={styles.ctaLink}>
-          CDMX
+        <Link href="/cobertura/cdmx/camaras-cctv" className={styles.ctaLink}>
+          CCTV CDMX
+        </Link>
+        {" · "}
+        <Link href="/cobertura" className={styles.ctaLink}>
+          Toda la cobertura
         </Link>
       </p>
     </section>

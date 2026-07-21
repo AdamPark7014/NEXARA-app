@@ -13,6 +13,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import { toast } from "@/components/Toast";
 
 interface ServiceClient {
   id: number;
@@ -134,6 +135,11 @@ export default function ServiceClientsPage() {
         const created = await res.json();
         const mapped = mapClient(created?.client ?? created);
         setItems(prev => [mapped, ...prev]);
+        if (created?.salesClient?.id) {
+          toast.success(`Cliente operativo listo · vinculado a CRM #${created.salesClient.id}`);
+        } else {
+          toast.success("Cliente operativo creado");
+        }
       }
       setShowForm(false);
     } catch (e) {

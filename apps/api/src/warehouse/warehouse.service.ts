@@ -241,11 +241,18 @@ export class WarehouseService {
       where: { productId, warehouseId, locationId: null },
     });
     if (existing) {
+      const prevQty = Number(existing.quantity);
+      const prevCost = Number(existing.unitCost) || 0;
+      const nextQty = prevQty + quantity;
+      const weighted =
+        unitCost > 0 && nextQty > 0
+          ? (prevQty * prevCost + quantity * unitCost) / nextQty
+          : prevCost;
       await tx.stockLevel.update({
         where: { id: existing.id },
         data: {
           quantity: { increment: quantity },
-          ...(unitCost > 0 ? { unitCost: new Prisma.Decimal(unitCost) } : {}),
+          ...(unitCost > 0 ? { unitCost: new Prisma.Decimal(weighted) } : {}),
         },
       });
     } else {

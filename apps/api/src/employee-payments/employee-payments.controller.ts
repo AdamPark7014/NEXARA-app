@@ -114,8 +114,8 @@ export class EmployeePaymentsController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Patch(':id/pagado')
-  markPagado(@Param('id') id: string) {
-    return this.service.markPagado(+id);
+  markPagado(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.service.markPagado(+id, user?.id);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
@@ -124,18 +124,19 @@ export class EmployeePaymentsController {
   @UseInterceptors(FilesInterceptor('files', 10, { dest: getUploadSubdir(__dirname, 'employee-payments') }))
   update(
     @Param('id') id: string,
+    @CurrentUser() user: any,
     @Body() body: UpdateEmployeePaymentDto,
     @UploadedFiles() files: any[],
   ) {
     this.validateFiles(files);
     const evidenceUrls = (files || []).map((file) => `/uploads/employee-payments/${file.filename}`);
-    return this.service.update(+id, body, evidenceUrls.length ? evidenceUrls : undefined);
+    return this.service.update(+id, body, evidenceUrls.length ? evidenceUrls : undefined, user?.id);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(+id);
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.service.remove(+id, user?.id);
   }
 }

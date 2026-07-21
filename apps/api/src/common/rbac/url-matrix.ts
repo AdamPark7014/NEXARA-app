@@ -57,6 +57,7 @@ export const SHARED_SESSION_URL_RULES: UrlRule[] = [
   { path: '/api/users/me', methods: ['GET', 'PATCH'], scope: 'write' },
   { path: '/api/users/profile/**', scope: 'write' },
   { path: '/api/devices/**', methods: ['GET', 'POST', 'PATCH', 'DELETE'], scope: 'write' },
+  { path: '/api/company/mine', methods: ['GET'], scope: 'read' },
 ];
 
 /**
@@ -437,6 +438,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/erp/notifications-center', scope: 'read' },
     { path: '/erp/my-profile', scope: 'write' },
     { path: '/api/projects/**', scope: 'write' },
+    { path: '/api/case-studies/**', scope: 'write' },
+    { path: '/api/studio/page-content/**', scope: 'write' },
     { path: '/api/news/**', scope: 'write' },
     { path: '/api/newsletter/**', scope: 'write' },
     { path: '/api/contact-messages/**', scope: 'read' },
@@ -459,6 +462,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/erp/notifications-center', scope: 'read' },
     { path: '/erp/my-profile', scope: 'write' },
     { path: '/api/projects/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    { path: '/api/case-studies/**', methods: ['GET', 'POST', 'PATCH', 'DELETE'], scope: 'write' },
+    { path: '/api/studio/page-content/**', methods: ['GET', 'PUT', 'POST'], scope: 'write' },
     { path: '/api/news/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     ...SELF_ATTENDANCE_URL_RULES,
   ],

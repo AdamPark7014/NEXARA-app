@@ -136,6 +136,41 @@
   text-underline-offset: 3px;
 }
 
+.geoStrip {
+  display: grid;
+  gap: 10px;
+}
+
+.geoList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.geoChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+  background: color-mix(in srgb, var(--surface) 92%, var(--primary));
+  color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
+  font-size: 0.82rem;
+  font-weight: 650;
+  text-decoration: none;
+  line-height: 1.2;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.geoChip:hover {
+  border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  color: var(--primary);
+}
+
 .footerCta {
   margin: 4px 0 0;
   font-size: 0.88rem;

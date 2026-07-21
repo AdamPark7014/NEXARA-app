@@ -1,4 +1,5 @@
 import { buildApiUrl } from "@/lib/api-base";
+import { withTenantHeaders } from "@/lib/tenant";
 
 export const EXPENSE_CATEGORIES = [
   "Renta",
@@ -67,10 +68,10 @@ async function parseError(res: Response) {
 }
 
 export async function financeFetch(path: string, token: string, opts?: RequestInit) {
-  const headers: Record<string, string> = {
+  const headers = withTenantHeaders({
     Authorization: `Bearer ${token}`,
     ...(opts?.headers as Record<string, string> | undefined),
-  };
+  }) as Record<string, string>;
   const isForm = typeof FormData !== "undefined" && opts?.body instanceof FormData;
   if (!isForm && !headers["Content-Type"] && opts?.body) {
     headers["Content-Type"] = "application/json";

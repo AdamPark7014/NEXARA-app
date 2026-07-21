@@ -24,6 +24,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
+import CompanySwitcher from "@/components/CompanySwitcher";
 import {
   MODULES,
   PANEL_META,
@@ -516,6 +517,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
         <Breadcrumbs panel={panel} pathname={pathname || ""} panelHome={panelEntryPath} />
 
         <div className={styles.topbarActions}>
+          <CompanySwitcher compact />
+
           {(isSuperAdmin || orgRoleKey) && (
             <div
               className={styles.roleBadge}

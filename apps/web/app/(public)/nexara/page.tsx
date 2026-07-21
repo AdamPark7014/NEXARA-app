@@ -15,6 +15,9 @@ import {
   type CtaContent,
 } from "@/lib/page-content-api";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
+import SeoInterlinkHub from "@/components/SeoInterlinkHub";
+import { GEO_CITIES } from "@/lib/seo/geo-cities";
+import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("home");
@@ -257,6 +260,38 @@ export default async function NexaraPage() {
           </div>
         </section>
 
+        <section className={shared.section} data-reveal="up">
+          <div className={shared.inner}>
+            <header className={shared.sectionHead}>
+              <p className={shared.eyebrow}>Cobertura</p>
+              <h2 className={shared.sectionTitle}>
+                Cotiza cerca de{" "}
+                <span className={shared.sectionTitleAccent}>tu ciudad</span>
+              </h2>
+            </header>
+            <div className={styles.geoRow}>
+              {GEO_CITIES.filter((c) => c.mode === "base" || c.slug === "queretaro").map((c) => (
+                <Link key={c.slug} href={`/cobertura/${c.slug}/camaras-cctv`} className={styles.geoChip}>
+                  CCTV {c.name}
+                </Link>
+              ))}
+              <Link href="/cobertura/puebla/redes-y-conectividad" className={styles.geoChip}>
+                Redes Puebla
+              </Link>
+              <Link href="/cobertura/cdmx/soporte-ti-pyme" className={styles.geoChip}>
+                Soporte CDMX
+              </Link>
+            </div>
+            <SeoInterlinkHub
+              title="Rutas que más convierten"
+              subtitle="CCTV, redes y soporte por industria — listas para Google y para WhatsApp."
+              currentPath="/"
+              maxIndustries={4}
+              maxServicesPerIndustry={3}
+            />
+          </div>
+        </section>
+
         <section className={`${shared.section} ${styles.ctaSection}`} aria-label="Empecemos" data-reveal="up">
           <div className={shared.inner}>
             <div className={shared.ctaBand}>
@@ -273,13 +308,19 @@ export default async function NexaraPage() {
                 >
                   {cta.primaryLabel} <span className={shared.btnArrow} aria-hidden>→</span>
                 </Link>
-                <Link
-                  href={cta.secondaryHref}
+                <a
+                  href={buildWhatsAppLeadUrl({
+                    industryName: "tu empresa",
+                    serviceName: "CCTV, redes o soporte TI",
+                    path: "/",
+                  })}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className={`${shared.btn} ${shared.btnSecondary}`}
-                  data-track-conversion="home_cta_secondary"
+                  data-track-conversion="home_cta_whatsapp"
                 >
-                  {cta.secondaryLabel}
-                </Link>
+                  WhatsApp
+                </a>
               </div>
             </div>
           </div>

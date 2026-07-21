@@ -3,6 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { CompanyService } from './company.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { CurrentUser } from '../common/current-user.decorator.js';
 
 /** Endpoint público — branding & datos para landing/portales. */
 @Controller('company-public')
@@ -16,8 +17,15 @@ export class CompanyPublicController {
 
   @Get('list')
   list() {
-    return this.service.list().then((cs: any[]) =>
-      cs.map((c) => ({ id: c.id, slug: c.slug, tradeName: c.tradeName, legalName: c.legalName, logoUrl: c.logoUrl, isPrimary: c.isPrimary })),
+    return this.service.list().then((cs) =>
+      cs.map((c) => ({
+        id: c.id,
+        slug: c.slug,
+        tradeName: c.tradeName,
+        legalName: c.legalName,
+        logoUrl: c.logoUrl,
+        isPrimary: c.isPrimary,
+      })),
     );
   }
 }
@@ -26,6 +34,22 @@ export class CompanyPublicController {
 @UseGuards(AuthGuard('jwt'), RbacGuard)
 export class CompanyController {
   constructor(private readonly service: CompanyService) {}
+
+  /** Empresas a las que el usuario pertenece (para CompanySwitcher). */
+  @Get('mine')
+  @RBAC({})
+  async mine(@CurrentUser() user: any) {
+    const isSuperAdmin = Boolean(user?.isSuperAdmin || user?.roleKey === 'super_admin');
+    const rows = await this.service.listForUser(user.id, isSuperAdmin);
+    return rows.map((c) => ({
+      id: c.id,
+      slug: c.slug,
+      tradeName: c.tradeName,
+      legalName: c.legalName,
+      logoUrl: c.logoUrl,
+      isPrimary: c.isPrimary,
+    }));
+  }
 
   @Get()
   @RBAC({ anyPermissions: [PERMISSIONS.COMPANY_SETTINGS_VIEW, PERMISSIONS.COMPANY_SETTINGS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })

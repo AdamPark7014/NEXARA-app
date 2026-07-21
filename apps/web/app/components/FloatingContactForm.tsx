@@ -4,13 +4,22 @@ import { usePathname } from "next/navigation";
 import styles from "./FloatingContactForm.module.css";
 import { buildApiUrl } from "@/lib/api-base";
 
+const CATEGORY_OPTIONS = [
+  { value: "VENTAS", label: "Proyecto / cotización" },
+  { value: "SOPORTE", label: "Soporte técnico" },
+] as const;
+
 export default function FloatingContactForm() {
   const pathname = usePathname();
   const hideOnContact = (pathname?.replace(/\/+$/, "") || "") === "/contacto";
   const [open, setOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [category, setCategory] = useState("");
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [categoryError, setCategoryError] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const categoryRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     return () => {
@@ -24,15 +33,36 @@ export default function FloatingContactForm() {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (categoryOpen) {
+          setCategoryOpen(false);
+          return;
+        }
         handleClose();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open]);
+  }, [open, categoryOpen]);
+
+  useEffect(() => {
+    if (!categoryOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!categoryRef.current?.contains(event.target as Node)) {
+        setCategoryOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [categoryOpen]);
 
   const onSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
+    if (!category) {
+      setCategoryError(true);
+      setCategoryOpen(true);
+      return;
+    }
+    setCategoryError(false);
     setLoading(true);
     const form = e.currentTarget;
     const formData = new FormData(form);
@@ -48,7 +78,7 @@ export default function FloatingContactForm() {
       phone: data.phone ? String(data.phone) : undefined,
       company: data.company ? String(data.company) : undefined,
       subject: data.subject ? String(data.subject) : undefined,
-      category: String(data.category || "SOPORTE"),
+      category,
       message: String(data.message || ""),
       newsletter: Boolean(data.newsletter),
       source: "contacto-floating",
@@ -76,6 +106,9 @@ export default function FloatingContactForm() {
     timeoutRef.current = setTimeout(() => {
       setSubmitted(false);
       setOpen(false);
+      setCategory("");
+      setCategoryOpen(false);
+      setCategoryError(false);
       form.reset();
       timeoutRef.current = null;
     }, 3000);
@@ -88,7 +121,11 @@ export default function FloatingContactForm() {
     }
     setOpen(false);
     setSubmitted(false);
+    setCategoryOpen(false);
   };
+
+  const selectedCategoryLabel =
+    CATEGORY_OPTIONS.find((option) => option.value === category)?.label || "Selecciona…";
 
   if (hideOnContact) return null;
 
@@ -185,12 +222,49 @@ export default function FloatingContactForm() {
                 </div>
 
                 <div className={styles.formField}>
-                  <label htmlFor="float-category">¿En qué podemos ayudarte? *</label>
-                  <select id="float-category" name="category" required disabled={loading}>
-                    <option value="">Selecciona…</option>
-                    <option value="VENTAS">Proyecto / cotización</option>
-                    <option value="SOPORTE">Soporte técnico</option>
-                  </select>
+                  <span id="float-category-label" className={styles.fieldLabel}>
+                    ¿En qué podemos ayudarte? *
+                  </span>
+                  <div className={styles.selectWrap} ref={categoryRef}>
+                    <input type="hidden" name="category" value={category} />
+                    <button
+                      id="float-category"
+                      type="button"
+                      className={`${styles.selectTrigger} ${!category ? styles.selectPlaceholder : ""} ${categoryError ? styles.selectInvalid : ""}`}
+                      aria-haspopup="listbox"
+                      aria-expanded={categoryOpen}
+                      aria-labelledby="float-category-label"
+                      disabled={loading}
+                      onClick={() => setCategoryOpen((prev) => !prev)}
+                    >
+                      <span>{selectedCategoryLabel}</span>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </button>
+                    {categoryOpen && (
+                      <ul className={styles.selectMenu} role="listbox" aria-labelledby="float-category-label">
+                        {CATEGORY_OPTIONS.map((option) => (
+                          <li key={option.value} role="option" aria-selected={category === option.value}>
+                            <button
+                              type="button"
+                              className={`${styles.selectOption} ${category === option.value ? styles.selectOptionActive : ""}`}
+                              onClick={() => {
+                                setCategory(option.value);
+                                setCategoryError(false);
+                                setCategoryOpen(false);
+                              }}
+                            >
+                              {option.label}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  {categoryError && (
+                    <p className={styles.fieldError}>Selecciona una opción para continuar.</p>
+                  )}
                 </div>
 
                 <div className={styles.formField}>

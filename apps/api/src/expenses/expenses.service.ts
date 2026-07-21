@@ -6,6 +6,8 @@ import { CreateExpenseDto } from './dto/create-expense.dto.js';
 import { UpdateExpenseDto } from './dto/update-expense.dto.js';
 import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 import { generateExpensesReportPdf } from './expenses-report-pdf.js';
+import { AccountingService } from '../accounting/accounting.service.js';
+import { AuditService } from '../audit/audit.service.js';
 
 const ADMIN_EXPENSE_ACTIVITY_AN = 'SYS-ADMIN-GASTOS';
 
@@ -33,6 +35,8 @@ export class ExpensesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly autoApproval: AutoApprovalService,
+    private readonly accounting: AccountingService,
+    private readonly audit: AuditService,
   ) {}
 
   private normalizeStatus(value?: string | null): string {
@@ -98,6 +102,7 @@ export class ExpensesService {
   async createAdministrative(dto: {
     usuarioId: number;
     createdById?: number;
+    companyId?: number | null;
     concepto: string;
     monto: number;
     categoria?: string;
@@ -119,11 +124,22 @@ export class ExpensesService {
     const fechaGasto = dto.fecha ? new Date(`${dto.fecha}T12:00:00`) : new Date();
     if (Number.isNaN(fechaGasto.getTime())) throw new BadRequestException('Fecha inválida');
 
+    const companyId =
+      dto.companyId ??
+      (
+        await this.prisma.companyProfile.findFirst({
+          where: { isPrimary: true, isActive: true },
+          select: { id: true },
+        })
+      )?.id ??
+      null;
+
     const expense = await this.prisma.expense.create({
       data: {
         actividadId,
         usuarioId: dto.usuarioId,
         createdById: dto.createdById ?? dto.usuarioId,
+        companyId,
         montoSolicitado: new Prisma.Decimal(dto.monto),
         isAdministrative: true,
         concepto: dto.concepto.trim().slice(0, 255),
@@ -197,7 +213,7 @@ export class ExpensesService {
     });
   }
 
-  async approveOrReject(id: number, action: 'approve' | 'reject', note?: string) {
+  async approveOrReject(id: number, action: 'approve' | 'reject', note?: string, actorId?: number) {
     const existing = await this.prisma.expense.findFirst({
       where: { id, deletedAt: null, isAdministrative: true },
     });
@@ -207,7 +223,7 @@ export class ExpensesService {
     }
 
     if (action === 'reject') {
-      return this.prisma.expense.update({
+      const updated = await this.prisma.expense.update({
         where: { id },
         data: {
           estatusPago: STATUS.RECHAZADO,
@@ -217,9 +233,13 @@ export class ExpensesService {
         },
         include: { usuario: true, actividad: true, createdBy: true },
       });
+      await this.audit
+        .log({ entityType: 'Expense', entityId: id, action: 'REJECT', changes: { note } }, actorId)
+        .catch(() => undefined);
+      return updated;
     }
 
-    return this.prisma.expense.update({
+    const updated = await this.prisma.expense.update({
       where: { id },
       data: {
         estatusPago: STATUS.APROBADO,
@@ -227,9 +247,13 @@ export class ExpensesService {
       },
       include: { usuario: true, actividad: true, createdBy: true },
     });
+    await this.audit
+      .log({ entityType: 'Expense', entityId: id, action: 'APPROVE' }, actorId)
+      .catch(() => undefined);
+    return updated;
   }
 
-  async markPagado(id: number) {
+  async markPagado(id: number, actorId?: number) {
     const existing = await this.prisma.expense.findFirst({
       where: { id, deletedAt: null, isAdministrative: true },
     });
@@ -237,14 +261,43 @@ export class ExpensesService {
     if (existing.estatusPago !== STATUS.APROBADO && existing.estatusPago !== STATUS.PAGADO) {
       throw new BadRequestException('El gasto debe estar aprobado para marcarlo como pagado');
     }
-    return this.prisma.expense.update({
+
+    let journalEntryId = existing.journalEntryId;
+    let contabilidadRef = existing.contabilidadRef;
+    if (!journalEntryId && actorId) {
+      const entry = await this.accounting.postOperationalDisbursement({
+        kind: 'expense',
+        entityId: id,
+        amount: Number(existing.montoSolicitado),
+        date: existing.fechaGasto || existing.fechaSolicitud,
+        description: `Pago gasto administrativo #${id}: ${existing.concepto || existing.razonGasto || 'Gasto'}`,
+        userId: actorId,
+      });
+      journalEntryId = entry.id;
+      contabilidadRef = entry.entryNumber;
+    }
+
+    const updated = await this.prisma.expense.update({
       where: { id },
       data: {
         estatusPago: STATUS.PAGADO,
-        contabilidadRef: existing.contabilidadRef || `GAS-${id}-${new Date().toISOString().slice(0, 10)}`,
+        journalEntryId: journalEntryId ?? undefined,
+        contabilidadRef: contabilidadRef || `GAS-${id}-${new Date().toISOString().slice(0, 10)}`,
       },
-      include: { usuario: true, actividad: true, createdBy: true },
+      include: { usuario: true, actividad: true, createdBy: true, journalEntry: true },
     });
+    await this.audit
+      .log(
+        {
+          entityType: 'Expense',
+          entityId: id,
+          action: 'MARK_PAID',
+          changes: { journalEntryId, contabilidadRef },
+        },
+        actorId,
+      )
+      .catch(() => undefined);
+    return updated;
   }
 
   private adminWhere(departmentId?: number) {
@@ -299,13 +352,17 @@ export class ExpensesService {
     });
   }
 
-  async remove(id: number) {
+  async remove(id: number, actorId?: number) {
     const existing = await this.prisma.expense.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException('Gasto no encontrado');
-    return this.prisma.expense.update({
+    const updated = await this.prisma.expense.update({
       where: { id },
       data: { deletedAt: new Date(), estatusPago: STATUS.RECHAZADO },
     });
+    await this.audit
+      .log({ entityType: 'Expense', entityId: id, action: 'DELETE' }, actorId)
+      .catch(() => undefined);
+    return updated;
   }
 
   async analytics(filters: { from?: string; to?: string }, departmentId?: number) {

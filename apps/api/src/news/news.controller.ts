@@ -48,7 +48,7 @@ export class NewsController {
 
   @Post()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'coverImage', maxCount: 1 },
@@ -78,7 +78,7 @@ export class NewsController {
 
   @Get('admin')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   listAdmin(@Query('search') search?: string, @Query('status') status?: string, @Query() query?: PaginationQueryDto) {
     return this.newsService.list(search, status, query, { includeDrafts: true });
   }
@@ -120,14 +120,14 @@ export class NewsController {
 
   @Get('admin/:id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   findOneAdmin(@Param('id', ParseIntPipe) id: number) {
     return this.newsService.findOne(id, { includeDrafts: true });
   }
 
   @Put(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() payload: UpdateNewsPostDto,
@@ -137,7 +137,7 @@ export class NewsController {
 
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.newsService.remove(id);
   }

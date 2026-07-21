@@ -38,6 +38,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         clientId: payload.clientId,
         isClient: true,
         isBranchUser: false,
+        portalKind: payload.portalKind || 'client',
       };
     }
 
@@ -56,6 +57,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         isClient: false,
         isBranchUser: true,
         branchId: payload.branchId,
+        portalKind: payload.portalKind || 'branch',
       };
     }
 

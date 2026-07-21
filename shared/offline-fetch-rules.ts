@@ -10,7 +10,8 @@ export function isNeverQueuePath(pathname: string): boolean {
     p.includes("/auth/register") ||
     p.includes("/auth/refresh") ||
     p.includes("/client-auth/login") ||
-    p.includes("/branch-auth/login")
+    p.includes("/branch-auth/login") ||
+    p.includes("/portal/login")
   ) {
     return true;
   }

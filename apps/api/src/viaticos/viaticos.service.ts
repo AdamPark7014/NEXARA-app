@@ -13,6 +13,8 @@ import {
 } from '../common/rbac/hierarchical-approval.js';
 import { ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
 import { generateViaticsReportPdf } from './viatics-report-pdf.js';
+import { AccountingService } from '../accounting/accounting.service.js';
+import { AuditService } from '../audit/audit.service.js';
 
 export const VIATIC_CATEGORIES = [
   'COMBUSTIBLE',
@@ -33,6 +35,8 @@ export class ViaticosService {
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly autoApproval: AutoApprovalService,
+    private readonly accounting: AccountingService,
+    private readonly audit: AuditService,
   ) {}
 
   private resolveActorRole(actor: any): RoleKey | null {
@@ -152,6 +156,15 @@ export class ViaticosService {
     }
     const vehicleId = dto.vehicleId ? Number(dto.vehicleId) : null;
     const categoria = this.normalizeCategory(dto.categoria);
+    const companyId =
+      (dto.companyId ? Number(dto.companyId) : null) ||
+      (
+        await this.prisma.companyProfile.findFirst({
+          where: { isPrimary: true, isActive: true },
+          select: { id: true },
+        })
+      )?.id ||
+      null;
 
     const viatico = await this.prisma['viatico'].create({
       data: {
@@ -159,6 +172,7 @@ export class ViaticosService {
         actividadId,
         projectId,
         vehicleId,
+        companyId,
         categoria,
         montoSolicitado: dto.montoSolicitado,
         motivo: dto.motivo ?? null,
@@ -313,6 +327,9 @@ export class ViaticosService {
       if (updated?.usuarioId) {
         await this.notificationHierarchy.notifyViaticReview(updated.usuarioId, id, 'rejected', 0);
       }
+      await this.audit
+        .log({ entityType: 'Viatico', entityId: id, action: 'REJECT', changes: { note } }, actor?.id)
+        .catch(() => undefined);
       return updated;
     }
 
@@ -339,6 +356,9 @@ export class ViaticosService {
       if (updated?.usuarioId) {
         await this.notificationHierarchy.notifyViaticReview(updated.usuarioId, id, 'approved', amount);
       }
+      await this.audit
+        .log({ entityType: 'Viatico', entityId: id, action: 'APPROVE', changes: { contabilidadRef } }, actor?.id)
+        .catch(() => undefined);
       return updated;
     }
 
@@ -347,21 +367,60 @@ export class ViaticosService {
       data: { approvalStep: nextStep, approvalTrail: trail, estatus: 'Pendiente' },
     });
     if (claim.count === 0) throw new BadRequestException('Este viático ya fue actualizado por otra solicitud');
+    await this.audit
+      .log(
+        { entityType: 'Viatico', entityId: id, action: 'APPROVE_STEP', changes: { nextStep } },
+        actor?.id,
+      )
+      .catch(() => undefined);
     return this.prisma['viatico'].findUnique({
       where: { id },
       include: { User: { select: { id: true, nombre: true } } },
     });
   }
 
-  async markPagado(id: number) {
+  async markPagado(id: number, actorId?: number) {
     const viatico = await this.findOne(id);
     if (!viatico || viatico.estatus !== 'Aprobado') {
       throw new BadRequestException('Solo viáticos aprobados por CEO pueden marcarse como pagados');
     }
-    return this.prisma['viatico'].update({
+
+    let journalEntryId = viatico.journalEntryId as number | null | undefined;
+    let contabilidadRef = viatico.contabilidadRef as string | null | undefined;
+    if (!journalEntryId && actorId) {
+      const entry = await this.accounting.postOperationalDisbursement({
+        kind: 'viatic',
+        entityId: id,
+        amount: this.amountOf(viatico),
+        date: viatico.fechaSolicitud,
+        description: `Pago viático #${id}: ${viatico.motivo || viatico.categoria || 'Viático'}`,
+        userId: actorId,
+      });
+      journalEntryId = entry.id;
+      contabilidadRef = entry.entryNumber;
+    }
+
+    const updated = await this.prisma['viatico'].update({
       where: { id },
-      data: { estatus: 'Pagado' },
+      data: {
+        estatus: 'Pagado',
+        journalEntryId: journalEntryId ?? undefined,
+        contabilidadRef: contabilidadRef || `VIAT-${id}-${new Date().toISOString().slice(0, 10)}`,
+      },
+      include: { User: { select: { id: true, nombre: true } }, journalEntry: true },
     });
+    await this.audit
+      .log(
+        {
+          entityType: 'Viatico',
+          entityId: id,
+          action: 'MARK_PAID',
+          changes: { journalEntryId, contabilidadRef },
+        },
+        actorId,
+      )
+      .catch(() => undefined);
+    return updated;
   }
 
   async update(id: number, dto: any) {

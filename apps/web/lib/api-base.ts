@@ -96,6 +96,23 @@ export const buildApiUrl = (path: string) => {
   return `${base}/${path.replace(/^\/+/, "")}`;
 };
 
+/**
+ * Fetch autenticado NEXARA: añade `X-Company-Id` desde tenant activo (browser).
+ * Preferir este helper en nuevas llamadas al API.
+ */
+export async function apiRequest(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers || {});
+  if (!headers.has("Content-Type") && !(typeof FormData !== "undefined" && init.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (typeof window !== "undefined") {
+    const raw = window.localStorage.getItem("nexara_active_company_id");
+    const id = raw ? parseInt(raw, 10) : NaN;
+    if (Number.isFinite(id)) headers.set("X-Company-Id", String(id));
+  }
+  return fetch(buildApiUrl(path), { ...init, headers });
+}
+
 /** Nest may respond 200 with an empty body when the handler returns null. */
 export async function parseResponseJson<T>(res: Response): Promise<T | null> {
   if (res.status === 204) return null;

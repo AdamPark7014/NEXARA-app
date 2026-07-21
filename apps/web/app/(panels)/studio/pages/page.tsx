@@ -26,6 +26,7 @@ import {
 import {
   getPageSection,
   savePageSection,
+  publishPageSection,
   uploadPageMedia,
   resolvePageMediaUrl,
   mergePageVisuals,
@@ -242,36 +243,59 @@ export default function StudioPagesPage() {
     }
   };
 
+  const buildActiveSectionPayload = (): { section: string; content: Record<string, unknown> } | null => {
+    if (mode === "textos") {
+      const tab = TEXT_TABS.find((t) => t.id === activeTextTab)!;
+      let content: Record<string, unknown>;
+      if (activeTextTab === "metricas") content = { items: metricas };
+      else if (activeTextTab === "servicios") content = { items: servicios };
+      else if (activeTextTab === "proceso") content = { items: proceso };
+      else if (activeTextTab === "industrias") content = { items: industrias };
+      else content = cta as unknown as Record<string, unknown>;
+      return { section: tab.section, content };
+    }
+    if (mode === "imagenes") {
+      return {
+        section: activeVisualTab,
+        content: visuals[activeVisualTab] as unknown as Record<string, unknown>,
+      };
+    }
+    return {
+      section: PAGE_SEO_META[activeSeoTab].section,
+      content: seoByPage[activeSeoTab] as unknown as Record<string, unknown>,
+    };
+  };
+
   const handleSave = async () => {
     if (!token) return;
+    const payload = buildActiveSectionPayload();
+    if (!payload) return;
     setSaving(true);
     try {
-      if (mode === "textos") {
-        const tab = TEXT_TABS.find((t) => t.id === activeTextTab)!;
-        let content: Record<string, unknown>;
-        if (activeTextTab === "metricas")        content = { items: metricas };
-        else if (activeTextTab === "servicios")  content = { items: servicios };
-        else if (activeTextTab === "proceso")    content = { items: proceso };
-        else if (activeTextTab === "industrias") content = { items: industrias };
-        else                                     content = cta as unknown as Record<string, unknown>;
-        await savePageSection(tab.section, content, token, user?.email ?? undefined);
-      } else if (mode === "imagenes") {
-        const content = visuals[activeVisualTab] as unknown as Record<string, unknown>;
-        await savePageSection(activeVisualTab, content, token, user?.email ?? undefined);
-      } else {
-        const content = seoByPage[activeSeoTab] as unknown as Record<string, unknown>;
-        await savePageSection(
-          PAGE_SEO_META[activeSeoTab].section,
-          content,
-          token,
-          user?.email ?? undefined,
-        );
-      }
+      await savePageSection(payload.section as any, payload.content, token, user?.email ?? undefined);
       const now = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
       setLastSaved(now);
-      toast.success("Guardado. Cambios visibles en el sitio en ~5 min.");
+      toast.success("Borrador guardado. Publica para que se vea en nexara.com.mx.");
     } catch (err) {
       toast.error("Error al guardar: " + (err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!token) return;
+    const payload = buildActiveSectionPayload();
+    if (!payload) return;
+    setSaving(true);
+    try {
+      await savePageSection(payload.section as any, payload.content, token, user?.email ?? undefined);
+      await publishPageSection(payload.section as any, token, user?.email ?? undefined);
+      const now = new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+      setLastSaved(now);
+      toast.success("Publicado en el sitio NEXARA.");
+    } catch (err) {
+      toast.error("Error al publicar: " + (err as Error).message);
     } finally {
       setSaving(false);
     }
@@ -370,8 +394,11 @@ export default function StudioPagesPage() {
             >
               Ver pagina
             </Button>
-            <Button variant="primary" iconLeft="Guardar" onClick={handleSave} disabled={saving || !!uploadingKey}>
-              {saving ? "Guardando..." : "Guardar seccion"}
+            <Button variant="secondary" onClick={handleSave} disabled={saving || !!uploadingKey}>
+              {saving ? "Guardando…" : "Guardar borrador"}
+            </Button>
+            <Button variant="primary" iconLeft="Publicar" onClick={handlePublish} disabled={saving || !!uploadingKey}>
+              {saving ? "Publicando…" : "Publicar en sitio"}
             </Button>
           </>
         }

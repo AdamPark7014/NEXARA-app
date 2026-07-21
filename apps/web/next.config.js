@@ -131,6 +131,19 @@ const nextConfig = {
       // Studio / copy histórico decía /noticias; canónica SEO = /blog
       { source: "/noticias", destination: "/blog", permanent: true },
       { source: "/noticias/:slug", destination: "/blog/:slug", permanent: true },
+      // Aliases de búsqueda local → landings geo×servicio
+      { source: "/cctv-puebla", destination: "/cobertura/puebla/camaras-cctv", permanent: true },
+      { source: "/cctv-cdmx", destination: "/cobertura/cdmx/camaras-cctv", permanent: true },
+      { source: "/camaras-seguridad-puebla", destination: "/cobertura/puebla/camaras-cctv", permanent: true },
+      { source: "/camaras-seguridad-cdmx", destination: "/cobertura/cdmx/camaras-cctv", permanent: true },
+      { source: "/redes-puebla", destination: "/cobertura/puebla/redes-y-conectividad", permanent: true },
+      { source: "/redes-cdmx", destination: "/cobertura/cdmx/redes-y-conectividad", permanent: true },
+      { source: "/wifi-empresarial-puebla", destination: "/cobertura/puebla/redes-y-conectividad", permanent: true },
+      { source: "/soporte-ti-puebla", destination: "/cobertura/puebla/soporte-ti-pyme", permanent: true },
+      { source: "/soporte-ti-cdmx", destination: "/cobertura/cdmx/soporte-ti-pyme", permanent: true },
+      { source: "/cctv-cholula", destination: "/cobertura/cholula/camaras-cctv", permanent: true },
+      { source: "/cctv-queretaro", destination: "/cobertura/queretaro/camaras-cctv", permanent: true },
+      { source: "/cctv-monterrey", destination: "/cobertura/monterrey/camaras-cctv", permanent: true },
     ];
   },
 
