@@ -75,7 +75,7 @@ export default function ContactoClient({ visuals }: Props) {
       category: String(data.category || "VENTAS"),
       message,
       source: "contacto-page",
-      pageUrl: typeof window !== "undefined" ? window.location.pathname : "/contacto",
+      pageUrl: typeof window !== "undefined" ? window.location.pathname + window.location.search : "/contacto",
     };
 
     try {

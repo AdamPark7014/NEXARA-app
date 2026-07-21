@@ -1,8 +1,11 @@
 import Link from "next/link";
-import { getProgrammaticLandings, INDUSTRY_LANDINGS } from "@/lib/seo/programmatic-landings";
+import {
+  getProgrammaticLandings,
+  INDUSTRY_LANDINGS,
+  findServiceLanding,
+} from "@/lib/seo/programmatic-landings";
 import { MONEY_SERVICE_SLUGS } from "@/lib/seo/money-pages";
-import { GEO_CITIES, GEO_SERVICE_SLUGS, findGeoCity } from "@/lib/seo/geo-cities";
-import { findServiceLanding } from "@/lib/seo/programmatic-landings";
+import { GEO_CITIES, findGeoCity } from "@/lib/seo/geo-cities";
 import styles from "./SeoInterlinkHub.module.css";
 
 const GEO_HUB_CITIES = ["puebla", "cdmx", "cholula", "queretaro", "monterrey"] as const;

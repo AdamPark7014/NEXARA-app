@@ -175,4 +175,11 @@ export const GEO_SEARCH_ALIASES: { source: string; city: string; service: string
   { source: "/cctv-cholula", city: "cholula", service: "camaras-cctv" },
   { source: "/cctv-queretaro", city: "queretaro", service: "camaras-cctv" },
   { source: "/cctv-monterrey", city: "monterrey", service: "camaras-cctv" },
+  { source: "/cctv-guadalajara", city: "guadalajara", service: "camaras-cctv" },
+  { source: "/cctv-cancun", city: "cancun", service: "camaras-cctv" },
+  { source: "/cctv-leon", city: "leon", service: "camaras-cctv" },
+  { source: "/cctv-tlaxcala", city: "tlaxcala", service: "camaras-cctv" },
+  { source: "/wifi-empresarial-cdmx", city: "cdmx", service: "redes-y-conectividad" },
+  { source: "/computo-puebla", city: "puebla", service: "equipo-de-computo" },
+  { source: "/computo-cdmx", city: "cdmx", service: "equipo-de-computo" },
 ];

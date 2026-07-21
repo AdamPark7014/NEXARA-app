@@ -7,6 +7,7 @@ import styles from "./page.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
 import heroStyles from "../../components/PublicPageHero.module.css";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
+import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import {
   fetchPublishedNews,
   normalizeNewsImageUrl,
@@ -150,6 +151,18 @@ export default async function BlogPage() {
               </p>
             </div>
           )}
+        </div>
+      </section>
+
+      <section className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
+        <div className={shared.inner}>
+          <SeoInterlinkHub
+            title="De la nota a la cotización"
+            subtitle="Cuando el contenido apunta a un problema real, estas landings cierran el ciclo."
+            currentPath="/blog"
+            maxIndustries={3}
+            maxServicesPerIndustry={2}
+          />
         </div>
       </section>
     </main>

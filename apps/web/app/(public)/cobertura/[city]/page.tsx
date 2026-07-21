@@ -6,6 +6,7 @@ import PublicPageHero from "../../../components/PublicPageHero";
 import heroStyles from "../../../components/PublicPageHero.module.css";
 import styles from "../page.module.css";
 import {
+  GEO_CITIES,
   GEO_MONEY_LINKS,
   GEO_SERVICE_SLUGS,
   findGeoCity,
