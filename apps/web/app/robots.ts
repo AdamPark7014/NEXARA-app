@@ -40,6 +40,7 @@ export default function robots(): MetadataRoute.Robots {
     "/nosotros",
     "/blog/",
     "/cobertura",
+    "/cobertura/",
     "/soluciones/",
     "/Nexara-Ingenieros",
     "/legal/",

@@ -3,8 +3,10 @@ import Link from "next/link";
 import shared from "../_shared/public.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
 import heroStyles from "../../components/PublicPageHero.module.css";
+import styles from "./page.module.css";
+import { GEO_CITIES } from "@/lib/seo/geo-cities";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 1800;
 
 const regiones = [
   {
@@ -54,6 +56,9 @@ const modalidades = [
   },
 ];
 
+const modeLabel = (mode: string) =>
+  mode === "base" ? "Base" : mode === "campo" ? "Campo" : "Extendida";
+
 export default function CoberturaPage() {
   return (
     <main className={`${shared.page} home-main-flush`}>
@@ -68,9 +73,44 @@ export default function CoberturaPage() {
         lead="Puebla y CDMX como ancla operativa. El resto del país con campo propio, partners y modelo remoto o híbrido."
         imageSrc="/images/hero/hero-06.png"
         imageAlt="Cobertura nacional Nexara"
+        actions={
+          <div className={styles.heroActions}>
+            <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
+              Cotizar mi zona <span className={shared.btnArrow}>→</span>
+            </Link>
+            <Link href="/cobertura/puebla" className={`${shared.btn} ${shared.btnSecondary}`}>
+              Ver Puebla
+            </Link>
+          </div>
+        }
       />
 
       <section className={shared.section} data-reveal="up">
+        <div className={shared.inner}>
+          <header className={shared.sectionHead}>
+            <p className={shared.eyebrow}>Ciudades</p>
+            <h2 className={shared.sectionTitle}>
+              Cotiza por <span className={shared.sectionTitleAccent}>ciudad</span>
+            </h2>
+            <p className={shared.sectionLead}>
+              Páginas locales de CCTV, redes y soporte — listas para Google y para WhatsApp.
+            </p>
+          </header>
+          <div className={styles.cityGrid}>
+            {GEO_CITIES.map((c) => (
+              <Link key={c.slug} href={`/cobertura/${c.slug}`} className={styles.cityCard}>
+                <p className={styles.cityMeta}>
+                  {modeLabel(c.mode)} · {c.region}
+                </p>
+                <h3 className={styles.cityName}>{c.name}</h3>
+                <p className={styles.cityHint}>{c.keywords[0]}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
         <div className={shared.inner}>
           <header className={shared.sectionHead}>
             <p className={shared.eyebrow}>Regiones</p>
@@ -93,7 +133,7 @@ export default function CoberturaPage() {
         </div>
       </section>
 
-      <section className={`${shared.section} ${shared.sectionDivider}`} data-reveal="up">
+      <section className={shared.section} data-reveal="up">
         <div className={shared.inner}>
           <header className={shared.sectionHead}>
             <p className={shared.eyebrow}>Modalidades</p>
@@ -126,6 +166,9 @@ export default function CoberturaPage() {
             <div className={shared.ctaActions}>
               <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
                 Consultar mi zona <span className={shared.btnArrow}>→</span>
+              </Link>
+              <Link href="/cobertura/cdmx" className={`${shared.btn} ${shared.btnSecondary}`}>
+                Ver CDMX
               </Link>
             </div>
           </div>

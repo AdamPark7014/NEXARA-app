@@ -7,6 +7,7 @@ import EditorialImage from "../../components/EditorialImage";
 import heroStyles from "../../components/PublicPageHero.module.css";
 import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
+import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("servicios");
@@ -186,6 +187,38 @@ export default async function ServiciosPage() {
             <li>Soporte técnico especializado antes, durante y después de la entrega.</li>
             <li>Soluciones escalables preparadas para el crecimiento de tu empresa.</li>
           </ul>
+        </div>
+      </section>
+
+      <section className={shared.section} data-reveal="up">
+        <div className={shared.inner}>
+          <SeoInterlinkHub
+            title="Soluciones que más cotizan"
+            subtitle="CCTV, redes y soporte por industria — enlaces listos para Google y para cerrar."
+            currentPath="/servicios"
+            maxIndustries={4}
+            maxServicesPerIndustry={3}
+          />
+        </div>
+      </section>
+
+      <section className={shared.sectionTight} data-reveal="up">
+        <div className={shared.inner}>
+          <div className={shared.ctaBand}>
+            <p className={shared.ctaEyebrow}>Siguiente paso</p>
+            <h2 className={shared.ctaTitle}>Cotiza CCTV, redes o soporte</h2>
+            <p className={shared.ctaLead}>
+              Diagnóstico corto en Puebla o CDMX. Te decimos qué instalar, qué posponer y qué presupuesto tiene sentido.
+            </p>
+            <div className={shared.ctaActions}>
+              <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`} data-track-conversion="servicios_footer_cta">
+                Hablar con un especialista <span className={shared.btnArrow}>→</span>
+              </Link>
+              <Link href="/cobertura/puebla" className={`${shared.btn} ${shared.btnSecondary}`}>
+                Cobertura Puebla
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
     </main>

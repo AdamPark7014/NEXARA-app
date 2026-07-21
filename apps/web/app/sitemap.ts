@@ -6,6 +6,7 @@ import {
 } from "@/lib/seo/programmatic-landings";
 import { sitemapPriorityForLanding } from "@/lib/seo/money-pages";
 import { fetchPublishedNews } from "@/lib/public-news";
+import { GEO_CITIES } from "@/lib/seo/geo-cities";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
@@ -36,6 +37,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       : 0.84,
   }));
 
+  const geoPages: MetadataRoute.Sitemap = GEO_CITIES.map((city) => ({
+    url: `${baseUrl}/cobertura/${city.slug}`,
+    lastModified: now,
+    changeFrequency: "weekly" as const,
+    priority: city.mode === "base" ? 0.92 : city.mode === "campo" ? 0.86 : 0.8,
+  }));
+
   const programmaticPages: MetadataRoute.Sitemap = getProgrammaticLandings()
     .map(({ industry, service }) => ({
       url: `${baseUrl}/soluciones/${industry.slug}/${service.slug}`,
@@ -53,5 +61,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.72,
   }));
 
-  return [...staticPages, ...industryHubs, ...programmaticPages, ...blogPosts];
+  return [...staticPages, ...geoPages, ...industryHubs, ...programmaticPages, ...blogPosts];
 }

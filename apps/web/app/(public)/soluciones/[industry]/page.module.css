@@ -1,3 +1,11 @@
 .focusList {
   margin-top: clamp(28px, 4vw, 40px);
 }
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+}
+
