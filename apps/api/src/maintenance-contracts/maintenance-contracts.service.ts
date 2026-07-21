@@ -248,7 +248,7 @@ export class MaintenanceContractsService {
         indicaciones: contract.serviceScope || null,
         activityType: 'CLIENT' as any,
         ticketType: 'PREVENTIVO' as any,
-        workType: 'PROJECT' as any,
+        workType: 'PREVENTIVE_INVENTORY',
         projectId: operationalProjectId,
         clientId: contract.clientId,
         branchName: contract.branch?.name || null,
@@ -290,6 +290,14 @@ export class MaintenanceContractsService {
   }
 
   async markVisitCompleted(visitId: number) {
+    const visit = await (this.prisma as any).maintenanceContractVisit.findUnique({
+      where: { id: visitId },
+    });
+    if (!visit) throw new NotFoundException('Visita no encontrada');
+    if (!visit.activityId) {
+      await this.materializeVisitAsActivity(visitId);
+    }
+
     const updated = await (this.prisma as any).maintenanceContractVisit.update({
       where: { id: visitId },
       data: { status: 'COMPLETED', completedAt: new Date() },

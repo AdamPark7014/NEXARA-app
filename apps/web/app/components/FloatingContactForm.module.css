@@ -172,8 +172,7 @@
 }
 
 .formField input,
-.formField textarea,
-.formField select {
+.formField textarea {
   width: 100%;
   padding: 9px 11px;
   border-radius: 8px;
@@ -184,14 +183,108 @@
   font-family: inherit;
 }
 
+.fieldLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #eef4ff;
+}
+
+.selectWrap {
+  position: relative;
+}
+
+.selectTrigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(140, 190, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: #eef4ff;
+  font-size: 0.93rem;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.selectTrigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.selectTrigger:focus-visible {
+  outline: none;
+  border-color: #2dd8f2;
+  box-shadow: 0 0 0 3px rgba(45, 216, 242, 0.14);
+}
+
+.selectPlaceholder {
+  color: #7288ad;
+}
+
+.selectInvalid {
+  border-color: #f07178;
+}
+
+.selectMenu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 5;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: 10px;
+  border: 1px solid rgba(140, 190, 255, 0.22);
+  background: #0b1729;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+}
+
+.selectOption {
+  width: 100%;
+  display: block;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #eef4ff;
+  font-size: 0.92rem;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.selectOption:hover,
+.selectOption:focus-visible {
+  outline: none;
+  background: rgba(45, 216, 242, 0.16);
+  color: #ffffff;
+}
+
+.selectOptionActive {
+  background: rgba(45, 216, 242, 0.22);
+  color: #ffffff;
+}
+
+.fieldError {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  color: #f07178;
+}
+
 .formField input::placeholder,
 .formField textarea::placeholder {
   color: #7288ad;
 }
 
 .formField input:focus,
-.formField textarea:focus,
-.formField select:focus {
+.formField textarea:focus {
   outline: none;
   border-color: #2dd8f2;
   box-shadow: 0 0 0 3px rgba(45, 216, 242, 0.14);
@@ -290,9 +383,20 @@
 
 :global(body.dark) .formField input,
 :global(body.dark) .formField textarea,
-:global(body.dark) .formField select {
+:global(body.dark) .selectTrigger {
   background: color-mix(in srgb, var(--surface) 90%, transparent);
   border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+:global(body.dark) .selectMenu {
+  background: color-mix(in srgb, var(--surface) 96%, #000 4%);
+  border-color: color-mix(in srgb, var(--primary) 34%, transparent);
+}
+
+:global(body.dark) .selectOption:hover,
+:global(body.dark) .selectOption:focus-visible,
+:global(body.dark) .selectOptionActive {
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
 }
 
 @media (max-width: 600px) {

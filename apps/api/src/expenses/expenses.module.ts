@@ -4,9 +4,11 @@ import { ExpensesController } from './expenses.controller.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { WorkflowModule } from '../workflow/workflow.module.js';
+import { AccountingModule } from '../accounting/accounting.module.js';
+import { AuditModule } from '../audit/audit.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, WorkflowModule],
+  imports: [PrismaModule, AuthModule, WorkflowModule, AccountingModule, AuditModule],
   controllers: [ExpensesController],
   providers: [ExpensesService],
   exports: [ExpensesService],

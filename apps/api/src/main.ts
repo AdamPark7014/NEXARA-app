@@ -303,7 +303,7 @@ async function bootstrap() {
       return;
     }
 
-    const isAuthPath = /^\/api\/(auth|client-auth|branch-auth)\b/i.test(pathname);
+    const isAuthPath = /^\/api\/(auth|client-auth|branch-auth|portal)\b/i.test(pathname);
     const limiterResult = isAuthPath ? authLimiter(ip, pathname) : globalLimiter(ip, pathname);
 
     response.setHeader('X-RateLimit-Limit', `${isAuthPath ? readPositiveIntEnv('AUTH_RATE_LIMIT_MAX', 25) : globalRateLimitMax}`);

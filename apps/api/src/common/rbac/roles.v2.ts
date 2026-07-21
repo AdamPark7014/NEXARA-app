@@ -5,14 +5,15 @@
  * + venta (licitaciones públicas/privadas, retail, gobierno, residencial).
  *
  * Esta es la ÚNICA fuente de verdad de roles. Reemplaza a:
- *   - los 27 flags booleanos `acceso*` del modelo Role (legacy)
+ *   - los 27 flags booleanos `acceso*` del modelo Role (legacy — ignorados si User.roleKey está set)
  *   - la matriz dispersa de `org-roles.ts` (legacy, eliminar)
  *   - la mezcla de `superadmin / admin / vendedor / ingeniero` (legacy)
  *
  * Reglas:
- *   - Un usuario tiene EXACTAMENTE 1 rol (`User.role`).
+ *   - Un usuario tiene EXACTAMENTE 1 rol (`User.roleKey` canónico + Role legacy opcional).
  *   - El rol determina: panel(es) accesibles, permisos, URLs permitidas y
  *     nivel jerárquico para aprobaciones.
+ *   - Con `roleKey` v2, `AuthService.resolveUserPermissions` NO lee flags `acceso*`.
  *   - SUPER_ADMIN es bypass total — uso exclusivo del equipo de desarrollo.
  */
 

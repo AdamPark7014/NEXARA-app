@@ -1,13 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 /**
- * CompanyService — multi-tenant base.
+ * CompanyService — multi-tenant NEXARA.
  *
- * Soporta múltiples instancias de CompanyProfile (cada una representa una empresa
- * distinta dentro de la misma instalación del ERP). Una se marca como `isPrimary`
- * y es el default. El frontend puede mandar header `X-Company-Id` para indicar
- * sobre cuál empresa quiere operar; si no se manda, se usa la primaria.
+ * Soporta múltiples CompanyProfile. Una es `isPrimary`.
+ * El frontend manda `X-Company-Id`; TenantInterceptor valida UserCompany.
  */
 @Injectable()
 export class CompanyService {
@@ -15,7 +13,7 @@ export class CompanyService {
 
   /** Lista todas las empresas activas. */
   list() {
-    return (this.prisma as any).companyProfile.findMany({
+    return this.prisma.companyProfile.findMany({
       where: { isActive: true },
       orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }],
     });
@@ -26,15 +24,14 @@ export class CompanyService {
    * Mantiene compatibilidad con código que asume single-company.
    */
   async get() {
-    const primary = await (this.prisma as any).companyProfile.findFirst({
+    const primary = await this.prisma.companyProfile.findFirst({
       where: { isPrimary: true, isActive: true },
       orderBy: { id: 'asc' },
     });
     if (primary) return primary;
-    const any = await (this.prisma as any).companyProfile.findFirst({ orderBy: { id: 'asc' } });
+    const any = await this.prisma.companyProfile.findFirst({ orderBy: { id: 'asc' } });
     if (any) return any;
-    // Si no existe ninguna, crea la primaria desde envs
-    return (this.prisma as any).companyProfile.create({
+    return this.prisma.companyProfile.create({
       data: {
         legalName: process.env.COMPANY_LEGAL_NAME || 'NEXARA Tech S.A. de C.V.',
         tradeName: process.env.COMPANY_TRADE_NAME || 'NEXARA',
@@ -54,9 +51,74 @@ export class CompanyService {
   /** Resuelve por id si viene, sino devuelve la primaria. */
   async resolve(id?: number) {
     if (!id) return this.get();
-    const found = await (this.prisma as any).companyProfile.findUnique({ where: { id } });
+    const found = await this.prisma.companyProfile.findUnique({ where: { id } });
     if (!found) throw new NotFoundException(`Empresa ${id} no encontrada`);
     return found;
+  }
+
+  /**
+   * Resuelve empresa para un request autenticado.
+   * Super-admin puede operar cualquier empresa activa.
+   * Usuarios normales requieren membresía UserCompany.
+   */
+  async resolveForUser(input: {
+    companyId?: number;
+    userId?: number;
+    isSuperAdmin?: boolean;
+  }) {
+    const primary = await this.get();
+    const wantedId = input.companyId || primary.id;
+
+    if (!input.userId) {
+      return this.resolve(wantedId);
+    }
+
+    if (input.isSuperAdmin) {
+      return this.resolve(wantedId);
+    }
+
+    await this.ensureMembership(input.userId, primary.id, true);
+
+    const membership = await this.prisma.userCompany.findUnique({
+      where: {
+        userId_companyId: { userId: input.userId, companyId: wantedId },
+      },
+    });
+    if (!membership) {
+      throw new ForbiddenException('No tienes acceso a esta empresa');
+    }
+    return this.resolve(wantedId);
+  }
+
+  /** Empresas visibles para el usuario (membership; super-admin ve todas activas). */
+  async listForUser(userId: number, isSuperAdmin?: boolean) {
+    if (isSuperAdmin) return this.list();
+
+    const primary = await this.get();
+    await this.ensureMembership(userId, primary.id, true);
+
+    const rows = await this.prisma.userCompany.findMany({
+      where: { userId, company: { isActive: true } },
+      include: { company: true },
+      orderBy: [{ isDefault: 'desc' }, { companyId: 'asc' }],
+    });
+    return rows.map((r) => r.company);
+  }
+
+  async ensureMembership(userId: number, companyId: number, isDefault = false) {
+    const existing = await this.prisma.userCompany.findUnique({
+      where: { userId_companyId: { userId, companyId } },
+    });
+    if (existing) return existing;
+    if (isDefault) {
+      await this.prisma.userCompany.updateMany({
+        where: { userId, isDefault: true },
+        data: { isDefault: false },
+      });
+    }
+    return this.prisma.userCompany.create({
+      data: { userId, companyId, isDefault },
+    });
   }
 
   /** Endpoint público (sin auth): datos no sensibles para web y portales. */
@@ -80,7 +142,7 @@ export class CompanyService {
   }
 
   async create(dto: any) {
-    return (this.prisma as any).companyProfile.create({
+    return this.prisma.companyProfile.create({
       data: {
         legalName: dto.legalName?.trim() || 'Empresa sin nombre',
         tradeName: dto.tradeName?.trim() || null,
@@ -104,7 +166,7 @@ export class CompanyService {
 
   async update(dto: any, id?: number) {
     const current = await this.resolve(id);
-    return (this.prisma as any).companyProfile.update({
+    return this.prisma.companyProfile.update({
       where: { id: current.id },
       data: {
         legalName: dto.legalName?.trim() ?? current.legalName,
@@ -132,17 +194,17 @@ export class CompanyService {
 
   /** Marca esta empresa como primaria y desmarca las demás. */
   async setPrimary(id: number) {
-    await (this.prisma as any).companyProfile.updateMany({
+    await this.prisma.companyProfile.updateMany({
       where: { isPrimary: true },
       data: { isPrimary: false },
     });
-    return (this.prisma as any).companyProfile.update({
+    return this.prisma.companyProfile.update({
       where: { id },
       data: { isPrimary: true },
     });
   }
 
   async setActive(id: number, isActive: boolean) {
-    return (this.prisma as any).companyProfile.update({ where: { id }, data: { isActive } });
+    return this.prisma.companyProfile.update({ where: { id }, data: { isActive } });
   }
 }

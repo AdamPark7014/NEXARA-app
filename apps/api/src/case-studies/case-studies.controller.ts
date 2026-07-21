@@ -11,6 +11,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CaseStudiesService, CreateCaseStudyDto, UpdateCaseStudyDto } from './case-studies.service.js';
+import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { PERMISSIONS } from '../common/permissions.js';
 
 interface MulterFile {
   fieldname: string;
@@ -46,12 +48,24 @@ export class CaseStudiesController {
       res.setHeader('Cache-Control', 'public, max-age=3600');
       createReadStream(filepath).pipe(res);
     } catch {
-      throw new NotFoundException('Image not found');
+      throw new NotFoundException('File not found');
     }
   }
 
+  /** Sitio público nexara.com.mx/proyectos */
+  @Get('public')
+  findAllPublic(@Query() query: PaginationQueryDto) {
+    return this.svc.findAll(query, true);
+  }
+
+  @Get('public/by-slug/:slug')
+  findBySlugPublic(@Param('slug') slug: string) {
+    return this.svc.findBySlugPublic(slug);
+  }
+
   @Post()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   @UseInterceptors(FileInterceptor('coverImage'))
   create(
     @Body() body: CreateCaseStudyDto,
@@ -62,19 +76,22 @@ export class CaseStudiesController {
   }
 
   @Get()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   findAll(@Query() query: PaginationQueryDto) {
     return this.svc.findAll(query);
   }
 
   @Get(':id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.svc.findOne(id);
   }
 
   @Patch(':id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   @UseInterceptors(FileInterceptor('coverImage'))
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -85,13 +102,15 @@ export class CaseStudiesController {
   }
 
   @Patch(':id/toggle-publicado')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   togglePublicado(@Param('id', ParseIntPipe) id: number) {
     return this.svc.togglePublicado(id);
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.svc.remove(id);
   }

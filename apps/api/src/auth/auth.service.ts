@@ -81,12 +81,54 @@ export class AuthService {
     return null;
   }
 
-  /** Permisos efectivos — flags de BD + enriquecimiento v2. */
+  /**
+   * Permisos efectivos.
+   * Con `roleKey` v2 válido: se ignoran flags `acceso*` (fuente = roleKey + url-matrix).
+   * Sin roleKey: modelo legacy por flags de Role.
+   */
   resolveUserPermissions(user: UserWithRole, isSuperAdmin = false): string[] {
-    return this.addV2RolePermissions(
-      this.buildPermissions(user.role, isSuperAdmin),
-      this.resolveEffectiveRoleKey(user),
-    );
+    const roleKey = this.resolveEffectiveRoleKey(user);
+    if (roleKey) {
+      return this.addV2RolePermissions(
+        this.buildBaseAuthenticatedPermissions(isSuperAdmin),
+        roleKey,
+      );
+    }
+    return this.buildPermissions(user.role, isSuperAdmin);
+  }
+
+  /** Permisos mínimos de cualquier empleado autenticado (sin flags acceso*). */
+  private buildBaseAuthenticatedPermissions(isSuperAdmin = false): string[] {
+    const permissions: string[] = [
+      PERMISSIONS.KB_VIEW,
+      PERMISSIONS.WORKFLOW_VIEW,
+      PERMISSIONS.PANEL_SUPPORT,
+      PERMISSIONS.SUPPORT_VIEW,
+      PERMISSIONS.PANEL_PEOPLE,
+      PERMISSIONS.PEOPLE_VIEW,
+    ];
+    if (isSuperAdmin) {
+      permissions.push(
+        PERMISSIONS.CVS_SUPERADMIN_REVIEW,
+        PERMISSIONS.CVS_ADMIN_REVIEW,
+        PERMISSIONS.CVS_MANAGE,
+        PERMISSIONS.KB_MANAGE,
+        PERMISSIONS.SALES_TARGETS_MANAGE,
+        PERMISSIONS.SALES_TARGETS_VIEW,
+        PERMISSIONS.COMPANY_SETTINGS_VIEW,
+        PERMISSIONS.COMPANY_SETTINGS_MANAGE,
+        PERMISSIONS.WORKFLOW_MANAGE,
+        PERMISSIONS.EXECUTIVE_DASHBOARD,
+        PERMISSIONS.PANEL_NOC,
+        PERMISSIONS.PANEL_LAB,
+        PERMISSIONS.NOC_VIEW,
+        PERMISSIONS.NOC_MANAGE,
+        PERMISSIONS.SUPPORT_MANAGE,
+        PERMISSIONS.PEOPLE_MANAGE,
+        PERMISSIONS.LAB_ACCESS,
+      );
+    }
+    return permissions;
   }
 
   private buildPermissions(role: UserWithRole['role'], isSuperAdmin = false) {
@@ -437,6 +479,14 @@ export class AuthService {
       set.add(PERMISSIONS.USERS_MANAGE);
       set.add(PERMISSIONS.USERS_REVIEW);
       set.add(PERMISSIONS.ROLES_MANAGE);
+      // Sustituye accesoConsoleAdmin legacy para endpoints @RBAC(CONSOLE_ADMIN)
+      set.add(PERMISSIONS.CONSOLE_ADMIN);
+      set.add(PERMISSIONS.WORKFLOW_MANAGE);
+      set.add(PERMISSIONS.AUDIT_VIEW);
+    }
+    if (roleKey === 'dir_operaciones' || roleKey === 'arquitecto') {
+      set.add(PERMISSIONS.CONSOLE_ADMIN);
+      set.add(PERMISSIONS.WORKFLOW_MANAGE);
     }
 
     // ── Gobierno ERP (empresas del grupo) ───────────────────────────
@@ -495,6 +545,11 @@ export class AuthService {
     if (V2_SELF_ATTENDANCE_ROLES.has(roleKey)) {
       set.add(PERMISSIONS.ATTENDANCE_VIEW);
       set.add(PERMISSIONS.LUNCH_BREAKS_VIEW);
+    }
+
+    // ── Studio / diseño web ──────────────────────────────────────────
+    if (roleKey === 'lider_diseno' || roleKey === 'disenador') {
+      set.add(PERMISSIONS.PANEL_WEB);
     }
 
     // ── Ingeniero de campo ───────────────────────────────────────────
@@ -617,6 +672,7 @@ export class AuthService {
   }
 
   private mapSessionUser(user: any, permissions: string[], isSuperAdmin: boolean, loginDevice?: string) {
+    const roleKey = this.resolveEffectiveRoleKey(user) ?? user.roleKey ?? null;
     return {
       id: user.id,
       nombre: user.nombre,
@@ -625,10 +681,11 @@ export class AuthService {
       roleId: user.roleId,
       // RBAC v2: clave canónica de rol (roles.v2.ts). Coexiste con roleId
       // legacy hasta que terminemos la migración de toda la base de usuarios.
-      roleKey: this.resolveEffectiveRoleKey(user) ?? user.roleKey ?? null,
+      roleKey,
       orgRoleKey: user.role?.orgRoleKey ?? null,
       nivelAutoridad: user.role?.nivelAutoridad ?? 0,
-      roleFlags: this.pickRoleFlags(user.role),
+      // Con roleKey v2 los flags acceso* ya no otorgan permisos — se reportan apagados.
+      roleFlags: roleKey ? this.pickRoleFlags(null) : this.pickRoleFlags(user.role),
       department: user.department?.nombre ?? '',
       departmentId: user.departmentId,
       permissions,
@@ -705,12 +762,35 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto, req?: any) {
-    const user = await this.validateUser(loginDto.email, loginDto.password);
-    const isSuperAdmin = this.isSuperAdmin(user.email);
-    const effectiveRoleKey = this.resolveEffectiveRoleKey(user);
-    const permissions = this.resolveUserPermissions(user, isSuperAdmin);
     const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
+    const ipAddress = String(req?.headers?.['x-forwarded-for'] || req?.ip || '')
+      .split(',')[0]
+      ?.trim();
     const detectedDevice = detectDeviceFromUserAgent(userAgent, req?.headers);
+
+    let user;
+    try {
+      user = await this.validateUser(loginDto.email, loginDto.password);
+    } catch (err) {
+      try {
+        await this.prisma.auditLog.create({
+          data: {
+            entityType: 'Auth',
+            entityId: 0,
+            action: 'LOGIN_FAILED',
+            changes: { email: String(loginDto.email || '').trim().toLowerCase() },
+            ipAddress: ipAddress || null,
+            userAgent: userAgent ? String(userAgent).slice(0, 500) : null,
+          },
+        });
+      } catch {
+        // no bloquear
+      }
+      throw err;
+    }
+
+    const isSuperAdmin = this.isSuperAdmin(user.email);
+    const permissions = this.resolveUserPermissions(user, isSuperAdmin);
 
     if (loginDto.panel === 'ventas' && !isSuperAdmin && !permissions.includes(PERMISSIONS.PANEL_VENTAS)) {
       throw new UnauthorizedException('Tu usuario no tiene acceso al panel de ventas');
@@ -729,6 +809,26 @@ export class AuthService {
     };
 
     await this.createLoginNotification(user.id, detectedDevice);
+
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          entityType: 'Auth',
+          entityId: user.id,
+          action: 'LOGIN_SUCCESS',
+          changes: {
+            email: user.email,
+            roleKey: payload.roleKey,
+            device: detectedDevice,
+          },
+          userId: user.id,
+          ipAddress: ipAddress || null,
+          userAgent: userAgent ? String(userAgent).slice(0, 500) : null,
+        },
+      });
+    } catch {
+      // no bloquear login
+    }
 
     return {
       access_token: this.jwtService.sign(payload),

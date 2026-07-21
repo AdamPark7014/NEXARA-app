@@ -490,6 +490,7 @@ model User {
   cvsRecruiterReviewed      CvCandidate[]              @relation("CvRecruiterReviewedBy")
   cvsAdminReviewed          CvCandidate[]              @relation("CvAdminReviewedBy")
   cvsSuperadminReviewed     CvCandidate[]              @relation("CvSuperadminReviewedBy")
+  companyMemberships        UserCompany[]
 
   // === ERP Industrial Relations ===
   fiscalPeriodsClosed     FiscalPeriod[]         @relation("FiscalPeriodClosedBy")
@@ -1083,6 +1084,8 @@ model Expense {
   esRecurrente       Boolean   @default(false)
   fechaGasto         DateTime?
   contabilidadRef    String?   @db.VarChar(120)
+  journalEntryId     Int?
+  companyId          Int?
   createdById        Int?
   ticketEvidenciaUrl String?
   /// Pendiente | Aprobado | Pagado | Rechazado
@@ -1092,9 +1095,12 @@ model Expense {
   actividad          Activity  @relation(fields: [actividadId], references: [id])
   usuario            User      @relation(fields: [usuarioId], references: [id])
   createdBy          User?     @relation("ExpenseCreator", fields: [createdById], references: [id])
+  journalEntry       JournalEntry? @relation(fields: [journalEntryId], references: [id])
+  company            CompanyProfile? @relation(fields: [companyId], references: [id])
 
   @@index([isAdministrative, estatusPago, fechaSolicitud])
   @@index([categoria, fechaSolicitud])
+  @@index([companyId])
 }
 
 model LocationTracking {
@@ -1125,15 +1131,20 @@ model Viatico {
   approvalStep       Int           @default(0)
   approvalTrail      Json?
   contabilidadRef    String?       @db.VarChar(120)
+  journalEntryId     Int?
+  companyId          Int?
   fechaSolicitud     DateTime      @default(now())
   deletedAt          DateTime?
   Activity           Activity?     @relation(fields: [actividadId], references: [id])
   User               User          @relation(fields: [usuarioId], references: [id])
   project            SalesProject? @relation(fields: [projectId], references: [id])
   vehicle            VehicleAsset? @relation(fields: [vehicleId], references: [id])
+  journalEntry       JournalEntry? @relation(fields: [journalEntryId], references: [id])
+  company            CompanyProfile? @relation(fields: [companyId], references: [id])
 
   @@index([projectId, fechaSolicitud])
   @@index([categoria, fechaSolicitud])
+  @@index([companyId])
   @@map("viaticos")
 }
 
@@ -1204,14 +1215,19 @@ model EmployeePayment {
   status         String    @default("Pagado") @db.VarChar(30)
   paidAt         DateTime?
   contabilidadRef String?  @db.VarChar(120)
+  journalEntryId  Int?
+  companyId       Int?
   evidenceUrls   String[]  @default([])
   createdAt      DateTime  @default(now())
   createdById    Int?
   deletedAt      DateTime?
   user           User      @relation(fields: [userId], references: [id])
   createdBy      User?     @relation("EmployeePaymentCreator", fields: [createdById], references: [id])
+  journalEntry   JournalEntry? @relation(fields: [journalEntryId], references: [id])
+  company        CompanyProfile? @relation(fields: [companyId], references: [id])
 
   @@index([status, periodFrom])
+  @@index([companyId])
   @@map("employee_payments")
 }
 
@@ -1334,12 +1350,17 @@ model HeroVideo {
 }
 
 model PageContent {
-  id        Int      @id @default(autoincrement())
-  section   String   @unique @db.VarChar(80)
-  content   Json
-  updatedBy String?  @db.VarChar(255)
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
+  id           Int       @id @default(autoincrement())
+  section      String    @unique @db.VarChar(80)
+  /// Contenido publicado (sitio público)
+  content      Json
+  /// Borrador Studio (no afecta sitio hasta publish)
+  draftContent Json?
+  publishedAt  DateTime?
+  publishedBy  String?   @db.VarChar(255)
+  updatedBy    String?   @db.VarChar(255)
+  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime  @default(now())
 
   @@map("page_content")
 }
@@ -2275,17 +2296,24 @@ model JournalEntry {
   totalCredit    Decimal            @default(0) @db.Decimal(16, 2)
   createdById    Int?
   postedAt       DateTime?
+  companyId      Int?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   fiscalPeriod   FiscalPeriod?      @relation(fields: [fiscalPeriodId], references: [id])
   reversalOf     JournalEntry?      @relation("JournalReversal", fields: [reversalOfId], references: [id])
   reversedBy     JournalEntry?      @relation("JournalReversal")
   createdBy      User?              @relation("JournalEntryCreator", fields: [createdById], references: [id])
+  company        CompanyProfile?    @relation(fields: [companyId], references: [id])
   lines          JournalEntryLine[]
+  expenses       Expense[]
+  viaticos       Viatico[]
+  employeePayments EmployeePayment[]
+  goodsReceipts  GoodsReceipt[]
 
   @@unique([reference])
   @@index([date])
   @@index([status])
+  @@index([companyId])
   @@map("journal_entries")
 }
 
@@ -2367,22 +2395,29 @@ model Invoice {
   substitutionUuid String?           @db.VarChar(80)
   // ── end CFDI ──
   createdById      Int?
+  companyId        Int?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   deletedAt        DateTime?
   client           SalesClient?      @relation(fields: [clientId], references: [id])
   supplier         Supplier?         @relation("SupplierInvoices", fields: [supplierId], references: [id])
   createdBy        User?             @relation("InvoiceCreator", fields: [createdById], references: [id])
+  company          CompanyProfile?   @relation(fields: [companyId], references: [id])
   items            InvoiceItem[]
   payments         Payment[]
   salesProjectOrderId Int?
   salesProjectOrder   SalesProjectOrder? @relation(fields: [salesProjectOrderId], references: [id], onDelete: SetNull)
+  purchaseOrderId     Int?
+  purchaseOrder       PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  goodsReceiptId      Int?
+  goodsReceipt        GoodsReceipt?      @relation(fields: [goodsReceiptId], references: [id], onDelete: SetNull)
 
   @@index([type, status])
   @@index([dueDate])
   @@unique([cfdiUuid])
   @@index([emisorRfc])
   @@index([receptorRfc])
+  @@index([companyId])
   @@map("invoices")
 }
 
@@ -2572,6 +2607,7 @@ model Warehouse {
   stockLevels   StockLevel[]
   movementsFrom StockMovement[]     @relation("MovementFromWarehouse")
   movementsTo   StockMovement[]     @relation("MovementToWarehouse")
+  goodsReceipts GoodsReceipt[]
 
   @@map("warehouses")
 }
@@ -2758,6 +2794,7 @@ model PurchaseOrder {
   createdById     Int?
   approvedById    Int?
   approvedAt      DateTime?
+  companyId       Int?
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
   deletedAt       DateTime?
@@ -2765,11 +2802,14 @@ model PurchaseOrder {
   requisition     PurchaseRequisition? @relation(fields: [requisitionId], references: [id])
   createdBy       User?                @relation("PurchaseOrderCreator", fields: [createdById], references: [id])
   approvedBy      User?                @relation("PurchaseOrderApprover", fields: [approvedById], references: [id])
+  company         CompanyProfile?      @relation(fields: [companyId], references: [id])
   items           PurchaseOrderItem[]
   receipts        GoodsReceipt[]
   stockMovements  StockMovement[]
+  invoices        Invoice[]
 
   @@index([supplierId, status])
+  @@index([companyId])
   @@map("purchase_orders")
 }
 
@@ -2794,15 +2834,21 @@ model GoodsReceipt {
   id              Int                @id @default(autoincrement())
   receiptNumber   String             @unique @db.VarChar(30)
   purchaseOrderId Int
+  warehouseId     Int?
   receiptDate     DateTime           @db.Date
   notes           String?
   receivedById    Int?
+  journalEntryId  Int?
   createdAt       DateTime           @default(now())
   purchaseOrder   PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id])
+  warehouse       Warehouse?         @relation(fields: [warehouseId], references: [id])
   receivedBy      User?              @relation("GoodsReceiptReceiver", fields: [receivedById], references: [id])
+  journalEntry    JournalEntry?      @relation(fields: [journalEntryId], references: [id])
   items           GoodsReceiptItem[]
+  invoices        Invoice[]
 
   @@index([purchaseOrderId])
+  @@index([warehouseId])
   @@map("goods_receipts")
 }
 
@@ -4016,7 +4062,30 @@ model CompanyProfile {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  memberships     UserCompany[]
+  invoices        Invoice[]
+  journalEntries  JournalEntry[]
+  expenses        Expense[]
+  viaticos        Viatico[]
+  employeePayments EmployeePayment[]
+  purchaseOrders  PurchaseOrder[]
+
   @@map("company_profile")
+}
+
+/// Membresía User ↔ Company (tenant NEXARA). Sin esto el switcher es cosmético.
+model UserCompany {
+  id        Int            @id @default(autoincrement())
+  userId    Int
+  companyId Int
+  isDefault Boolean        @default(false)
+  createdAt DateTime       @default(now())
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+  @@index([companyId])
+  @@map("user_companies")
 }
 
 

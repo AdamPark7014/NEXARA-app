@@ -6,9 +6,19 @@ import { PrismaModule } from '../prisma/prisma.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { WorkflowModule } from '../workflow/workflow.module.js';
+import { AccountingModule } from '../accounting/accounting.module.js';
+import { AuditModule } from '../audit/audit.module.js';
 
 @Module({
-  imports: [AuthModule, PrismaModule, UsersModule, NotificationsModule, WorkflowModule],
+  imports: [
+    AuthModule,
+    PrismaModule,
+    UsersModule,
+    NotificationsModule,
+    WorkflowModule,
+    AccountingModule,
+    AuditModule,
+  ],
   controllers: [ViaticosController],
   providers: [ViaticosService],
   exports: [ViaticosService],

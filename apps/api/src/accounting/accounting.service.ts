@@ -236,6 +236,7 @@ export class AccountingService {
     description: string;
     reference?: string;
     fiscalPeriodId?: number;
+    companyId?: number | null;
     lines: Array<{ debitAccountId: number; creditAccountId?: number; description?: string; debit: number; credit: number; costCenterId?: number }>;
   }, userId: number) {
     const totalDebit = dto.lines.reduce((s, l) => s + (l.debit || 0), 0);
@@ -244,6 +245,7 @@ export class AccountingService {
       throw new BadRequestException('Debe y Haber no cuadran');
     }
 
+    const companyId = await this.resolveCompanyId(dto.companyId);
     const entryNumber = await this.generateEntryNumber();
     return this.prisma.journalEntry.create({
       data: {
@@ -252,6 +254,7 @@ export class AccountingService {
         description: dto.description.trim(),
         reference: dto.reference?.trim() || null,
         fiscalPeriodId: dto.fiscalPeriodId ?? null,
+        companyId,
         totalDebit: new Prisma.Decimal(totalDebit),
         totalCredit: new Prisma.Decimal(totalCredit),
         createdById: userId,
@@ -268,6 +271,16 @@ export class AccountingService {
       },
       include: { lines: { include: { debitAccount: true, creditAccount: true, costCenter: true } } },
     });
+  }
+
+  private async resolveCompanyId(explicit?: number | null) {
+    if (explicit != null && Number.isFinite(Number(explicit))) return Number(explicit);
+    const primary = await this.prisma.companyProfile.findFirst({
+      where: { isPrimary: true, isActive: true },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+    return primary?.id ?? null;
   }
 
   async listJournalEntries(filters?: { status?: string; from?: string; to?: string }, query?: PaginationQueryDto) {
@@ -395,6 +408,12 @@ export class AccountingService {
       { code: '102.01', name: 'Bancos', type: 'ASSET' as const },
       { code: '401.01', name: 'Ingresos por servicios', type: 'REVENUE' as const },
       { code: '208.01', name: 'IVA trasladado cobrado', type: 'LIABILITY' as const },
+      { code: '601.01', name: 'Gastos de administración', type: 'EXPENSE' as const },
+      { code: '601.02', name: 'Viáticos y gastos de viaje', type: 'EXPENSE' as const },
+      { code: '602.01', name: 'Sueldos y salarios', type: 'EXPENSE' as const },
+      { code: '115.01', name: 'Inventario de mercancías', type: 'ASSET' as const },
+      { code: '201.01', name: 'Proveedores nacionales', type: 'LIABILITY' as const },
+      { code: '209.01', name: 'IVA acreditable pagado', type: 'ASSET' as const },
     ];
 
     for (const account of defaults) {
@@ -455,6 +474,270 @@ export class AccountingService {
       }
       throw err;
     }
+  }
+
+  /**
+   * Póliza automática de egreso operativo (gasto / viático / pago a empleado).
+   * Debe gasto  ·  Haber bancos.
+   */
+  async postOperationalDisbursement(input: {
+    kind: 'expense' | 'viatic' | 'payroll';
+    entityId: number;
+    amount: number;
+    date?: Date | string | null;
+    description: string;
+    userId: number;
+  }) {
+    const amount = Number(input.amount);
+    if (!amount || amount <= 0) {
+      throw new BadRequestException('Monto inválido para póliza operativa');
+    }
+
+    const expenseAccountCode =
+      input.kind === 'viatic' ? '601.02' : input.kind === 'payroll' ? '602.01' : '601.01';
+    const prefix =
+      input.kind === 'viatic' ? 'VIAT-PAY' : input.kind === 'payroll' ? 'PAYR-PAY' : 'EXP-PAY';
+    const reference = `${prefix}-${input.entityId}`;
+
+    const [expenseAccount, bank] = await Promise.all([
+      this.getAccountByCode(expenseAccountCode),
+      this.getAccountByCode('102.01'),
+    ]);
+
+    const rawDate = input.date ? new Date(input.date) : new Date();
+    const date = Number.isNaN(rawDate.getTime())
+      ? new Date().toISOString().slice(0, 10)
+      : rawDate.toISOString().slice(0, 10);
+
+    const entry = await this.createAndPostAutoJournal(
+      reference,
+      input.description,
+      date,
+      [
+        {
+          debitAccountId: expenseAccount.id,
+          creditAccountId: bank.id,
+          debit: amount,
+          credit: 0,
+          label: `Gasto ${input.kind} #${input.entityId}`,
+        },
+        {
+          debitAccountId: bank.id,
+          creditAccountId: expenseAccount.id,
+          debit: 0,
+          credit: amount,
+          label: 'Salida de bancos',
+        },
+      ],
+      input.userId,
+    );
+
+    return entry;
+  }
+
+  /**
+   * Póliza de recepción de compra (inventario perpetuo).
+   * Productos → Debe inventario; servicios → Debe gasto; IVA → 209.01; Haber proveedores.
+   */
+  async postPurchaseReceiptAccrual(input: {
+    goodsReceiptId: number;
+    userId: number;
+  }) {
+    const reference = `GR-ACCRUAL-${input.goodsReceiptId}`;
+    const existing = await this.prisma.journalEntry.findFirst({ where: { reference } });
+    if (existing) return existing;
+
+    const receipt = await this.prisma.goodsReceipt.findUnique({
+      where: { id: input.goodsReceiptId },
+      include: {
+        items: {
+          include: {
+            purchaseOrderItem: {
+              include: { product: { select: { id: true, itemType: true, name: true } } },
+            },
+          },
+        },
+        purchaseOrder: { select: { poNumber: true, supplierId: true } },
+      },
+    });
+    if (!receipt) throw new BadRequestException('Recepción no encontrada');
+
+    let inventoryBase = 0;
+    let expenseBase = 0;
+    let taxAmount = 0;
+
+    for (const item of receipt.items) {
+      const qty = Number(item.quantityReceived) || 0;
+      if (qty <= 0) continue;
+      const poItem = item.purchaseOrderItem;
+      const unitPrice = Number(poItem.unitPrice) || 0;
+      const taxRate = Number(poItem.taxRate) || 0;
+      const base = qty * unitPrice;
+      const tax = base * (taxRate / 100);
+      taxAmount += tax;
+      const itemType = poItem.product?.itemType || (poItem.productId ? 'PRODUCT' : 'SERVICE');
+      if (itemType === 'PRODUCT') inventoryBase += base;
+      else expenseBase += base;
+    }
+
+    const total = inventoryBase + expenseBase + taxAmount;
+    if (total <= 0) {
+      throw new BadRequestException('La recepción no tiene monto contable');
+    }
+
+    const [inventory, expense, taxAccount, payable] = await Promise.all([
+      this.getAccountByCode('115.01'),
+      this.getAccountByCode('601.01'),
+      this.getAccountByCode('209.01'),
+      this.getAccountByCode('201.01'),
+    ]);
+
+    const date = new Date(receipt.receiptDate).toISOString().slice(0, 10);
+    const lines: Array<{
+      debitAccountId: number;
+      creditAccountId: number;
+      debit: number;
+      credit: number;
+      label: string;
+    }> = [];
+
+    if (inventoryBase > 0) {
+      lines.push({
+        debitAccountId: inventory.id,
+        creditAccountId: payable.id,
+        debit: inventoryBase,
+        credit: 0,
+        label: 'Entrada de inventario',
+      });
+    }
+    if (expenseBase > 0) {
+      lines.push({
+        debitAccountId: expense.id,
+        creditAccountId: payable.id,
+        debit: expenseBase,
+        credit: 0,
+        label: 'Servicios / gastos de compra',
+      });
+    }
+    if (taxAmount > 0) {
+      lines.push({
+        debitAccountId: taxAccount.id,
+        creditAccountId: payable.id,
+        debit: taxAmount,
+        credit: 0,
+        label: 'IVA acreditable',
+      });
+    }
+    lines.push({
+      debitAccountId: payable.id,
+      creditAccountId: inventoryBase > 0 ? inventory.id : expense.id,
+      debit: 0,
+      credit: total,
+      label: `CXP recepción ${receipt.receiptNumber}`,
+    });
+
+    const entry = await this.createAndPostAutoJournal(
+      reference,
+      `Recepción ${receipt.receiptNumber} / OC ${receipt.purchaseOrder.poNumber}`,
+      date,
+      lines,
+      input.userId,
+    );
+
+    await this.prisma.goodsReceipt.update({
+      where: { id: input.goodsReceiptId },
+      data: { journalEntryId: entry.id },
+    });
+
+    return entry;
+  }
+
+  /**
+   * Factura AP en borrador a partir de una recepción (NEXARA compras).
+   */
+  async createInvoiceFromGoodsReceipt(goodsReceiptId: number, userId: number) {
+    const existing = await this.prisma.invoice.findFirst({
+      where: { goodsReceiptId, deletedAt: null },
+    });
+    if (existing) return existing;
+
+    const receipt = await this.prisma.goodsReceipt.findUnique({
+      where: { id: goodsReceiptId },
+      include: {
+        items: {
+          include: {
+            purchaseOrderItem: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    satProductKey: true,
+                    satUnitKey: true,
+                    unitName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        purchaseOrder: {
+          include: { supplier: true },
+        },
+      },
+    });
+    if (!receipt) throw new BadRequestException('Recepción no encontrada');
+
+    const items = receipt.items
+      .filter((i) => Number(i.quantityReceived) > 0)
+      .map((i) => {
+        const poItem = i.purchaseOrderItem;
+        const qty = Number(i.quantityReceived);
+        const unitPrice = Number(poItem.unitPrice);
+        const taxRate = Number(poItem.taxRate) || 16;
+        return {
+          description: poItem.description || poItem.product?.name || 'Partida compra',
+          quantity: qty,
+          unitPrice,
+          taxRate,
+          ivaRate: taxRate,
+          productId: poItem.productId ?? undefined,
+          satProductKey: poItem.product?.satProductKey || undefined,
+          satUnitKey: poItem.product?.satUnitKey || undefined,
+          unitName: poItem.product?.unitName || undefined,
+        };
+      });
+
+    if (!items.length) {
+      throw new BadRequestException('La recepción no tiene partidas facturables');
+    }
+
+    const issueDate = new Date(receipt.receiptDate).toISOString().slice(0, 10);
+    const due = new Date(receipt.receiptDate);
+    due.setDate(due.getDate() + 30);
+
+    const invoice = await this.createInvoice(
+      {
+        type: 'ACCOUNTS_PAYABLE',
+        issueDate,
+        dueDate: due.toISOString().slice(0, 10),
+        supplierId: receipt.purchaseOrder.supplierId,
+        currency: receipt.purchaseOrder.currency || 'MXN',
+        notes: `Desde ${receipt.receiptNumber} / OC ${receipt.purchaseOrder.poNumber}`,
+        receptorName: receipt.purchaseOrder.supplier?.name || undefined,
+        items,
+      },
+      userId,
+    );
+
+    return this.prisma.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        purchaseOrderId: receipt.purchaseOrderId,
+        goodsReceiptId: receipt.id,
+      },
+      include: { items: true, supplier: true },
+    });
   }
 
   private async autoJournalForStampedInvoice(
@@ -736,6 +1019,7 @@ export class AccountingService {
     cfdiSerie?: string;
     cfdiRelationType?: string;
     cfdiRelatedUuids?: string[];
+    companyId?: number | null;
     items: Array<{
       description: string;
       quantity: number;
@@ -753,7 +1037,8 @@ export class AccountingService {
     }>;
   }, userId: number) {
     const invoiceNumber = await this.generateInvoiceNumber();
-    const issuer = await this.getInvoiceIssuerProfile();
+    const companyId = await this.resolveCompanyId(dto.companyId);
+    const issuer = await this.getInvoiceIssuerProfile(companyId ?? undefined);
     const emisorRfc = dto.emisorRfc?.trim() || issuer.emisorRfc || null;
     const emisorName = dto.emisorName?.trim() || issuer.emisorName || null;
     const emisorRegime = dto.emisorRegime?.trim() || issuer.emisorRegime || null;
@@ -786,6 +1071,7 @@ export class AccountingService {
         currency: dto.currency || 'MXN',
         notes: dto.notes?.trim() || null,
         createdById: userId,
+        companyId,
         // CFDI 4.0
         cfdiUsage: this.normalizeCfdiUsage(dto.cfdiUsage || 'G03') as any,
         satPaymentForm: this.normalizeSatPaymentForm(dto.satPaymentForm || '03') as any,
@@ -1205,7 +1491,7 @@ export class AccountingService {
     return this.getInvoice(id);
   }
 
-  async getInvoiceIssuerProfile() {
+  async getInvoiceIssuerProfile(companyId?: number) {
     const settings = await this.prisma.systemSetting.findMany({
       where: { category: { in: ['empresa', 'fiscal'] } },
       select: { key: true, value: true, label: true },
@@ -1226,10 +1512,15 @@ export class AccountingService {
       };
     }
 
-    const company = await this.prisma.companyProfile.findFirst({
-      where: { isPrimary: true, isActive: true },
-      select: { rfc: true, legalName: true, fiscalRegime: true, fiscalPostalCode: true },
-    });
+    const company = companyId
+      ? await this.prisma.companyProfile.findFirst({
+          where: { id: companyId, isActive: true },
+          select: { rfc: true, legalName: true, fiscalRegime: true, fiscalPostalCode: true },
+        })
+      : await this.prisma.companyProfile.findFirst({
+          where: { isPrimary: true, isActive: true },
+          select: { rfc: true, legalName: true, fiscalRegime: true, fiscalPostalCode: true },
+        });
     if (company) {
       return {
         emisorRfc: company.rfc || null,

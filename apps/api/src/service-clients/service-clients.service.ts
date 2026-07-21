@@ -270,6 +270,9 @@ export class ServiceClientsService {
       },
     });
 
+    // P0-E: vincular o crear maestro comercial (SalesClient)
+    const salesClient = await this.ensureSalesClientLink(client);
+
     if (generatedEmail || generatedPassword) {
       const recipient = dto.contactEmail?.trim() || (dto.portalEmail?.trim() || generatedEmail || null);
       if (recipient && generatedPassword) {
@@ -286,6 +289,9 @@ export class ServiceClientsService {
       }
       return {
         client,
+        salesClient: salesClient
+          ? { id: salesClient.id, name: salesClient.name, serviceClientId: salesClient.serviceClientId }
+          : null,
         credentials: {
           email: generatedEmail || dto.portalEmail?.trim() || null,
           password: generatedPassword,
@@ -293,7 +299,72 @@ export class ServiceClientsService {
       };
     }
 
-    return { client };
+    return {
+      client,
+      salesClient: salesClient
+        ? { id: salesClient.id, name: salesClient.name, serviceClientId: salesClient.serviceClientId }
+        : null,
+    };
+  }
+
+  /**
+   * Asegura un SalesClient comercial linkeado a este ServiceClient operativo.
+   * Match por taxId/accountCode o nombre; si no hay, crea maestro mínimo.
+   */
+  private async ensureSalesClientLink(serviceClient: {
+    id: number;
+    name: string;
+    contactName: string | null;
+    contactEmail: string | null;
+    contactPhone: string | null;
+    address: string | null;
+    accountCode: string | null;
+  }) {
+    const already = await this.db.salesClient.findFirst({
+      where: { serviceClientId: serviceClient.id },
+    });
+    if (already) return already;
+
+    const code = serviceClient.accountCode?.trim() || null;
+    const nameNorm = serviceClient.name.trim();
+
+    let match = code
+      ? await this.db.salesClient.findFirst({
+          where: { taxId: code, serviceClientId: null },
+        })
+      : null;
+
+    if (!match) {
+      match = await this.db.salesClient.findFirst({
+        where: {
+          serviceClientId: null,
+          OR: [
+            { name: { equals: nameNorm, mode: 'insensitive' } },
+            { legalName: { equals: nameNorm, mode: 'insensitive' } },
+          ],
+        },
+      });
+    }
+
+    if (match) {
+      return this.db.salesClient.update({
+        where: { id: match.id },
+        data: { serviceClientId: serviceClient.id },
+      });
+    }
+
+    return this.db.salesClient.create({
+      data: {
+        name: serviceClient.contactName?.trim() || nameNorm,
+        legalName: nameNorm,
+        taxId: code,
+        billingEmail: serviceClient.contactEmail,
+        billingPhone: serviceClient.contactPhone,
+        fiscalAddress: serviceClient.address,
+        serviceClientId: serviceClient.id,
+        status: 'Activo',
+      },
+    });
   }
 
   async findAll(query?: PaginationQueryDto) {

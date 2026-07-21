@@ -168,8 +168,8 @@ export class ViaticosController {
   @Patch(':id/pagado')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_MANAGE] })
-  markPagado(@Param('id') id: string) {
-    return this.viaticosService.markPagado(+id);
+  markPagado(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.viaticosService.markPagado(+id, user?.id);
   }
 
   @Patch(':id')

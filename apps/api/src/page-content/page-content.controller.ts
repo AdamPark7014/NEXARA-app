@@ -22,6 +22,8 @@ import { createReadStream } from 'fs';
 import { PageContentService, VALID_SECTIONS } from './page-content.service.js';
 import { UpsertPageContentDto } from './dto/upsert-page-content.dto.js';
 import { resolveUploadsDir } from '../common/uploads-path.js';
+import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { PERMISSIONS } from '../common/permissions.js';
 
 interface MulterFile {
   fieldname: string;
@@ -54,7 +56,8 @@ export class PageContentController {
 
   /** POST /api/studio/page-content/media — sube imagen para slots de página */
   @Post('media')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   @UseInterceptors(FileInterceptor('image'))
   async uploadMedia(@UploadedFile() file?: MulterFile) {
     if (!file) {
@@ -131,20 +134,41 @@ export class PageContentController {
   }
 
   /**
+   * GET /api/studio/page-content/:section/draft — Studio (borrador)
+   */
+  @Get(':section/draft')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  findDraft(@Param('section') section: string) {
+    return this.svc.findDraft(section);
+  }
+
+  /**
+   * POST /api/studio/page-content/:section/publish — publica borrador al sitio
+   */
+  @Post(':section/publish')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  publish(@Param('section') section: string, @Body() body: { updatedBy?: string }) {
+    return this.svc.publish(section, body?.updatedBy);
+  }
+
+  /**
    * GET /api/studio/page-content/:section
-   * Uso público (landing page) y Studio.
+   * Uso público (landing) — solo publicado.
    */
   @Get(':section')
   findOne(@Param('section') section: string) {
-    return this.svc.findOne(section);
+    return this.svc.findPublished(section);
   }
 
   /**
    * PUT /api/studio/page-content/:section
-   * Solo Studio.
+   * Guarda borrador (no publica).
    */
   @Put(':section')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   upsert(
     @Param('section') section: string,
     @Body() dto: UpsertPageContentDto,

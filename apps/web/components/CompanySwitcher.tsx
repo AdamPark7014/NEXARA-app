@@ -24,8 +24,15 @@ export default function CompanySwitcher({ compact = false }: { compact?: boolean
   const refresh = useCallback(async () => {
     if (!user?.token) return;
     try {
-      const res = await fetch(buildApiUrl("company-public/list"));
-      if (res.ok) setCompanies(await res.json());
+      const res = await fetch(buildApiUrl("company/mine"), {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      if (res.ok) {
+        setCompanies(await res.json());
+        return;
+      }
+      const fallback = await fetch(buildApiUrl("company-public/list"));
+      if (fallback.ok) setCompanies(await fallback.json());
     } catch {
       // silent
     }

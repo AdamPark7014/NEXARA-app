@@ -158,6 +158,8 @@ export default function ProcurementPage() {
   const [showReceiptForm, setShowReceiptForm] = useState(false);
   const [receiptPoId, setReceiptPoId] = useState("");
   const [receiptNotes, setReceiptNotes] = useState("");
+  const [receiptWarehouseId, setReceiptWarehouseId] = useState("");
+  const [warehouses, setWarehouses] = useState<Array<{ id: number; code: string; name: string }>>([]);
   const [savingReceipt, setSavingReceipt] = useState(false);
 
   // ── Rechazar requisición ───────────────────────────────────────────────
@@ -203,6 +205,22 @@ export default function ProcurementPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!token || !showReceiptForm) return;
+    void (async () => {
+      try {
+        const rows = unwrapList<{ id: number; code: string; name: string; isActive?: boolean }>(
+          await apiFetch("warehouse", token),
+        );
+        const active = rows.filter((w) => w.isActive !== false);
+        setWarehouses(active);
+        if (!receiptWarehouseId && active[0]) setReceiptWarehouseId(String(active[0].id));
+      } catch {
+        setWarehouses([]);
+      }
+    })();
+  }, [token, showReceiptForm]);
 
   const visibleOrders = useMemo(() => {
     let rows = orders;
@@ -443,6 +461,7 @@ export default function ProcurementPage() {
         method: "POST",
         body: JSON.stringify({
           purchaseOrderId: poNum,
+          warehouseId: receiptWarehouseId ? Number(receiptWarehouseId) : undefined,
           receiptDate: new Date().toISOString().slice(0, 10),
           notes: receiptNotes.trim() || undefined,
           items,
@@ -451,7 +470,9 @@ export default function ProcurementPage() {
       setShowReceiptForm(false);
       setReceiptPoId("");
       setReceiptNotes("");
+      setReceiptWarehouseId("");
       setReceiptLines([]);
+      toast.success("Recepción registrada · stock y factura AP generados");
       if (detailKind === "order" && poDetail?.id === poNum) {
         void loadOrderDetail(poDetail.id);
       }
@@ -766,10 +787,19 @@ export default function ProcurementPage() {
       {showReceiptForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 16 }}>
           <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Registrar recepción de mercancía</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "end" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 10, alignItems: "end" }}>
             <div>
               <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Orden de compra (ID) *</label>
               <input value={receiptPoId} onChange={(e) => setReceiptPoId(e.target.value)} placeholder="Ej. 12" style={inp} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Almacén NEXARA</label>
+              <select value={receiptWarehouseId} onChange={(e) => setReceiptWarehouseId(e.target.value)} style={inp}>
+                <option value="">Automático</option>
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Notas</label>

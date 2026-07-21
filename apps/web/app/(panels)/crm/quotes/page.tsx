@@ -31,6 +31,7 @@ interface LineItem { name: string; qty: number; unitPrice: number; discount: num
 const emptyItem = (): LineItem => ({ name: "", qty: 1, unitPrice: 0, discount: 0, tax: 16, description: "" });
 
 const emptyForm = {
+  salesClientId: "" as string,
   clientCompany: "", clientName: "", clientEmail: "",
   projectName: "", currency: "MXN",
   validDays: 15, notes: "",
@@ -119,10 +120,12 @@ export default function QuotesPage() {
     const c = clients.find((c) => String(c.id) === id);
     if (c) setForm((f) => ({
       ...f,
+      salesClientId: String(c.id),
       clientCompany: c.legalName?.trim() || c.name,
       clientName: "",
       clientEmail: c.billingEmail ?? "",
     }));
+    else setForm((f) => ({ ...f, salesClientId: "" }));
   };
 
   // Line items helpers
@@ -154,6 +157,7 @@ export default function QuotesPage() {
         quoteNumber,
         issueDate: new Date().toISOString().slice(0, 10),
         validUntil,
+        salesClientId: form.salesClientId ? Number(form.salesClientId) : undefined,
         clientCompany: form.clientCompany.trim(),
         clientName: form.clientName.trim() || undefined,
         clientEmail: form.clientEmail.trim() || undefined,
@@ -415,7 +419,11 @@ export default function QuotesPage() {
                 <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
                   Seleccionar cliente existente
                 </label>
-                <select onChange={(e) => selectClient(e.target.value)} style={inp} defaultValue="">
+                <select
+                  value={form.salesClientId}
+                  onChange={(e) => selectClient(e.target.value)}
+                  style={inp}
+                >
                   <option value="">— buscar en cartera —</option>
                   {clients.map((c) => (
                     <option key={c.id} value={c.id}>{c.legalName?.trim() || c.name}</option>

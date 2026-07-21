@@ -92,6 +92,15 @@ export class CaseStudiesService {
     return cs;
   }
 
+  async findBySlugPublic(slug: string) {
+    const cs = await this.prisma.caseStudy.findFirst({
+      where: { slug, publicado: true },
+      include: { autor: { select: { id: true, nombre: true } } },
+    });
+    if (!cs) throw new NotFoundException(`Caso publicado slug="${slug}" no encontrado`);
+    return cs;
+  }
+
   async update(id: number, data: UpdateCaseStudyDto, coverImage?: MulterFile) {
     await this.findOne(id);
     const imageUrl = coverImage ? await this.saveCoverImage(coverImage) : data.imageUrl;

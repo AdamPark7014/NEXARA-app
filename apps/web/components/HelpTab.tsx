@@ -131,8 +131,8 @@ const helpContent: Record<string, Record<string, string>> = {
     vendedor: `Si tienes acceso, aquí puedes consultar el resumen contable para alinear compromisos comerciales con la capacidad financiera real.`
   },
   "employee-payments": {
-    superadmin: `Aquí se registra y audita la nómina/pagos operativos. Cada pago debe llevar periodo, monto, referencia y evidencia; su impacto se refleja en contabilidad y reportes.`,
-    admin: `Aquí capturas pagos al personal con periodo y soporte. Usa criterios consistentes de concepto y referencia para que contabilidad y conciliación bancaria cuadren sin ajustes manuales.`,
+    superadmin: `Aquí se registran pagos internos a empleados (dispersiones, anticipos, complementos). No es CFDI de nómina fiscal; cada pago deja póliza contable y evidencia para auditoría.`,
+    admin: `Captura pagos al personal con periodo y soporte. Al marcar Pagado se genera la póliza automática (sueldos vs bancos). La nómina CFDI (tipo N) es un roadmap aparte.`,
     ingeniero: `Si tu perfil lo permite, aquí consultas pagos registrados por periodo y su evidencia.`,
     vendedor: `Si tienes acceso, aquí puedes consultar pagos vinculados a la operación comercial o de servicio.`
   },
@@ -241,7 +241,7 @@ const moduleNames: Record<string, string> = {
   cvs: "CVs / Candidatos",
   "work-projects": "Proyectos de Trabajo",
   accounting: "Contabilidad General",
-  "employee-payments": "Nómina y Pagos",
+  "employee-payments": "Pagos a empleados",
   expenses: "Gastos Operativos",
   invoicing: "Facturación",
   banking: "Banca y Conciliaciones",

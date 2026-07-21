@@ -87,27 +87,18 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
       };
 
       if (mode === "tickets") {
-        const clientAttempt = await loginToEndpoint(buildApiUrl("client-auth/login"));
-        if (clientAttempt.res.ok) {
-          onClientLogin?.(clientAttempt.data);
-          if (!onClientLogin) router.replace(redirectTo);
-          return;
+        const { res, data } = await loginToEndpoint(buildApiUrl("portal/login"));
+        if (!res.ok) {
+          throw new Error(data.message || data.error || "Credenciales incorrectas");
         }
-
-        const branchAttempt = await loginToEndpoint(buildApiUrl("branch-auth/login"));
-        if (branchAttempt.res.ok) {
-          onBranchLogin?.(branchAttempt.data);
+        if (data.portalKind === "branch" || data.branch) {
+          onBranchLogin?.(data);
           if (!onBranchLogin) router.replace(redirectTo);
           return;
         }
-
-        throw new Error(
-          branchAttempt.data?.message ||
-            clientAttempt.data?.message ||
-            branchAttempt.data?.error ||
-            clientAttempt.data?.error ||
-            "Credenciales incorrectas",
-        );
+        onClientLogin?.(data);
+        if (!onClientLogin) router.replace(redirectTo);
+        return;
       }
 
       const endpoint =

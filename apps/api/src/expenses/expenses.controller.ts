@@ -21,6 +21,7 @@ import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CreateExpenseDto } from './dto/create-expense.dto.js';
 import { UpdateExpenseDto } from './dto/update-expense.dto.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -76,6 +77,7 @@ export class ExpensesController {
   @UseInterceptors(FileInterceptor('ticketEvidencia', { dest: getUploadSubdir(__dirname, 'expenses') }))
   create(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Body() body: CreateExpenseDto & Record<string, unknown>,
     @UploadedFile() file?: any,
   ) {
@@ -96,6 +98,7 @@ export class ExpensesController {
       return this.expensesService.createAdministrative({
         usuarioId,
         createdById: user.id,
+        companyId,
         concepto: String(body.concepto),
         monto: Number(body.monto),
         categoria: body.categoria ? String(body.categoria) : undefined,
@@ -142,17 +145,18 @@ export class ExpensesController {
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   approve(
     @Param('id') id: string,
+    @CurrentUser() user: any,
     @Body() body: { action?: 'approve' | 'reject'; note?: string },
   ) {
     const action = body.action === 'reject' ? 'reject' : 'approve';
-    return this.expensesService.approveOrReject(+id, action, body.note);
+    return this.expensesService.approveOrReject(+id, action, body.note, user?.id);
   }
 
   @Patch(':id/pagado')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
-  markPagado(@Param('id') id: string) {
-    return this.expensesService.markPagado(+id);
+  markPagado(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.expensesService.markPagado(+id, user?.id);
   }
 
   @Patch(':id')
@@ -196,7 +200,7 @@ export class ExpensesController {
   @Delete(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
-  remove(@CurrentUser() _user: any, @Param('id') id: string) {
-    return this.expensesService.remove(+id);
+  remove(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.expensesService.remove(+id, user?.id);
   }
 }

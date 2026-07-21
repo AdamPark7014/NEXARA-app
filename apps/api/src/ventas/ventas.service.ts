@@ -287,6 +287,17 @@ export class VentasService {
         .notifySalesClientCreated(user.id, created.id, created.name, actorName)
         .catch(() => undefined);
     }
+
+    // P0-E: todo cliente comercial queda vinculado a operación/portal
+    if (!created.serviceClientId) {
+      try {
+        const provisioned = await this.provisionServiceClient(created.id, user);
+        return provisioned.salesClient;
+      } catch {
+        // No bloquear alta comercial si falla OPS; se puede provisionar después
+        return created;
+      }
+    }
     return created;
   }
 

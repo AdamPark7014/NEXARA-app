@@ -4,9 +4,11 @@
  * Consume `apps/api/src/page-content/`.
  *
  * Endpoints:
- *   GET  /studio/page-content/:section  → contenido de una sección
- *   PUT  /studio/page-content/:section  → guardar (Studio, requiere token)
- *   POST /studio/page-content/media     → subir imagen de página
+ *   GET  /studio/page-content/:section        → publicado (sitio)
+ *   GET  /studio/page-content/:section/draft  → borrador (Studio)
+ *   PUT  /studio/page-content/:section        → guardar borrador
+ *   POST /studio/page-content/:section/publish → publicar
+ *   POST /studio/page-content/media           → subir imagen
  */
 
 import { buildApiUrl } from "@/lib/api-base";
@@ -45,9 +47,14 @@ export interface PageContentRow {
   id: number;
   section: string;
   content: Record<string, unknown>;
+  draftContent?: Record<string, unknown> | null;
+  publishedAt?: string | null;
+  publishedBy?: string | null;
   updatedBy: string | null;
   updatedAt: string;
   createdAt: string;
+  hasUnpublishedChanges?: boolean;
+  isDraft?: boolean;
 }
 
 // ── Tipos de contenido por sección ───────────────────────────────────────────
@@ -488,7 +495,7 @@ export async function getPageSection(
   section: HomeSection,
   token: string,
 ): Promise<PageContentRow | null> {
-  const res = await fetch(buildApiUrl(`studio/page-content/${section}`), {
+  const res = await fetch(buildApiUrl(`studio/page-content/${section}/draft`), {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
@@ -510,6 +517,26 @@ export async function savePageSection(
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ content, updatedBy }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Error ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
+export async function publishPageSection(
+  section: HomeSection,
+  token: string,
+  updatedBy?: string,
+): Promise<PageContentRow> {
+  const res = await fetch(buildApiUrl(`studio/page-content/${section}/publish`), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ updatedBy }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
