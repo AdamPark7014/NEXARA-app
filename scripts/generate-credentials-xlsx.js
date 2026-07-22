@@ -7,7 +7,7 @@ const path = require('path');
 
 /** Misma lista / passwords que apps/api/prisma/seed-demo-users.ts */
 const USERS = [
-  ['Claudia Bernal', 'claudia.bernal@nexara.com.mx', 'Nexara!NX010', 'CEO', 'Dirección General'],
+  ['Claudia Bernal', 'claudia.bernal@nexara.com.mx', 'Nexara!NX010', 'Director General', 'Dirección General'],
   ['Christian Eduardo Del Pozo Sánchez', 'gerencia@nexara.com.mx', 'Nexara!NX001', 'Director General', 'Dirección General'],
   ['Adam Del Pozo', 'developer@nexara.com.mx', 'Nexara!NX002', 'Developer / Super Admin', 'Dirección General'],
   ['Josué Teodulo Cervantes Arellano', 'infraestructura@nexara.com.mx', 'Nexara!NX003', 'Arquitecto / Director Técnico', 'Arquitectura'],
@@ -106,7 +106,7 @@ const MUTED = '5A6F6A';
     { width: 20 },
   ];
 
-  const out = path.join(__dirname, '..', 'NEXARA-credenciales-usuarios.xlsx');
+  const out = path.join(__dirname, '..', 'NEXARA-credenciales-usuarios-v2.xlsx');
   await wb.xlsx.writeFile(out);
   console.log(out);
 })().catch((e) => {

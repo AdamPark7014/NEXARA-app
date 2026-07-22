@@ -40,7 +40,7 @@ const DEMO_USERS: DemoUser[] = [
     roleKey: 'ceo',
     departmentName: 'Dirección General',
     employeeNumber: 'NX-010',
-    puesto: 'CEO',
+    puesto: 'Director General',
     password: 'Nexara!NX010',
   },
   {
