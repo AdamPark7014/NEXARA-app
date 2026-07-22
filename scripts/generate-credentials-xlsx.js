@@ -78,7 +78,13 @@ const MUTED = '5A6F6A';
     const bg = idx % 2 === 0 ? WHITE : TEAL_LIGHT;
     vals.forEach((v, i) => {
       const cell = row.getCell(i + 1);
-      cell.value = v;
+      // Contraseña como texto forzado (Excel interpreta "!" como ref. de hoja).
+      if (i === 3) {
+        cell.value = String(v);
+        cell.numFmt = '@';
+      } else {
+        cell.value = v;
+      }
       cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF' + DARK }, bold: i === 3 };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + bg } };
       cell.alignment = { vertical: 'middle', horizontal: i === 0 ? 'center' : 'left' };
@@ -93,7 +99,7 @@ const MUTED = '5A6F6A';
   const noteRow = 4 + USERS.length + 1;
   ws.mergeCells(noteRow, 1, noteRow, 6);
   const note = ws.getCell(noteRow, 1);
-  note.value = 'Confidencial · Solo uso interno NEXARA · No compartir fuera del equipo';
+  note.value = 'Confidencial · Solo uso interno NEXARA · No compartir fuera del equipo · Contraseñas en formato texto';
   note.font = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF' + MUTED } };
   note.alignment = { horizontal: 'left', indent: 1 };
 
@@ -106,7 +112,7 @@ const MUTED = '5A6F6A';
     { width: 20 },
   ];
 
-  const out = path.join(__dirname, '..', 'NEXARA-credenciales-usuarios-v2.xlsx');
+  const out = path.join(__dirname, '..', 'NEXARA-credenciales-usuarios-v4.xlsx');
   await wb.xlsx.writeFile(out);
   console.log(out);
 })().catch((e) => {

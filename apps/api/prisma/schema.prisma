@@ -449,7 +449,7 @@ model User {
   // ── IAM / seguridad de acceso ───────────────────────────
   lastLoginAt               DateTime?
   lastLoginIp               String?                    @db.VarChar(45)
-  lastLoginDevice           String?                    @db.VarChar(80)
+  lastLoginDevice           String?                    @db.VarChar(255)
   failedLoginCount          Int                        @default(0)
   lockedUntil               DateTime?
   passwordChangedAt         DateTime?
@@ -598,7 +598,7 @@ model UserSession {
   id         Int       @id @default(autoincrement())
   userId     Int
   jti        String    @unique @db.VarChar(64)
-  device     String?   @db.VarChar(80)
+  device     String?   @db.VarChar(255)
   ipAddress  String?   @db.VarChar(45)
   userAgent  String?   @db.VarChar(500)
   createdAt  DateTime  @default(now())
