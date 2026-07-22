@@ -125,6 +125,63 @@ export default function SettingsPage() {
         }
       />
 
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+        <a
+          href="/erp/settings/webhooks"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 14px",
+            borderRadius: 10,
+            border: "1px solid var(--border)",
+            background: "var(--surface)",
+            color: "var(--foreground)",
+            textDecoration: "none",
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          Webhooks outbound →
+        </a>
+        <a
+          href="/erp/settings/api-keys"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 14px",
+            borderRadius: 10,
+            border: "1px solid var(--border)",
+            background: "var(--surface)",
+            color: "var(--foreground)",
+            textDecoration: "none",
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          API keys por empresa →
+        </a>
+        <a
+          href="/erp/settings/billing"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 14px",
+            borderRadius: 10,
+            border: "1px solid var(--border)",
+            background: "var(--surface)",
+            color: "var(--foreground)",
+            textDecoration: "none",
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          Billing / asientos →
+        </a>
+      </div>
+
       {!loading && settings.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 18 }}>
           <KpiCard label="Total parámetros" value={settings.length} icon="⚙️" />

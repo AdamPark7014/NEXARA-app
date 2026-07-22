@@ -541,6 +541,13 @@ export class ClientPortalController {
     const requestTypeRaw = String(body.requestType || '').toUpperCase();
     const requestType = requestTypeRaw === 'PREVENTIVE_INVENTORY' ? 'PREVENTIVE_INVENTORY' : 'ISSUE';
 
+    const primaryCompany = await this.prisma.companyProfile.findFirst({
+      where: { isPrimary: true, isActive: true },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+    if (!primaryCompany) throw new BadRequestException('No hay empresa configurada');
+
     return this.prisma['clientTicketRequest'].create({
       data: {
         clientId: user.clientId,
@@ -558,6 +565,7 @@ export class ClientPortalController {
         placeId: body.placeId?.trim() || branchData?.placeId || null,
         latitud: Number.isFinite(latitud) ? latitud : branchData?.latitud,
         longitud: Number.isFinite(longitud) ? longitud : branchData?.longitud,
+        companyId: primaryCompany.id,
       },
     });
   }

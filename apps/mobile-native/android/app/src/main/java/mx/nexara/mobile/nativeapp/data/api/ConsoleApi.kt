@@ -14,11 +14,28 @@ data class ViaticDto(
     val usuarioId: Long? = null,
     val montoSolicitado: Double? = null,
     val estatusPago: String? = null,
+    val estatus: String? = null,
     val razonGasto: String? = null,
+    val categoria: String? = null,
     val createdAt: String? = null,
     val usuario: SimpleUserDto? = null,
     val actividad: ActivityShortDto? = null,
     val ticketEvidenciaUrl: String? = null,
+) {
+    fun displayStatus(): String = estatusPago ?: estatus ?: "—"
+}
+
+data class CreateViaticJsonRequest(
+    val montoSolicitado: Double,
+    val motivo: String,
+    val categoria: String? = null,
+    val actividadId: Long? = null,
+    val ticketEvidenciaUrl: String,
+)
+
+data class ViaticApproveRequest(
+    val action: String,
+    val note: String? = null,
 )
 
 data class ActivityShortDto(
@@ -106,6 +123,17 @@ data class AttendanceRegisterResponse(
 interface ConsoleApi {
     @GET("viatics")
     suspend fun getViatics(): List<ViaticDto>
+
+    @retrofit2.http.POST("viatics")
+    suspend fun createViatic(
+        @retrofit2.http.Body body: CreateViaticJsonRequest,
+    ): ViaticDto
+
+    @PATCH("viatics/{id}/approve")
+    suspend fun approveViatic(
+        @Path("id") id: Long,
+        @retrofit2.http.Body body: ViaticApproveRequest,
+    ): okhttp3.ResponseBody
 
     @GET("activities")
     suspend fun getActivities(

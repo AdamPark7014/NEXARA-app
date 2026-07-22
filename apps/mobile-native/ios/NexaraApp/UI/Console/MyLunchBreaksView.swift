@@ -22,8 +22,19 @@ final class MyLunchBreaksVM: ObservableObject {
         actionLoading = true; actionMessage = nil
         do {
             let now = ISO8601DateFormatter().string(from: Date())
+            let coord = await DeviceLocation.shared.current()
             try await ExtraRepository.shared.lunchCheckin(checkinTime: now, photoDataUrl: photoDataUrl)
-            actionMessage = "✅ Entrada a comida registrada"
+            var msg = "✅ Entrada a comida registrada"
+            if let c = coord {
+                if let acc = c.accuracyM {
+                    msg += String(format: " · GPS ±%.0fm", acc)
+                } else {
+                    msg += " · GPS ok"
+                }
+            } else {
+                msg += " (sin GPS)"
+            }
+            actionMessage = msg
             load()
         } catch {
             actionMessage = "❌ \(error.localizedDescription)"
@@ -35,8 +46,19 @@ final class MyLunchBreaksVM: ObservableObject {
         actionLoading = true; actionMessage = nil
         do {
             let now = ISO8601DateFormatter().string(from: Date())
+            let coord = await DeviceLocation.shared.current()
             try await ExtraRepository.shared.lunchCheckout(checkoutTime: now, photoDataUrl: photoDataUrl)
-            actionMessage = "✅ Salida de comida registrada"
+            var msg = "✅ Salida de comida registrada"
+            if let c = coord {
+                if let acc = c.accuracyM {
+                    msg += String(format: " · GPS ±%.0fm", acc)
+                } else {
+                    msg += " · GPS ok"
+                }
+            } else {
+                msg += " (sin GPS)"
+            }
+            actionMessage = msg
             load()
         } catch {
             actionMessage = "❌ \(error.localizedDescription)"

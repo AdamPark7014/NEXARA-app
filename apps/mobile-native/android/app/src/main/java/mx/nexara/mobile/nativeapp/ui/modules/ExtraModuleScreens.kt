@@ -706,8 +706,14 @@ class MyLunchBreaksViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val now = java.time.Instant.now().toString()
+                val coords = mx.nexara.mobile.nativeapp.util.DeviceLocation.current(getApplication())
                 withContext(Dispatchers.IO) { repo.lunchCheckin(now, photoDataUrl) }
-                _state.update { it.copy(actionLoading = false, actionMessage = "✅ Entrada a comida registrada") }
+                val geo = when {
+                    coords == null -> " (sin GPS)"
+                    coords.accuracyM != null -> " · GPS ±${coords.accuracyM.toInt()}m"
+                    else -> " · GPS ok"
+                }
+                _state.update { it.copy(actionLoading = false, actionMessage = "✅ Entrada a comida registrada$geo") }
                 load(userId)
             } catch (e: Exception) {
                 _state.update { it.copy(actionLoading = false, actionMessage = "❌ ${e.message ?: "Error"}") }
@@ -720,8 +726,14 @@ class MyLunchBreaksViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val now = java.time.Instant.now().toString()
+                val coords = mx.nexara.mobile.nativeapp.util.DeviceLocation.current(getApplication())
                 withContext(Dispatchers.IO) { repo.lunchCheckout(now, photoDataUrl) }
-                _state.update { it.copy(actionLoading = false, actionMessage = "✅ Salida de comida registrada") }
+                val geo = when {
+                    coords == null -> " (sin GPS)"
+                    coords.accuracyM != null -> " · GPS ±${coords.accuracyM.toInt()}m"
+                    else -> " · GPS ok"
+                }
+                _state.update { it.copy(actionLoading = false, actionMessage = "✅ Salida de comida registrada$geo") }
                 load(userId)
             } catch (e: Exception) {
                 _state.update { it.copy(actionLoading = false, actionMessage = "❌ ${e.message ?: "Error"}") }

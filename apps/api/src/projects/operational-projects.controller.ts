@@ -15,6 +15,7 @@ import { OperationalProjectsService } from './operational-projects.service.js';
 import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto, CreateProjectActivityDto } from './dto/create-operational-project.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
 @Controller('operational-projects')
@@ -40,6 +41,7 @@ export class OperationalProjectsController {
   @Get()
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
   findAll(
+    @CurrentCompanyId() companyId: number | null,
     @Query('vendorId') vendorId?: string,
     @Query('clientId') clientId?: string,
     @Query('status') status?: string,
@@ -48,6 +50,7 @@ export class OperationalProjectsController {
       this.parseOptionalNumber(vendorId),
       this.parseOptionalNumber(clientId),
       status,
+      companyId,
     );
   }
 

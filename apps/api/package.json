@@ -54,6 +54,7 @@
     "prisma": "^5.0.0",
     "reflect-metadata": "^0.2.2",
     "socket.io": "^4.7.5",
+    "stripe": "^18.5.0",
     "typescript": "^5.4.5",
     "web-push": "^3.6.7",
     "winston": "^3.13.0",

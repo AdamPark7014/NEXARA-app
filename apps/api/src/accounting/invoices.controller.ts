@@ -2,6 +2,7 @@ import { Controller, Get, Post, Param, Body, Query, UseGuards, Patch, Delete, Re
 import type { Response } from 'express';
 import { AccountingService } from './accounting.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -29,9 +30,9 @@ export class InvoicesController {
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
-  findAll(@Query() query: ListInvoicesQueryDto) {
+  findAll(@Query() query: ListInvoicesQueryDto, @CurrentCompanyId() companyId: number | null) {
     return this.service.listInvoices(
-      { type: query.type, status: query.status, from: query.from, to: query.to },
+      { type: query.type, status: query.status, from: query.from, to: query.to, companyId },
       query,
     );
   }
@@ -48,6 +49,13 @@ export class InvoicesController {
   @RBAC({ anyPermissions: [PERMISSIONS.INVOICING_VIEW, PERMISSIONS.CONTABILIDAD_VIEW, PERMISSIONS.CONSOLE_ADMIN] })
   financialDashboard() {
     return this.service.getFinancialDashboard();
+  }
+
+  @Get('insights')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.INVOICING_VIEW, PERMISSIONS.CONTABILIDAD_VIEW, PERMISSIONS.CONSOLE_ADMIN] })
+  financeInsights() {
+    return this.service.getFinanceInsights();
   }
 
   @Get('issuer-profile')
@@ -124,15 +132,37 @@ export class InvoicesController {
   @Get(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
-  findOne(@Param('id') id: string) {
-    return this.service.getInvoice(+id);
+  findOne(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
+    return this.service.getInvoice(+id, companyId);
   }
 
   @Patch(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
-  updateDraft(@Param('id') id: string, @Body() dto: UpdateInvoiceDraftDto) {
-    return this.service.updateInvoiceDraft(+id, dto);
+  updateDraft(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: number },
+    @Body() dto: UpdateInvoiceDraftDto,
+  ) {
+    return this.service.updateInvoiceDraft(+id, dto, user.id);
+  }
+
+  @Post(':id/match/evaluate')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
+  evaluateMatch(@Param('id') id: string, @CurrentUser() user: { id: number }) {
+    return this.service.evaluateThreeWayMatch(+id, user.id);
+  }
+
+  @Post(':id/match/waive')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
+  waiveMatch(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: number },
+    @Body() body?: { notes?: string },
+  ) {
+    return this.service.waiveThreeWayMatch(+id, user.id, body?.notes);
   }
 
   @Post(':id/payments')

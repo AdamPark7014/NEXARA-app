@@ -21,18 +21,22 @@ import {
   listLots,
   createLot,
   getStockValuation,
+  getInventoryInsights,
   type StockMovementRow,
   type LotRow,
   type ValuationRow,
+  type InventoryInsights,
 } from "@/lib/stock-api";
 import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import { DashGrid, DashCol, DashPanel, StatStrip, DashPill } from "@/components/dashboard/DashKit";
 
 type StockRow = ReturnType<typeof mapStockLevelToRow>;
 
 const TABS = [
+  { key: "dashboard", label: "Inteligencia" },
   { key: "inventario", label: "Inventario" },
   { key: "movimientos", label: "Movimientos" },
   { key: "lotes", label: "Lotes y caducidad" },
@@ -76,7 +80,9 @@ export default function WarehousePage() {
   const [warehouseForm, setWarehouseForm] = useState({ name: "", code: "", address: "", city: "" });
   const [savingWarehouse, setSavingWarehouse] = useState(false);
 
-  const [tab, setTab] = useState<TabKey>("inventario");
+  const [tab, setTab] = useState<TabKey>("dashboard");
+  const [insights, setInsights] = useState<InventoryInsights | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
 
   const [movements, setMovements] = useState<StockMovementRow[]>([]);
   const [movementsLoading, setMovementsLoading] = useState(false);
@@ -260,6 +266,23 @@ export default function WarehousePage() {
     }
   }, [token, valuationWarehouseFilter]);
 
+  const loadInsights = useCallback(async () => {
+    if (!token) return;
+    setInsightsLoading(true);
+    try {
+      setInsights(await getInventoryInsights(token));
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo cargar inteligencia de inventario"));
+      setInsights(null);
+    } finally {
+      setInsightsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (tab === "dashboard") void loadInsights();
+  }, [tab, loadInsights]);
+
   useEffect(() => {
     if (tab === "movimientos") void loadMovements();
   }, [tab, loadMovements]);
@@ -429,8 +452,8 @@ export default function WarehousePage() {
     <>
       <PageHeader
         eyebrow="ERP · Almacén"
-        title={cfg.title}
-        subtitle={cfg.subtitle}
+        title="Inteligencia de inventario"
+        subtitle="Rotación, aging, dead stock, ABC, cobertura proyectada, reorden y valuación — no solo existencia."
         actions={
           <div style={{ display: "flex", gap: 8 }}>
             {cfg.canCreate && (
@@ -544,6 +567,152 @@ export default function WarehousePage() {
             <Button variant="ghost" onClick={() => setShowMovementForm(false)}>Cancelar</Button>
             <Button variant="primary" onClick={() => void saveMovement()} disabled={savingMovement}>{savingMovement ? "Registrando…" : movement.type === "RECEIPT" ? "Registrar entrada" : "Registrar salida"}</Button>
           </div>
+        </div>
+      )}
+
+      {tab === "dashboard" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {insightsLoading && <div style={{ color: "var(--text-tertiary)", fontSize: 13 }}>Calculando inteligencia de inventario…</div>}
+          {insights && (
+            <>
+              <StatStrip
+                stats={[
+                  { label: "Valor inventario", value: `$${insights.kpis.totalValue.toLocaleString("es-MX", { maximumFractionDigits: 0 })}`, big: true },
+                  { label: "SKU×ubicación", value: insights.kpis.skuLocations, sub: `${insights.kpis.fillHealthyPct}% healthy` },
+                  { label: "Rotación proxy", value: `${insights.kpis.turnoverAnnualProxy}x`, sub: "COGS 30d ×12 / valor", tone: "accent" },
+                  { label: "Bajo mínimo", value: insights.kpis.lowStock, tone: insights.kpis.lowStock ? "warning" : "positive" },
+                  { label: "Sin stock", value: insights.kpis.zeroStock, tone: insights.kpis.zeroStock ? "danger" : "default" },
+                  { label: "Dead stock", value: insights.kpis.deadStock, sub: `$${insights.kpis.deadStockValue.toLocaleString("es-MX", { maximumFractionDigits: 0 })}`, tone: insights.kpis.deadStock ? "warning" : "default" },
+                ]}
+              />
+              {insights.alerts.map((a) => (
+                <div
+                  key={a.message}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    fontSize: 13,
+                    background: a.severity === "danger" ? "var(--state-danger-bg)" : "var(--state-warning-bg)",
+                    border: `1px solid ${a.severity === "danger" ? "var(--state-danger-border)" : "var(--state-warning-border)"}`,
+                    color: a.severity === "danger" ? "var(--state-danger-text)" : "var(--state-warning-text)",
+                  }}
+                >
+                  {a.message}
+                </div>
+              ))}
+              <DashGrid>
+                <DashCol span={6}>
+                  <DashPanel title="Entradas vs salidas · 14d" subtitle="Unidades movidas">
+                    <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 80 }}>
+                      {insights.trends.outflow14d.map((p, i) => {
+                        const inflow = insights.trends.inflow14d[i]?.qty ?? 0;
+                        const max = Math.max(1, ...insights.trends.outflow14d.map((x) => x.qty), ...insights.trends.inflow14d.map((x) => x.qty));
+                        return (
+                          <div key={p.date} style={{ flex: 1, display: "flex", gap: 1, alignItems: "flex-end" }} title={`${p.date}: in ${inflow} / out ${p.qty}`}>
+                            <div style={{ flex: 1, height: `${Math.max(2, (inflow / max) * 70)}px`, background: "var(--success)", borderRadius: 2, opacity: 0.85 }} />
+                            <div style={{ flex: 1, height: `${Math.max(2, (p.qty / max) * 70)}px`, background: "var(--primary)", borderRadius: 2 }} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ marginTop: 10, display: "flex", gap: 12, fontSize: 11, color: "var(--text-tertiary)" }}>
+                      <span><span style={{ color: "var(--success)" }}>■</span> Entradas</span>
+                      <span><span style={{ color: "var(--primary)" }}>■</span> Salidas</span>
+                    </div>
+                  </DashPanel>
+                </DashCol>
+                <DashCol span={6}>
+                  <DashPanel title="Aging de movimiento" subtitle="Días desde último movimiento">
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      {[
+                        { label: "0–30d", value: insights.aging.d0_30 },
+                        { label: "30–60d", value: insights.aging.d30_60 },
+                        { label: "60–90d", value: insights.aging.d60_90 },
+                        { label: "90d+", value: insights.aging.d90_plus },
+                      ].map((b) => (
+                        <div key={b.label} style={{ padding: 12, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{b.label}</div>
+                          <div style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{b.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <DashPill tone="accent">ABC A: {insights.kpis.abcA}</DashPill>
+                      <DashPill tone="neutral">B: {insights.kpis.abcB}</DashPill>
+                      <DashPill tone="warning">C: {insights.kpis.abcC}</DashPill>
+                    </div>
+                  </DashPanel>
+                </DashCol>
+                <DashCol span={6}>
+                  <DashPanel title="Top movers 30d" subtitle="Mayor despacho">
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 220, overflowY: "auto" }}>
+                      {insights.topMovers.map((m) => (
+                        <div key={m.productId} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5 }}>
+                          <div>
+                            <strong>{m.name}</strong>
+                            <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{m.sku}</div>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontWeight: 700 }}>{m.dispatched30d}</div>
+                            <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+                              {m.daysOfCover != null ? `${m.daysOfCover}d cover` : "sin consumo"}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {!insights.topMovers.length && <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin despachos en 30d</span>}
+                    </div>
+                  </DashPanel>
+                </DashCol>
+                <DashCol span={6}>
+                  <DashPanel title="Sugerencias de reorden" subtitle="Basado en mínimo / máximo">
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 220, overflowY: "auto" }}>
+                      {insights.reorderSuggestions.map((r) => (
+                        <div key={`${r.productId}-${r.warehouse}`} style={{ fontSize: 12.5, borderBottom: "1px solid var(--border)", paddingBottom: 6 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <strong>{r.name}</strong>
+                            <span>+{r.suggestedQty}</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                            {r.warehouse} · on hand {r.onHand} · est. ${r.estimatedCost.toLocaleString("es-MX")}
+                          </div>
+                        </div>
+                      ))}
+                      {!insights.reorderSuggestions.length && <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin sugerencias — stock saludable</span>}
+                    </div>
+                  </DashPanel>
+                </DashCol>
+                <DashCol span={6}>
+                  <DashPanel title="Slow / dead movers" subtitle="Mayor idle time">
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 180, overflowY: "auto" }}>
+                      {insights.slowMovers.map((m) => (
+                        <div key={m.productId} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
+                          <span>{m.name}</span>
+                          <span style={{ color: "var(--text-tertiary)" }}>{m.idleDays ?? "∞"}d · ${m.value.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </DashPanel>
+                </DashCol>
+                <DashCol span={6}>
+                  <DashPanel title="Por almacén" subtitle="Valor y alertas">
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {insights.byWarehouse.map((w) => (
+                        <div key={w.name} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 10, fontSize: 12.5, alignItems: "center" }}>
+                          <span>{w.name}</span>
+                          <span style={{ fontVariantNumeric: "tabular-nums" }}>${w.value.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</span>
+                          <Tag variant={w.low ? "warning" : "positive"}>{w.low} alertas</Tag>
+                        </div>
+                      ))}
+                    </div>
+                  </DashPanel>
+                </DashCol>
+              </DashGrid>
+            </>
+          )}
+          {!insightsLoading && !insights && (
+            <div style={{ padding: 24, color: "var(--text-tertiary)", fontSize: 13 }}>No hay datos de inteligencia disponibles.</div>
+          )}
         </div>
       )}
 

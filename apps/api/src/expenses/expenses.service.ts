@@ -8,6 +8,7 @@ import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 import { generateExpensesReportPdf } from './expenses-report-pdf.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 
 const ADMIN_EXPENSE_ACTIVITY_AN = 'SYS-ADMIN-GASTOS';
 
@@ -67,6 +68,7 @@ export class ExpensesService {
     });
     if (existing) return existing.id;
 
+    const companyId = await resolveRequiredCompanyId(this.prisma);
     const created = await this.prisma.activity.create({
       data: {
         anNumber: ADMIN_EXPENSE_ACTIVITY_AN,
@@ -76,6 +78,7 @@ export class ExpensesService {
         activityType: 'INTERNAL',
         creadoPorId: usuarioId,
         responsableId: usuarioId,
+        companyId,
       },
       select: { id: true },
     });
@@ -83,7 +86,10 @@ export class ExpensesService {
   }
 
   async create(createExpenseDto: CreateExpenseDto) {
-    const expense = await this.prisma.expense.create({ data: createExpenseDto });
+    const companyId = await resolveRequiredCompanyId(this.prisma, (createExpenseDto as any).companyId);
+    const expense = await this.prisma.expense.create({
+      data: { ...createExpenseDto, companyId } as any,
+    });
 
     if (createExpenseDto.usuarioId) {
       this.autoApproval
@@ -124,15 +130,7 @@ export class ExpensesService {
     const fechaGasto = dto.fecha ? new Date(`${dto.fecha}T12:00:00`) : new Date();
     if (Number.isNaN(fechaGasto.getTime())) throw new BadRequestException('Fecha inválida');
 
-    const companyId =
-      dto.companyId ??
-      (
-        await this.prisma.companyProfile.findFirst({
-          where: { isPrimary: true, isActive: true },
-          select: { id: true },
-        })
-      )?.id ??
-      null;
+    const companyId = await resolveRequiredCompanyId(this.prisma, dto.companyId);
 
     const expense = await this.prisma.expense.create({
       data: {
@@ -300,10 +298,11 @@ export class ExpensesService {
     return updated;
   }
 
-  private adminWhere(departmentId?: number) {
+  private adminWhere(departmentId?: number, companyId?: number | null) {
     const where: Prisma.ExpenseWhereInput = {
       deletedAt: null,
       isAdministrative: true,
+      ...companyWhere(companyId ?? null),
     };
     if (departmentId != null) {
       where.usuario = { departmentId };
@@ -311,8 +310,8 @@ export class ExpensesService {
     return where;
   }
 
-  async findAllAdministrative(query?: PaginationQueryDto, departmentId?: number) {
-    const where = this.adminWhere(departmentId);
+  async findAllAdministrative(query?: PaginationQueryDto, departmentId?: number, companyId?: number | null) {
+    const where = this.adminWhere(departmentId, companyId);
     const include = { usuario: true, actividad: true, createdBy: true } as const;
     if (query?.limit) {
       const [data, total] = await Promise.all([
@@ -330,19 +329,21 @@ export class ExpensesService {
     return this.prisma.expense.findMany({ where, include, orderBy: { fechaSolicitud: 'desc' } });
   }
 
-  async findAll(query?: PaginationQueryDto) {
-    return this.findAllAdministrative(query);
+  async findAll(query?: PaginationQueryDto, companyId?: number | null) {
+    return this.findAllAdministrative(query, undefined, companyId);
   }
 
-  async findByDepartment(departmentId: number, query?: PaginationQueryDto) {
-    return this.findAllAdministrative(query, departmentId);
+  async findByDepartment(departmentId: number, query?: PaginationQueryDto, companyId?: number | null) {
+    return this.findAllAdministrative(query, departmentId, companyId);
   }
 
-  findOne(id: number) {
-    return this.prisma.expense.findFirst({
+  async findOne(id: number, companyId?: number | null) {
+    const row = await this.prisma.expense.findFirst({
       where: { id, deletedAt: null },
       include: { usuario: true, actividad: true, createdBy: true },
     });
+    assertCompanyAccess(row, companyId, 'Gasto');
+    return row;
   }
 
   update(id: number, updateExpenseDto: UpdateExpenseDto) {

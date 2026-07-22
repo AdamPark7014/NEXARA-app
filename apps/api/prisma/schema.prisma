@@ -10,7 +10,7 @@ datasource db {
 
 model Product {
   id              Int             @id @default(autoincrement())
-  sku             String          @unique
+  sku             String
   name            String
   description     String?
   specifications  Json?
@@ -37,7 +37,9 @@ model Product {
   protegido       Boolean?        @default(false)
   sustituto       String?
   tipoCambio      Float?
+  companyId       Int
   brand           Brand?          @relation(fields: [brandId], references: [id])
+  company         CompanyProfile  @relation(fields: [companyId], references: [id], onDelete: Restrict)
   sources         ProductSource[]
 
   // === ERP Industrial Relations ===
@@ -55,6 +57,9 @@ model Product {
   qualityInspections QualityInspection[]
   ncrs               NonConformanceReport[]
   maintenanceParts   MaintenanceOrderPart[]
+
+  @@unique([companyId, sku])
+  @@index([companyId])
 }
 
 model ProductSource {
@@ -151,6 +156,7 @@ model OperationalProject {
   status         OperationalProjectStatus @default(ACTIVE)
   vendorId       Int
   clientId       Int
+  companyId      Int
   startDate      DateTime
   endDate        DateTime?
   actualEndDate  DateTime?
@@ -160,6 +166,7 @@ model OperationalProject {
 
   vendor              User                 @relation("ProjectVendor", fields: [vendorId], references: [id])
   client              ServiceClient        @relation(fields: [clientId], references: [id])
+  company             CompanyProfile       @relation(fields: [companyId], references: [id], onDelete: Restrict)
   salesProject        SalesProject?        @relation("SalesOperationalHandoff", fields: [salesProjectId], references: [id], onDelete: SetNull)
   engineers           ProjectEngineer[]
   activities          Activity[]
@@ -167,6 +174,7 @@ model OperationalProject {
 
   @@index([vendorId])
   @@index([clientId])
+  @@index([companyId])
   @@index([status])
   @@map("operational_projects")
 }
@@ -438,6 +446,18 @@ model User {
   estadoRRHH                String?                    @db.VarChar(30)  @default("Activo")
   isActive                  Boolean                    @default(true)
   fechaIngreso              DateTime?
+  // ── IAM / seguridad de acceso ───────────────────────────
+  lastLoginAt               DateTime?
+  lastLoginIp               String?                    @db.VarChar(45)
+  lastLoginDevice           String?                    @db.VarChar(80)
+  failedLoginCount          Int                        @default(0)
+  lockedUntil               DateTime?
+  passwordChangedAt         DateTime?
+  mfaEnabled                Boolean                    @default(false)
+  mfaSecret                 String?                    @db.VarChar(64)
+  mfaEnabledAt              DateTime?
+  oidcProvider              String?                    @db.VarChar(40)
+  oidcSubject               String?                    @db.VarChar(190)
   perfil                    UserProfile?
   documentos                UserDocument[]
   documentosRevisados       UserDocument[]             @relation("UserDocumentReviewer")
@@ -455,6 +475,7 @@ model User {
   role                      Role                       @relation(fields: [roleId], references: [id])
   vehicleControls           VehicleControl[]           @relation("SolicitanteVehiculo")
   Viatico                   Viatico[]
+  viaticosAsignados         Viatico[]                  @relation("ViaticoAsignadoPor")
   attendances               Attendance[]
   attendanceDays            AttendanceDay[]
   lunchBreaks               LunchBreak[]
@@ -496,6 +517,7 @@ model User {
   fiscalPeriodsClosed     FiscalPeriod[]         @relation("FiscalPeriodClosedBy")
   journalEntriesCreated   JournalEntry[]         @relation("JournalEntryCreator")
   invoicesCreated         Invoice[]              @relation("InvoiceCreator")
+  invoicesMatched         Invoice[]              @relation("InvoiceMatcher")
   paymentsCreated         Payment[]              @relation("PaymentCreator")
   reconciliations         BankReconciliation[]   @relation("ReconciliationUser")
   warehousesManaged       Warehouse[]            @relation("WarehouseManager")
@@ -541,6 +563,9 @@ model User {
   auditLogs               AuditLog[]             @relation("AuditLogUser")
   preferences             UserPreference[]       @relation("UserPreferences")
   pushEndpoints           UserPushEndpoint[]
+  sessions                UserSession[]       @relation("UserSessions")
+  webhooksCreated         OutboundWebhook[]   @relation("WebhookCreator")
+  companyApiKeysCreated   CompanyApiKey[]     @relation("CompanyApiKeyCreator")
 
   // === HR Relations ===
   leaveRequests           LeaveRequest[]      @relation("LeaveRequester")
@@ -561,6 +586,31 @@ model User {
   // === Operational Project Relations ===
   projectsAsVendor OperationalProject[] @relation("ProjectVendor")
   projectEngineers ProjectEngineer[]    @relation("ProjectEngineers")
+
+  @@index([lastLoginAt])
+  @@index([isActive, lastLoginAt])
+  @@index([lockedUntil])
+  @@unique([oidcProvider, oidcSubject])
+}
+
+/// Sesión JWT activa (jti). Permite force-logout y auditoría de dispositivos.
+model UserSession {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  jti        String    @unique @db.VarChar(64)
+  device     String?   @db.VarChar(80)
+  ipAddress  String?   @db.VarChar(45)
+  userAgent  String?   @db.VarChar(500)
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  revokeReason String? @db.VarChar(120)
+  user       User      @relation("UserSessions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("user_sessions")
 }
 
 enum CvEmploymentStatus {
@@ -713,9 +763,12 @@ model Activity {
   Viatico                 Viatico[]
   inventorySnapshot       InventorySnapshot?
   deletedAt               DateTime?
+  companyId               Int
+  company                 CompanyProfile          @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([projectId])
   @@index([clientId])
+  @@index([companyId])
 }
 
 enum ActivityWorkType {
@@ -750,6 +803,8 @@ model ServiceClient {
   isActive            Boolean                  @default(true)
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
+  companyId           Int
+  company             CompanyProfile           @relation(fields: [companyId], references: [id], onDelete: Restrict)
   activities          Activity[]
   branches            ServiceClientBranch[]
   ticketRequests      ClientTicketRequest[]
@@ -759,6 +814,7 @@ model ServiceClient {
   operationalProjects OperationalProject[]
   maintenanceContracts MaintenanceContract[]
 
+  @@index([companyId])
   @@map("service_clients")
 }
 
@@ -829,9 +885,12 @@ model ClientTicketRequest {
   branch            ServiceClientBranch? @relation(fields: [branchId], references: [id])
   activity          Activity?            @relation(fields: [activityId], references: [id])
   inventorySnapshot InventorySnapshot?
+  companyId         Int
+  company           CompanyProfile       @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([clientId])
   @@index([status])
+  @@index([companyId])
   @@map("client_ticket_requests")
 }
 
@@ -1085,7 +1144,7 @@ model Expense {
   fechaGasto         DateTime?
   contabilidadRef    String?   @db.VarChar(120)
   journalEntryId     Int?
-  companyId          Int?
+  companyId          Int
   createdById        Int?
   ticketEvidenciaUrl String?
   /// Pendiente | Aprobado | Pagado | Rechazado
@@ -1096,7 +1155,7 @@ model Expense {
   usuario            User      @relation(fields: [usuarioId], references: [id])
   createdBy          User?     @relation("ExpenseCreator", fields: [createdById], references: [id])
   journalEntry       JournalEntry? @relation(fields: [journalEntryId], references: [id])
-  company            CompanyProfile? @relation(fields: [companyId], references: [id])
+  company            CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([isAdministrative, estatusPago, fechaSolicitud])
   @@index([categoria, fechaSolicitud])
@@ -1124,6 +1183,9 @@ model Viatico {
   vehicleId          Int?
   /// COMBUSTIBLE | CASETA | HOSPEDAJE | ALIMENTACION | TRANSPORTE | OTROS
   categoria          String?       @db.VarChar(40)
+  /// SOLICITUD (usuario pide) | ASIGNACION (manager asigna a usuario/actividad/proyecto)
+  origen             String        @default("SOLICITUD") @db.VarChar(20)
+  asignadoPorId      Int?
   montoSolicitado    Decimal       @db.Decimal(10, 2)
   motivo             String?       @db.VarChar(255)
   ticketEvidenciaUrl String?
@@ -1132,19 +1194,21 @@ model Viatico {
   approvalTrail      Json?
   contabilidadRef    String?       @db.VarChar(120)
   journalEntryId     Int?
-  companyId          Int?
+  companyId          Int
   fechaSolicitud     DateTime      @default(now())
   deletedAt          DateTime?
   Activity           Activity?     @relation(fields: [actividadId], references: [id])
   User               User          @relation(fields: [usuarioId], references: [id])
+  asignadoPor        User?         @relation("ViaticoAsignadoPor", fields: [asignadoPorId], references: [id])
   project            SalesProject? @relation(fields: [projectId], references: [id])
   vehicle            VehicleAsset? @relation(fields: [vehicleId], references: [id])
   journalEntry       JournalEntry? @relation(fields: [journalEntryId], references: [id])
-  company            CompanyProfile? @relation(fields: [companyId], references: [id])
+  company            CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([projectId, fechaSolicitud])
   @@index([categoria, fechaSolicitud])
   @@index([companyId])
+  @@index([origen, fechaSolicitud])
   @@map("viaticos")
 }
 
@@ -1216,7 +1280,7 @@ model EmployeePayment {
   paidAt         DateTime?
   contabilidadRef String?  @db.VarChar(120)
   journalEntryId  Int?
-  companyId       Int?
+  companyId       Int
   evidenceUrls   String[]  @default([])
   createdAt      DateTime  @default(now())
   createdById    Int?
@@ -1224,7 +1288,7 @@ model EmployeePayment {
   user           User      @relation(fields: [userId], references: [id])
   createdBy      User?     @relation("EmployeePaymentCreator", fields: [createdById], references: [id])
   journalEntry   JournalEntry? @relation(fields: [journalEntryId], references: [id])
-  company        CompanyProfile? @relation(fields: [companyId], references: [id])
+  company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([status, periodFrom])
   @@index([companyId])
@@ -1421,17 +1485,20 @@ model Cotizacion {
   signedByEmail  String?                 @db.VarChar(200)
   signedAt       DateTime?
   createdById    Int?
+  companyId      Int
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
   deletedAt      DateTime?
   items          CotizacionItem[]
   createdBy      User?                   @relation(fields: [createdById], references: [id])
+  company        CompanyProfile          @relation(fields: [companyId], references: [id], onDelete: Restrict)
   salesClient    SalesClient?            @relation(fields: [salesClientId], references: [id], onDelete: SetNull)
   opportunity    SalesOpportunity?       @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
   salesQuotes    SalesOpportunityQuote[]
 
   @@index([salesClientId])
   @@index([opportunityId])
+  @@index([companyId])
   @@map("cotizaciones")
 }
 
@@ -1510,6 +1577,7 @@ model SalesClient {
   notes           String?               @db.Text
   ownerId         Int?
   serviceClientId Int?
+  companyId       Int
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
   documents       SalesClientDocument[]
@@ -1518,10 +1586,12 @@ model SalesClient {
   cotizaciones    Cotizacion[]
   owner           User?                 @relation("SalesClientOwner", fields: [ownerId], references: [id])
   serviceClient   ServiceClient?        @relation(fields: [serviceClientId], references: [id])
+  company         CompanyProfile        @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   // === ERP Industrial Relations ===
   invoices Invoice[]
 
+  @@index([companyId])
   @@map("sales_clients")
 }
 
@@ -1553,14 +1623,17 @@ model SalesLead {
   clientId      Int?
   createdById   Int?
   ownerId       Int?
+  companyId     Int
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
   client        SalesClient?       @relation(fields: [clientId], references: [id])
+  tenantCompany CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
   opportunities SalesOpportunity[]
   createdBy     User?              @relation("SalesLeadCreator", fields: [createdById], references: [id])
   owner         User?              @relation("SalesLeadOwner", fields: [ownerId], references: [id])
   crmActivities CrmActivity[]
 
+  @@index([companyId])
   @@map("sales_leads")
 }
 
@@ -1588,7 +1661,10 @@ model SalesOpportunity {
   projects          SalesProject[]
   tender            Tender?
   crmActivities     CrmActivity[]
+  companyId         Int
+  company           CompanyProfile             @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@index([companyId])
   @@map("sales_opportunities")
 }
 
@@ -2142,6 +2218,15 @@ enum InvoiceType {
   ACCOUNTS_PAYABLE
 }
 
+// 3-way match PO-GR-factura AP
+enum InvoiceMatchStatus {
+  NOT_REQUIRED
+  PENDING
+  MATCHED
+  VARIANCE
+  WAIVED
+}
+
 enum PaymentMethod {
   CASH
   BANK_TRANSFER
@@ -2296,14 +2381,14 @@ model JournalEntry {
   totalCredit    Decimal            @default(0) @db.Decimal(16, 2)
   createdById    Int?
   postedAt       DateTime?
-  companyId      Int?
+  companyId      Int
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   fiscalPeriod   FiscalPeriod?      @relation(fields: [fiscalPeriodId], references: [id])
   reversalOf     JournalEntry?      @relation("JournalReversal", fields: [reversalOfId], references: [id])
   reversedBy     JournalEntry?      @relation("JournalReversal")
   createdBy      User?              @relation("JournalEntryCreator", fields: [createdById], references: [id])
-  company        CompanyProfile?    @relation(fields: [companyId], references: [id])
+  company        CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
   lines          JournalEntryLine[]
   expenses       Expense[]
   viaticos       Viatico[]
@@ -2395,14 +2480,14 @@ model Invoice {
   substitutionUuid String?           @db.VarChar(80)
   // ── end CFDI ──
   createdById      Int?
-  companyId        Int?
+  companyId        Int
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   deletedAt        DateTime?
   client           SalesClient?      @relation(fields: [clientId], references: [id])
   supplier         Supplier?         @relation("SupplierInvoices", fields: [supplierId], references: [id])
   createdBy        User?             @relation("InvoiceCreator", fields: [createdById], references: [id])
-  company          CompanyProfile?   @relation(fields: [companyId], references: [id])
+  company          CompanyProfile    @relation(fields: [companyId], references: [id], onDelete: Restrict)
   items            InvoiceItem[]
   payments         Payment[]
   salesProjectOrderId Int?
@@ -2411,6 +2496,11 @@ model Invoice {
   purchaseOrder       PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
   goodsReceiptId      Int?
   goodsReceipt        GoodsReceipt?      @relation(fields: [goodsReceiptId], references: [id], onDelete: SetNull)
+  matchStatus         InvoiceMatchStatus @default(NOT_REQUIRED)
+  matchedAt           DateTime?
+  matchedById         Int?
+  matchNotes          String?            @db.VarChar(500)
+  matchedBy           User?              @relation("InvoiceMatcher", fields: [matchedById], references: [id])
 
   @@index([type, status])
   @@index([dueDate])
@@ -2418,6 +2508,7 @@ model Invoice {
   @@index([emisorRfc])
   @@index([receptorRfc])
   @@index([companyId])
+  @@index([matchStatus])
   @@map("invoices")
 }
 
@@ -2445,11 +2536,17 @@ model InvoiceItem {
   ivaRetRate    Decimal? @db.Decimal(5, 4)
   ivaRetAmount  Decimal? @db.Decimal(14, 2)
   // ── end SAT ──
+  purchaseOrderItemId Int?
+  goodsReceiptItemId  Int?
   invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   product       Product? @relation(fields: [productId], references: [id])
   salesOrderLineId Int?  @unique
   salesOrderLine   SalesProjectOrderLine? @relation(fields: [salesOrderLineId], references: [id], onDelete: SetNull)
+  purchaseOrderItem PurchaseOrderItem? @relation(fields: [purchaseOrderItemId], references: [id], onDelete: SetNull)
+  goodsReceiptItem  GoodsReceiptItem?  @relation(fields: [goodsReceiptItemId], references: [id], onDelete: SetNull)
 
+  @@index([purchaseOrderItemId])
+  @@index([goodsReceiptItemId])
   @@map("invoice_items")
 }
 
@@ -2608,7 +2705,10 @@ model Warehouse {
   movementsFrom StockMovement[]     @relation("MovementFromWarehouse")
   movementsTo   StockMovement[]     @relation("MovementToWarehouse")
   goodsReceipts GoodsReceipt[]
+  companyId     Int
+  company       CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@index([companyId])
   @@map("warehouses")
 }
 
@@ -2794,7 +2894,7 @@ model PurchaseOrder {
   createdById     Int?
   approvedById    Int?
   approvedAt      DateTime?
-  companyId       Int?
+  companyId       Int
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
   deletedAt       DateTime?
@@ -2802,7 +2902,7 @@ model PurchaseOrder {
   requisition     PurchaseRequisition? @relation(fields: [requisitionId], references: [id])
   createdBy       User?                @relation("PurchaseOrderCreator", fields: [createdById], references: [id])
   approvedBy      User?                @relation("PurchaseOrderApprover", fields: [approvedById], references: [id])
-  company         CompanyProfile?      @relation(fields: [companyId], references: [id])
+  company         CompanyProfile       @relation(fields: [companyId], references: [id], onDelete: Restrict)
   items           PurchaseOrderItem[]
   receipts        GoodsReceipt[]
   stockMovements  StockMovement[]
@@ -2826,6 +2926,7 @@ model PurchaseOrderItem {
   purchaseOrder   PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   product         Product?           @relation(fields: [productId], references: [id])
   receiptItems    GoodsReceiptItem[]
+  invoiceItems    InvoiceItem[]
 
   @@map("purchase_order_items")
 }
@@ -2862,6 +2963,7 @@ model GoodsReceiptItem {
   notes               String?
   goodsReceipt        GoodsReceipt      @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
   purchaseOrderItem   PurchaseOrderItem @relation(fields: [purchaseOrderItemId], references: [id])
+  invoiceItems        InvoiceItem[]
 
   @@map("goods_receipt_items")
 }
@@ -2896,6 +2998,12 @@ enum ProductionOrderStatus {
   COMPLETED
   CANCELLED
 }
+
+// ============================================================================
+// ERP INDUSTRIAL — DEFERRED P2 (schema theater, NOT product)
+// Models retained for future MRP/Quality/HSE. Feature flags module.mrp|quality|hse = false.
+// Do not expose Nest controllers / web nav until P2 ship decision.
+// ============================================================================
 
 model BillOfMaterials {
   id               Int                 @id @default(autoincrement())
@@ -3505,20 +3613,25 @@ model WorkflowApproval {
 // ============================================================================
 
 model AuditLog {
-  id           Int      @id @default(autoincrement())
-  entityType   String   @db.VarChar(100)
+  id           Int             @id @default(autoincrement())
+  entityType   String          @db.VarChar(100)
   entityId     Int
-  action       String   @db.VarChar(50)
+  action       String          @db.VarChar(50)
   changes      Json?
   previousData Json?
   userId       Int?
-  ipAddress    String?  @db.VarChar(45)
-  userAgent    String?  @db.VarChar(500)
-  createdAt    DateTime @default(now())
-  user         User?    @relation("AuditLogUser", fields: [userId], references: [id])
+  companyId    Int?
+  source       String          @default("http") @db.VarChar(30)
+  ipAddress    String?         @db.VarChar(45)
+  userAgent    String?         @db.VarChar(500)
+  createdAt    DateTime        @default(now())
+  user         User?           @relation("AuditLogUser", fields: [userId], references: [id])
+  company      CompanyProfile? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   @@index([entityType, entityId])
   @@index([userId])
+  @@index([companyId])
+  @@index([source])
   @@index([createdAt])
   @@map("audit_logs")
 }
@@ -4057,6 +4170,14 @@ model CompanyProfile {
   defaultClabe    String?  @db.VarChar(20)
   // Notificación
   notificationEmail String? @db.VarChar(180)
+  // Billing / SaaS packaging
+  planCode          String   @default("enterprise") @db.VarChar(40)
+  seatLimit         Int      @default(50)
+  billingStatus     String   @default("active") @db.VarChar(30)
+  stripeCustomerId  String?  @db.VarChar(80)
+  stripeSubscriptionId String? @db.VarChar(80)
+  stripePriceId     String?  @db.VarChar(80)
+  trialEndsAt       DateTime?
   isPrimary       Boolean  @default(false)
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
@@ -4069,6 +4190,20 @@ model CompanyProfile {
   viaticos        Viatico[]
   employeePayments EmployeePayment[]
   purchaseOrders  PurchaseOrder[]
+  apiKeys         CompanyApiKey[]
+  salesOpportunities SalesOpportunity[]
+  warehouses      Warehouse[]
+  ticketRequests  ClientTicketRequest[]
+  auditLogs       AuditLog[]
+  usageEvents     CompanyUsageEvent[]
+  products        Product[]
+  activities      Activity[]
+  serviceClients  ServiceClient[]
+  operationalProjects OperationalProject[]
+  salesClients    SalesClient[]
+  salesLeads      SalesLead[]
+  cotizaciones    Cotizacion[]
+  outboundWebhooks OutboundWebhook[]
 
   @@map("company_profile")
 }
@@ -4086,6 +4221,43 @@ model UserCompany {
   @@unique([userId, companyId])
   @@index([companyId])
   @@map("user_companies")
+}
+
+/// API keys por empresa — auth machine-to-machine scoped al tenant.
+model CompanyApiKey {
+  id          Int            @id @default(autoincrement())
+  companyId   Int
+  name        String         @db.VarChar(120)
+  keyPrefix   String         @db.VarChar(12)
+  keyHash     String         @db.VarChar(64)
+  scopes      String[]       @default([])
+  isActive    Boolean        @default(true)
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime       @default(now())
+  createdById Int?
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy   User?          @relation("CompanyApiKeyCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([keyHash])
+  @@index([companyId, isActive])
+  @@index([keyPrefix])
+  @@map("company_api_keys")
+}
+
+/// Metering de uso por tenant (base billing SaaS).
+model CompanyUsageEvent {
+  id         Int            @id @default(autoincrement())
+  companyId  Int
+  metric     String         @db.VarChar(60)
+  quantity   Decimal        @default(1) @db.Decimal(16, 4)
+  metadata   Json?
+  occurredAt DateTime       @default(now())
+  createdAt  DateTime       @default(now())
+  company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, metric, occurredAt])
+  @@map("company_usage_events")
 }
 
 
@@ -4250,3 +4422,47 @@ model ChatMessageReaction {
   @@unique([messageId, userId, emoji])
   @@map("chat_message_reactions")
 }
+
+/// Webhooks outbound — integración enterprise (Stripe/Atlassian-style)
+model OutboundWebhook {
+  id             Int               @id @default(autoincrement())
+  name           String            @db.VarChar(120)
+  url            String            @db.VarChar(500)
+  secret         String?           @db.VarChar(120)
+  events         String[]          @default([])
+  isActive       Boolean           @default(true)
+  failureCount   Int               @default(0)
+  lastDeliveryAt DateTime?
+  lastStatusCode Int?
+  companyId      Int
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  createdById    Int?
+  company        CompanyProfile    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy      User?             @relation("WebhookCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  deliveries     WebhookDelivery[]
+
+  @@index([isActive])
+  @@index([companyId, isActive])
+  @@map("outbound_webhooks")
+}
+
+model WebhookDelivery {
+  id           Int             @id @default(autoincrement())
+  webhookId    Int
+  event        String          @db.VarChar(80)
+  payload      Json
+  status       String          @default("pending") @db.VarChar(20)
+  responseCode Int?
+  responseBody String?         @db.VarChar(1000)
+  attempts     Int             @default(0)
+  nextRetryAt  DateTime?
+  createdAt    DateTime        @default(now())
+  deliveredAt  DateTime?
+  webhook      OutboundWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, status])
+  @@index([nextRetryAt])
+  @@map("webhook_deliveries")
+}
+

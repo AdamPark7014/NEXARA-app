@@ -23,6 +23,7 @@ enum DeepLinkParser {
         "compras": "procurement", "auditoria": "audit", "documentos": "documents",
         "notificaciones": "notifications-center", "notifications-center": "notifications-center",
         "mi-perfil": "my-profile", "configuracion": "settings", "usuarios": "users",
+        "cola-offline": "offline-queue", "offline": "offline-queue",
         "leads": "leads", "noticias": "news", "contactos": "contacts",
         "dashboard": "dashboard", "flags": "flags", "health": "health", "ai": "ai",
         "soporte": "client-tickets", "support": "client-tickets", "client-tickets": "client-tickets",

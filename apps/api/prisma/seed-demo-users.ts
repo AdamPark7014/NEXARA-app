@@ -37,6 +37,14 @@ type DemoUser = {
  */
 const DEMO_USERS: DemoUser[] = [
   {
+    nombre: 'Claudia Bernal',
+    email: 'claudia.bernal@nexara.com.mx',
+    roleKey: 'ceo',
+    departmentName: 'Dirección General',
+    employeeNumber: 'NX-010',
+    puesto: 'CEO',
+  },
+  {
     nombre: 'Christian Eduardo Del Pozo Sánchez',
     email: 'gerencia@nexara.com.mx',
     roleKey: 'ceo',
@@ -270,6 +278,17 @@ async function seedDemoUsers() {
   console.log('🌱 [demo-users] Upsert de usuarios demo…');
   await ensureV2Roles();
 
+  // Etiqueta formal del rol CEO (sin "Dueño").
+  const ceoRenamed = await prisma.role.updateMany({
+    where: {
+      OR: [{ orgRoleKey: 'ceo' }, { nombre: { contains: 'Dueño', mode: 'insensitive' } }],
+    },
+    data: { nombre: 'CEO' },
+  });
+  if (ceoRenamed.count > 0) {
+    console.log(`   ✏️  Rol CEO renombrado (${ceoRenamed.count})`);
+  }
+
   let created = 0;
   let updated = 0;
   let passwordsFixed = 0;
@@ -349,6 +368,7 @@ async function main() {
   console.log('\n📊 Verificación de login demo:');
   await verifyLogin('soporte@nexara.com.mx');
   await verifyLogin('gerencia@nexara.com.mx');
+  await verifyLogin('claudia.bernal@nexara.com.mx');
   await verifyLogin('operaciones@nexara.com.mx');
 }
 

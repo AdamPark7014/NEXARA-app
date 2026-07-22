@@ -4,41 +4,105 @@ import SwiftUI
 
 struct CrmPipelineView: View {
     @State private var stages: [(String, [[String: Any]])] = []
+    @State private var flat: [[String: Any]] = []
     @State private var isLoading = true
+
+    private let stageOrder: [(String, String)] = [
+        ("LEAD", "Lead"),
+        ("QUALIFIED", "Calificada"),
+        ("PROPOSAL", "Propuesta"),
+        ("NEGOTIATION", "Negociación"),
+        ("WON", "Ganada"),
+        ("LOST", "Perdida"),
+    ]
+
+    private var totalValue: Double {
+        flat.reduce(0) { $0 + ConsoleHelpers.mapDouble($1, "value", "amount") }
+    }
+    private var weighted: Double {
+        flat.reduce(0) {
+            let v = ConsoleHelpers.mapDouble($1, "value", "amount")
+            let p = (ConsoleHelpers.mapDouble($1, "probability") > 0
+                ? ConsoleHelpers.mapDouble($1, "probability")
+                : 20) / 100
+            return $0 + v * p
+        }
+    }
+    private var wonCount: Int {
+        flat.filter {
+            let s = ConsoleHelpers.mapStr($0, "stage", "etapa").lowercased()
+            return s == "won" || s.contains("ganad")
+        }.count
+    }
 
     var body: some View {
         ScrollView {
-            if isLoading { ProgressView().padding(.top, 40) }
-            else if stages.isEmpty {
-                Text("Sin oportunidades en pipeline").foregroundColor(.secondary).padding()
-            } else {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    ForEach(stages, id: \.0) { stage, items in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text(stage).font(.headline)
-                                Spacer()
-                                Text("\(items.count)").font(.caption.bold())
-                                    .padding(.horizontal, 8).padding(.vertical, 2)
-                                    .background(Color.green.opacity(0.15)).clipShape(Capsule())
+            VStack(alignment: .leading, spacing: 14) {
+                NxSectionHeader(
+                    title: "Pipeline comercial",
+                    subtitle: "Valor · ponderado · conversión por etapa"
+                )
+                .padding(.horizontal)
+
+                NxKpiGrid(items: [
+                    NxKpi(label: "Pipeline", value: fmtMxn(totalValue), tone: .brand),
+                    NxKpi(label: "Ponderado", value: fmtMxn(weighted), tone: .info),
+                    NxKpi(label: "Ganadas", value: "\(wonCount)", tone: .success),
+                    NxKpi(label: "Oportunidades", value: "\(flat.count)", tone: .neutral),
+                ])
+                .padding(.horizontal)
+
+                if isLoading {
+                    ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
+                } else if stages.isEmpty {
+                    Text("Sin oportunidades en pipeline")
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else {
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        ForEach(stages, id: \.0) { stage, items in
+                            let stageValue = items.reduce(0.0) {
+                                $0 + ConsoleHelpers.mapDouble($1, "value", "amount")
                             }
-                            ForEach(items.indices, id: \.self) { i in
-                                let o = items[i]
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(ConsoleHelpers.mapStr(o, "title", "name")).font(.subheadline.bold())
-                                    Text(fmtMxn(ConsoleHelpers.mapDouble(o, "value", "amount")))
-                                        .font(.caption).foregroundColor(.green)
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text(stage).font(.headline)
+                                    Spacer()
+                                    Text("\(items.count) · \(fmtMxn(stageValue))")
+                                        .font(.caption.bold())
+                                        .foregroundColor(.green)
                                 }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(10)
-                                .background(Color(.secondarySystemGroupedBackground))
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                ForEach(items.indices, id: \.self) { i in
+                                    let o = items[i]
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(ConsoleHelpers.mapStr(o, "title", "name")).font(.subheadline.bold())
+                                        HStack {
+                                            Text(fmtMxn(ConsoleHelpers.mapDouble(o, "value", "amount")))
+                                                .font(.caption).foregroundColor(.green).bold()
+                                            Spacer()
+                                            if o["probability"] != nil {
+                                                let prob = ConsoleHelpers.mapDouble(o, "probability")
+                                                Text("\(Int(prob))% prob.").font(.caption2).foregroundColor(.secondary)
+                                            }
+                                        }
+                                        let client = ConsoleHelpers.mapStr(o, "clientName", "accountName")
+                                        if !client.isEmpty {
+                                            Text(client).font(.caption2).foregroundColor(.secondary)
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(10)
+                                    .background(Color(.secondarySystemGroupedBackground))
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                }
                             }
                         }
                     }
+                    .padding(.horizontal)
                 }
-                .padding()
             }
+            .padding(.vertical)
         }
         .navigationTitle("Pipeline")
         .task { await reload() }
@@ -49,13 +113,25 @@ struct CrmPipelineView: View {
         isLoading = true
         defer { isLoading = false }
         let list = (try? await CrmRepository.shared.oportunidades()) ?? []
+        flat = list
         let grouped = Dictionary(grouping: list) { item -> String in
             let s = ConsoleHelpers.mapStr(item, "stage")
             if !s.isEmpty { return s }
             let e = ConsoleHelpers.mapStr(item, "etapa")
             return e.isEmpty ? "Sin etapa" : e
         }
-        stages = grouped.keys.sorted().map { ($0, grouped[$0] ?? []) }
+        var ordered: [(String, [[String: Any]])] = []
+        for (key, label) in stageOrder {
+            if let items = grouped[key] ?? grouped[label], !items.isEmpty {
+                ordered.append((label, items))
+            }
+        }
+        let known = Set(stageOrder.flatMap { [$0.0, $0.1] })
+        let extras = grouped.keys.filter { !known.contains($0) }.sorted()
+        for key in extras {
+            ordered.append((key, grouped[key] ?? []))
+        }
+        stages = ordered
     }
 }
 

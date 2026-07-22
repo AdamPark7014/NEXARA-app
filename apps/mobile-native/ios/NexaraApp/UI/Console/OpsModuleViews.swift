@@ -66,39 +66,58 @@ private func opsIdKey(_ m: [String: Any], _ prefix: String) -> String {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @MainActor final class MaintenanceVM: ObservableObject {
-    @Published var orders: [[String: Any]] = []
-    @Published var assets: [[String: Any]] = []
+    @Published var orders: [WorkOrder] = []
+    @Published var assets: [MaintenanceAsset] = []
     @Published var tab    = 0
     @Published var query  = ""
     @Published var isLoading = false
-    @Published var selectedOrder: [String: Any]?
+    @Published var selectedOrder: WorkOrder?
+    @Published var selectedAsset: MaintenanceAsset?
     @Published var acting = false
     @Published var message: String?
+    @Published var statusFilter = "todos"
+    @Published var completeNotes = ""
 
-    var filteredOrders: [[String: Any]] {
-        guard !query.isEmpty else { return orders }
+    var filteredOrders: [WorkOrder] {
         let q = query.lowercased()
-        return orders.filter {
-            oStr($0, "title","description","orderNumber").lowercased().contains(q) ||
-            oStr($0, "assetName","equipmentName").lowercased().contains(q)
+        return orders.filter { row in
+            let st = row.status
+            let matchStatus: Bool = {
+                switch statusFilter {
+                case "abiertas": return woIsOpen(st)
+                case "progreso": return woInProgress(st)
+                case "cerradas": return woIsDone(st)
+                default: return true
+                }
+            }()
+            let matchQ = q.isEmpty ||
+                row.displayTitle.lowercased().contains(q) ||
+                row.description.lowercased().contains(q) ||
+                row.orderNumber.lowercased().contains(q) ||
+                row.assetName.lowercased().contains(q)
+            return matchStatus && matchQ
         }
     }
-    var filteredAssets: [[String: Any]] {
+    var filteredAssets: [MaintenanceAsset] {
         guard !query.isEmpty else { return assets }
         let q = query.lowercased()
         return assets.filter {
-            oStr($0, "name","nombre").lowercased().contains(q) ||
-            oStr($0, "code","tag","serial").lowercased().contains(q)
+            $0.displayName.lowercased().contains(q) ||
+            $0.code.lowercased().contains(q) ||
+            $0.serialNumber.lowercased().contains(q) ||
+            $0.category.lowercased().contains(q)
         }
     }
 
-    var openOrders: Int { orders.filter { oStr($0,"status","estado").lowercased().contains("abierta") || oStr($0,"status").lowercased() == "open" }.count }
+    var openOrders: Int {
+        orders.filter { woIsOpen($0.status) || woInProgress($0.status) }.count
+    }
 
     func load() {
         isLoading = true
         Task {
-            async let o = ExtraRepository.shared.workOrders()
-            async let a = ExtraRepository.shared.maintenanceAssets()
+            async let o = ExtraRepository.shared.workOrderItems()
+            async let a = ExtraRepository.shared.maintenanceAssetItems()
             orders = await o; assets = await a
             isLoading = false
         }
@@ -107,21 +126,29 @@ private func opsIdKey(_ m: [String: Any], _ prefix: String) -> String {
     func startOrder(_ id: Int64) async {
         acting = true; defer { acting = false }
         do {
+            let coord = await DeviceLocation.shared.current()
             _ = try await OpsRepository.shared.startWorkOrder(id: id)
-            message = "Orden iniciada"
+            message = "✅ Orden iniciada\(coord.messageSuffixOrNone)"
             selectedOrder = nil
             load()
-        } catch { message = error.localizedDescription }
+        } catch { message = "❌ \(error.localizedDescription)" }
     }
 
     func completeOrder(_ id: Int64) async {
         acting = true; defer { acting = false }
         do {
-            _ = try await OpsRepository.shared.completeWorkOrder(id: id)
-            message = "Orden completada"
+            let coord = await DeviceLocation.shared.current()
+            let notes = completeNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+            let merged = coord.mergeIntoNotes(notes.isEmpty ? nil : notes)
+            _ = try await OpsRepository.shared.completeWorkOrder(
+                id: id,
+                notes: merged.isEmpty ? nil : merged
+            )
+            message = "✅ Orden completada\(coord.messageSuffixOrNone)"
+            completeNotes = ""
             selectedOrder = nil
             load()
-        } catch { message = error.localizedDescription }
+        } catch { message = "❌ \(error.localizedDescription)" }
     }
 }
 
@@ -131,7 +158,13 @@ struct MaintenanceView: View {
 
     var body: some View {
         Group {
-            if let order = vm.selectedOrder { orderDetail(order) } else { mainBody }
+            if let order = vm.selectedOrder {
+                orderDetail(order)
+            } else if let asset = vm.selectedAsset {
+                assetDetail(asset)
+            } else {
+                mainBody
+            }
         }
         .navigationTitle("Mantenimiento")
         .onAppear { vm.tab = initialTab }
@@ -164,6 +197,19 @@ struct MaintenanceView: View {
             }
             .pickerStyle(.segmented).padding(.horizontal).padding(.top, 8)
 
+            if vm.tab == 0 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach([("todos","Todas"),("abiertas","Abiertas"),("progreso","En progreso"),("cerradas","Cerradas")], id: \.0) { key, label in
+                            Button(label) { vm.statusFilter = key }
+                                .buttonStyle(.bordered)
+                                .tint(vm.statusFilter == key ? .teal : .secondary)
+                        }
+                    }.padding(.horizontal)
+                }
+                .padding(.top, 6)
+            }
+
             // Search
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundColor(.secondary)
@@ -180,20 +226,23 @@ struct MaintenanceView: View {
             if vm.isLoading {
                 Spacer(); ProgressView(); Spacer()
             } else if vm.tab == 0 {
-                List(vm.filteredOrders.prefix(60), id: { opsIdKey($0,"wo") }) { item in
+                List(vm.filteredOrders.prefix(60), id: \.rowKey) { item in
                     Button { vm.selectedOrder = item } label: {
                         WorkOrderRow(item: item)
                     }
                     .buttonStyle(.plain)
-                        .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
-                        .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
+                    .listRowSeparator(.hidden)
                 }
                 .listStyle(.plain)
             } else {
-                List(vm.filteredAssets.prefix(60), id: { opsIdKey($0,"ast") }) { item in
-                    AssetRow(item: item)
-                        .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
-                        .listRowSeparator(.hidden)
+                List(vm.filteredAssets.prefix(60), id: \.rowKey) { item in
+                    Button { vm.selectedAsset = item } label: {
+                        AssetRow(item: item)
+                    }
+                    .buttonStyle(.plain)
+                    .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
+                    .listRowSeparator(.hidden)
                 }
                 .listStyle(.plain)
             }
@@ -202,28 +251,57 @@ struct MaintenanceView: View {
         .refreshable { vm.load() }
     }
 
-    private func orderDetail(_ order: [String: Any]) -> some View {
-        let id = ConsoleHelpers.mapInt64(order, "id")
-        let status = oStr(order, "status", "estado").uppercased()
+    private func assetDetail(_ asset: MaintenanceAsset) -> some View {
+        List {
+            Section("Activo") {
+                detailRow("Nombre", asset.displayName)
+                detailRow("Código", asset.code)
+                detailRow("Serie", asset.serialNumber)
+                detailRow("Tipo", asset.category)
+                detailRow("Estado", asset.status)
+                detailRow("Ubicación", asset.location)
+                detailRow("Responsable", asset.responsibleName)
+                detailRow("Fabricante", asset.manufacturer)
+                detailRow("Modelo", asset.model)
+                detailRow("Última mantto.", String(asset.lastMaintenanceDate.prefix(10)))
+            }
+            Button("Volver") { vm.selectedAsset = nil }
+        }
+    }
+
+    private func orderDetail(_ order: WorkOrder) -> some View {
+        let id = order.id
+        let status = order.status
         return List {
             Section("Orden de trabajo") {
-                detailRow("Título", oStr(order, "title", "description"))
-                detailRow("Activo", oStr(order, "assetName", "equipmentName", "asset"))
-                detailRow("Prioridad", oStr(order, "priority"))
-                detailRow("Estado", oStr(order, "status", "estado"))
-                detailRow("Programada", oStr(order, "scheduledAt", "scheduledDate"))
+                detailRow("Folio", order.orderNumber)
+                detailRow("Título", order.displayTitle)
+                detailRow("Activo", order.assetName)
+                detailRow("Prioridad", order.priority)
+                detailRow("Estado", status)
+                detailRow("Programada", order.plannedDate)
+            }
+            Section {
+                LocationPermissionBanner(
+                    message: "Al iniciar o completar la orden se registrará tu GPS en notas de campo.",
+                    requestOnAppear: true
+                )
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             }
             if let id {
                 Section("Acciones") {
-                    if status.contains("PENDIENTE") || status == "OPEN" {
+                    if woIsOpen(status) {
                         Button("Iniciar orden") { Task { await vm.startOrder(id) } }.disabled(vm.acting)
                     }
-                    if status.contains("PROGRESO") || status.contains("IN_PROGRESS") {
+                    if woInProgress(status) || woIsOpen(status) {
+                        TextField("Notas de cierre", text: $vm.completeNotes, axis: .vertical)
+                            .lineLimit(2...4)
                         Button("Completar orden") { Task { await vm.completeOrder(id) } }.disabled(vm.acting)
                     }
                 }
             }
-            Button("Volver") { vm.selectedOrder = nil }
+            Button("Volver") { vm.selectedOrder = nil; vm.completeNotes = "" }
         }
     }
 
@@ -233,12 +311,12 @@ struct MaintenanceView: View {
 }
 
 private struct WorkOrderRow: View {
-    let item: [String: Any]
+    let item: WorkOrder
     var body: some View {
-        let title  = oStr(item, "title","description","orderNumber")
-        let asset  = oStr(item, "assetName","equipmentName","asset")
-        let status = oStr(item, "status","estado")
-        let date   = String(oStr(item,"scheduledDate","createdAt").prefix(10))
+        let title  = item.displayTitle
+        let asset  = item.assetName
+        let status = item.status
+        let date   = String(item.plannedDate.prefix(10))
         let color  = maintenanceStatusColor(status)
         HStack(spacing: 10) {
             ZStack {
@@ -264,11 +342,11 @@ private struct WorkOrderRow: View {
 }
 
 private struct AssetRow: View {
-    let item: [String: Any]
+    let item: MaintenanceAsset
     var body: some View {
-        let name   = oStr(item,"name","nombre")
-        let code   = oStr(item,"code","tag","serial")
-        let status = oStr(item,"status","estado","condition")
+        let name   = item.displayName
+        let code   = item.code.isEmpty ? item.serialNumber : item.code
+        let status = item.status
         let color  = maintenanceStatusColor(status)
         HStack(spacing:10) {
             ZStack {
@@ -300,6 +378,21 @@ private func maintenanceStatusColor(_ s: String) -> Color {
     case "cancelada","cancelado": return .red
     default: return .secondary
     }
+}
+
+private func woIsOpen(_ status: String) -> Bool {
+    let s = status.lowercased()
+    return s.contains("pendiente") || s == "open" || s.contains("abierta") || s.contains("scheduled") || s.contains("new")
+}
+
+private func woInProgress(_ status: String) -> Bool {
+    let s = status.lowercased()
+    return s.contains("progreso") || s.contains("in_progress") || s.contains("in-progress") || s.contains("started") || s == "active"
+}
+
+private func woIsDone(_ status: String) -> Bool {
+    let s = status.lowercased()
+    return s.contains("complet") || s.contains("cerrad") || s.contains("done") || s.contains("closed")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

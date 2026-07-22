@@ -41,6 +41,8 @@ object DeepLinkParser {
         "notifications-center" to "notifications-center",
         "mi-perfil" to "my-profile",
         "configuracion" to "settings",
+        "cola-offline" to "offline-queue",
+        "offline" to "offline-queue",
         "usuarios" to "users",
         "leads" to "leads",
         "noticias" to "news",

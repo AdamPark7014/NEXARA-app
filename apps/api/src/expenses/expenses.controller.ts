@@ -122,22 +122,30 @@ export class ExpensesController {
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
-  findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
+  findAll(
+    @CurrentUser() user: any,
+    @Query() query: PaginationQueryDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
     if (
       user.isSuperAdmin ||
       user.permissions?.includes(PERMISSIONS.CONTABILIDAD_MANAGE) ||
       user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)
     ) {
-      return this.expensesService.findAll(query);
+      return this.expensesService.findAll(query, companyId);
     }
-    return this.expensesService.findByDepartment(user.departmentId, query);
+    return this.expensesService.findByDepartment(user.departmentId, query, companyId);
   }
 
   @Get(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
-  findOne(@CurrentUser() _user: any, @Param('id') id: string) {
-    return this.expensesService.findOne(+id);
+  findOne(
+    @CurrentUser() _user: any,
+    @Param('id') id: string,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.expensesService.findOne(+id, companyId);
   }
 
   @Patch(':id/approve')

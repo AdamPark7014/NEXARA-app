@@ -326,7 +326,7 @@ export function getUserHomePath(user: UserAccessInput | null | undefined): strin
 
 export function getUserRoleLabel(user: UserAccessInput | null | undefined): string {
   if (!user) return '';
-  if (resolveIsPlatformOwner(user)) return 'Dueño / CEO';
+  if (resolveIsPlatformOwner(user)) return 'CEO';
   if (isTechnicalSuperAdmin(user)) return 'Super Admin · Desarrollador';
   if (user.isSuperAdmin) return ROLE_LABELS[ROLES.SUPER_ADMIN];
   const v2 = resolveV2RoleKey(user);

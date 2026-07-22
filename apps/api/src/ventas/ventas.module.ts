@@ -13,9 +13,19 @@ import { VentasCotizacionesController } from './ventas-cotizaciones.controller.j
 import { VentasOrderTemplatesController } from './ventas-order-templates.controller.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { WorkflowModule } from '../workflow/workflow.module.js';
+import { WebhooksModule } from '../webhooks/webhooks.module.js';
+import { AuditModule } from '../audit/audit.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, forwardRef(() => CotizacionesModule), NotificationsModule, WorkflowModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    forwardRef(() => CotizacionesModule),
+    NotificationsModule,
+    WorkflowModule,
+    WebhooksModule,
+    AuditModule,
+  ],
   providers: [VentasService, PdfGeneratorService],
   exports: [VentasService],
   controllers: [VentasClientesController, VentasLeadsController, VentasOportunidadesController, VentasProyectosController, VentasReportesController, VentasCotizacionesController, VentasOrderTemplatesController],

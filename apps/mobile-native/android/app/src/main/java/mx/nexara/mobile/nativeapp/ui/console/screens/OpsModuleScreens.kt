@@ -51,6 +51,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.ops.OpsRepository
+import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
+import mx.nexara.mobile.nativeapp.util.mergeIntoNotes
+import mx.nexara.mobile.nativeapp.util.messageSuffixOrNone
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -252,15 +255,17 @@ data class ProcurementUiState(
     val error: String? = null,
     val message: String? = null,
     val query: String = "",
-    val requisitions: List<Map<String, Any?>> = emptyList(),
-    val orders: List<Map<String, Any?>> = emptyList(),
-    val selected: Map<String, Any?>? = null,
+    val requisitions: List<mx.nexara.mobile.nativeapp.data.api.RequisitionDto> = emptyList(),
+    val orders: List<mx.nexara.mobile.nativeapp.data.api.PurchaseOrderDto> = emptyList(),
+    val goodsReceipts: List<mx.nexara.mobile.nativeapp.data.api.GoodsReceiptDto> = emptyList(),
+    val selected: mx.nexara.mobile.nativeapp.data.api.RequisitionDto? = null,
     val rejectReason: String = "",
     val acting: Boolean = false,
 )
 
 class ProcurementViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = OpsRepository(app.applicationContext)
+    private val extra = ExtraRepository(app.applicationContext)
     private val _state = MutableStateFlow(ProcurementUiState())
     val state: StateFlow<ProcurementUiState> = _state
 
@@ -269,15 +274,20 @@ class ProcurementViewModel(app: Application) : AndroidViewModel(app) {
     fun setTab(v: Int) = _state.update { it.copy(tab = v, selected = null) }
     fun setQuery(v: String) = _state.update { it.copy(query = v) }
     fun setRejectReason(v: String) = _state.update { it.copy(rejectReason = v) }
-    fun select(item: Map<String, Any?>?) = _state.update { it.copy(selected = item) }
+    fun select(item: mx.nexara.mobile.nativeapp.data.api.RequisitionDto?) = _state.update { it.copy(selected = item) }
 
     fun refresh() {
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             try {
-                val reqs = withContext(Dispatchers.IO) { repo.requisitions() }
-                val orders = withContext(Dispatchers.IO) { repo.purchaseOrders() }
-                _state.update { it.copy(loading = false, requisitions = reqs, orders = orders) }
+                val reqs = withContext(Dispatchers.IO) { repo.requisitionDtos() }
+                val orders = withContext(Dispatchers.IO) { repo.purchaseOrderDtos() }
+                val gr = withContext(Dispatchers.IO) {
+                    runCatching { extra.goodsReceiptDtos() }.getOrDefault(emptyList())
+                }
+                _state.update {
+                    it.copy(loading = false, requisitions = reqs, orders = orders, goodsReceipts = gr)
+                }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message) }
             }
@@ -307,16 +317,34 @@ class ProcurementViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun currentList(): List<Map<String, Any?>> =
-        if (_state.value.tab == 0) _state.value.requisitions else _state.value.orders
-
-    fun filtered(): List<Map<String, Any?>> {
+    fun filteredRequisitions(): List<mx.nexara.mobile.nativeapp.data.api.RequisitionDto> {
         val q = _state.value.query.trim().lowercase()
-        val list = currentList()
+        val list = _state.value.requisitions
         if (q.isBlank()) return list
         return list.filter {
-            str(it, "title", "description", "folio").lowercase().contains(q) ||
-                str(it, "requestedBy", "solicitante").lowercase().contains(q)
+            it.displayTitle.lowercase().contains(q) ||
+                it.requestedByName.lowercase().contains(q) ||
+                it.reqNumber.lowercase().contains(q)
+        }
+    }
+
+    fun filteredOrders(): List<mx.nexara.mobile.nativeapp.data.api.PurchaseOrderDto> {
+        val q = _state.value.query.trim().lowercase()
+        val list = _state.value.orders
+        if (q.isBlank()) return list
+        return list.filter {
+            it.displayTitle.lowercase().contains(q) || it.supplierName.lowercase().contains(q)
+        }
+    }
+
+    fun filteredReceipts(): List<mx.nexara.mobile.nativeapp.data.api.GoodsReceiptDto> {
+        val q = _state.value.query.trim().lowercase()
+        val list = _state.value.goodsReceipts
+        if (q.isBlank()) return list
+        return list.filter {
+            it.displayTitle.lowercase().contains(q) ||
+                it.warehouseName.lowercase().contains(q) ||
+                it.poNumber.lowercase().contains(q)
         }
     }
 }
@@ -327,14 +355,16 @@ fun ProcurementModuleScreen(vm: ProcurementViewModel = viewModel()) {
     val selected = s.selected
 
     if (selected != null && s.tab == 0) {
-        val id = str(selected, "id").toLongOrNull()
-        val status = str(selected, "status", "estado").uppercase()
+        val id = selected.id
         LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { Text("Requisición", style = MaterialTheme.typography.titleLarge) }
-            item { DetailLine("Título", str(selected, "title", "description")) }
-            item { DetailLine("Solicitante", str(selected, "requestedBy", "solicitante")) }
-            item { DetailLine("Estado", str(selected, "status", "estado")) }
-            if (id != null && (status == "PENDING" || status == "SUBMITTED")) {
+            item { DetailLine("Título", selected.displayTitle) }
+            item { DetailLine("Número", selected.reqNumber) }
+            item { DetailLine("Solicitante", selected.requestedByName) }
+            item { DetailLine("Departamento", selected.departmentName) }
+            item { DetailLine("Estado", selected.status) }
+            item { DetailLine("Prioridad", selected.priority) }
+            if (id != null && selected.canDecide) {
                 item {
                     OutlinedTextField(
                         value = s.rejectReason,
@@ -359,6 +389,7 @@ fun ProcurementModuleScreen(vm: ProcurementViewModel = viewModel()) {
         ScrollableTabRow(selectedTabIndex = s.tab) {
             Tab(selected = s.tab == 0, onClick = { vm.setTab(0) }, text = { Text("Requisiciones") })
             Tab(selected = s.tab == 1, onClick = { vm.setTab(1) }, text = { Text("Órdenes") })
+            Tab(selected = s.tab == 2, onClick = { vm.setTab(2) }, text = { Text("Recepciones") })
         }
         LazyColumn(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
@@ -370,19 +401,61 @@ fun ProcurementModuleScreen(vm: ProcurementViewModel = viewModel()) {
                     singleLine = true,
                 )
             }
+            if (!s.message.isNullOrBlank()) {
+                item { Text(s.message!!, color = Color(0xFF2E7D32), fontWeight = FontWeight.SemiBold) }
+            }
+            if (!s.error.isNullOrBlank()) {
+                item { Text(s.error!!, color = MaterialTheme.colorScheme.error) }
+            }
             if (s.loading) item { CircularProgressIndicator() }
-            else if (vm.filtered().isEmpty()) item { Text("Sin registros") }
-            else items(vm.filtered().take(80), key = { rowId(it) }) { r ->
-                val clickable = s.tab == 0
-                Card(
-                    onClick = { if (clickable) vm.select(r) },
-                    enabled = clickable,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(str(r, "title", "description", "folio", "number"), fontWeight = FontWeight.Bold)
-                        Text(str(r, "requestedBy", "solicitante", "vendorName"), style = MaterialTheme.typography.bodySmall)
-                        Text(str(r, "status", "estado"), style = MaterialTheme.typography.labelSmall)
+            else when (s.tab) {
+                1 -> {
+                    val list = vm.filteredOrders()
+                    if (list.isEmpty()) item { Text("Sin registros") }
+                    else items(list.take(80), key = { it.rowKey }) { r ->
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(r.displayTitle, fontWeight = FontWeight.Bold)
+                                Text(r.supplierName, style = MaterialTheme.typography.bodySmall)
+                                Text(r.status, style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                }
+                2 -> {
+                    val list = vm.filteredReceipts()
+                    if (list.isEmpty()) item { Text("Sin recepciones de mercancía") }
+                    else items(list.take(80), key = { it.rowKey }) { r ->
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(r.displayTitle, fontWeight = FontWeight.Bold)
+                                Text(r.warehouseName, style = MaterialTheme.typography.bodySmall)
+                                Text(r.status, style = MaterialTheme.typography.labelSmall)
+                                r.quantity?.let { qty ->
+                                    Text(
+                                        "Cantidad: $qty",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF0D9488),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                else -> {
+                    val list = vm.filteredRequisitions()
+                    if (list.isEmpty()) item { Text("Sin registros") }
+                    else items(list.take(80), key = { it.rowKey }) { r ->
+                        Card(
+                            onClick = { vm.select(r) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(r.displayTitle, fontWeight = FontWeight.Bold)
+                                Text(r.requestedByName, style = MaterialTheme.typography.bodySmall)
+                                Text(r.status, style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
                     }
                 }
             }
@@ -394,102 +467,8 @@ fun ProcurementModuleScreen(vm: ProcurementViewModel = viewModel()) {
 
 @Composable
 fun WarehouseHubScreen(initialTab: Int = 0) {
-    val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as Application
-    val repo = remember { OpsRepository(app) }
-    var tab by remember { mutableIntStateOf(initialTab) }
-    var loading by remember { mutableStateOf(true) }
-    var warehouses by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
-    var stock by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
-    var query by remember { mutableStateOf("") }
-    var selectedItem by remember { mutableStateOf<Map<String, Any?>?>(null) }
-
-    LaunchedEffect(Unit) {
-        loading = true
-        warehouses = withContext(Dispatchers.IO) { repo.warehouse() }
-        stock = withContext(Dispatchers.IO) { repo.stock() }
-        loading = false
-    }
-
-    val si = selectedItem
-    if (si != null) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { OutlinedButton(onClick = { selectedItem = null }) { Text(if (tab == 0) "← Inventario" else "← Bodegas") } }
-            item {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(str(si, "name", "nombre", "productName").ifBlank { "Producto" }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                        if (tab == 0) {
-                            DetailLine("SKU", str(si, "sku", "code"))
-                            DetailLine("Categoría", str(si, "category", "categoria"))
-                            num(si, "quantity", "cantidad", "stock")?.let { DetailLine("Cantidad", "${it.toInt()} uds") }
-                            num(si, "minStock", "stockMinimo")?.let { DetailLine("Stock mínimo", "${it.toInt()}") }
-                            DetailLine("Ubicación", str(si, "location", "ubicacion", "bodega"))
-                            num(si, "price", "precio")?.let { DetailLine("Precio", "$$it") }
-                        } else {
-                            DetailLine("Código", str(si, "code", "codigo"))
-                            DetailLine("Ubicación", str(si, "location", "ubicacion", "address"))
-                            DetailLine("Responsable", str(si, "managerName", "responsable"))
-                        }
-                    }
-                }
-            }
-        }
-        return
-    }
-
-    val items = if (tab == 0) stock else warehouses
-    val filtered = if (query.isBlank()) items else {
-        val q = query.lowercase()
-        items.filter {
-            str(it, "name", "nombre", "productName").lowercase().contains(q) ||
-                str(it, "code", "sku").lowercase().contains(q)
-        }
-    }
-    val lowStock = stock.count { (num(it, "quantity", "cantidad", "stock") ?: 99.0) < 5 }
-
-    Column(Modifier.fillMaxSize()) {
-        if (stock.isNotEmpty() || warehouses.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                KpiChip("Productos", "${stock.size}")
-                KpiChip("Stock bajo", "$lowStock", if (lowStock > 0) Color.Red else Color(0xFF2E7D32))
-                KpiChip("Bodegas", "${warehouses.size}")
-            }
-        }
-        ScrollableTabRow(selectedTabIndex = tab) {
-            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Inventario") })
-            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Bodegas") })
-        }
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            placeholder = { Text("Buscar…") },
-            singleLine = true,
-        )
-        if (loading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        } else {
-            LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp)) {
-                items(filtered.take(100), key = { rowId(it) }) { row ->
-                    Card(
-                        onClick = { selectedItem = row },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(str(row, "name", "nombre", "productName"), fontWeight = FontWeight.Bold)
-                            Text(str(row, "code", "sku", "location"), style = MaterialTheme.typography.bodySmall)
-                            if (tab == 0) {
-                                num(row, "quantity", "cantidad", "stock")?.let { q ->
-                                    Text("Cantidad: ${q.toInt()}", style = MaterialTheme.typography.labelSmall,
-                                        color = if (q < 5) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // WMS enterprise: recepción / despacho / conteo / alertas
+    WarehouseWmsScreen(initialTab = initialTab)
 }
 
 // ── Service sheets ───────────────────────────────────────────────────────────
@@ -602,9 +581,10 @@ data class MaintenanceUiState(
     val tab: Int = 0,
     val loading: Boolean = true,
     val query: String = "",
-    val orders: List<Map<String, Any?>> = emptyList(),
-    val assets: List<Map<String, Any?>> = emptyList(),
-    val selected: Map<String, Any?>? = null,
+    val orders: List<mx.nexara.mobile.nativeapp.data.api.WorkOrderDto> = emptyList(),
+    val assets: List<mx.nexara.mobile.nativeapp.data.api.MaintenanceAssetDto> = emptyList(),
+    val selectedOrder: mx.nexara.mobile.nativeapp.data.api.WorkOrderDto? = null,
+    val selectedAsset: mx.nexara.mobile.nativeapp.data.api.MaintenanceAssetDto? = null,
     val acting: Boolean = false,
     val message: String? = null,
 )
@@ -616,57 +596,107 @@ class MaintenanceViewModel(app: Application) : AndroidViewModel(app) {
 
     init { refresh() }
 
-    fun setTab(v: Int) = _state.update { it.copy(tab = v, selected = null) }
+    fun setTab(v: Int) = _state.update { it.copy(tab = v, selectedOrder = null, selectedAsset = null) }
     fun setQuery(v: String) = _state.update { it.copy(query = v) }
-    fun select(item: Map<String, Any?>?) = _state.update { it.copy(selected = item) }
+    fun selectOrder(item: mx.nexara.mobile.nativeapp.data.api.WorkOrderDto?) =
+        _state.update { it.copy(selectedOrder = item, selectedAsset = null) }
+    fun selectAsset(item: mx.nexara.mobile.nativeapp.data.api.MaintenanceAssetDto?) =
+        _state.update { it.copy(selectedAsset = item, selectedOrder = null) }
 
     fun refresh() {
         _state.update { it.copy(loading = true) }
         viewModelScope.launch {
-            val orders = withContext(Dispatchers.IO) { repo.workOrders() }
-            val assets = withContext(Dispatchers.IO) { repo.maintenanceAssets() }
+            val orders = withContext(Dispatchers.IO) { repo.workOrderDtos() }
+            val assets = withContext(Dispatchers.IO) { repo.maintenanceAssetDtos() }
             _state.update { it.copy(loading = false, orders = orders, assets = assets) }
         }
     }
 
-    fun startOrder(id: Long) = act(id) { repo.startWorkOrder(id) }
-    fun completeOrder(id: Long) = act(id) { repo.completeWorkOrder(id) }
-
-    private fun act(id: Long, block: suspend () -> Unit) {
-        _state.update { it.copy(acting = true) }
+    fun startOrder(id: Long) {
+        _state.update { it.copy(acting = true, message = null) }
         viewModelScope.launch {
             try {
-                withContext(Dispatchers.IO) { block() }
-                _state.update { it.copy(acting = false, message = "Actualizado", selected = null) }
+                val coords = mx.nexara.mobile.nativeapp.util.DeviceLocation.current(getApplication())
+                withContext(Dispatchers.IO) { repo.startWorkOrder(id) }
+                val geo = coords.messageSuffixOrNone()
+                _state.update {
+                    it.copy(acting = false, message = "✅ Orden iniciada$geo", selectedOrder = null)
+                }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(acting = false, message = e.message) }
+                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
             }
         }
     }
 
-    fun filteredOrders(): List<Map<String, Any?>> {
-        val q = _state.value.query.trim().lowercase()
-        if (q.isBlank()) return _state.value.orders
-        return _state.value.orders.filter {
-            str(it, "title", "description", "orderNumber").lowercase().contains(q) ||
-                str(it, "assetName", "equipmentName").lowercase().contains(q)
+    fun completeOrder(id: Long, notes: String? = null) {
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                val coords = mx.nexara.mobile.nativeapp.util.DeviceLocation.current(getApplication())
+                val merged = coords.mergeIntoNotes(notes)
+                withContext(Dispatchers.IO) {
+                    repo.completeWorkOrder(id, merged.ifBlank { null })
+                }
+                val geo = coords.messageSuffixOrNone()
+                _state.update {
+                    it.copy(acting = false, message = "✅ Orden completada$geo", selectedOrder = null)
+                }
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+            }
         }
     }
 
-    fun filteredAssets(): List<Map<String, Any?>> {
+    fun filteredOrders(statusFilter: String = "todos"): List<mx.nexara.mobile.nativeapp.data.api.WorkOrderDto> {
+        val q = _state.value.query.trim().lowercase()
+        return _state.value.orders.filter { row ->
+            val st = row.status
+            val matchStatus = when (statusFilter) {
+                "abiertas" -> woIsOpen(st)
+                "progreso" -> woInProgress(st)
+                "cerradas" -> woIsDone(st)
+                else -> true
+            }
+            val matchQ = q.isBlank() ||
+                row.displayTitle.lowercase().contains(q) ||
+                row.description.lowercase().contains(q) ||
+                row.orderNumber.lowercase().contains(q) ||
+                row.assetName.lowercase().contains(q)
+            matchStatus && matchQ
+        }
+    }
+
+    fun filteredAssets(): List<mx.nexara.mobile.nativeapp.data.api.MaintenanceAssetDto> {
         val q = _state.value.query.trim().lowercase()
         if (q.isBlank()) return _state.value.assets
         return _state.value.assets.filter {
-            str(it, "name", "nombre").lowercase().contains(q) ||
-                str(it, "code", "tag", "serial").lowercase().contains(q)
+            it.displayName.lowercase().contains(q) ||
+                it.code.lowercase().contains(q) ||
+                it.serialNumber.lowercase().contains(q) ||
+                it.category.lowercase().contains(q)
         }
     }
 
     fun openOrdersCount() = _state.value.orders.count {
-        val st = str(it, "status", "estado").lowercase()
-        st.contains("pendiente") || st == "open" || st.contains("abierta")
+        woIsOpen(it.status) || woInProgress(it.status)
     }
+}
+
+private fun woIsOpen(status: String): Boolean {
+    val s = status.lowercase()
+    return s.contains("pendiente") || s == "open" || s.contains("abierta") || s.contains("scheduled") || s.contains("new")
+}
+
+private fun woInProgress(status: String): Boolean {
+    val s = status.lowercase()
+    return s.contains("progreso") || s.contains("in_progress") || s.contains("in-progress") || s.contains("started") || s == "active"
+}
+
+private fun woIsDone(status: String): Boolean {
+    val s = status.lowercase()
+    return s.contains("complet") || s.contains("cerrad") || s.contains("done") || s.contains("closed")
 }
 
 @Composable
@@ -676,55 +706,98 @@ fun MaintenanceModuleScreen(
 ) {
     val s by vm.state.collectAsState()
     LaunchedEffect(initialTab) { vm.setTab(initialTab) }
+    var statusFilter by remember { mutableStateOf("todos") }
+    var completeNotes by remember { mutableStateOf("") }
 
-    val selected = s.selected
-    if (selected != null) {
-        if (s.tab == 0) {
-            val id = str(selected, "id").toLongOrNull()
-            val status = str(selected, "status", "estado").uppercase()
-            LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { OutlinedButton(onClick = { vm.select(null) }) { Text("← Órdenes") } }
-                item { Text("Orden de trabajo", style = MaterialTheme.typography.titleLarge) }
+    val selectedOrder = s.selectedOrder
+    if (selectedOrder != null) {
+        val id = selectedOrder.id
+        val status = selectedOrder.status
+        LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item { OutlinedButton(onClick = { vm.selectOrder(null); completeNotes = "" }) { Text("← Órdenes") } }
+            item { Text("Orden de trabajo", style = MaterialTheme.typography.titleLarge) }
+            item {
+                mx.nexara.mobile.nativeapp.ui.common.LocationPermissionBanner(
+                    message = "Al iniciar o completar la orden se registrará tu GPS en notas de campo.",
+                    requestOnAppear = true,
+                )
+            }
+            if (!s.message.isNullOrBlank()) {
                 item {
-                    Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            DetailLine("Título", str(selected, "title", "description"))
-                            DetailLine("Activo", str(selected, "assetName", "equipmentName"))
-                            DetailLine("Estado", str(selected, "status", "estado"))
-                            DetailLine("Técnico", str(selected, "technicianName", "responsable"))
-                            DetailLine("Prioridad", str(selected, "priority", "prioridad"))
-                            DetailLine("Fecha", str(selected, "scheduledDate", "createdAt").take(10))
-                        }
-                    }
+                    Text(
+                        s.message!!,
+                        color = if (s.message!!.startsWith("✅")) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
-                val notes = str(selected, "notes", "observaciones", "description")
-                if (notes.isNotBlank()) {
-                    item { Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp)) { Text("Notas", fontWeight = FontWeight.SemiBold); Text(notes, style = MaterialTheme.typography.bodyMedium) } } }
-                }
-                if (id != null) {
-                    if (status.contains("PENDIENTE") || status == "OPEN") {
-                        item { ActionBtn("Iniciar orden", s.acting) { vm.startOrder(id) } }
-                    }
-                    if (status.contains("PROGRESO") || status.contains("IN_PROGRESS")) {
-                        item { ActionBtn("Completar orden", s.acting) { vm.completeOrder(id) } }
+            }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        DetailLine("Folio", selectedOrder.orderNumber)
+                        DetailLine("Título", selectedOrder.displayTitle)
+                        DetailLine("Activo", selectedOrder.assetName)
+                        DetailLine("Estado", status)
+                        DetailLine("Técnico", selectedOrder.technicianName)
+                        DetailLine("Prioridad", selectedOrder.priority)
+                        DetailLine("Fecha", selectedOrder.plannedDate.take(10))
                     }
                 }
             }
-        } else {
-            LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { OutlinedButton(onClick = { vm.select(null) }) { Text("← Activos") } }
-                item { Text("Activo", style = MaterialTheme.typography.titleLarge) }
+            val notes = selectedOrder.notes.ifBlank { selectedOrder.description }
+            if (notes.isNotBlank()) {
                 item {
                     Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            DetailLine("Nombre", str(selected, "name", "nombre"))
-                            DetailLine("Código", str(selected, "code", "tag", "serial"))
-                            DetailLine("Tipo", str(selected, "type", "tipo", "category"))
-                            DetailLine("Estado", str(selected, "status", "estado"))
-                            DetailLine("Ubicación", str(selected, "location", "ubicacion"))
-                            DetailLine("Responsable", str(selected, "assignedTo", "responsable"))
-                            DetailLine("Última mantto.", str(selected, "lastMaintenanceDate", "lastService").take(10))
+                        Column(Modifier.padding(14.dp)) {
+                            Text("Notas", fontWeight = FontWeight.SemiBold)
+                            Text(notes, style = MaterialTheme.typography.bodyMedium)
                         }
+                    }
+                }
+            }
+            if (id != null) {
+                if (woIsOpen(status)) {
+                    item { ActionBtn("Iniciar orden", s.acting) { vm.startOrder(id) } }
+                }
+                if (woInProgress(status) || woIsOpen(status)) {
+                    item {
+                        OutlinedTextField(
+                            value = completeNotes,
+                            onValueChange = { completeNotes = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Notas de cierre (opcional)") },
+                            minLines = 2,
+                        )
+                    }
+                    item {
+                        ActionBtn("Completar orden", s.acting) {
+                            vm.completeOrder(id, completeNotes.ifBlank { null })
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    val selectedAsset = s.selectedAsset
+    if (selectedAsset != null) {
+        LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item { OutlinedButton(onClick = { vm.selectAsset(null) }) { Text("← Activos") } }
+            item { Text("Activo", style = MaterialTheme.typography.titleLarge) }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        DetailLine("Nombre", selectedAsset.displayName)
+                        DetailLine("Código", selectedAsset.code)
+                        DetailLine("Serie", selectedAsset.serialNumber)
+                        DetailLine("Tipo", selectedAsset.category)
+                        DetailLine("Estado", selectedAsset.status)
+                        DetailLine("Ubicación", selectedAsset.location)
+                        DetailLine("Responsable", selectedAsset.responsibleName)
+                        DetailLine("Fabricante", selectedAsset.manufacturer)
+                        DetailLine("Modelo", selectedAsset.model)
+                        DetailLine("Última mantto.", selectedAsset.lastMaintenanceDate.take(10))
                     }
                 }
             }
@@ -744,6 +817,17 @@ fun MaintenanceModuleScreen(
             Tab(selected = s.tab == 0, onClick = { vm.setTab(0) }, text = { Text("Órdenes") })
             Tab(selected = s.tab == 1, onClick = { vm.setTab(1) }, text = { Text("Activos") })
         }
+        if (s.tab == 0) {
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                listOf("todos" to "Todas", "abiertas" to "Abiertas", "progreso" to "En progreso", "cerradas" to "Cerradas")
+                    .forEach { (key, label) ->
+                        FilterChip(selected = statusFilter == key, onClick = { statusFilter = key }, label = { Text(label) })
+                    }
+            }
+        }
         OutlinedTextField(
             value = s.query,
             onValueChange = vm::setQuery,
@@ -753,26 +837,40 @@ fun MaintenanceModuleScreen(
         )
         if (s.loading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        } else {
-            val list = if (s.tab == 0) vm.filteredOrders() else vm.filteredAssets()
+        } else if (s.tab == 0) {
+            val list = vm.filteredOrders(statusFilter)
             LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp)) {
-                items(list.take(80), key = { rowId(it) }) { row ->
+                if (list.isEmpty()) {
+                    item { Text("Sin registros", color = Color(0xFF64748B), modifier = Modifier.padding(24.dp)) }
+                }
+                items(list.take(80), key = { it.id ?: it.orderNumber }) { row ->
                     Card(
-                        onClick = { vm.select(row) },
+                        onClick = { vm.selectOrder(row) },
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     ) {
                         Column(Modifier.padding(12.dp)) {
-                            Text(
-                                if (s.tab == 0) str(row, "title", "description", "orderNumber")
-                                else str(row, "name", "nombre"),
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(
-                                if (s.tab == 0) str(row, "assetName", "equipmentName")
-                                else str(row, "code", "tag", "serial"),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                            Text(str(row, "status", "estado"), style = MaterialTheme.typography.labelSmall)
+                            Text(row.displayTitle, fontWeight = FontWeight.Bold)
+                            Text(row.assetName, style = MaterialTheme.typography.bodySmall)
+                            Text(row.status, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
+        } else {
+            val list = vm.filteredAssets()
+            LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp)) {
+                if (list.isEmpty()) {
+                    item { Text("Sin registros", color = Color(0xFF64748B), modifier = Modifier.padding(24.dp)) }
+                }
+                items(list.take(80), key = { it.id ?: it.code }) { row ->
+                    Card(
+                        onClick = { vm.selectAsset(row) },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(row.displayName, fontWeight = FontWeight.Bold)
+                            Text(row.code.ifBlank { row.serialNumber }, style = MaterialTheme.typography.bodySmall)
+                            Text(row.status, style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }

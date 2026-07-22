@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
-import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
@@ -16,6 +15,7 @@ import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac";
+import { DashGrid, DashCol, DashPanel, StatStrip, DashPill } from "@/components/dashboard/DashKit";
 
 interface Breach {
   id: number;
@@ -26,13 +26,33 @@ interface Breach {
   hoursLate: number;
 }
 
-interface SlaStats {
+interface SlaInsights {
   total: number;
   stillOpen: number;
   responseSla: { onTime: number; late: number; compliancePct: number; avgHours: number };
   resolutionSla: { onTime: number; late: number; compliancePct: number; avgHours: number };
   breaches: Breach[];
   bySeverity: { high: number; medium: number; low: number };
+  mttr: { meanHours: number; medianHours: number; sampleSize: number };
+  backlog: {
+    open: number;
+    aging: { h0_24: number; d1_3: number; d3_7: number; d7_plus: number };
+    oldest: Array<{
+      id: number;
+      anNumber?: string | null;
+      titulo?: string | null;
+      prioridad?: string | null;
+      ageHours: number | null;
+      assignee: string | null;
+    }>;
+  };
+  techRanking: Array<{ userId: number; nombre: string; closed: number; mttrHours: number }>;
+  trends: {
+    opened14d: Array<{ date: string; count: number }>;
+    closed14d: Array<{ date: string; count: number }>;
+  };
+  inboxByStatus: Record<string, number>;
+  alerts: Array<{ severity: string; message: string }>;
 }
 
 async function apiFetch(path: string, token: string) {
@@ -53,7 +73,7 @@ export default function SupportSlaPage() {
     if (!user?.isSuperAdmin && v2 === ROLES.ING_CAMPO) router.replace("/ops/dashboard");
   }, [user, router]);
 
-  const [stats, setStats] = useState<SlaStats | null>(null);
+  const [stats, setStats] = useState<SlaInsights | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQ, setSearchQ] = useState("");
@@ -65,7 +85,7 @@ export default function SupportSlaPage() {
     setLoading(true); setError(null);
     try {
       const from = new Date(Date.now() - 30 * 86400000).toISOString();
-      const data = await apiFetch(`sla/stats?from=${from}`, token);
+      const data = await apiFetch(`sla/insights?from=${from}`, token);
       setStats(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar cumplimiento de SLA");
@@ -103,9 +123,9 @@ export default function SupportSlaPage() {
     <>
       <PageHeader
         eyebrow="OPS · Soporte"
-        title={cfg.title}
-        subtitle={cfg.subtitle}
-        actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
+        title="SLA Command Center"
+        subtitle="Cumplimiento, MTTR, backlog aging, productividad por técnico e inbox del portal."
+        actions={<Button variant="ghost" onClick={() => void load()}>Actualizar</Button>}
       />
 
       {loading && <EmptyState icon="⏳" title="Cargando SLA…" description="Calculando cumplimiento de tickets." />}
@@ -113,15 +133,107 @@ export default function SupportSlaPage() {
 
       {!loading && !error && stats && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-            <KpiCard label="Tickets (30d)" value={stats.total} icon="🎫" />
-            <KpiCard label="Cumplimiento respuesta" value={`${stats.responseSla.compliancePct}%`} variant={stats.responseSla.compliancePct >= 90 ? "positive" : "warning"} icon="📞" />
-            <KpiCard label="Cumplimiento resolución" value={`${stats.resolutionSla.compliancePct}%`} variant={stats.resolutionSla.compliancePct >= 90 ? "positive" : "warning"} icon="✅" />
-            <KpiCard label="Tickets abiertos" value={stats.stillOpen} icon="⏳" />
+          <StatStrip
+            stats={[
+              { label: "Tickets 30d", value: stats.total, big: true },
+              { label: "SLA respuesta", value: `${stats.responseSla.compliancePct}%`, tone: stats.responseSla.compliancePct >= 90 ? "positive" : "warning" },
+              { label: "SLA resolución", value: `${stats.resolutionSla.compliancePct}%`, tone: stats.resolutionSla.compliancePct >= 90 ? "positive" : "warning" },
+              { label: "MTTR mediano", value: `${stats.mttr.medianHours}h`, sub: `media ${stats.mttr.meanHours}h · n=${stats.mttr.sampleSize}`, tone: "accent" },
+              { label: "Backlog", value: stats.backlog.open, tone: stats.backlog.aging.d7_plus ? "danger" : "default" },
+              { label: "Inbox NEW", value: stats.inboxByStatus?.NEW ?? 0, tone: (stats.inboxByStatus?.NEW ?? 0) ? "warning" : "positive" },
+            ]}
+          />
+
+          {stats.alerts?.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "16px 0" }}>
+              {stats.alerts.map((a) => (
+                <div key={a.message} style={{
+                  padding: "10px 14px", borderRadius: 10, fontSize: 13,
+                  background: a.severity === "danger" ? "var(--state-danger-bg)" : "var(--state-warning-bg)",
+                  border: `1px solid ${a.severity === "danger" ? "var(--state-danger-border)" : "var(--state-warning-border)"}`,
+                  color: a.severity === "danger" ? "var(--state-danger-text)" : "var(--state-warning-text)",
+                }}>
+                  {a.message}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ marginTop: 16 }}>
+            <DashGrid>
+              <DashCol span={6}>
+                <DashPanel title="Backlog aging" subtitle="Tickets abiertos por antigüedad">
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    {[
+                      { label: "<24h", value: stats.backlog.aging.h0_24 },
+                      { label: "1–3d", value: stats.backlog.aging.d1_3 },
+                      { label: "3–7d", value: stats.backlog.aging.d3_7 },
+                      { label: ">7d", value: stats.backlog.aging.d7_plus },
+                    ].map((b) => (
+                      <div key={b.label} style={{ padding: 12, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{b.label}</div>
+                        <div style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{b.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </DashPanel>
+              </DashCol>
+              <DashCol span={6}>
+                <DashPanel title="Aperturas vs cierres · 14d" subtitle="Flujo neto de tickets">
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 72 }}>
+                    {stats.trends.opened14d.map((p, i) => {
+                      const closed = stats.trends.closed14d[i]?.count ?? 0;
+                      const max = Math.max(1, ...stats.trends.opened14d.map((x) => x.count), ...stats.trends.closed14d.map((x) => x.count));
+                      return (
+                        <div key={p.date} style={{ flex: 1, display: "flex", gap: 1, alignItems: "flex-end" }} title={`${p.date}: +${p.count} / −${closed}`}>
+                          <div style={{ flex: 1, height: `${Math.max(2, (p.count / max) * 64)}px`, background: "var(--warning)", borderRadius: 2 }} />
+                          <div style={{ flex: 1, height: `${Math.max(2, (closed / max) * 64)}px`, background: "var(--success)", borderRadius: 2 }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ marginTop: 10, display: "flex", gap: 12, fontSize: 11, color: "var(--text-tertiary)" }}>
+                    <span>Aperturas</span><span>Cierres</span>
+                  </div>
+                </DashPanel>
+              </DashCol>
+              <DashCol span={6}>
+                <DashPanel title="Ranking técnicos" subtitle="Cierres y MTTR">
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 200, overflowY: "auto" }}>
+                    {stats.techRanking.map((t) => (
+                      <div key={t.userId} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
+                        <strong>{t.nombre}</strong>
+                        <span style={{ color: "var(--text-tertiary)" }}>{t.closed} cerrados · MTTR {t.mttrHours}h</span>
+                      </div>
+                    ))}
+                    {!stats.techRanking.length && <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin cierres en el periodo</span>}
+                  </div>
+                </DashPanel>
+              </DashCol>
+              <DashCol span={6}>
+                <DashPanel title="Backlog más viejo" subtitle="Priorizar atención">
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 200, overflowY: "auto" }}>
+                    {stats.backlog.oldest.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => router.push(`/ops/activities/${t.id}`)}
+                        style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer" }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, gap: 8 }}>
+                          <span><DashPill tone="accent">{t.anNumber ?? `#${t.id}`}</DashPill> {t.titulo}</span>
+                          <span style={{ color: "var(--danger)", whiteSpace: "nowrap" }}>{t.ageHours ?? "—"}h</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </DashPanel>
+              </DashCol>
+            </DashGrid>
           </div>
 
           {/* SLA compliance visual bars */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, margin: "20px 0" }}>
             {[
               { label: "Respuesta", pct: stats.responseSla.compliancePct, avg: `${stats.responseSla.avgHours}h prom.`, late: stats.responseSla.late },
               { label: "Resolución", pct: stats.resolutionSla.compliancePct, avg: `${stats.resolutionSla.avgHours}h prom.`, late: stats.resolutionSla.late },

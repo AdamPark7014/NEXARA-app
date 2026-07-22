@@ -93,10 +93,13 @@ data class ClientPortalTicketDto(
     val titulo: String? = null,
     val estatus: String? = null,
     val prioridad: String? = null,
+    val urgency: String? = null,
     val ticketType: String? = null,
     val fechaAsignacion: String? = null,
     val fechaInicio: String? = null,
     val fechaFinalizacion: String? = null,
+    val dueAt: String? = null,
+    val slaDueAt: String? = null,
     val branchName: String? = null,
     val branchCity: String? = null,
     val branchState: String? = null,
@@ -104,7 +107,19 @@ data class ClientPortalTicketDto(
     val evidencias: Any? = null,
     val serviceSheet: Any? = null,
     val activityEvidence: Any? = null,
-)
+) {
+    fun displayPriority(): String = prioridad ?: urgency ?: "—"
+
+    fun isOpen(): Boolean {
+        val s = (estatus ?: "").lowercase()
+        return !s.contains("finaliz") && !s.contains("cerrad") && !s.contains("complet") && !s.contains("cancel")
+    }
+
+    fun isHighPriority(): Boolean {
+        val p = displayPriority().lowercase()
+        return p.contains("alta") || p.contains("high") || p.contains("urgent") || p == "high"
+    }
+}
 
 data class PendingFeedbackTicketDto(
     val id: Long,

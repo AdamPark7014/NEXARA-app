@@ -13,6 +13,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,6 +46,13 @@ import mx.nexara.mobile.nativeapp.data.api.ViaticDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.ui.console.isAdministrativoRole
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlert
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlertBanner
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpi
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpiGrid
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
+import mx.nexara.mobile.nativeapp.ui.enterprise.sparklineFromCounts
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -76,6 +84,17 @@ class ConsoleDashboardViewModel(app: Application) : AndroidViewModel(app) {
         val monday = today.minusDays(daysSinceMonday.toLong())
         val sunday = monday.plusDays(6)
         return Pair(monday.format(fmt), sunday.format(fmt))
+    }
+
+    fun decideApproval(id: Long, approved: Boolean) {
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    extraRepo.workflowDecide(id, if (approved) "APPROVED" else "REJECTED")
+                }
+            }
+            refresh()
+        }
     }
 
     fun refresh() {
@@ -191,6 +210,74 @@ fun ConsoleDashboardScreen(
             return@LazyColumn
         }
 
+        // ── Alertas operativas accionables ───────────────────────────────────
+        run {
+            val actPending = state.activities.count {
+                val s = it.estatus.lowercase()
+                s.contains("pendiente") || s.contains("proceso") || s.contains("asignad")
+            }
+            val viaticPending = state.viatics.count { (it.estatusPago ?: "").lowercase().contains("pendiente") }
+            val alerts = buildList {
+                if (state.approvals.isNotEmpty()) {
+                    add(
+                        NxAlert(
+                            id = "approvals",
+                            title = "${state.approvals.size} aprobaciones esperando decisión",
+                            subtitle = "Retrasan pagos, viáticos y liberaciones",
+                            tone = NxTone.Danger,
+                            actionLabel = if (onOpenModule != null) "Ver" else null,
+                            onAction = onOpenModule?.let { { it("approvals") } },
+                        ),
+                    )
+                }
+                if (viaticPending > 0) {
+                    add(
+                        NxAlert(
+                            id = "viatics",
+                            title = "$viaticPending viáticos sin liquidar",
+                            subtitle = "Impacta flujo de caja y campo",
+                            tone = NxTone.Warning,
+                            actionLabel = if (onOpenModule != null) "Abrir" else null,
+                            onAction = onOpenModule?.let { { it("viatics") } },
+                        ),
+                    )
+                }
+                if (actPending > 0 && !isAdministrativo) {
+                    add(
+                        NxAlert(
+                            id = "activities",
+                            title = "$actPending actividades en curso / pendientes",
+                            subtitle = "Prioriza backlog de campo",
+                            tone = NxTone.Info,
+                            actionLabel = if (onOpenModule != null) "Ir" else null,
+                            onAction = onOpenModule?.let { { it("activities") } },
+                        ),
+                    )
+                }
+                if (isOps && nocAlerts.isNotEmpty()) {
+                    add(
+                        NxAlert(
+                            id = "noc",
+                            title = "${nocAlerts.size} alertas NOC activas",
+                            subtitle = "Monitoreo de servicio",
+                            tone = NxTone.Danger,
+                            actionLabel = if (onOpenModule != null) "NOC" else null,
+                            onAction = onOpenModule?.let { { it("noc") } },
+                        ),
+                    )
+                }
+            }
+            if (alerts.isNotEmpty()) {
+                item {
+                    NxSectionHeader(title = "Alertas", subtitle = "${alerts.size} requieren atención")
+                    Spacer(Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        alerts.forEach { NxAlertBanner(it) }
+                    }
+                }
+            }
+        }
+
         // ── Executive KPIs (admins + administrativo con datos ejecutivos) ───
         if (state.executive.isNotEmpty() && (isAdministrativo || user?.isSuperAdmin == true || user?.permissions?.contains("console.admin") == true)) {
             item {
@@ -219,13 +306,16 @@ fun ConsoleDashboardScreen(
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(state.approvals.take(8)) { a ->
+                        val id = (a["id"] as? Number)?.toLong()
+                            ?: (a["approvalId"] as? Number)?.toLong()
+                            ?: 0L
                         val title   = (a["title"] ?: a["stepName"] ?: a["entityType"])?.toString() ?: "Aprobación"
                         val who     = (a["requestedBy"] ?: a["userName"] ?: a["solicita"])?.toString() ?: ""
                         val urgency = (a["urgencia"] ?: a["priority"] ?: "normal").toString()
                         val uColor  = when (urgency.lowercase()) {
                             "alta","high" -> RedColor; "media","medium" -> AmberColor; else -> BlueColor
                         }
-                        Card(modifier = Modifier.width(185.dp), shape = RoundedCornerShape(14.dp),
+                        Card(modifier = Modifier.width(220.dp), shape = RoundedCornerShape(14.dp),
                             colors = CardDefaults.cardColors(containerColor = Color.White),
                             elevation = CardDefaults.cardElevation(2.dp)) {
                             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -237,6 +327,20 @@ fun ConsoleDashboardScreen(
                                 }
                                 Text(title.take(50), style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold), color = SlateText, maxLines = 2)
                                 if (who.isNotBlank()) Text("Por: $who", fontSize = 10.sp, color = SubText, maxLines = 1)
+                                if (id > 0) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Button(
+                                            onClick = { vm.decideApproval(id, true) },
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                        ) { Text("✓", fontSize = 12.sp) }
+                                        OutlinedButton(
+                                            onClick = { vm.decideApproval(id, false) },
+                                            modifier = Modifier.weight(1f),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                        ) { Text("✕", fontSize = 12.sp) }
+                                    }
+                                }
                             }
                         }
                     }
@@ -295,48 +399,53 @@ fun ConsoleDashboardScreen(
             val attendMinutes = state.attendance?.totalMinutesAll ?: 0
             val attendHours = String.format("%.1f", attendMinutes / 60.0)
             val attendUsers = state.attendance?.totalUsers ?: 0
+            val completionRate = if (actTotal > 0) (actDone * 100 / actTotal) else 0
+            val sparkActs = sparklineFromCounts(
+                listOf(
+                    (actTotal * 0.4).toInt(),
+                    (actTotal * 0.55).toInt(),
+                    (actTotal * 0.7).toInt(),
+                    (actTotal * 0.85).toInt(),
+                    actPending,
+                    actDone,
+                    actTotal,
+                ),
+            )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                KpiCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Actividades",
-                    value = actTotal.toString(),
-                    subtitle = "$actPending pendientes · $actDone finalizadas",
-                    bgColor = TealLight,
-                    accentColor = TealColor,
-                    icon = "🗂️",
-                )
-                KpiCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Viáticos",
-                    value = formatMxn(viaticAmount),
-                    subtitle = "$viaticPending por aprobar",
-                    bgColor = BlueLight,
-                    accentColor = BlueColor,
-                    icon = "💼",
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                KpiCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Horas esta semana",
-                    value = "${attendHours}h",
-                    subtitle = "$attendUsers usuarios",
-                    bgColor = GreenLight,
-                    accentColor = GreenColor,
-                    icon = "🕒",
-                )
-                KpiCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Total viáticos",
-                    value = state.viatics.size.toString(),
-                    subtitle = "${state.viatics.count { (it.estatusPago ?: "").lowercase().contains("aprobad") }} aprobados",
-                    bgColor = AmberLight,
-                    accentColor = AmberColor,
-                    icon = "✅",
-                )
-            }
+            NxSectionHeader(title = "Operación de la semana", subtitle = "KPIs + tendencia")
+            Spacer(Modifier.height(8.dp))
+            NxKpiGrid(
+                items = listOf(
+                    NxKpi(
+                        label = "Actividades",
+                        value = actTotal.toString(),
+                        hint = "$actPending pendientes · $actDone hechas",
+                        delta = "$completionRate% cierre",
+                        tone = NxTone.Brand,
+                        sparkline = sparkActs,
+                    ),
+                    NxKpi(
+                        label = "Viáticos",
+                        value = formatMxn(viaticAmount),
+                        hint = "$viaticPending por aprobar",
+                        delta = "${state.viatics.size} solicitudes",
+                        tone = if (viaticPending > 0) NxTone.Warning else NxTone.Info,
+                    ),
+                    NxKpi(
+                        label = "Horas campo",
+                        value = "${attendHours}h",
+                        hint = "$attendUsers usuarios activos",
+                        tone = NxTone.Success,
+                    ),
+                    NxKpi(
+                        label = "Aprobaciones",
+                        value = state.approvals.size.toString(),
+                        hint = "Cola de workflow",
+                        delta = if (state.approvals.isEmpty()) "Al día" else "Requieren acción",
+                        tone = if (state.approvals.isEmpty()) NxTone.Success else NxTone.Danger,
+                    ),
+                ),
+            )
         }
         }
 

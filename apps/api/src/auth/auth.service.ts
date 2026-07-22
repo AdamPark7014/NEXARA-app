@@ -1,4 +1,4 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto.js';
@@ -11,6 +11,7 @@ import {
   isSuperAdminEmail,
 } from '../common/platform-accounts.js';
 import { LEGACY_TO_V2, ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
+import { WebhooksService } from '../webhooks/webhooks.service.js';
 
 type UserWithRole = {
   roleKey?: string | null;
@@ -54,6 +55,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    @Optional() private readonly webhooks?: WebhooksService,
   ) {}
 
   private isSuperAdmin(email: string) {
@@ -754,8 +756,54 @@ export class AuthService {
     if (user.isActive === false) {
       throw new UnauthorizedException('Usuario inactivo');
     }
+    if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+      const mins = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000);
+      throw new UnauthorizedException(`Cuenta bloqueada temporalmente. Reintenta en ${mins} min.`);
+    }
     const isPasswordMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordMatch) {
+      const failures = (user.failedLoginCount ?? 0) + 1;
+      const lockThreshold = 5;
+      const lockMinutes = 15;
+      const lockedNow = failures >= lockThreshold;
+      const lockedUntil = lockedNow ? new Date(Date.now() + lockMinutes * 60_000) : undefined;
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginCount: failures,
+          ...(lockedUntil ? { lockedUntil } : {}),
+        },
+      });
+      if (lockedNow) {
+        const memberships = await this.prisma.userCompany.findMany({
+          where: { userId: user.id },
+          select: { companyId: true },
+          take: 20,
+        });
+        const companyIds: number[] = memberships.map((m) => m.companyId);
+        if (!companyIds.length) {
+          const primary = await this.prisma.companyProfile.findFirst({
+            where: { isPrimary: true },
+            select: { id: true },
+          });
+          if (primary) companyIds.push(primary.id);
+        }
+        for (const companyId of companyIds) {
+          void this.webhooks
+            ?.emit(
+              'user.locked',
+              {
+                userId: user.id,
+                email: user.email,
+                failures,
+                lockedUntil: lockedUntil?.toISOString(),
+                companyId,
+              },
+              companyId,
+            )
+            .catch(() => undefined);
+        }
+      }
       throw new UnauthorizedException('Credenciales inválidas');
     }
     return user;
@@ -795,18 +843,82 @@ export class AuthService {
     if (loginDto.panel === 'ventas' && !isSuperAdmin && !permissions.includes(PERMISSIONS.PANEL_VENTAS)) {
       throw new UnauthorizedException('Tu usuario no tiene acceso al panel de ventas');
     }
+
+    if (user.mfaEnabled && user.mfaSecret) {
+      const { verifyTotp } = await import('../users/mfa.util.js');
+      if (!loginDto.mfaCode) {
+        throw new UnauthorizedException({
+          statusCode: 401,
+          message: 'MFA_REQUIRED',
+          error: 'Se requiere código MFA',
+        });
+      }
+      if (!verifyTotp(user.mfaSecret, loginDto.mfaCode)) {
+        throw new UnauthorizedException('Código MFA inválido');
+      }
+    }
+
+    return this.issueSession(user, req, { authMethod: 'password' });
+  }
+
+  /** Login vía OIDC (SSO). El IdP ya autenticó; no exige MFA local. */
+  async loginWithOidcUser(user: any, req?: any) {
+    return this.issueSession(user, req, { authMethod: 'oidc' });
+  }
+
+  private async issueSession(user: any, req: any, opts: { authMethod: string }) {
+    const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
+    const ipAddress = String(req?.headers?.['x-forwarded-for'] || req?.ip || '')
+      .split(',')[0]
+      ?.trim();
+    const detectedDevice = detectDeviceFromUserAgent(userAgent, req?.headers);
+    const isSuperAdmin = this.isSuperAdmin(user.email);
+    const permissions = this.resolveUserPermissions(user, isSuperAdmin);
+
+    const { randomUUID } = await import('node:crypto');
+    const jti = randomUUID().replace(/-/g, '');
+    const expiresInRaw = process.env.JWT_EXPIRES_IN || '4h';
+    const expiresMs = this.parseExpiresToMs(expiresInRaw);
+    const expiresAt = new Date(Date.now() + expiresMs);
+
     const payload = {
       sub: user.id,
       roleId: user.roleId,
-      // RBAC v2: el guard híbrido lee `roleKey` para resolver permisos
-      // contra `url-matrix.ts`. Si es null, cae al modelo legacy.
       roleKey: this.resolveEffectiveRoleKey(user) ?? user.roleKey ?? null,
       orgRoleKey: user.role?.orgRoleKey ?? null,
       departmentId: user.departmentId,
       permissions,
       isSuperAdmin,
       isPlatformOwner: this.isPlatformOwner(user.email),
+      jti,
     };
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastLoginAt: new Date(),
+        lastLoginIp: ipAddress || null,
+        lastLoginDevice: detectedDevice || null,
+        failedLoginCount: 0,
+        lockedUntil: null,
+      },
+    });
+
+    try {
+      await this.prisma.userSession.create({
+        data: {
+          userId: user.id,
+          jti,
+          device: detectedDevice || null,
+          ipAddress: ipAddress || null,
+          userAgent: userAgent ? String(userAgent).slice(0, 500) : null,
+          expiresAt,
+        },
+      });
+    } catch (sessionErr) {
+      this.logger.warn(`No se pudo registrar UserSession para userId=${user.id}`);
+      this.logger.debug(sessionErr instanceof Error ? sessionErr.message : String(sessionErr));
+    }
 
     await this.createLoginNotification(user.id, detectedDevice);
 
@@ -816,10 +928,13 @@ export class AuthService {
           entityType: 'Auth',
           entityId: user.id,
           action: 'LOGIN_SUCCESS',
+          source: opts.authMethod === 'oidc' ? 'oidc' : 'http',
           changes: {
             email: user.email,
             roleKey: payload.roleKey,
             device: detectedDevice,
+            jti,
+            authMethod: opts.authMethod,
           },
           userId: user.id,
           ipAddress: ipAddress || null,
@@ -831,11 +946,42 @@ export class AuthService {
     }
 
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: this.jwtService.sign(payload, { expiresIn: expiresInRaw as any }),
       loginDevice: detectedDevice,
       loginGreeting: `Hola ${user.nombre}, bienvenido de nuevo. Accediste desde ${detectedDevice}.`,
       user: this.mapSessionUser(user, permissions, isSuperAdmin, detectedDevice),
     };
+  }
+
+  /** Parsea JWT_EXPIRES_IN estilo "4h" / "30m" / "7d" a milisegundos. */
+  private parseExpiresToMs(raw: string): number {
+    const m = String(raw).trim().match(/^(\d+)([smhd])$/i);
+    if (!m) return 4 * 60 * 60 * 1000;
+    const n = Number(m[1]);
+    const unit = m[2].toLowerCase();
+    if (unit === 's') return n * 1000;
+    if (unit === 'm') return n * 60_000;
+    if (unit === 'h') return n * 3_600_000;
+    return n * 86_400_000;
+  }
+
+  async assertSessionActive(jti: string | undefined, userId: number): Promise<void> {
+    // Tokens legacy sin jti siguen válidos hasta expirar (compat).
+    if (!jti) return;
+    const session = await this.prisma.userSession.findUnique({ where: { jti } });
+    if (!session || session.userId !== userId) {
+      throw new UnauthorizedException('Sesión inválida');
+    }
+    if (session.revokedAt) {
+      throw new UnauthorizedException('Sesión revocada. Vuelve a iniciar sesión.');
+    }
+    if (session.expiresAt.getTime() < Date.now()) {
+      throw new UnauthorizedException('Sesión expirada');
+    }
+    // Touch lastSeen (fire-and-forget)
+    void this.prisma.userSession
+      .update({ where: { id: session.id }, data: { lastSeenAt: new Date() } })
+      .catch(() => undefined);
   }
 
   async getProfile(userId: number) {

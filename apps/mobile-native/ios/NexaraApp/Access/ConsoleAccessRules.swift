@@ -75,7 +75,7 @@ enum ConsoleAccessRules {
     /// Módulos ERP permitidos para personal administrativo (espejo `page-matrix.ts`).
     static let administrativoModuleKeys: Set<String> = [
         "dashboard", "approvals", "companies", "calendar", "documents",
-        "viatics", "expenses", "notifications-center", "my-profile", "my-preferences",
+        "viatics", "expenses", "notifications-center", "my-profile", "my-preferences", "offline-queue",
         "news", "attendance", "my-lunch-breaks", "lunch-breaks",
     ]
 
@@ -253,7 +253,7 @@ enum ConsoleAccessRules {
         }
 
         let groups: [ConsoleSidebarGroup] = [
-            ConsoleSidebarGroup(id: "profile", title: "Cuenta personal", modules: pick(["my-profile", "calendar"])),
+            ConsoleSidebarGroup(id: "profile", title: "Cuenta personal", modules: pick(["my-profile", "offline-queue", "calendar"])),
             ConsoleSidebarGroup(id: "employee", title: "Mi espacio de trabajo", modules: pick([
                 "dashboard", "my-activities", "my-evidences", "my-viatics", "my-vehicles", "my-lunch-breaks",
             ])),

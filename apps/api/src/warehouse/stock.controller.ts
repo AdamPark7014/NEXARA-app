@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { WarehouseService } from './warehouse.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -14,6 +15,7 @@ export class StockController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.STOCK_VIEW] })
   getLevels(
+    @CurrentCompanyId() companyId: number | null,
     @Query('warehouseId') warehouseId?: string,
     @Query('productId') productId?: string,
     @Query('belowReorder') belowReorder?: string,
@@ -22,6 +24,7 @@ export class StockController {
       warehouseId: warehouseId ? +warehouseId : undefined,
       productId: productId ? +productId : undefined,
       belowReorder: belowReorder === 'true',
+      companyId,
     });
   }
 
@@ -75,6 +78,13 @@ export class StockController {
   @RBAC({ permissions: [PERMISSIONS.STOCK_VIEW] })
   listLots(@Query('productId') productId?: string) {
     return this.service.listLots(productId ? +productId : undefined);
+  }
+
+  @Get('insights')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_VIEW] })
+  inventoryInsights() {
+    return this.service.getInventoryInsights();
   }
 
   @Get('valuation')

@@ -58,6 +58,29 @@ class ConsoleRepository(context: Context) {
 
     suspend fun evidenceByActivity(activityId: Long) = api.getActivityEvidence(activityId)
 
+    suspend fun approveEvidence(activityId: Long, reviewerId: Long, notes: String? = null) =
+        api.approveEvidence(
+            activityId = activityId,
+            body = mx.nexara.mobile.nativeapp.data.api.EvidenceReviewRequest(
+                reviewerId = reviewerId,
+                notes = notes,
+            ),
+        )
+
+    suspend fun rejectEvidence(
+        activityId: Long,
+        reviewerId: Long,
+        notes: String,
+        rejectedStep: String = "EVIDENCE_PHOTOS",
+    ) = api.rejectEvidence(
+        activityId = activityId,
+        body = mx.nexara.mobile.nativeapp.data.api.EvidenceRejectRequest(
+            reviewerId = reviewerId,
+            rejectedStep = rejectedStep,
+            notes = notes,
+        ),
+    )
+
     suspend fun evidenceEntryPhoto(activityId: Long, photoUrl: String, lat: Double, lng: Double) =
         api.postEvidenceEntryPhoto(
             activityId = activityId,
@@ -94,6 +117,31 @@ class ConsoleRepository(context: Context) {
         )
 
     suspend fun viaticsFetch() = api.getViatics()
+
+    suspend fun createViatic(
+        amount: Double,
+        motivo: String,
+        categoria: String?,
+        activityId: Long?,
+        ticketEvidenciaUrl: String,
+    ) = api.createViatic(
+        mx.nexara.mobile.nativeapp.data.api.CreateViaticJsonRequest(
+            montoSolicitado = amount,
+            motivo = motivo,
+            categoria = categoria,
+            actividadId = activityId,
+            ticketEvidenciaUrl = ticketEvidenciaUrl,
+        ),
+    )
+
+    suspend fun approveViatic(id: Long, approve: Boolean, note: String? = null) =
+        api.approveViatic(
+            id = id,
+            body = mx.nexara.mobile.nativeapp.data.api.ViaticApproveRequest(
+                action = if (approve) "approve" else "reject",
+                note = note,
+            ),
+        )
 
     suspend fun vehiclesFetch() = api.getVehicleControls()
 

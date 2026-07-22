@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto, CreateProjectActivityDto } from './dto/create-operational-project.dto.js';
 import { salesPatchFromOps, opsStatusToSales } from '../common/project-handoff.js';
+import { resolveRequiredCompanyId, companyWhere } from '../common/tenant/tenant-scope.js';
 
 const salesProjectInclude = {
   id: true,
@@ -60,9 +61,26 @@ export class OperationalProjectsService {
           serviceClientId: serviceClient.id,
           status: 'ACTIVE',
           notes: `Creado automáticamente desde proyecto OPS #${op.id}`,
+          companyId: (op as any).companyId || (serviceClient as any).companyId || (
+            await this.prisma.companyProfile.findFirst({
+              where: { isPrimary: true, isActive: true },
+              select: { id: true },
+              orderBy: { id: 'asc' },
+            })
+          )?.id!,
         },
       });
     }
+
+    const companyId =
+      (
+        await this.prisma.companyProfile.findFirst({
+          where: { isPrimary: true, isActive: true },
+          select: { id: true },
+          orderBy: { id: 'asc' },
+        })
+      )?.id;
+    if (!companyId) throw new BadRequestException('No hay empresa configurada');
 
     const opportunity = await this.prisma.salesOpportunity.create({
       data: {
@@ -74,6 +92,7 @@ export class OperationalProjectsService {
         closedAt: new Date(),
         clientId: salesClient.id,
         ownerId: actorId || op.vendorId,
+        companyId,
       },
     });
 
@@ -142,6 +161,7 @@ export class OperationalProjectsService {
     }
 
     // Create the operational project
+    const companyId = await resolveRequiredCompanyId(this.prisma, (client as any).companyId);
     const created = await this.projectRepo.create({
       data: {
         title: createDto.title,
@@ -155,6 +175,7 @@ export class OperationalProjectsService {
         clientId: createDto.clientId,
         startDate: new Date(createDto.startDate),
         endDate: createDto.endDate ? new Date(createDto.endDate) : null,
+        companyId,
       },
       include: {
         vendor: {
@@ -195,8 +216,8 @@ export class OperationalProjectsService {
     return created;
   }
 
-  async findAll(vendorId?: number, clientId?: number, status?: string) {
-    const where: any = {};
+  async findAll(vendorId?: number, clientId?: number, status?: string, companyId?: number | null) {
+    const where: any = { ...companyWhere(companyId ?? null) };
     if (vendorId) where.vendorId = vendorId;
     if (clientId) where.clientId = clientId;
     if (status) where.status = status;
@@ -519,19 +540,22 @@ export class OperationalProjectsService {
 
   async createProjectActivity(projectId: number, dto: CreateProjectActivityDto, userId: number) {
     const project = await this.findById(projectId);
-    return this.activitiesService.create({
-      titulo: dto.titulo,
-      descripcion: dto.descripcion,
-      projectId,
-      clientId: project.clientId,
-      activityType: 'CLIENT',
-      ticketType: 'INSTALACION',
-      workType: 'ISSUE',
-      branchName: dto.branchName,
-      branchNumber: dto.branchNumber,
-      creadoPorId: userId,
-      responsableId: dto.responsableId,
-    });
+    return this.activitiesService.create(
+      {
+        titulo: dto.titulo,
+        descripcion: dto.descripcion,
+        projectId,
+        clientId: project.clientId,
+        activityType: 'CLIENT',
+        ticketType: 'INSTALACION',
+        workType: 'ISSUE',
+        branchName: dto.branchName,
+        branchNumber: dto.branchNumber,
+        creadoPorId: userId,
+        responsableId: dto.responsableId,
+      },
+      (project as any).companyId,
+    );
   }
 
   async createSiteActivities(projectId: number, userId: number, responsableId?: number) {
@@ -544,19 +568,22 @@ export class OperationalProjectsService {
     const assigneeId = responsableId ?? project.vendorId;
     const created = [];
     for (let i = 1; i <= siteCount; i += 1) {
-      const activity = await this.activitiesService.create({
-        titulo: `${project.title} — Sucursal ${i}`,
-        descripcion: project.scopeSummary || project.description || undefined,
-        projectId,
-        clientId: project.clientId,
-        activityType: 'CLIENT',
-        ticketType: 'INSTALACION',
-        workType: 'ISSUE',
-        branchName: `Sucursal ${i}`,
-        branchNumber: String(i),
-        creadoPorId: userId,
-        responsableId: assigneeId,
-      });
+      const activity = await this.activitiesService.create(
+        {
+          titulo: `${project.title} — Sucursal ${i}`,
+          descripcion: project.scopeSummary || project.description || undefined,
+          projectId,
+          clientId: project.clientId,
+          activityType: 'CLIENT',
+          ticketType: 'INSTALACION',
+          workType: 'ISSUE',
+          branchName: `Sucursal ${i}`,
+          branchNumber: String(i),
+          creadoPorId: userId,
+          responsableId: assigneeId,
+        },
+        (project as any).companyId,
+      );
       created.push(activity);
     }
     return { count: created.length, activities: created };

@@ -57,6 +57,7 @@ export default function ReportsPage() {
   const [period, setPeriod] = useState<Period>("month");
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [vendors, setVendors] = useState<VendorStat[]>([]);
+  const [insights, setInsights] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQ, setSearchQ] = useState("");
@@ -66,12 +67,14 @@ export default function ReportsPage() {
     if (!token) return;
     setLoading(true); setError(null);
     try {
-      const [m, v] = await Promise.all([
+      const [m, v, i] = await Promise.all([
         apiFetch(`ventas/reportes/metricas?period=${period}`, token),
         apiFetch(`ventas/reportes/vendedores?period=${period}`, token).catch(() => []),
+        apiFetch(`ventas/reportes/insights?period=${period}`, token).catch(() => null),
       ]);
       setMetrics(m);
       setVendors(Array.isArray(v) ? v : []);
+      setInsights(i);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar reportes comerciales");
     } finally { setLoading(false); }
@@ -124,9 +127,9 @@ export default function ReportsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="CRM · Equipo y métricas"
-        title={viewCfg.title}
-        subtitle={viewCfg.subtitle}
+        eyebrow="CRM · Inteligencia comercial"
+        title="CRM Intelligence"
+        subtitle="Forecast probabilístico, LTV, churn, higiene de pipeline y productividad del equipo."
         actions={
           <>
             <select
@@ -138,7 +141,7 @@ export default function ReportsPage() {
               <option value="month">Este mes</option>
               <option value="year">Este año</option>
             </select>
-            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
+            <Button variant="ghost" onClick={() => void load()}>Actualizar</Button>
           </>
         }
       />
@@ -162,6 +165,30 @@ export default function ReportsPage() {
               <KpiCard label="Días promedio cierre" value={metrics.avgDaysToClose} icon="⏱️" hint="Desde creación a cerrado" />
             )}
           </div>
+
+          {insights?.forecast && (
+            <Section title="Forecast & clientes" subtitle="Weighted / commit / LTV / churn">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 16 }}>
+                <KpiCard label="Weighted forecast" value={<Money value={insights.forecast.weightedForecast} compact />} variant="accent" />
+                <KpiCard label="Commit (≥70%)" value={<Money value={insights.forecast.commitForecast} compact />} />
+                <KpiCard label="Cobertura forecast" value={`${insights.forecast.forecastCoverage}%`} variant={insights.forecast.forecastCoverage >= 85 ? "positive" : "warning"} />
+                <KpiCard label="LTV promedio" value={<Money value={insights.customers?.avgLtv ?? 0} compact />} />
+                <KpiCard label="Churn risk" value={insights.customers?.churnRiskCount ?? 0} hint={`${insights.customers?.churnRiskPct ?? 0}% de clientes con win`} variant={(insights.customers?.churnRiskCount ?? 0) > 0 ? "warning" : "positive"} />
+                <KpiCard label="Higiene pipeline" value={insights.pipelineHygiene?.score ?? "—"} variant={(insights.pipelineHygiene?.score ?? 0) >= 70 ? "positive" : "warning"} />
+              </div>
+              {insights.customers?.topLtv?.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase" }}>Top LTV</div>
+                  {insights.customers.topLtv.slice(0, 5).map((c: any) => (
+                    <div key={c.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                      <span>{c.nombre}</span>
+                      <Money value={c.ltv} compact />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Section>
+          )}
 
           {/* Won/lost funnel */}
           {totalClosed > 0 && (

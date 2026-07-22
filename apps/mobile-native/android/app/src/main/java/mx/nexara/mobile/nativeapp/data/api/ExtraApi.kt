@@ -2,8 +2,10 @@ package mx.nexara.mobile.nativeapp.data.api
 
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 // ── News ──────────────────────────────────────────────────────────────────
@@ -99,11 +101,410 @@ data class ExpenseDto(
     val id: Long,
     val concepto: String? = null,
     val monto: Double? = null,
+    val montoSolicitado: Double? = null,
     val estatus: String? = null,
+    val estatusPago: String? = null,
+    val categoria: String? = null,
     val usuarioId: Long? = null,
     val createdAt: String? = null,
+    val ticketEvidenciaUrl: String? = null,
     val usuario: SimpleUserDto? = null,
+) {
+    fun displayAmount(): Double = monto ?: montoSolicitado ?: 0.0
+    fun displayStatus(): String = estatusPago ?: estatus ?: "—"
+}
+
+data class CreateExpenseRequest(
+    val concepto: String,
+    val monto: Double,
+    val categoria: String? = null,
+    val ticketEvidenciaUrl: String? = null,
 )
+
+data class ExpenseApproveRequest(
+    val action: String,
+    val note: String? = null,
+)
+
+/** Movimiento de inventario — POST /stock/movements */
+data class StockMovementRequest(
+    val type: String,
+    val productId: Long,
+    val quantity: Double,
+    val fromWarehouseId: Long? = null,
+    val toWarehouseId: Long? = null,
+    val unitCost: Double? = null,
+    val reference: String? = null,
+    val notes: String? = null,
+)
+
+/** Bodega — GET /warehouse */
+data class WarehouseDto(
+    val id: Long? = null,
+    val code: String = "",
+    val name: String = "",
+    val address: String? = null,
+    val city: String? = null,
+    val state: String? = null,
+    val isActive: Boolean = true,
+    val managerName: String? = null,
+    val locationsCount: Int = 0,
+    val stockLevelsCount: Int = 0,
+) {
+    val label: String
+        get() = when {
+            name.isNotBlank() && code.isNotBlank() -> "$name ($code)"
+            name.isNotBlank() -> name
+            code.isNotBlank() -> code
+            else -> "Bodega"
+        }
+
+    fun toFlatMap(): Map<String, Any?> = buildMap {
+        put("id", id)
+        put("code", code)
+        put("name", name)
+        put("nombre", name)
+        put("address", address)
+        put("city", city)
+        put("state", state)
+        put("isActive", isActive)
+        put("managerName", managerName)
+        put("locationsCount", locationsCount)
+        put("stockLevelsCount", stockLevelsCount)
+    }
+
+    companion object {
+        fun fromRaw(row: Map<String, Any?>): WarehouseDto {
+            @Suppress("UNCHECKED_CAST")
+            val manager = row["manager"] as? Map<String, Any?>
+            @Suppress("UNCHECKED_CAST")
+            val count = row["_count"] as? Map<String, Any?>
+            fun str(vararg keys: Any?): String {
+                for (v in keys) {
+                    when (v) {
+                        is String -> if (v.isNotBlank() && v != "null") return v
+                        is Number -> return v.toString()
+                    }
+                }
+                return ""
+            }
+            fun lng(vararg keys: Any?): Long? {
+                for (v in keys) {
+                    when (v) {
+                        is Number -> return v.toLong()
+                        is String -> v.toLongOrNull()?.let { return it }
+                    }
+                }
+                return null
+            }
+            fun int(vararg keys: Any?): Int {
+                for (v in keys) {
+                    when (v) {
+                        is Number -> return v.toInt()
+                        is String -> v.toIntOrNull()?.let { return it }
+                    }
+                }
+                return 0
+            }
+            fun bool(vararg keys: Any?): Boolean {
+                for (v in keys) {
+                    when (v) {
+                        is Boolean -> return v
+                        is String -> return v.equals("true", true)
+                    }
+                }
+                return true
+            }
+            return WarehouseDto(
+                id = lng(row["id"]),
+                code = str(row["code"], row["codigo"]),
+                name = str(row["name"], row["nombre"]),
+                address = str(row["address"], row["direccion"]).ifBlank { null },
+                city = str(row["city"], row["ciudad"]).ifBlank { null },
+                state = str(row["state"], row["estado"]).ifBlank { null },
+                isActive = bool(row["isActive"], row["activo"]),
+                managerName = str(manager?.get("nombre"), manager?.get("name"), row["managerName"]).ifBlank { null },
+                locationsCount = int(count?.get("locations"), row["locationsCount"]),
+                stockLevelsCount = int(count?.get("stockLevels"), row["stockLevelsCount"]),
+            )
+        }
+    }
+}
+
+/** Producto de catálogo — GET /catalog/products */
+data class CatalogProductDto(
+    val id: Long? = null,
+    val name: String = "",
+    val sku: String = "",
+    val category: String? = null,
+    val price: Double? = null,
+    val unit: String? = null,
+    val isActive: Boolean = true,
+) {
+    val label: String
+        get() = if (sku.isNotBlank()) "$name ($sku)" else name.ifBlank { "Producto" }
+
+    fun toFlatMap(): Map<String, Any?> = buildMap {
+        put("id", id)
+        put("productId", id)
+        put("name", name)
+        put("productName", name)
+        put("nombre", name)
+        put("sku", sku)
+        put("code", sku)
+        put("category", category)
+        put("price", price)
+        put("unit", unit)
+        put("isActive", isActive)
+    }
+
+    companion object {
+        fun fromRaw(row: Map<String, Any?>): CatalogProductDto {
+            fun str(vararg keys: Any?): String {
+                for (v in keys) {
+                    when (v) {
+                        is String -> if (v.isNotBlank() && v != "null") return v
+                        is Number -> return v.toString()
+                    }
+                }
+                return ""
+            }
+            fun lng(vararg keys: Any?): Long? {
+                for (v in keys) {
+                    when (v) {
+                        is Number -> return v.toLong()
+                        is String -> v.toLongOrNull()?.let { return it }
+                    }
+                }
+                return null
+            }
+            fun num(vararg keys: Any?): Double? {
+                for (v in keys) {
+                    when (v) {
+                        is Number -> return v.toDouble()
+                        is String -> v.toDoubleOrNull()?.let { return it }
+                    }
+                }
+                return null
+            }
+            fun bool(vararg keys: Any?): Boolean {
+                for (v in keys) {
+                    when (v) {
+                        is Boolean -> return v
+                        is String -> return v.equals("true", true)
+                    }
+                }
+                return true
+            }
+            return CatalogProductDto(
+                id = lng(row["id"], row["productId"]),
+                name = str(row["name"], row["nombre"], row["productName"]),
+                sku = str(row["sku"], row["code"], row["codigo"]),
+                category = str(row["category"], row["categoria"]).ifBlank { null },
+                price = num(row["price"], row["precio"], row["unitPrice"]),
+                unit = str(row["unit"], row["unidad"]).ifBlank { null },
+                isActive = bool(row["isActive"], row["activo"]),
+            )
+        }
+    }
+}
+
+/** Nivel de stock aplanado para UI WMS (product/warehouse anidados → campos planos). */
+data class StockLevelDto(
+    val id: Long? = null,
+    val productId: Long? = null,
+    val warehouseId: Long? = null,
+    val name: String = "",
+    val sku: String = "",
+    val quantity: Double = 0.0,
+    val reorderPoint: Double? = null,
+    val minStock: Double? = null,
+    val warehouseName: String? = null,
+    val location: String? = null,
+    val category: String? = null,
+    val price: Double? = null,
+) {
+    val isLow: Boolean
+        get() {
+            val threshold = reorderPoint ?: minStock ?: return false
+            return threshold > 0 && quantity <= threshold
+        }
+
+    fun toFlatMap(): Map<String, Any?> = buildMap {
+        put("id", id)
+        put("productId", productId)
+        put("warehouseId", warehouseId)
+        put("name", name)
+        put("productName", name)
+        put("sku", sku)
+        put("code", sku)
+        put("quantity", quantity)
+        put("cantidad", quantity)
+        put("reorderPoint", reorderPoint)
+        put("minStock", minStock ?: reorderPoint)
+        put("warehouseName", warehouseName)
+        put("bodega", warehouseName)
+        put("ubicacion", location ?: warehouseName)
+        put("location", location)
+        put("category", category)
+        put("price", price)
+    }
+
+    companion object {
+        fun fromRaw(row: Map<String, Any?>): StockLevelDto {
+            @Suppress("UNCHECKED_CAST")
+            val product = row["product"] as? Map<String, Any?>
+            @Suppress("UNCHECKED_CAST")
+            val warehouse = row["warehouse"] as? Map<String, Any?>
+            @Suppress("UNCHECKED_CAST")
+            val locationObj = row["location"] as? Map<String, Any?>
+
+            val name = firstStr(
+                product?.get("name"), product?.get("nombre"),
+                row["name"], row["productName"], row["nombre"],
+            )
+            val sku = firstStr(product?.get("sku"), product?.get("code"), row["sku"], row["code"])
+            val whName = firstStr(warehouse?.get("name"), warehouse?.get("nombre"), row["warehouseName"], row["bodega"])
+            val loc = firstStr(
+                locationObj?.get("code"), locationObj?.get("name"),
+                row["location"]?.takeIf { it !is Map<*, *> },
+            )
+            val qty = firstNum(row["quantity"], row["cantidad"]) ?: 0.0
+            val reorder = firstNum(row["reorderPoint"], row["minStock"])
+            return StockLevelDto(
+                id = firstLong(row["id"]),
+                productId = firstLong(product?.get("id"), row["productId"]),
+                warehouseId = firstLong(warehouse?.get("id"), row["warehouseId"]),
+                name = name,
+                sku = sku,
+                quantity = qty,
+                reorderPoint = reorder,
+                minStock = firstNum(row["minStock"]) ?: reorder,
+                warehouseName = whName.ifBlank { null },
+                location = loc.ifBlank { null },
+                category = firstStr(product?.get("category"), product?.get("categoria"), row["category"]).ifBlank { null },
+                price = firstNum(product?.get("price"), row["price"]),
+            )
+        }
+
+        private fun firstStr(vararg values: Any?): String {
+            for (v in values) {
+                when (v) {
+                    is String -> if (v.isNotBlank() && v != "null") return v
+                    is Number -> return v.toString()
+                }
+            }
+            return ""
+        }
+
+        private fun firstNum(vararg values: Any?): Double? {
+            for (v in values) {
+                when (v) {
+                    is Number -> return v.toDouble()
+                    is String -> v.toDoubleOrNull()?.let { return it }
+                }
+            }
+            return null
+        }
+
+        private fun firstLong(vararg values: Any?): Long? {
+            for (v in values) {
+                when (v) {
+                    is Number -> return v.toLong()
+                    is String -> v.toLongOrNull()?.let { return it }
+                }
+            }
+            return null
+        }
+    }
+}
+
+/** Movimiento de inventario leído de GET /stock/movements */
+data class StockMovementDto(
+    val id: Long? = null,
+    val type: String = "",
+    val productId: Long? = null,
+    val productName: String = "",
+    val sku: String = "",
+    val quantity: Double = 0.0,
+    val fromWarehouseId: Long? = null,
+    val toWarehouseId: Long? = null,
+    val fromWarehouseName: String? = null,
+    val toWarehouseName: String? = null,
+    val reference: String? = null,
+    val notes: String? = null,
+    val createdAt: String? = null,
+) {
+    fun toFlatMap(): Map<String, Any?> = buildMap {
+        put("id", id)
+        put("type", type)
+        put("productId", productId)
+        put("name", productName)
+        put("productName", productName)
+        put("sku", sku)
+        put("quantity", quantity)
+        put("fromWarehouseId", fromWarehouseId)
+        put("toWarehouseId", toWarehouseId)
+        put("fromWarehouseName", fromWarehouseName)
+        put("toWarehouseName", toWarehouseName)
+        put("reference", reference)
+        put("notes", notes)
+        put("createdAt", createdAt)
+    }
+
+    companion object {
+        fun fromRaw(row: Map<String, Any?>): StockMovementDto {
+            @Suppress("UNCHECKED_CAST")
+            val product = row["product"] as? Map<String, Any?>
+            @Suppress("UNCHECKED_CAST")
+            val fromWh = row["fromWarehouse"] as? Map<String, Any?>
+            @Suppress("UNCHECKED_CAST")
+            val toWh = row["toWarehouse"] as? Map<String, Any?>
+            fun str(vararg keys: Any?): String {
+                for (v in keys) {
+                    when (v) {
+                        is String -> if (v.isNotBlank() && v != "null") return v
+                        is Number -> return v.toString()
+                    }
+                }
+                return ""
+            }
+            fun num(vararg keys: Any?): Double? {
+                for (v in keys) {
+                    when (v) {
+                        is Number -> return v.toDouble()
+                        is String -> v.toDoubleOrNull()?.let { return it }
+                    }
+                }
+                return null
+            }
+            fun lng(vararg keys: Any?): Long? {
+                for (v in keys) {
+                    when (v) {
+                        is Number -> return v.toLong()
+                        is String -> v.toLongOrNull()?.let { return it }
+                    }
+                }
+                return null
+            }
+            return StockMovementDto(
+                id = lng(row["id"]),
+                type = str(row["type"], row["movementType"]),
+                productId = lng(product?.get("id"), row["productId"]),
+                productName = str(product?.get("name"), row["productName"], row["name"]),
+                sku = str(product?.get("sku"), row["sku"]),
+                quantity = num(row["quantity"], row["cantidad"]) ?: 0.0,
+                fromWarehouseId = lng(fromWh?.get("id"), row["fromWarehouseId"]),
+                toWarehouseId = lng(toWh?.get("id"), row["toWarehouseId"]),
+                fromWarehouseName = str(fromWh?.get("name"), row["fromWarehouseName"]).ifBlank { null },
+                toWarehouseName = str(toWh?.get("name"), row["toWarehouseName"]).ifBlank { null },
+                reference = str(row["reference"], row["ref"]).ifBlank { null },
+                notes = str(row["notes"]).ifBlank { null },
+                createdAt = str(row["createdAt"], row["date"]).ifBlank { null },
+            )
+        }
+    }
+}
 
 data class ExpenseListResponse(
     val items: List<ExpenseDto>? = null,
@@ -197,6 +598,21 @@ data class InvoiceDto(
     val total: Double? = null,
     val status: String? = null,
     val issueDate: String? = null,
+    val pdfUrl: String? = null,
+    val balance: Double? = null,
+    val matchStatus: String? = null,
+)
+
+data class InvoicePaymentRequest(
+    val amount: Double,
+    val paymentDate: String,
+    val method: String? = null,
+    val reference: String? = null,
+    val notes: String? = null,
+)
+
+data class InvoiceMatchWaiveRequest(
+    val notes: String? = null,
 )
 
 data class BankAccountDto(
@@ -257,6 +673,17 @@ interface ExtraApi {
     @GET("expenses")
     suspend fun getExpensesRaw(): okhttp3.ResponseBody
 
+    @retrofit2.http.POST("expenses")
+    suspend fun createExpense(
+        @retrofit2.http.Body body: CreateExpenseRequest,
+    ): ExpenseDto
+
+    @PATCH("expenses/{id}/approve")
+    suspend fun approveExpense(
+        @Path("id") id: Long,
+        @retrofit2.http.Body body: ExpenseApproveRequest,
+    ): okhttp3.ResponseBody
+
     // Fines
     @GET("fines")
     suspend fun getFinesRaw(): okhttp3.ResponseBody
@@ -297,6 +724,24 @@ interface ExtraApi {
     @GET("accounting/invoices")
     suspend fun getInvoicesRaw(): okhttp3.ResponseBody
 
+    @GET("accounting/invoices/{id}")
+    suspend fun getInvoiceRaw(@Path("id") id: Long): okhttp3.ResponseBody
+
+    @retrofit2.http.POST("accounting/invoices/{id}/payments")
+    suspend fun registerInvoicePayment(
+        @Path("id") id: Long,
+        @Body body: InvoicePaymentRequest,
+    ): okhttp3.ResponseBody
+
+    @retrofit2.http.POST("accounting/invoices/{id}/match/evaluate")
+    suspend fun evaluateInvoiceMatch(@Path("id") id: Long): okhttp3.ResponseBody
+
+    @retrofit2.http.POST("accounting/invoices/{id}/match/waive")
+    suspend fun waiveInvoiceMatch(
+        @Path("id") id: Long,
+        @Body body: InvoiceMatchWaiveRequest,
+    ): okhttp3.ResponseBody
+
     // Banking accounts
     @GET("accounting/banking/accounts")
     suspend fun getBankAccountsRaw(): okhttp3.ResponseBody
@@ -315,8 +760,31 @@ interface ExtraApi {
     @GET("warehouse")
     suspend fun getWarehouseRaw(): okhttp3.ResponseBody
 
-    @GET("stock")
-    suspend fun getStockRaw(): okhttp3.ResponseBody
+    @GET("stock/levels")
+    suspend fun getStockLevelsRaw(
+        @Query("warehouseId") warehouseId: Long? = null,
+        @Query("belowReorder") belowReorder: Boolean? = null,
+    ): okhttp3.ResponseBody
+
+    @GET("stock/alerts/low-stock")
+    suspend fun getLowStockAlertsRaw(): okhttp3.ResponseBody
+
+    @GET("stock/movements")
+    suspend fun getStockMovementsRaw(
+        @Query("warehouseId") warehouseId: Long? = null,
+        @Query("productId") productId: Long? = null,
+        @Query("type") type: String? = null,
+    ): okhttp3.ResponseBody
+
+    @POST("stock/movements")
+    suspend fun createStockMovement(
+        @Body body: StockMovementRequest,
+    ): okhttp3.ResponseBody
+
+    @GET("catalog/products")
+    suspend fun getCatalogProductsRaw(
+        @Query("take") take: Int = 200,
+    ): okhttp3.ResponseBody
 
     // Procurement
     @GET("procurement/requisitions")

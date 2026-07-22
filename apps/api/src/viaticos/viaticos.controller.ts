@@ -18,12 +18,14 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { ViaticosService } from './viaticos.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { CreateViaticoDto } from './dto/create-viatico.dto.js';
+import { AssignViaticoDto } from './dto/assign-viatico.dto.js';
 import { UpdateViaticoDto } from './dto/update-viatico.dto.js';
 
 @Controller('viatics')
@@ -37,8 +39,8 @@ export class ViaticosController {
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_VIEW, PERMISSIONS.VIATICS_MANAGE] })
-  async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
-    return this.viaticosService.findAll(user, query);
+  async findAll(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null, @Query() query: PaginationQueryDto) {
+    return this.viaticosService.findAll(user, query, companyId);
   }
 
   @Get('analytics')
@@ -115,6 +117,28 @@ export class ViaticosController {
         motivo: body.motivo ?? body.concepto,
         ticketEvidenciaUrl,
         estatus: 'Pendiente',
+      },
+      user,
+    );
+  }
+
+  /** Asigna viático a un usuario para actividad/proyecto (sin evidencia previa). */
+  @Post('assign')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  assign(@CurrentUser() user: any, @Body() body: AssignViaticoDto) {
+    if (!body.usuarioId) {
+      throw new BadRequestException('Debes indicar el usuario beneficiario');
+    }
+    return this.viaticosService.assign(
+      {
+        usuarioId: Number(body.usuarioId),
+        actividadId: body.actividadId ? Number(body.actividadId) : null,
+        projectId: body.projectId ? Number(body.projectId) : null,
+        vehicleId: body.vehicleId ? Number(body.vehicleId) : null,
+        categoria: body.categoria,
+        montoSolicitado: Number(body.montoSolicitado),
+        motivo: body.motivo ?? body.concepto,
       },
       user,
     );

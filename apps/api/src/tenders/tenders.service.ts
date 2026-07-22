@@ -176,6 +176,16 @@ export class TendersService {
       throw new BadRequestException('Solo licitaciones adjudicadas se promueven a oportunidad');
     }
 
+    const companyId =
+      (
+        await this.prisma.companyProfile.findFirst({
+          where: { isPrimary: true, isActive: true },
+          select: { id: true },
+          orderBy: { id: 'asc' },
+        })
+      )?.id;
+    if (!companyId) throw new BadRequestException('No hay empresa configurada');
+
     const opportunity = await this.prisma.salesOpportunity.create({
       data: {
         title: `Licitación ${tender.tenderNumber} — ${tender.title}`,
@@ -185,6 +195,7 @@ export class TendersService {
         probability: 100,
         ownerId: tender.ownerId ?? null,
         closedAt: tender.awardDate || new Date(),
+        companyId,
       },
     });
 

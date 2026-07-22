@@ -118,6 +118,8 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-scalars:2.11.0")
 
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.fragment:fragment-ktx:1.8.6")
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("io.socket:socket.io-client:2.1.0") {
         exclude(group = "org.json", module = "json")
@@ -127,12 +129,13 @@ dependencies {
     implementation("com.google.android.gms:play-services-maps:19.0.0")
     implementation("com.google.maps.android:maps-compose:4.4.1")
 
-    // CameraX para captura de evidencias
+    // CameraX para captura de evidencias / barcode
     val cameraX = "1.3.4"
     implementation("androidx.camera:camera-core:$cameraX")
     implementation("androidx.camera:camera-camera2:$cameraX")
     implementation("androidx.camera:camera-lifecycle:$cameraX")
     implementation("androidx.camera:camera-view:$cameraX")
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
     // Image picker (Android Photo Picker - Android 13+, fallback a selector del sistema)
     implementation("androidx.activity:activity-compose:1.11.0")

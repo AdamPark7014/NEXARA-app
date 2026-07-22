@@ -183,21 +183,42 @@ final class ApprovalsVM: ObservableObject {
     @Published var items: [[String: Any]] = []
     @Published var isLoading = false
     @Published var actingId: Int?
+    @Published var error: String?
+    @Published var message: String?
+    @Published var rejectNotes: [Int: String] = [:]
 
     func load() {
         isLoading = true
         Task {
             items = await ExtraRepository.shared.workflowPending()
             isLoading = false
+            actingId = nil
         }
     }
 
     func decide(id: Int, approved: Bool) {
+        let comments = rejectNotes[id]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !approved && (comments == nil || comments?.isEmpty == true) {
+            error = "Indica el motivo de rechazo"
+            return
+        }
         actingId = id
+        error = nil
+        message = nil
         Task {
-            try? await ExtraRepository.shared.workflowDecide(id: id, decision: approved ? "APPROVED" : "REJECTED")
-            actingId = nil
-            load()
+            do {
+                try await ExtraRepository.shared.workflowDecide(
+                    id: id,
+                    decision: approved ? "APPROVED" : "REJECTED",
+                    comments: comments
+                )
+                message = approved ? "✅ Aprobado" : "✅ Rechazado"
+                actingId = nil
+                load()
+            } catch {
+                self.error = error.localizedDescription
+                actingId = nil
+            }
         }
     }
 }
@@ -208,6 +229,12 @@ struct ApprovalsView: View {
     var body: some View {
         List {
             if vm.isLoading { ProgressView() }
+            if let message = vm.message {
+                Text(message).foregroundColor(.green).font(.footnote.weight(.semibold))
+            }
+            if let error = vm.error {
+                Text(error).foregroundColor(.red).font(.footnote)
+            }
             if vm.items.isEmpty && !vm.isLoading {
                 Text("Sin aprobaciones pendientes.").foregroundColor(.secondary)
             }
@@ -216,6 +243,10 @@ struct ApprovalsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(approvalTitle(item)).font(.headline)
                     Text(approvalSubtitle(item)).font(.caption).foregroundColor(.secondary)
+                    TextField("Comentario / motivo rechazo", text: Binding(
+                        get: { vm.rejectNotes[id] ?? "" },
+                        set: { vm.rejectNotes[id] = $0 }
+                    ))
                     HStack {
                         Button("Aprobar") { vm.decide(id: id, approved: true) }
                             .buttonStyle(.borderedProminent).tint(.green)
@@ -257,6 +288,21 @@ final class NocVM: ObservableObject {
 
 struct NocView: View {
     @StateObject private var vm = NocVM()
+    @State private var sevFilter = "todos"
+
+    private var filteredAlerts: [[String: Any]] {
+        switch sevFilter {
+        case "critical":
+            return vm.alerts.filter { platStr($0, "severity").lowercased() == "critical" }
+        case "warning":
+            return vm.alerts.filter {
+                let s = platStr($0, "severity").lowercased()
+                return s == "warning" || s == "high" || s == "medium"
+            }
+        default:
+            return vm.alerts
+        }
+    }
 
     var body: some View {
         List {
@@ -265,16 +311,32 @@ struct NocView: View {
                 HStack {
                     ErpTile(label: "Dispositivos", value: "\(platInt(vm.summary, "total"))", accent: .blue)
                     ErpTile(label: "Críticos", value: "\(platInt(vm.summary, "criticalCount"))", accent: .red)
+                    ErpTile(label: "Uptime", value: platFmtPct(platDbl(vm.summary, "avgUptime")), accent: .green)
                 }
             }
             if !vm.alerts.isEmpty {
-                Section("Alertas") {
-                    ForEach(vm.alerts.prefix(15), id: \.platRowId) { a in
-                        VStack(alignment: .leading) {
-                            Text(platStr(a, "title", "deviceName")).font(.subheadline.bold())
-                            Text(platStr(a, "message")).font(.caption).foregroundColor(.secondary)
+                Section {
+                    Picker("Severidad", selection: $sevFilter) {
+                        Text("Todas").tag("todos")
+                        Text("Críticas").tag("critical")
+                        Text("Warning").tag("warning")
+                    }
+                    .pickerStyle(.segmented)
+                    ForEach(filteredAlerts.prefix(20), id: \.platRowId) { a in
+                        let sev = platStr(a, "severity")
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(platStr(a, "title", "deviceName")).font(.subheadline.bold())
+                                Text(platStr(a, "message")).font(.caption).foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Text(sev)
+                                .font(.caption2.bold())
+                                .foregroundColor(sev.lowercased() == "critical" ? .red : .orange)
                         }
                     }
+                } header: {
+                    Text("Alertas (\(filteredAlerts.count)/\(vm.alerts.count))")
                 }
             }
             if !vm.devices.isEmpty {
@@ -283,10 +345,11 @@ struct NocView: View {
                         HStack {
                             VStack(alignment: .leading) {
                                 Text(platStr(d, "name")).font(.subheadline)
-                                Text(platStr(d, "type")).font(.caption2).foregroundColor(.secondary)
+                                Text("\(platStr(d, "type")) · \(platStr(d, "clientName"))").font(.caption2).foregroundColor(.secondary)
                             }
                             Spacer()
                             Text(platStr(d, "status")).font(.caption.bold())
+                                .foregroundColor(deviceStatusColor(platStr(d, "status")))
                         }
                     }
                 }
@@ -295,6 +358,14 @@ struct NocView: View {
         .navigationTitle("NOC")
         .task { vm.load() }
         .refreshable { vm.load() }
+    }
+
+    private func deviceStatusColor(_ status: String) -> Color {
+        switch status.uppercased() {
+        case "ONLINE": return .green
+        case "OFFLINE", "ALERT": return .red
+        default: return .orange
+        }
     }
 }
 

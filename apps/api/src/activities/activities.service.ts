@@ -5,6 +5,7 @@ import { CreateActivityDto } from './dto/create-activity.dto.js';
 import { UpdateActivityDto } from './dto/update-activity.dto.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { generateTicketReportPdf } from './ticket-report-pdf.js';
+import { companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -59,12 +60,13 @@ export class ActivitiesService {
     return this.generateNextAnNumber();
   }
 
-  async create(createActivityDto: CreateActivityDto) {
+  async create(createActivityDto: CreateActivityDto, companyId?: number | null) {
     const trimmed = createActivityDto.anNumber?.trim();
     const anNumber = trimmed ? trimmed : await this.generateNextAnNumber();
+    const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
     
     const activity = await this.prisma['activity'].create({
-      data: { ...createActivityDto, anNumber },
+      data: { ...createActivityDto, anNumber, companyId: resolvedCompanyId },
       include: { responsable: { select: { nombre: true, id: true } }, creador: { select: { nombre: true } } },
     });
 
@@ -81,8 +83,8 @@ export class ActivitiesService {
     return activity;
   }
 
-  async findAll(query?: PaginationQueryDto) {
-    const where: any = {};
+  async findAll(query?: PaginationQueryDto, companyId?: number | null) {
+    const where: any = { ...companyWhere(companyId ?? null) };
     if (query?.search) {
       where.OR = [
         { titulo: { contains: query.search, mode: 'insensitive' } },
@@ -195,9 +197,9 @@ export class ActivitiesService {
     });
   }
 
-  async findByResponsible(userId: number) {
+  async findByResponsible(userId: number, companyId?: number | null) {
     return this.prisma['activity'].findMany({
-      where: { responsableId: userId },
+      where: { responsableId: userId, ...companyWhere(companyId ?? null) },
       include: {
         creador: true,
         responsable: true,
@@ -217,11 +219,11 @@ export class ActivitiesService {
     });
   }
 
-  async findByAllowedUsers(userIds: number[]) {
+  async findByAllowedUsers(userIds: number[], companyId?: number | null) {
     // Actividades cuyo responsable está en la lista (p. ej. alcance de consola para admin)
     if (!userIds || userIds.length === 0) return [];
     return this.prisma['activity'].findMany({
-      where: { responsableId: { in: userIds } },
+      where: { responsableId: { in: userIds }, ...companyWhere(companyId ?? null) },
       include: {
         creador: true,
         responsable: true,

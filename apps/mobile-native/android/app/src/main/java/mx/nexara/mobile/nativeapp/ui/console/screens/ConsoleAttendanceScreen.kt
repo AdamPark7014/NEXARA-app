@@ -77,9 +77,22 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(checkInLoading = true, checkInMessage = null) }
         viewModelScope.launch {
             try {
-                val res = withContext(Dispatchers.IO) { repo.attendanceCheckIn(type) }
-                val msg = res.message ?: if (type == "entrada") "✅ Entrada registrada" else "✅ Salida registrada"
-                _state.update { it.copy(checkInLoading = false, checkInMessage = msg) }
+                val coords = withContext(Dispatchers.IO) {
+                    mx.nexara.mobile.nativeapp.util.DeviceLocation.current(getApplication())
+                }
+                val res = withContext(Dispatchers.IO) {
+                    repo.attendanceCheckIn(type, lat = coords?.lat, lng = coords?.lng)
+                }
+                val base = res.message ?: if (type == "entrada") "✅ Entrada registrada" else "✅ Salida registrada"
+                val geoHint = when {
+                    coords == null -> " (sin GPS — activa ubicación)"
+                    coords.accuracyM != null && coords.accuracyM > 100f ->
+                        " · GPS ${"%.5f".format(coords.lat)}, ${"%.5f".format(coords.lng)} (±${coords.accuracyM.toInt()}m — baja precisión)"
+                    coords.accuracyM != null ->
+                        " · GPS ${"%.5f".format(coords.lat)}, ${"%.5f".format(coords.lng)} (±${coords.accuracyM.toInt()}m)"
+                    else -> " · GPS ${"%.5f".format(coords.lat)}, ${"%.5f".format(coords.lng)}"
+                }
+                _state.update { it.copy(checkInLoading = false, checkInMessage = base + geoHint) }
                 refresh()
             } catch (e: Exception) {
                 _state.update {
@@ -165,6 +178,12 @@ fun ConsoleAttendanceScreen(
 
         // ── Personal check-in (not superadmin) ──────────────────────────────
         if (!isSuperAdmin) {
+            item {
+                mx.nexara.mobile.nativeapp.ui.common.LocationPermissionBanner(
+                    message = "La asistencia registra tu GPS al marcar entrada o salida.",
+                    requestOnAppear = true,
+                )
+            }
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),

@@ -37,7 +37,7 @@ const readPositiveIntEnv = (name: string, fallback: number): number => {
 };
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   const httpServer = app.getHttpAdapter().getInstance();
   app.enableShutdownHooks();
 

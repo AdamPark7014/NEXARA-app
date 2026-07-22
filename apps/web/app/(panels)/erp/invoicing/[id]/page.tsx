@@ -53,6 +53,10 @@ interface InvoiceDetail {
   emisorName?: string | null;
   description?: string | null;
   notes?: string | null;
+  matchStatus?: string | null;
+  matchNotes?: string | null;
+  purchaseOrderId?: number | null;
+  goodsReceiptId?: number | null;
   items?: InvoiceLine[];
   payments?: PaymentRecord[];
   createdAt?: string;
@@ -80,6 +84,22 @@ const STATUS_VARIANT: Record<string, "positive" | "warning" | "danger" | "accent
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Borrador", SENT: "Enviada", PARTIALLY_PAID: "Pago parcial",
   PAID: "Pagada", OVERDUE: "Vencida", CANCELLED: "Cancelada",
+};
+
+const MATCH_LABELS: Record<string, string> = {
+  NOT_REQUIRED: "No aplica",
+  PENDING: "Pendiente",
+  MATCHED: "OK",
+  VARIANCE: "Variación",
+  WAIVED: "Eximido",
+};
+
+const MATCH_VARIANT: Record<string, "positive" | "warning" | "danger" | "accent" | "neutral"> = {
+  NOT_REQUIRED: "neutral",
+  PENDING: "warning",
+  MATCHED: "positive",
+  VARIANCE: "danger",
+  WAIVED: "accent",
 };
 
 const inp: React.CSSProperties = {
@@ -119,6 +139,7 @@ export default function InvoiceDetailPage() {
   const [substitutionUuid, setSubstitutionUuid] = useState("");
   const [cancelling, setCancelling] = useState(false);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [matching, setMatching] = useState(false);
 
   const load = useCallback(async () => {
     if (!token || !id) return;
@@ -270,10 +291,51 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  const evaluateMatch = async () => {
+    if (!token || !id) return;
+    setMatching(true);
+    try {
+      await apiFetch(`accounting/invoices/${id}/match/evaluate`, token, { method: "POST" });
+      toast.success("3-way match recalculado");
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al evaluar match");
+    } finally {
+      setMatching(false);
+    }
+  };
+
+  const waiveMatch = async () => {
+    if (!token || !id) return;
+    setMatching(true);
+    try {
+      await apiFetch(`accounting/invoices/${id}/match/waive`, token, {
+        method: "POST",
+        body: JSON.stringify({ notes: "Eximido desde UI facturación" }),
+      });
+      toast.success("Match eximido — ya puedes pagar");
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error al eximir match");
+    } finally {
+      setMatching(false);
+    }
+  };
+
   const pendingAmount = useMemo(() => {
     if (!invoice) return 0;
     return Math.max(0, invoice.totalAmount - (invoice.paidAmount ?? 0));
   }, [invoice]);
+
+  const needsThreeWay =
+    invoice?.type === "ACCOUNTS_PAYABLE" &&
+    Boolean(invoice.purchaseOrderId || invoice.goodsReceiptId);
+
+  const matchAllowsPay =
+    !needsThreeWay ||
+    invoice?.matchStatus === "MATCHED" ||
+    invoice?.matchStatus === "WAIVED" ||
+    invoice?.matchStatus === "NOT_REQUIRED";
 
   const paidPct = useMemo(() => {
     if (!invoice || !invoice.totalAmount) return 0;
@@ -326,21 +388,67 @@ export default function InvoiceDetailPage() {
               </Button>
             )}
             {canEdit && invoice.status !== "PAID" && invoice.status !== "CANCELLED" && (
-              <Button variant="secondary" onClick={() => {
-                setShowPayment(true);
-                setPayErr(null);
-                setPayForm((f) => ({
-                  ...f,
-                  amount: String(pendingAmount),
-                  stampComplement: invoice.satPaymentMethod === "PPD",
-                }));
-              }}>
+              <Button
+                variant="secondary"
+                disabled={!matchAllowsPay}
+                title={!matchAllowsPay ? "Resuelve el 3-way match antes de pagar" : undefined}
+                onClick={() => {
+                  setShowPayment(true);
+                  setPayErr(null);
+                  setPayForm((f) => ({
+                    ...f,
+                    amount: String(pendingAmount),
+                    stampComplement: invoice.satPaymentMethod === "PPD",
+                  }));
+                }}
+              >
                 💳 Registrar pago
               </Button>
             )}
           </>
         }
       />
+
+      {needsThreeWay && (
+        <div
+          style={{
+            marginBottom: 18,
+            padding: "12px 14px",
+            borderRadius: 10,
+            border: "1px solid var(--border)",
+            background: "var(--surface-2)",
+            fontSize: 13,
+            color: "var(--text-secondary)",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 10,
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div>
+            <strong style={{ color: "var(--foreground)" }}>3-way match OC–GR–factura: </strong>
+            <Tag variant={MATCH_VARIANT[invoice.matchStatus ?? "PENDING"] ?? "neutral"}>
+              {MATCH_LABELS[invoice.matchStatus ?? "PENDING"] ?? invoice.matchStatus}
+            </Tag>
+            {invoice.matchNotes && (
+              <div style={{ marginTop: 6 }}>{invoice.matchNotes}</div>
+            )}
+          </div>
+          {canEdit && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <Button variant="ghost" onClick={() => void evaluateMatch()} disabled={matching}>
+                {matching ? "…" : "Reevaluar"}
+              </Button>
+              {invoice.matchStatus === "VARIANCE" || invoice.matchStatus === "PENDING" ? (
+                <Button variant="secondary" onClick={() => void waiveMatch()} disabled={matching}>
+                  Eximir match
+                </Button>
+              ) : null}
+            </div>
+          )}
+        </div>
+      )}
 
       {pacInfo && (
         <div

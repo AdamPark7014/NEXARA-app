@@ -27,6 +27,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -233,6 +235,7 @@ class ConsoleSettingsViewModel(app: Application) : AndroidViewModel(app) {
 fun ConsoleSettingsScreen(
     onExitToPanels: () -> Unit,
     contentPadding: PaddingValues = PaddingValues(16.dp),
+    onOpenOfflineQueue: (() -> Unit)? = null,
 ) {
     val vm: ConsoleSettingsViewModel = viewModel()
     val state by vm.state.collectAsState()
@@ -268,6 +271,25 @@ fun ConsoleSettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+
+        if (onOpenOfflineQueue != null) {
+            item {
+                Card(
+                    onClick = onOpenOfflineQueue,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
+                ) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Cola offline", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Ver y sincronizar mutaciones pendientes del dispositivo",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
 
         item {

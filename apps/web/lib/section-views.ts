@@ -680,10 +680,10 @@ export function getViaticsSectionConfig(user: UserAccessInput | null | undefined
       canCreate: false,
       canEdit: true,
       canDelete: false,
-      canAssign: false,
+      canAssign: true,
       canApprove: true,
       title: 'Viáticos · Aprobación',
-      subtitle: 'Revisa y autoriza solicitudes de viáticos del equipo.',
+      subtitle: 'Asigna y autoriza viáticos del equipo para actividades o proyectos.',
     };
   }
   if (isOpsManager(v2)) {
@@ -693,10 +693,10 @@ export function getViaticsSectionConfig(user: UserAccessInput | null | undefined
       canCreate: false,
       canEdit: true,
       canDelete: false,
-      canAssign: false,
+      canAssign: true,
       canApprove: true,
-      title: 'Viáticos · Aprobación',
-      subtitle: 'Revisa y autoriza solicitudes de viáticos del equipo.',
+      title: 'Viáticos · Gestión',
+      subtitle: 'Asigna viáticos a ingenieros y autoriza solicitudes del equipo.',
     };
   }
   return {
@@ -1193,10 +1193,10 @@ export function getErpViaticsAdminSectionConfig(user: UserAccessInput | null | u
       canCreate: false,
       canEdit: true,
       canDelete: Boolean(user?.isSuperAdmin) || v2 === ROLES.SUPER_ADMIN,
-      canAssign: false,
+      canAssign: true,
       canApprove: true,
       title: 'Viáticos · Aprobación',
-      subtitle: 'Autoriza solicitudes del equipo — el dueño no solicita viáticos.',
+      subtitle: 'Autoriza y asigna viáticos del equipo — el CEO no solicita viáticos.',
     };
   }
   if (ERP_VIATICS_APPROVERS.has(v2)) {
@@ -1207,12 +1207,12 @@ export function getErpViaticsAdminSectionConfig(user: UserAccessInput | null | u
       canCreate,
       canEdit: true,
       canDelete: tier(v2) >= 70,
-      canAssign: false,
+      canAssign: true,
       canApprove: true,
       title: canCreate ? 'Viáticos · Gestión' : 'Viáticos · Aprobación',
       subtitle: canCreate
-        ? 'Preaprueba del equipo y, si lo necesitas, solicita los tuyos.'
-        : 'Gestión y autorización de viáticos — flujo admin → coordinación → dirección → CEO.',
+        ? 'Asigna viáticos al equipo, preaprueba solicitudes y, si lo necesitas, solicita los tuyos.'
+        : 'Asigna, gestiona y autoriza viáticos — flujo admin → coordinación → dirección → CEO.',
     };
   }
   return {

@@ -11,8 +11,10 @@ import { listViaticsForActivity, type ViaticoRow } from "@/lib/ops-activities-ap
 import { DetailError, DetailSection, formatDateTime } from "@/components/detail/DetailFrame";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { resolveV2RoleKey } from "@/lib/user-access";
+import { getViaticsSectionConfig } from "@/lib/section-views";
 import { ROLES } from "@/lib/rbac";
-import { postViatico } from "@/lib/viatics-api";
+import { assignViatico, postViatico } from "@/lib/viatics-api";
+import { listUsers, type ApiUserRow } from "@/lib/users-api";
 import { buildApiUrl } from "@/lib/api-base";
 
 const CONCEPTOS = [
@@ -28,11 +30,14 @@ const CONCEPTOS = [
 
 const EMPTY_FORM = { concepto: "", montoSolicitado: "", motivo: "" };
 
+type FormMode = "request" | "assign" | null;
+
 export default function ActivityViaticsPage() {
   const { user } = useUser();
   const token = user?.token ?? "";
   const { id, activity, error, reload } = useActivityDetail();
   const v2 = resolveV2RoleKey(user);
+  const cfg = getViaticsSectionConfig(user);
 
   const canCreate =
     !user?.isSuperAdmin &&
@@ -43,16 +48,20 @@ export default function ActivityViaticsPage() {
       v2 === ROLES.ADMINISTRATIVO ||
       v2 === ROLES.COORD_ADMIN);
 
+  const canAssign = cfg.canAssign;
+
   const [viatics, setViatics] = useState<ViaticoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [viaticError, setViaticError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [formMode, setFormMode] = useState<FormMode>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [vehicles, setVehicles] = useState<{ id: number; nombre: string; placas?: string | null }[]>([]);
   const [vehicleId, setVehicleId] = useState("");
+  const [users, setUsers] = useState<ApiUserRow[]>([]);
+  const [assigneeId, setAssigneeId] = useState("");
 
   const load = useCallback(async () => {
     if (!token || !id) return;
@@ -88,38 +97,86 @@ export default function ActivityViaticsPage() {
       .catch(() => setVehicles([]));
   }, [token]);
 
+  useEffect(() => {
+    if (!token || !canAssign) return;
+    void listUsers(token, { limit: 200 })
+      .then(setUsers)
+      .catch(() => setUsers([]));
+  }, [token, canAssign]);
+
+  const openForm = (mode: FormMode) => {
+    setFormMode(mode);
+    setSaveErr(null);
+    setForm({ ...EMPTY_FORM });
+    setEvidenceFile(null);
+    setVehicleId("");
+    setAssigneeId(
+      mode === "assign" && activity?.responsable?.id
+        ? String(activity.responsable.id)
+        : "",
+    );
+  };
+
   const submit = async () => {
     if (!token || !id || !form.concepto || !form.montoSolicitado) return;
-    if (!evidenceFile) {
-      setSaveErr("Debes adjuntar el ticket o comprobante");
+    const cat =
+      CONCEPTOS.find((c) => c.label === form.concepto)?.categoria ?? "OTROS";
+    const motivo = (form.motivo || form.concepto).trim();
+    const monto = parseFloat(form.montoSolicitado);
+
+    if (formMode === "request") {
+      if (!evidenceFile) {
+        setSaveErr("Debes adjuntar el ticket o comprobante");
+        return;
+      }
+      setSaving(true);
+      setSaveErr(null);
+      try {
+        await postViatico(
+          token,
+          {
+            usuarioId: user?.id,
+            actividadId: Number(id),
+            motivo,
+            montoSolicitado: monto,
+            categoria: cat,
+            vehicleId: vehicleId ? Number(vehicleId) : null,
+          },
+          evidenceFile,
+        );
+        setFormMode(null);
+        void load();
+      } catch (e) {
+        setSaveErr(e instanceof Error ? e.message : "Error al solicitar viático");
+      } finally {
+        setSaving(false);
+      }
       return;
     }
-    setSaving(true);
-    setSaveErr(null);
-    try {
-      const cat =
-        CONCEPTOS.find((c) => c.label === form.concepto)?.categoria ?? "OTROS";
-      await postViatico(
-        token,
-        {
-          usuarioId: user?.id,
+
+    if (formMode === "assign") {
+      if (!assigneeId) {
+        setSaveErr("Selecciona el usuario beneficiario");
+        return;
+      }
+      setSaving(true);
+      setSaveErr(null);
+      try {
+        await assignViatico(token, {
+          usuarioId: Number(assigneeId),
           actividadId: Number(id),
-          motivo: (form.motivo || form.concepto).trim(),
-          montoSolicitado: parseFloat(form.montoSolicitado),
+          motivo,
+          montoSolicitado: monto,
           categoria: cat,
           vehicleId: vehicleId ? Number(vehicleId) : null,
-        },
-        evidenceFile,
-      );
-      setShowForm(false);
-      setForm({ ...EMPTY_FORM });
-      setEvidenceFile(null);
-      setVehicleId("");
-      void load();
-    } catch (e) {
-      setSaveErr(e instanceof Error ? e.message : "Error al solicitar viático");
-    } finally {
-      setSaving(false);
+        });
+        setFormMode(null);
+        void load();
+      } catch (e) {
+        setSaveErr(e instanceof Error ? e.message : "Error al asignar viático");
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
@@ -144,6 +201,12 @@ export default function ActivityViaticsPage() {
     return s === "pendiente" || s.includes("aprobado_coordinador");
   }).length;
 
+  const isAssign = formMode === "assign";
+  const canSubmit =
+    !!form.concepto &&
+    !!form.montoSolicitado &&
+    (isAssign ? !!assigneeId : !!evidenceFile);
+
   return (
     <>
       {viatics.length > 0 && (
@@ -154,41 +217,22 @@ export default function ActivityViaticsPage() {
           <KpiCard label="Pendientes" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" />
         </div>
       )}
-      {viatics.length > 0 && (() => {
-        const byConcepto: Record<string, number> = {};
-        for (const v of viatics) { const c = v.motivo ?? "Otro"; byConcepto[c] = (byConcepto[c] ?? 0) + 1; }
-        const byEstatus: Record<string, number> = {};
-        for (const v of viatics) { const s = v.estatus ?? "PENDIENTE"; byEstatus[s] = (byEstatus[s] ?? 0) + 1; }
-        const total = viatics.length;
-        const estatusColors: Record<string, string> = { APROBADO: "var(--success)", PENDIENTE: "var(--warning)", RECHAZADO: "var(--danger)", PAGADO: "var(--primary)" };
-        return (
-          <div style={{ marginBottom: 14, padding: "10px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Estado de viáticos</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {Object.entries(byEstatus).sort((a, b) => b[1] - a[1]).map(([s, count]) => (
-                <div key={s} style={{ display: "grid", gridTemplateColumns: "90px 1fr 30px", gap: 8, alignItems: "center" }}>
-                  <span style={{ fontSize: 11.5, color: "var(--text-secondary)", fontWeight: 500 }}>{s.charAt(0) + s.slice(1).toLowerCase()}</span>
-                  <div style={{ height: 5, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(count / total) * 100}%`, background: estatusColors[s] ?? "var(--primary)", borderRadius: 3 }} />
-                  </div>
-                  <span style={{ fontSize: 11, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
       <DetailSection title="Viáticos vinculados">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
           {viatics.length > 0 && (
-            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+            <span style={{ fontSize: 12.5, color: "var(--text-secondary)", marginRight: "auto" }}>
               Total: <strong><Money value={totalMonto} /></strong>
             </span>
           )}
+          {canAssign && (
+            <Button size="sm" variant="secondary" iconLeft="+"
+              onClick={() => openForm("assign")}>
+              Asignar viático
+            </Button>
+          )}
           {canCreate && (
             <Button size="sm" variant="primary" iconLeft="+"
-              onClick={() => { setShowForm(true); setSaveErr(null); setForm({ ...EMPTY_FORM }); setEvidenceFile(null); setVehicleId(""); }}
-              style={{ marginLeft: "auto" }}>
+              onClick={() => openForm("request")}>
               Solicitar viático
             </Button>
           )}
@@ -198,7 +242,13 @@ export default function ActivityViaticsPage() {
           <div style={{ padding: 24, textAlign: "center", color: "var(--text-secondary)" }}>Cargando viáticos…</div>
         ) : viatics.length === 0 ? (
           <EmptyState icon="💳" title="Sin viáticos"
-            description={canCreate ? "Solicita un viático para esta actividad." : "No hay solicitudes asociadas."} />
+            description={
+              canAssign
+                ? "Asigna un viático al responsable o solicita uno para esta actividad."
+                : canCreate
+                  ? "Solicita un viático para esta actividad."
+                  : "No hay solicitudes asociadas."
+            } />
         ) : (
           <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
             {viatics.map((v) => (
@@ -228,30 +278,54 @@ export default function ActivityViaticsPage() {
         )}
       </DetailSection>
 
-      {showForm && (
+      {formMode && (
         <div
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
-          onClick={() => setShowForm(false)}
+          onClick={() => setFormMode(null)}
         >
           <div
-            style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 420, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }}
+            style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>Solicitar viático</div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
+              {isAssign ? "Asignar viático" : "Solicitar viático"}
+            </div>
             <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 18 }}>
               OT: <strong>{(activity as Record<string, unknown>).anNumber as string ?? `#${id}`}</strong>
+              {isAssign
+                ? " · Presupuesto anticipado (sin comprobante aún)"
+                : " · Requiere ticket o comprobante"}
             </div>
             <div style={{ display: "grid", gap: 14 }}>
+              {isAssign && (
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Asignar a *</span>
+                  <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} style={inp} autoFocus>
+                    <option value="">— Seleccionar usuario —</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.nombre}{u.employeeNumber ? ` · ${u.employeeNumber}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
               <label style={{ display: "grid", gap: 4 }}>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Concepto *</span>
-                <select value={form.concepto} onChange={(e) => setForm((f) => ({ ...f, concepto: e.target.value }))} style={inp} autoFocus>
+                <select
+                  value={form.concepto}
+                  onChange={(e) => setForm((f) => ({ ...f, concepto: e.target.value }))}
+                  style={inp}
+                  autoFocus={!isAssign}
+                >
                   <option value="">— Seleccionar —</option>
                   {CONCEPTOS.map((c) => <option key={c.label} value={c.label}>{c.label}</option>)}
                 </select>
               </label>
 
               <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Monto solicitado (MXN) *</span>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Monto (MXN) *</span>
                 <input type="number" min="0" step="0.01" value={form.montoSolicitado}
                   onChange={(e) => setForm((f) => ({ ...f, montoSolicitado: e.target.value }))}
                   placeholder="0.00" style={inp} />
@@ -274,13 +348,15 @@ export default function ActivityViaticsPage() {
                 </select>
               </label>
 
-              <FileDropzone
-                file={evidenceFile}
-                onFile={setEvidenceFile}
-                label="Ticket / comprobante"
-                required
-                hint="Obligatorio · PDF o imagen"
-              />
+              {!isAssign && (
+                <FileDropzone
+                  file={evidenceFile}
+                  onFile={setEvidenceFile}
+                  label="Ticket / comprobante"
+                  required
+                  hint="Obligatorio · PDF o imagen"
+                />
+              )}
 
               {saveErr && (
                 <div style={{ padding: "8px 12px", background: "var(--state-danger-bg, #fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
@@ -290,9 +366,9 @@ export default function ActivityViaticsPage() {
             </div>
 
             <div style={{ display: "flex", gap: 10, marginTop: 22, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void submit()} disabled={saving || !form.concepto || !form.montoSolicitado || !evidenceFile}>
-                {saving ? "Enviando…" : "Solicitar"}
+              <Button variant="secondary" onClick={() => setFormMode(null)}>Cancelar</Button>
+              <Button variant="primary" onClick={() => void submit()} disabled={saving || !canSubmit}>
+                {saving ? "Guardando…" : isAssign ? "Asignar" : "Solicitar"}
               </Button>
             </div>
           </div>

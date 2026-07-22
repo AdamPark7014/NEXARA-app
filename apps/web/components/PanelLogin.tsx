@@ -33,11 +33,76 @@ type PanelLoginProps = {
 export default function PanelLogin({ redirectTo, requiredPermission, mode = "console", onClientLogin, onBranchLogin, title, subtitle, accessNotice, smartRedirect = false }: PanelLoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaRequired, setMfaRequired] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [ssoEnabled, setSsoEnabled] = useState(false);
   const { setUser } = useUser();
   const router = useRouter();
+
+  useEffect(() => {
+    void fetch(buildApiUrl("auth/oidc/status"))
+      .then((r) => r.json())
+      .then((d) => setSsoEnabled(Boolean(d?.enabled)))
+      .catch(() => setSsoEnabled(false));
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || mode !== "console") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("sso") === "error") {
+      setError("SSO falló. Revisa OIDC o que el usuario exista en NEXARA.");
+      return;
+    }
+    if (params.get("sso") !== "ok") return;
+    const hash = window.location.hash.replace(/^#/, "");
+    if (!hash) return;
+    try {
+      const pad = hash.length % 4 === 0 ? "" : "=".repeat(4 - (hash.length % 4));
+      const b64 = hash.replace(/-/g, "+").replace(/_/g, "/") + pad;
+      const data = JSON.parse(atob(b64));
+      if (!data?.access_token || !data?.user) throw new Error("Sesión SSO incompleta");
+      void (async () => {
+        const userData = {
+          id: data.user.id,
+          nombre: data.user.nombre,
+          email: data.user.email,
+          role: data.user.role,
+          roleId: data.user.roleId,
+          roleKey: data.user.roleKey ?? null,
+          orgRoleKey: data.user.orgRoleKey ?? null,
+          nivelAutoridad: data.user.nivelAutoridad ?? 0,
+          roleFlags: data.user.roleFlags || undefined,
+          department: data.user.department,
+          departmentId: data.user.departmentId,
+          token: data.access_token,
+          avatarUrl: data.user.avatarUrl || "",
+          permissions: data.user.permissions || [],
+          isSuperAdmin: data.user.isSuperAdmin || false,
+          isPlatformOwner: data.user.isPlatformOwner || false,
+          loginDevice: data.loginDevice || data.user.loginDevice,
+        };
+        if (typeof document !== "undefined") {
+          const isHttps = window.location.protocol === "https:";
+          const secureFlag = isHttps ? "; Secure" : "";
+          const isProduction = window.location.hostname.includes("nexara.com.mx");
+          const domainFlag = isProduction ? "; Domain=.nexara.com.mx" : "";
+          document.cookie = `nx_session=1; Path=/; SameSite=Lax; Max-Age=86400${domainFlag}${secureFlag}`;
+        }
+        setUser(userData);
+        window.history.replaceState({}, "", window.location.pathname);
+        if (smartRedirect) {
+          router.replace(getUserHomeUrl(userData));
+        } else {
+          router.replace(redirectTo);
+        }
+      })();
+    } catch {
+      setError("No se pudo completar el SSO");
+    }
+  }, [mode, redirectTo, router, setUser, smartRedirect]);
 
   useEffect(() => {
     const socketUrl = getSocketBaseUrl();
@@ -73,6 +138,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
       const payload = {
         email,
         password,
+        ...(mfaCode.trim() ? { mfaCode: mfaCode.trim() } : {}),
         ...(requiredPermission === PERMISSIONS.PANEL_VENTAS ? { panel: "ventas" } : {}),
       };
 
@@ -108,7 +174,16 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
             ? buildApiUrl("branch-auth/login")
             : buildApiUrl("auth/login");
       const { res, data } = await loginToEndpoint(endpoint);
-      if (!res.ok) throw new Error(data.message || data.error || "Credenciales incorrectas");
+      const msg = typeof data.message === "string" ? data.message : Array.isArray(data.message) ? data.message.join(" ") : "";
+      if (!res.ok) {
+        if (mode === "console" && (msg === "MFA_REQUIRED" || String(data.error || "").includes("MFA"))) {
+          setMfaRequired(true);
+          setError("Ingresa el código de tu autenticador (MFA)");
+          return;
+        }
+        throw new Error(msg || data.error || "Credenciales incorrectas");
+      }
+      setMfaRequired(false);
 
       if (mode === "client") {
         onClientLogin?.(data);
@@ -609,10 +684,48 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
               </div>
             </div>
 
+            {mfaRequired && (
+              <div className="input-group">
+                <label className="input-label" htmlFor="mfaCode">
+                  Código MFA
+                </label>
+                <div className="input-wrapper">
+                  <svg className="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <input
+                    id="mfaCode"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    className="input"
+                    placeholder="000000"
+                    value={mfaCode}
+                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    required
+                    autoFocus
+                  />
+                </div>
+              </div>
+            )}
+
             <button type="submit" className="submit-button" disabled={isLoading}>
               {isLoading && <span className="loader"></span>}
-              {isLoading ? "Iniciando sesión..." : "Entrar"}
+              {isLoading ? "Iniciando sesión..." : mfaRequired ? "Verificar MFA" : "Entrar"}
             </button>
+
+            {mode === "console" && ssoEnabled && (
+              <button
+                type="button"
+                className="submit-button"
+                style={{ marginTop: 10, background: "transparent", border: "1px solid var(--border, #ccc)", color: "inherit" }}
+                onClick={() => {
+                  window.location.href = buildApiUrl("auth/oidc/start");
+                }}
+              >
+                Continuar con SSO / OIDC
+              </button>
+            )}
 
             {error && (
               <div className="error-message" role="alert">

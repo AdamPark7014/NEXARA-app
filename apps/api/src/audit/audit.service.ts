@@ -13,6 +13,8 @@ export class AuditService {
     previousData?: any;
     ipAddress?: string;
     userAgent?: string;
+    companyId?: number | null;
+    source?: string;
   }, userId?: number) {
     return this.prisma.auditLog.create({
       data: {
@@ -22,6 +24,8 @@ export class AuditService {
         changes: dto.changes ?? undefined,
         previousData: dto.previousData ?? undefined,
         userId: userId ?? null,
+        companyId: dto.companyId ?? null,
+        source: dto.source || 'http',
         ipAddress: dto.ipAddress?.trim() || null,
         userAgent: dto.userAgent?.trim() || null,
       },
@@ -33,6 +37,8 @@ export class AuditService {
     entityId?: number;
     action?: string;
     userId?: number;
+    companyId?: number | null;
+    source?: string;
     from?: string;
     to?: string;
     page?: number;
@@ -43,6 +49,8 @@ export class AuditService {
     if (filters.entityId) where.entityId = filters.entityId;
     if (filters.action) where.action = filters.action;
     if (filters.userId) where.userId = filters.userId;
+    if (filters.companyId != null) where.companyId = filters.companyId;
+    if (filters.source) where.source = filters.source;
     if (filters.from || filters.to) {
       where.createdAt = {};
       if (filters.from) where.createdAt.gte = new Date(filters.from);
@@ -62,6 +70,63 @@ export class AuditService {
       this.prisma.auditLog.count({ where }),
     ]);
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  /** Export compliance: hasta 10k filas CSV. */
+  async exportCsv(filters: {
+    entityType?: string;
+    action?: string;
+    userId?: number;
+    companyId?: number | null;
+    from?: string;
+    to?: string;
+  }) {
+    const where: any = {};
+    if (filters.entityType) where.entityType = filters.entityType;
+    if (filters.action) where.action = filters.action;
+    if (filters.userId) where.userId = filters.userId;
+    if (filters.companyId != null) where.companyId = filters.companyId;
+    if (filters.from || filters.to) {
+      where.createdAt = {};
+      if (filters.from) where.createdAt.gte = new Date(filters.from);
+      if (filters.to) where.createdAt.lte = new Date(filters.to);
+    }
+    const rows = await this.prisma.auditLog.findMany({
+      where,
+      include: { user: { select: { email: true, nombre: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 10_000,
+    });
+    const header = ['id', 'createdAt', 'source', 'action', 'entityType', 'entityId', 'userEmail', 'companyId', 'ipAddress'];
+    const escape = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [header.join(',')];
+    for (const r of rows) {
+      lines.push(
+        [
+          r.id,
+          r.createdAt.toISOString(),
+          r.source,
+          r.action,
+          r.entityType,
+          r.entityId,
+          r.user?.email || '',
+          r.companyId ?? '',
+          r.ipAddress || '',
+        ]
+          .map(escape)
+          .join(','),
+      );
+    }
+    return lines.join('\n');
+  }
+
+  /** Retención: borra logs más viejos que N días (default 365). */
+  async purgeOlderThan(days = 365) {
+    const cutoff = new Date(Date.now() - Math.max(30, days) * 86_400_000);
+    const result = await this.prisma.auditLog.deleteMany({
+      where: { createdAt: { lt: cutoff } },
+    });
+    return { deleted: result.count, cutoff: cutoff.toISOString() };
   }
 
   async getEntityHistory(entityType: string, entityId: number) {

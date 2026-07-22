@@ -79,6 +79,7 @@ enum ModuleCatalog {
         ModuleEntry("newsletter", "Newsletter", "📮", "/console/newsletter"),
         ModuleEntry("my-profile", "Mi perfil", "👤", "/console/my-profile"),
         ModuleEntry("my-preferences", "Mis preferencias", "⚙️", "/console/my-preferences"),
+        ModuleEntry("offline-queue", "Cola offline", "☁️", "/console/offline-queue"),
         ModuleEntry("settings", "Ajustes", "⚙️", "/console/settings"),
         ModuleEntry("companies", "Multi-empresa", "🏛️", "/erp/companies"),
         ModuleEntry("kb", "Knowledge Base", "📚", "/erp/kb"),

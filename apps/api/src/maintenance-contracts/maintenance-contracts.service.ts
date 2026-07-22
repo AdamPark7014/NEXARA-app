@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 
 const FREQUENCY_DAYS: Record<string, number> = {
   WEEKLY: 7,
@@ -210,6 +211,10 @@ export class MaintenanceContractsService {
     }
 
     let operationalProjectId = visit.operationalProjectId || contract.operationalProjectId;
+    const companyId = await resolveRequiredCompanyId(
+      this.prisma,
+      (contract.client as any)?.companyId,
+    );
     if (!operationalProjectId) {
       // Proyecto OPS dedicado al contrato — NUNCA reutilizar un proyecto comercial del cliente.
       const vendorId = contract.ownerId || 1;
@@ -224,6 +229,7 @@ export class MaintenanceContractsService {
           startDate: contract.startDate,
           endDate: contract.endDate || null,
           status: 'ACTIVE' as any,
+          companyId,
         },
       });
       operationalProjectId = created.id;
@@ -261,6 +267,7 @@ export class MaintenanceContractsService {
         responsableId: responsibleId,
         fechaAsignacion,
         fechaMaxima,
+        companyId,
       },
     });
 

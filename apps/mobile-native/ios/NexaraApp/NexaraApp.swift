@@ -8,13 +8,16 @@ struct NexaraApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(session)
-                .environmentObject(appState)
-                .onOpenURL { url in
-                    DeepLinkCoordinator.shared.ingest(url)
-                    applyPendingDeepLink()
-                }
+            AppLockGate {
+                RootView()
+                    .environmentObject(session)
+                    .environmentObject(appState)
+            }
+            .environmentObject(session)
+            .onOpenURL { url in
+                DeepLinkCoordinator.shared.ingest(url)
+                applyPendingDeepLink()
+            }
         }
     }
 

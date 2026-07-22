@@ -4,8 +4,8 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 /** Models that support soft-delete (have deletedAt column) */
 const SOFT_DELETE_MODELS = new Set<string>([
-  'Activity', 'Invoice', 'PurchaseOrder', 'ProductionOrder',
-  'MaintenanceOrder', 'QualityInspection', 'NonConformanceReport',
+  'Activity', 'Invoice', 'PurchaseOrder',
+  'MaintenanceOrder',
   'Expense', 'Viatico', 'WorkProject', 'Cotizacion', 'Asset',
 ]);
 

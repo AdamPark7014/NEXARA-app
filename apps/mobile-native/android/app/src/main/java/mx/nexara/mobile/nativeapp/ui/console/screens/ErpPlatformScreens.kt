@@ -288,7 +288,13 @@ fun ExecutiveScreen() {
 
 // ── Aprobaciones workflow ───────────────────────────────────────────────────
 
-data class ApprovalsState(val loading: Boolean = true, val error: String? = null, val items: List<Map<String, Any?>> = emptyList(), val acting: Long? = null)
+data class ApprovalsState(
+    val loading: Boolean = true,
+    val error: String? = null,
+    val message: String? = null,
+    val items: List<Map<String, Any?>> = emptyList(),
+    val acting: Long? = null,
+)
 
 class ApprovalsViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ExtraRepository(app.applicationContext)
@@ -300,18 +306,27 @@ class ApprovalsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val items = withContext(Dispatchers.IO) { repo.workflowPending() }
-                _state.update { it.copy(loading = false, items = items) }
+                _state.update { it.copy(loading = false, items = items, acting = null) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message) }
             }
         }
     }
 
-    fun decide(id: Long, approved: Boolean) {
-        _state.update { it.copy(acting = id) }
+    fun decide(id: Long, approved: Boolean, comments: String? = null) {
+        if (!approved && comments.isNullOrBlank()) {
+            _state.update { it.copy(error = "Indica el motivo de rechazo") }
+            return
+        }
+        _state.update { it.copy(acting = id, error = null, message = null) }
         viewModelScope.launch {
             try {
-                withContext(Dispatchers.IO) { repo.workflowDecide(id, if (approved) "APPROVED" else "REJECTED") }
+                withContext(Dispatchers.IO) {
+                    repo.workflowDecide(id, if (approved) "APPROVED" else "REJECTED", comments)
+                }
+                _state.update {
+                    it.copy(message = if (approved) "✅ Aprobado" else "✅ Rechazado", acting = null)
+                }
                 load()
             } catch (e: Exception) {
                 _state.update { it.copy(acting = null, error = e.message) }
@@ -324,12 +339,19 @@ class ApprovalsViewModel(app: Application) : AndroidViewModel(app) {
 fun ApprovalsScreen() {
     val vm: ApprovalsViewModel = viewModel()
     val state by vm.state.collectAsState()
+    var rejectNotes by remember { mutableStateOf<Map<Long, String>>(emptyMap()) }
     LaunchedEffect(Unit) { vm.load() }
 
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Text("Aprobaciones", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
             Text("Pendientes de tu decisión", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+        }
+        if (!state.message.isNullOrBlank()) {
+            item { Text(state.message!!, color = Color(0xFF2E7D32), fontWeight = FontWeight.SemiBold) }
+        }
+        if (!state.error.isNullOrBlank()) {
+            item { Text(state.error!!, color = MaterialTheme.colorScheme.error) }
         }
         if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
         if (state.items.isEmpty()) {
@@ -338,18 +360,26 @@ fun ApprovalsScreen() {
         }
         items(state.items, key = { erpStr(it, "id", "approvalId") }) { item ->
             val id = erpLong(item, "id", "approvalId")
+            val note = rejectNotes[id].orEmpty()
             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(approvalTitle(item), fontWeight = FontWeight.SemiBold)
                     Text(approvalSubtitle(item), style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                    OutlinedTextField(
+                        value = note,
+                        onValueChange = { rejectNotes = rejectNotes + (id to it) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Comentario / motivo rechazo") },
+                        singleLine = true,
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
-                            onClick = { if (id > 0) vm.decide(id, true) },
+                            onClick = { if (id > 0) vm.decide(id, true, note.ifBlank { null }) },
                             enabled = state.acting != id,
                             modifier = Modifier.weight(1f),
                         ) { Text("Aprobar") }
                         OutlinedButton(
-                            onClick = { if (id > 0) vm.decide(id, false) },
+                            onClick = { if (id > 0) vm.decide(id, false, note) },
                             enabled = state.acting != id,
                             modifier = Modifier.weight(1f),
                         ) { Text("Rechazar") }
@@ -388,7 +418,19 @@ class NocViewModel(app: Application) : AndroidViewModel(app) {
 fun NocModuleScreen() {
     val vm: NocViewModel = viewModel()
     val state by vm.state.collectAsState()
+    var sevFilter by remember { mutableStateOf("todos") }
     LaunchedEffect(Unit) { vm.load() }
+
+    val filteredAlerts = remember(state.alerts, sevFilter) {
+        when (sevFilter) {
+            "critical" -> state.alerts.filter { erpStr(it, "severity").equals("critical", true) }
+            "warning" -> state.alerts.filter {
+                val s = erpStr(it, "severity").lowercase()
+                s == "warning" || s == "high" || s == "medium"
+            }
+            else -> state.alerts
+        }
+    }
 
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
@@ -407,10 +449,21 @@ fun NocModuleScreen() {
         }
 
         if (state.alerts.isNotEmpty()) {
-            item { ErpSectionTitle("Alertas activas", "${state.alerts.size}") }
-            items(state.alerts.take(15), key = { erpStr(it, "id") }) { a ->
+            item { ErpSectionTitle("Alertas activas", "${filteredAlerts.size}/${state.alerts.size}") }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("todos" to "Todas", "critical" to "Críticas", "warning" to "Warning").forEach { (key, label) ->
+                        FilterChip(
+                            selected = sevFilter == key,
+                            onClick = { sevFilter = key },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+            }
+            items(filteredAlerts.take(20), key = { erpStr(it, "id") }) { a ->
                 val sev = erpStr(a, "severity")
-                val color = if (sev == "critical") Color(0xFFEF4444) else Color(0xFFF59E0B)
+                val color = if (sev.equals("critical", true)) Color(0xFFEF4444) else Color(0xFFF59E0B)
                 ErpListCard(erpStr(a, "title", "deviceName"), erpStr(a, "message"), trailing = sev, accent = color)
             }
         }

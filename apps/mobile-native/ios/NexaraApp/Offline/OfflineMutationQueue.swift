@@ -6,6 +6,45 @@ struct QueuedMutation: Codable, Identifiable {
     let url: String
     let body: String?
     let contentType: String
+    var attempts: Int
+    var lastAttemptAt: Double?
+    var lastError: String?
+
+    init(
+        id: String,
+        method: String,
+        url: String,
+        body: String?,
+        contentType: String,
+        attempts: Int = 0,
+        lastAttemptAt: Double? = nil,
+        lastError: String? = nil
+    ) {
+        self.id = id
+        self.method = method
+        self.url = url
+        self.body = body
+        self.contentType = contentType
+        self.attempts = attempts
+        self.lastAttemptAt = lastAttemptAt
+        self.lastError = lastError
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, method, url, body, contentType, attempts, lastAttemptAt, lastError
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        method = try c.decode(String.self, forKey: .method)
+        url = try c.decode(String.self, forKey: .url)
+        body = try c.decodeIfPresent(String.self, forKey: .body)
+        contentType = try c.decodeIfPresent(String.self, forKey: .contentType) ?? "application/json"
+        attempts = try c.decodeIfPresent(Int.self, forKey: .attempts) ?? 0
+        lastAttemptAt = try c.decodeIfPresent(Double.self, forKey: .lastAttemptAt)
+        lastError = try c.decodeIfPresent(String.self, forKey: .lastError)
+    }
 }
 
 /// Cola de mutaciones offline — paridad Android `OfflineMutationQueue`.
@@ -38,11 +77,25 @@ final class OfflineMutationQueue {
         NotificationCenter.default.post(name: .nexaraOfflineQueueChanged, object: nil)
     }
 
-    func removeIds(_ ids: Set<String>) {
+    func upsert(_ item: QueuedMutation) {
         queue.sync {
-            var all = loadUnlocked().filter { !ids.contains($0.id) }
+            var all = loadUnlocked()
+            if let idx = all.firstIndex(where: { $0.id == item.id }) {
+                all[idx] = item
+            } else {
+                all.append(item)
+            }
             saveUnlocked(all)
         }
+        NotificationCenter.default.post(name: .nexaraOfflineQueueChanged, object: nil)
+    }
+
+    func removeIds(_ ids: Set<String>) {
+        queue.sync {
+            let all = loadUnlocked().filter { !ids.contains($0.id) }
+            saveUnlocked(all)
+        }
+        NotificationCenter.default.post(name: .nexaraOfflineQueueChanged, object: nil)
     }
 
     var pendingCount: Int { load().count }

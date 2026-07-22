@@ -3,6 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { CatalogService } from './catalog.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 const CATALOG_ACCESS = [
   PERMISSIONS.CATALOG_VIEW,
@@ -21,7 +22,9 @@ export class CatalogController {
   @Post('products')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CATALOG_MANAGE] })
-  createProduct(@Body() dto: {
+  createProduct(
+    @CurrentCompanyId() companyId: number | null,
+    @Body() dto: {
     sku?: string;
     name: string;
     category?: string;
@@ -35,7 +38,7 @@ export class CatalogController {
     satUnitKey?: string;
     unitName?: string;
   }) {
-    return this.catalogService.createProduct(dto);
+    return this.catalogService.createProduct({ ...dto, companyId });
   }
 
   @Patch('products/:id')
@@ -43,6 +46,7 @@ export class CatalogController {
   @RBAC({ permissions: [PERMISSIONS.CATALOG_MANAGE] })
   updateProduct(
     @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
     @Body() dto: {
       name?: string;
       category?: string;
@@ -57,20 +61,21 @@ export class CatalogController {
       unitName?: string;
     },
   ) {
-    return this.catalogService.updateProduct(id, dto);
+    return this.catalogService.updateProduct(id, dto, companyId);
   }
 
   @Get('products/next-sku')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: CATALOG_ACCESS })
-  nextSku() {
-    return this.catalogService.generateNextSku();
+  nextSku(@CurrentCompanyId() companyId: number | null) {
+    return this.catalogService.generateNextSku(companyId);
   }
 
   @Get('products')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: CATALOG_ACCESS })
   listProducts(
+    @CurrentCompanyId() companyId: number | null,
     @Query('q') q?: string,
     @Query('category') category?: string,
     @Query('brand') brand?: string,
@@ -83,20 +88,21 @@ export class CatalogController {
       brand,
       skip: skip ? Number(skip) : undefined,
       take: take ? Number(take) : undefined,
+      companyId,
     });
   }
 
   @Get('products/:id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: CATALOG_ACCESS })
-  getProduct(@Param('id', ParseIntPipe) id: number) {
-    return this.catalogService.getProduct(id);
+  getProduct(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.catalogService.getProduct(id, companyId);
   }
 
   @Get('categories')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: CATALOG_ACCESS })
-  listCategories() {
-    return this.catalogService.listCategories();
+  listCategories(@CurrentCompanyId() companyId: number | null) {
+    return this.catalogService.listCategories(companyId);
   }
 }

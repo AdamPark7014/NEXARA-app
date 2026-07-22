@@ -171,9 +171,9 @@ struct ModuleRouter {
         case (.console, "assets"):
             MaintenanceView(initialTab: 1)
         case (.console, "stock"):
-            StockView(initialTab: 0)
+            WarehouseWmsView(initialTab: 0)
         case (.console, "warehouse"):
-            StockView(initialTab: 1)
+            WarehouseWmsView(initialTab: 1)
         case (.console, "procurement"):
             ProcurementModuleView()
         case (.console, "maintenance"):
@@ -200,6 +200,8 @@ struct ModuleRouter {
             MyPreferencesView()
         case (.console, "settings"):
             ConsoleSettingsView()
+        case (.console, "offline-queue"), (.console, "offline"):
+            OfflineQueueView()
         case (.console, "dashboard"):
             ConsoleDashboardView()
         // ── Ventas / Contabilidad / Web restantes caen a analytics/proyectos
@@ -245,6 +247,18 @@ struct MyProfileView: View {
                     row("Email", u.email)
                     if let r = u.role { row("Rol", r) }
                     if let d = u.department { row("Departamento", d) }
+                }
+                Section("Dispositivo") {
+                    NavigationLink {
+                        OfflineQueueView()
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Cola offline")
+                            Text("Ver y sincronizar cambios pendientes")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
                 Section("Flags") {
                     row("SuperAdmin", u.isSuperAdmin ? "Sí" : "No")

@@ -78,6 +78,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Usuario inactivo');
     }
 
+    await this.authService.assertSessionActive(payload.jti, user.id);
+
     const isSuperAdmin = Boolean(payload.isSuperAdmin) || isSuperAdminEmail(user.email);
     const effectiveRoleKey = this.authService.resolveEffectiveRoleKey(user);
     const permissions = this.authService.resolveUserPermissions(user, isSuperAdmin);
@@ -92,6 +94,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       orgRoleKey: user.role?.orgRoleKey ?? payload.orgRoleKey ?? null,
       clientId: payload.clientId,
       isClient: false,
+      jti: payload.jti ?? null,
     };
   }
 }

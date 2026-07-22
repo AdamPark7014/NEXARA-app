@@ -8,8 +8,18 @@ final class InvoicesVM: ObservableObject {
     @Published var query        = ""
     @Published var statusFilter = "todos"
     @Published var isLoading    = false
+    @Published var acting = false
+    @Published var message: String?
+    @Published var detail: [String: Any] = [:]
 
     let statuses = ["todos", "pagada", "pendiente", "cancelada", "vencida"]
+
+    var canManage: Bool {
+        let u = SessionStore.shared.currentUser
+        if u?.isSuperAdmin == true { return true }
+        let perms = u?.permissions ?? []
+        return perms.contains { $0.contains("invoicing.manage") || $0.contains("contabilidad.manage") || $0.contains("console.admin") }
+    }
 
     var filtered: [[String: Any]] {
         var list = items
@@ -36,6 +46,45 @@ final class InvoicesVM: ObservableObject {
             isLoading = false
         }
     }
+
+    func loadDetail(id: Int64) {
+        Task { detail = await ExtraRepository.shared.invoiceDetail(id: id) }
+    }
+
+    func registerPayment(id: Int64, amount: Double, method: String?, reference: String?) async -> Bool {
+        acting = true; message = nil
+        defer { acting = false }
+        do {
+            let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+            try await ExtraRepository.shared.registerInvoicePayment(
+                id: id,
+                amount: amount,
+                paymentDate: df.string(from: Date()),
+                method: method,
+                reference: reference
+            )
+            message = "✅ Pago registrado"
+            load()
+            loadDetail(id: id)
+            return true
+        } catch {
+            message = "❌ \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    func evaluateMatch(id: Int64) async {
+        acting = true; message = nil
+        defer { acting = false }
+        do {
+            let result = try await ExtraRepository.shared.evaluateInvoiceMatch(id: id)
+            let status = invStr(result, "matchStatus", "status")
+            message = "✅ 3-way match: \(status.isEmpty ? "evaluado" : status)"
+            loadDetail(id: id)
+        } catch {
+            message = "❌ \(error.localizedDescription)"
+        }
+    }
 }
 
 // MARK: – View
@@ -43,6 +92,9 @@ final class InvoicesVM: ObservableObject {
 struct InvoicesView: View {
     @StateObject private var vm = InvoicesVM()
     @State private var selected: [String: Any]?
+    @State private var payAmount = ""
+    @State private var payMethod = "TRANSFERENCIA"
+    @State private var payRef = ""
 
     var body: some View {
         Group {
@@ -125,10 +177,18 @@ struct InvoicesView: View {
         let folio  = invStr(inv, "folio", "invoiceNumber", "number")
         let status = invStr(inv, "status", "estatus")
         let color  = invStatusColor(status)
+        let id = ConsoleHelpers.mapInt64(inv, "id")
+        let merged = vm.detail.isEmpty ? inv : vm.detail.merging(inv) { new, _ in new }
+        let pdfUrl = invStr(merged, "pdfUrl")
+        let matchStatus = invStr(merged, "matchStatus", "threeWayMatchStatus")
+        let pending = status.lowercased().contains("pendiente")
+            || status.lowercased().contains("parcial")
+            || status.lowercased().contains("open")
+            || status.lowercased().contains("posted")
         List {
             Section {
                 HStack {
-                    Button("← Facturas") { selected = nil }
+                    Button("← Facturas") { selected = nil; payAmount = ""; payRef = ""; vm.message = nil }
                     Spacer()
                     if !status.isEmpty {
                         Text(status.capitalized).font(.caption).bold().foregroundColor(color)
@@ -139,20 +199,62 @@ struct InvoicesView: View {
             }
             Section("Factura") {
                 iRow("Folio",    folio)
-                iRow("Cliente",  invStr(inv, "clientName", "cliente"))
-                if let t = invDouble(inv, "total", "amount") {
+                iRow("Cliente",  invStr(merged, "clientName", "cliente"))
+                if let t = invDouble(merged, "total", "amount") {
                     HStack { Text("Total"); Spacer(); Text(fmtInv(t)).foregroundColor(.secondary) }
                 }
-                iRow("RFC",      invStr(inv, "rfc", "taxId"))
-                iRow("Fecha",    String(invStr(inv, "createdAt", "issuedAt", "fecha").prefix(10)))
-                iRow("Vence",    String(invStr(inv, "dueDate", "fechaVencimiento").prefix(10)))
-                iRow("Método",   invStr(inv, "paymentMethod", "metodoPago"))
-                iRow("CFDI",     invStr(inv, "cfdiUse", "usoCfdi"))
+                if let bal = invDouble(merged, "balance", "amountDue") {
+                    HStack { Text("Saldo"); Spacer(); Text(fmtInv(bal)).foregroundColor(.orange) }
+                }
+                iRow("RFC",      invStr(merged, "rfc", "taxId"))
+                iRow("Fecha",    String(invStr(merged, "createdAt", "issuedAt", "issueDate", "fecha").prefix(10)))
+                iRow("Vence",    String(invStr(merged, "dueDate", "fechaVencimiento").prefix(10)))
+                iRow("3-way match", matchStatus)
             }
-            let notes = invStr(inv, "notes", "notas", "description")
+            if !pdfUrl.isEmpty {
+                Section {
+                    if let url = URL(string: pdfUrl) {
+                        Link("Abrir PDF", destination: url)
+                    }
+                }
+            }
+            if vm.canManage, let id {
+                Section("Acciones") {
+                    Button(vm.acting ? "…" : "Evaluar 3-way match") {
+                        Task { await vm.evaluateMatch(id: id) }
+                    }
+                    .disabled(vm.acting)
+                    if pending {
+                        TextField("Monto pago", text: $payAmount).keyboardType(.decimalPad)
+                        TextField("Método", text: $payMethod)
+                        TextField("Referencia", text: $payRef)
+                        Button(vm.acting ? "…" : "Registrar pago") {
+                            Task {
+                                guard let amt = Double(payAmount), amt > 0 else {
+                                    vm.message = "❌ Monto inválido"; return
+                                }
+                                let ok = await vm.registerPayment(
+                                    id: id, amount: amt,
+                                    method: payMethod.isEmpty ? nil : payMethod,
+                                    reference: payRef.isEmpty ? nil : payRef
+                                )
+                                if ok { payAmount = ""; payRef = "" }
+                            }
+                        }
+                        .disabled(vm.acting)
+                    }
+                }
+            }
+            if let msg = vm.message {
+                Section { Text(msg).foregroundColor(msg.hasPrefix("✅") ? .green : .red) }
+            }
+            let notes = invStr(merged, "notes", "notas", "description")
             if !notes.isEmpty { Section("Notas") { Text(notes).font(.subheadline) } }
         }
         .listStyle(.insetGrouped)
+        .task {
+            if let id { vm.loadDetail(id: id) }
+        }
     }
 
     @ViewBuilder private func iRow(_ k: String, _ v: String) -> some View {

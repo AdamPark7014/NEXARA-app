@@ -4,13 +4,26 @@ import SwiftUI
 struct OfflineBanner: View {
     @ObservedObject private var network = NetworkMonitor.shared
     @State private var pending = 0
+    @State private var syncing = false
 
     var body: some View {
         Group {
             if !network.isOnline {
-                banner("Sin conexión — mostrando datos guardados", color: .orange)
+                banner(
+                    pending > 0
+                        ? "Sin conexión — \(pending) en cola (incl. fotos)"
+                        : "Sin conexión — cambios y fotos se encolan localmente",
+                    color: .orange,
+                    tappable: false
+                )
             } else if pending > 0 {
-                banner("Sincronizando \(pending) cambio(s) pendiente(s)…", color: .blue)
+                banner(
+                    syncing
+                        ? "Sincronizando \(pending)…"
+                        : "Pendientes de sync: \(pending) · toca para reintentar",
+                    color: .blue,
+                    tappable: !syncing
+                )
             }
         }
         .task {
@@ -21,13 +34,22 @@ struct OfflineBanner: View {
         }
     }
 
-    private func banner(_ text: String, color: Color) -> some View {
+    private func banner(_ text: String, color: Color, tappable: Bool) -> some View {
         Text(text)
             .font(.caption)
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
             .background(color)
+            .onTapGesture {
+                guard tappable else { return }
+                Task {
+                    syncing = true
+                    await OfflineSyncCoordinator.shared.replay()
+                    pending = OfflineMutationQueue.shared.pendingCount
+                    syncing = false
+                }
+            }
     }
 }
 

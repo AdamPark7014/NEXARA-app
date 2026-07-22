@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { WarehouseService } from './warehouse.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -13,22 +14,22 @@ export class WarehouseController {
   @Post()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.WAREHOUSE_MANAGE] })
-  create(@Body() dto: any) {
-    return this.service.createWarehouse(dto);
+  create(@Body() dto: any, @CurrentCompanyId() companyId: number | null) {
+    return this.service.createWarehouse({ ...dto, companyId });
   }
 
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.WAREHOUSE_VIEW] })
-  findAll() {
-    return this.service.listWarehouses();
+  findAll(@CurrentCompanyId() companyId: number | null) {
+    return this.service.listWarehouses(companyId);
   }
 
   @Get(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.WAREHOUSE_VIEW] })
-  findOne(@Param('id') id: string) {
-    return this.service.getWarehouse(+id);
+  findOne(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
+    return this.service.getWarehouse(+id, companyId);
   }
 
   @Patch(':id')

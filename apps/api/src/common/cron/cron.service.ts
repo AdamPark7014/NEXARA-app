@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { EmailService } from '../email/email.service.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
 import { MaintenanceContractsService } from '../../maintenance-contracts/maintenance-contracts.service.js';
 import { VehiclesService } from '../../vehicles/vehicles.service.js';
+import { WebhooksService } from '../../webhooks/webhooks.service.js';
 
 @Injectable()
 export class CronService {
@@ -16,6 +17,7 @@ export class CronService {
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly maintenanceContracts: MaintenanceContractsService,
     private readonly vehiclesService: VehiclesService,
+    @Optional() private readonly webhooks?: WebhooksService,
   ) {}
 
   // ── Contratos de mantenimiento — generar OT cada hora ───────────
@@ -227,5 +229,200 @@ export class CronService {
         },
       },
     });
+  }
+
+  // ── Webhooks retry — cada 5 min ────────────────────────────────
+  @Cron(CronExpression.EVERY_5_MINUTES, { name: 'webhook-retries' })
+  async handleWebhookRetries() {
+    if (!this.webhooks) return;
+    try {
+      const result = await this.webhooks.processRetries(40);
+      if (result.processed > 0) {
+        this.logger.log(`Webhook retries procesados: ${result.processed}`);
+      }
+    } catch (error) {
+      this.logger.error('Webhook retries falló', error as Error);
+    }
+  }
+
+  // ── IAM: usuarios inactivos 30d — diario 9AM ───────────────────
+  @Cron('0 9 * * *', { name: 'inactive-users-warn' })
+  async handleInactiveUsers() {
+    const cutoff = new Date(Date.now() - 30 * 86_400_000);
+    const stale = await this.prisma.user.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { lastLoginAt: { lt: cutoff } },
+          { lastLoginAt: null, fechaCreacion: { lt: cutoff } },
+        ],
+        email: { notIn: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] },
+      },
+      select: { id: true, email: true, nombre: true, lastLoginAt: true },
+      take: 100,
+    });
+    if (!stale.length) return;
+    this.logger.log(`Usuarios inactivos 30d: ${stale.length}`);
+    if (this.webhooks) {
+      const memberships = await this.prisma.userCompany.findMany({
+        where: { userId: { in: stale.map((u) => u.id) } },
+        select: { userId: true, companyId: true },
+      });
+      const byCompany = new Map<number, typeof stale>();
+      for (const m of memberships) {
+        const user = stale.find((u) => u.id === m.userId);
+        if (!user) continue;
+        const list = byCompany.get(m.companyId) || [];
+        list.push(user);
+        byCompany.set(m.companyId, list);
+      }
+      if (!byCompany.size) {
+        const primary = await this.prisma.companyProfile.findFirst({
+          where: { isPrimary: true },
+          select: { id: true },
+        });
+        if (primary) byCompany.set(primary.id, stale);
+      }
+      for (const [companyId, users] of byCompany) {
+        await this.webhooks.emit(
+          'user.inactive',
+          {
+            count: users.length,
+            users: users.map((u) => ({ id: u.id, email: u.email, lastLoginAt: u.lastLoginAt })),
+            companyId,
+          },
+          companyId,
+        );
+      }
+    }
+  }
+
+  // ── Inventario: dead stock + low stock — diario 7AM ────────────
+  @Cron('0 7 * * *', { name: 'inventory-health-alerts' })
+  async handleInventoryHealth() {
+    const levels = await this.prisma.stockLevel.findMany({
+      include: {
+        product: { select: { id: true, name: true, sku: true } },
+        warehouse: { select: { id: true, companyId: true } },
+      },
+    });
+    const low = levels.filter(
+      (l) => Number(l.reorderPoint) > 0 && Number(l.quantity) <= Number(l.reorderPoint),
+    );
+    if (low.length && this.webhooks) {
+      const byCompany = new Map<number, typeof low>();
+      for (const l of low) {
+        const cid = l.warehouse?.companyId;
+        if (cid == null) continue;
+        const list = byCompany.get(cid) || [];
+        list.push(l);
+        byCompany.set(cid, list);
+      }
+      for (const [companyId, items] of byCompany) {
+        await this.webhooks.emit(
+          'stock.low',
+          {
+            count: items.length,
+            companyId,
+            items: items.slice(0, 30).map((l) => ({
+              productId: l.productId,
+              sku: l.product?.sku,
+              name: l.product?.name,
+              quantity: Number(l.quantity),
+              reorderPoint: Number(l.reorderPoint),
+            })),
+          },
+          companyId,
+        );
+      }
+    }
+
+    const d90 = new Date(Date.now() - 90 * 86_400_000);
+    const recentMoves = await this.prisma.stockMovement.findMany({
+      where: { createdAt: { gte: d90 }, type: { in: ['DISPATCH', 'SCRAP', 'PRODUCTION_OUT'] } },
+      select: { productId: true },
+      distinct: ['productId'],
+    });
+    const moved = new Set(recentMoves.map((m) => m.productId));
+    const dead = levels.filter((l) => Number(l.quantity) > 0 && !moved.has(l.productId));
+    if (dead.length && this.webhooks) {
+      const byCompany = new Map<number, typeof dead>();
+      for (const l of dead) {
+        const cid = l.warehouse?.companyId;
+        if (cid == null) continue;
+        const list = byCompany.get(cid) || [];
+        list.push(l);
+        byCompany.set(cid, list);
+      }
+      for (const [companyId, items] of byCompany) {
+        await this.webhooks.emit(
+          'stock.dead',
+          {
+            count: items.length,
+            companyId,
+            value: items.reduce((s, l) => s + Number(l.quantity) * Number(l.unitCost), 0),
+            items: items.slice(0, 30).map((l) => ({
+              productId: l.productId,
+              sku: l.product?.sku,
+              name: l.product?.name,
+              quantity: Number(l.quantity),
+            })),
+          },
+          companyId,
+        );
+      }
+    }
+  }
+
+  // ── SLA breach escalate — cada hora ────────────────────────────
+  @Cron(CronExpression.EVERY_HOUR, { name: 'sla-breach-escalate' })
+  async handleSlaBreachEscalate() {
+    const now = Date.now();
+    const open = await this.prisma.activity.findMany({
+      where: { ticketType: { not: null }, estatus: { not: 'Finalizado' } },
+      select: {
+        id: true,
+        anNumber: true,
+        titulo: true,
+        prioridad: true,
+        fechaAsignacion: true,
+        responsableId: true,
+        companyId: true,
+      },
+      take: 200,
+    });
+    const limits: Record<string, number> = { Alta: 8, Media: 24, Baja: 72 };
+    const breaches = open.filter((t) => {
+      if (!t.fechaAsignacion) return false;
+      const hrs = (now - t.fechaAsignacion.getTime()) / 3600000;
+      return hrs > (limits[t.prioridad || 'Media'] ?? 24);
+    });
+    if (!breaches.length) return;
+    this.logger.warn(`SLA breaches abiertos: ${breaches.length}`);
+    if (this.webhooks) {
+      const byCompany = new Map<number, typeof breaches>();
+      for (const t of breaches) {
+        const list = byCompany.get(t.companyId) || [];
+        list.push(t);
+        byCompany.set(t.companyId, list);
+      }
+      for (const [companyId, tickets] of byCompany) {
+        await this.webhooks.emit(
+          'ticket.sla_breach',
+          {
+            count: tickets.length,
+            companyId,
+            tickets: tickets.slice(0, 20).map((t) => ({
+              id: t.id,
+              anNumber: t.anNumber,
+              titulo: t.titulo,
+              prioridad: t.prioridad,
+              assigneeId: t.responsableId,
+            })),
+          },
+          companyId,
+        );
+      }
+    }
   }
 }

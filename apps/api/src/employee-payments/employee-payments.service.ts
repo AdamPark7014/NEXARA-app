@@ -8,6 +8,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { generateEmployeePaymentsReportPdf } from './employee-payments-report-pdf.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { resolveRequiredCompanyId, companyWhere } from '../common/tenant/tenant-scope.js';
 
 const STATUS = {
   BORRADOR: 'Borrador',
@@ -52,6 +53,7 @@ export class EmployeePaymentsService {
     user: { id: number; departmentId: number; isSuperAdmin?: boolean; permissions?: string[] },
     filters: { from?: string; to?: string; userId?: number; status?: string },
     query?: PaginationQueryDto,
+    companyId?: number | null,
   ) {
     const fromDate = this.toDate(filters.from);
     const toDate = this.toDate(filters.to);
@@ -62,7 +64,10 @@ export class EmployeePaymentsService {
       throw new BadRequestException('Rango invalido');
     }
 
-    const where: Prisma.EmployeePaymentWhereInput = { deletedAt: null };
+    const where: Prisma.EmployeePaymentWhereInput = {
+      deletedAt: null,
+      ...companyWhere(companyId ?? null),
+    };
     if (fromDate || toDate) {
       where.periodFrom = fromDate ? { gte: fromDate } : undefined;
       where.periodTo = toDate ? { lte: toDate } : undefined;
@@ -121,13 +126,7 @@ export class EmployeePaymentsService {
       dto.note?.trim() ||
       'Pago a empleado';
     const wantsPaid = status === STATUS.PAGADO;
-    const companyId =
-      (
-        await this.prisma.companyProfile.findFirst({
-          where: { isPrimary: true, isActive: true },
-          select: { id: true },
-        })
-      )?.id ?? null;
+    const companyId = await resolveRequiredCompanyId(this.prisma);
 
     const created = await this.prisma.employeePayment.create({
       data: {
