@@ -2,5 +2,6 @@
 ALTER TABLE "User"
   ALTER COLUMN "lastLoginDevice" TYPE VARCHAR(255);
 
-ALTER TABLE "UserSession"
+-- Mapped table name is user_sessions (not UserSession).
+ALTER TABLE "user_sessions"
   ALTER COLUMN "device" TYPE VARCHAR(255);
