@@ -1,10 +1,8 @@
 /**
  * Seed de usuarios demo NEXARA — equipo oficial (organigrama v1).
  *
- * Crea/actualiza los 16 miembros del equipo con contraseña demo universal.
+ * Crea/actualiza los miembros del equipo con contraseña ÚNICA por usuario.
  * Es idempotente: puede correrse N veces sin duplicar nada.
- *
- * Password demo: Nexara2026!
  *
  * Run:
  *   cd apps/api && npm run prisma:seed
@@ -14,9 +12,6 @@ import { PrismaClient } from '@prisma/client';
 import bcryptjs from 'bcryptjs';
 
 const prisma = new PrismaClient();
-
-const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD || 'Nexara2026!';
-const DEMO_PASSWORD_HASH = bcryptjs.hashSync(DEMO_PASSWORD, 10);
 
 /** Hash placeholder de la migración seed_nexara_team — no permite login. */
 const PLACEHOLDER_PASSWORD_HASH =
@@ -29,11 +24,14 @@ type DemoUser = {
   departmentName: string;
   employeeNumber?: string;
   puesto?: string;
+  /** Contraseña en claro (única por usuario). */
+  password: string;
 };
 
 /**
  * Equipo oficial NEXARA — alineado con migration 20260620120000_seed_nexara_team.
  * soporte@nexara.com.mx usa ing_soporte (no ing_campo).
+ * Contraseñas: Nexara! + número de empleado (únicas).
  */
 const DEMO_USERS: DemoUser[] = [
   {
@@ -43,6 +41,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Dirección General',
     employeeNumber: 'NX-010',
     puesto: 'CEO',
+    password: 'Nexara!NX010',
   },
   {
     nombre: 'Christian Eduardo Del Pozo Sánchez',
@@ -51,6 +50,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Dirección General',
     employeeNumber: 'NX-001',
     puesto: 'Director General',
+    password: 'Nexara!NX001',
   },
   {
     nombre: 'Adam Del Pozo',
@@ -59,6 +59,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Dirección General',
     employeeNumber: 'NX-002',
     puesto: 'Developer / Super Admin',
+    password: 'Nexara!NX002',
   },
   {
     nombre: 'Josué Teodulo Cervantes Arellano',
@@ -67,6 +68,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Arquitectura',
     employeeNumber: 'NX-003',
     puesto: 'Arquitecto / Director Técnico',
+    password: 'Nexara!NX003',
   },
   {
     nombre: 'Karen Elizalde Sarmiento',
@@ -75,6 +77,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Administración',
     employeeNumber: 'NX-101',
     puesto: 'Coordinadora Administrativa',
+    password: 'Nexara!NX101',
   },
   {
     nombre: 'Mónica García Guzmán',
@@ -83,6 +86,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Administración',
     employeeNumber: 'NX-102',
     puesto: 'Ejecutiva Administrativa',
+    password: 'Nexara!NX102',
   },
   {
     nombre: 'Daniela Galindo Almazán',
@@ -91,6 +95,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Área Creativa',
     employeeNumber: 'NX-201',
     puesto: 'Líder de Área Creativa',
+    password: 'Nexara!NX201',
   },
   {
     nombre: 'Luis Joel Aguilar Castillo',
@@ -99,6 +104,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Operaciones',
     employeeNumber: 'NX-301',
     puesto: 'Coordinador de Operaciones',
+    password: 'Nexara!NX301',
   },
   {
     nombre: 'David Morales Zenón',
@@ -107,6 +113,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Operaciones',
     employeeNumber: 'NX-302',
     puesto: 'Coordinador de Operaciones',
+    password: 'Nexara!NX302',
   },
   {
     nombre: 'José Iván Tapia Reyes',
@@ -115,6 +122,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'NX-401',
     puesto: 'Ingeniero de Campo',
+    password: 'Nexara!NX401',
   },
   {
     nombre: 'Iván Camargo Cañete',
@@ -123,6 +131,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'NX-402',
     puesto: 'Ingeniero de Campo',
+    password: 'Nexara!NX402',
   },
   {
     nombre: 'Isaías García Bustamante',
@@ -131,6 +140,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'NX-403',
     puesto: 'Ingeniero de Campo',
+    password: 'Nexara!NX403',
   },
   {
     nombre: 'Joan Sebastián Sánchez Espinoza',
@@ -139,6 +149,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'NX-404',
     puesto: 'Ingeniero de Campo',
+    password: 'Nexara!NX404',
   },
   {
     nombre: 'Carolina Juárez Álvarez',
@@ -147,6 +158,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'NX-405',
     puesto: 'Ingeniera de Soporte',
+    password: 'Nexara!NX405',
   },
   {
     nombre: 'Ariadna Sierra Gallardo',
@@ -155,6 +167,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'NX-406',
     puesto: 'Ingeniera de Campo',
+    password: 'Nexara!NX406',
   },
   {
     nombre: 'Alejandro González Bustamante',
@@ -163,6 +176,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'NX-407',
     puesto: 'Ingeniero de Campo',
+    password: 'Nexara!NX407',
   },
   {
     nombre: 'Israel Ramos Lima',
@@ -171,6 +185,7 @@ const DEMO_USERS: DemoUser[] = [
     departmentName: 'Ingeniería',
     employeeNumber: 'NX-408',
     puesto: 'Ingeniero de Campo',
+    password: 'Nexara!NX408',
   },
 ];
 
@@ -300,12 +315,13 @@ async function seedDemoUsers() {
       continue;
     }
     const departmentId = await ensureDepartment(u.departmentName);
+    const passwordHash = bcryptjs.hashSync(u.password, 10);
 
     const existing = await prisma.user.findUnique({ where: { email: u.email } });
     const needsPasswordFix =
       !existing ||
       existing.passwordHash === PLACEHOLDER_PASSWORD_HASH ||
-      !(await bcryptjs.compare(DEMO_PASSWORD, existing.passwordHash));
+      !(await bcryptjs.compare(u.password, existing.passwordHash));
 
     const employeeNumber = await resolveEmployeeNumber(
       u.email,
@@ -318,7 +334,7 @@ async function seedDemoUsers() {
         where: { email: u.email },
         data: {
           nombre: u.nombre,
-          passwordHash: DEMO_PASSWORD_HASH,
+          passwordHash,
           roleId: role.id,
           roleKey: u.roleKey,
           departmentId,
@@ -335,7 +351,7 @@ async function seedDemoUsers() {
         data: {
           nombre: u.nombre,
           email: u.email,
-          passwordHash: DEMO_PASSWORD_HASH,
+          passwordHash,
           roleId: role.id,
           roleKey: u.roleKey,
           departmentId,
@@ -350,26 +366,32 @@ async function seedDemoUsers() {
   }
 
   console.log(`   ✅ ${created} creados · ${updated} actualizados · ${passwordsFixed} passwords corregidos`);
-  console.log(`   🔑 Password demo: ${DEMO_PASSWORD}`);
+  console.log('   🔑 Contraseñas únicas por usuario (ver Excel / seed DEMO_USERS.password)');
 }
 
-async function verifyLogin(email: string) {
+async function verifyLogin(email: string, password: string) {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
     console.log(`   ❌ ${email} — no existe en DB`);
     return;
   }
-  const ok = await bcryptjs.compare(DEMO_PASSWORD, user.passwordHash);
+  const ok = await bcryptjs.compare(password, user.passwordHash);
   console.log(`   ${ok ? '✅' : '❌'} ${email} — login ${ok ? 'OK' : 'FALLA'} (roleKey: ${user.roleKey ?? '—'})`);
 }
 
 async function main() {
   await seedDemoUsers();
   console.log('\n📊 Verificación de login demo:');
-  await verifyLogin('soporte@nexara.com.mx');
-  await verifyLogin('gerencia@nexara.com.mx');
-  await verifyLogin('claudia.bernal@nexara.com.mx');
-  await verifyLogin('operaciones@nexara.com.mx');
+  const samples = [
+    'soporte@nexara.com.mx',
+    'gerencia@nexara.com.mx',
+    'claudia.bernal@nexara.com.mx',
+    'operaciones@nexara.com.mx',
+  ];
+  for (const email of samples) {
+    const u = DEMO_USERS.find((d) => d.email === email);
+    if (u) await verifyLogin(u.email, u.password);
+  }
 }
 
 main()
