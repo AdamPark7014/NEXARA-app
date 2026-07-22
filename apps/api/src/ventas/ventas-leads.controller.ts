@@ -17,6 +17,7 @@ import { UpdateSalesLeadDto } from './dto/update-sales-lead.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { SalesPaginationQueryDto } from './dto/sales-pagination-query.dto.js';
 
 const SALES_VIEW_ACCESS = [PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
@@ -29,13 +30,18 @@ export class VentasLeadsController {
   @Post()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async create(@Body() dto: CreateSalesLeadDto, @CurrentUser() user: any) {
-    const created = await this.ventasService.createLead(dto, user);
+  async create(
+    @Body() dto: CreateSalesLeadDto,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const created = await this.ventasService.createLead(dto, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'lead.create',
       entityType: 'lead',
       entityId: created.id,
       actorId: user?.id,
+      companyId,
       metadata: { status: created.status, source: created.source || null },
     });
     return created;
@@ -44,8 +50,12 @@ export class VentasLeadsController {
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  findAll(@CurrentUser() user: any, @Query() query: SalesPaginationQueryDto) {
-    return this.ventasService.listLeads(user, query.ownerId, query);
+  findAll(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query() query: SalesPaginationQueryDto,
+  ) {
+    return this.ventasService.listLeads(user, query.ownerId, query, companyId);
   }
 
   @Get(':id')

@@ -75,6 +75,32 @@ export async function postViatico(
   return t ? JSON.parse(t) : null;
 }
 
+/** Asigna viático a un usuario para actividad/proyecto (sin evidencia). */
+export async function assignViatico(token: string, fields: ViaticoCreateFields) {
+  if (!fields.usuarioId) {
+    throw new Error("Debes indicar el usuario beneficiario");
+  }
+  const res = await fetch(buildApiUrl("viatics/assign"), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      usuarioId: fields.usuarioId,
+      actividadId: fields.actividadId,
+      projectId: fields.projectId,
+      vehicleId: fields.vehicleId,
+      categoria: fields.categoria,
+      motivo: fields.motivo,
+      montoSolicitado: fields.montoSolicitado,
+    }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  const t = await res.text();
+  return t ? JSON.parse(t) : null;
+}
+
 export async function patchViatico(
   token: string,
   id: number,

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Inject, forwardRef, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CotizacionesService } from '../cotizaciones/cotizaciones.service.js';
@@ -23,6 +23,9 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { isSalesTeamLeadUser } from '../common/org-roles.js';
 import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 import { opsPatchFromSales } from '../common/project-handoff.js';
+import { WebhooksService } from '../webhooks/webhooks.service.js';
+import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
+import { AuditService } from '../audit/audit.service.js';
 
 @Injectable()
 export class VentasService {
@@ -33,6 +36,8 @@ export class VentasService {
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly notificationsService: NotificationsService,
     private readonly autoApproval: AutoApprovalService,
+    @Optional() private readonly webhooks?: WebhooksService,
+    @Optional() private readonly audit?: AuditService,
   ) {}
 
   private isSuperAdminUser(user?: any) {
@@ -188,21 +193,21 @@ export class VentasService {
   private async getQuotaMap(period: 'week' | 'month' | 'year', ownerIds: number[]) {
     if (ownerIds.length === 0) return new Map<number, { targetRevenue: number; targetOpportunities: number }>();
     const { start } = this.getPeriodRange(period);
-    const salesAuditEvent = (this.prisma as any).salesAuditEvent;
-    const events = await salesAuditEvent.findMany({
+    const events = await this.prisma.auditLog.findMany({
       where: {
         action: 'quota.set',
+        source: 'sales',
         createdAt: { gte: start },
       },
       orderBy: { createdAt: 'desc' },
       select: {
-        metadata: true,
+        changes: true,
       },
     });
 
     const quotaMap = new Map<number, { targetRevenue: number; targetOpportunities: number }>();
     for (const event of events) {
-      const metadata = (event?.metadata || {}) as any;
+      const metadata = (event?.changes || {}) as any;
       if (metadata?.period !== period) continue;
       const ownerId = Number(metadata?.ownerId || 0);
       if (!ownerId || !ownerIds.includes(ownerId)) continue;
@@ -223,33 +228,57 @@ export class VentasService {
     entityId?: number | null;
     actorId?: number | null;
     metadata?: unknown;
+    companyId?: number | null;
   }) {
-    const salesAuditEvent = (this.prisma as any).salesAuditEvent;
-    return salesAuditEvent.create({
-      data: {
+    // Iter 10: AuditLog es la fuente de verdad; SalesAuditEvent queda solo lectura legacy.
+    const logged = await this.audit?.log(
+      {
+        entityType: `Sales:${payload.entityType}`,
+        entityId: Number(payload.entityId || 0),
         action: payload.action,
-        entityType: payload.entityType,
-        entityId: payload.entityId ?? null,
-        actorId: payload.actorId ?? null,
-        metadata: payload.metadata as any,
+        changes: payload.metadata,
+        companyId: payload.companyId ?? null,
+        source: 'sales',
       },
-    });
+      payload.actorId ?? undefined,
+    );
+
+    if (process.env.SALES_AUDIT_DUAL_WRITE === 'true') {
+      const salesAuditEvent = (this.prisma as any).salesAuditEvent;
+      await salesAuditEvent.create({
+        data: {
+          action: payload.action,
+          entityType: payload.entityType,
+          entityId: payload.entityId ?? null,
+          actorId: payload.actorId ?? null,
+          metadata: payload.metadata as any,
+        },
+      });
+    }
+
+    return logged ?? { ok: true, action: payload.action };
   }
 
-  async listAuditEvents(period: 'week' | 'month' | 'year' = 'month', limit = 50, user?: any) {
+  async listAuditEvents(
+    period: 'week' | 'month' | 'year' = 'month',
+    limit = 50,
+    user?: any,
+    companyId?: number | null,
+  ) {
     const startDate = this.getPeriodStart(period);
     const safeLimit = Math.min(Math.max(limit || 50, 1), 300);
-    const where = {
+    const where: any = {
       createdAt: { gte: startDate },
-      ...(this.isSuperAdminUser(user) ? {} : user?.id ? { actorId: user.id } : {}),
+      source: 'sales',
+      ...companyWhere(companyId ?? null),
+      ...(this.isSuperAdminUser(user) ? {} : user?.id ? { userId: user.id } : {}),
     };
-    const salesAuditEvent = (this.prisma as any).salesAuditEvent;
-    return salesAuditEvent.findMany({
+    const rows = await this.prisma.auditLog.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: safeLimit,
       include: {
-        actor: {
+        user: {
           select: {
             id: true,
             nombre: true,
@@ -258,10 +287,18 @@ export class VentasService {
         },
       },
     });
+    // Compat UI legacy (SalesAuditEvent.actor)
+    return rows.map((r) => ({
+      ...r,
+      actor: r.user,
+      metadata: r.changes,
+      entityType: String(r.entityType || '').replace(/^Sales:/, ''),
+    }));
   }
 
-  async createClient(dto: CreateSalesClientDto, user?: any) {
+  async createClient(dto: CreateSalesClientDto, user?: any, companyId?: number | null) {
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user);
+    const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
     const created = await this.prisma.salesClient.create({
       data: {
         name: dto.name,
@@ -278,6 +315,7 @@ export class VentasService {
         notes: dto.notes || null,
         ownerId,
         serviceClientId: dto.serviceClientId ?? null,
+        companyId: resolvedCompanyId,
       },
       include: { documents: true, opportunities: true, serviceClient: { select: { id: true, name: true, isActive: true, accountCode: true } } },
     });
@@ -301,8 +339,8 @@ export class VentasService {
     return created;
   }
 
-  async listClients(user?: any, ownerId?: number, query?: PaginationQueryDto) {
-    const where = this.buildScopedOwnerWhere(user, ownerId);
+  async listClients(user?: any, ownerId?: number, query?: PaginationQueryDto, companyId?: number | null) {
+    const where = { ...this.buildScopedOwnerWhere(user, ownerId), ...companyWhere(companyId ?? null) };
     const include = {
       documents: true,
       opportunities: true,
@@ -402,6 +440,7 @@ export class VentasService {
     }
 
     const accountCode = salesClient.taxId?.trim() || `SC-${salesClient.id}`;
+    const companyId = await resolveRequiredCompanyId(this.prisma, salesClient.companyId);
     const serviceClient = await this.prisma.serviceClient.create({
       data: {
         name: salesClient.legalName?.trim() || salesClient.name,
@@ -411,6 +450,7 @@ export class VentasService {
         address: salesClient.fiscalAddress,
         accountCode,
         isActive: true,
+        companyId,
       },
     });
 
@@ -447,8 +487,9 @@ export class VentasService {
     });
   }
 
-  async createLead(dto: CreateSalesLeadDto, user?: any) {
+  async createLead(dto: CreateSalesLeadDto, user?: any, companyId?: number | null) {
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user);
+    const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
     const created = await this.prisma.salesLead.create({
       data: {
         name: dto.name || null,
@@ -462,6 +503,7 @@ export class VentasService {
         clientId: dto.clientId ?? null,
         createdById: user?.id || null,
         ownerId,
+        companyId: resolvedCompanyId,
       },
     });
     if (user?.id) {
@@ -477,8 +519,8 @@ export class VentasService {
     return created;
   }
 
-  async listLeads(user?: any, ownerId?: number, query?: PaginationQueryDto) {
-    const where = this.buildScopedOwnerWhere(user, ownerId);
+  async listLeads(user?: any, ownerId?: number, query?: PaginationQueryDto, companyId?: number | null) {
+    const where = { ...this.buildScopedOwnerWhere(user, ownerId), ...companyWhere(companyId ?? null) };
     const include = { client: true, opportunities: true };
     if (query?.limit) {
       const [data, total] = await Promise.all([
@@ -529,11 +571,22 @@ export class VentasService {
     return this.prisma.salesLead.delete({ where: { id } });
   }
 
-  async createOpportunity(dto: CreateSalesOpportunityDto, user?: any) {
+  async createOpportunity(dto: CreateSalesOpportunityDto, user?: any, companyId?: number | null) {
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user);
     const stage = dto.stage || 'DISCOVERY';
     const expectedCloseDate = this.normalizeDateTimeInput(dto.expectedCloseDate, 'expectedCloseDate');
     this.validateNextActionPlan(stage, dto.description, expectedCloseDate);
+    const resolvedCompanyId =
+      companyId ??
+      (
+        await this.prisma.companyProfile.findFirst({
+          where: { isPrimary: true, isActive: true },
+          select: { id: true },
+        })
+      )?.id;
+    if (resolvedCompanyId == null) {
+      throw new BadRequestException('Empresa requerida para crear oportunidad');
+    }
     const created = await this.prisma.salesOpportunity.create({
       data: {
         title: dto.title,
@@ -545,6 +598,7 @@ export class VentasService {
         clientId: dto.clientId ?? null,
         leadId: dto.leadId ?? null,
         ownerId,
+        companyId: resolvedCompanyId,
       },
       include: { client: true, lead: true },
     });
@@ -557,8 +611,8 @@ export class VentasService {
     return created;
   }
 
-  async listOpportunities(user?: any, ownerId?: number, query?: PaginationQueryDto) {
-    const where = this.buildScopedOwnerWhere(user, ownerId);
+  async listOpportunities(user?: any, ownerId?: number, query?: PaginationQueryDto, companyId?: number | null) {
+    const where = { ...this.buildScopedOwnerWhere(user, ownerId), ...companyWhere(companyId ?? null) };
     const include = { client: true, lead: true, notes: true, evidences: true, quotes: true };
     if (query?.limit) {
       const [data, total] = await Promise.all([
@@ -574,7 +628,7 @@ export class VentasService {
     });
   }
 
-  async getOpportunity(id: number, user?: any) {
+  async getOpportunity(id: number, user?: any, companyId?: number | null) {
     const opp = await this.prisma.salesOpportunity.findUnique({
       where: { id },
       include: {
@@ -586,9 +640,9 @@ export class VentasService {
         projects: { select: { id: true, name: true, status: true, budget: true } },
       },
     });
-    if (!opp) throw new NotFoundException('Oportunidad no encontrada');
-    this.assertOwnerAccess(opp.ownerId, user, 'oportunidad');
-    return opp;
+    assertCompanyAccess(opp, companyId, 'Oportunidad');
+    this.assertOwnerAccess(opp!.ownerId, user, 'oportunidad');
+    return opp!;
   }
 
   async updateOpportunity(id: number, dto: UpdateSalesOpportunityDto, user?: any) {
@@ -634,6 +688,28 @@ export class VentasService {
 
     if (updated.stage === 'WON' && existing.stage !== 'WON') {
       void this.autoEnsureSalesProjectFromWonOpportunity(updated.id, user?.id).catch(() => undefined);
+      void this.webhooks
+        ?.emit('opportunity.won', {
+          opportunityId: updated.id,
+          title: updated.title,
+          value: Number(updated.value || 0),
+          clientId: updated.clientId,
+          ownerId: updated.ownerId,
+          companyId: updated.companyId,
+        }, updated.companyId)
+        .catch(() => undefined);
+    }
+    if (updated.stage === 'LOST' && existing.stage !== 'LOST') {
+      void this.webhooks
+        ?.emit('opportunity.lost', {
+          opportunityId: updated.id,
+          title: updated.title,
+          value: Number(updated.value || 0),
+          clientId: updated.clientId,
+          ownerId: updated.ownerId,
+          companyId: updated.companyId,
+        }, updated.companyId)
+        .catch(() => undefined);
     }
 
     return updated;
@@ -1012,6 +1088,10 @@ export class VentasService {
       });
     }
 
+    const companyId = await resolveRequiredCompanyId(
+      this.prisma,
+      (salesClient as any).companyId ?? project.opportunity?.companyId,
+    );
     const operationalProject = await this.prisma.operationalProject.create({
       data: {
         title: patch.title,
@@ -1025,6 +1105,7 @@ export class VentasService {
         startDate: patch.startDate,
         endDate: patch.endDate,
         status: patch.status,
+        companyId,
       },
       include: {
         client: { select: { id: true, name: true } },
@@ -2414,7 +2495,7 @@ export class VentasService {
     });
 
     return {
-      id: event.id,
+      id: (event as any)?.id ?? 0,
       ...payload,
     };
   }
@@ -2450,11 +2531,12 @@ export class VentasService {
           description: true,
         },
       }),
-      (this.prisma as any).salesAuditEvent.groupBy({
+      this.prisma.auditLog.groupBy({
         by: ['action'],
         where: {
           createdAt: { gte: startDate },
-          ...(this.isSuperAdminUser(user) ? {} : user?.id ? { actorId: user.id } : {}),
+          source: 'sales',
+          ...(this.isSuperAdminUser(user) ? {} : user?.id ? { userId: user.id } : {}),
         },
         _count: { action: true },
       }),
@@ -2622,6 +2704,68 @@ export class VentasService {
       revenue: Number(vendor.revenue || 0),
     }));
 
+    // ── Customer intelligence (LTV / churn / cohortes) ──────────────
+    const clients = await this.prisma.salesClient.findMany({
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+        opportunities: {
+          select: { stage: true, value: true, closedAt: true, createdAt: true },
+        },
+      },
+      take: 500,
+    });
+
+    const customerRows = clients.map((c) => {
+      const won = c.opportunities.filter((o) => o.stage === 'WON');
+      const lost = c.opportunities.filter((o) => o.stage === 'LOST');
+      const ltv = won.reduce((s, o) => s + Number(o.value || 0), 0);
+      const lastWon = won
+        .map((o) => o.closedAt)
+        .filter(Boolean)
+        .sort((a, b) => (b as Date).getTime() - (a as Date).getTime())[0] as Date | undefined;
+      const inactive180 =
+        !lastWon || now.getTime() - lastWon.getTime() > 180 * 86_400_000;
+      return {
+        id: c.id,
+        nombre: c.name,
+        ltv,
+        wonDeals: won.length,
+        lostDeals: lost.length,
+        lastWonAt: lastWon?.toISOString() ?? null,
+        churnRisk: inactive180 && won.length > 0,
+        cohortMonth: c.createdAt.toISOString().slice(0, 7),
+      };
+    });
+
+    const activeCustomers = customerRows.filter((c) => c.wonDeals > 0);
+    const churnRisk = activeCustomers.filter((c) => c.churnRisk);
+    const avgLtv = activeCustomers.length
+      ? activeCustomers.reduce((s, c) => s + c.ltv, 0) / activeCustomers.length
+      : 0;
+
+    const cohortMap: Record<string, { customers: number; revenue: number }> = {};
+    for (const c of customerRows) {
+      if (!cohortMap[c.cohortMonth]) cohortMap[c.cohortMonth] = { customers: 0, revenue: 0 };
+      cohortMap[c.cohortMonth].customers += 1;
+      cohortMap[c.cohortMonth].revenue += c.ltv;
+    }
+    const cohorts = Object.entries(cohortMap)
+      .map(([month, v]) => ({
+        month,
+        customers: v.customers,
+        revenue: Math.round(v.revenue * 100) / 100,
+        avgLtv: v.customers ? Math.round((v.revenue / v.customers) * 100) / 100 : 0,
+      }))
+      .sort((a, b) => b.month.localeCompare(a.month))
+      .slice(0, 12);
+
+    const topLtv = [...customerRows]
+      .sort((a, b) => b.ltv - a.ltv)
+      .slice(0, 10)
+      .map((c) => ({ id: c.id, nombre: c.nombre, ltv: c.ltv, wonDeals: c.wonDeals }));
+
     return {
       forecast: {
         weightedForecast: Number(weightedForecast.toFixed(2)),
@@ -2661,9 +2805,24 @@ export class VentasService {
         opportunitiesWithoutRecentActivity,
         avgTouchesPerOpportunity: Number(avgTouchesPerOpportunity.toFixed(2)),
       },
+      customers: {
+        avgLtv: Math.round(avgLtv * 100) / 100,
+        activeWithWins: activeCustomers.length,
+        churnRiskCount: churnRisk.length,
+        churnRiskPct: activeCustomers.length
+          ? Math.round((churnRisk.length / activeCustomers.length) * 1000) / 10
+          : 0,
+        topLtv,
+        cohorts,
+      },
       repRiskSummary,
       vendorStatus,
-      riskAlerts,
+      riskAlerts: [
+        ...riskAlerts,
+        ...(churnRisk.length
+          ? [{ level: 'medium' as const, message: `${churnRisk.length} cliente(s) con riesgo de churn (sin win 180d)` }]
+          : []),
+      ],
       topActions: auditEvents
         .map((entry) => ({ action: entry.action, count: entry._count.action }))
         .sort((a, b) => b.count - a.count)

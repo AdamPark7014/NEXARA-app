@@ -19,6 +19,7 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { EmployeePaymentsService } from './employee-payments.service.js';
 import { CreateEmployeePaymentDto } from './dto/create-employee-payment.dto.js';
 import { UpdateEmployeePaymentDto } from './dto/update-employee-payment.dto.js';
@@ -84,6 +85,7 @@ export class EmployeePaymentsController {
   @Get()
   findAll(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('userId') userId?: string,
@@ -94,7 +96,7 @@ export class EmployeePaymentsController {
     if (userId && Number.isNaN(parsedUserId)) {
       throw new BadRequestException('Empleado invalido');
     }
-    return this.service.findAll(user, { from, to, userId: parsedUserId, status }, query);
+    return this.service.findAll(user, { from, to, userId: parsedUserId, status }, query, companyId);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)

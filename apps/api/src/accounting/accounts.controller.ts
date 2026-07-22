@@ -91,6 +91,13 @@ export class AccountsController {
     return this.service.closeFiscalPeriod(+id, user.id);
   }
 
+  @Patch('fiscal-periods/:id/reopen')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_CLOSE_PERIOD] })
+  reopenPeriod(@Param('id') id: string) {
+    return this.service.reopenFiscalPeriod(+id);
+  }
+
   @Get('reports/pdf')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_VIEW] })

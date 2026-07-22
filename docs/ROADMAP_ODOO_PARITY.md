@@ -24,5 +24,7 @@ Ver tabla completa en el plan maestro. Contabilidad/compras subieron con P0-A/B 
 | P0-E Clientes | ✅ |
 | P0-F Portal/RBAC | ✅ |
 | P0-G CMMS | ✅ base |
+| P1 AP pay + 3-way | ✅ código |
+| P1 COGS + periodo | ✅ código |
 
 Detalle, Fase 1/2 y checklist: **plan maestro**.

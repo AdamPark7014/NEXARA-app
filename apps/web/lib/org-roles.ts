@@ -77,7 +77,7 @@ export type OrgRoleMeta = {
 export const ORG_ROLE_META: Record<OrgRoleKey, OrgRoleMeta> = {
   [ORG_ROLE_KEYS.CEO]: {
     orgRoleKey: ORG_ROLE_KEYS.CEO,
-    label: 'Dueño / CEO',
+    label: 'CEO',
     description: 'Acceso ejecutivo total.',
     missionStatement: 'Vista 360° del negocio: pipeline, operación, finanzas y personas.',
     dailyActions: [
@@ -430,7 +430,7 @@ export function getOrgRoleLabel(
   ctx?: PlatformAccountUser,
 ): string {
   const account = { isSuperAdmin, ...ctx };
-  if (resolveIsPlatformOwner(account)) return 'Dueño / CEO';
+  if (resolveIsPlatformOwner(account)) return 'CEO';
   if (isTechnicalSuperAdmin(account)) return 'Super Admin · Desarrollador';
   const key = resolveOrgRoleKey(roleName, orgRoleKey);
   if (key) return ORG_ROLE_META[key].label;

@@ -59,22 +59,109 @@ final class ViaticsVM: ObservableObject {
 struct ViaticsView: View {
     var personalOnly: Bool = false
     @StateObject private var vm = ViaticsVM()
+    @EnvironmentObject var session: SessionStore
     @State private var selected: [String: Any]?
+    @State private var showCreate = false
+    @State private var amountText = ""
+    @State private var motivo = ""
+    @State private var categoria = "COMBUSTIBLE"
+    @State private var ticketDataUrl: String?
+    @State private var creating = false
+    @State private var rejectNote = ""
+    @State private var acting = false
+    @State private var actionMessage: String?
+
+    private let categories = ["COMBUSTIBLE", "CASETA", "HOSPEDAJE", "ALIMENTACION", "TRANSPORTE", "OTROS"]
+
+    private var canApprove: Bool {
+        let u = session.currentUser
+        if u?.isSuperAdmin == true { return true }
+        let perms = u?.permissions ?? []
+        return perms.contains { $0.contains("viatics.manage") || $0.contains("console.admin") || $0.contains("finance") }
+    }
 
     var body: some View {
         Group {
-            if let s = selected { viatDetail(s) } else { listBody }
+            if showCreate {
+                createForm
+            } else if let s = selected {
+                viatDetail(s)
+            } else {
+                listBody
+            }
         }
-        .navigationTitle(selected == nil ? (personalOnly ? "Mis viáticos" : "Viáticos") : "")
+        .navigationTitle(selected == nil && !showCreate ? (personalOnly ? "Mis viáticos" : "Viáticos") : "")
         .toolbar {
-            if selected == nil {
+            if selected == nil && !showCreate {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { vm.load(personalOnly: personalOnly) } label: { Image(systemName: "arrow.clockwise") }
+                    HStack {
+                        Button { showCreate = true; actionMessage = nil } label: {
+                            Image(systemName: "plus.circle.fill")
+                        }
+                        Button { vm.load(personalOnly: personalOnly) } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                    }
                 }
             }
         }
-        .refreshable { if selected == nil { vm.load(personalOnly: personalOnly) } }
+        .refreshable { if selected == nil && !showCreate { vm.load(personalOnly: personalOnly) } }
         .task { vm.load(personalOnly: personalOnly) }
+    }
+
+    private var createForm: some View {
+        Form {
+            Section("Nueva solicitud") {
+                TextField("Monto (MXN)", text: $amountText)
+                    .keyboardType(.decimalPad)
+                TextField("Motivo / concepto", text: $motivo, axis: .vertical)
+                    .lineLimit(2...4)
+                Picker("Categoría", selection: $categoria) {
+                    ForEach(categories, id: \.self) { Text($0).tag($0) }
+                }
+            }
+            Section("Comprobante") {
+                MediaPickerBar { media in
+                    ticketDataUrl = media.first?.dataUrl
+                }
+                if ticketDataUrl != nil {
+                    Text("✓ Comprobante listo").foregroundColor(.green).font(.caption)
+                }
+            }
+            if let actionMessage {
+                Section {
+                    Text(actionMessage)
+                        .foregroundColor(actionMessage.hasPrefix("✅") ? .green : .red)
+                }
+            }
+            Section {
+                Button(creating ? "Enviando…" : "Enviar a aprobación") {
+                    Task { await submitCreate() }
+                }
+                .disabled(creating || ticketDataUrl == nil || motivo.isEmpty || (Double(amountText) ?? 0) <= 0)
+                Button("Cancelar", role: .cancel) { showCreate = false }
+            }
+        }
+    }
+
+    private func submitCreate() async {
+        guard let amount = Double(amountText), amount > 0, let ticket = ticketDataUrl else { return }
+        creating = true; actionMessage = nil
+        defer { creating = false }
+        do {
+            _ = try await ConsoleRepository.shared.createViatic(
+                amount: amount,
+                motivo: motivo.trimmingCharacters(in: .whitespacesAndNewlines),
+                categoria: categoria,
+                ticketEvidenciaUrl: ticket
+            )
+            actionMessage = "✅ Solicitud enviada a aprobación"
+            showCreate = false
+            amountText = ""; motivo = ""; ticketDataUrl = nil
+            vm.load(personalOnly: personalOnly)
+        } catch {
+            actionMessage = "❌ \(error.localizedDescription)"
+        }
     }
 
     private var listBody: some View {
@@ -149,11 +236,13 @@ struct ViaticsView: View {
         let status = vStr(v, "estatusPago", "status", "estatus", "estado")
         let color  = viatStatusColor(status)
         let ticketUrl = vStr(v, "ticketEvidenciaUrl", "ticketUrl", "evidenciaUrl", "comprobante")
+        let pending = status.lowercased() == "pendiente"
+        let id = ConsoleHelpers.mapInt64(v, "id")
 
         List {
             Section {
                 HStack {
-                    Button("← Volver") { selected = nil }
+                    Button("← Volver") { selected = nil; rejectNote = ""; actionMessage = nil }
                     Spacer()
                     Text(status.isEmpty ? "—" : status.capitalized)
                         .font(.caption).bold().foregroundColor(color)
@@ -173,6 +262,7 @@ struct ViaticsView: View {
                     viatRow("Empleado", vStr(v, "usuarioNombre", "userName", "nombre"))
                 }
                 viatRow("Razón de gasto", vStr(v, "razonGasto", "concepto", "descripcion", "motivo"))
+                viatRow("Categoría", vStr(v, "categoria"))
                 viatRow("Monto", fmtMxnV(vDouble(v, "montoSolicitado", "amount", "monto", "total") ?? 0))
                 viatRow("Estado de pago", status)
                 viatRow("Fecha", String(vStr(v, "createdAt", "fecha").prefix(10)))
@@ -185,8 +275,49 @@ struct ViaticsView: View {
                     }
                 }
             }
+
+            if canApprove && pending, let id {
+                Section("Decisión") {
+                    TextField("Nota / motivo de rechazo", text: $rejectNote, axis: .vertical)
+                        .lineLimit(2...4)
+                    NxDecisionActions(
+                        acting: acting,
+                        onApprove: { Task { await decide(id: id, approve: true) } },
+                        onReject: { Task { await decide(id: id, approve: false) } }
+                    )
+                }
+            }
+
+            if let actionMessage {
+                Section {
+                    Text(actionMessage)
+                        .foregroundColor(actionMessage.hasPrefix("✅") ? .green : .red)
+                }
+            }
         }
         .listStyle(.insetGrouped)
+    }
+
+    private func decide(id: Int64, approve: Bool) async {
+        if !approve && rejectNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            actionMessage = "❌ Indica motivo de rechazo"
+            return
+        }
+        acting = true; actionMessage = nil
+        defer { acting = false }
+        do {
+            try await ConsoleRepository.shared.approveViatic(
+                id: id,
+                approve: approve,
+                note: rejectNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : rejectNote
+            )
+            actionMessage = approve ? "✅ Viático aprobado" : "✅ Viático rechazado"
+            selected = nil
+            rejectNote = ""
+            vm.load(personalOnly: personalOnly)
+        } catch {
+            actionMessage = "❌ \(error.localizedDescription)"
+        }
     }
 
     @ViewBuilder private func viatRow(_ label: String, _ value: String) -> some View {

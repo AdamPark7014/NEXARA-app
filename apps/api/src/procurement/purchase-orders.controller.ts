@@ -3,6 +3,7 @@ import { Response } from 'express';
 import { ProcurementService } from './procurement.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { generateProcurementDashboardPdf } from './procurement-dashboard-pdf.js';
@@ -26,14 +27,22 @@ export class PurchaseOrdersController {
 
   @Post()
   @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_MANAGE] })
-  create(@Body() dto: any, @CurrentUser() user: any) {
-    return this.svc.createPurchaseOrder(dto, user.id);
+  create(@Body() dto: any, @CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    return this.svc.createPurchaseOrder({ ...dto, companyId }, user.id);
   }
 
   @Get()
   @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_VIEW] })
-  list(@Query('status') status?: string, @Query('supplierId') supplierId?: string, @Query() query?: PaginationQueryDto) {
-    return this.svc.listPurchaseOrders({ status, supplierId: supplierId ? +supplierId : undefined }, query);
+  list(
+    @Query('status') status?: string,
+    @Query('supplierId') supplierId?: string,
+    @Query() query?: PaginationQueryDto,
+    @CurrentCompanyId() companyId?: number | null,
+  ) {
+    return this.svc.listPurchaseOrders(
+      { status, supplierId: supplierId ? +supplierId : undefined, companyId },
+      query,
+    );
   }
 
   @Get('dashboard')
@@ -67,8 +76,8 @@ export class PurchaseOrdersController {
 
   @Get(':id')
   @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_VIEW] })
-  get(@Param('id', ParseIntPipe) id: number) {
-    return this.svc.getPurchaseOrder(id);
+  get(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.svc.getPurchaseOrder(id, companyId);
   }
 
   @Patch(':id/approve')

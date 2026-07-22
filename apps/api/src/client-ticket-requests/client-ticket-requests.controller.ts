@@ -5,6 +5,7 @@ import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { ClientTicketRequestsService } from './client-ticket-requests.service.js';
 import { ClientTicketRequestsQueryDto } from './dto/client-ticket-requests-query.dto.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 @Controller('client-ticket-requests')
 @UseGuards(UrlAccessGuard, RbacGuard)
@@ -21,8 +22,11 @@ export class ClientTicketRequestsController {
 
   @Get()
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
-  findAll(@Query() query: ClientTicketRequestsQueryDto) {
-    return this.service.findAll(this.normalizeStatus(query.status), query);
+  findAll(
+    @Query() query: ClientTicketRequestsQueryDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.findAll(this.normalizeStatus(query.status), query, companyId);
   }
 
   @Patch(':id/assign')

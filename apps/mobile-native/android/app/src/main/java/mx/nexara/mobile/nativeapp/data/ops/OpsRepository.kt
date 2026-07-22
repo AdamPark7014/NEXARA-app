@@ -66,10 +66,15 @@ class OpsRepository(context: Context) {
     }
 
     suspend fun workOrders() = extra.workOrders()
+    suspend fun workOrderDtos() = extra.workOrderDtos()
     suspend fun maintenanceAssets() = extra.maintenanceAssets()
+    suspend fun maintenanceAssetDtos() = extra.maintenanceAssetDtos()
     suspend fun warehouse() = extra.warehouse()
     suspend fun stock() = extra.stock()
     suspend fun requisitions() = extra.requisitions()
+    suspend fun requisitionDtos() = extra.requisitionDtos()
     suspend fun purchaseOrders() = extra.purchaseOrders()
+    suspend fun purchaseOrderDtos() = extra.purchaseOrderDtos()
+    suspend fun goodsReceiptDtos() = extra.goodsReceiptDtos()
     suspend fun serviceSheets() = extra.serviceSheets()
 }

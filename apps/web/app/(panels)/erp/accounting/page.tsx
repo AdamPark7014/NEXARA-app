@@ -117,6 +117,7 @@ const ACCOUNT_TYPE_LABEL: Record<Account["type"], string> = {
 };
 
 const TABS = [
+  { key: "inteligencia", label: "Inteligencia" },
   { key: "polizas", label: "Pólizas" },
   { key: "cuentas", label: "Catálogo de cuentas" },
   { key: "balanza", label: "Balanza de comprobación" },
@@ -162,8 +163,10 @@ export default function AccountingPage() {
   const highlightId = searchParams.get("highlight");
   const tabParam = searchParams.get("tab") as TabKey | null;
 
-  const [tab, setTab] = useState<TabKey>(tabParam && TABS.some((t) => t.key === tabParam) ? tabParam : "polizas");
+  const [tab, setTab] = useState<TabKey>(tabParam && TABS.some((t) => t.key === tabParam) ? tabParam : "inteligencia");
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [financeInsights, setFinanceInsights] = useState<any>(null);
+  const [financeInsightsLoading, setFinanceInsightsLoading] = useState(false);
 
   // ── Pólizas (journal entries) ──────────────────────────────────────
   const [items, setItems] = useState<JournalEntry[]>([]);
@@ -391,6 +394,16 @@ export default function AccountingPage() {
   }, [token, budgetVsActualCostCenter, budgetVsActualYear]);
 
   useEffect(() => {
+    if (tab === "inteligencia" && token) {
+      setFinanceInsightsLoading(true);
+      void apiFetch("accounting/invoices/insights", token)
+        .then(setFinanceInsights)
+        .catch(() => setFinanceInsights(null))
+        .finally(() => setFinanceInsightsLoading(false));
+    }
+  }, [tab, token]);
+
+  useEffect(() => {
     if (tab === "cuentas" || tab === "presupuestos") void loadAccounts();
   }, [tab, loadAccounts]);
 
@@ -603,6 +616,22 @@ export default function AccountingPage() {
     });
   };
 
+  const reopenPeriod = (period: FiscalPeriod) => {
+    setConfirmState({
+      message: `¿Reabrir el periodo "${period.name}"? Se podrán volver a postear asientos en este rango.`,
+      confirmLabel: "Reabrir periodo",
+      fn: async () => {
+        try {
+          const updated = await apiFetch(`accounting/accounts/fiscal-periods/${period.id}/reopen`, token, { method: "PATCH" });
+          setPeriods(prev => prev.map(p => p.id === period.id ? { ...p, ...updated } : p));
+          toast.success(`Periodo "${period.name}" reabierto.`);
+        } catch (e) {
+          toast.error(formatApiError(e, "No se pudo reabrir el periodo"));
+        }
+      },
+    });
+  };
+
   // ── Reportes: PDF ─────────────────────────────────────────────────
   const downloadFinancialPdf = async () => {
     if (!token) return;
@@ -783,12 +812,17 @@ export default function AccountingPage() {
         {new Date(p.startDate).toLocaleDateString("es-MX")} — {new Date(p.endDate).toLocaleDateString("es-MX")}
       </span>
     ) },
-    { key: "isClosed", label: "Estado", width: 160, render: p => (
+    { key: "isClosed", label: "Estado", width: 200, render: p => (
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <Tag variant={p.isClosed ? "neutral" : "positive"}>{p.isClosed ? "Cerrado" : "Abierto"}</Tag>
         {!p.isClosed && cfg.canApprove && (
           <button onClick={() => closePeriod(p)} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
             Cerrar
+          </button>
+        )}
+        {p.isClosed && cfg.canApprove && (
+          <button onClick={() => reopenPeriod(p)} style={{ fontSize: 11, background: "var(--accent)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
+            Reabrir
           </button>
         )}
       </div>
@@ -892,6 +926,75 @@ export default function AccountingPage() {
           </Button>
         ))}
       </div>
+
+      {tab === "inteligencia" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {financeInsightsLoading && <div style={{ color: "var(--text-tertiary)", fontSize: 13 }}>Calculando inteligencia financiera…</div>}
+          {financeInsights && (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+                <KpiCard label="Cash" value={<Money value={financeInsights.kpis?.cashBalance ?? 0} compact />} />
+                <KpiCard label="Working capital" value={<Money value={financeInsights.kpis?.workingCapital ?? 0} compact />} variant="accent" />
+                <KpiCard label="DSO" value={`${financeInsights.kpis?.dso ?? 0}d`} />
+                <KpiCard label="DPO" value={`${financeInsights.kpis?.dpo ?? 0}d`} />
+                <KpiCard label="Runway" value={financeInsights.kpis?.runwayMonths != null ? `${financeInsights.kpis.runwayMonths}m` : "∞"} variant={financeInsights.kpis?.runwayMonths != null && financeInsights.kpis.runwayMonths < 6 ? "danger" : "positive"} />
+                <KpiCard label="Vencidas" value={financeInsights.overdueInvoices ?? 0} variant={financeInsights.overdueInvoices ? "danger" : "default"} />
+              </div>
+              {(financeInsights.alerts || []).map((a: any) => (
+                <div key={a.message} style={{ padding: "10px 14px", borderRadius: 10, fontSize: 13, background: "var(--state-warning-bg)", border: "1px solid var(--state-warning-border)", color: "var(--state-warning-text)" }}>
+                  {a.message}
+                </div>
+              ))}
+              <Section title="Aging CXC" subtitle="Antigüedad de cuentas por cobrar">
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
+                  {[
+                    ["Current", financeInsights.aging?.ar?.current],
+                    ["1–30d", financeInsights.aging?.ar?.d1_30],
+                    ["31–60d", financeInsights.aging?.ar?.d31_60],
+                    ["61–90d", financeInsights.aging?.ar?.d61_90],
+                    [">90d", financeInsights.aging?.ar?.d90_plus],
+                  ].map(([label, val]) => (
+                    <div key={String(label)} style={{ padding: 12, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                      <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{label}</div>
+                      <div style={{ fontWeight: 700, fontSize: 16 }}><Money value={Number(val || 0)} compact /></div>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+              <Section title="Aging CXP" subtitle="Antigüedad de cuentas por pagar">
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
+                  {[
+                    ["Current", financeInsights.aging?.ap?.current],
+                    ["1–30d", financeInsights.aging?.ap?.d1_30],
+                    ["31–60d", financeInsights.aging?.ap?.d31_60],
+                    ["61–90d", financeInsights.aging?.ap?.d61_90],
+                    [">90d", financeInsights.aging?.ap?.d90_plus],
+                  ].map(([label, val]) => (
+                    <div key={String(label)} style={{ padding: 12, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                      <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{label}</div>
+                      <div style={{ fontWeight: 700, fontSize: 16 }}><Money value={Number(val || 0)} compact /></div>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+              <Section title="Cashflow semanal · 90d" subtitle={`In ${Number(financeInsights.cashflow90d?.inflow || 0).toLocaleString("es-MX")} · Out ${Number(financeInsights.cashflow90d?.outflow || 0).toLocaleString("es-MX")}`}>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 80 }}>
+                  {(financeInsights.cashflow90d?.weekly || []).map((w: any) => {
+                    const max = Math.max(1, ...(financeInsights.cashflow90d.weekly.map((x: any) => Math.abs(x.net))));
+                    const h = Math.max(4, (Math.abs(w.net) / max) * 70);
+                    return (
+                      <div key={w.weekEnding} title={`${w.weekEnding}: ${w.net}`} style={{ flex: 1, height: h, background: w.net >= 0 ? "var(--success)" : "var(--danger)", borderRadius: 3, opacity: 0.85 }} />
+                    );
+                  })}
+                </div>
+              </Section>
+            </>
+          )}
+          {!financeInsightsLoading && !financeInsights && (
+            <div style={{ color: "var(--text-tertiary)", fontSize: 13 }}>Sin datos de inteligencia financiera.</div>
+          )}
+        </div>
+      )}
 
       {tab === "polizas" && (
         <>

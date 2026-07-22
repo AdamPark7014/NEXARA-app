@@ -1,5 +1,6 @@
 import { Injectable, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 
 export type CatalogProductQuery = {
   q?: string;
@@ -7,6 +8,7 @@ export type CatalogProductQuery = {
   brand?: string;
   skip?: number;
   take?: number;
+  companyId?: number | null;
 };
 
 @Injectable()
@@ -14,7 +16,10 @@ export class CatalogService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listProducts(query: CatalogProductQuery = {}) {
-    const where: Record<string, unknown> = { activo: { not: false } };
+    const where: Record<string, unknown> = {
+      activo: { not: false },
+      ...companyWhere(query.companyId ?? null),
+    };
 
     if (query.category?.trim()) {
       where.category = { equals: query.category.trim(), mode: 'insensitive' };
@@ -49,9 +54,9 @@ export class CatalogService {
     return { data, total };
   }
 
-  async getProduct(id: number) {
-    return this.prisma.product.findFirst({
-      where: { id, activo: { not: false } },
+  async getProduct(id: number, companyId?: number | null) {
+    const product = await this.prisma.product.findFirst({
+      where: { id, activo: { not: false }, ...companyWhere(companyId ?? null) },
       include: {
         brand: { select: { id: true, name: true } },
         stockLevels: {
@@ -60,12 +65,15 @@ export class CatalogService {
         },
       },
     });
+    assertCompanyAccess(product, companyId, 'Producto');
+    return product;
   }
 
-  async generateNextSku() {
+  async generateNextSku(companyId?: number | null) {
+    const resolved = await resolveRequiredCompanyId(this.prisma, companyId);
     const [latest] = await this.prisma.$queryRaw<Array<{ sku: string }>>`
       SELECT sku FROM "Product"
-      WHERE sku ~ '^SKU-\\d+$'
+      WHERE "companyId" = ${resolved} AND sku ~ '^SKU-\\d+$'
       ORDER BY CAST(substring(sku FROM '(\\d+)$') AS INTEGER) DESC
       LIMIT 1
     `;
@@ -89,11 +97,13 @@ export class CatalogService {
     satProductKey?: string;
     satUnitKey?: string;
     unitName?: string;
+    companyId?: number | null;
   }) {
+    const companyId = await resolveRequiredCompanyId(this.prisma, dto.companyId);
     const sku = dto.sku?.trim()
       ? dto.sku.trim().toUpperCase()
-      : await this.generateNextSku();
-    const existing = await this.prisma.product.findFirst({ where: { sku } });
+      : await this.generateNextSku(companyId);
+    const existing = await this.prisma.product.findFirst({ where: { sku, companyId } });
     if (existing) throw new ConflictException(`Ya existe un producto con SKU ${sku}`);
     const unit = dto.unit?.trim() || dto.unitName?.trim() || null;
     return this.prisma.product.create({
@@ -111,6 +121,7 @@ export class CatalogService {
         unitName: unit,
         specifications: unit ? { unit } : undefined,
         activo: true,
+        companyId,
       },
       include: { brand: { select: { id: true, name: true } } },
     });
@@ -131,8 +142,12 @@ export class CatalogService {
       satUnitKey?: string;
       unitName?: string;
     },
+    companyId?: number | null,
   ) {
-    const existing = await this.prisma.product.findFirst({ where: { id, activo: { not: false } } });
+    const existing = await this.prisma.product.findFirst({
+      where: { id, activo: { not: false }, ...companyWhere(companyId ?? null) },
+    });
+    assertCompanyAccess(existing, companyId, 'Producto');
     if (!existing) throw new ConflictException('Producto no encontrado');
     const unit = dto.unit?.trim() || dto.unitName?.trim() || undefined;
     return this.prisma.product.update({
@@ -163,9 +178,9 @@ export class CatalogService {
     });
   }
 
-  async listCategories() {
+  async listCategories(companyId?: number | null) {
     const rows = await this.prisma.product.findMany({
-      where: { activo: { not: false }, category: { not: null } },
+      where: { activo: { not: false }, category: { not: null }, ...companyWhere(companyId ?? null) },
       distinct: ['category'],
       select: { category: true },
       orderBy: { category: 'asc' },

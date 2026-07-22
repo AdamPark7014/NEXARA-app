@@ -9,6 +9,7 @@ import { randomBytes } from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
 import { generateClientReportPdf } from './client-report-pdf.js';
+import { companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class ServiceClientsService {
@@ -252,6 +253,7 @@ export class ServiceClientsService {
       ? await bcrypt.hash(dto.portalPassword || generatedPassword || '', 10)
       : undefined;
 
+    const companyId = await resolveRequiredCompanyId(this.db);
     const client = await this.db.serviceClient.create({
       data: {
         name: dto.name.trim(),
@@ -267,6 +269,7 @@ export class ServiceClientsService {
         portalEmail: (dto.portalEmail?.trim() || generatedEmail || null),
         portalPasswordHash,
         isActive: dto.isActive ?? true,
+        companyId,
       },
     });
 
@@ -319,6 +322,7 @@ export class ServiceClientsService {
     contactPhone: string | null;
     address: string | null;
     accountCode: string | null;
+    companyId: number;
   }) {
     const already = await this.db.salesClient.findFirst({
       where: { serviceClientId: serviceClient.id },
@@ -363,22 +367,38 @@ export class ServiceClientsService {
         fiscalAddress: serviceClient.address,
         serviceClientId: serviceClient.id,
         status: 'Activo',
+        companyId: serviceClient.companyId,
       },
     });
   }
 
-  async findAll(query?: PaginationQueryDto) {
+  async findAll(query?: PaginationQueryDto, companyId?: number | null) {
     const includeBranchCount = { _count: { select: { branches: true } } } as const;
+    const tenant = companyWhere(companyId ?? null);
 
     if (query?.limit) {
-      const where = query.search ? { OR: [{ companyName: { contains: query.search, mode: 'insensitive' as const } }, { contactName: { contains: query.search, mode: 'insensitive' as const } }] } : undefined;
+      const where = {
+        ...tenant,
+        ...(query.search
+          ? {
+              OR: [
+                { name: { contains: query.search, mode: 'insensitive' as const } },
+                { contactName: { contains: query.search, mode: 'insensitive' as const } },
+              ],
+            }
+          : {}),
+      };
       const [data, total] = await Promise.all([
         this.db.serviceClient.findMany({ where, include: includeBranchCount, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
         this.db.serviceClient.count({ where }),
       ]);
       return buildPaginatedResponse(data, total, query);
     }
-    return this.db.serviceClient.findMany({ include: includeBranchCount, orderBy: { createdAt: 'desc' } });
+    return this.db.serviceClient.findMany({
+      where: tenant,
+      include: includeBranchCount,
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   async findOne(id: number) {

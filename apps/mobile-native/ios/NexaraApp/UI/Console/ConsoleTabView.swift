@@ -131,6 +131,21 @@ private struct ConsoleMoreView: View {
                 }
             }
 
+            Section {
+                NavigationLink {
+                    OfflineQueueView()
+                } label: {
+                    HStack(spacing: 12) {
+                        Text("☁️").font(.title3)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Cola offline")
+                            Text("Sincronizar cambios y fotos pendientes")
+                                .font(.caption).foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+
             ForEach(ConsoleAccessRules.consoleSidebarGroupsForMore(user: session.currentUser, panel: panel)) { group in
                 Section(group.title) {
                     ForEach(group.modules) { m in

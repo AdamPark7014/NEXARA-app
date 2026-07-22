@@ -9,6 +9,25 @@ import { PERMISSIONS } from '../common/permissions.js';
 export class SlaTrackerController {
   constructor(private readonly service: SlaTrackerService) {}
 
+  @Get('insights')
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.SUPPORT_VIEW,
+      PERMISSIONS.SUPPORT_MANAGE,
+      PERMISSIONS.NOC_VIEW,
+    ],
+  })
+  insights(@Query('from') from?: string, @Query('to') to?: string, @Query('clientId') clientId?: string) {
+    return this.service.getInsights({
+      from: from ? new Date(from) : undefined,
+      to: to ? new Date(to) : undefined,
+      clientId: clientId ? +clientId : undefined,
+    });
+  }
+
   @Get('stats')
   @RBAC({
     anyPermissions: [

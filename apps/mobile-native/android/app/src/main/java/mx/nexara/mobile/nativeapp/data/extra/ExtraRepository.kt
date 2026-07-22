@@ -10,18 +10,32 @@ import mx.nexara.mobile.nativeapp.data.api.AuditEntryDto
 import mx.nexara.mobile.nativeapp.data.api.BankAccountDto
 import mx.nexara.mobile.nativeapp.data.api.ContactMessageDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDto
+import mx.nexara.mobile.nativeapp.data.api.CreateExpenseRequest
 import mx.nexara.mobile.nativeapp.data.api.DocumentDto
 import mx.nexara.mobile.nativeapp.data.api.EmployeePaymentDto
+import mx.nexara.mobile.nativeapp.data.api.ExpenseApproveRequest
 import mx.nexara.mobile.nativeapp.data.api.ExpenseDto
 import mx.nexara.mobile.nativeapp.data.api.ExtraApi
 import mx.nexara.mobile.nativeapp.data.api.FineDto
 import mx.nexara.mobile.nativeapp.data.api.InvoiceDto
+import mx.nexara.mobile.nativeapp.data.api.InvoiceMatchWaiveRequest
+import mx.nexara.mobile.nativeapp.data.api.InvoicePaymentRequest
 import mx.nexara.mobile.nativeapp.data.api.JournalEntryDto
 import mx.nexara.mobile.nativeapp.data.api.LunchBreakDto
 import mx.nexara.mobile.nativeapp.data.api.LunchCheckinRequest
 import mx.nexara.mobile.nativeapp.data.api.LunchCheckoutRequest
 import mx.nexara.mobile.nativeapp.data.api.NewsPostDto
 import mx.nexara.mobile.nativeapp.data.api.NewsletterSubscriberDto
+import mx.nexara.mobile.nativeapp.data.api.CatalogProductDto
+import mx.nexara.mobile.nativeapp.data.api.StockLevelDto
+import mx.nexara.mobile.nativeapp.data.api.StockMovementDto
+import mx.nexara.mobile.nativeapp.data.api.StockMovementRequest
+import mx.nexara.mobile.nativeapp.data.api.GoodsReceiptDto
+import mx.nexara.mobile.nativeapp.data.api.MaintenanceAssetDto
+import mx.nexara.mobile.nativeapp.data.api.PurchaseOrderDto
+import mx.nexara.mobile.nativeapp.data.api.RequisitionDto
+import mx.nexara.mobile.nativeapp.data.api.WarehouseDto
+import mx.nexara.mobile.nativeapp.data.api.WorkOrderDto
 import mx.nexara.mobile.nativeapp.data.api.WorkflowDecideRequest
 import java.lang.reflect.ParameterizedType
 
@@ -85,6 +99,25 @@ class ExtraRepository(context: Context) {
     suspend fun analyticsComputedKpisList(): List<Map<String, Any?>> = loadGeneric { api.getAnalyticsComputedKpisRaw() }
 
     suspend fun expenses(): List<ExpenseDto> = parseList(api.getExpensesRaw())
+
+    suspend fun createExpense(concepto: String, monto: Double, categoria: String?, ticketUrl: String?) =
+        api.createExpense(
+            CreateExpenseRequest(
+                concepto = concepto,
+                monto = monto,
+                categoria = categoria,
+                ticketEvidenciaUrl = ticketUrl,
+            ),
+        )
+
+    suspend fun approveExpense(id: Long, approve: Boolean, note: String? = null) =
+        api.approveExpense(
+            id = id,
+            body = ExpenseApproveRequest(
+                action = if (approve) "approve" else "reject",
+                note = note,
+            ),
+        )
     suspend fun fines(): List<FineDto> = parseList(api.getFinesRaw())
     suspend fun employeePayments(): List<EmployeePaymentDto> = parseList(api.getEmployeePaymentsRaw())
     suspend fun cotizaciones(): List<CotizacionDto> = parseList(api.getCotizacionesRaw())
@@ -98,6 +131,45 @@ class ExtraRepository(context: Context) {
     suspend fun documents(): List<DocumentDto> = parseList(api.getDocumentsRaw())
     suspend fun journalEntries(): List<JournalEntryDto> = parseList(api.getJournalEntriesRaw())
     suspend fun invoices(): List<InvoiceDto> = parseList(api.getInvoicesRaw())
+
+    suspend fun invoiceDetail(id: Long): Map<String, Any?> {
+        val raw = api.getInvoiceRaw(id).string().trim()
+        if (raw.isEmpty() || !raw.startsWith("{")) return emptyMap()
+        val mapType = Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java)
+        return moshi.adapter<Map<String, Any?>>(mapType).fromJson(raw) ?: emptyMap()
+    }
+
+    suspend fun registerInvoicePayment(
+        id: Long,
+        amount: Double,
+        paymentDate: String,
+        method: String? = null,
+        reference: String? = null,
+        notes: String? = null,
+    ) {
+        api.registerInvoicePayment(
+            id,
+            InvoicePaymentRequest(
+                amount = amount,
+                paymentDate = paymentDate,
+                method = method,
+                reference = reference,
+                notes = notes,
+            ),
+        )
+    }
+
+    suspend fun evaluateInvoiceMatch(id: Long): Map<String, Any?> {
+        val raw = api.evaluateInvoiceMatch(id).string().trim()
+        if (raw.isEmpty() || !raw.startsWith("{")) return emptyMap()
+        val mapType = Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java)
+        return moshi.adapter<Map<String, Any?>>(mapType).fromJson(raw) ?: emptyMap()
+    }
+
+    suspend fun waiveInvoiceMatch(id: Long, notes: String?) {
+        api.waiveInvoiceMatch(id, InvoiceMatchWaiveRequest(notes = notes))
+    }
+
     suspend fun bankAccounts(): List<BankAccountDto> = parseList(api.getBankAccountsRaw())
 
     // ── Generic endpoints (Map<String, Any?>) for screens that only list raw
@@ -131,14 +203,102 @@ class ExtraRepository(context: Context) {
     suspend fun hrLeaves() = loadGeneric { api.getHrLeavesRaw() }
     suspend fun hrReviews() = loadGeneric { api.getHrReviewsRaw() }
     suspend fun hrDashboardRaw(): String = api.getHrDashboardRaw().string()
-    suspend fun warehouse() = loadGeneric { api.getWarehouseRaw() }
-    suspend fun stock() = loadGeneric { api.getStockRaw() }
-    suspend fun requisitions() = loadGeneric { api.getRequisitionsRaw() }
-    suspend fun purchaseOrders() = loadGeneric { api.getPurchaseOrdersRaw() }
-    suspend fun goodsReceipts() = loadGeneric { api.getGoodsReceiptsRaw() }
+    suspend fun warehouse(): List<Map<String, Any?>> =
+        warehouses().map { it.toFlatMap() }
+
+    suspend fun warehouses(): List<WarehouseDto> =
+        loadGeneric { api.getWarehouseRaw() }.map { WarehouseDto.fromRaw(it) }
+
+    suspend fun stock(belowReorder: Boolean? = null): List<Map<String, Any?>> =
+        stockLevels(belowReorder).map { it.toFlatMap() }
+
+    suspend fun stockLevels(belowReorder: Boolean? = null): List<StockLevelDto> =
+        loadGeneric { api.getStockLevelsRaw(belowReorder = belowReorder) }
+            .map { StockLevelDto.fromRaw(it) }
+
+    suspend fun lowStockAlerts(): List<Map<String, Any?>> =
+        lowStockLevelDtos().map { it.toFlatMap() }
+
+    suspend fun lowStockLevelDtos(): List<StockLevelDto> {
+        val parsed = loadGeneric { api.getLowStockAlertsRaw() }.map { StockLevelDto.fromRaw(it) }
+        if (parsed.isNotEmpty()) return parsed
+        return stockLevels().filter { it.isLow }
+    }
+
+    suspend fun stockMovements(
+        warehouseId: Long? = null,
+        productId: Long? = null,
+        type: String? = null,
+    ): List<Map<String, Any?>> =
+        stockMovementDtos(warehouseId, productId, type).map { it.toFlatMap() }
+
+    suspend fun stockMovementDtos(
+        warehouseId: Long? = null,
+        productId: Long? = null,
+        type: String? = null,
+    ): List<StockMovementDto> =
+        loadGeneric { api.getStockMovementsRaw(warehouseId, productId, type) }
+            .map { StockMovementDto.fromRaw(it) }
+
+    suspend fun catalogProducts(): List<Map<String, Any?>> =
+        catalogProductDtos().map { it.toFlatMap() }
+
+    suspend fun catalogProductDtos(): List<CatalogProductDto> =
+        loadGeneric { api.getCatalogProductsRaw(200) }.map { CatalogProductDto.fromRaw(it) }
+
+    suspend fun createStockMovement(
+        type: String,
+        productId: Long,
+        quantity: Double,
+        fromWarehouseId: Long? = null,
+        toWarehouseId: Long? = null,
+        unitCost: Double? = null,
+        reference: String? = null,
+        notes: String? = null,
+    ) {
+        api.createStockMovement(
+            StockMovementRequest(
+                type = type,
+                productId = productId,
+                quantity = quantity,
+                fromWarehouseId = fromWarehouseId,
+                toWarehouseId = toWarehouseId,
+                unitCost = unitCost,
+                reference = reference,
+                notes = notes,
+            ),
+        )
+    }
+
+    suspend fun requisitions(): List<Map<String, Any?>> =
+        requisitionDtos().map { it.toFlatMap() }
+
+    suspend fun requisitionDtos(): List<RequisitionDto> =
+        loadGeneric { api.getRequisitionsRaw() }.map { RequisitionDto.fromRaw(it) }
+
+    suspend fun purchaseOrders(): List<Map<String, Any?>> =
+        purchaseOrderDtos().map { it.toFlatMap() }
+
+    suspend fun purchaseOrderDtos(): List<PurchaseOrderDto> =
+        loadGeneric { api.getPurchaseOrdersRaw() }.map { PurchaseOrderDto.fromRaw(it) }
+
+    suspend fun goodsReceipts(): List<Map<String, Any?>> =
+        goodsReceiptDtos().map { it.toFlatMap() }
+
+    suspend fun goodsReceiptDtos(): List<GoodsReceiptDto> =
+        loadGeneric { api.getGoodsReceiptsRaw() }.map { GoodsReceiptDto.fromRaw(it) }
     suspend fun supplierEvaluations() = loadGeneric { api.getSupplierEvaluationsRaw() }
-    suspend fun maintenanceAssets() = loadGeneric { api.getMaintenanceAssetsRaw() }
-    suspend fun workOrders() = loadGeneric { api.getWorkOrdersRaw() }
+    suspend fun maintenanceAssets(): List<Map<String, Any?>> =
+        maintenanceAssetDtos().map { it.toFlatMap() }
+
+    suspend fun maintenanceAssetDtos(): List<MaintenanceAssetDto> =
+        loadGeneric { api.getMaintenanceAssetsRaw() }.map { MaintenanceAssetDto.fromRaw(it) }
+
+    suspend fun workOrders(): List<Map<String, Any?>> =
+        workOrderDtos().map { it.toFlatMap() }
+
+    suspend fun workOrderDtos(): List<WorkOrderDto> =
+        loadGeneric { api.getWorkOrdersRaw() }.map { WorkOrderDto.fromRaw(it) }
     suspend fun serviceSheets() = loadGeneric { api.getServiceSheetsRaw() }
     suspend fun cvs() = loadGeneric { api.getCvsRaw() }
     suspend fun clientTicketRequests() = loadGeneric { api.getClientTicketRequestsRaw() }

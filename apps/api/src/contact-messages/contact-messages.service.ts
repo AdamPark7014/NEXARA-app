@@ -8,6 +8,7 @@ import { UpdateContactMessageDto } from './dto/update-contact-message.dto.js';
 import { ContactStatus } from '@prisma/client';
 import { NewsletterService } from '../newsletter/newsletter.service.js';
 import nodemailer from 'nodemailer';
+import { resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class ContactMessagesService {
@@ -94,6 +95,7 @@ export class ContactMessagesService {
     if ((message.subject || message.message || '').match(/cctv|cableado|licitaci|proyecto|presupuesto|cotiza|sucursal/i)) score += 10;
     score = Math.min(score, 99);
 
+    const companyId = await resolveRequiredCompanyId(this.db);
     const lead = await this.db.salesLead.create({
       data: {
         name: message.name,
@@ -104,6 +106,7 @@ export class ContactMessagesService {
         status: 'NEW',
         score,
         notes: `Origen: ${message.source || 'web'}. Página: ${message.pageUrl || 'n/a'}.\n\n${message.message || ''}`,
+        companyId,
       },
     });
 

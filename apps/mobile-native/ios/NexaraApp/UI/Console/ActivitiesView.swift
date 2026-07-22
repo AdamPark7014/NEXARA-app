@@ -5,16 +5,15 @@ import SwiftUI
 struct ActivityDetailView: View {
     let activity: [String: Any]
     let onBack: () -> Void
+    var onCaptureEvidence: ((Int64) -> Void)? = nil
 
     @State private var tab       = 0
     @State private var detail:  [String: Any] = [:]
     @State private var loading  = true
     private let tabs = ["Info", "Evidencias", "Viáticos", "Aprobaciones"]
 
-    private var actId: Int? {
-        if let n = activity["id"] as? Int { return n }
-        if let s = activity["id"] as? String { return Int(s) }
-        return nil
+    private var actId: Int64? {
+        ConsoleHelpers.mapInt64(activity, "id")
     }
 
     var body: some View {
@@ -28,6 +27,19 @@ struct ActivityDetailView: View {
             let title = actStr(detail.isEmpty ? activity : detail, "titulo", "title", "descripcion")
             Text(title.isEmpty ? "Actividad" : title)
                 .font(.headline).lineLimit(2).padding(.horizontal).padding(.bottom, 4)
+
+            if let onCaptureEvidence, let actId {
+                Button {
+                    onCaptureEvidence(actId)
+                } label: {
+                    Label("Capturar / continuar evidencias", systemImage: "camera.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.teal)
+                .padding(.horizontal)
+                .padding(.bottom, 8)
+            }
 
             Picker("", selection: $tab) {
                 ForEach(0..<tabs.count, id: \.self) { Text(tabs[$0]).tag($0) }
@@ -78,6 +90,11 @@ struct ActivityDetailView: View {
             + nestedList(detail, "evidencias")
             + nestedList(detail, "activityEvidence").flatMap { nestedList($0, "photos") + [$0] }
         return Group {
+            if let onCaptureEvidence, let actId {
+                Button("Ir al flujo de evidencias") { onCaptureEvidence(actId) }
+                    .buttonStyle(.bordered)
+                    .padding()
+            }
             if evList.isEmpty {
                 VStack { Spacer(); Text("Sin evidencias registradas").foregroundColor(.secondary); Spacer() }
             } else {
@@ -187,46 +204,48 @@ private func fmtActMxn(_ v: Double) -> String {
 
 @MainActor
 final class ActivitiesVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [ActivityItem] = []
     @Published var query        = ""
     @Published var statusFilter = "todos"
     @Published var isLoading    = false
 
     let statuses = ["todos", "pendiente", "en proceso", "completada", "cancelada"]
 
-    var filtered: [[String: Any]] {
+    var filtered: [ActivityItem] {
         var result = items
         if statusFilter != "todos" {
-            result = result.filter { actStr($0, "status", "estatus", "estado").lowercased() == statusFilter }
+            result = result.filter { $0.status == statusFilter }
         }
         if !query.isEmpty {
             let q = query.lowercased()
             result = result.filter { row in
-                actStr(row, "titulo", "title", "descripcion").lowercased().contains(q) ||
-                actStr(row, "clientName", "cliente").lowercased().contains(q) ||
-                actStr(row, "responsable", "assignedTo").lowercased().contains(q)
+                row.title.lowercased().contains(q) ||
+                row.clientName.lowercased().contains(q) ||
+                row.responsable.lowercased().contains(q)
             }
         }
         return result
     }
 
     var statusCounts: [String: Int] {
-        Dictionary(grouping: items) { actStr($0, "status", "estatus", "estado").lowercased() }
-            .mapValues(\.count)
+        Dictionary(grouping: items, by: \.status).mapValues(\.count)
     }
 
     func load(personalOnly: Bool = false) {
         isLoading = true
         Task {
             if personalOnly {
-                items = (try? await ConsoleRepository.shared.activities(scope: "mine")) ?? []
-                if items.isEmpty, let uid = SessionStore.shared.currentUser?.id {
-                    let all = await ExtraRepository.shared.activities()
-                    items = all.filter { actStr($0, "assignedToId", "userId", "responsableId") == uid
-                        || actStr($0, "assignedTo", "responsable").lowercased().contains(SessionStore.shared.currentUser?.nombre.lowercased() ?? "") }
+                var loaded = (try? await ConsoleRepository.shared.activityItems(scope: "mine")) ?? []
+                if loaded.isEmpty, let uid = SessionStore.shared.currentUser?.id {
+                    let all = await ExtraRepository.shared.activityItems()
+                    let nombre = SessionStore.shared.currentUser?.nombre.lowercased() ?? ""
+                    loaded = all.filter {
+                        $0.responsableId == uid || $0.responsable.lowercased().contains(nombre)
+                    }
                 }
+                items = loaded
             } else {
-                items = await ExtraRepository.shared.activities()
+                items = await ExtraRepository.shared.activityItems()
             }
             isLoading = false
         }
@@ -239,16 +258,28 @@ struct ActivitiesView: View {
     @StateObject private var vm = ActivitiesVM()
     var filterForUserId: String? = nil
     @State private var selected: [String: Any]?
+    @State private var evidenceFocusId: Int64?
 
     var body: some View {
         Group {
-            if let sel = selected {
-                ActivityDetailView(activity: sel, onBack: { selected = nil })
+            if let evidenceFocusId {
+                EvidencesView(reviewMode: false, initialActivityId: evidenceFocusId)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("← Actividad") { self.evidenceFocusId = nil }
+                        }
+                    }
+            } else if let sel = selected {
+                ActivityDetailView(
+                    activity: sel,
+                    onBack: { selected = nil },
+                    onCaptureEvidence: { id in evidenceFocusId = id }
+                )
             } else {
                 listBody
             }
         }
-        .navigationTitle(selected == nil ? (filterForUserId == nil ? "Actividades" : "Mis actividades") : "")
+        .navigationTitle(selected == nil && evidenceFocusId == nil ? (filterForUserId == nil ? "Actividades" : "Mis actividades") : "")
     }
 
     private var listBody: some View {
@@ -301,8 +332,8 @@ struct ActivitiesView: View {
                         .frame(maxWidth: .infinity).padding(.top, 40)
                 } else {
                     VStack(spacing: 6) {
-                        ForEach(vm.filtered.prefix(60), id: \.actId) { act in
-                            Button { selected = act } label: {
+                        ForEach(vm.filtered.prefix(60)) { act in
+                            Button { selected = act.raw } label: {
                                 ActivityCard(item: act).padding(.horizontal)
                             }
                             .buttonStyle(.plain)
@@ -353,15 +384,15 @@ struct ActivitiesView: View {
 // MARK: – Card
 
 private struct ActivityCard: View {
-    let item: [String: Any]
+    let item: ActivityItem
     var body: some View {
-        let title      = actStr(item, "titulo", "title", "descripcion")
-        let client     = actStr(item, "clientName", "cliente", "clienteNombre")
-        let responsible= actStr(item, "responsable", "assignedTo", "asignadoNombre")
-        let status     = actStr(item, "status", "estatus", "estado")
-        let date       = String(actStr(item, "scheduledDate", "fechaProgramada", "createdAt").prefix(10))
-        let priority   = actStr(item, "priority", "prioridad")
-        let color      = actStatusColor(status)
+        let title = item.title
+        let client = item.clientName
+        let responsible = item.responsable
+        let status = item.status
+        let date = String(item.scheduledDate.prefix(10))
+        let priority = item.priority
+        let color = actStatusColor(status)
 
         VStack(alignment: .leading, spacing: 0) {
             // Top bar

@@ -25,6 +25,7 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { SalesPaginationQueryDto } from './dto/sales-pagination-query.dto.js';
 
 const SALES_VIEW_ACCESS = [PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
@@ -37,13 +38,18 @@ export class VentasOportunidadesController {
   @Post()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async create(@Body() dto: CreateSalesOpportunityDto, @CurrentUser() user: any) {
-    const created = await this.ventasService.createOpportunity(dto, user);
+  async create(
+    @Body() dto: CreateSalesOpportunityDto,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const created = await this.ventasService.createOpportunity(dto, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'opportunity.create',
       entityType: 'opportunity',
       entityId: created.id,
       actorId: user?.id,
+      companyId,
       metadata: { stage: created.stage, value: created.value },
     });
     return created;
@@ -52,15 +58,23 @@ export class VentasOportunidadesController {
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  findAll(@CurrentUser() user: any, @Query() query: SalesPaginationQueryDto) {
-    return this.ventasService.listOpportunities(user, query.ownerId, query);
+  findAll(
+    @CurrentUser() user: any,
+    @Query() query: SalesPaginationQueryDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.listOpportunities(user, query.ownerId, query, companyId);
   }
 
   @Get(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.ventasService.getOpportunity(id, user);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.getOpportunity(id, user, companyId);
   }
 
   @Get(':id/cotizaciones')

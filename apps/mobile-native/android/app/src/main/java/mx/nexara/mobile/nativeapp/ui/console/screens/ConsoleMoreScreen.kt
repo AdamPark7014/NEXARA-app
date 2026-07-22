@@ -49,6 +49,7 @@ fun ConsoleMoreScreen(
     isSuperAdmin: Boolean = false,
     showContabilidadHub: Boolean = false,
     onOpenContabilidad: (() -> Unit)? = null,
+    onOpenOfflineQueue: (() -> Unit)? = null,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(contentPadding),
@@ -64,6 +65,35 @@ fun ConsoleMoreScreen(
                 isSuperAdmin = isSuperAdmin,
             )
             Spacer(Modifier.height(16.dp))
+        }
+
+        if (onOpenOfflineQueue != null) {
+            item(key = "hub-offline") {
+                Card(
+                    onClick = onOpenOfflineQueue,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
+                ) {
+                    Row(
+                        Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text("☁️", fontSize = 22.sp)
+                        Column(Modifier.weight(1f)) {
+                            Text("Cola offline", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Sincronizar cambios y fotos pendientes",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF64748B),
+                            )
+                        }
+                        Text("›", color = Color(0xFF64748B), fontSize = 20.sp)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
         }
 
         if (showContabilidadHub && onOpenContabilidad != null) {

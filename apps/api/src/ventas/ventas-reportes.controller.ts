@@ -4,6 +4,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { VentasService } from './ventas.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 
@@ -138,8 +139,9 @@ export class VentasReportesController {
     @Query('period') period: 'week' | 'month' | 'year' = 'month',
     @Query('limit') limit = '50',
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.ventasService.listAuditEvents(period, Number(limit) || 50, user);
+    return this.ventasService.listAuditEvents(period, Number(limit) || 50, user, companyId);
   }
 
   @Get('pdf')

@@ -7,14 +7,18 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.modifier
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,11 +31,12 @@ import mx.nexara.mobile.nativeapp.data.api.RegisterFcmTokenRequest
 import mx.nexara.mobile.nativeapp.push.NexaraNotifications
 import mx.nexara.mobile.nativeapp.access.DeepLinkParser
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
+import mx.nexara.mobile.nativeapp.security.AppLock
 import mx.nexara.mobile.nativeapp.ui.NexaraScaffold
 import mx.nexara.mobile.nativeapp.ui.NexaraApp
 import mx.nexara.mobile.nativeapp.ui.theme.NexaraTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     private val requestPostNotifications =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* respuesta opcional */ }
 
@@ -50,8 +55,49 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    NexaraScaffold {
-                        NexaraApp()
+                    var locked by remember { mutableStateOf(false) }
+                    val authRepo = remember { AuthRepository(this@MainActivity) }
+                    val activity = this@MainActivity
+
+                    // Bridge Activity background → Compose lock state
+                    androidx.compose.runtime.DisposableEffect(Unit) {
+                        val callbacks = object : android.app.Application.ActivityLifecycleCallbacks {
+                            override fun onActivityStopped(a: android.app.Activity) {
+                                if (a !== activity) return
+                                if (activity.isChangingConfigurations) return
+                                if (authRepo.loadSession() != null && AppLock.shouldLock(activity)) {
+                                    locked = true
+                                }
+                            }
+                            override fun onActivityStarted(a: android.app.Activity) {
+                                if (a !== activity) return
+                                if (locked && authRepo.loadSession() != null) {
+                                    CoroutineScope(Dispatchers.Main).launch {
+                                        if (AppLock.authenticate(activity)) locked = false
+                                    }
+                                }
+                            }
+                            override fun onActivityCreated(a: android.app.Activity, b: Bundle?) {}
+                            override fun onActivityResumed(a: android.app.Activity) {}
+                            override fun onActivityPaused(a: android.app.Activity) {}
+                            override fun onActivitySaveInstanceState(a: android.app.Activity, b: Bundle) {}
+                            override fun onActivityDestroyed(a: android.app.Activity) {}
+                        }
+                        application.registerActivityLifecycleCallbacks(callbacks)
+                        onDispose { application.unregisterActivityLifecycleCallbacks(callbacks) }
+                    }
+
+                    if (!locked) {
+                        NexaraScaffold {
+                            NexaraApp()
+                        }
+                    } else {
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = androidx.compose.ui.Alignment.Center,
+                        ) {
+                            androidx.compose.material3.Text("NEXARA bloqueado — confirma tu identidad")
+                        }
                     }
                 }
             }

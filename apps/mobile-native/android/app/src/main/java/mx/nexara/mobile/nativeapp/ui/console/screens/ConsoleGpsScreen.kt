@@ -133,10 +133,11 @@ fun ConsoleGpsScreen(
         // Solo personal operativo (no super/admin) tiene la opción de enviar su propia ubicación.
         if (!isOwnerView) {
             if (!hasPerm) {
-                Text(
-                    "Falta permiso de ubicación. Actívalo para enviar tu GPS.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                mx.nexara.mobile.nativeapp.ui.common.LocationPermissionBanner(
+                    message = "Activa la ubicación para enviar tu GPS al equipo.",
+                    requestOnAppear = true,
                 )
+                Spacer(modifier = Modifier.height(12.dp))
             } else {
                 Button(
                     onClick = {

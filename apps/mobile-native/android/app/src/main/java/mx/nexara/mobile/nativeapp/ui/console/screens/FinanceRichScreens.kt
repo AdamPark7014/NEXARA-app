@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
@@ -33,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
@@ -44,6 +47,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.BankAccountDto
 import mx.nexara.mobile.nativeapp.data.api.EmployeePaymentDto
 import mx.nexara.mobile.nativeapp.data.api.ExpenseDto
@@ -64,6 +68,8 @@ data class ExpensesRichUiState(
     val loading: Boolean = true,
     val query: String = "",
     val items: List<ExpenseDto> = emptyList(),
+    val acting: Boolean = false,
+    val message: String? = null,
 )
 
 class ExpensesRichViewModel(app: Application) : AndroidViewModel(app) {
@@ -73,6 +79,7 @@ class ExpensesRichViewModel(app: Application) : AndroidViewModel(app) {
 
     init { refresh() }
     fun setQuery(v: String) = _state.update { it.copy(query = v) }
+    fun clearMessage() = _state.update { it.copy(message = null) }
 
     fun refresh() {
         _state.update { it.copy(loading = true) }
@@ -82,53 +89,198 @@ class ExpensesRichViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun create(concepto: String, monto: Double, categoria: String?, ticketUrl: String?, onDone: () -> Unit) {
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.createExpense(concepto, monto, categoria, ticketUrl) }
+                _state.update { it.copy(acting = false, message = "✅ Gasto registrado") }
+                refresh()
+                onDone()
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+            }
+        }
+    }
+
+    fun decide(id: Long, approve: Boolean, note: String?) {
+        if (!approve && note.isNullOrBlank()) {
+            _state.update { it.copy(message = "❌ Indica motivo de rechazo") }
+            return
+        }
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.approveExpense(id, approve, note) }
+                _state.update {
+                    it.copy(acting = false, message = if (approve) "✅ Gasto aprobado" else "✅ Gasto rechazado")
+                }
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+            }
+        }
+    }
+
     fun filtered(): List<ExpenseDto> {
         val q = _state.value.query.trim().lowercase()
         if (q.isBlank()) return _state.value.items
         return _state.value.items.filter {
             (it.concepto ?: "").lowercase().contains(q) ||
-                (it.estatus ?: "").lowercase().contains(q)
+                it.displayStatus().lowercase().contains(q)
         }
     }
 
-    fun total() = _state.value.items.sumOf { it.monto ?: 0.0 }
+    fun total() = _state.value.items.sumOf { it.displayAmount() }
+    fun pendingTotal() = _state.value.items
+        .filter { it.displayStatus().equals("pendiente", true) }
+        .sumOf { it.displayAmount() }
 }
 
 @Composable
 fun ExpensesRichScreen(vm: ExpensesRichViewModel = viewModel()) {
     val s by vm.state.collectAsState()
+    val context = LocalContext.current
+    val user = remember { AuthRepository(context).loadSession() }
+    val canManage = user?.isSuperAdmin == true ||
+        (user?.permissions ?: emptyList()).any {
+            it.contains("contabilidad.manage") || it.contains("console.admin")
+        }
+
     var selected by remember { mutableStateOf<ExpenseDto?>(null) }
-    val sel = selected
-    if (sel != null) {
-        FinanceDetailScaffold(onBack = { selected = null }) {
-            item { Text(sel.concepto ?: "Gasto", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium) }
-            item { FinanceRow("Monto", fmtMoney(sel.monto)) }
-            item { FinanceRow("Estatus", sel.estatus) }
-            item { FinanceRow("Responsable", sel.usuario?.nombre) }
-            item { FinanceRow("Fecha", sel.createdAt?.take(10)) }
+    var showCreate by remember { mutableStateOf(false) }
+    var concepto by remember { mutableStateOf("") }
+    var montoText by remember { mutableStateOf("") }
+    var categoria by remember { mutableStateOf("OTROS") }
+    var rejectNote by remember { mutableStateOf("") }
+
+    if (showCreate) {
+        FinanceDetailScaffold(onBack = { showCreate = false }) {
+            item { Text("Nuevo gasto", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium) }
+            item {
+                OutlinedTextField(
+                    value = concepto,
+                    onValueChange = { concepto = it },
+                    label = { Text("Concepto") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            item {
+                OutlinedTextField(
+                    value = montoText,
+                    onValueChange = { montoText = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text("Monto") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+            item {
+                OutlinedTextField(
+                    value = categoria,
+                    onValueChange = { categoria = it },
+                    label = { Text("Categoría") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+            if (!s.message.isNullOrBlank()) {
+                item {
+                    Text(s.message!!, color = if (s.message!!.startsWith("✅")) Color(0xFF2E7D32) else Color(0xFFC62828))
+                }
+            }
+            item {
+                Button(
+                    onClick = {
+                        val m = montoText.toDoubleOrNull() ?: return@Button
+                        if (concepto.isBlank() || m <= 0) return@Button
+                        vm.create(concepto.trim(), m, categoria, null) { showCreate = false }
+                    },
+                    enabled = !s.acting,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (s.acting) "Guardando…" else "Registrar gasto") }
+            }
         }
         return
     }
-    FinanceScaffold(
-        kpis = listOf(
-            Triple("Gastos", "${s.items.size}", null),
-            Triple("Total", fmtMoney(vm.total()), Color(0xFFC62828)),
-        ),
-        query = s.query,
-        onQuery = vm::setQuery,
-        placeholder = "Buscar gasto…",
-        loading = s.loading,
-        isEmpty = vm.filtered().isEmpty(),
-        empty = "Sin gastos",
-    ) {
-        items(vm.filtered().take(80), key = { it.id }) { e ->
-            Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selected = e }) {
-                Column(Modifier.padding(12.dp)) {
-                    Text(e.concepto ?: "Gasto", fontWeight = FontWeight.Bold)
-                    Text(e.usuario?.nombre ?: "", style = MaterialTheme.typography.bodySmall)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(fmtMoney(e.monto), fontWeight = FontWeight.SemiBold, color = Color(0xFFC62828))
-                        Text(e.estatus ?: "", style = MaterialTheme.typography.labelSmall)
+
+    val sel = selected
+    if (sel != null) {
+        val pending = sel.displayStatus().equals("pendiente", true)
+        FinanceDetailScaffold(onBack = { selected = null; rejectNote = "" }) {
+            item { Text(sel.concepto ?: "Gasto", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium) }
+            item { FinanceRow("Monto", fmtMoney(sel.displayAmount())) }
+            item { FinanceRow("Estatus", sel.displayStatus()) }
+            item { FinanceRow("Categoría", sel.categoria) }
+            item { FinanceRow("Responsable", sel.usuario?.nombre) }
+            item { FinanceRow("Fecha", sel.createdAt?.take(10)) }
+            if (canManage && pending) {
+                item {
+                    OutlinedTextField(
+                        value = rejectNote,
+                        onValueChange = { rejectNote = it },
+                        label = { Text("Nota / rechazo") },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                vm.decide(sel.id, true, rejectNote.ifBlank { null })
+                                selected = null
+                            },
+                            enabled = !s.acting,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                        ) { Text("Aprobar") }
+                        OutlinedButton(
+                            onClick = {
+                                vm.decide(sel.id, false, rejectNote)
+                                selected = null
+                            },
+                            enabled = !s.acting,
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Rechazar", color = Color(0xFFC62828)) }
+                    }
+                }
+            }
+            if (!s.message.isNullOrBlank()) {
+                item {
+                    Text(s.message!!, color = if (s.message!!.startsWith("✅")) Color(0xFF2E7D32) else Color(0xFFC62828))
+                }
+            }
+        }
+        return
+    }
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            Button(onClick = { showCreate = true; vm.clearMessage() }) { Text("+ Gasto") }
+        }
+        FinanceScaffold(
+            kpis = listOf(
+                Triple("Gastos", "${s.items.size}", null),
+                Triple("Total", fmtMoney(vm.total()), Color(0xFFC62828)),
+                Triple("Pendiente", fmtMoney(vm.pendingTotal()), Color(0xFFE65100)),
+            ),
+            query = s.query,
+            onQuery = vm::setQuery,
+            placeholder = "Buscar gasto…",
+            loading = s.loading,
+            isEmpty = vm.filtered().isEmpty(),
+            empty = "Sin gastos — registra el primero",
+        ) {
+            items(vm.filtered().take(80), key = { it.id }) { e ->
+                Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selected = e }) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(e.concepto ?: "Gasto", fontWeight = FontWeight.Bold)
+                        Text(e.usuario?.nombre ?: "", style = MaterialTheme.typography.bodySmall)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(fmtMoney(e.displayAmount()), fontWeight = FontWeight.SemiBold, color = Color(0xFFC62828))
+                            Text(e.displayStatus(), style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
             }
@@ -143,6 +295,9 @@ data class InvoicesRichUiState(
     val query: String = "",
     val statusFilter: String = "todos",
     val items: List<InvoiceDto> = emptyList(),
+    val acting: Boolean = false,
+    val message: String? = null,
+    val detail: Map<String, Any?>? = null,
 )
 
 class InvoicesRichViewModel(app: Application) : AndroidViewModel(app) {
@@ -153,12 +308,60 @@ class InvoicesRichViewModel(app: Application) : AndroidViewModel(app) {
     init { refresh() }
     fun setQuery(v: String) = _state.update { it.copy(query = v) }
     fun setStatus(v: String) = _state.update { it.copy(statusFilter = v) }
+    fun clearMessage() = _state.update { it.copy(message = null) }
 
     fun refresh() {
         _state.update { it.copy(loading = true) }
         viewModelScope.launch {
             val list = withContext(Dispatchers.IO) { repo.invoices() }
             _state.update { it.copy(loading = false, items = list) }
+        }
+    }
+
+    fun loadDetail(id: Long) {
+        viewModelScope.launch {
+            val d = withContext(Dispatchers.IO) { runCatching { repo.invoiceDetail(id) }.getOrNull() }
+            _state.update { it.copy(detail = d) }
+        }
+    }
+
+    fun registerPayment(id: Long, amount: Double, method: String?, reference: String?, onDone: () -> Unit) {
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                val date = java.time.LocalDate.now().toString()
+                withContext(Dispatchers.IO) {
+                    repo.registerInvoicePayment(
+                        id = id,
+                        amount = amount,
+                        paymentDate = date,
+                        method = method,
+                        reference = reference,
+                    )
+                }
+                _state.update { it.copy(acting = false, message = "✅ Pago registrado") }
+                loadDetail(id)
+                refresh()
+                onDone()
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+            }
+        }
+    }
+
+    fun evaluateMatch(id: Long) {
+        _state.update { it.copy(acting = true, message = null) }
+        viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) { repo.evaluateInvoiceMatch(id) }
+                val status = result["matchStatus"]?.toString()
+                    ?: result["status"]?.toString()
+                    ?: "evaluado"
+                _state.update { it.copy(acting = false, message = "✅ 3-way match: $status", detail = result) }
+                loadDetail(id)
+            } catch (e: Exception) {
+                _state.update { it.copy(acting = false, message = "❌ ${e.message ?: "Error"}") }
+            }
         }
     }
 
@@ -189,16 +392,115 @@ class InvoicesRichViewModel(app: Application) : AndroidViewModel(app) {
 @Composable
 fun InvoicesRichScreen(vm: InvoicesRichViewModel = viewModel()) {
     val s by vm.state.collectAsState()
+    val context = LocalContext.current
+    val user = remember { AuthRepository(context).loadSession() }
+    val canManage = user?.isSuperAdmin == true ||
+        (user?.permissions ?: emptyList()).any {
+            it.contains("invoicing.manage") || it.contains("contabilidad.manage") || it.contains("console.admin")
+        }
     val statuses = listOf("todos", "pagada", "pendiente", "cancelada", "vencida")
     var selected by remember { mutableStateOf<InvoiceDto?>(null) }
+    var payAmount by remember { mutableStateOf("") }
+    var payMethod by remember { mutableStateOf("TRANSFERENCIA") }
+    var payRef by remember { mutableStateOf("") }
+
     val sel = selected
     if (sel != null) {
-        FinanceDetailScaffold(onBack = { selected = null }) {
+        LaunchedEffect(sel.id) { vm.loadDetail(sel.id) }
+        val detail = s.detail
+        val pdfUrl = (detail?.get("pdfUrl") as? String)?.takeIf { it.isNotBlank() } ?: sel.pdfUrl
+        val matchStatus = detail?.get("matchStatus")?.toString()
+            ?: detail?.get("threeWayMatchStatus")?.toString()
+            ?: sel.matchStatus
+        val balance = (detail?.get("balance") as? Number)?.toDouble()
+            ?: (detail?.get("amountDue") as? Number)?.toDouble()
+            ?: sel.balance
+        val pending = (sel.status ?: "").lowercase().let {
+            it.contains("pendiente") || it.contains("parcial") || it.contains("open") || it.contains("posted")
+        }
+        FinanceDetailScaffold(onBack = { selected = null; vm.clearMessage(); payAmount = ""; payRef = "" }) {
             item { Text(sel.folio ?: "Factura #${sel.id}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium) }
             item { FinanceRow("Cliente", sel.clientName) }
             item { FinanceRow("Total", fmtMoney(sel.total)) }
+            if (balance != null) item { FinanceRow("Saldo", fmtMoney(balance)) }
             item { FinanceRow("Estatus", sel.status) }
             item { FinanceRow("Fecha", sel.issueDate?.take(10)) }
+            if (!matchStatus.isNullOrBlank()) item { FinanceRow("3-way match", matchStatus) }
+            if (!pdfUrl.isNullOrBlank()) {
+                item {
+                    OutlinedButton(
+                        onClick = {
+                            runCatching {
+                                val uri = android.net.Uri.parse(pdfUrl)
+                                context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri))
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Abrir PDF") }
+                }
+            }
+            if (canManage) {
+                item {
+                    Button(
+                        onClick = { vm.evaluateMatch(sel.id) },
+                        enabled = !s.acting,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488)),
+                    ) { Text(if (s.acting) "Evaluando…" else "Evaluar 3-way match") }
+                }
+            }
+            if (canManage && pending) {
+                item { Text("Registrar pago", fontWeight = FontWeight.SemiBold) }
+                item {
+                    OutlinedTextField(
+                        value = payAmount,
+                        onValueChange = { payAmount = it.filter { c -> c.isDigit() || c == '.' } },
+                        label = { Text("Monto") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        value = payMethod,
+                        onValueChange = { payMethod = it },
+                        label = { Text("Método") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                }
+                item {
+                    OutlinedTextField(
+                        value = payRef,
+                        onValueChange = { payRef = it },
+                        label = { Text("Referencia") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                }
+                item {
+                    Button(
+                        onClick = {
+                            val amt = payAmount.toDoubleOrNull() ?: return@Button
+                            if (amt <= 0) return@Button
+                            vm.registerPayment(sel.id, amt, payMethod.ifBlank { null }, payRef.ifBlank { null }) {
+                                payAmount = ""
+                                payRef = ""
+                            }
+                        },
+                        enabled = !s.acting,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(if (s.acting) "Guardando…" else "Registrar pago") }
+                }
+            }
+            if (!s.message.isNullOrBlank()) {
+                item {
+                    Text(
+                        s.message!!,
+                        color = if (s.message!!.startsWith("✅")) Color(0xFF2E7D32) else Color(0xFFC62828),
+                    )
+                }
+            }
         }
         return
     }

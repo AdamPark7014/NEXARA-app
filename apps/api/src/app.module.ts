@@ -85,6 +85,8 @@ import { PageContentModule } from './page-content/page-content.module.js';
 import { CaseStudiesModule } from './case-studies/case-studies.module.js';
 import { SocialPostsModule } from './social-posts/social-posts.module.js';
 import { InternalComunicadosModule } from './internal-comunicados/internal-comunicados.module.js';
+import { WebhooksModule } from './webhooks/webhooks.module.js';
+import { ScimModule } from './scim/scim.module.js';
 
 @Module({
   imports: [
@@ -167,6 +169,8 @@ import { InternalComunicadosModule } from './internal-comunicados/internal-comun
     ExportsModule,
     NocModule,
     LabModule,
+    WebhooksModule,
+    ScimModule,
   ],
   controllers: [AppController, ExcelExportController, ExcelImportController],
   providers: [

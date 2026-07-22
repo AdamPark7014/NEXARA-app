@@ -836,23 +836,96 @@ fun VentasPipelineScreen() {
     val ctx = LocalContext.current
     val vm: CrmOportunidadesViewModel = viewModel(factory = crmVmFactory<CrmOportunidadesViewModel>(ctx))
     val state by vm.state.collectAsState()
+    val stageOrder = OPPORTUNITY_STAGES.map { it.first }
     val grouped = remember(state.items) {
-        state.items.groupBy { mStr(it, "stage", "etapa").ifBlank { "Sin etapa" } }.toList().sortedBy { it.first }
+        val map = state.items.groupBy { mStr(it, "stage", "etapa").ifBlank { "Sin etapa" } }
+        val ordered = stageOrder.mapNotNull { key ->
+            val label = OPPORTUNITY_STAGES.firstOrNull { it.first == key }?.second ?: key
+            val items = map[key] ?: map[label]
+            if (items.isNullOrEmpty()) null else (label to items)
+        }
+        val extras = map.filterKeys { key ->
+            stageOrder.none { it == key } && OPPORTUNITY_STAGES.none { it.second == key }
+        }.toList().sortedBy { it.first }
+        ordered + extras
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (state.isLoading) item { Box(Modifier.fillMaxWidth().padding(40.dp), Alignment.Center) { CircularProgressIndicator() } }
+    val totalValue = state.items.sumOf { mDouble(it, "value", "amount") ?: 0.0 }
+    val weighted = state.items.sumOf {
+        val v = mDouble(it, "value", "amount") ?: 0.0
+        val p = (mDouble(it, "probability") ?: 20.0) / 100.0
+        v * p
+    }
+    val won = state.items.count { mStr(it, "stage", "etapa").equals("WON", true) || mStr(it, "stage").equals("Ganada", true) }
+
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Text("Pipeline comercial", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                "Valor · ponderado · conversión por etapa",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CrmKpiMini(Modifier.weight(1f), "Pipeline", fmtMxnShort(totalValue))
+                CrmKpiMini(Modifier.weight(1f), "Ponderado", fmtMxnShort(weighted))
+                CrmKpiMini(Modifier.weight(1f), "Ganadas", "$won")
+            }
+        }
+        if (state.isLoading) {
+            item { Box(Modifier.fillMaxWidth().padding(40.dp), Alignment.Center) { CircularProgressIndicator() } }
+        }
         grouped.forEach { (stage, items) ->
+            val stageValue = items.sumOf { mDouble(it, "value", "amount") ?: 0.0 }
             item {
-                Text(stage, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                    Text(stage, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        "${items.size} · ${fmtMxnShort(stageValue)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = CrmGreen,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
             items(items, key = { mStr(it, "id") }) { o ->
                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                    Column(Modifier.padding(12.dp)) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(mStr(o, "title", "name"), fontWeight = FontWeight.SemiBold)
-                        Text(fmtMxnShort(mDouble(o, "value", "amount") ?: 0.0), color = CrmGreen, fontWeight = FontWeight.Bold)
+                        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                            Text(fmtMxnShort(mDouble(o, "value", "amount") ?: 0.0), color = CrmGreen, fontWeight = FontWeight.Bold)
+                            val prob = mDouble(o, "probability")
+                            if (prob != null) {
+                                Text("${prob.toInt()}% prob.", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                        val client = mStr(o, "clientName", "accountName")
+                        if (client.isNotBlank()) {
+                            Text(client, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }
+        }
+        if (!state.isLoading && grouped.isEmpty()) {
+            item {
+                Text("Sin oportunidades en pipeline", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CrmKpiMini(modifier: Modifier, label: String, value: String) {
+    Card(modifier = modifier, shape = RoundedCornerShape(12.dp)) {
+        Column(Modifier.padding(10.dp)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
         }
     }
 }

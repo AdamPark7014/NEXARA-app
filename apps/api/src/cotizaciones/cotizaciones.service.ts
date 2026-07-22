@@ -18,6 +18,7 @@ import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { VentasService } from '../ventas/ventas.service.js';
+import { resolveRequiredCompanyId, companyWhere } from '../common/tenant/tenant-scope.js';
 import { randomBytes } from 'crypto';
 import nodemailer from 'nodemailer';
 import fs from 'fs/promises';
@@ -190,6 +191,18 @@ export class CotizacionesService {
       clientAddress = clientAddress || salesClient.fiscalAddress;
     }
 
+    const companyId = await resolveRequiredCompanyId(
+      this.db,
+      (opportunityId
+        ? (await this.db.salesOpportunity.findUnique({ where: { id: opportunityId }, select: { companyId: true } }))
+            ?.companyId
+        : null) ??
+        (salesClientId
+          ? (await this.db.salesClient.findUnique({ where: { id: salesClientId }, select: { companyId: true } }))
+              ?.companyId
+          : null),
+    );
+
     const data: Prisma.CotizacionUncheckedCreateInput = {
       quoteNumber,
       issueDate: this.parseDate(dto.issueDate) || new Date(),
@@ -218,6 +231,7 @@ export class CotizacionesService {
       retentionTotal: round2(totals.retentionTotal),
       total: round2(totals.total),
       createdById: createdById || null,
+      companyId,
       items: { create: this.buildItemData(items) },
     };
 
@@ -265,10 +279,21 @@ export class CotizacionesService {
     return created;
   }
 
-  async findAll(query?: PaginationQueryDto) {
+  async findAll(query?: PaginationQueryDto, companyId?: number | null) {
     const include = { items: true, createdBy: true };
+    const tenant = companyWhere(companyId ?? null);
     if (query?.limit) {
-      const where = query.search ? { OR: [{ quoteNumber: { contains: query.search, mode: 'insensitive' as const } }, { clientName: { contains: query.search, mode: 'insensitive' as const } }] } : undefined;
+      const where = {
+        ...tenant,
+        ...(query.search
+          ? {
+              OR: [
+                { quoteNumber: { contains: query.search, mode: 'insensitive' as const } },
+                { clientName: { contains: query.search, mode: 'insensitive' as const } },
+              ],
+            }
+          : {}),
+      };
       const [data, total] = await Promise.all([
         this.db.cotizacion.findMany({ where, orderBy: { createdAt: 'desc' }, include, skip: query.skip, take: query.take }),
         this.db.cotizacion.count({ where }),
@@ -276,6 +301,7 @@ export class CotizacionesService {
       return buildPaginatedResponse(data, total, query);
     }
     return this.db.cotizacion.findMany({
+      where: tenant,
       orderBy: { createdAt: 'desc' },
       include,
     });

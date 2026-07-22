@@ -140,7 +140,11 @@ private fun matchesFilter(estatus: String, filter: String): Boolean {
 // ── Activity Detail Screen ───────────────────────────────────────────────────
 
 @Composable
-fun ActivityDetailScreen(activity: ActivityDto, onBack: () -> Unit) {
+fun ActivityDetailScreen(
+    activity: ActivityDto,
+    onBack: () -> Unit,
+    onCaptureEvidence: ((Long) -> Unit)? = null,
+) {
     val context = LocalContext.current
     val repo = remember(context) { ConsoleRepository(context) }
     var selectedTab by remember { mutableStateOf(0) }
@@ -153,7 +157,6 @@ fun ActivityDetailScreen(activity: ActivityDto, onBack: () -> Unit) {
         loadingEv = true
         runCatching {
             withContext(Dispatchers.IO) {
-                @Suppress("UNCHECKED_CAST")
                 val dto = repo.evidenceByActivity(activity.id)
                 val map = mutableMapOf<String, Any?>()
                 dto.javaClass.declaredFields.forEach { f ->
@@ -167,7 +170,6 @@ fun ActivityDetailScreen(activity: ActivityDto, onBack: () -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        // Back button + title
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -182,7 +184,13 @@ fun ActivityDetailScreen(activity: ActivityDto, onBack: () -> Unit) {
             )
         }
 
-        // Status + Tab row
+        if (onCaptureEvidence != null) {
+            Button(
+                onClick = { onCaptureEvidence(activity.id) },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            ) { Text("📸 Capturar / continuar evidencias") }
+        }
+
         TabRow(selectedTabIndex = selectedTab) {
             tabs.forEachIndexed { i, label ->
                 Tab(selected = selectedTab == i, onClick = { selectedTab = i }, text = { Text(label, fontSize = 12.sp) })
@@ -191,9 +199,11 @@ fun ActivityDetailScreen(activity: ActivityDto, onBack: () -> Unit) {
 
         when (selectedTab) {
             0 -> ActivityInfoTab(activity, statusColor)
-            1 -> ActivityEvidenceTab(evidence, loadingEv)
-            2 -> ActivityPlaceholderTab("Sin viáticos vinculados")
-            else -> ActivityPlaceholderTab("Sin aprobaciones registradas")
+            1 -> ActivityEvidenceTab(evidence, loadingEv, onCapture = {
+                onCaptureEvidence?.invoke(activity.id)
+            })
+            2 -> ActivityPlaceholderTab("Abre Viáticos desde Consola para vincular a esta AN")
+            else -> ActivityPlaceholderTab("Las aprobaciones aparecen en Workflow / Evidencias")
         }
     }
 }
@@ -219,15 +229,26 @@ private fun ActivityInfoTab(a: ActivityDto, statusColor: Color) {
 }
 
 @Composable
-private fun ActivityEvidenceTab(ev: Map<String, Any?>, loading: Boolean) {
+private fun ActivityEvidenceTab(
+    ev: Map<String, Any?>,
+    loading: Boolean,
+    onCapture: (() -> Unit)? = null,
+) {
     if (loading) {
         Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
         return
     }
     val photos = (ev["evidencePhotos"] as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
     val entryPhoto = ev["entryPhoto"] as? String
-    val exitPhoto  = ev["exitPhoto"]  as? String
+    val exitPhoto = ev["exitPhoto"] as? String
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (onCapture != null) {
+            item {
+                OutlinedButton(onClick = onCapture, modifier = Modifier.fillMaxWidth()) {
+                    Text("Ir al flujo de evidencias")
+                }
+            }
+        }
         if (entryPhoto != null) item {
             Text("📷 Foto de entrada: ${entryPhoto.take(60)}...", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
         }
@@ -275,12 +296,28 @@ fun ConsoleActivitiesScreen(
     val isSuperAdmin = user?.isSuperAdmin == true
     val isAdmin = !isSuperAdmin && (user?.permissions ?: emptyList()).contains("console.admin")
     var selectedActivity by remember { mutableStateOf<ActivityDto?>(null) }
+    var evidenceFocusId by remember { mutableStateOf<Long?>(null) }
 
     val vm: ConsoleActivitiesViewModel = viewModel()
     val state by vm.state.collectAsState()
 
+    if (evidenceFocusId != null) {
+        Column(Modifier.fillMaxSize()) {
+            TextButton(
+                onClick = { evidenceFocusId = null },
+                modifier = Modifier.padding(8.dp),
+            ) { Text("← Volver a actividad") }
+            ConsoleEvidencesScreen(mode = "user", initialActivityId = evidenceFocusId)
+        }
+        return
+    }
+
     if (selectedActivity != null) {
-        ActivityDetailScreen(activity = selectedActivity!!, onBack = { selectedActivity = null })
+        ActivityDetailScreen(
+            activity = selectedActivity!!,
+            onBack = { selectedActivity = null },
+            onCaptureEvidence = { id -> evidenceFocusId = id },
+        )
         return
     }
 

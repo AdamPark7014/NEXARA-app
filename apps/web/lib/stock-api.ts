@@ -162,3 +162,68 @@ export async function getStockValuation(token: string, warehouseId?: number) {
   );
   return unwrapArray(raw);
 }
+
+export type InventoryInsights = {
+  generatedAt: string;
+  kpis: {
+    skuLocations: number;
+    totalValue: number;
+    zeroStock: number;
+    lowStock: number;
+    overstock: number;
+    deadStock: number;
+    deadStockValue: number;
+    cogs30d: number;
+    receiptsValue30d: number;
+    turnoverAnnualProxy: number;
+    fillHealthyPct: number;
+    abcA: number;
+    abcB: number;
+    abcC: number;
+  };
+  aging: { d0_30: number; d30_60: number; d60_90: number; d90_plus: number };
+  trends: {
+    inflow14d: Array<{ date: string; qty: number }>;
+    outflow14d: Array<{ date: string; qty: number }>;
+  };
+  byWarehouse: Array<{ name: string; skus: number; value: number; low: number }>;
+  topMovers: Array<{
+    productId: number;
+    sku: string;
+    name: string;
+    dispatched30d: number;
+    valueOnHand: number;
+    daysOfCover: number | null;
+  }>;
+  slowMovers: Array<{
+    productId: number;
+    sku: string;
+    name: string;
+    quantity: number;
+    value: number;
+    idleDays: number | null;
+  }>;
+  reorderSuggestions: Array<{
+    productId: number;
+    sku: string;
+    name: string;
+    warehouse: string;
+    onHand: number;
+    reorderPoint: number;
+    suggestedQty: number;
+    estimatedCost: number;
+  }>;
+  expiringLots: Array<{
+    id: number;
+    lotNumber: string;
+    product: string;
+    sku: string;
+    expirationDate: string;
+    daysLeft: number;
+  }>;
+  alerts: Array<{ severity: "danger" | "warning"; message: string }>;
+};
+
+export async function getInventoryInsights(token: string) {
+  return stockRequest<InventoryInsights>("stock/insights", token, {}, "No se pudo cargar inteligencia de inventario");
+}

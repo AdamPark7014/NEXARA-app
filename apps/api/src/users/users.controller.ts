@@ -108,6 +108,83 @@ export class UsersController {
     return this.usersService.findAllVisible(user, query);
   }
 
+  @Get('iam/insights')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_VIEW] })
+  async iamInsights(@CurrentUser() user: any) {
+    return this.usersService.getIamInsights(user);
+  }
+
+  @Post('bulk/active')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
+  async bulkActive(@Body() body: { ids: number[]; isActive: boolean }) {
+    return this.usersService.bulkSetActive(body?.ids ?? [], Boolean(body?.isActive));
+  }
+
+  @Get(':id/sessions')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
+  async listSessions(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.listUserSessions(id);
+  }
+
+  @Get(':id/auth-activity')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
+  async authActivity(@Param('id', ParseIntPipe) id: number, @Query('limit') limit?: string) {
+    return this.usersService.getUserAuthActivity(id, limit ? Number(limit) : 40);
+  }
+
+  @Post(':id/sessions/revoke-all')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
+  async revokeAllSessions(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.revokeAllUserSessions(id);
+  }
+
+  @Post('sessions/:sessionId/revoke')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
+  async revokeSession(@Param('sessionId', ParseIntPipe) sessionId: number) {
+    return this.usersService.revokeSession(sessionId);
+  }
+
+  @Post(':id/unlock')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
+  async unlock(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.unlockUser(id);
+  }
+
+  @Get('mfa/status')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.PEOPLE_VIEW] })
+  mfaStatus(@CurrentUser() user: any) {
+    return this.usersService.getMfaStatus(user.id);
+  }
+
+  @Post('mfa/setup')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.PEOPLE_VIEW] })
+  mfaSetup(@CurrentUser() user: any) {
+    return this.usersService.beginMfaSetup(user.id);
+  }
+
+  @Post('mfa/confirm')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.PEOPLE_VIEW] })
+  mfaConfirm(@CurrentUser() user: any, @Body('token') token: string) {
+    return this.usersService.confirmMfaSetup(user.id, token);
+  }
+
+  @Post('mfa/disable')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.PEOPLE_VIEW] })
+  mfaDisable(@CurrentUser() user: any, @Body('token') token?: string) {
+    return this.usersService.disableMfa(user.id, token);
+  }
+
   @Get('roles')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({

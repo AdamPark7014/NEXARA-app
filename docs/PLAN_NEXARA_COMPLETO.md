@@ -7,9 +7,28 @@
 
 Documento vivo. El resumen ejecutivo corto sigue en `docs/ROADMAP_ODOO_PARITY.md`.
 
+## Enterprise transformation log (2026-07-21)
+
+| Iter | Módulo | Entrega |
+|------|--------|---------|
+| 1 | IAM / Usuarios | Sesiones JWT (`UserSession`), lockout, lastLogin*, risk score, `GET users/iam/insights`, force logout, bulk activate, MFA TOTP + login UI, UI Command Center |
+| 2 | Almacén | `GET stock/insights` — rotación, aging, ABC, dead stock, reorden, trends; tab Inteligencia en UI |
+| 3 | HR / Personas | `hr/dashboard` → People Intelligence (puntualidad, carga, leaves queue, trends); KPIs page rediseñada |
+| 4 | Support / SLA | `GET sla/insights` — MTTR, backlog aging, tech ranking, trends, inbox; SLA Command Center UI |
+| 5 | Audit + Webhooks | `MutationAuditInterceptor` global; outbound webhooks HMAC + retries; emits dominio (pago, opp, SLA, stock, lock) |
+| 6 | CRM Intelligence | LTV, churn risk, cohortes, forecast ponderado en insights/reportes |
+| 7 | Finance Intelligence | Aging AR/AP, cashflow 90d, DSO/DPO, runway; tab Inteligencia contable |
+| 8 | Multi-tenant hard (base) | `companyWhere` + IDOR assert en facturas/asientos/gastos/OC; `CompanyApiKey` + UI; soft-scope legacy null |
+| 9 | SSO + packaging | OIDC genérico, billing/seats/metering, scope CRM/warehouse/tickets, audit CSV+purge, theater MRP/HSE deferred |
+| 10 | Hard SaaS | Stripe Checkout+Portal+webhooks, SCIM v2 Users, companyId NOT NULL, AuditLog SoT |
+| 11 | Tenant OPS/CRM | Activity/ServiceClient/OpsProject/Product/SalesClient/Lead/Cotizacion NOT NULL; SCIM Groups; audit tenant+actor |
+| 12 | Tenant harden | Webhooks companyId + emit scoped; companyWhere lists (ops/viáticos/pagos/stock); SCIM per-tenant via ApiKey scope=scim + seats |
+
+Pendiente inmediato: configurar env prod (STRIPE_*, OIDC_*, SCIM_*). Opcional: Chat/MaintenanceContract tenant, GL/Bank/Period, plan gates.
+
 ---
 
-## 0. Visión y definición de “hecho”
+
 
 NEXARA debe quedar como **ERP vertical de servicios tecnológicos MX** con:
 
@@ -130,15 +149,15 @@ NEXARA debe quedar como **ERP vertical de servicios tecnológicos MX** con:
 ### Sprint P0-F — Auth portal + RBAC cierre
 | # | Entrega | Criterio |
 |---|---------|----------|
-| F1 | Unificar `client-auth` + `branch-auth` | Un login portal, scopes por sucursal |
-| F2 | Apagar flags `acceso*` | Solo `roleKey` + url-matrix |
-| F3 | Audit login | Login fallido/exitoso en AuditLog |
+| F1 | Unificar `client-auth` + `branch-auth` | ✅ `POST /portal/login` (aliases deprecated) |
+| F2 | Apagar flags `acceso*` | ✅ Ignorados si hay `roleKey`; permisos desde v2 + url-matrix |
+| F3 | Audit login | ✅ `LOGIN_SUCCESS` / `LOGIN_FAILED` (Auth + PortalAuth) |
 
 ### Sprint P0-G — CMMS / campo
 | # | Entrega | Criterio |
 |---|---------|----------|
-| G1 | Contrato visita → `Activity` canónica | Sin OT duplicada |
-| G2 | Evidencia única | Preferir `ActivityEvidence`; plan deprecar `Evidence` legacy |
+| G1 | Contrato visita → `Activity` canónica | ✅ Cron + generate-ot + complete materializan OT (`activityId`) |
+| G2 | Evidencia única | Preferir `ActivityEvidence` (flujo campo); `/api/evidences` legacy compat |
 
 ---
 
@@ -213,14 +232,14 @@ NEXARA debe quedar como **ERP vertical de servicios tecnológicos MX** con:
 - [x] Auto-póliza AR timbre/cobro
 - [x] Auto-póliza gastos/viáticos/pagos
 - [x] Auto-póliza recepción compra
-- [ ] Auto-póliza pago a proveedor (CXP → bancos)
-- [ ] Auto-póliza COGS al despacho
+- [x] Auto-póliza pago a proveedor (CXP → bancos)
+- [x] Auto-póliza COGS al despacho
 - [ ] XML SAT + DIOT
-- [ ] Periodo fiscal con bloqueo de posteo
+- [x] Periodo fiscal con bloqueo de posteo
 
 ### 6.2 Compras / almacén
 - [x] GR → stock + AP draft + póliza
-- [ ] 3-way match
+- [x] 3-way match (MVP: evaluate + gate pago + waive)
 - [ ] RFQ multi-proveedor
 - [ ] Conteos / reservas
 - [ ] Landéd cost
@@ -313,3 +332,5 @@ NEXARA debe quedar como **ERP vertical de servicios tecnológicos MX** con:
 | P0-E Clientes | ✅ código | CRM↔OPS auto-link; legacy `/clients` writes bloqueadas; cotizaciones con `salesClientId` |
 | P0-F Portal/RBAC | ✅ código | `POST /portal/login`; flags `acceso*` ignorados con roleKey; Audit LOGIN_* |
 | P0-G CMMS | ✅ base | Visita→Activity canónica; workType PREVENTIVE_INVENTORY |
+| P1 AP pay + 3-way | ✅ código | Póliza PAY CXP→bancos; matchStatus + gate pago; migración `20260721160000_*` |
+| P1 COGS + periodo | ✅ código | `SM-COGS-*` Dr 501.01 Cr 115.01; bloqueo periodo cerrado + reopen |

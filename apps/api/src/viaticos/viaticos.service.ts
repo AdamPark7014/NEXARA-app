@@ -15,6 +15,7 @@ import { ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
 import { generateViaticsReportPdf } from './viatics-report-pdf.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { resolveRequiredCompanyId, companyWhere } from '../common/tenant/tenant-scope.js';
 
 export const VIATIC_CATEGORIES = [
   'COMBUSTIBLE',
@@ -54,9 +55,10 @@ export class ViaticosService {
   }
 
   /** Scope de listado/detalle/reportes según rol del actor. */
-  private buildListWhere(currentUser?: any): Record<string, unknown> {
+  private buildListWhere(currentUser?: any, companyId?: number | null): Record<string, unknown> {
+    const tenant = companyWhere(companyId ?? null);
     if (!currentUser || currentUser.isSuperAdmin) {
-      return { deletedAt: null };
+      return { deletedAt: null, ...tenant };
     }
     if (
       currentUser.permissions?.includes('CONSOLE_ADMIN') ||
@@ -64,10 +66,11 @@ export class ViaticosService {
     ) {
       const role = this.resolveActorRole(currentUser);
       if (!currentUser.departmentId || role === ROLES.CEO || role === ROLES.DIR_ADMIN || role === ROLES.CONTABILIDAD) {
-        return { deletedAt: null };
+        return { deletedAt: null, ...tenant };
       }
       return {
         deletedAt: null,
+        ...tenant,
         User: {
           AND: [
             { departmentId: currentUser.departmentId },
@@ -76,14 +79,14 @@ export class ViaticosService {
         },
       };
     }
-    return { deletedAt: null, usuarioId: currentUser.id };
+    return { deletedAt: null, usuarioId: currentUser.id, ...tenant };
   }
 
   private assertCanRequest(actor: any) {
     const role = this.resolveActorRole(actor);
     if (actor?.isSuperAdmin || (role && CEO_NO_REQUEST.has(role))) {
       throw new ForbiddenException(
-        'El dueño / CEO no solicita viáticos — solo autoriza el cierre del flujo.',
+        'El CEO no solicita viáticos — solo autoriza el cierre del flujo.',
       );
     }
   }
@@ -156,15 +159,10 @@ export class ViaticosService {
     }
     const vehicleId = dto.vehicleId ? Number(dto.vehicleId) : null;
     const categoria = this.normalizeCategory(dto.categoria);
-    const companyId =
-      (dto.companyId ? Number(dto.companyId) : null) ||
-      (
-        await this.prisma.companyProfile.findFirst({
-          where: { isPrimary: true, isActive: true },
-          select: { id: true },
-        })
-      )?.id ||
-      null;
+    const companyId = await resolveRequiredCompanyId(
+      this.prisma,
+      dto.companyId ? Number(dto.companyId) : null,
+    );
 
     const viatico = await this.prisma['viatico'].create({
       data: {
@@ -174,6 +172,7 @@ export class ViaticosService {
         vehicleId,
         companyId,
         categoria,
+        origen: 'SOLICITUD',
         montoSolicitado: dto.montoSolicitado,
         motivo: dto.motivo ?? null,
         ticketEvidenciaUrl: dto.ticketEvidenciaUrl,
@@ -208,14 +207,106 @@ export class ViaticosService {
     return viatico;
   }
 
-  async findAll(currentUser?: any, query?: PaginationQueryDto) {
+  /**
+   * Asigna un viático a un usuario para una actividad/proyecto.
+   * No requiere evidencia (presupuesto anticipado); entra al mismo flujo de aprobación.
+   */
+  async assign(dto: any, actor: any) {
+    if (!actor?.id) {
+      throw new ForbiddenException('Se requiere autenticación para asignar viáticos');
+    }
+    const usuarioId = Number(dto.usuarioId);
+    if (!usuarioId) {
+      throw new BadRequestException('Debes indicar el usuario beneficiario');
+    }
+    const actividadId = dto.actividadId ? Number(dto.actividadId) : null;
+    let projectId = dto.projectId ? Number(dto.projectId) : null;
+    projectId = await this.resolveSalesProjectId(actividadId, projectId);
+    if (!actividadId && !projectId) {
+      throw new BadRequestException(
+        'La asignación debe ligarse a una actividad o a un proyecto.',
+      );
+    }
+
+    const beneficiary = await this.prisma.user.findUnique({
+      where: { id: usuarioId },
+      select: { id: true, nombre: true, isActive: true },
+    });
+    if (!beneficiary || beneficiary.isActive === false) {
+      throw new BadRequestException('El usuario beneficiario no existe o está inactivo');
+    }
+
+    const vehicleId = dto.vehicleId ? Number(dto.vehicleId) : null;
+    const categoria = this.normalizeCategory(dto.categoria);
+    const companyId = await resolveRequiredCompanyId(
+      this.prisma,
+      dto.companyId ? Number(dto.companyId) : null,
+    );
+    const motivo =
+      dto.motivo ??
+      dto.concepto ??
+      `Viático asignado${actividadId ? ` · OT #${actividadId}` : ''}`;
+
+    const viatico = await this.prisma['viatico'].create({
+      data: {
+        usuarioId,
+        actividadId,
+        projectId,
+        vehicleId,
+        companyId,
+        categoria,
+        origen: 'ASIGNACION',
+        asignadoPorId: Number(actor.id),
+        montoSolicitado: dto.montoSolicitado,
+        motivo,
+        ticketEvidenciaUrl: null,
+        approvalStep: 0,
+        approvalTrail: [],
+        estatus: 'Pendiente',
+      },
+      include: {
+        User: { select: { nombre: true, id: true } },
+        Activity: { select: { anNumber: true, id: true } },
+        project: { select: { id: true, name: true } },
+        asignadoPor: { select: { id: true, nombre: true } },
+      },
+    });
+
+    const amount = this.amountOf(viatico);
+    const assignerName = actor?.nombre || 'Administración';
+    await this.notificationHierarchy.notifyViaticAssignedToUser(
+      usuarioId,
+      viatico.id,
+      assignerName,
+      amount,
+      motivo,
+    );
+    await this.notificationHierarchy.notifyViaticRequested(
+      usuarioId,
+      viatico.id,
+      `${beneficiary.nombre} (asignado por ${assignerName})`,
+      amount,
+    );
+    this.autoApproval
+      .evaluate({
+        entityType: 'VIATIC',
+        entityId: viatico.id,
+        userId: usuarioId,
+        payload: { amount, outOfPolicy: false, origen: 'ASIGNACION' },
+      })
+      .catch(() => undefined);
+
+    return viatico;
+  }
+
+  async findAll(currentUser?: any, query?: PaginationQueryDto, companyId?: number | null) {
     const include = {
       Activity: true,
       User: true,
       project: { select: { id: true, name: true } },
       vehicle: { select: { id: true, nombre: true, placas: true } },
     };
-    const where = this.buildListWhere(currentUser);
+    const where = this.buildListWhere(currentUser, companyId);
 
     const mapRow = (row: any) => ({
       ...row,

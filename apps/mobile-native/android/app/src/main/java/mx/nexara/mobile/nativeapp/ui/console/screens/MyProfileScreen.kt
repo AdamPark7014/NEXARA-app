@@ -32,6 +32,7 @@ import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 @Composable
 fun MyProfileScreen(
     contentPadding: PaddingValues = PaddingValues(20.dp),
+    onOpenOfflineQueue: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val repo = remember(context) { AuthRepository(context) }
@@ -133,6 +134,33 @@ fun MyProfileScreen(
                     if (user.clientId != null) ProfileInfoRow("Client ID", user.clientId.toString(), Teal, Sub)
                     if (user.branchId != null) ProfileInfoRow("Branch ID", user.branchId.toString(), Teal, Sub)
                     ProfileInfoRow("ID de usuario", user.id.toString(), Teal, Sub)
+                }
+            }
+        }
+
+        if (onOpenOfflineQueue != null) {
+            item {
+                Card(
+                    onClick = onOpenOfflineQueue,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF6FF)),
+                ) {
+                    Row(
+                        Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Cola offline", fontWeight = FontWeight.SemiBold, color = Slate)
+                            Text(
+                                "Ver y sincronizar cambios pendientes",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Sub,
+                            )
+                        }
+                        Text("›", color = Sub, fontSize = 20.sp)
+                    }
                 }
             }
         }

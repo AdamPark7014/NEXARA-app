@@ -357,6 +357,32 @@ export class NotificationHierarchyService {
     }
   }
 
+  /** Notifica al beneficiario cuando un manager le asigna un viático. */
+  async notifyViaticAssignedToUser(
+    userId: number,
+    viaticId: number,
+    assignerName: string,
+    amount: number,
+    motivo?: string | null,
+  ) {
+    try {
+      const detail = motivo ? ` · ${motivo}` : '';
+      await this.notificationsService.createNotification({
+        userId,
+        type: 'VIATICO_ASSIGNED',
+        category: 'viatics',
+        title: '💳 Viático asignado',
+        message: `${assignerName} te asignó un viático de $${amount.toFixed(2)}${detail}`,
+        relatedEntityId: viaticId,
+        entityType: 'Viatico',
+        relatedUrl: `/ops/my-viatics?highlight=${viaticId}`,
+        priority: 'high',
+      });
+    } catch (error) {
+      this.logger.error(`Error notifying viatico assigned to user:`, error);
+    }
+  }
+
   /**
    * Notificar aprobación/rechazo de viático
    */

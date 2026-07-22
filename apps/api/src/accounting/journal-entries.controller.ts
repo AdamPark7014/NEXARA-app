@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { AccountingService } from './accounting.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -22,9 +23,9 @@ export class JournalEntriesController {
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_VIEW] })
-  findAll(@Query() query: ListJournalEntriesQueryDto) {
+  findAll(@Query() query: ListJournalEntriesQueryDto, @CurrentCompanyId() companyId: number | null) {
     return this.service.listJournalEntries(
-      { status: query.status, from: query.from, to: query.to },
+      { status: query.status, from: query.from, to: query.to, companyId },
       query,
     );
   }
@@ -32,8 +33,8 @@ export class JournalEntriesController {
   @Get(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_VIEW] })
-  findOne(@Param('id') id: string) {
-    return this.service.getJournalEntry(+id);
+  findOne(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
+    return this.service.getJournalEntry(+id, companyId);
   }
 
   @Patch(':id/post')

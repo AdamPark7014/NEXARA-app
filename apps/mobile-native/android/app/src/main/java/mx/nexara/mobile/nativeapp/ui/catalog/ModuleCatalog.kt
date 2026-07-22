@@ -77,6 +77,7 @@ object ModuleCatalog {
         ModuleEntry("newsletter", "Newsletter", "📮", "/console/newsletter", nativeImplemented = true),
         ModuleEntry("my-profile", "Mi perfil", "👤", "/console/my-profile", nativeImplemented = true),
         ModuleEntry("my-preferences", "Mis preferencias", "⚙️", "/console/my-preferences", nativeImplemented = true),
+        ModuleEntry("offline-queue", "Cola offline", "☁️", "/console/offline-queue", nativeImplemented = true),
         ModuleEntry("settings", "Ajustes", "⚙️", "/console/settings", nativeImplemented = true),
         ModuleEntry("companies", "Multi-empresa", "🏛️", "/erp/companies", nativeImplemented = true),
         ModuleEntry("kb", "Knowledge Base", "📚", "/erp/kb", nativeImplemented = true),

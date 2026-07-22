@@ -14,7 +14,8 @@ import { getViaticsSectionConfig } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
-import { approveViatico } from "@/lib/viatics-api";
+import { approveViatico, assignViatico } from "@/lib/viatics-api";
+import { listUsers, type ApiUserRow } from "@/lib/users-api";
 import {
   formatApprovalProgress,
   isViaticoPending,
@@ -24,6 +25,15 @@ import {
 } from "@/lib/viatics-display";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+
+const CONCEPTOS = [
+  { label: "Gasolina", categoria: "COMBUSTIBLE" },
+  { label: "Caseta", categoria: "CASETA" },
+  { label: "Alimentos", categoria: "ALIMENTACION" },
+  { label: "Hospedaje", categoria: "HOSPEDAJE" },
+  { label: "Transporte", categoria: "TRANSPORTE" },
+  { label: "Otro", categoria: "OTROS" },
+] as const;
 
 async function apiFetch(path: string, token: string, opts?: RequestInit) {
   const res = await fetch(buildApiUrl(path), {
@@ -53,6 +63,17 @@ export default function OpsViaticsPage() {
   const [approveNote, setApproveNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
+  const [showAssign, setShowAssign] = useState(false);
+  const [users, setUsers] = useState<ApiUserRow[]>([]);
+  const [assignForm, setAssignForm] = useState({
+    usuarioId: "",
+    actividadId: "",
+    projectId: "",
+    concepto: "",
+    montoSolicitado: "",
+    motivo: "",
+  });
+  const [assignErr, setAssignErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -70,6 +91,13 @@ export default function OpsViaticsPage() {
   }, [token]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (!token || !cfg.canAssign) return;
+    void listUsers(token, { limit: 200 })
+      .then(setUsers)
+      .catch(() => setUsers([]));
+  }, [token, cfg.canAssign]);
 
   const actOnViatic = async (id: number, action: "approve" | "reject") => {
     if (!token) return;
@@ -95,6 +123,45 @@ export default function OpsViaticsPage() {
     setSelected(v);
     setApproveNote("");
     setActionErr(null);
+  };
+
+  const submitAssign = async () => {
+    if (!token) return;
+    if (!assignForm.usuarioId || !assignForm.concepto || !assignForm.montoSolicitado) {
+      setAssignErr("Completa usuario, concepto y monto");
+      return;
+    }
+    if (!assignForm.actividadId && !assignForm.projectId) {
+      setAssignErr("Indica actividad o proyecto");
+      return;
+    }
+    setSaving(true);
+    setAssignErr(null);
+    try {
+      const cat = CONCEPTOS.find((c) => c.label === assignForm.concepto)?.categoria ?? "OTROS";
+      await assignViatico(token, {
+        usuarioId: Number(assignForm.usuarioId),
+        actividadId: assignForm.actividadId ? Number(assignForm.actividadId) : null,
+        projectId: assignForm.projectId ? Number(assignForm.projectId) : null,
+        motivo: (assignForm.motivo || assignForm.concepto).trim(),
+        montoSolicitado: parseFloat(assignForm.montoSolicitado),
+        categoria: cat,
+      });
+      setShowAssign(false);
+      setAssignForm({
+        usuarioId: "",
+        actividadId: "",
+        projectId: "",
+        concepto: "",
+        montoSolicitado: "",
+        motivo: "",
+      });
+      void load();
+    } catch (e) {
+      setAssignErr(formatApiError(e, "Error al asignar viático"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const pendientes = items.filter((v) => isViaticoPending(v.estatus)).length;
@@ -199,7 +266,22 @@ export default function OpsViaticsPage() {
         eyebrow="OPS · Finanzas campo"
         title={cfg.title}
         subtitle={cfg.subtitle}
-        actions={<Button variant="ghost" onClick={() => void load()}>Actualizar</Button>}
+        actions={
+          <div style={{ display: "flex", gap: 8 }}>
+            {cfg.canAssign && (
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setShowAssign(true);
+                  setAssignErr(null);
+                }}
+              >
+                Asignar viático
+              </Button>
+            )}
+            <Button variant="ghost" onClick={() => void load()}>Actualizar</Button>
+          </div>
+        }
       />
 
       {!loading && items.length > 0 && (() => {
@@ -306,6 +388,60 @@ export default function OpsViaticsPage() {
               <Button variant="secondary" onClick={() => setSelected(null)}>Cancelar</Button>
               <Button variant="primary" disabled={saving} onClick={() => void actOnViatic(selected.id, "approve")}>
                 {saving ? "Guardando…" : "Pre-autorizar / Aprobar"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAssign && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowAssign(false)}>
+          <div style={{ background: "var(--surface)", borderRadius: 16, padding: 24, width: 440, maxWidth: "calc(100vw - 32px)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>Asignar viático</div>
+            <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: "0 0 16px" }}>
+              Presupuesto anticipado para un ingeniero · ligado a actividad o proyecto.
+            </p>
+            <div style={{ display: "grid", gap: 12 }}>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Usuario *</span>
+                <select value={assignForm.usuarioId} onChange={(e) => setAssignForm((f) => ({ ...f, usuarioId: e.target.value }))} style={inp} autoFocus>
+                  <option value="">— Seleccionar —</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>{u.nombre}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>ID actividad (OT)</span>
+                <input value={assignForm.actividadId} onChange={(e) => setAssignForm((f) => ({ ...f, actividadId: e.target.value }))} placeholder="Ej. 42" style={inp} />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>ID proyecto (opcional)</span>
+                <input value={assignForm.projectId} onChange={(e) => setAssignForm((f) => ({ ...f, projectId: e.target.value }))} placeholder="Si no hay OT" style={inp} />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Concepto *</span>
+                <select value={assignForm.concepto} onChange={(e) => setAssignForm((f) => ({ ...f, concepto: e.target.value }))} style={inp}>
+                  <option value="">— Seleccionar —</option>
+                  {CONCEPTOS.map((c) => <option key={c.label} value={c.label}>{c.label}</option>)}
+                </select>
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Monto (MXN) *</span>
+                <input type="number" min="0" step="0.01" value={assignForm.montoSolicitado} onChange={(e) => setAssignForm((f) => ({ ...f, montoSolicitado: e.target.value }))} style={inp} />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo</span>
+                <textarea value={assignForm.motivo} onChange={(e) => setAssignForm((f) => ({ ...f, motivo: e.target.value }))} rows={2} style={{ ...inp, resize: "vertical" }} />
+              </label>
+              {assignErr && (
+                <div style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 12 }}>{assignErr}</div>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 18 }}>
+              <Button variant="secondary" onClick={() => setShowAssign(false)}>Cancelar</Button>
+              <Button variant="primary" disabled={saving} onClick={() => void submitAssign()}>
+                {saving ? "Guardando…" : "Asignar"}
               </Button>
             </div>
           </div>

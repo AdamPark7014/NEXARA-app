@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// Compras — requisiciones y órdenes (paridad web `/erp/procurement`).
+/// Compras — requisiciones, órdenes y recepciones.
 struct ProcurementModuleView: View {
   @State private var tab = 0
   @State private var requisitions: [[String: Any]] = []
   @State private var orders: [[String: Any]] = []
+  @State private var goodsReceipts: [[String: Any]] = []
   @State private var query = ""
   @State private var isLoading = true
   @State private var message: String?
@@ -12,14 +13,20 @@ struct ProcurementModuleView: View {
   @State private var actingId: Int64?
   @State private var selected: [String: Any]?
 
-  private var items: [[String: Any]] { tab == 0 ? requisitions : orders }
+  private var items: [[String: Any]] {
+    switch tab {
+    case 1: return orders
+    case 2: return goodsReceipts
+    default: return requisitions
+    }
+  }
 
   private var filtered: [[String: Any]] {
     guard !query.isEmpty else { return items }
     let q = query.lowercased()
     return items.filter {
-      opsStr($0, "title", "description", "descripcion", "folio").lowercased().contains(q) ||
-      opsStr($0, "requestedBy", "solicitante").lowercased().contains(q)
+      opsStr($0, "title", "description", "descripcion", "folio", "number", "poNumber").lowercased().contains(q) ||
+      opsStr($0, "requestedBy", "solicitante", "vendorName", "supplierName").lowercased().contains(q)
     }
   }
 
@@ -37,6 +44,7 @@ struct ProcurementModuleView: View {
       Picker("Sección", selection: $tab) {
         Text("Requisiciones").tag(0)
         Text("Órdenes").tag(1)
+        Text("Recepciones").tag(2)
       }
       .pickerStyle(.segmented)
       .padding()
@@ -58,7 +66,7 @@ struct ProcurementModuleView: View {
         Spacer(); ProgressView(); Spacer()
       } else if filtered.isEmpty {
         Spacer()
-        Text("Sin registros").foregroundColor(.secondary)
+        Text(tab == 2 ? "Sin recepciones de mercancía" : "Sin registros").foregroundColor(.secondary)
         Spacer()
       } else {
         List(filtered.prefix(80), id: \.procId) { row in
@@ -75,8 +83,9 @@ struct ProcurementModuleView: View {
 
   private func procRow(_ r: [String: Any]) -> some View {
     VStack(alignment: .leading, spacing: 4) {
-      Text(opsStr(r, "title", "description", "descripcion", "folio", "number")).font(.headline)
-      Text(opsStr(r, "requestedBy", "solicitante", "vendorName")).font(.caption).foregroundColor(.secondary)
+      let title = opsStr(r, "title", "description", "descripcion", "folio", "number", "poNumber")
+      Text(title.isEmpty ? "Registro" : title).font(.headline)
+      Text(opsStr(r, "requestedBy", "solicitante", "vendorName", "supplierName", "warehouseName")).font(.caption).foregroundColor(.secondary)
       HStack {
         Text(opsStr(r, "status", "estado")).font(.caption2).bold()
         Spacer()
@@ -116,8 +125,10 @@ struct ProcurementModuleView: View {
     defer { isLoading = false }
     async let r = ExtraRepository.shared.requisitions()
     async let o = ExtraRepository.shared.purchaseOrders()
+    async let g = ExtraRepository.shared.goodsReceipts()
     requisitions = await r
     orders = await o
+    goodsReceipts = await g
   }
 
   private func approve(_ id: Int64) async {

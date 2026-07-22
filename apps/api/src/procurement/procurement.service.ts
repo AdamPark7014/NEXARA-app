@@ -7,6 +7,7 @@ import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 import { WarehouseService } from '../warehouse/warehouse.service.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
+import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class ProcurementService {
@@ -152,6 +153,7 @@ export class ProcurementService {
     paymentTerms?: string;
     shippingAddress?: string;
     notes?: string;
+    companyId?: number | null;
     items: Array<{ productId?: number; description: string; quantity: number; unitPrice: number; taxRate?: number }>;
   }, userId: number) {
     if (!dto.supplierId && !dto.supplierName) {
@@ -173,13 +175,7 @@ export class ProcurementService {
     }));
     const subtotal = dto.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
     const taxAmount = dto.items.reduce((s, i) => s + i.quantity * i.unitPrice * ((i.taxRate || 0) / 100), 0);
-    const companyId =
-      (
-        await this.prisma.companyProfile.findFirst({
-          where: { isPrimary: true, isActive: true },
-          select: { id: true },
-        })
-      )?.id ?? null;
+    const companyId = await resolveRequiredCompanyId(this.prisma, dto.companyId);
 
     const created = await this.prisma.purchaseOrder.create({
       data: {
@@ -234,8 +230,11 @@ export class ProcurementService {
     return created;
   }
 
-  async listPurchaseOrders(filters?: { status?: string; supplierId?: number }, query?: PaginationQueryDto) {
-    const where: any = {};
+  async listPurchaseOrders(
+    filters?: { status?: string; supplierId?: number; companyId?: number | null },
+    query?: PaginationQueryDto,
+  ) {
+    const where: any = { ...companyWhere(filters?.companyId ?? null) };
     if (filters?.status) where.status = filters.status;
     if (filters?.supplierId) where.supplierId = filters.supplierId;
     const include = { items: true, supplier: true, createdBy: { select: { id: true, nombre: true } } };
@@ -249,13 +248,13 @@ export class ProcurementService {
     return this.prisma.purchaseOrder.findMany({ where, include, orderBy: { createdAt: 'desc' } });
   }
 
-  async getPurchaseOrder(id: number) {
+  async getPurchaseOrder(id: number, companyId?: number | null) {
     const po = await this.prisma.purchaseOrder.findUnique({
       where: { id },
       include: { items: { include: { product: true } }, supplier: true, receipts: { include: { items: true } }, createdBy: { select: { id: true, nombre: true } }, approvedBy: { select: { id: true, nombre: true } } },
     });
-    if (!po) throw new NotFoundException('Orden de compra no encontrada');
-    return po;
+    assertCompanyAccess(po, companyId, 'Orden de compra');
+    return po!;
   }
 
   async approvePurchaseOrder(id: number, userId: number) {

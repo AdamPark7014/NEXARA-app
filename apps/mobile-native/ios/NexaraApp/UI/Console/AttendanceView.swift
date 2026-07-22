@@ -51,8 +51,27 @@ final class AttendanceVM: ObservableObject {
         checkInLoading = true; checkInMessage = nil
         Task {
             do {
-                let res = try await ConsoleRepository.shared.attendanceCheckIn(type: type)
-                checkInMessage = (res["message"] as? String) ?? (type == "entrada" ? "✅ Entrada registrada" : "✅ Salida registrada")
+                let coord = await DeviceLocation.shared.current()
+                let res = try await ConsoleRepository.shared.attendanceCheckIn(
+                    type: type,
+                    lat: coord?.latitude,
+                    lng: coord?.longitude
+                )
+                let base = (res["message"] as? String)
+                    ?? (type == "entrada" ? "✅ Entrada registrada" : "✅ Salida registrada")
+                let geo: String
+                if let c = coord {
+                    if let acc = c.accuracyM, acc > 100 {
+                        geo = String(format: " · GPS %.5f, %.5f (±%.0fm — baja precisión)", c.latitude, c.longitude, acc)
+                    } else if let acc = c.accuracyM {
+                        geo = String(format: " · GPS %.5f, %.5f (±%.0fm)", c.latitude, c.longitude, acc)
+                    } else {
+                        geo = String(format: " · GPS %.5f, %.5f", c.latitude, c.longitude)
+                    }
+                } else {
+                    geo = " (sin GPS — activa ubicación)"
+                }
+                checkInMessage = base + geo
                 load()
             } catch {
                 checkInMessage = "❌ \(error.localizedDescription)"
@@ -202,6 +221,10 @@ struct AttendanceView: View {
 
     private var checkInCard: some View {
         VStack(alignment: .leading, spacing: 12) {
+            LocationPermissionBanner(
+                message: "La asistencia registra tu GPS al marcar entrada o salida.",
+                requestOnAppear: true
+            )
             HStack {
                 Text(vm.isCheckedIn ? "🟢 Jornada abierta" : "⚪ Sin entrada hoy")
                     .font(.subheadline).bold()

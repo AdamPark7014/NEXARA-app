@@ -1,10 +1,12 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { PacService } from '../pac/pac.service.js';
 import { SatService } from '../pac/sat.service.js';
+import { WebhooksService } from '../webhooks/webhooks.service.js';
+import { assertCompanyAccess, companyWhere } from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class AccountingService {
@@ -13,6 +15,7 @@ export class AccountingService {
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly pacService: PacService,
     private readonly satService: SatService,
+    @Optional() private readonly webhooks?: WebhooksService,
   ) {}
 
   private readonly satPaymentFormValues = new Set([
@@ -225,6 +228,49 @@ export class AccountingService {
     });
   }
 
+  async reopenFiscalPeriod(id: number) {
+    return this.prisma.fiscalPeriod.update({
+      where: { id },
+      data: { isClosed: false, closedAt: null, closedById: null },
+    });
+  }
+
+  /**
+   * Resuelve periodo abierto que cubre la fecha.
+   * Si hay periodo cerrado → bloquea. Si no hay periodo → null (compat).
+   */
+  private async resolveOpenFiscalPeriodId(date: Date, explicit?: number | null): Promise<number | null> {
+    if (explicit != null && Number.isFinite(Number(explicit))) {
+      const period = await this.prisma.fiscalPeriod.findUnique({ where: { id: Number(explicit) } });
+      if (!period) throw new BadRequestException('Periodo fiscal no encontrado');
+      if (period.isClosed) {
+        throw new BadRequestException(`Periodo fiscal cerrado (${period.name})`);
+      }
+      return period.id;
+    }
+
+    const day = new Date(date);
+    day.setHours(12, 0, 0, 0);
+    const covering = await this.prisma.fiscalPeriod.findFirst({
+      where: {
+        startDate: { lte: day },
+        endDate: { gte: day },
+      },
+      orderBy: { startDate: 'desc' },
+    });
+    if (!covering) return null;
+    if (covering.isClosed) {
+      throw new BadRequestException(
+        `Periodo fiscal cerrado (${covering.name}) — no se pueden postear asientos en esta fecha`,
+      );
+    }
+    return covering.id;
+  }
+
+  private async assertDateNotInClosedPeriod(date: Date) {
+    await this.resolveOpenFiscalPeriodId(date, null);
+  }
+
   // ── Journal Entries ───────────────────────────────────────────────
   private async generateEntryNumber(): Promise<string> {
     const count = await this.prisma.journalEntry.count();
@@ -245,15 +291,18 @@ export class AccountingService {
       throw new BadRequestException('Debe y Haber no cuadran');
     }
 
+    const entryDate = new Date(dto.date);
+    const fiscalPeriodId = await this.resolveOpenFiscalPeriodId(entryDate, dto.fiscalPeriodId ?? null);
+
     const companyId = await this.resolveCompanyId(dto.companyId);
     const entryNumber = await this.generateEntryNumber();
     return this.prisma.journalEntry.create({
       data: {
         entryNumber,
-        date: new Date(dto.date),
+        date: entryDate,
         description: dto.description.trim(),
         reference: dto.reference?.trim() || null,
-        fiscalPeriodId: dto.fiscalPeriodId ?? null,
+        fiscalPeriodId,
         companyId,
         totalDebit: new Prisma.Decimal(totalDebit),
         totalCredit: new Prisma.Decimal(totalCredit),
@@ -273,18 +322,27 @@ export class AccountingService {
     });
   }
 
-  private async resolveCompanyId(explicit?: number | null) {
+  private async resolveCompanyId(explicit?: number | null): Promise<number> {
     if (explicit != null && Number.isFinite(Number(explicit))) return Number(explicit);
     const primary = await this.prisma.companyProfile.findFirst({
       where: { isPrimary: true, isActive: true },
       select: { id: true },
       orderBy: { id: 'asc' },
     });
-    return primary?.id ?? null;
+    if (primary?.id) return primary.id;
+    const any = await this.prisma.companyProfile.findFirst({
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+    if (!any?.id) throw new BadRequestException('No hay empresa configurada');
+    return any.id;
   }
 
-  async listJournalEntries(filters?: { status?: string; from?: string; to?: string }, query?: PaginationQueryDto) {
-    const where: any = {};
+  async listJournalEntries(
+    filters?: { status?: string; from?: string; to?: string; companyId?: number | null },
+    query?: PaginationQueryDto,
+  ) {
+    const where: any = { ...companyWhere(filters?.companyId ?? null) };
     if (filters?.status) where.status = filters.status;
     if (filters?.from || filters?.to) {
       where.date = {};
@@ -306,13 +364,13 @@ export class AccountingService {
     return buildPaginatedResponse(data, total, pageQuery);
   }
 
-  async getJournalEntry(id: number) {
+  async getJournalEntry(id: number, companyId?: number | null) {
     const entry = await this.prisma.journalEntry.findUnique({
       where: { id },
       include: { lines: { include: { debitAccount: true, creditAccount: true, costCenter: true } }, createdBy: { select: { id: true, nombre: true } } },
     });
-    if (!entry) throw new NotFoundException('Asiento no encontrado');
-    return entry;
+    assertCompanyAccess(entry, companyId, 'Asiento');
+    return entry!;
   }
 
   async postJournalEntry(id: number, postedByUserId: number) {
@@ -320,6 +378,8 @@ export class AccountingService {
     if (!entry) throw new NotFoundException('Asiento no encontrado');
     if (entry.status === 'POSTED') throw new BadRequestException('Ya está contabilizado');
     if (entry.fiscalPeriod?.isClosed) throw new BadRequestException('Periodo fiscal cerrado');
+    // Cubre asientos legacy sin fiscalPeriodId: bloquea por fecha si el periodo está cerrado
+    const resolvedPeriodId = entry.fiscalPeriodId ?? (await this.resolveOpenFiscalPeriodId(entry.date, null));
 
     // Todo corre en una sola transacción: la "reclamación" del asiento vía
     // updateMany con status distinto de POSTED en el WHERE hace que dos
@@ -328,7 +388,13 @@ export class AccountingService {
     const updated = await this.prisma.$transaction(async (tx) => {
       const claim = await tx.journalEntry.updateMany({
         where: { id, status: { not: 'POSTED' } },
-        data: { status: 'POSTED', postedAt: new Date() },
+        data: {
+          status: 'POSTED',
+          postedAt: new Date(),
+          ...(entry.fiscalPeriodId || resolvedPeriodId == null
+            ? {}
+            : { fiscalPeriodId: resolvedPeriodId }),
+        },
       });
       if (claim.count === 0) {
         throw new BadRequestException('Ya está contabilizado');
@@ -412,6 +478,7 @@ export class AccountingService {
       { code: '601.02', name: 'Viáticos y gastos de viaje', type: 'EXPENSE' as const },
       { code: '602.01', name: 'Sueldos y salarios', type: 'EXPENSE' as const },
       { code: '115.01', name: 'Inventario de mercancías', type: 'ASSET' as const },
+      { code: '501.01', name: 'Costo de ventas', type: 'EXPENSE' as const },
       { code: '201.01', name: 'Proveedores nacionales', type: 'LIABILITY' as const },
       { code: '209.01', name: 'IVA acreditable pagado', type: 'ASSET' as const },
     ];
@@ -533,6 +600,55 @@ export class AccountingService {
     );
 
     return entry;
+  }
+
+  /**
+   * COGS al despacho / merma / salida a producción.
+   * Debe 501.01 Costo de ventas · Haber 115.01 Inventario.
+   */
+  async postInventoryIssueCogs(input: {
+    stockMovementId: number;
+    amount: number;
+    date?: Date | string | null;
+    description: string;
+    userId: number;
+  }) {
+    const amount = Number(input.amount);
+    if (!amount || amount <= 0) return null;
+
+    const reference = `SM-COGS-${input.stockMovementId}`;
+    const [cogs, inventory] = await Promise.all([
+      this.getAccountByCode('501.01'),
+      this.getAccountByCode('115.01'),
+    ]);
+
+    const rawDate = input.date ? new Date(input.date) : new Date();
+    const date = Number.isNaN(rawDate.getTime())
+      ? new Date().toISOString().slice(0, 10)
+      : rawDate.toISOString().slice(0, 10);
+
+    return this.createAndPostAutoJournal(
+      reference,
+      input.description,
+      date,
+      [
+        {
+          debitAccountId: cogs.id,
+          creditAccountId: inventory.id,
+          debit: amount,
+          credit: 0,
+          label: `COGS movimiento #${input.stockMovementId}`,
+        },
+        {
+          debitAccountId: inventory.id,
+          creditAccountId: cogs.id,
+          debit: 0,
+          credit: amount,
+          label: 'Salida de inventario',
+        },
+      ],
+      input.userId,
+    );
   }
 
   /**
@@ -705,6 +821,8 @@ export class AccountingService {
           satProductKey: poItem.product?.satProductKey || undefined,
           satUnitKey: poItem.product?.satUnitKey || undefined,
           unitName: poItem.product?.unitName || undefined,
+          purchaseOrderItemId: poItem.id,
+          goodsReceiptItemId: i.id,
         };
       });
 
@@ -730,13 +848,136 @@ export class AccountingService {
       userId,
     );
 
-    return this.prisma.invoice.update({
+    await this.prisma.invoice.update({
       where: { id: invoice.id },
       data: {
         purchaseOrderId: receipt.purchaseOrderId,
         goodsReceiptId: receipt.id,
+        matchStatus: 'PENDING',
       },
-      include: { items: true, supplier: true },
+    });
+
+    return this.evaluateThreeWayMatch(invoice.id, userId);
+  }
+
+  /**
+   * 3-way match: cantidad factura ≤ recibida; precio ≈ OC (±2%).
+   * Solo aplica a CXP ligadas a OC/GR.
+   */
+  async evaluateThreeWayMatch(invoiceId: number, userId?: number) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, deletedAt: null },
+      include: {
+        items: true,
+        purchaseOrder: { include: { items: true } },
+        goodsReceipt: { include: { items: true } },
+      },
+    });
+    if (!invoice) throw new NotFoundException('Factura no encontrada');
+
+    if (invoice.type !== 'ACCOUNTS_PAYABLE' || (!invoice.purchaseOrderId && !invoice.goodsReceiptId)) {
+      return this.prisma.invoice.update({
+        where: { id: invoiceId },
+        data: { matchStatus: 'NOT_REQUIRED', matchedAt: null, matchedById: null, matchNotes: null },
+        include: { items: true, supplier: true, payments: true },
+      });
+    }
+
+    if (invoice.matchStatus === 'WAIVED') {
+      return this.getInvoice(invoiceId);
+    }
+
+    const PRICE_TOL = 0.02;
+    const qtyByPoItem = new Map<number, number>();
+    if (invoice.goodsReceipt?.items?.length) {
+      for (const gri of invoice.goodsReceipt.items) {
+        const prev = qtyByPoItem.get(gri.purchaseOrderItemId) || 0;
+        qtyByPoItem.set(gri.purchaseOrderItemId, prev + Number(gri.quantityReceived));
+      }
+    } else if (invoice.purchaseOrderId) {
+      const griAll = await this.prisma.goodsReceiptItem.findMany({
+        where: { goodsReceipt: { purchaseOrderId: invoice.purchaseOrderId } },
+        select: { purchaseOrderItemId: true, quantityReceived: true },
+      });
+      for (const gri of griAll) {
+        const prev = qtyByPoItem.get(gri.purchaseOrderItemId) || 0;
+        qtyByPoItem.set(gri.purchaseOrderItemId, prev + Number(gri.quantityReceived));
+      }
+    }
+
+    const poById = new Map((invoice.purchaseOrder?.items || []).map((i) => [i.id, i]));
+    const variances: string[] = [];
+
+    for (const line of invoice.items) {
+      if (!line.purchaseOrderItemId) {
+        variances.push(`Partida "${line.description}" sin vínculo a OC`);
+        continue;
+      }
+      const poItem = poById.get(line.purchaseOrderItemId);
+      if (!poItem) {
+        variances.push(`Partida "${line.description}": ítem OC #${line.purchaseOrderItemId} no encontrado`);
+        continue;
+      }
+      const invQty = Number(line.quantity);
+      const invPrice = Number(line.unitPrice);
+      const poQty = Number(poItem.quantity);
+      const poPrice = Number(poItem.unitPrice);
+      const receivedQty = qtyByPoItem.get(line.purchaseOrderItemId) ?? 0;
+
+      if (invQty > receivedQty + 1e-6) {
+        variances.push(
+          `"${line.description}": qty factura ${invQty} > recibida ${receivedQty}`,
+        );
+      }
+      if (invQty > poQty + 1e-6) {
+        variances.push(
+          `"${line.description}": qty factura ${invQty} > OC ${poQty}`,
+        );
+      }
+      if (poPrice > 0) {
+        const delta = Math.abs(invPrice - poPrice) / poPrice;
+        if (delta > PRICE_TOL) {
+          variances.push(
+            `"${line.description}": precio ${invPrice} vs OC ${poPrice} (tol ${PRICE_TOL * 100}%)`,
+          );
+        }
+      } else if (invPrice > 0) {
+        variances.push(`"${line.description}": precio OC es 0 pero factura tiene ${invPrice}`);
+      }
+    }
+
+    if (!invoice.items.length) {
+      variances.push('Factura sin partidas');
+    }
+
+    const matched = variances.length === 0;
+    return this.prisma.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        matchStatus: matched ? 'MATCHED' : 'VARIANCE',
+        matchedAt: matched ? new Date() : null,
+        matchedById: matched ? (userId ?? null) : null,
+        matchNotes: matched ? '3-way match OK' : variances.slice(0, 8).join('; ').slice(0, 500),
+      },
+      include: { items: true, supplier: true, payments: true, purchaseOrder: true, goodsReceipt: true },
+    });
+  }
+
+  async waiveThreeWayMatch(invoiceId: number, userId: number, notes?: string) {
+    const invoice = await this.prisma.invoice.findFirst({ where: { id: invoiceId, deletedAt: null } });
+    if (!invoice) throw new NotFoundException('Factura no encontrada');
+    if (invoice.type !== 'ACCOUNTS_PAYABLE') {
+      throw new BadRequestException('Solo aplica a facturas por pagar');
+    }
+    return this.prisma.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        matchStatus: 'WAIVED',
+        matchedAt: new Date(),
+        matchedById: userId,
+        matchNotes: (notes?.trim() || 'Match eximido manualmente').slice(0, 500),
+      },
+      include: { items: true, supplier: true, payments: true },
     });
   }
 
@@ -786,37 +1027,60 @@ export class AccountingService {
     invoice: { id: number; invoiceNumber: string; type: string },
     userId: number,
   ) {
-    if (invoice.type !== 'ACCOUNTS_RECEIVABLE') return null;
-
     const amount = Number(payment.amount);
     if (amount <= 0) return null;
-
-    const [bank, cxc] = await Promise.all([
-      this.getAccountByCode('102.01'),
-      this.getAccountByCode('105.01'),
-    ]);
 
     const date = new Date(payment.paymentDate).toISOString().slice(0, 10);
     const ref = `PAY-${payment.id}`;
 
-    return this.createAndPostAutoJournal(
-      ref,
-      `Cobro factura ${invoice.invoiceNumber}`,
-      date,
-      [
-        { debitAccountId: bank.id, creditAccountId: cxc.id, debit: amount, credit: 0, label: 'Entrada bancaria' },
-        { debitAccountId: cxc.id, creditAccountId: bank.id, debit: 0, credit: amount, label: 'Aplicación CXC' },
-      ],
-      userId,
-    );
+    // Cobro cliente: Debe bancos · Haber CXC
+    if (invoice.type === 'ACCOUNTS_RECEIVABLE') {
+      const [bank, cxc] = await Promise.all([
+        this.getAccountByCode('102.01'),
+        this.getAccountByCode('105.01'),
+      ]);
+      return this.createAndPostAutoJournal(
+        ref,
+        `Cobro factura ${invoice.invoiceNumber}`,
+        date,
+        [
+          { debitAccountId: bank.id, creditAccountId: cxc.id, debit: amount, credit: 0, label: 'Entrada bancaria' },
+          { debitAccountId: cxc.id, creditAccountId: bank.id, debit: 0, credit: amount, label: 'Aplicación CXC' },
+        ],
+        userId,
+      );
+    }
+
+    // Pago proveedor: Debe CXP · Haber bancos
+    if (invoice.type === 'ACCOUNTS_PAYABLE') {
+      const [bank, cxp] = await Promise.all([
+        this.getAccountByCode('102.01'),
+        this.getAccountByCode('201.01'),
+      ]);
+      return this.createAndPostAutoJournal(
+        ref,
+        `Pago proveedor factura ${invoice.invoiceNumber}`,
+        date,
+        [
+          { debitAccountId: cxp.id, creditAccountId: bank.id, debit: amount, credit: 0, label: 'Liquidación CXP' },
+          { debitAccountId: bank.id, creditAccountId: cxp.id, debit: 0, credit: amount, label: 'Salida bancaria' },
+        ],
+        userId,
+      );
+    }
+
+    return null;
   }
 
   async reverseJournalEntry(id: number, userId: number) {
     const original = await this.prisma.journalEntry.findUnique({ where: { id }, include: { lines: true } });
     if (!original) throw new NotFoundException('Asiento no encontrado');
     if (original.status !== 'POSTED') throw new BadRequestException('Solo se pueden revertir asientos contabilizados');
+    await this.assertDateNotInClosedPeriod(original.date);
+    await this.assertDateNotInClosedPeriod(new Date());
 
     const entryNumber = await this.generateEntryNumber();
+    const reversalPeriodId = await this.resolveOpenFiscalPeriodId(new Date(), null);
 
     // Transacción: (1) reclama el original atómicamente (evita reversas
     // duplicadas por doble clic / reintento concurrente), (2) crea la
@@ -840,6 +1104,8 @@ export class AccountingService {
           description: `Reversa de ${original.entryNumber}: ${original.description}`,
           status: 'POSTED',
           reversalOfId: original.id,
+          fiscalPeriodId: reversalPeriodId,
+          companyId: original.companyId,
           totalDebit: original.totalCredit,
           totalCredit: original.totalDebit,
           createdById: userId,
@@ -1034,6 +1300,8 @@ export class AccountingService {
       iepsRate?: number;
       isrRetRate?: number;
       ivaRetRate?: number;
+      purchaseOrderItemId?: number;
+      goodsReceiptItemId?: number;
     }>;
   }, userId: number) {
     const invoiceNumber = await this.generateInvoiceNumber();
@@ -1108,6 +1376,8 @@ export class AccountingService {
             isrRetAmount: i.isrRet ? new Prisma.Decimal(i.isrRet) : null,
             ivaRetRate: i.ivaRetRate ? new Prisma.Decimal(i.ivaRetRate) : null,
             ivaRetAmount: i.ivaRet ? new Prisma.Decimal(i.ivaRet) : null,
+            purchaseOrderItemId: i.purchaseOrderItemId ?? null,
+            goodsReceiptItemId: i.goodsReceiptItemId ?? null,
           })),
         },
       },
@@ -1369,8 +1639,11 @@ export class AccountingService {
     return { ...updated, pacProvider: stamp.provider };
   }
 
-  async listInvoices(filters?: { type?: string; status?: string; from?: string; to?: string }, query?: PaginationQueryDto) {
-    const where: any = { deletedAt: null };
+  async listInvoices(
+    filters?: { type?: string; status?: string; from?: string; to?: string; companyId?: number | null },
+    query?: PaginationQueryDto,
+  ) {
+    const where: any = { deletedAt: null, ...companyWhere(filters?.companyId ?? null) };
     if (filters?.type) where.type = filters.type;
     if (filters?.status) where.status = filters.status;
     if (filters?.from || filters?.to) {
@@ -1393,13 +1666,13 @@ export class AccountingService {
     return buildPaginatedResponse(data, total, pageQuery);
   }
 
-  async getInvoice(id: number) {
+  async getInvoice(id: number, companyId?: number | null) {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id, deletedAt: null },
       include: { items: { include: { product: true } }, client: true, supplier: true, payments: true },
     });
-    if (!invoice) throw new NotFoundException('Factura no encontrada');
-    return invoice;
+    assertCompanyAccess(invoice, companyId, 'Factura');
+    return invoice!;
   }
 
   async updateInvoiceDraft(
@@ -1421,21 +1694,38 @@ export class AccountingService {
         satProductKey?: string;
         satUnitKey?: string;
         unitName?: string;
+        purchaseOrderItemId?: number;
+        goodsReceiptItemId?: number;
       }>;
     },
+    userId?: number,
   ) {
-    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, deletedAt: null },
+      include: { items: true },
+    });
     if (!invoice) throw new NotFoundException('Factura no encontrada');
     if (invoice.status !== 'DRAFT' || invoice.cfdiUuid) {
       throw new BadRequestException('Solo borradores sin timbrar pueden editarse');
     }
 
     if (dto.items?.length) {
-      const items = dto.items.map((item) => {
+      const prevLinks = invoice.items.map((i) => ({
+        purchaseOrderItemId: i.purchaseOrderItemId,
+        goodsReceiptItemId: i.goodsReceiptItemId,
+      }));
+      const items = dto.items.map((item, idx) => {
         const base = item.quantity * item.unitPrice;
         const iva = base * ((item.taxRate ?? 16) / 100);
         const total = base + iva;
-        return { ...item, base, iva, total };
+        return {
+          ...item,
+          base,
+          iva,
+          total,
+          purchaseOrderItemId: item.purchaseOrderItemId ?? prevLinks[idx]?.purchaseOrderItemId ?? null,
+          goodsReceiptItemId: item.goodsReceiptItemId ?? prevLinks[idx]?.goodsReceiptItemId ?? null,
+        };
       });
       const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
       const taxAmount = items.reduce((s, i) => s + i.iva, 0);
@@ -1457,6 +1747,10 @@ export class AccountingService {
             subtotal: new Prisma.Decimal(subtotal),
             taxAmount: new Prisma.Decimal(taxAmount),
             totalAmount: new Prisma.Decimal(totalAmount),
+            matchStatus:
+              invoice.type === 'ACCOUNTS_PAYABLE' && (invoice.purchaseOrderId || invoice.goodsReceiptId)
+                ? 'PENDING'
+                : undefined,
             items: {
               create: items.map((i) => ({
                 description: i.description.trim(),
@@ -1467,6 +1761,8 @@ export class AccountingService {
                 satProductKey: i.satProductKey?.trim() || null,
                 satUnitKey: i.satUnitKey?.trim() || null,
                 unitName: i.unitName?.trim() || 'Servicio',
+                purchaseOrderItemId: i.purchaseOrderItemId,
+                goodsReceiptItemId: i.goodsReceiptItemId,
               })),
             },
           },
@@ -1488,6 +1784,9 @@ export class AccountingService {
       });
     }
 
+    if (invoice.type === 'ACCOUNTS_PAYABLE' && (invoice.purchaseOrderId || invoice.goodsReceiptId)) {
+      return this.evaluateThreeWayMatch(id, userId);
+    }
     return this.getInvoice(id);
   }
 
@@ -1617,6 +1916,19 @@ export class AccountingService {
       if (locked.isCancelled) throw new BadRequestException('La factura está cancelada');
       if (locked.deletedAt) throw new NotFoundException('Factura no encontrada');
 
+      // Gate 3-way match en CXP ligadas a OC/GR
+      if (
+        locked.type === 'ACCOUNTS_PAYABLE' &&
+        (locked.purchaseOrderId || locked.goodsReceiptId) &&
+        locked.matchStatus !== 'MATCHED' &&
+        locked.matchStatus !== 'WAIVED' &&
+        locked.matchStatus !== 'NOT_REQUIRED'
+      ) {
+        throw new BadRequestException(
+          `3-way match pendiente (${locked.matchStatus}). Resuelve variaciones o exime el match antes de pagar.`,
+        );
+      }
+
       if (dto.bankAccountId) {
         const bankAccount = await tx.bankAccount.findUnique({ where: { id: dto.bankAccountId } });
         if (!bankAccount) {
@@ -1698,7 +2010,40 @@ export class AccountingService {
     void this.notificationHierarchy
       .notifyPaymentRegistered(userId, payment.id, invoice.invoiceNumber, amountLabel)
       .catch(() => undefined);
-    void this.autoJournalForPayment(payment, invoice, userId).catch(() => undefined);
+
+    const newPaid = Number(invoice.paidAmount) + dto.amount;
+    const fullyPaid = newPaid >= Number(invoice.totalAmount) - 0.01;
+    void this.webhooks
+      ?.emit('payment.registered', {
+        paymentId: payment.id,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        amount: dto.amount,
+        currency: invoice.currency,
+        status: fullyPaid ? 'PAID' : 'PARTIALLY_PAID',
+        companyId: invoice.companyId,
+      }, invoice.companyId)
+      .catch(() => undefined);
+    if (fullyPaid) {
+      void this.webhooks
+        ?.emit('invoice.paid', {
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          totalAmount: Number(invoice.totalAmount),
+          currency: invoice.currency,
+          type: invoice.type,
+          companyId: invoice.companyId,
+        }, invoice.companyId)
+        .catch(() => undefined);
+    }
+
+    let journalEntryId: number | null = null;
+    try {
+      const journal = await this.autoJournalForPayment(payment, invoice, userId);
+      journalEntryId = journal?.id ?? null;
+    } catch {
+      // Pago ya guardado; la póliza se puede reintentar por reference PAY-{id}
+    }
 
     const shouldStampComplement =
       Boolean(dto.stampComplement) ||
@@ -1707,14 +2052,14 @@ export class AccountingService {
     if (shouldStampComplement) {
       try {
         const complement = await this.stampPaymentComplement(payment.id, userId);
-        return { ...payment, complement };
+        return { ...payment, journalEntryId, complement };
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Error al timbrar complemento';
-        return { ...payment, complementStampWarning: message };
+        return { ...payment, journalEntryId, complementStampWarning: message };
       }
     }
 
-    return payment;
+    return { ...payment, journalEntryId };
   }
 
   async getInvoiceXml(id: number) {
@@ -2096,6 +2441,7 @@ export class AccountingService {
         issueDate: new Date(),
         dueDate: new Date(),
         clientId: original.clientId,
+        companyId: original.companyId,
         subtotal: new Prisma.Decimal(subtotal),
         taxAmount: new Prisma.Decimal(taxAmount),
         totalAmount: new Prisma.Decimal(totalAmount),
@@ -2399,6 +2745,183 @@ export class AccountingService {
         paid: Number(r._sum.paidAmount || 0),
         pending: Number(r._sum.totalAmount || 0) - Number(r._sum.paidAmount || 0),
       })),
+    };
+  }
+
+  /**
+   * Inteligencia financiera: aging AR/AP, cashflow 90d, DSO/DPO, runway proxy.
+   */
+  async getFinanceInsights() {
+    const base = await this.getFinancialDashboard();
+    const now = new Date();
+    const d90 = new Date(now.getTime() - 90 * 86_400_000);
+
+    const openInvoices = await this.prisma.invoice.findMany({
+      where: {
+        deletedAt: null,
+        isCancelled: false,
+        status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] },
+      },
+      select: {
+        id: true,
+        type: true,
+        totalAmount: true,
+        paidAmount: true,
+        dueDate: true,
+        issueDate: true,
+        receptorName: true,
+        invoiceNumber: true,
+      },
+    });
+
+    const bucket = () => ({ current: 0, d1_30: 0, d31_60: 0, d61_90: 0, d90_plus: 0, amount: 0 });
+    const arAging = bucket();
+    const apAging = bucket();
+
+    const classify = (target: ReturnType<typeof bucket>, due: Date | null, pending: number) => {
+      target.amount += pending;
+      if (!due || due >= now) {
+        target.current += pending;
+        return;
+      }
+      const days = Math.floor((now.getTime() - due.getTime()) / 86_400_000);
+      if (days <= 30) target.d1_30 += pending;
+      else if (days <= 60) target.d31_60 += pending;
+      else if (days <= 90) target.d61_90 += pending;
+      else target.d90_plus += pending;
+    };
+
+    for (const inv of openInvoices) {
+      const pending = Math.max(0, Number(inv.totalAmount) - Number(inv.paidAmount));
+      if (pending <= 0) continue;
+      if (inv.type === 'ACCOUNTS_RECEIVABLE') classify(arAging, inv.dueDate, pending);
+      else if (inv.type === 'ACCOUNTS_PAYABLE') classify(apAging, inv.dueDate, pending);
+    }
+
+    const payments = await this.prisma.payment.findMany({
+      where: { paymentDate: { gte: d90 } },
+      select: {
+        amount: true,
+        paymentDate: true,
+        invoice: { select: { type: true } },
+      },
+    });
+
+    const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+    const inflow: Record<string, number> = {};
+    const outflow: Record<string, number> = {};
+    for (let i = 89; i >= 0; i--) {
+      const k = dayKey(new Date(now.getTime() - i * 86_400_000));
+      inflow[k] = 0;
+      outflow[k] = 0;
+    }
+    let cashIn90 = 0;
+    let cashOut90 = 0;
+    for (const p of payments) {
+      const k = dayKey(p.paymentDate);
+      const amt = Number(p.amount);
+      if (!(k in inflow)) continue;
+      if (p.invoice?.type === 'ACCOUNTS_PAYABLE') {
+        outflow[k] += amt;
+        cashOut90 += amt;
+      } else {
+        inflow[k] += amt;
+        cashIn90 += amt;
+      }
+    }
+
+    // DSO ≈ AR pendiente / (revenue 90d / 90)
+    const rev90 = await this.prisma.invoice.aggregate({
+      where: {
+        deletedAt: null,
+        type: 'ACCOUNTS_RECEIVABLE',
+        issueDate: { gte: d90 },
+        isCancelled: false,
+      },
+      _sum: { totalAmount: true },
+    });
+    const ap90 = await this.prisma.invoice.aggregate({
+      where: {
+        deletedAt: null,
+        type: 'ACCOUNTS_PAYABLE',
+        issueDate: { gte: d90 },
+        isCancelled: false,
+      },
+      _sum: { totalAmount: true },
+    });
+    const dailyRev = Number(rev90._sum.totalAmount || 0) / 90;
+    const dailyAp = Number(ap90._sum.totalAmount || 0) / 90;
+    const dso = dailyRev > 0 ? Math.round((base.accountsReceivable.pending / dailyRev) * 10) / 10 : 0;
+    const dpo = dailyAp > 0 ? Math.round((base.accountsPayable.pending / dailyAp) * 10) / 10 : 0;
+
+    const monthlyBurn = Math.max(0, base.profitAndLoss.month.expenses - base.profitAndLoss.month.revenue);
+    const netBurn = base.profitAndLoss.month.profit < 0 ? Math.abs(base.profitAndLoss.month.profit) : 0;
+    const runwayMonths =
+      netBurn > 0 ? Math.round((base.cash.totalBalance / netBurn) * 10) / 10 : null;
+
+    const weeklyCashflow = [];
+    for (let w = 12; w >= 0; w--) {
+      const end = new Date(now.getTime() - w * 7 * 86_400_000);
+      const start = new Date(end.getTime() - 7 * 86_400_000);
+      let inn = 0;
+      let out = 0;
+      for (const [k, v] of Object.entries(inflow)) {
+        const d = new Date(k);
+        if (d >= start && d < end) inn += v;
+      }
+      for (const [k, v] of Object.entries(outflow)) {
+        const d = new Date(k);
+        if (d >= start && d < end) out += v;
+      }
+      weeklyCashflow.push({
+        weekEnding: end.toISOString().slice(0, 10),
+        inflow: Math.round(inn * 100) / 100,
+        outflow: Math.round(out * 100) / 100,
+        net: Math.round((inn - out) * 100) / 100,
+      });
+    }
+
+    const roundBucket = (b: ReturnType<typeof bucket>) => ({
+      current: Math.round(b.current * 100) / 100,
+      d1_30: Math.round(b.d1_30 * 100) / 100,
+      d31_60: Math.round(b.d31_60 * 100) / 100,
+      d61_90: Math.round(b.d61_90 * 100) / 100,
+      d90_plus: Math.round(b.d90_plus * 100) / 100,
+      amount: Math.round(b.amount * 100) / 100,
+    });
+
+    return {
+      generatedAt: now.toISOString(),
+      ...base,
+      aging: {
+        ar: roundBucket(arAging),
+        ap: roundBucket(apAging),
+      },
+      cashflow90d: {
+        inflow: Math.round(cashIn90 * 100) / 100,
+        outflow: Math.round(cashOut90 * 100) / 100,
+        net: Math.round((cashIn90 - cashOut90) * 100) / 100,
+        weekly: weeklyCashflow,
+      },
+      kpis: {
+        dso,
+        dpo,
+        workingCapital: base.workingCapital,
+        runwayMonths,
+        monthlyBurn: Math.round(netBurn * 100) / 100,
+        cashBalance: base.cash.totalBalance,
+      },
+      alerts: [
+        ...(base.overdueInvoices
+          ? [{ severity: 'danger' as const, message: `${base.overdueInvoices} factura(s) vencida(s)` }]
+          : []),
+        ...(arAging.d90_plus > 0
+          ? [{ severity: 'warning' as const, message: `CXC >90d: $${Math.round(arAging.d90_plus).toLocaleString('es-MX')}` }]
+          : []),
+        ...(runwayMonths != null && runwayMonths < 6
+          ? [{ severity: 'danger' as const, message: `Runway estimado ${runwayMonths} meses` }]
+          : []),
+      ],
     };
   }
 

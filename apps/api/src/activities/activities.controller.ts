@@ -19,6 +19,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { ActivitiesService } from './activities.service.js';
 import { UsersService } from '../users/users.service.js';
 import { CreateActivityDto } from './dto/create-activity.dto.js';
@@ -106,7 +107,11 @@ export class ActivitiesController {
   @Post()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
-  async create(@CurrentUser() user: any, @Body() createActivityDto: CreateActivityDto) {
+  async create(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() createActivityDto: CreateActivityDto,
+  ) {
     if (!user.isSuperAdmin && createActivityDto.creadoPorId !== user.id) {
       throw new ForbiddenException(
         'Solo puedes asignar actividades creadas por ti',
@@ -120,7 +125,7 @@ export class ActivitiesController {
     if (!user.isSuperAdmin && targetUser.departmentId !== user.departmentId) {
       throw new ForbiddenException('Solo puedes asignar a tu propio departamento');
     }
-    return this.activitiesService.create(createActivityDto);
+    return this.activitiesService.create(createActivityDto, companyId);
   }
 
   @Get()
@@ -128,22 +133,23 @@ export class ActivitiesController {
   @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
   async findAll(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Query() query: GetActivitiesQueryDto,
   ) {
     const { scope } = query;
 
     if (scope === 'mine') {
-      return this.activitiesService.findByResponsible(user.id);
+      return this.activitiesService.findByResponsible(user.id, companyId);
     }
 
     if (user.isSuperAdmin) {
-      return this.activitiesService.findAll(query);
+      return this.activitiesService.findAll(query, companyId);
     } else if (this.hasTeamActivitiesScope(user)) {
       const scopeUsers = await this.usersService.findUsersForConsoleActivityScope();
       const allowedUserIds = scopeUsers.map((u: { id: number }) => u.id);
-      return this.activitiesService.findByAllowedUsers(allowedUserIds);
+      return this.activitiesService.findByAllowedUsers(allowedUserIds, companyId);
     } else {
-      return this.activitiesService.findByResponsible(user.id);
+      return this.activitiesService.findByResponsible(user.id, companyId);
     }
   }
 

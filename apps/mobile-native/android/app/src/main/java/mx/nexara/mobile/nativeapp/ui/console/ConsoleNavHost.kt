@@ -79,6 +79,7 @@ private object ConsoleRoutes {
     const val Users = "console/users"
     const val Attendance = "console/attendance"
     const val Settings = "console/settings"
+    const val OfflineQueue = "console/offline-queue"
     const val More = "console/more"
     const val MyProfile = "console/my-profile"
     const val ModulePattern = "console/m/{key}"
@@ -107,6 +108,7 @@ private fun routeForModuleKey(key: String): String {
         "users" -> ConsoleRoutes.Users
         "attendance" -> ConsoleRoutes.Attendance
         "settings" -> ConsoleRoutes.Settings
+        "offline-queue", "offline" -> ConsoleRoutes.OfflineQueue
         "my-profile" -> ConsoleRoutes.MyProfile
         else -> ConsoleRoutes.module(key)
     }
@@ -220,6 +222,7 @@ fun ConsoleNavHost(
             ConsoleRoutes.Users -> "Gestión de usuarios"
             ConsoleRoutes.Attendance -> "Asistencia y jornadas"
             ConsoleRoutes.Settings -> "Ajustes del sistema"
+            ConsoleRoutes.OfflineQueue -> "Cola offline"
             ConsoleRoutes.More -> "Todos los módulos"
             ConsoleRoutes.MyProfile -> "Mi perfil"
             ConsoleRoutes.ModulePattern -> {
@@ -340,7 +343,15 @@ fun ConsoleNavHost(
                 ConsoleAttendanceScreen()
             }
             composable(ConsoleRoutes.Settings) {
-                ConsoleSettingsScreen(onExitToPanels = onExitToPanels)
+                ConsoleSettingsScreen(
+                    onExitToPanels = onExitToPanels,
+                    onOpenOfflineQueue = {
+                        navController.navigate(ConsoleRoutes.OfflineQueue) { launchSingleTop = true }
+                    },
+                )
+            }
+            composable(ConsoleRoutes.OfflineQueue) {
+                mx.nexara.mobile.nativeapp.ui.shared.OfflineQueueScreen()
             }
             composable(ConsoleRoutes.More) {
                 ConsoleMoreScreen(
@@ -353,6 +364,9 @@ fun ConsoleNavHost(
                     isSuperAdmin = user?.isSuperAdmin == true,
                     showContabilidadHub = canFinance,
                     onOpenContabilidad = { showContabilidad = true },
+                    onOpenOfflineQueue = {
+                        navController.navigate(ConsoleRoutes.OfflineQueue) { launchSingleTop = true }
+                    },
                     onOpenModule = { m ->
                         val target = routeForModuleKey(m.key)
                         navController.navigate(target) { launchSingleTop = true }
@@ -362,7 +376,11 @@ fun ConsoleNavHost(
                 )
             }
             composable(ConsoleRoutes.MyProfile) {
-                MyProfileScreen()
+                MyProfileScreen(
+                    onOpenOfflineQueue = {
+                        navController.navigate(ConsoleRoutes.OfflineQueue) { launchSingleTop = true }
+                    },
+                )
             }
             composable(ConsoleRoutes.ModulePattern) { backStack ->
                 val key = backStack.arguments?.getString("key").orEmpty()

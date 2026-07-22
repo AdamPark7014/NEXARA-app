@@ -76,6 +76,11 @@ struct ConsoleSettingsView: View {
                 Button("Crear") { Task { await vm.create() } }
                     .disabled(vm.newKey.isEmpty || vm.newValue.isEmpty)
             }
+            Section("Dispositivo") {
+                NavigationLink("Cola offline") {
+                    OfflineQueueView()
+                }
+            }
         }
     }
 

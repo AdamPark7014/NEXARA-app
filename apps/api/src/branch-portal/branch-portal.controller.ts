@@ -392,6 +392,13 @@ export class BranchPortalController {
       ? files.map((file) => `/uploads/client-requests/${file.filename}`)
       : [];
 
+    const primaryCompany = await this.prisma.companyProfile.findFirst({
+      where: { isPrimary: true, isActive: true },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+    if (!primaryCompany) throw new BadRequestException('No hay empresa configurada');
+
     return this.prisma['clientTicketRequest'].create({
       data: {
         clientId: user.clientId,
@@ -410,6 +417,7 @@ export class BranchPortalController {
         latitud: Number.isFinite(latitud) ? latitud : branch.latitud,
         longitud: Number.isFinite(longitud) ? longitud : branch.longitud,
         evidenceUrls,
+        companyId: primaryCompany.id,
       },
     });
   }

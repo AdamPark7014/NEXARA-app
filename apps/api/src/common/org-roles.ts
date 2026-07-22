@@ -124,8 +124,8 @@ const allTrue = (): OrgRoleFlags =>
 export const ORG_ROLE_TEMPLATES: OrgRoleTemplate[] = [
   {
     orgRoleKey: ORG_ROLE_KEYS.CEO,
-    nombre: 'Dueño / CEO',
-    label: 'Dueño / CEO',
+    nombre: 'CEO',
+    label: 'CEO',
     description: 'Acceso ejecutivo total a todos los paneles y módulos.',
     missionStatement: 'Vista 360° del negocio: pipeline, operación, finanzas y personas.',
     dailyActions: [

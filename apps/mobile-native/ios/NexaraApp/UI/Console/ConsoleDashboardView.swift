@@ -79,6 +79,7 @@ struct ConsoleDashboardView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
                 headerSection
+                actionableAlertsSection
                 if isAdministrativo { administrativoShortcuts }
                 if isOps && !vm.nocAlerts.isEmpty { nocAlertsSection }
                 if !vm.executive.isEmpty && (isAdmin || isAdministrativo) { executiveKpiSection }
@@ -212,7 +213,17 @@ struct ConsoleDashboardView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(vm.approvals.prefix(8), id: \.dashId) { a in
-                        ApprovalCard(item: a)
+                        ApprovalCard(item: a) { approved in
+                            Task {
+                                if let id = ConsoleHelpers.mapInt64(a, "id", "approvalId") {
+                                    try? await ExtraRepository.shared.workflowDecide(
+                                        id: Int(id),
+                                        decision: approved ? "APPROVED" : "REJECTED"
+                                    )
+                                    vm.load(isOps: isOps)
+                                }
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal)
@@ -221,6 +232,55 @@ struct ConsoleDashboardView: View {
     }
 
     // ── Operations KPIs
+    private var actionableAlertsSection: some View {
+        let actPending = vm.activities.filter { dashIsPending(dVal($0, "estatus", "status")) }.count
+        let viaticPend = vm.viatics.filter { dVal($0, "estatusPago", "status").localizedLowercase.contains("pendiente") }.count
+        var alerts: [NxAlert] = []
+        if !vm.approvals.isEmpty {
+            alerts.append(NxAlert(
+                id: "approvals",
+                title: "\(vm.approvals.count) aprobaciones esperando decisión",
+                subtitle: "Retrasan pagos, viáticos y liberaciones",
+                tone: .danger
+            ))
+        }
+        if viaticPend > 0 {
+            alerts.append(NxAlert(
+                id: "viatics",
+                title: "\(viaticPend) viáticos sin liquidar",
+                subtitle: "Impacta flujo de caja y campo",
+                tone: .warning
+            ))
+        }
+        if actPending > 0 && !isAdministrativo {
+            alerts.append(NxAlert(
+                id: "activities",
+                title: "\(actPending) actividades en curso / pendientes",
+                subtitle: "Prioriza backlog de campo",
+                tone: .info
+            ))
+        }
+        if isOps && !vm.nocAlerts.isEmpty {
+            alerts.append(NxAlert(
+                id: "noc",
+                title: "\(vm.nocAlerts.count) alertas NOC activas",
+                subtitle: "Monitoreo de servicio",
+                tone: .danger
+            ))
+        }
+        return Group {
+            if !alerts.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    NxSectionHeader(title: "Alertas", subtitle: "\(alerts.count) requieren atención")
+                        .padding(.horizontal)
+                    ForEach(alerts) { alert in
+                        NxAlertBanner(alert: alert).padding(.horizontal)
+                    }
+                }
+            }
+        }
+    }
+
     private var operationsKpiSection: some View {
         let actTotal   = vm.activities.count
         let actPending = vm.activities.filter { dashIsPending(dVal($0, "estatus", "status")) }.count
@@ -228,18 +288,38 @@ struct ConsoleDashboardView: View {
         let viaticAmt  = vm.viatics.compactMap { asDouble($0["montoSolicitado"] ?? $0["monto"]) }.reduce(0, +)
         let viaticPend = vm.viatics.filter { dVal($0, "estatusPago", "status").localizedLowercase.contains("pendiente") }.count
         let attCount   = vm.attendance.count
+        let completion = actTotal > 0 ? (actDone * 100 / actTotal) : 0
+        let spark = sparklineFromCounts([
+            Int(Double(actTotal) * 0.4),
+            Int(Double(actTotal) * 0.55),
+            Int(Double(actTotal) * 0.7),
+            Int(Double(actTotal) * 0.85),
+            actPending,
+            actDone,
+            actTotal,
+        ])
 
-        return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            DashKpiCard(icon: "🗂️", label: "Actividades", value: "\(actTotal)",
-                        detail: "\(actPending) pendientes · \(actDone) fin.", accent: .teal)
-            DashKpiCard(icon: "💼", label: "Viáticos",   value: fmtMxn(viaticAmt),
-                        detail: "\(viaticPend) por aprobar", accent: .indigo)
-            DashKpiCard(icon: "🕒", label: "Asistencia", value: "\(attCount) reg.",
-                        detail: "\(Set(vm.attendance.compactMap { dVal($0,"userId","user_id") }).count) personas", accent: .green)
-            DashKpiCard(icon: "✅", label: "Comp. viáticos", value: "\(vm.viatics.filter { dashIsDone(dVal($0,"estatusPago","status")) }.count)",
-                        detail: "de \(vm.viatics.count) total", accent: .orange)
+        return VStack(alignment: .leading, spacing: 10) {
+            NxSectionHeader(title: "Operación de la semana", subtitle: "KPIs + tendencia")
+                .padding(.horizontal)
+            NxKpiGrid(items: [
+                NxKpi(label: "Actividades", value: "\(actTotal)",
+                      hint: "\(actPending) pendientes · \(actDone) hechas",
+                      delta: "\(completion)% cierre", tone: .brand, sparkline: spark),
+                NxKpi(label: "Viáticos", value: fmtMxn(viaticAmt),
+                      hint: "\(viaticPend) por aprobar",
+                      delta: "\(vm.viatics.count) solicitudes",
+                      tone: viaticPend > 0 ? .warning : .info),
+                NxKpi(label: "Asistencia", value: "\(attCount) reg.",
+                      hint: "\(Set(vm.attendance.compactMap { dVal($0,"userId","user_id") }).count) personas",
+                      tone: .success),
+                NxKpi(label: "Aprobaciones", value: "\(vm.approvals.count)",
+                      hint: "Cola de workflow",
+                      delta: vm.approvals.isEmpty ? "Al día" : "Requieren acción",
+                      tone: vm.approvals.isEmpty ? .success : .danger),
+            ])
+            .padding(.horizontal)
         }
-        .padding(.horizontal)
     }
 
     // ── Status breakdown
@@ -361,6 +441,7 @@ private struct DashStatusRow: View {
 
 private struct ApprovalCard: View {
     let item: [String: Any]
+    var onDecide: ((Bool) -> Void)? = nil
     var body: some View {
         let title    = dVal(item, "title","stepName","entityType").ifEmpty("Aprobación")
         let requester = dVal(item, "requestedBy","userName","solicita")
@@ -378,8 +459,14 @@ private struct ApprovalCard: View {
             if !requester.isEmpty {
                 Text("Por: \(requester)").font(.caption).foregroundColor(.secondary)
             }
+            if let onDecide {
+                HStack {
+                    Button("✓") { onDecide(true) }.buttonStyle(.borderedProminent).tint(.green)
+                    Button("✕") { onDecide(false) }.buttonStyle(.bordered).tint(.red)
+                }
+            }
         }
-        .frame(width: 180)
+        .frame(width: 200)
         .padding(14)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))

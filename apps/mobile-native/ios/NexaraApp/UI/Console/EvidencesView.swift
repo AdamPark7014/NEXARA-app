@@ -4,6 +4,7 @@ import SwiftUI
 
 struct EvidencesView: View {
     var reviewMode: Bool = false
+    var initialActivityId: Int64? = nil
 
     @State private var rows: [[String: Any]] = []
     @State private var myActivities: [[String: Any]] = []
@@ -16,6 +17,9 @@ struct EvidencesView: View {
     @State private var uploadMessage: String?
     @State private var uploading = false
     @State private var reportData: Data?
+    @State private var rejectNotes = ""
+    @State private var reviewingId: Int64?
+    @State private var reviewMessage: String?
 
     private var statuses: [String] {
         var s = Set(rows.compactMap { ConsoleHelpers.mapStr($0, "status", "estado").ifEmptyNil })
@@ -46,7 +50,12 @@ struct EvidencesView: View {
             }
         }
         .navigationTitle(reviewMode ? "Evidencias · Revisión" : "Mis evidencias")
-        .task { await reload() }
+        .task {
+            await reload()
+            if let initialActivityId {
+                await openActivity(initialActivityId)
+            }
+        }
         .refreshable { await reload() }
         .sheet(item: Binding(
             get: { reportData.map { PDFSheetData(data: $0) } },
@@ -61,6 +70,13 @@ struct EvidencesView: View {
     private var listBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                if !reviewMode {
+                    LocationPermissionBanner(
+                        message: "Las evidencias de campo adjuntan tu GPS al subir fotos.",
+                        requestOnAppear: true
+                    )
+                    .padding(.horizontal)
+                }
                 if !reviewMode && !myActivities.isEmpty {
                     Text("Actividades asignadas").font(.headline)
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -83,6 +99,12 @@ struct EvidencesView: View {
 
                 searchBar
                 if statuses.count > 1 { statusChips }
+
+                if let reviewMessage {
+                    Text(reviewMessage)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundColor(reviewMessage.hasPrefix("✅") ? .green : .red)
+                }
 
                 if isLoading { ProgressView().frame(maxWidth: .infinity).padding(.top, 40) }
                 else if let error, rows.isEmpty {
@@ -125,29 +147,106 @@ struct EvidencesView: View {
         }
     }
 
+    private func evidenceNeedsReview(_ status: String) -> Bool {
+        let s = status.lowercased()
+        if s.contains("aprobad") || s.contains("rechazad") { return false }
+        return s.contains("pendiente") || s.contains("revis") || s.contains("complet")
+            || s.contains("enviad") || s.contains("entregad") || s.isEmpty
+    }
+
     private func evidenceRow(_ row: [String: Any]) -> some View {
         let an = ConsoleHelpers.mapStr(row, "activityAn", "anNumber", "titulo")
         let client = ConsoleHelpers.mapStr(row, "clientName", "cliente")
-        let status = ConsoleHelpers.mapStr(row, "status", "estado")
-        return Button {
-            if let id = ConsoleHelpers.mapInt64(row, "activityId", "id") {
-                Task { await openActivity(id) }
-            }
-        } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(an.isEmpty ? "Actividad" : an).font(.subheadline).bold()
-                    if !client.isEmpty { Text(client).font(.caption).foregroundColor(.secondary) }
-                    OpsStatusChip(text: status.isEmpty ? "—" : status)
+        let status = ConsoleHelpers.mapStr(row, "status", "estado", "estatus")
+        let activityId = ConsoleHelpers.mapInt64(row, "activityId")
+            ?? ConsoleHelpers.mapInt64(row, "id")
+        let canReview = reviewMode && activityId != nil && evidenceNeedsReview(status)
+        let acting = reviewingId == activityId
+
+        return VStack(alignment: .leading, spacing: 10) {
+            Button {
+                if !reviewMode, let id = activityId {
+                    Task { await openActivity(id) }
                 }
-                Spacer()
-                Image(systemName: "chevron.right").foregroundColor(.secondary)
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(an.isEmpty ? "Actividad" : an).font(.subheadline).bold()
+                        if !client.isEmpty { Text(client).font(.caption).foregroundColor(.secondary) }
+                        OpsStatusChip(text: status.isEmpty ? "—" : status)
+                    }
+                    Spacer()
+                    if !reviewMode {
+                        Image(systemName: "chevron.right").foregroundColor(.secondary)
+                    }
+                }
             }
-            .padding(12)
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .buttonStyle(.plain)
+            .disabled(reviewMode)
+
+            if canReview, let id = activityId {
+                TextField("Motivo de rechazo (requerido para rechazar)", text: $rejectNotes, axis: .vertical)
+                    .lineLimit(2...4)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(acting == true)
+                NxDecisionActions(
+                    acting: acting == true,
+                    onApprove: { Task { await approve(id) } },
+                    onReject: { Task { await reject(id) } }
+                )
+            }
         }
-        .buttonStyle(.plain)
+        .padding(12)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func approve(_ activityId: Int64) async {
+        guard let reviewerId = Int64(SessionStore.shared.currentUser?.id ?? "") else {
+            reviewMessage = "❌ Sesión inválida"
+            return
+        }
+        reviewingId = activityId
+        reviewMessage = nil
+        defer { reviewingId = nil }
+        do {
+            try await ConsoleRepository.shared.approveEvidence(
+                activityId: activityId,
+                reviewerId: reviewerId
+            )
+            reviewMessage = "✅ Evidencia aprobada"
+            rejectNotes = ""
+            await reload()
+        } catch {
+            reviewMessage = "❌ \(error.localizedDescription)"
+        }
+    }
+
+    private func reject(_ activityId: Int64) async {
+        let notes = rejectNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !notes.isEmpty else {
+            reviewMessage = "❌ Indica el motivo del rechazo"
+            return
+        }
+        guard let reviewerId = Int64(SessionStore.shared.currentUser?.id ?? "") else {
+            reviewMessage = "❌ Sesión inválida"
+            return
+        }
+        reviewingId = activityId
+        reviewMessage = nil
+        defer { reviewingId = nil }
+        do {
+            try await ConsoleRepository.shared.rejectEvidence(
+                activityId: activityId,
+                reviewerId: reviewerId,
+                notes: notes
+            )
+            reviewMessage = "✅ Evidencia rechazada — el técnico debe corregir"
+            rejectNotes = ""
+            await reload()
+        } catch {
+            reviewMessage = "❌ \(error.localizedDescription)"
+        }
     }
 
     @ViewBuilder
@@ -237,9 +336,14 @@ struct EvidencesView: View {
         do {
             switch key {
             case "entry":
+                let coord = await DeviceLocation.shared.current()
                 _ = try await ConsoleRepository.shared.evidenceEntryPhoto(
-                    activityId: activityId, photoUrl: media[0].dataUrl)
-                uploadMessage = "Entrada guardada."
+                    activityId: activityId,
+                    photoUrl: media[0].dataUrl,
+                    lat: coord?.latitude ?? 0,
+                    lng: coord?.longitude ?? 0
+                )
+                uploadMessage = coord == nil ? "Entrada guardada (sin GPS)." : "Entrada guardada · GPS ok."
             case "photos":
                 _ = try await ConsoleRepository.shared.evidencePhotos(
                     activityId: activityId, photoUrls: media.map(\.dataUrl))
@@ -253,9 +357,14 @@ struct EvidencesView: View {
                 _ = try await ConsoleRepository.shared.evidenceServiceSheetData(activityId: activityId)
                 uploadMessage = "Plantilla completada."
             case "exit":
+                let coord = await DeviceLocation.shared.current()
                 _ = try await ConsoleRepository.shared.evidenceExitPhoto(
-                    activityId: activityId, photoUrl: media[0].dataUrl)
-                uploadMessage = "✅ Flujo completado."
+                    activityId: activityId,
+                    photoUrl: media[0].dataUrl,
+                    lat: coord?.latitude ?? 0,
+                    lng: coord?.longitude ?? 0
+                )
+                uploadMessage = coord == nil ? "✅ Flujo completado (sin GPS)." : "✅ Flujo completado · GPS ok."
             default: break
             }
             evidence = try await ConsoleRepository.shared.evidenceDetail(activityId: activityId)

@@ -212,7 +212,8 @@ final class ApiClient {
     }
 
     private func enqueueOffline(req: URLRequest, urlStr: String) {
-        let bodyStr = req.httpBody.flatMap { String(data: $0, encoding: .utf8) }
+        let rawBody = req.httpBody.flatMap { String(data: $0, encoding: .utf8) }
+        let bodyStr = OfflineMediaStore.shared.externalizeDataUrls(rawBody)
         let ct = req.value(forHTTPHeaderField: "Content-Type") ?? "application/json"
         OfflineMutationQueue.shared.enqueue(QueuedMutation(
             id: UUID().uuidString,

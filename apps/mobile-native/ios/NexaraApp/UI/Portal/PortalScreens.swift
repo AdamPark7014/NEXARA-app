@@ -228,6 +228,7 @@ struct PortalBranchEditView: View {
 
 private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
+    func ifBlank(_ fallback: () -> String) -> String { isEmpty ? fallback() : self }
 }
 
 // MARK: - Requests
@@ -364,32 +365,117 @@ struct PortalTicketsView: View {
     let onOpen: (Int64) -> Void
     @State private var tickets: [[String: Any]] = []
     @State private var query = ""
+    @State private var filter = "todos" // todos | abiertos | alta | aging
     @State private var isLoading = true
 
+    private var openCount: Int { tickets.filter { ticketIsOpen($0) }.count }
+    private var highCount: Int { tickets.filter { ticketIsOpen($0) && ticketIsHigh($0) }.count }
+    private var agingCount: Int { tickets.filter { ticketIsOpen($0) && ticketAgeHours($0) >= 48 }.count }
+
     private var filtered: [[String: Any]] {
-        guard !query.isEmpty else { return tickets }
         let q = query.lowercased()
-        return tickets.filter {
-            ConsoleHelpers.mapStr($0, "titulo", "anNumber").lowercased().contains(q) ||
-            ConsoleHelpers.mapStr($0, "branchName").lowercased().contains(q)
+        return tickets.filter { t in
+            let matchFilter: Bool = {
+                switch filter {
+                case "abiertos": return ticketIsOpen(t)
+                case "alta": return ticketIsOpen(t) && ticketIsHigh(t)
+                case "aging": return ticketIsOpen(t) && ticketAgeHours(t) >= 48
+                default: return true
+                }
+            }()
+            guard matchFilter else { return false }
+            guard !q.isEmpty else { return true }
+            let hay = [
+                ConsoleHelpers.mapStr(t, "titulo", "anNumber"),
+                ConsoleHelpers.mapStr(t, "branchName"),
+                ConsoleHelpers.mapStr(t, "estatus"),
+            ].joined(separator: " ").lowercased()
+            return hay.contains(q)
         }
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            TextField("Buscar ticket…", text: $query)
-                .textFieldStyle(.roundedBorder).padding()
-            if isLoading { Spacer(); ProgressView(); Spacer() }
-            else {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Prioridad · antigüedad · estado operativo")
+                    .font(.caption).foregroundColor(.secondary)
+                NxKpiGrid(items: [
+                    NxKpi(label: "Abiertos", value: "\(openCount)",
+                          tone: openCount > 0 ? .warning : .success),
+                    NxKpi(label: "Alta prioridad", value: "\(highCount)",
+                          tone: highCount > 0 ? .danger : .neutral),
+                    NxKpi(label: ">48h", value: "\(agingCount)", hint: "Sin cierre",
+                          tone: agingCount > 0 ? .danger : .info),
+                    NxKpi(label: "Total", value: "\(tickets.count)", tone: .brand),
+                ])
+                TextField("Buscar AN, título o sucursal", text: $query)
+                    .textFieldStyle(.roundedBorder)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach([
+                            ("todos", "Todos"),
+                            ("abiertos", "Abiertos"),
+                            ("alta", "Alta"),
+                            ("aging", ">48h"),
+                        ], id: \.0) { key, label in
+                            Button(label) { filter = key }
+                                .buttonStyle(.bordered)
+                                .tint(filter == key ? .teal : .secondary)
+                        }
+                    }
+                }
+            }
+            .padding()
+
+            if isLoading {
+                Spacer(); ProgressView(); Spacer()
+            } else if filtered.isEmpty {
+                Text("No hay tickets con este filtro.")
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
                 List(filtered, id: \.ptkKey) { t in
                     Button {
                         if let id = ConsoleHelpers.mapInt64(t, "id") { onOpen(id) }
                     } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(ConsoleHelpers.mapStr(t, "anNumber", "titulo")).font(.headline)
-                            Text(ConsoleHelpers.mapStr(t, "estatus", "branchName"))
-                                .font(.caption).foregroundColor(.secondary)
+                        let ageH = ticketAgeHours(t)
+                        let open = ticketIsOpen(t)
+                        let tone: NxTone = {
+                            if !open { return .success }
+                            if ticketIsHigh(t) || ageH >= 72 { return .danger }
+                            if ageH >= 48 { return .warning }
+                            return .info
+                        }()
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(ConsoleHelpers.mapStr(t, "titulo").ifBlank {
+                                    ConsoleHelpers.mapStr(t, "anNumber").ifBlank { "Ticket" }
+                                })
+                                .font(.headline)
+                                .lineLimit(2)
+                                Spacer()
+                                NxStatusChip(
+                                    text: ConsoleHelpers.mapStr(t, "estatus").ifBlank { "—" },
+                                    tone: tone
+                                )
+                            }
+                            let priority = ConsoleHelpers.mapStr(t, "prioridad", "urgency")
+                            let meta = [
+                                ConsoleHelpers.mapStr(t, "anNumber"),
+                                priority.isEmpty ? "" : "Prioridad \(priority)",
+                                ConsoleHelpers.mapStr(t, "branchName"),
+                                open ? "\(ageH)h abiertos" : "",
+                            ].filter { !$0.isEmpty }.joined(separator: " · ")
+                            if !meta.isEmpty {
+                                Text(meta).font(.caption).foregroundColor(.secondary)
+                            }
+                            if open && ageH >= 48 {
+                                Text("⚠ Fuera de ventana operativa (>48h)")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundColor(.red)
+                            }
                         }
+                        .padding(.vertical, 4)
                     }
                 }
                 .listStyle(.plain)
@@ -415,12 +501,37 @@ struct PortalTicketDetailView: View {
     var body: some View {
         ScrollView {
             if let t = ticket {
+                let ageH = ticketAgeHours(t)
+                let open = ticketIsOpen(t)
                 VStack(alignment: .leading, spacing: 12) {
                     Text(ConsoleHelpers.mapStr(t, "titulo", "anNumber")).font(.title3).bold()
                     detailRow("Estado", ConsoleHelpers.mapStr(t, "estatus"))
-                    detailRow("Prioridad", ConsoleHelpers.mapStr(t, "prioridad"))
+                    detailRow("Prioridad", ConsoleHelpers.mapStr(t, "prioridad", "urgency"))
                     detailRow("Sucursal", ConsoleHelpers.mapStr(t, "branchName"))
                     detailRow("Asignación", String(ConsoleHelpers.mapStr(t, "fechaAsignacion").prefix(16)))
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Operación / SLA").font(.subheadline.weight(.semibold))
+                        if open {
+                            detailRow("Antigüedad", "\(ageH) horas abiertos")
+                            if ageH >= 48 {
+                                Text("Fuera de ventana operativa (>48h)")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundColor(.red)
+                            } else {
+                                Text("Dentro de ventana operativa")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        } else {
+                            detailRow("Cierre", String(ConsoleHelpers.mapStr(t, "fechaFinalizacion").prefix(16)))
+                        }
+                        let sla = ConsoleHelpers.mapStr(t, "slaDueAt", "dueAt")
+                        if !sla.isEmpty { detailRow("SLA / vencimiento", String(sla.prefix(16))) }
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                     Button("Descargar reporte PDF") { Task { await downloadPdf() } }
                         .buttonStyle(.borderedProminent).tint(.teal)
                 }
@@ -444,6 +555,39 @@ struct PortalTicketDetailView: View {
     private func downloadPdf() async {
         reportData = try? await TicketsRepository.shared.ticketReportPdf(id: ticketId)
     }
+}
+
+private func ticketIsOpen(_ t: [String: Any]) -> Bool {
+    let s = ConsoleHelpers.mapStr(t, "estatus").lowercased()
+    return !(s.contains("finaliz") || s.contains("cerrad") || s.contains("complet") || s.contains("cancel"))
+}
+
+private func ticketIsHigh(_ t: [String: Any]) -> Bool {
+    let p = ConsoleHelpers.mapStr(t, "prioridad", "urgency").lowercased()
+    return p.contains("alta") || p.contains("high") || p.contains("urgent") || p == "high"
+}
+
+private func ticketAgeHours(_ t: [String: Any]) -> Int {
+    let raw = ConsoleHelpers.mapStr(t, "fechaAsignacion", "fechaInicio")
+    guard !raw.isEmpty else { return 0 }
+    let normalized: String = {
+        if raw.count >= 19, raw[raw.index(raw.startIndex, offsetBy: 10)] == " " {
+            let head = String(raw.prefix(19)).replacingOccurrences(of: " ", with: "T")
+            return head + "Z"
+        }
+        if raw.hasSuffix("Z") || raw.contains("+") { return raw }
+        if raw.count >= 19 { return String(raw.prefix(19)) + "Z" }
+        return raw
+    }()
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    var date = formatter.date(from: normalized)
+    if date == nil {
+        formatter.formatOptions = [.withInternetDateTime]
+        date = formatter.date(from: normalized)
+    }
+    guard let start = date else { return 0 }
+    return max(0, Int(Date().timeIntervalSince(start) / 3600))
 }
 
 // MARK: - Feedback

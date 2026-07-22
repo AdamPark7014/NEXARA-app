@@ -28,7 +28,7 @@ object ModulePanelMap {
         "documents", "audit", "analytics",
         "clients", "projects", "cotizaciones", "gestion-vendedores",
         "contact-messages", "news", "newsletter",
-        "settings", "my-profile", "my-preferences",
+        "settings", "my-profile", "my-preferences", "offline-queue",
         "companies", "kb", "exports", "architecture", "calendar", "orgchart", "kpis-hr",
     )
 

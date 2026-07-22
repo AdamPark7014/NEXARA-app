@@ -41,6 +41,10 @@ final class ConsoleRepository {
         return ApiClient.decodeMapList(try await api.get("activities", query: q))
     }
 
+    func activityItems(scope: String? = nil) async throws -> [ActivityItem] {
+        try await activities(scope: scope).map { ActivityItem(raw: $0) }
+    }
+
     // MARK: Evidences
 
     func myEvidenceHistory() async throws -> [[String: Any]] {
@@ -86,6 +90,27 @@ final class ConsoleRepository {
         struct Body: Encodable { let photoUrl: String; let latitude: Double; let longitude: Double }
         let data = try await api.postJSON("activity-evidence/\(activityId)/exit-photo", body: Body(photoUrl: photoUrl, latitude: lat, longitude: lng))
         return ConsoleHelpers.decodeMap(data)
+    }
+
+    func approveEvidence(activityId: Int64, reviewerId: Int64, notes: String? = nil) async throws {
+        struct Body: Encodable { let reviewerId: Int64; let notes: String? }
+        _ = try await api.postJSON(
+            "activity-evidence/\(activityId)/approve",
+            body: Body(reviewerId: reviewerId, notes: notes)
+        )
+    }
+
+    func rejectEvidence(
+        activityId: Int64,
+        reviewerId: Int64,
+        notes: String,
+        rejectedStep: String = "EVIDENCE_PHOTOS"
+    ) async throws {
+        struct Body: Encodable { let reviewerId: Int64; let notes: String; let rejectedStep: String }
+        _ = try await api.postJSON(
+            "activity-evidence/\(activityId)/reject",
+            body: Body(reviewerId: reviewerId, notes: notes, rejectedStep: rejectedStep)
+        )
     }
 
     func ticketReportPdf(activityId: Int64) async throws -> Data {
@@ -251,6 +276,41 @@ final class ConsoleRepository {
 
     func viatics() async throws -> [[String: Any]] {
         ApiClient.decodeMapList(try await api.get("viatics"))
+    }
+
+    func createViatic(
+        amount: Double,
+        motivo: String,
+        categoria: String?,
+        ticketEvidenciaUrl: String,
+        activityId: Int64? = nil
+    ) async throws -> [String: Any] {
+        struct Body: Encodable {
+            let montoSolicitado: Double
+            let motivo: String
+            let categoria: String?
+            let actividadId: Int64?
+            let ticketEvidenciaUrl: String
+        }
+        let data = try await api.postJSON(
+            "viatics",
+            body: Body(
+                montoSolicitado: amount,
+                motivo: motivo,
+                categoria: categoria,
+                actividadId: activityId,
+                ticketEvidenciaUrl: ticketEvidenciaUrl
+            )
+        )
+        return ConsoleHelpers.decodeMap(data)
+    }
+
+    func approveViatic(id: Int64, approve: Bool, note: String? = nil) async throws {
+        struct Body: Encodable { let action: String; let note: String? }
+        _ = try await api.patchJSON(
+            "viatics/\(id)/approve",
+            body: Body(action: approve ? "approve" : "reject", note: note)
+        )
     }
 
     func gpsPost(lat: Double, lng: Double, speedKmh: Double? = nil) async throws {

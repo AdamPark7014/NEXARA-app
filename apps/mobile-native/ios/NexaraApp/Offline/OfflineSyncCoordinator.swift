@@ -6,6 +6,8 @@ final class OfflineSyncCoordinator {
 
     private let lock = NSLock()
     private var isReplaying = false
+    private let maxAttempts = 8
+    private let permanentClient: Set<Int> = [400, 401, 403, 404, 409, 410, 422]
 
     private init() {}
 
@@ -27,18 +29,55 @@ final class OfflineSyncCoordinator {
         guard !pending.isEmpty else { return }
 
         var done = Set<String>()
+        let now = Date().timeIntervalSince1970
         for item in pending {
+            if let last = item.lastAttemptAt, item.attempts > 0 {
+                let wait = min(300.0, pow(2.0, Double(min(item.attempts, 8))))
+                if now - last < wait { continue }
+            }
             var req = URLRequest(url: URL(string: item.url)!)
             req.httpMethod = item.method
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             req.setValue(item.contentType, forHTTPHeaderField: "Content-Type")
-            if let body = item.body { req.httpBody = body.data(using: .utf8) }
+            if let body = OfflineMediaStore.shared.expandMediaRefs(item.body) {
+                req.httpBody = body.data(using: .utf8)
+            }
             do {
                 let (_, res) = try await URLSession.shared.data(for: req)
-                if let http = res as? HTTPURLResponse, (200..<300).contains(http.statusCode) || (400..<500).contains(http.statusCode) {
+                guard let http = res as? HTTPURLResponse else { continue }
+                if (200..<300).contains(http.statusCode) {
                     done.insert(item.id)
+                    OfflineMediaStore.shared.purgeRefs(in: item.body)
+                } else if permanentClient.contains(http.statusCode) {
+                    done.insert(item.id)
+                    OfflineMediaStore.shared.purgeRefs(in: item.body)
+                } else {
+                    let next = item.attempts + 1
+                    if next >= maxAttempts {
+                        done.insert(item.id)
+                        OfflineMediaStore.shared.purgeRefs(in: item.body)
+                    } else {
+                        var updated = item
+                        updated.attempts = next
+                        updated.lastAttemptAt = Date().timeIntervalSince1970
+                        updated.lastError = "HTTP \(http.statusCode)"
+                        OfflineMutationQueue.shared.upsert(updated)
+                    }
                 }
-            } catch { continue }
+            } catch {
+                let next = item.attempts + 1
+                if next >= maxAttempts {
+                    done.insert(item.id)
+                    OfflineMediaStore.shared.purgeRefs(in: item.body)
+                } else {
+                    var updated = item
+                    updated.attempts = next
+                    updated.lastAttemptAt = Date().timeIntervalSince1970
+                    updated.lastError = error.localizedDescription
+                    OfflineMutationQueue.shared.upsert(updated)
+                }
+            }
+            try? await Task.sleep(nanoseconds: 80_000_000)
         }
         if !done.isEmpty {
             OfflineMutationQueue.shared.removeIds(done)

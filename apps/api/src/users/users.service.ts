@@ -159,39 +159,10 @@ export class UsersService {
   }
 
   async findAllVisible(currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean }, query?: PaginationQueryDto) {
-    const excludeSuperAdmins = {
-      NOT: { email: { in: this.superAdminEmails } },
-    };
-    // Incluye campos RRHH (puesto, tipoContrato, estadoRRHH, isActive, fechaIngreso)
-    const include = {
-      role: true,
-      department: true,
-      manager: { select: { id: true, nombre: true } },
-    };
-
-    let where: any;
-    if (currentUser.isSuperAdmin) {
-      where = excludeSuperAdmins;
-    } else if (this.canViewUsersDirectory(currentUser)) {
-      where = { AND: [{ role: { accesoConsoleAdmin: false } }, excludeSuperAdmins] };
-    } else {
-      where = { id: currentUser.id, ...excludeSuperAdmins };
-    }
-
-    if (query?.limit) {
-      const [data, total] = await Promise.all([
-        this.prisma['user'].findMany({ where, include, skip: query.skip, take: query.take }),
-        this.prisma['user'].count({ where }),
-      ]);
-      const paginated = buildPaginatedResponse(data, total, query);
-      return {
-        ...paginated,
-        data: this.withEmployeeNumberList(paginated.data || []),
-      };
-    }
-    const users = await this.prisma['user'].findMany({ where, include });
-    return this.withEmployeeNumberList(users);
+    // Implementation moved below with IAM enrichment (risk, sessions).
+    return this.findAllVisibleIam(currentUser, query);
   }
+
   /** Plantilla RRHH — lista todos los usuarios activos con campos HR */
   async findHrStaff(currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] }, query?: PaginationQueryDto) {
     const where: any = { NOT: { email: { in: this.superAdminEmails } } };
@@ -293,6 +264,28 @@ export class UsersService {
   async create(createUserDto: CreateUserDto) {
     await this.clearEmployeeNumberForProtectedUsers();
 
+    // Seat limit del tenant primario (billing SaaS)
+    const primary = await this.prisma.companyProfile.findFirst({
+      where: { isPrimary: true, isActive: true },
+      select: { id: true, seatLimit: true, billingStatus: true },
+      orderBy: { id: 'asc' },
+    });
+    if (primary) {
+      if (primary.billingStatus === 'suspended') {
+        throw new BadRequestException('Empresa suspendida por billing — no se pueden crear usuarios');
+      }
+      const seatsUsed = await this.prisma.userCompany.count({
+        where: { companyId: primary.id, user: { isActive: true } },
+      });
+      const activeUsers = await this.prisma.user.count({ where: { isActive: true } });
+      const used = Math.max(seatsUsed, activeUsers);
+      if (used >= primary.seatLimit) {
+        throw new BadRequestException(
+          `Límite de asientos alcanzado (${used}/${primary.seatLimit}). Amplía el plan en Billing.`,
+        );
+      }
+    }
+
     const hash = await bcrypt.hash(createUserDto.password, 10);
     const roleId = await this.resolveRoleId(createUserDto.roleId);
     const departmentId = await this.resolveDepartmentId(createUserDto.departmentId);
@@ -325,6 +318,7 @@ export class UsersService {
             departmentId,
             avatarUrl: createUserDto.avatarUrl,
             passwordHash: hash,
+            passwordChangedAt: new Date(),
             managerId: await this.resolveManagerId(createUserDto.managerId, tx),
           },
         });
@@ -643,6 +637,7 @@ export class UsersService {
 
     if (data.password) {
       data.passwordHash = await bcrypt.hash(data.password, 10);
+      data.passwordChangedAt = new Date();
       delete data.password;
     }
     if (data.roleId !== undefined) {
@@ -709,5 +704,464 @@ export class UsersService {
       }
     }
     return roots;
+  }
+
+  /** Score de riesgo 0–100 para un usuario (IAM). */
+  computeRiskScore(u: {
+    isActive?: boolean | null;
+    lastLoginAt?: Date | null;
+    failedLoginCount?: number | null;
+    lockedUntil?: Date | null;
+    managerId?: number | null;
+    mfaEnabled?: boolean | null;
+    passwordChangedAt?: Date | null;
+    fechaCreacion?: Date | null;
+  }): { score: number; factors: string[] } {
+    const factors: string[] = [];
+    let score = 0;
+    const now = Date.now();
+    const day = 86_400_000;
+
+    if (u.isActive === false) {
+      return { score: 100, factors: ['Cuenta desactivada'] };
+    }
+    if (u.lockedUntil && u.lockedUntil.getTime() > now) {
+      score += 40;
+      factors.push('Cuenta bloqueada por intentos fallidos');
+    }
+    if (!u.lastLoginAt) {
+      score += 30;
+      factors.push('Nunca ha iniciado sesión');
+    } else {
+      const idleDays = (now - u.lastLoginAt.getTime()) / day;
+      if (idleDays >= 60) {
+        score += 35;
+        factors.push(`Inactivo ${Math.floor(idleDays)} días`);
+      } else if (idleDays >= 30) {
+        score += 25;
+        factors.push(`Sin acceso ${Math.floor(idleDays)} días`);
+      } else if (idleDays >= 14) {
+        score += 12;
+        factors.push(`Último acceso hace ${Math.floor(idleDays)} días`);
+      }
+    }
+    const fails = u.failedLoginCount ?? 0;
+    if (fails > 0) {
+      const add = Math.min(30, fails * 8);
+      score += add;
+      factors.push(`${fails} intento(s) fallido(s) reciente(s)`);
+    }
+    if (!u.mfaEnabled) {
+      score += 8;
+      factors.push('MFA desactivado');
+    }
+    if (!u.managerId) {
+      score += 5;
+      factors.push('Sin manager asignado');
+    }
+    if (u.passwordChangedAt) {
+      const pwdAge = (now - u.passwordChangedAt.getTime()) / day;
+      if (pwdAge >= 180) {
+        score += 15;
+        factors.push('Contraseña con más de 6 meses');
+      }
+    } else if (u.fechaCreacion) {
+      const age = (now - u.fechaCreacion.getTime()) / day;
+      if (age >= 90) {
+        score += 10;
+        factors.push('Sin cambio de contraseña registrado');
+      }
+    }
+
+    return { score: Math.min(100, score), factors };
+  }
+
+  private enrichIamUser<T extends {
+    id: number;
+    isActive?: boolean | null;
+    lastLoginAt?: Date | null;
+    failedLoginCount?: number | null;
+    lockedUntil?: Date | null;
+    managerId?: number | null;
+    mfaEnabled?: boolean | null;
+    passwordChangedAt?: Date | null;
+    fechaCreacion?: Date | null;
+  }>(user: T) {
+    const risk = this.computeRiskScore(user);
+    return {
+      ...this.withEmployeeNumber(user as T & { email?: string | null; employeeNumber?: string | null }),
+      riskScore: risk.score,
+      riskLevel: risk.score >= 70 ? 'high' : risk.score >= 40 ? 'medium' : 'low',
+      riskFactors: risk.factors,
+    };
+  }
+
+  private async findAllVisibleIam(currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean }, query?: PaginationQueryDto) {
+    const excludeSuperAdmins = {
+      NOT: { email: { in: this.superAdminEmails } },
+    };
+    const include = {
+      role: true,
+      department: true,
+      manager: { select: { id: true, nombre: true } },
+      _count: { select: { sessions: { where: { revokedAt: null, expiresAt: { gt: new Date() } } } } },
+    };
+
+    let where: any;
+    if (currentUser.isSuperAdmin) {
+      where = excludeSuperAdmins;
+    } else if (this.canViewUsersDirectory(currentUser)) {
+      where = { AND: [{ role: { accesoConsoleAdmin: false } }, excludeSuperAdmins] };
+    } else {
+      where = { id: currentUser.id, ...excludeSuperAdmins };
+    }
+
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma['user'].findMany({ where, include, skip: query.skip, take: query.take }),
+        this.prisma['user'].count({ where }),
+      ]);
+      const paginated = buildPaginatedResponse(data, total, query);
+      return {
+        ...paginated,
+        data: (paginated.data || []).map((u: any) => ({
+          ...this.enrichIamUser(u),
+          activeSessions: u._count?.sessions ?? 0,
+        })),
+      };
+    }
+    const users = await this.prisma['user'].findMany({ where, include });
+    return users.map((u: any) => ({
+      ...this.enrichIamUser(u),
+      activeSessions: u._count?.sessions ?? 0,
+    }));
+  }
+
+  /** Dashboard IAM: KPIs, tendencias, rankings de riesgo. */
+  async getIamInsights(currentUser: { isSuperAdmin?: boolean; permissions?: string[] }) {
+    if (!this.canViewUsersDirectory(currentUser)) {
+      throw new ForbiddenException('Sin permiso para ver insights IAM');
+    }
+
+    const exclude = { email: { notIn: this.superAdminEmails } };
+    const now = new Date();
+    const d7 = new Date(now.getTime() - 7 * 86_400_000);
+    const d30 = new Date(now.getTime() - 30 * 86_400_000);
+    const d90 = new Date(now.getTime() - 90 * 86_400_000);
+
+    const users = await this.prisma.user.findMany({
+      where: exclude,
+      select: {
+        id: true,
+        nombre: true,
+        email: true,
+        isActive: true,
+        lastLoginAt: true,
+        lastLoginDevice: true,
+        failedLoginCount: true,
+        lockedUntil: true,
+        mfaEnabled: true,
+        managerId: true,
+        passwordChangedAt: true,
+        fechaCreacion: true,
+        role: { select: { id: true, nombre: true } },
+        department: { select: { id: true, nombre: true } },
+      },
+    });
+
+    const enriched = users.map((u) => this.enrichIamUser(u));
+    const active = enriched.filter((u) => u.isActive);
+    const inactive = enriched.filter((u) => !u.isActive);
+    const neverLogin = enriched.filter((u) => u.isActive && !u.lastLoginAt);
+    const active7 = enriched.filter((u) => u.lastLoginAt && u.lastLoginAt >= d7);
+    const active30 = enriched.filter((u) => u.lastLoginAt && u.lastLoginAt >= d30);
+    const stale30 = enriched.filter(
+      (u) => u.isActive && u.lastLoginAt && u.lastLoginAt < d30,
+    );
+    const locked = enriched.filter((u) => u.lockedUntil && u.lockedUntil > now);
+    const highRisk = enriched.filter((u) => u.riskLevel === 'high');
+    const created7 = enriched.filter((u) => u.fechaCreacion && u.fechaCreacion >= d7);
+    const created30 = enriched.filter((u) => u.fechaCreacion && u.fechaCreacion >= d30);
+    const mfaOn = enriched.filter((u) => u.mfaEnabled);
+
+    const byDept: Record<string, number> = {};
+    const byRole: Record<string, number> = {};
+    const byDevice: Record<string, number> = {};
+    for (const u of enriched) {
+      const dept = (u as any).department?.nombre ?? 'Sin depto.';
+      const role = (u as any).role?.nombre ?? 'Sin rol';
+      byDept[dept] = (byDept[dept] ?? 0) + 1;
+      byRole[role] = (byRole[role] ?? 0) + 1;
+      if (u.lastLoginDevice) {
+        byDevice[u.lastLoginDevice] = (byDevice[u.lastLoginDevice] ?? 0) + 1;
+      }
+    }
+
+    const auditSince = d90;
+    const loginEvents = await this.prisma.auditLog.findMany({
+      where: {
+        entityType: 'Auth',
+        action: { in: ['LOGIN_SUCCESS', 'LOGIN_FAILED'] },
+        createdAt: { gte: auditSince },
+      },
+      select: { action: true, createdAt: true, userId: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+    const successByDay: Record<string, number> = {};
+    const failedByDay: Record<string, number> = {};
+    const hourBuckets = Array.from({ length: 24 }, () => 0);
+    for (let i = 13; i >= 0; i--) {
+      const k = dayKey(new Date(now.getTime() - i * 86_400_000));
+      successByDay[k] = 0;
+      failedByDay[k] = 0;
+    }
+    for (const ev of loginEvents) {
+      const k = dayKey(ev.createdAt);
+      if (ev.action === 'LOGIN_SUCCESS') {
+        if (k in successByDay) successByDay[k] += 1;
+        hourBuckets[ev.createdAt.getHours()] += 1;
+      } else if (k in failedByDay) {
+        failedByDay[k] += 1;
+      }
+    }
+
+    const activeSessions = await this.prisma.userSession.count({
+      where: { revokedAt: null, expiresAt: { gt: now } },
+    });
+
+    const riskTop = [...enriched]
+      .filter((u) => u.isActive)
+      .sort((a, b) => b.riskScore - a.riskScore)
+      .slice(0, 10)
+      .map((u) => ({
+        id: u.id,
+        nombre: u.nombre,
+        email: u.email,
+        riskScore: u.riskScore,
+        riskLevel: u.riskLevel,
+        riskFactors: u.riskFactors,
+        lastLoginAt: u.lastLoginAt,
+        failedLoginCount: u.failedLoginCount,
+      }));
+
+    return {
+      generatedAt: now.toISOString(),
+      kpis: {
+        total: enriched.length,
+        active: active.length,
+        inactive: inactive.length,
+        neverLoggedIn: neverLogin.length,
+        activeLast7d: active7.length,
+        activeLast30d: active30.length,
+        stale30d: stale30.length,
+        locked: locked.length,
+        highRisk: highRisk.length,
+        createdLast7d: created7.length,
+        createdLast30d: created30.length,
+        mfaEnabled: mfaOn.length,
+        mfaCoveragePct: enriched.length
+          ? Math.round((mfaOn.length / enriched.length) * 1000) / 10
+          : 0,
+        activeSessions,
+        retentionProxy30d: active.length
+          ? Math.round((active30.length / active.length) * 1000) / 10
+          : 0,
+      },
+      distributions: {
+        byDepartment: Object.entries(byDept)
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count),
+        byRole: Object.entries(byRole)
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 12),
+        byDevice: Object.entries(byDevice)
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count),
+      },
+      trends: {
+        loginsSuccess14d: Object.entries(successByDay).map(([date, count]) => ({ date, count })),
+        loginsFailed14d: Object.entries(failedByDay).map(([date, count]) => ({ date, count })),
+        peakHours: hourBuckets.map((count, hour) => ({ hour, count })),
+      },
+      riskTop,
+      alerts: [
+        ...(locked.length
+          ? [{ severity: 'danger' as const, message: `${locked.length} cuenta(s) bloqueada(s) por force brute` }]
+          : []),
+        ...(neverLogin.length
+          ? [{ severity: 'warning' as const, message: `${neverLogin.length} usuario(s) activo(s) sin primer login` }]
+          : []),
+        ...(stale30.length
+          ? [{ severity: 'warning' as const, message: `${stale30.length} usuario(s) sin acceso en 30+ días` }]
+          : []),
+        ...(highRisk.length
+          ? [{ severity: 'danger' as const, message: `${highRisk.length} usuario(s) en riesgo alto` }]
+          : []),
+      ],
+    };
+  }
+
+  async listUserSessions(userId: number) {
+    return this.prisma.userSession.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        device: true,
+        ipAddress: true,
+        userAgent: true,
+        createdAt: true,
+        lastSeenAt: true,
+        expiresAt: true,
+        revokedAt: true,
+        revokeReason: true,
+      },
+    });
+  }
+
+  async revokeSession(sessionId: number, reason = 'admin_revoke') {
+    const session = await this.prisma.userSession.findUnique({ where: { id: sessionId } });
+    if (!session) throw new NotFoundException('Sesión no encontrada');
+    if (session.revokedAt) return session;
+    return this.prisma.userSession.update({
+      where: { id: sessionId },
+      data: { revokedAt: new Date(), revokeReason: reason },
+    });
+  }
+
+  async revokeAllUserSessions(userId: number, reason = 'admin_force_logout') {
+    const result = await this.prisma.userSession.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date(), revokeReason: reason },
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        entityType: 'User',
+        entityId: userId,
+        action: 'FORCE_LOGOUT',
+        changes: { revoked: result.count, reason },
+        userId,
+      },
+    }).catch(() => undefined);
+    return { revoked: result.count };
+  }
+
+  async unlockUser(userId: number) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { lockedUntil: null, failedLoginCount: 0 },
+      select: { id: true, nombre: true, email: true, lockedUntil: true, failedLoginCount: true },
+    });
+  }
+
+  async bulkSetActive(ids: number[], isActive: boolean) {
+    const safeIds = ids.filter((id) => Number.isFinite(id) && id > 0);
+    if (!safeIds.length) throw new BadRequestException('Sin IDs válidos');
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: safeIds } },
+      select: { id: true, email: true },
+    });
+    const allowed = users
+      .filter((u) => !this.isProtectedSuperAdminEmail(u.email))
+      .map((u) => u.id);
+    const result = await this.prisma.user.updateMany({
+      where: { id: { in: allowed } },
+      data: { isActive },
+    });
+    if (!isActive) {
+      await this.prisma.userSession.updateMany({
+        where: { userId: { in: allowed }, revokedAt: null },
+        data: { revokedAt: new Date(), revokeReason: 'bulk_deactivate' },
+      });
+    }
+    return { updated: result.count, skipped: safeIds.length - allowed.length };
+  }
+
+  async getUserAuthActivity(userId: number, limit = 40) {
+    return this.prisma.auditLog.findMany({
+      where: {
+        OR: [
+          { userId, entityType: 'Auth' },
+          { entityType: 'User', entityId: userId, action: { in: ['FORCE_LOGOUT', 'UNLOCK', 'PASSWORD_RESET'] } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(100, Math.max(1, limit)),
+      select: {
+        id: true,
+        action: true,
+        changes: true,
+        ipAddress: true,
+        userAgent: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async beginMfaSetup(userId: number) {
+    const { generateMfaSecret, buildOtpAuthUrl } = await import('./mfa.util.js');
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, mfaEnabled: true },
+    });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    const secret = generateMfaSecret();
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { mfaSecret: secret, mfaEnabled: false, mfaEnabledAt: null },
+    });
+    return {
+      secret,
+      otpauthUrl: buildOtpAuthUrl(secret, user.email),
+      message: 'Escanea el QR en tu app autenticadora y confirma con un código.',
+    };
+  }
+
+  async confirmMfaSetup(userId: number, token: string) {
+    const { verifyTotp } = await import('./mfa.util.js');
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { mfaSecret: true },
+    });
+    if (!user?.mfaSecret) throw new BadRequestException('Inicia el setup MFA primero');
+    if (!verifyTotp(user.mfaSecret, token)) {
+      throw new BadRequestException('Código MFA inválido');
+    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { mfaEnabled: true, mfaEnabledAt: new Date() },
+    });
+    return { mfaEnabled: true };
+  }
+
+  async disableMfa(userId: number, token?: string) {
+    const { verifyTotp } = await import('./mfa.util.js');
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { mfaSecret: true, mfaEnabled: true },
+    });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    if (user.mfaEnabled && user.mfaSecret) {
+      if (!token || !verifyTotp(user.mfaSecret, token)) {
+        throw new BadRequestException('Código MFA requerido para desactivar');
+      }
+    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { mfaEnabled: false, mfaSecret: null, mfaEnabledAt: null },
+    });
+    return { mfaEnabled: false };
+  }
+
+  async getMfaStatus(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { mfaEnabled: true, mfaEnabledAt: true },
+    });
+    return { mfaEnabled: Boolean(user?.mfaEnabled), mfaEnabledAt: user?.mfaEnabledAt ?? null };
   }
 }

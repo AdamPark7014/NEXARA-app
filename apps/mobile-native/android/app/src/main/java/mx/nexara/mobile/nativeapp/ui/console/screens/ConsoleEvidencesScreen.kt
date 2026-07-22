@@ -55,6 +55,9 @@ data class EvidencesUiState(
     val uploadingStep: String? = null,
     val uploadMessage: String? = null,
     val downloadingReport: Boolean = false,
+    val reviewingActivityId: Long? = null,
+    val reviewMessage: String? = null,
+    val rejectNotesDraft: String = "",
 )
 
 class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
@@ -86,6 +89,80 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearUploadMessage() = setUploadMessage(null)
 
+    fun setRejectNotesDraft(v: String) = _state.update { it.copy(rejectNotesDraft = v) }
+
+    fun clearReviewMessage() = _state.update { it.copy(reviewMessage = null) }
+
+    fun approveEvidence(activityId: Long, reviewerId: Long, notes: String? = null) {
+        _state.update { it.copy(reviewingActivityId = activityId, reviewMessage = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repo.approveEvidence(activityId = activityId, reviewerId = reviewerId, notes = notes)
+                }
+                _state.update {
+                    it.copy(
+                        reviewingActivityId = null,
+                        reviewMessage = "✅ Evidencia aprobada",
+                        rejectNotesDraft = "",
+                    )
+                }
+                loadAll(
+                    isAdmin = true,
+                    isSuperAdmin = AuthRepository(getApplication()).loadSession()?.isSuperAdmin == true,
+                    currentUserId = reviewerId,
+                )
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        reviewingActivityId = null,
+                        reviewMessage = "❌ ${e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo aprobar"}",
+                    )
+                }
+            }
+        }
+    }
+
+    fun rejectEvidence(activityId: Long, reviewerId: Long, notes: String, rejectedStep: String = "EVIDENCE_PHOTOS") {
+        val reason = notes.trim()
+        if (reason.isBlank()) {
+            _state.update { it.copy(reviewMessage = "❌ Indica el motivo del rechazo") }
+            return
+        }
+        _state.update { it.copy(reviewingActivityId = activityId, reviewMessage = null) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repo.rejectEvidence(
+                        activityId = activityId,
+                        reviewerId = reviewerId,
+                        notes = reason,
+                        rejectedStep = rejectedStep,
+                    )
+                }
+                _state.update {
+                    it.copy(
+                        reviewingActivityId = null,
+                        reviewMessage = "✅ Evidencia rechazada — el técnico debe corregir",
+                        rejectNotesDraft = "",
+                    )
+                }
+                loadAll(
+                    isAdmin = true,
+                    isSuperAdmin = AuthRepository(getApplication()).loadSession()?.isSuperAdmin == true,
+                    currentUserId = reviewerId,
+                )
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        reviewingActivityId = null,
+                        reviewMessage = "❌ ${e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo rechazar"}",
+                    )
+                }
+            }
+        }
+    }
+
     fun loadActivityEvidence(activityId: Long) {
         viewModelScope.launch {
             val evidence = withContext(Dispatchers.IO) {
@@ -100,11 +177,24 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
         setUploadMessage(null)
         viewModelScope.launch {
             try {
+                val coords = if (lat == 0.0 && lng == 0.0) {
+                    withContext(Dispatchers.IO) {
+                        mx.nexara.mobile.nativeapp.util.DeviceLocation.current(getApplication())
+                    }
+                } else null
+                val useLat = coords?.lat ?: lat
+                val useLng = coords?.lng ?: lng
                 val updated = withContext(Dispatchers.IO) {
-                    repo.evidenceEntryPhoto(activityId = activityId, photoUrl = photoDataUrl, lat = lat, lng = lng)
+                    repo.evidenceEntryPhoto(
+                        activityId = activityId,
+                        photoUrl = photoDataUrl,
+                        lat = useLat,
+                        lng = useLng,
+                    )
                 }
                 _state.update { it.copy(selectedEvidence = updated) }
-                setUploadMessage("Entrada guardada. Sigue con fotos de evidencia.")
+                val geo = if (useLat != 0.0 || useLng != 0.0) " · GPS ok" else " · sin GPS"
+                setUploadMessage("Entrada guardada$geo. Sigue con fotos de evidencia.")
             } catch (e: Exception) {
                 setUploadMessage(e.message?.takeIf { it.isNotBlank() } ?: "No se pudo guardar la foto de entrada")
             } finally {
@@ -179,11 +269,24 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
         setUploadMessage(null)
         viewModelScope.launch {
             try {
+                val coords = if (lat == 0.0 && lng == 0.0) {
+                    withContext(Dispatchers.IO) {
+                        mx.nexara.mobile.nativeapp.util.DeviceLocation.current(getApplication())
+                    }
+                } else null
+                val useLat = coords?.lat ?: lat
+                val useLng = coords?.lng ?: lng
                 val updated = withContext(Dispatchers.IO) {
-                    repo.evidenceExitPhoto(activityId = activityId, photoUrl = photoDataUrl, lat = lat, lng = lng)
+                    repo.evidenceExitPhoto(
+                        activityId = activityId,
+                        photoUrl = photoDataUrl,
+                        lat = useLat,
+                        lng = useLng,
+                    )
                 }
                 _state.update { it.copy(selectedEvidence = updated) }
-                setUploadMessage("Flujo completado. Evidencia enviada para revisión.")
+                val geo = if (useLat != 0.0 || useLng != 0.0) " · GPS ok" else " · sin GPS"
+                setUploadMessage("Flujo completado$geo. Evidencia enviada para revisión.")
             } catch (e: Exception) {
                 setUploadMessage(e.message?.takeIf { it.isNotBlank() } ?: "No se pudo guardar la foto de salida")
             } finally {
@@ -280,6 +383,7 @@ private val EV_STATUS_FILTERS = listOf("Todos", "Pendiente", "Aprobada", "Rechaz
 fun ConsoleEvidencesScreen(
     mode: String = "combined", // "admin" | "user" | "combined"
     contentPadding: PaddingValues = PaddingValues(16.dp),
+    initialActivityId: Long? = null,
 ) {
     val context = LocalContext.current
     val authRepo = remember(context) { AuthRepository(context) }
@@ -293,6 +397,12 @@ fun ConsoleEvidencesScreen(
 
     val vm: ConsoleEvidencesViewModel = viewModel()
     val state by vm.state.collectAsState()
+
+    LaunchedEffect(initialActivityId) {
+        if (initialActivityId != null) {
+            vm.setSelectedActivityId(initialActivityId)
+        }
+    }
 
     if (state.isLoading && state.error == null && state.teamRows.isEmpty() && state.myRows.isEmpty()) {
         vm.loadAll(isAdmin = isAdmin || showTeam, isSuperAdmin = isSuperAdmin, currentUserId = user?.id)
@@ -358,6 +468,21 @@ fun ConsoleEvidencesScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = EvSub,
                 )
+                if (showMine && !isSuperAdmin) {
+                    Spacer(Modifier.height(8.dp))
+                    mx.nexara.mobile.nativeapp.ui.common.LocationPermissionBanner(
+                        message = "Las evidencias de campo adjuntan tu GPS al subir fotos.",
+                        requestOnAppear = true,
+                    )
+                }
+                if (!state.reviewMessage.isNullOrBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        state.reviewMessage!!,
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = if (state.reviewMessage!!.startsWith("✅")) EvGreen else EvRed,
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
             }
         }
@@ -675,7 +800,27 @@ fun ConsoleEvidencesScreen(
                 }
             } else {
                 items(teamFiltered.take(100)) { r ->
-                    EvidenceCard(r, context)
+                    val activityId = r.actividad?.id
+                    val canReview = activityId != null && evidenceNeedsReview(r.estatus)
+                    EvidenceCard(
+                        r = r,
+                        context = context,
+                        showOwner = true,
+                        canReview = canReview,
+                        acting = state.reviewingActivityId == activityId,
+                        rejectNotes = state.rejectNotesDraft,
+                        onRejectNotesChange = vm::setRejectNotesDraft,
+                        onApprove = {
+                            if (activityId != null && user != null) {
+                                vm.approveEvidence(activityId, user.id)
+                            }
+                        },
+                        onReject = {
+                            if (activityId != null && user != null) {
+                                vm.rejectEvidence(activityId, user.id, state.rejectNotesDraft)
+                            }
+                        },
+                    )
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -778,8 +923,29 @@ private fun EvidenceSectionHeader(label: String, count: Int, icon: String) {
     }
 }
 
+private fun evidenceNeedsReview(status: String?): Boolean {
+    val s = (status ?: "").lowercase()
+    if (s.contains("aprobad") || s.contains("rechazad")) return false
+    return s.contains("pendiente") ||
+        s.contains("revis") ||
+        s.contains("complet") ||
+        s.contains("enviad") ||
+        s.contains("entregad") ||
+        s.isBlank()
+}
+
 @Composable
-private fun EvidenceCard(r: ActivityEvidenceRowDto, context: android.content.Context, showOwner: Boolean = true) {
+private fun EvidenceCard(
+    r: ActivityEvidenceRowDto,
+    context: android.content.Context,
+    showOwner: Boolean = true,
+    canReview: Boolean = false,
+    acting: Boolean = false,
+    rejectNotes: String = "",
+    onRejectNotesChange: (String) -> Unit = {},
+    onApprove: () -> Unit = {},
+    onReject: () -> Unit = {},
+) {
     val statusColor = evidenceStatusColor(r.estatus)
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -841,6 +1007,12 @@ private fun EvidenceCard(r: ActivityEvidenceRowDto, context: android.content.Con
                 }
             }
 
+            val notes = r.observacionesRevision ?: r.comentarios
+            if (!notes.isNullOrBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(notes, style = MaterialTheme.typography.bodySmall, color = EvSub)
+            }
+
             val pdfUrl = r.serviceSheetPdfUrl ?: r.archivoUrl
             if (!pdfUrl.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
@@ -850,6 +1022,37 @@ private fun EvidenceCard(r: ActivityEvidenceRowDto, context: android.content.Con
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                 ) {
                     Text("📄 Abrir archivo", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
+            if (canReview) {
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = rejectNotes,
+                    onValueChange = onRejectNotesChange,
+                    label = { Text("Motivo de rechazo (requerido para rechazar)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    enabled = !acting,
+                    shape = RoundedCornerShape(10.dp),
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = onApprove,
+                        enabled = !acting,
+                        colors = ButtonDefaults.buttonColors(containerColor = EvGreen),
+                        shape = RoundedCornerShape(10.dp),
+                    ) {
+                        Text(if (acting) "…" else "Aprobar")
+                    }
+                    OutlinedButton(
+                        onClick = onReject,
+                        enabled = !acting,
+                        shape = RoundedCornerShape(10.dp),
+                    ) {
+                        Text("Rechazar", color = EvRed)
+                    }
                 }
             }
         }
