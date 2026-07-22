@@ -874,7 +874,7 @@ export class AuthService {
     const detectedDeviceRaw = detectDeviceFromUserAgent(userAgent, req?.headers);
     const detectedDevice = detectedDeviceRaw
       ? String(detectedDeviceRaw).slice(0, 255)
-      : null;
+      : 'Dispositivo desconocido';
     const isSuperAdmin = this.isSuperAdmin(user.email);
     const permissions = this.resolveUserPermissions(user, isSuperAdmin);
 
@@ -923,7 +923,7 @@ export class AuthService {
       this.logger.debug(sessionErr instanceof Error ? sessionErr.message : String(sessionErr));
     }
 
-    await this.createLoginNotification(user.id, detectedDevice || 'Desconocido');
+    await this.createLoginNotification(user.id, detectedDevice);
 
     try {
       await this.prisma.auditLog.create({
