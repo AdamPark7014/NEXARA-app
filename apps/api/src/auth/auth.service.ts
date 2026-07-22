@@ -871,7 +871,10 @@ export class AuthService {
     const ipAddress = String(req?.headers?.['x-forwarded-for'] || req?.ip || '')
       .split(',')[0]
       ?.trim();
-    const detectedDevice = detectDeviceFromUserAgent(userAgent, req?.headers);
+    const detectedDeviceRaw = detectDeviceFromUserAgent(userAgent, req?.headers);
+    const detectedDevice = detectedDeviceRaw
+      ? String(detectedDeviceRaw).slice(0, 255)
+      : null;
     const isSuperAdmin = this.isSuperAdmin(user.email);
     const permissions = this.resolveUserPermissions(user, isSuperAdmin);
 
@@ -897,8 +900,8 @@ export class AuthService {
       where: { id: user.id },
       data: {
         lastLoginAt: new Date(),
-        lastLoginIp: ipAddress || null,
-        lastLoginDevice: detectedDevice || null,
+        lastLoginIp: ipAddress ? String(ipAddress).slice(0, 45) : null,
+        lastLoginDevice: detectedDevice,
         failedLoginCount: 0,
         lockedUntil: null,
       },
@@ -909,8 +912,8 @@ export class AuthService {
         data: {
           userId: user.id,
           jti,
-          device: detectedDevice || null,
-          ipAddress: ipAddress || null,
+          device: detectedDevice,
+          ipAddress: ipAddress ? String(ipAddress).slice(0, 45) : null,
           userAgent: userAgent ? String(userAgent).slice(0, 500) : null,
           expiresAt,
         },
@@ -920,7 +923,7 @@ export class AuthService {
       this.logger.debug(sessionErr instanceof Error ? sessionErr.message : String(sessionErr));
     }
 
-    await this.createLoginNotification(user.id, detectedDevice);
+    await this.createLoginNotification(user.id, detectedDevice || 'Desconocido');
 
     try {
       await this.prisma.auditLog.create({
