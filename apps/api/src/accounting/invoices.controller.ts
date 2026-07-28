@@ -28,7 +28,7 @@ export class InvoicesController {
     @Body() dto: CreateInvoiceDto,
     @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.createInvoice({ ...dto, companyId: dto.companyId ?? companyId }, user.id);
+    return this.service.createInvoice({ ...dto, companyId }, user.id);
   }
 
   @Get()
@@ -89,8 +89,8 @@ export class InvoicesController {
   createFromSalesProject(
     @Param('projectId') projectId: string,
     @CurrentUser() user: any,
-    @Body() body?: { lineIds?: number[] },
     @CurrentCompanyId() companyId: number | null,
+    @Body() body?: { lineIds?: number[] },
   ) {
     return this.service.createInvoiceFromSalesProject(+projectId, user.id, body, companyId);
   }

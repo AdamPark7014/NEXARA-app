@@ -51,7 +51,7 @@ export class SalesTargetsService {
           year: dto.year,
           month: dto.month ?? null,
           quarter: dto.quarter ?? null,
-        },
+        } as any,
       },
       create: data,
       update: data,

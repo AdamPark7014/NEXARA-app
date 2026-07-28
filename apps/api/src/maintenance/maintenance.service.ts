@@ -377,7 +377,7 @@ export class MaintenanceService {
         where: { ...companyWhere(tenantId), status: { in: ['PLANNED', 'IN_PROGRESS'] } },
       }),
       this.prisma.asset.count({
-        where: { ...companyWhere(tenantId), status: { in: ['DOWN', 'MAINTENANCE'] } },
+        where: { ...companyWhere(tenantId), status: { in: ['OUT_OF_SERVICE', 'UNDER_MAINTENANCE'] as any } },
       }),
       this.getDepreciationSummary(tenantId),
     ]);
