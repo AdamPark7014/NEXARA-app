@@ -40,7 +40,11 @@ import java.time.temporal.ChronoUnit
 
 // ── Multi-empresa ───────────────────────────────────────────────────────────
 
-data class CompaniesState(val loading: Boolean = true, val error: String? = null, val items: List<Map<String, Any?>> = emptyList())
+data class CompaniesState(
+    val loading: Boolean = true,
+    val error: String? = null,
+    val items: List<mx.nexara.mobile.nativeapp.data.api.CompanyDto> = emptyList(),
+)
 
 class CompaniesViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ExtraRepository(app.applicationContext)
@@ -51,7 +55,7 @@ class CompaniesViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             try {
-                val items = withContext(Dispatchers.IO) { repo.companies() }
+                val items = withContext(Dispatchers.IO) { repo.companyDtos() }
                 _state.update { it.copy(loading = false, items = items) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message) }
@@ -73,16 +77,12 @@ fun CompaniesScreen() {
         if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
         if (state.error != null) { item { Text(state.error!!, color = MaterialTheme.colorScheme.error) }; return@LazyColumn }
         if (state.items.isEmpty()) { item { Text("Sin empresas registradas.", color = Color(0xFF64748B)) }; return@LazyColumn }
-        items(state.items, key = { govStr(it, "id") }) { c ->
+        items(state.items, key = { it.rowKey }) { c ->
             GovCard(
-                title = govStr(c, "legalName", "tradeName"),
-                subtitle = listOfNotNull(govStr(c, "rfc").takeIf { it.isNotBlank() }, govStr(c, "fiscalRegime").takeIf { it.isNotBlank() }).joinToString(" · "),
-                trailing = when {
-                    c["isPrimary"] == true -> "Principal"
-                    c["isActive"] == false -> "Inactiva"
-                    else -> govStr(c, "tradeName").ifBlank { "Activa" }
-                },
-                accent = if (c["isPrimary"] == true) Color(0xFF059669) else Color(0xFF64748B),
+                title = c.displayName,
+                subtitle = listOfNotNull(c.rfc.takeIf { it.isNotBlank() }, c.fiscalRegime.takeIf { it.isNotBlank() }).joinToString(" · "),
+                trailing = c.trailingLabel,
+                accent = if (c.isPrimary) Color(0xFF059669) else Color(0xFF64748B),
             )
         }
     }
@@ -90,7 +90,13 @@ fun CompaniesScreen() {
 
 // ── Knowledge Base ──────────────────────────────────────────────────────────
 
-data class KbState(val loading: Boolean = true, val error: String? = null, val query: String = "", val articles: List<Map<String, Any?>> = emptyList(), val selected: Map<String, Any?>? = null)
+data class KbState(
+    val loading: Boolean = true,
+    val error: String? = null,
+    val query: String = "",
+    val articles: List<mx.nexara.mobile.nativeapp.data.api.KbArticleDto> = emptyList(),
+    val selected: mx.nexara.mobile.nativeapp.data.api.KbArticleDto? = null,
+)
 
 class KbViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ExtraRepository(app.applicationContext)
@@ -104,7 +110,7 @@ class KbViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val q = _state.value.query.trim().ifBlank { null }
-                val articles = withContext(Dispatchers.IO) { repo.kbArticles(q) }
+                val articles = withContext(Dispatchers.IO) { repo.kbArticleDtos(q) }
                 _state.update { it.copy(loading = false, articles = articles) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message) }
@@ -115,7 +121,7 @@ class KbViewModel(app: Application) : AndroidViewModel(app) {
     fun openArticle(slugOrId: String) {
         viewModelScope.launch {
             try {
-                val article = withContext(Dispatchers.IO) { repo.kbArticle(slugOrId) }
+                val article = withContext(Dispatchers.IO) { repo.kbArticleDto(slugOrId) }
                 _state.update { it.copy(selected = article) }
             } catch (_: Exception) { }
         }
@@ -134,7 +140,7 @@ fun KbScreen() {
         val q = state.query.trim().lowercase()
         if (q.isEmpty()) state.articles
         else state.articles.filter {
-            govStr(it, "title").lowercase().contains(q) || govStr(it, "tags").lowercase().contains(q)
+            it.title.lowercase().contains(q) || it.tags.lowercase().contains(q)
         }
     }
 
@@ -151,27 +157,26 @@ fun KbScreen() {
                 )
             }
             if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
-            items(filtered, key = { govStr(it, "id", "slug") }) { a ->
-                val slug = govStr(a, "slug", "id")
+            items(filtered, key = { it.rowKey }) { a ->
                 GovCard(
-                    title = govStr(a, "title"),
-                    subtitle = govStr(a, "excerpt").ifBlank { govStr(a, "category", "name") },
-                    trailing = govStr(a, "status", "visibility"),
+                    title = a.title,
+                    subtitle = a.excerpt.ifBlank { a.category },
+                    trailing = a.status,
                     accent = Color(0xFF6366F1),
-                    modifier = Modifier.clickable { vm.openArticle(slug) },
+                    modifier = Modifier.clickable { vm.openArticle(a.openKey) },
                 )
             }
         }
         state.selected?.let { article ->
             AlertDialog(
                 onDismissRequest = { vm.closeArticle() },
-                title = { Text(govStr(article, "title")) },
+                title = { Text(article.title) },
                 text = {
                     Column {
-                        Text(govStr(article, "excerpt"), style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                        Text(article.excerpt, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            govStr(article, "content").take(2000).ifBlank { "Sin contenido." },
+                            article.content.take(2000).ifBlank { "Sin contenido." },
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -327,7 +332,12 @@ fun ArchitectureScreen() {
 
 // ── Calendario personal ERP ─────────────────────────────────────────────────
 
-data class CalendarState(val loading: Boolean = true, val error: String? = null, val rangeDays: Int = 30, val events: List<Map<String, Any?>> = emptyList())
+data class CalendarState(
+    val loading: Boolean = true,
+    val error: String? = null,
+    val rangeDays: Int = 30,
+    val events: List<mx.nexara.mobile.nativeapp.data.api.CalendarEventDto> = emptyList(),
+)
 
 class ErpCalendarViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ExtraRepository(app.applicationContext)
@@ -345,7 +355,7 @@ class ErpCalendarViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val from = java.time.Instant.now().toString()
                 val to = java.time.Instant.now().plus(_state.value.rangeDays.toLong(), ChronoUnit.DAYS).toString()
-                val events = withContext(Dispatchers.IO) { repo.calendarEvents(from, to) }
+                val events = withContext(Dispatchers.IO) { repo.calendarEventDtos(from, to) }
                 _state.update { it.copy(loading = false, events = events) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message) }
@@ -361,7 +371,7 @@ fun ErpCalendarScreen() {
     LaunchedEffect(Unit) { vm.load() }
 
     val grouped = remember(state.events) {
-        state.events.groupBy { govStr(it, "start", "fecha").take(10) }
+        state.events.groupBy { it.dayKey.ifBlank { "Sin fecha" } }
             .entries.sortedBy { it.key }
     }
 
@@ -377,12 +387,12 @@ fun ErpCalendarScreen() {
         if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
         if (state.events.isEmpty()) { item { Text("Sin eventos en este rango.", color = Color(0xFF64748B)) }; return@LazyColumn }
         grouped.forEach { (day, list) ->
-            item { Text(day.ifBlank { "Sin fecha" }, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A)) }
-            items(list, key = { govStr(it, "id") }) { ev ->
+            item { Text(day, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A)) }
+            items(list, key = { it.rowKey }) { ev ->
                 GovCard(
-                    title = govStr(ev, "title", "titulo"),
-                    subtitle = "${govStr(ev, "source")} · ${govStr(ev, "type")}",
-                    trailing = govStr(ev, "start").takeLast(8),
+                    title = ev.displayTitle,
+                    subtitle = "${ev.source} · ${ev.type}",
+                    trailing = ev.timeLabel,
                     accent = Color(0xFF3B82F6),
                 )
             }
@@ -394,7 +404,7 @@ fun ErpCalendarScreen() {
 
 @Composable
 fun OrgchartScreen() {
-    var roots by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var roots by remember { mutableStateOf<List<mx.nexara.mobile.nativeapp.data.api.OrgNodeDto>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
@@ -402,7 +412,7 @@ fun OrgchartScreen() {
     LaunchedEffect(Unit) {
         loading = true
         try {
-            roots = withContext(Dispatchers.IO) { ExtraRepository(context).orgchart() }
+            roots = withContext(Dispatchers.IO) { ExtraRepository(context).orgNodeDtos() }
         } catch (e: Exception) {
             error = e.message
         }
@@ -418,30 +428,33 @@ fun OrgchartScreen() {
 }
 
 @Composable
-private fun OrgchartTree(nodes: List<Map<String, Any?>>, depth: Int) {
+private fun OrgchartTree(nodes: List<mx.nexara.mobile.nativeapp.data.api.OrgNodeDto>, depth: Int) {
     nodes.forEach { node ->
         val pad = (depth * 16).dp
         GovCard(
-            title = govStr(node, "nombre", "name"),
+            title = node.name,
             subtitle = listOfNotNull(
-                govNestedStr(node, "role", "nombre"),
-                govNestedStr(node, "department", "nombre"),
+                node.roleName.takeIf { it.isNotBlank() },
+                node.departmentName.takeIf { it.isNotBlank() },
             ).joinToString(" · "),
-            trailing = if ((node["children"] as? List<*>)?.isNotEmpty() == true) "${(node["children"] as List<*>).size} ↓" else "",
+            trailing = if (node.children.isNotEmpty()) "${node.children.size} ↓" else "",
             accent = Color(0xFF0D9488),
             modifier = Modifier.padding(start = pad),
         )
-        @Suppress("UNCHECKED_CAST")
-        val children = node["children"] as? List<Map<String, Any?>> ?: emptyList()
-        if (children.isNotEmpty()) {
-            OrgchartTree(children, depth + 1)
+        if (node.children.isNotEmpty()) {
+            OrgchartTree(node.children, depth + 1)
         }
     }
 }
 
 // ── KPIs RH ─────────────────────────────────────────────────────────────────
 
-data class HrKpisState(val loading: Boolean = true, val error: String? = null, val staff: List<Map<String, Any?>> = emptyList(), val engineers: List<Map<String, Any?>> = emptyList())
+data class HrKpisState(
+    val loading: Boolean = true,
+    val error: String? = null,
+    val staff: List<mx.nexara.mobile.nativeapp.data.api.HrStaffDto> = emptyList(),
+    val engineers: List<mx.nexara.mobile.nativeapp.data.api.BiEngineerRowDto> = emptyList(),
+)
 
 class HrKpisViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ExtraRepository(app.applicationContext)
@@ -452,16 +465,16 @@ class HrKpisViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             try {
-                val allStaff = mutableListOf<Map<String, Any?>>()
+                val allStaff = mutableListOf<mx.nexara.mobile.nativeapp.data.api.HrStaffDto>()
                 var page = 1
                 repeat(10) {
-                    val batch = withContext(Dispatchers.IO) { repo.hrStaff(page) }
+                    val batch = withContext(Dispatchers.IO) { repo.hrStaffDtos(page) }
                     if (batch.isEmpty()) return@repeat
                     allStaff.addAll(batch)
                     if (batch.size < 100) return@repeat
                     page++
                 }
-                val engineers = withContext(Dispatchers.IO) { repo.biEngineers(15) }
+                val engineers = withContext(Dispatchers.IO) { repo.biEngineerRowDtos(15) }
                 _state.update { it.copy(loading = false, staff = allStaff, engineers = engineers) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message) }
@@ -477,9 +490,9 @@ fun HrKpisScreen() {
     LaunchedEffect(Unit) { vm.load() }
 
     val total = state.staff.size
-    val bajas = state.staff.count { govStr(it, "estadoRRHH") == "Baja" || it["isActive"] == false }
+    val bajas = state.staff.count { it.isBaja }
     val rotacion = if (total > 0) (bajas.toDouble() / total * 100) else 0.0
-    val avgCompletion = state.engineers.map { govDbl(it, "completionRate") }.average().let { if (it.isNaN()) 0.0 else it }
+    val avgCompletion = state.engineers.map { it.completionRate }.average().let { if (it.isNaN()) 0.0 else it }
 
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { GovHeader("KPIs de personas", "Plantilla · rotación · productividad") }
@@ -493,11 +506,11 @@ fun HrKpisScreen() {
         }
         if (state.engineers.isNotEmpty()) {
             item { Text("Productividad operativa (90d)", fontWeight = FontWeight.SemiBold) }
-            items(state.engineers, key = { govStr(it, "engineerId", "id") }) { e ->
+            items(state.engineers, key = { it.rowKey }) { e ->
                 GovCard(
-                    title = govStr(e, "engineerName"),
-                    subtitle = "${govInt(e, "completed")}/${govInt(e, "totalActivities")} OT",
-                    trailing = "${govDbl(e, "completionRate").toInt()}%",
+                    title = e.engineerName,
+                    subtitle = "${e.completed}/${e.totalActivities} OT",
+                    trailing = "${e.completionRate.toInt()}%",
                     accent = Color(0xFF6366F1),
                 )
             }
@@ -578,32 +591,30 @@ fun RecruitingScreen() {
     val context = LocalContext.current
     val repo = remember { mx.nexara.mobile.nativeapp.data.extra.ExtraRepository(context) }
     var loading by remember { mutableStateOf(true) }
-    var candidates by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var candidates by remember { mutableStateOf<List<mx.nexara.mobile.nativeapp.data.api.CandidateDto>>(emptyList()) }
     var query by remember { mutableStateOf("") }
     var showRejected by remember { mutableStateOf(false) }
-    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
+    var selected by remember { mutableStateOf<mx.nexara.mobile.nativeapp.data.api.CandidateDto?>(null) }
 
     LaunchedEffect(Unit) {
         loading = true
-        candidates = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { repo.cvs() }
+        candidates = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { repo.candidateDtos() }
         loading = false
     }
 
     val filtered = remember(candidates, query, showRejected) {
         candidates.filter { c ->
-            val stage = govStr(c, "stage", "status")
-            val isRejected = stage.contains("REJECTED")
-            if (!showRejected && isRejected) return@filter false
+            if (!showRejected && c.isRejected) return@filter false
             if (query.isBlank()) return@filter true
             val q = query.lowercase()
-            govStr(c, "fullName", "nombre").lowercase().contains(q) ||
-            govStr(c, "email").lowercase().contains(q) ||
-            govStr(c, "category").lowercase().contains(q)
+            c.displayName.lowercase().contains(q) ||
+            c.email.lowercase().contains(q) ||
+            c.category.lowercase().contains(q)
         }
     }
 
     val grouped = remember(filtered) {
-        val map = filtered.groupBy { govStr(it, "stage", "status").ifBlank { "INBOX" } }
+        val map = filtered.groupBy { it.stageKey }
         STAGE_ORDER.filter { map.containsKey(it) }.map { key -> key to map[key]!! }
     }
 
@@ -618,9 +629,9 @@ fun RecruitingScreen() {
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 val total      = candidates.size
-                val inProcess  = candidates.count { !govStr(it, "stage").contains("REJECTED") && govStr(it, "stage") != "APPROVED" }
-                val approved   = candidates.count { govStr(it, "stage") == "APPROVED" }
-                val rejected   = candidates.count { govStr(it, "stage").contains("REJECTED") }
+                val inProcess  = candidates.count { !it.isRejected && !it.isApproved }
+                val approved   = candidates.count { it.isApproved }
+                val rejected   = candidates.count { it.isRejected }
                 RecruKpiChip("Total", "$total")
                 RecruKpiChip("En proceso", "$inProcess", Color(0xFF3B82F6))
                 RecruKpiChip("Contratados", "$approved", Color(0xFF22C55E))
@@ -658,7 +669,7 @@ fun RecruitingScreen() {
                             }
                         }
                     }
-                    items(list, key = { govStr(it, "id") }) { c ->
+                    items(list, key = { it.rowKey }) { c ->
                         RecruCandidateCard(c, color, onClick = { selected = c })
                     }
                 }
@@ -676,17 +687,17 @@ private fun RecruKpiChip(label: String, value: String, color: Color = MaterialTh
 }
 
 @Composable
-private fun CandidateDetail(c: Map<String, Any?>, onBack: () -> Unit) {
-    val name     = govStr(c, "fullName", "nombre")
-    val email    = govStr(c, "email")
-    val phone    = govStr(c, "whatsapp", "phone", "telefono")
-    val position = govStr(c, "category", "position", "puesto")
-    val stage    = govStr(c, "stage", "status")
-    val cv       = govStr(c, "cvUrl", "fileUrl", "url")
-    val exp      = govStr(c, "experience", "experiencia")
-    val notes    = govStr(c, "notes", "notas", "comentarios")
-    val source   = govStr(c, "source", "fuente")
-    val salary   = govStr(c, "expectedSalary", "salario")
+private fun CandidateDetail(c: mx.nexara.mobile.nativeapp.data.api.CandidateDto, onBack: () -> Unit) {
+    val name     = c.displayName
+    val email    = c.email
+    val phone    = c.whatsapp
+    val position = c.category.ifBlank { c.position }
+    val stage    = c.stageKey
+    val cv       = c.cvUrl
+    val exp      = c.experience
+    val notes    = c.notes
+    val source   = c.source
+    val salary   = c.expectedSalary
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { OutlinedButton(onClick = onBack) { Text("← Candidatos") } }
@@ -738,11 +749,11 @@ private fun CandLine(label: String, value: String) {
 }
 
 @Composable
-private fun RecruCandidateCard(c: Map<String, Any?>, accent: Color, onClick: () -> Unit = {}) {
-    val name     = govStr(c, "fullName", "nombre")
-    val email    = govStr(c, "email")
-    val category = govStr(c, "category")
-    val whatsapp = govStr(c, "whatsapp")
+private fun RecruCandidateCard(c: mx.nexara.mobile.nativeapp.data.api.CandidateDto, accent: Color, onClick: () -> Unit = {}) {
+    val name     = c.displayName
+    val email    = c.email
+    val category = c.category
+    val whatsapp = c.whatsapp
     val initials = name.split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
 
     Row(
@@ -765,21 +776,4 @@ private fun RecruCandidateCard(c: Map<String, Any?>, accent: Color, onClick: () 
     }
 }
 
-private fun govStr(m: Map<String, Any?>, vararg keys: String): String {
-    for (k in keys) {
-        val v = m[k] ?: continue
-        val s = v.toString()
-        if (s.isNotBlank() && s != "null") return s
-    }
-    return ""
-}
 
-private fun govNestedStr(m: Map<String, Any?>, objKey: String, field: String): String {
-    val obj = m[objKey] as? Map<*, *> ?: return ""
-    return obj[field]?.toString() ?: ""
-}
-
-private fun govDbl(m: Map<String, Any?>, key: String) = when (val v = m[key]) {
-    is Double -> v; is Number -> v.toDouble(); is String -> v.toDoubleOrNull() ?: 0.0; else -> 0.0
-}
-private fun govInt(m: Map<String, Any?>, key: String) = govDbl(m, key).toInt()

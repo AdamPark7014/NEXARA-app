@@ -64,7 +64,7 @@ struct CrmTabView: View {
 
 struct CrmCotizacionesView: View {
     @StateObject private var vm = CrmCotizacionesVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: Cotizacion?
 
     var body: some View {
         Group {
@@ -80,7 +80,9 @@ struct CrmCotizacionesView: View {
                 HStack(spacing: 0) {
                     crmKpi("Total", "\(vm.items.count)", .primary)
                     Divider().frame(height: 32)
-                    let aprobadas = vm.items.filter { ["aprobada","completada","won"].contains(cStr($0, "status", "estatus", "estado").lowercased()) }.count
+                    let aprobadas = vm.items.filter {
+                        ["aprobada", "completada", "won"].contains($0.estatus.lowercased())
+                    }.count
                     crmKpi("Aprobadas", "\(aprobadas)", .green)
                     Divider().frame(height: 32)
                     crmKpi("Monto", fmtMxn(vm.totalMxn), .blue)
@@ -125,7 +127,7 @@ struct CrmCotizacionesView: View {
             } else if vm.filtered.isEmpty {
                 Spacer(); Text("Sin cotizaciones").foregroundColor(.secondary); Spacer()
             } else {
-                List(vm.filtered, id: \.cotId) { cot in
+                List(vm.filtered) { cot in
                     Button { selected = cot } label: {
                         CotizacionCard(item: cot)
                     }
@@ -139,8 +141,8 @@ struct CrmCotizacionesView: View {
     }
 
     @ViewBuilder
-    private func cotDetail(_ cot: [String: Any]) -> some View {
-        let status = cStr(cot, "status", "estatus", "estado")
+    private func cotDetail(_ cot: Cotizacion) -> some View {
+        let status = cot.estatus
         let color  = cotStatusColor(status)
         List {
             Section {
@@ -155,22 +157,21 @@ struct CrmCotizacionesView: View {
                 }
             }
             Section("Cotización") {
-                cotRow("Folio", cStr(cot, "folio", "number"))
-                cotRow("Cliente", cStr(cot, "clientName", "cliente", "razonSocial"))
-                if let total = cDouble(cot, "total", "amount") {
-                    HStack { Text("Total"); Spacer(); Text(fmtMxn(total)).foregroundColor(.secondary) }
+                cotRow("Folio", cot.folio)
+                cotRow("Cliente", cot.cliente)
+                if cot.total != 0 {
+                    HStack { Text("Total"); Spacer(); Text(fmtMxn(cot.total)).foregroundColor(.secondary) }
                 }
-                cotRow("Fecha", String(cStr(cot, "fecha", "createdAt", "date").prefix(10)))
-                cotRow("Responsable", cStr(cot, "ownerName", "responsable", "vendedor"))
-                cotRow("Vigencia", cStr(cot, "vigencia", "validUntil", "fechaVigencia"))
-                cotRow("Moneda", cStr(cot, "moneda", "currency"))
-                cotRow("Descuento", cStr(cot, "descuento", "discount"))
+                cotRow("Fecha", cot.dateLabel)
+                cotRow("Responsable", cot.ownerName)
+                cotRow("Vigencia", cot.vigencia)
+                cotRow("Moneda", cot.moneda)
+                cotRow("Descuento", cot.descuento)
             }
-            let notas = cStr(cot, "notas", "notes", "description", "observaciones")
-            if !notas.isEmpty {
-                Section("Notas") { Text(notas).font(.subheadline) }
+            if !cot.notes.isEmpty {
+                Section("Notas") { Text(cot.notes).font(.subheadline) }
             }
-            let items = (cot["items"] as? [[String: Any]]) ?? (cot["conceptos"] as? [[String: Any]]) ?? []
+            let items = cot.lineItems
             if !items.isEmpty {
                 Section("Conceptos (\(items.count))") {
                     ForEach(Array(items.enumerated()), id: \.offset) { _, item in
@@ -197,76 +198,74 @@ struct CrmCotizacionesView: View {
 
 @MainActor
 final class CrmCotizacionesVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [Cotizacion] = []
     @Published var query = ""
     @Published var statusFilter = "todos"
     @Published var isLoading = false
 
     let statuses = ["todos", "pendiente", "aprobada", "rechazada", "en proceso"]
 
-    var filtered: [[String: Any]] {
+    var filtered: [Cotizacion] {
         var list = items
         if statusFilter != "todos" {
-            list = list.filter { cStr($0, "status", "estatus", "estado").lowercased() == statusFilter }
+            list = list.filter { $0.estatus.lowercased() == statusFilter }
         }
         if !query.isEmpty {
             let q = query.lowercased()
-            list = list.filter { row in
-                cStr(row, "folio", "number").lowercased().contains(q) ||
-                cStr(row, "clientName", "cliente").lowercased().contains(q)
+            list = list.filter {
+                $0.folio.lowercased().contains(q) || $0.cliente.lowercased().contains(q)
             }
         }
         return list
     }
 
     var totalMxn: Double {
-        items.reduce(0) { $0 + (cDouble($1, "total", "amount") ?? 0) }
+        items.reduce(0) { $0 + $1.total }
     }
 
     func load() {
         isLoading = true
         Task {
-            items = (try? await CrmRepository.shared.cotizaciones()) ?? await ExtraRepository.shared.cotizaciones()
+            if let typed = try? await CrmRepository.shared.cotizacionItems(), !typed.isEmpty {
+                items = typed
+            } else {
+                items = await ExtraRepository.shared.cotizacionItems()
+            }
             isLoading = false
         }
     }
 }
 
 private struct CotizacionCard: View {
-    let item: [String: Any]
+    let item: Cotizacion
     var body: some View {
-        let folio   = cStr(item, "folio", "number")
-        let client  = cStr(item, "clientName", "cliente", "razonSocial")
-        let status  = cStr(item, "status", "estatus", "estado")
-        let total   = cDouble(item, "total", "amount")
-        let date    = String(cStr(item, "createdAt", "date").prefix(10))
-        let color   = cotStatusColor(status)
+        let color = cotStatusColor(item.estatus)
 
         HStack(spacing: 0) {
             Rectangle().fill(color).frame(width: 4)
                 .clipShape(RoundedRectangle(cornerRadius: 2))
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(folio.isEmpty ? "Sin folio" : folio)
+                    Text(item.displayFolio)
                         .font(.subheadline).bold()
                     Spacer()
-                    if let t = total {
-                        Text(fmtMxn(t)).font(.subheadline).foregroundColor(.primary)
+                    if item.total != 0 {
+                        Text(fmtMxn(item.total)).font(.subheadline).foregroundColor(.primary)
                     }
                 }
-                if !client.isEmpty {
-                    Text(client).font(.caption).foregroundColor(.secondary)
+                if !item.cliente.isEmpty {
+                    Text(item.cliente).font(.caption).foregroundColor(.secondary)
                 }
                 HStack {
-                    Text(status.capitalized)
+                    Text(item.estatus.capitalized)
                         .font(.caption2).bold()
                         .foregroundColor(color)
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(color.opacity(0.12))
                         .clipShape(Capsule())
                     Spacer()
-                    if !date.isEmpty {
-                        Text(date).font(.caption2).foregroundColor(.secondary)
+                    if !item.dateLabel.isEmpty {
+                        Text(item.dateLabel).font(.caption2).foregroundColor(.secondary)
                     }
                 }
             }
@@ -281,7 +280,7 @@ private struct CotizacionCard: View {
 
 struct CrmLeadsView: View {
     @StateObject private var vm = CrmLeadsVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: CrmLead?
 
     var body: some View {
         Group {
@@ -311,7 +310,7 @@ struct CrmLeadsView: View {
             } else if vm.filtered.isEmpty {
                 Spacer(); Text("Sin leads").foregroundColor(.secondary); Spacer()
             } else {
-                List(vm.filtered, id: \.leadId) { lead in
+                List(vm.filtered) { lead in
                     Button { selected = lead } label: {
                         LeadCard(item: lead)
                     }
@@ -325,8 +324,9 @@ struct CrmLeadsView: View {
     }
 
     @ViewBuilder
-    private func leadDetail(_ lead: [String: Any]) -> some View {
-        let status = cStr(lead, "status", "estatus", "estado")
+    private func leadDetail(_ lead: CrmLead) -> some View {
+        let raw = lead.raw
+        let status = lead.status
         let color  = cotStatusColor(status)
         List {
             Section {
@@ -341,17 +341,16 @@ struct CrmLeadsView: View {
                 }
             }
             Section("Lead") {
-                ldRow("Título", cStr(lead, "title", "subject", "asunto"))
-                ldRow("Cliente", cStr(lead, "clientName", "cliente"))
-                ldRow("Email", cStr(lead, "email", "correo"))
-                ldRow("Teléfono", cStr(lead, "phone", "telefono"))
-                ldRow("Origen", cStr(lead, "source", "origen", "fuente"))
-                ldRow("Asignado a", cStr(lead, "ownerName", "assignedTo"))
-                ldRow("Fecha", String(cStr(lead, "createdAt", "fecha").prefix(10)))
+                ldRow("Título", lead.displayTitle)
+                ldRow("Cliente", lead.clientName)
+                ldRow("Email", StockParse.str(raw["email"], raw["correo"]))
+                ldRow("Teléfono", StockParse.str(raw["phone"], raw["telefono"]))
+                ldRow("Origen", StockParse.str(raw["source"], raw["origen"], raw["fuente"]))
+                ldRow("Asignado a", StockParse.str(raw["ownerName"], raw["assignedTo"]))
+                ldRow("Fecha", String(StockParse.str(raw["createdAt"], raw["fecha"]).prefix(10)))
             }
-            let notes = cStr(lead, "notes", "notas", "description")
-            if !notes.isEmpty {
-                Section("Notas") { Text(notes).font(.subheadline) }
+            if !lead.description.isEmpty {
+                Section("Notas") { Text(lead.description).font(.subheadline) }
             }
         }
         .listStyle(.insetGrouped)
@@ -364,26 +363,26 @@ struct CrmLeadsView: View {
 
 @MainActor
 final class CrmLeadsVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [CrmLead] = []
     @Published var query = ""
     @Published var isLoading = false
 
-    var filtered: [[String: Any]] {
+    var filtered: [CrmLead] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter { row in
-            let title  = cStr(row, "title", "subject", "asunto").lowercased()
-            let client = cStr(row, "clientName", "cliente").lowercased()
-            return title.contains(q) || client.contains(q)
+            row.displayTitle.lowercased().contains(q) ||
+            row.clientName.lowercased().contains(q) ||
+            row.branchName.lowercased().contains(q)
         }
     }
 
     func load() {
         isLoading = true
         Task {
-            let leads = (try? await CrmRepository.shared.leads()) ?? []
+            let leads = (try? await CrmRepository.shared.leadItems()) ?? []
             if leads.isEmpty {
-                items = await ExtraRepository.shared.clientTicketRequests()
+                items = await ExtraRepository.shared.clientTicketRequests().map { CrmLead(raw: $0) }
             } else {
                 items = leads
             }
@@ -393,12 +392,12 @@ final class CrmLeadsVM: ObservableObject {
 }
 
 private struct LeadCard: View {
-    let item: [String: Any]
+    let item: CrmLead
     var body: some View {
-        let title   = cStr(item, "title", "subject", "asunto")
-        let client  = cStr(item, "clientName", "cliente")
-        let status  = cStr(item, "status", "estatus")
-        let date    = String(cStr(item, "createdAt").prefix(10))
+        let title   = item.displayTitle
+        let client  = item.clientName.isEmpty ? item.branchName : item.clientName
+        let status  = item.status
+        let date    = String(StockParse.str(item.raw["createdAt"], item.raw["fecha"]).prefix(10))
         let color   = cotStatusColor(status)
 
         HStack(spacing: 12) {

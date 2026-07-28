@@ -7,8 +7,18 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.AuditEntryDto
+import mx.nexara.mobile.nativeapp.data.api.AnalyticsDashboardDto
 import mx.nexara.mobile.nativeapp.data.api.BankAccountDto
+import mx.nexara.mobile.nativeapp.data.api.BiClientRoiDto
+import mx.nexara.mobile.nativeapp.data.api.BiEngineerRowDto
+import mx.nexara.mobile.nativeapp.data.api.BiMarginRowDto
+import mx.nexara.mobile.nativeapp.data.api.CalendarEventDto
+import mx.nexara.mobile.nativeapp.data.api.ComputedKpiDto
+import mx.nexara.mobile.nativeapp.data.api.CompanyDto
 import mx.nexara.mobile.nativeapp.data.api.ContactMessageDto
+import mx.nexara.mobile.nativeapp.data.api.ExecutiveCLevelDto
+import mx.nexara.mobile.nativeapp.data.api.KbArticleDto
+import mx.nexara.mobile.nativeapp.data.api.OrgNodeDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDto
 import mx.nexara.mobile.nativeapp.data.api.CreateExpenseRequest
 import mx.nexara.mobile.nativeapp.data.api.DocumentDto
@@ -17,6 +27,8 @@ import mx.nexara.mobile.nativeapp.data.api.ExpenseApproveRequest
 import mx.nexara.mobile.nativeapp.data.api.ExpenseDto
 import mx.nexara.mobile.nativeapp.data.api.ExtraApi
 import mx.nexara.mobile.nativeapp.data.api.FineDto
+import mx.nexara.mobile.nativeapp.data.api.HrLeaveDto
+import mx.nexara.mobile.nativeapp.data.api.HrStaffDto
 import mx.nexara.mobile.nativeapp.data.api.InvoiceDto
 import mx.nexara.mobile.nativeapp.data.api.InvoiceMatchWaiveRequest
 import mx.nexara.mobile.nativeapp.data.api.InvoicePaymentRequest
@@ -25,8 +37,12 @@ import mx.nexara.mobile.nativeapp.data.api.LunchBreakDto
 import mx.nexara.mobile.nativeapp.data.api.LunchCheckinRequest
 import mx.nexara.mobile.nativeapp.data.api.LunchCheckoutRequest
 import mx.nexara.mobile.nativeapp.data.api.NewsPostDto
+import mx.nexara.mobile.nativeapp.data.api.CrmLeadDto
 import mx.nexara.mobile.nativeapp.data.api.NewsletterSubscriberDto
+import mx.nexara.mobile.nativeapp.data.api.CandidateDto
 import mx.nexara.mobile.nativeapp.data.api.CatalogProductDto
+import mx.nexara.mobile.nativeapp.data.api.PortfolioProjectDto
+import mx.nexara.mobile.nativeapp.data.api.ServiceSheetListDto
 import mx.nexara.mobile.nativeapp.data.api.StockLevelDto
 import mx.nexara.mobile.nativeapp.data.api.StockMovementDto
 import mx.nexara.mobile.nativeapp.data.api.StockMovementRequest
@@ -35,6 +51,11 @@ import mx.nexara.mobile.nativeapp.data.api.MaintenanceAssetDto
 import mx.nexara.mobile.nativeapp.data.api.PurchaseOrderDto
 import mx.nexara.mobile.nativeapp.data.api.RequisitionDto
 import mx.nexara.mobile.nativeapp.data.api.WarehouseDto
+import mx.nexara.mobile.nativeapp.data.api.MaintenanceContractDto
+import mx.nexara.mobile.nativeapp.data.api.NocAlertDto
+import mx.nexara.mobile.nativeapp.data.api.NocDeviceDto
+import mx.nexara.mobile.nativeapp.data.api.SlaStatsDto
+import mx.nexara.mobile.nativeapp.data.api.WorkflowApprovalDto
 import mx.nexara.mobile.nativeapp.data.api.WorkOrderDto
 import mx.nexara.mobile.nativeapp.data.api.WorkflowDecideRequest
 import java.lang.reflect.ParameterizedType
@@ -95,8 +116,13 @@ class ExtraRepository(context: Context) {
 
     suspend fun analyticsDashboardRaw(): String = api.getAnalyticsDashboardRaw().string()
     suspend fun analyticsKpisRaw(): String = api.getAnalyticsComputedKpisRaw().string()
-    suspend fun analyticsDashboardMap(): Map<String, Any?> = parseObject(api.getAnalyticsDashboardRaw().string())
-    suspend fun analyticsComputedKpisList(): List<Map<String, Any?>> = loadGeneric { api.getAnalyticsComputedKpisRaw() }
+    suspend fun analyticsDashboardMap(): Map<String, Any?> = analyticsDashboardDto().raw
+    suspend fun analyticsDashboardDto(): AnalyticsDashboardDto =
+        AnalyticsDashboardDto.fromRaw(parseObject(api.getAnalyticsDashboardRaw().string()))
+    suspend fun analyticsComputedKpisList(): List<Map<String, Any?>> =
+        analyticsComputedKpiDtos().map { it.raw }
+    suspend fun analyticsComputedKpiDtos(): List<ComputedKpiDto> =
+        loadGeneric { api.getAnalyticsComputedKpisRaw() }.map { ComputedKpiDto.fromRaw(it) }
 
     suspend fun expenses(): List<ExpenseDto> = parseList(api.getExpensesRaw())
 
@@ -200,7 +226,9 @@ class ExtraRepository(context: Context) {
         return emptyList()
     }
 
-    suspend fun hrLeaves() = loadGeneric { api.getHrLeavesRaw() }
+    suspend fun hrLeaves() = hrLeaveDtos().map { it.raw }
+    suspend fun hrLeaveDtos(): List<HrLeaveDto> =
+        loadGeneric { api.getHrLeavesRaw() }.map { HrLeaveDto.fromRaw(it) }
     suspend fun hrReviews() = loadGeneric { api.getHrReviewsRaw() }
     suspend fun hrDashboardRaw(): String = api.getHrDashboardRaw().string()
     suspend fun warehouse(): List<Map<String, Any?>> =
@@ -299,37 +327,73 @@ class ExtraRepository(context: Context) {
 
     suspend fun workOrderDtos(): List<WorkOrderDto> =
         loadGeneric { api.getWorkOrdersRaw() }.map { WorkOrderDto.fromRaw(it) }
-    suspend fun serviceSheets() = loadGeneric { api.getServiceSheetsRaw() }
-    suspend fun cvs() = loadGeneric { api.getCvsRaw() }
+    suspend fun serviceSheets() = serviceSheetDtos().map { it.toFlatMap() }
+    suspend fun serviceSheetDtos(): List<ServiceSheetListDto> =
+        loadGeneric { api.getServiceSheetsRaw() }.map { ServiceSheetListDto.fromRaw(it) }
+    suspend fun cvs() = candidateDtos().map { it.toFlatMap() }
+    suspend fun candidateDtos(): List<CandidateDto> =
+        loadGeneric { api.getCvsRaw() }.map { CandidateDto.fromRaw(it) }
     suspend fun clientTicketRequests() = loadGeneric { api.getClientTicketRequestsRaw() }
-    suspend fun projects() = loadGeneric { api.getProjectsRaw() }
+    suspend fun clientTicketLeadDtos(): List<CrmLeadDto> =
+        clientTicketRequests().map { CrmLeadDto.fromRaw(it) }
+    suspend fun projects() = portfolioProjectDtos().map { it.toFlatMap() }
+    suspend fun portfolioProjectDtos(): List<PortfolioProjectDto> =
+        loadGeneric { api.getProjectsRaw() }.map { PortfolioProjectDto.fromRaw(it) }
 
-    suspend fun biMarginByType() = loadGeneric { api.getBiMarginRaw() }
-    suspend fun biEngineers(limit: Int = 10) = loadGeneric { api.getBiEngineersRaw(limit) }
-    suspend fun biClientsRoi(limit: Int = 10) = loadGeneric { api.getBiClientsRoiRaw(limit) }
-    suspend fun executiveCLevel(): Map<String, Any?> = parseObject(api.getExecutiveCLevelRaw().string())
-    suspend fun workflowPending() = loadGeneric { api.getWorkflowPendingRaw() }
+    suspend fun biMarginByType() = biMarginRowDtos().map { it.raw }
+    suspend fun biMarginRowDtos(): List<BiMarginRowDto> =
+        loadGeneric { api.getBiMarginRaw() }.map { BiMarginRowDto.fromRaw(it) }
+    suspend fun biEngineers(limit: Int = 10) = biEngineerRowDtos(limit).map { it.raw }
+    suspend fun biEngineerRowDtos(limit: Int = 10): List<BiEngineerRowDto> =
+        loadGeneric { api.getBiEngineersRaw(limit) }.map { BiEngineerRowDto.fromRaw(it) }
+    suspend fun biClientsRoi(limit: Int = 10) = biClientRoiDtos(limit).map { it.raw }
+    suspend fun biClientRoiDtos(limit: Int = 10): List<BiClientRoiDto> =
+        loadGeneric { api.getBiClientsRoiRaw(limit) }.map { BiClientRoiDto.fromRaw(it) }
+    suspend fun executiveCLevel(): Map<String, Any?> = executiveCLevelDto().raw
+    suspend fun executiveCLevelDto(): ExecutiveCLevelDto =
+        ExecutiveCLevelDto.fromRaw(parseObject(api.getExecutiveCLevelRaw().string()))
+    suspend fun workflowPending() = workflowApprovals().map { it.toFlatMap() }
+    suspend fun workflowApprovals(): List<WorkflowApprovalDto> =
+        loadGeneric { api.getWorkflowPendingRaw() }.map { WorkflowApprovalDto.fromRaw(it) }
     suspend fun workflowDecide(id: Long, decision: String, comments: String? = null) {
         api.postWorkflowDecide(id, WorkflowDecideRequest(decision, comments))
     }
     suspend fun nocSummary(): Map<String, Any?> = parseObject(api.getNocSummaryRaw().string())
-    suspend fun nocAlerts() = loadGeneric { api.getNocAlertsRaw() }
-    suspend fun nocDevices() = loadGeneric { api.getNocDevicesRaw() }
-    suspend fun slaStats(): Map<String, Any?> = parseObject(api.getSlaStatsRaw().string())
+    suspend fun nocAlerts() = nocAlertDtos().map { it.toFlatMap() }
+    suspend fun nocAlertDtos(): List<NocAlertDto> =
+        loadGeneric { api.getNocAlertsRaw() }.map { NocAlertDto.fromRaw(it) }
+    suspend fun nocDevices() = nocDeviceDtos().map { it.toFlatMap() }
+    suspend fun nocDeviceDtos(): List<NocDeviceDto> =
+        loadGeneric { api.getNocDevicesRaw() }.map { NocDeviceDto.fromRaw(it) }
+    suspend fun slaStats(): Map<String, Any?> = slaStatsDto().raw
+    suspend fun slaStatsDto(): SlaStatsDto = SlaStatsDto.fromRaw(parseObject(api.getSlaStatsRaw().string()))
     suspend fun maintenanceContracts(status: String? = null, clientId: String? = null) =
-        loadGeneric { api.getMaintenanceContractsRaw(status, clientId) }
+        maintenanceContractDtos(status, clientId).map { it.toFlatMap() }
+    suspend fun maintenanceContractDtos(status: String? = null, clientId: String? = null): List<MaintenanceContractDto> =
+        loadGeneric { api.getMaintenanceContractsRaw(status, clientId) }.map { MaintenanceContractDto.fromRaw(it) }
 
     suspend fun serviceClientBranches(serviceClientId: String) =
         loadGeneric { api.getServiceClientBranchesRaw(serviceClientId) }
 
-    suspend fun companies() = loadGeneric { api.getCompaniesRaw() }
-    suspend fun kbArticles(q: String? = null) = loadGeneric { api.getKbArticlesRaw(q) }
-    suspend fun kbArticle(slugOrId: String): Map<String, Any?> =
-        parseObject(api.getKbArticleRaw(slugOrId).string())
-    suspend fun orgchart(): List<Map<String, Any?>> = loadGeneric { api.getOrgchartRaw() }
-    suspend fun hrStaff(page: Int = 1, limit: Int = 100) = loadGeneric { api.getHrStaffRaw(limit, page) }
+    suspend fun companies() = companyDtos().map { it.raw }
+    suspend fun companyDtos(): List<CompanyDto> =
+        loadGeneric { api.getCompaniesRaw() }.map { CompanyDto.fromRaw(it) }
+    suspend fun kbArticles(q: String? = null) = kbArticleDtos(q).map { it.raw }
+    suspend fun kbArticleDtos(q: String? = null): List<KbArticleDto> =
+        loadGeneric { api.getKbArticlesRaw(q) }.map { KbArticleDto.fromRaw(it) }
+    suspend fun kbArticle(slugOrId: String): Map<String, Any?> = kbArticleDto(slugOrId).raw
+    suspend fun kbArticleDto(slugOrId: String): KbArticleDto =
+        KbArticleDto.fromRaw(parseObject(api.getKbArticleRaw(slugOrId).string()))
+    suspend fun orgchart(): List<Map<String, Any?>> = orgNodeDtos().map { it.raw }
+    suspend fun orgNodeDtos(): List<OrgNodeDto> =
+        loadGeneric { api.getOrgchartRaw() }.map { OrgNodeDto.fromRaw(it) }
+    suspend fun hrStaff(page: Int = 1, limit: Int = 100) = hrStaffDtos(page, limit).map { it.raw }
+    suspend fun hrStaffDtos(page: Int = 1, limit: Int = 100): List<HrStaffDto> =
+        loadGeneric { api.getHrStaffRaw(limit, page) }.map { HrStaffDto.fromRaw(it) }
     suspend fun calendarEvents(from: String, to: String) =
-        loadGeneric { api.getCalendarEventsRaw(from, to) }
+        calendarEventDtos(from, to).map { it.raw }
+    suspend fun calendarEventDtos(from: String, to: String): List<CalendarEventDto> =
+        loadGeneric { api.getCalendarEventsRaw(from, to) }.map { CalendarEventDto.fromRaw(it) }
     suspend fun exportCsv(entity: String, from: String, to: String): ByteArray =
         api.getExportRaw(entity, from, to).bytes()
 

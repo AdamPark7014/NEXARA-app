@@ -23,8 +23,12 @@ export class InvoicesController {
   @Post()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
-  create(@CurrentUser() user: { id: number }, @Body() dto: CreateInvoiceDto) {
-    return this.service.createInvoice(dto, user.id);
+  create(
+    @CurrentUser() user: { id: number },
+    @Body() dto: CreateInvoiceDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.createInvoice({ ...dto, companyId: dto.companyId ?? companyId }, user.id);
   }
 
   @Get()
@@ -40,29 +44,29 @@ export class InvoicesController {
   @Get('dashboard')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
-  dashboard() {
-    return this.service.getInvoiceDashboard();
+  dashboard(@CurrentCompanyId() companyId: number | null) {
+    return this.service.getInvoiceDashboard(companyId);
   }
 
   @Get('financial-dashboard')
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.INVOICING_VIEW, PERMISSIONS.CONTABILIDAD_VIEW, PERMISSIONS.CONSOLE_ADMIN] })
-  financialDashboard() {
-    return this.service.getFinancialDashboard();
+  financialDashboard(@CurrentCompanyId() companyId: number | null) {
+    return this.service.getFinancialDashboard(companyId);
   }
 
   @Get('insights')
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.INVOICING_VIEW, PERMISSIONS.CONTABILIDAD_VIEW, PERMISSIONS.CONSOLE_ADMIN] })
-  financeInsights() {
-    return this.service.getFinanceInsights();
+  financeInsights(@CurrentCompanyId() companyId: number | null) {
+    return this.service.getFinanceInsights(companyId);
   }
 
   @Get('issuer-profile')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
-  issuerProfile() {
-    return this.service.getInvoiceIssuerProfile();
+  issuerProfile(@CurrentCompanyId() companyId: number | null) {
+    return this.service.getInvoiceIssuerProfile(companyId ?? undefined);
   }
 
   @Get('pac-info')
@@ -75,8 +79,8 @@ export class InvoicesController {
   @Get('overdue')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
-  overdue() {
-    return this.service.getOverdueInvoices();
+  overdue(@CurrentCompanyId() companyId: number | null) {
+    return this.service.getOverdueInvoices(companyId);
   }
 
   @Post('from-sales-project/:projectId')
@@ -86,8 +90,9 @@ export class InvoicesController {
     @Param('projectId') projectId: string,
     @CurrentUser() user: any,
     @Body() body?: { lineIds?: number[] },
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.createInvoiceFromSalesProject(+projectId, user.id, body);
+    return this.service.createInvoiceFromSalesProject(+projectId, user.id, body, companyId);
   }
 
   @Get('sat/descarga-masiva')
@@ -107,8 +112,12 @@ export class InvoicesController {
   @Post('payments/:paymentId/stamp-complement')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
-  stampPaymentComplement(@Param('paymentId') paymentId: string, @CurrentUser() user: any) {
-    return this.service.stampPaymentComplement(+paymentId, user.id);
+  stampPaymentComplement(
+    @Param('paymentId') paymentId: string,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.stampPaymentComplement(+paymentId, user.id, companyId);
   }
 
   @Get(':id/xml')
@@ -143,8 +152,9 @@ export class InvoicesController {
     @Param('id') id: string,
     @CurrentUser() user: { id: number },
     @Body() dto: UpdateInvoiceDraftDto,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.updateInvoiceDraft(+id, dto, user.id);
+    return this.service.updateInvoiceDraft(+id, dto, user.id, companyId);
   }
 
   @Post(':id/match/evaluate')
@@ -160,9 +170,10 @@ export class InvoicesController {
   waiveMatch(
     @Param('id') id: string,
     @CurrentUser() user: { id: number },
+    @CurrentCompanyId() companyId: number | null,
     @Body() body?: { notes?: string },
   ) {
-    return this.service.waiveThreeWayMatch(+id, user.id, body?.notes);
+    return this.service.waiveThreeWayMatch(+id, user.id, body?.notes, companyId);
   }
 
   @Post(':id/payments')
@@ -172,15 +183,20 @@ export class InvoicesController {
     @Param('id') id: string,
     @CurrentUser() user: { id: number },
     @Body() dto: RegisterPaymentDto,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.registerPayment({ ...dto, invoiceId: +id }, user.id);
+    return this.service.registerPayment({ ...dto, invoiceId: +id }, user.id, companyId);
   }
 
   @Post(':id/stamp')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
-  stamp(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.service.stampInvoice(+id, user.id);
+  stamp(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.stampInvoice(+id, user.id, companyId);
   }
 
   @Post(':id/credit-note')
@@ -190,15 +206,16 @@ export class InvoicesController {
     @Param('id') id: string,
     @CurrentUser() user: { id: number },
     @Body() dto: CreateCreditNoteDto,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.createCreditNote(+id, dto, user.id);
+    return this.service.createCreditNote(+id, dto, user.id, companyId);
   }
 
   @Get(':id/sat-status')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
-  satStatus(@Param('id') id: string) {
-    return this.service.queryCfdiStatus(+id);
+  satStatus(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
+    return this.service.queryCfdiStatus(+id, companyId);
   }
 
   @Patch(':id/cancel')
@@ -208,14 +225,19 @@ export class InvoicesController {
     @Param('id') id: string,
     @CurrentUser() user: { id: number },
     @Body() dto: CancelInvoiceDto,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.cancelInvoice(+id, dto, user.id);
+    return this.service.cancelInvoice(+id, dto, user.id, companyId);
   }
 
   @Delete(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
-  remove(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.service.deleteInvoice(+id, user.id);
+  remove(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.deleteInvoice(+id, user.id, companyId);
   }
 }

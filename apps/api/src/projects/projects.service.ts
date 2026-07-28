@@ -12,6 +12,13 @@ import { UpdateProjectDto } from './dto/update-project.dto.js';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import PDFDocument from 'pdfkit';
+import {
+  assertCompanyAccess,
+  companyWhere,
+  requireCompanyId,
+  resolvePublicCompanyId,
+} from '../common/tenant/tenant-scope.js';
+import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 
 interface MulterFile {
   fieldname: string;
@@ -38,7 +45,8 @@ export class ProjectsService {
     return this.prisma;
   }
 
-  async create(createProjectDto: CreateProjectDto, files: ProjectFiles) {
+  async create(createProjectDto: CreateProjectDto, files: ProjectFiles, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const payload = this.normalizePayload(createProjectDto);
 
     if (!payload.title || !payload.sector || !payload.summary || !payload.impact) {
@@ -62,7 +70,9 @@ export class ProjectsService {
 
     const slug = this.ensureSlug(payload.slug || payload.title);
 
-    const existingSlug = await this.db.project.findUnique({ where: { slug } });
+    const existingSlug = await this.db.project.findFirst({
+      where: { slug, companyId: tenantId },
+    });
     if (existingSlug) {
       throw new BadRequestException('El slug ya existe');
     }
@@ -82,6 +92,7 @@ export class ProjectsService {
         highlights: payload.highlights,
         mainImage: mainImageUrl,
         gallery: galleryUrls,
+        companyId: tenantId,
       },
     });
 
@@ -93,25 +104,41 @@ export class ProjectsService {
     return project;
   }
 
-  async findAll(query?: PaginationQueryDto) {
+  async findAll(query?: PaginationQueryDto, companyId?: number | null, publicSite = true) {
+    const tenantId = publicSite
+      ? await withTenantBypassAsync(() => resolvePublicCompanyId(this.prisma))
+      : requireCompanyId(companyId);
+    const where: any = {
+      ...companyWhere(tenantId),
+      ...(query?.search ? { title: { contains: query.search, mode: 'insensitive' as const } } : {}),
+    };
+    const run = <T>(fn: () => Promise<T>) => (publicSite ? withTenantBypassAsync(fn) : fn());
     if (query?.limit) {
-      const where = query.search ? { title: { contains: query.search, mode: 'insensitive' as const } } : undefined;
-      const [data, total] = await Promise.all([
-        this.db.project.findMany({ where, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
-        this.db.project.count({ where }),
-      ]);
+      const [data, total] = await run(() =>
+        Promise.all([
+          this.db.project.findMany({ where, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
+          this.db.project.count({ where }),
+        ]),
+      );
       return buildPaginatedResponse(data, total, query);
     }
-    return this.db.project.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    return run(() =>
+      this.db.project.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
   }
 
-  async findOne(id: number) {
-    const project = await this.db.project.findUnique({ where: { id } });
-    if (!project) {
-      throw new NotFoundException(`Proyecto con ID ${id} no encontrado`);
-    }
+  async findOne(id: number, companyId?: number | null, publicSite = true) {
+    const tenantId = publicSite
+      ? await withTenantBypassAsync(() => resolvePublicCompanyId(this.prisma))
+      : requireCompanyId(companyId);
+    const run = <T>(fn: () => Promise<T>) => (publicSite ? withTenantBypassAsync(fn) : fn());
+    const project = await run(() =>
+      this.db.project.findFirst({ where: { id, ...companyWhere(tenantId) } }),
+    );
+    assertCompanyAccess(project, tenantId, 'Proyecto');
     return project;
   }
 
@@ -119,11 +146,13 @@ export class ProjectsService {
     id: number,
     updateProjectDto: UpdateProjectDto & { galleryKeep?: string[] },
     files: ProjectFiles,
+    companyId?: number | null,
   ) {
-    const existing = await this.db.project.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundException(`Proyecto con ID ${id} no encontrado`);
-    }
+    const tenantId = requireCompanyId(companyId);
+    const existing = await this.db.project.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(existing, tenantId, 'Proyecto');
 
     const payload = this.normalizePayload(updateProjectDto);
     const updateData: Record<string, any> = {};
@@ -140,7 +169,9 @@ export class ProjectsService {
     if (payload.slug) {
       const slug = this.ensureSlug(payload.slug);
       if (slug !== existing.slug) {
-        const slugExists = await this.db.project.findUnique({ where: { slug } });
+        const slugExists = await this.db.project.findFirst({
+          where: { slug, companyId: existing.companyId, NOT: { id } },
+        });
         if (slugExists) {
           throw new BadRequestException('El slug ya existe');
         }
@@ -188,11 +219,12 @@ export class ProjectsService {
     return project;
   }
 
-  async remove(id: number) {
-    const project = await this.db.project.findUnique({ where: { id } });
-    if (!project) {
-      throw new NotFoundException(`Proyecto con ID ${id} no encontrado`);
-    }
+  async remove(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const project = await this.db.project.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(project, tenantId, 'Proyecto');
 
     if (project.mainImage) {
       await this.deleteImage(project.mainImage);
@@ -210,9 +242,13 @@ export class ProjectsService {
   }
 
   async buildCatalogPdf(): Promise<Buffer> {
-    const projects = await this.db.project.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    const companyId = await withTenantBypassAsync(() => resolvePublicCompanyId(this.prisma));
+    const projects = await withTenantBypassAsync(() =>
+      this.db.project.findMany({
+        where: companyWhere(companyId),
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
 
     const doc = new PDFDocument({
       size: 'A4',

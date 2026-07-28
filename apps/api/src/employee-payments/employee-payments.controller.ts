@@ -42,17 +42,31 @@ export class EmployeePaymentsController {
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
+  @Get('calculate-from-attendance')
+  calculateFromAttendance(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('userId') userId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    if (!userId) throw new BadRequestException('userId requerido');
+    return this.service.calculateFromAttendance(+userId, from, to, companyId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   @Get('analytics')
   analytics(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('userId') userId?: string,
   ) {
     const parsedUserId = userId ? Number(userId) : undefined;
     if (userId && Number.isNaN(parsedUserId)) throw new BadRequestException('Empleado invalido');
-    return this.service.analytics(user, { from, to, userId: parsedUserId });
+    return this.service.analytics(user, { from, to, userId: parsedUserId }, companyId);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
@@ -60,6 +74,7 @@ export class EmployeePaymentsController {
   @Get('report.pdf')
   async reportPdf(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('userId') userId?: string,
@@ -71,6 +86,7 @@ export class EmployeePaymentsController {
       user,
       { from, to, userId: parsedUserId },
       user?.nombre ?? null,
+      companyId,
     );
     res!.header('Content-Type', 'application/pdf');
     res!.header(
@@ -105,19 +121,24 @@ export class EmployeePaymentsController {
   @UseInterceptors(FilesInterceptor('files', 10, { dest: getUploadSubdir(__dirname, 'employee-payments') }))
   create(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Body() body: CreateEmployeePaymentDto & { concepto?: string; status?: string },
     @UploadedFiles() files: any[],
   ) {
     this.validateFiles(files);
     const evidenceUrls = (files || []).map((file) => `/uploads/employee-payments/${file.filename}`);
-    return this.service.create(user, body, evidenceUrls);
+    return this.service.create(user, body, evidenceUrls, companyId);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Patch(':id/pagado')
-  markPagado(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.service.markPagado(+id, user?.id);
+  markPagado(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.markPagado(+id, user?.id, companyId);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
@@ -127,18 +148,23 @@ export class EmployeePaymentsController {
   update(
     @Param('id') id: string,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Body() body: UpdateEmployeePaymentDto,
     @UploadedFiles() files: any[],
   ) {
     this.validateFiles(files);
     const evidenceUrls = (files || []).map((file) => `/uploads/employee-payments/${file.filename}`);
-    return this.service.update(+id, body, evidenceUrls.length ? evidenceUrls : undefined, user?.id);
+    return this.service.update(+id, body, evidenceUrls.length ? evidenceUrls : undefined, user?.id, companyId);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Delete(':id')
-  remove(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.service.remove(+id, user?.id);
+  remove(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.remove(+id, user?.id, companyId);
   }
 }

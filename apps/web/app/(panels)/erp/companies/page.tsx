@@ -155,11 +155,12 @@ export default function CompaniesPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Gobierno"
-        title="Multi-empresa"
-        subtitle="Razones sociales registradas en NEXARA: RFC, régimen, contacto fiscal y cuál opera como primaria."
+        eyebrow="ERP · Gobierno · Multi-tenant"
+        title="Empresas del tenant"
+        subtitle="Razones sociales, RFC y primaria operativa. Integra billing, webhooks y API keys desde Settings."
         actions={
           <>
+            <Button variant="ghost" onClick={() => { window.location.href = "/erp/settings"; }}>Control center</Button>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
             {cfg.canAssign && <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva empresa</Button>}
           </>

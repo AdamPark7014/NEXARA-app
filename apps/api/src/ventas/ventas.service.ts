@@ -24,7 +24,7 @@ import { isSalesTeamLeadUser } from '../common/org-roles.js';
 import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 import { opsPatchFromSales } from '../common/project-handoff.js';
 import { WebhooksService } from '../webhooks/webhooks.service.js';
-import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { AuditService } from '../audit/audit.service.js';
 
 @Injectable()
@@ -329,7 +329,7 @@ export class VentasService {
     // P0-E: todo cliente comercial queda vinculado a operación/portal
     if (!created.serviceClientId) {
       try {
-        const provisioned = await this.provisionServiceClient(created.id, user);
+        const provisioned = await this.provisionServiceClient(created.id, user, resolvedCompanyId);
         return provisioned.salesClient;
       } catch {
         // No bloquear alta comercial si falla OPS; se puede provisionar después
@@ -360,19 +360,20 @@ export class VentasService {
     });
   }
 
-  async getClient(id: number, user?: any) {
-    const client = await this.prisma.salesClient.findUnique({
-      where: { id },
+  async getClient(id: number, user?: any, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const client = await this.prisma.salesClient.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: { documents: true, opportunities: true, serviceClient: { select: { id: true, name: true, isActive: true, accountCode: true } } },
     });
-    if (!client) throw new NotFoundException('Cliente no encontrado');
-    this.assertOwnerAccess(client.ownerId, user, 'cliente');
-    return client;
+    assertCompanyAccess(client, tenantId, 'Cliente');
+    this.assertOwnerAccess(client!.ownerId, user, 'cliente');
+    return client!;
   }
 
   /** Facturas CFDI vinculadas al cliente comercial (ERP ↔ CRM). */
-  async listClientInvoices(clientId: number, user?: any) {
-    await this.getClient(clientId, user);
+  async listClientInvoices(clientId: number, user?: any, companyId?: number | null) {
+    await this.getClient(clientId, user, companyId);
     return this.prisma.invoice.findMany({
       where: { clientId, deletedAt: null },
       orderBy: [{ issueDate: 'desc' }, { id: 'desc' }],
@@ -397,8 +398,8 @@ export class VentasService {
     });
   }
 
-  async updateClient(id: number, dto: UpdateSalesClientDto, user?: any) {
-    const existing = await this.getClient(id, user);
+  async updateClient(id: number, dto: UpdateSalesClientDto, user?: any, companyId?: number | null) {
+    const existing = await this.getClient(id, user, companyId);
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user, existing.ownerId);
     return this.prisma.salesClient.update({
       where: { id },
@@ -422,14 +423,14 @@ export class VentasService {
     });
   }
 
-  async deleteClient(id: number, user?: any) {
-    await this.getClient(id, user);
+  async deleteClient(id: number, user?: any, companyId?: number | null) {
+    await this.getClient(id, user, companyId);
     return this.prisma.salesClient.delete({ where: { id } });
   }
 
   /** Crea o devuelve el ServiceClient operativo vinculado a un cliente comercial. */
-  async provisionServiceClient(id: number, user?: any) {
-    const salesClient = await this.getClient(id, user);
+  async provisionServiceClient(id: number, user?: any, companyId?: number | null) {
+    const salesClient = await this.getClient(id, user, companyId);
     if (salesClient.serviceClientId) {
       const existing = await this.prisma.serviceClient.findUnique({
         where: { id: salesClient.serviceClientId },
@@ -440,7 +441,7 @@ export class VentasService {
     }
 
     const accountCode = salesClient.taxId?.trim() || `SC-${salesClient.id}`;
-    const companyId = await resolveRequiredCompanyId(this.prisma, salesClient.companyId);
+    const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, salesClient.companyId);
     const serviceClient = await this.prisma.serviceClient.create({
       data: {
         name: salesClient.legalName?.trim() || salesClient.name,
@@ -450,7 +451,7 @@ export class VentasService {
         address: salesClient.fiscalAddress,
         accountCode,
         isActive: true,
-        companyId,
+        companyId: resolvedCompanyId,
       },
     });
 
@@ -467,8 +468,8 @@ export class VentasService {
     return { salesClient: updated, serviceClient, created: true };
   }
 
-  async addClientDocuments(clientId: number, type: string, files: Array<{ url: string; name?: string }>, user?: any) {
-    const client = await this.getClient(clientId, user);
+  async addClientDocuments(clientId: number, type: string, files: Array<{ url: string; name?: string }>, user?: any, companyId?: number | null) {
+    const client = await this.getClient(clientId, user, companyId);
     const existingCount = await this.prisma.salesClientDocument.count({
       where: { clientId, type },
     });
@@ -536,18 +537,19 @@ export class VentasService {
     });
   }
 
-  async getLead(id: number, user?: any) {
-    const lead = await this.prisma.salesLead.findUnique({
-      where: { id },
+  async getLead(id: number, user?: any, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const lead = await this.prisma.salesLead.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: { client: true, opportunities: true },
     });
-    if (!lead) throw new NotFoundException('Lead no encontrado');
-    this.assertOwnerAccess(lead.ownerId, user, 'lead');
-    return lead;
+    assertCompanyAccess(lead, tenantId, 'Lead');
+    this.assertOwnerAccess(lead!.ownerId, user, 'lead');
+    return lead!;
   }
 
-  async updateLead(id: number, dto: UpdateSalesLeadDto, user?: any) {
-    const existing = await this.getLead(id, user);
+  async updateLead(id: number, dto: UpdateSalesLeadDto, user?: any, companyId?: number | null) {
+    const existing = await this.getLead(id, user, companyId);
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user, existing.ownerId);
     return this.prisma.salesLead.update({
       where: { id },
@@ -566,8 +568,8 @@ export class VentasService {
     });
   }
 
-  async deleteLead(id: number, user?: any) {
-    await this.getLead(id, user);
+  async deleteLead(id: number, user?: any, companyId?: number | null) {
+    await this.getLead(id, user, companyId);
     return this.prisma.salesLead.delete({ where: { id } });
   }
 
@@ -629,8 +631,9 @@ export class VentasService {
   }
 
   async getOpportunity(id: number, user?: any, companyId?: number | null) {
-    const opp = await this.prisma.salesOpportunity.findUnique({
-      where: { id },
+    const tenantId = requireCompanyId(companyId);
+    const opp = await this.prisma.salesOpportunity.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: {
         client: true,
         lead: true,
@@ -640,13 +643,13 @@ export class VentasService {
         projects: { select: { id: true, name: true, status: true, budget: true } },
       },
     });
-    assertCompanyAccess(opp, companyId, 'Oportunidad');
+    assertCompanyAccess(opp, tenantId, 'Oportunidad');
     this.assertOwnerAccess(opp!.ownerId, user, 'oportunidad');
     return opp!;
   }
 
-  async updateOpportunity(id: number, dto: UpdateSalesOpportunityDto, user?: any) {
-    const existing = await this.getOpportunity(id, user);
+  async updateOpportunity(id: number, dto: UpdateSalesOpportunityDto, user?: any, companyId?: number | null) {
+    const existing = await this.getOpportunity(id, user, companyId);
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user, existing.ownerId);
     const mergedStage = dto.stage || existing.stage;
     const mergedDescription = dto.description ?? existing.description;
@@ -715,13 +718,18 @@ export class VentasService {
     return updated;
   }
 
-  async deleteOpportunity(id: number, user?: any) {
-    await this.getOpportunity(id, user);
+  async deleteOpportunity(id: number, user?: any, companyId?: number | null) {
+    await this.getOpportunity(id, user, companyId);
     return this.prisma.salesOpportunity.delete({ where: { id } });
   }
 
-  async addOpportunityNote(opportunityId: number, dto: CreateSalesOpportunityNoteDto, user?: any) {
-    await this.getOpportunity(opportunityId, user);
+  async addOpportunityNote(
+    opportunityId: number,
+    dto: CreateSalesOpportunityNoteDto,
+    user?: any,
+    companyId?: number | null,
+  ) {
+    await this.getOpportunity(opportunityId, user, companyId);
     return this.prisma.salesOpportunityNote.create({
       data: {
         opportunityId,
@@ -731,8 +739,13 @@ export class VentasService {
     });
   }
 
-  async addOpportunityEvidence(opportunityId: number, files: Array<{ url: string; name?: string; kind?: string }>, user?: any) {
-    await this.getOpportunity(opportunityId, user);
+  async addOpportunityEvidence(
+    opportunityId: number,
+    files: Array<{ url: string; name?: string; kind?: string }>,
+    user?: any,
+    companyId?: number | null,
+  ) {
+    await this.getOpportunity(opportunityId, user, companyId);
     const data = files.map((file) => ({
       opportunityId,
       fileUrl: file.url,
@@ -747,8 +760,13 @@ export class VentasService {
     });
   }
 
-  async addOpportunityQuote(opportunityId: number, dto: CreateSalesOpportunityQuoteDto, user?: any) {
-    await this.getOpportunity(opportunityId, user);
+  async addOpportunityQuote(
+    opportunityId: number,
+    dto: CreateSalesOpportunityQuoteDto,
+    user?: any,
+    companyId?: number | null,
+  ) {
+    await this.getOpportunity(opportunityId, user, companyId);
     const existingCount = await this.prisma.salesOpportunityQuote.count({
       where: { opportunityId },
     });
@@ -768,8 +786,8 @@ export class VentasService {
     });
   }
 
-  async listOpportunityQuotes(opportunityId: number, user?: any) {
-    await this.getOpportunity(opportunityId, user);
+  async listOpportunityQuotes(opportunityId: number, user?: any, companyId?: number | null) {
+    await this.getOpportunity(opportunityId, user, companyId);
     return this.prisma.salesOpportunityQuote.findMany({
       where: { opportunityId },
       orderBy: { createdAt: 'desc' },
@@ -785,11 +803,13 @@ export class VentasService {
     return budget - (costProducts + costViaticos + costOperativo);
   }
 
-  async createProject(dto: CreateSalesProjectDto, user?: any) {
-    await this.getOpportunity(dto.opportunityId, user);
+  async createProject(dto: CreateSalesProjectDto, user?: any, companyId?: number | null) {
+    const opp = await this.getOpportunity(dto.opportunityId, user, companyId);
+    const tenantId = opp.companyId ?? requireCompanyId(companyId);
     const margin = this.calculateProjectMargin(dto);
     const created = await this.prisma.salesProject.create({
       data: {
+        companyId: tenantId,
         opportunityId: dto.opportunityId,
         name: dto.name,
         projectType: dto.projectType ?? 'OTRO',
@@ -814,6 +834,7 @@ export class VentasService {
           entityType: 'SALES_PROJECT',
           entityId: created.id,
           userId: user.id,
+          companyId: tenantId,
           payload: {
             budget: Number(created.budget ?? 0),
             margin: Number(created.margin ?? 0),
@@ -824,8 +845,8 @@ export class VentasService {
         .catch(() => undefined);
     }
 
-    void this.ensureProjectSalesOrder(created.id, user).catch(() => undefined);
-    void this.tryAutoProvisionOperational(created.id, user).catch(() => undefined);
+    void this.ensureProjectSalesOrder(created.id, user, tenantId).catch(() => undefined);
+    void this.tryAutoProvisionOperational(created.id, user, tenantId).catch(() => undefined);
 
     return created;
   }
@@ -859,6 +880,7 @@ export class VentasService {
           status: 'PLANNED',
         },
         actorUser,
+        opportunity.companyId,
       );
 
       if (actorId) {
@@ -871,16 +893,16 @@ export class VentasService {
         });
       }
     } else {
-      void this.ensureProjectSalesOrder(project.id, actorUser).catch(() => undefined);
-      void this.tryAutoProvisionOperational(project.id, actorUser).catch(() => undefined);
+      void this.ensureProjectSalesOrder(project.id, actorUser, opportunity.companyId).catch(() => undefined);
+      void this.tryAutoProvisionOperational(project.id, actorUser, opportunity.companyId).catch(() => undefined);
     }
 
     return project;
   }
 
-  private async tryAutoProvisionOperational(projectId: number, user?: any) {
+  private async tryAutoProvisionOperational(projectId: number, user?: any, companyId?: number | null) {
     try {
-      const result = await this.provisionOperationalProject(projectId, user);
+      const result = await this.provisionOperationalProject(projectId, user, companyId);
       if (result.created && user?.id) {
         await this.prisma.salesOpportunityNote.create({
           data: {
@@ -894,8 +916,11 @@ export class VentasService {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo activar operaciones';
       if (user?.id) {
-        const project = await this.prisma.salesProject.findUnique({
-          where: { id: projectId },
+        const project = await this.prisma.salesProject.findFirst({
+          where: {
+            id: projectId,
+            ...(companyId != null && Number(companyId) > 0 ? companyWhere(companyId) : {}),
+          },
           select: { opportunityId: true },
         });
         if (project?.opportunityId) {
@@ -912,8 +937,9 @@ export class VentasService {
     }
   }
 
-  async listProjects(user?: any, ownerId?: number, query?: PaginationQueryDto) {
-    const where = this.buildScopedProjectOwnerWhere(user, ownerId);
+  async listProjects(user?: any, ownerId?: number, query?: PaginationQueryDto, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const where = { ...this.buildScopedProjectOwnerWhere(user, ownerId), ...companyWhere(tenantId) };
     const include = {
       opportunity: true,
       operationalProject: { select: { id: true, title: true, status: true, clientId: true } },
@@ -932,9 +958,18 @@ export class VentasService {
     });
   }
 
-  async updateProject(id: number, dto: UpdateSalesProjectDto, user?: any) {
-    const project = await this.prisma.salesProject.findUnique({ where: { id }, include: { opportunity: true } });
-    if (!project) throw new NotFoundException('Proyecto no encontrado');
+  private async loadSalesProject(id: number, companyId?: number | null, include?: any): Promise<any> {
+    const tenantId = requireCompanyId(companyId);
+    const project = await this.prisma.salesProject.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+      include: include ?? { opportunity: true, operationalProject: true },
+    });
+    assertCompanyAccess(project, tenantId, 'Proyecto');
+    return project!;
+  }
+
+  async updateProject(id: number, dto: UpdateSalesProjectDto, user?: any, companyId?: number | null) {
+    const project = await this.loadSalesProject(id, companyId);
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
     const margin = this.calculateProjectMargin(dto);
     const updated = await this.prisma.salesProject.update({
@@ -991,6 +1026,7 @@ export class VentasService {
           entityType: 'SALES_PROJECT',
           entityId: updated.id,
           userId: requesterId,
+          companyId: project.companyId ?? companyId,
           payload: {
             budget: Number(updated.budget ?? 0),
             margin: Number(updated.margin ?? 0),
@@ -1004,19 +1040,15 @@ export class VentasService {
   }
 
   /** Crea proyecto operativo en campo vinculado a un proyecto comercial ganado. */
-  async provisionOperationalProject(id: number, user?: any) {
-    const project = await this.prisma.salesProject.findUnique({
-      where: { id },
-      include: {
-        opportunity: {
-          include: {
-            client: true,
-            owner: true,
-          },
+  async provisionOperationalProject(id: number, user?: any, companyId?: number | null) {
+    const project = await this.loadSalesProject(id, companyId ?? user?.companyId, {
+      opportunity: {
+        include: {
+          client: true,
+          owner: true,
         },
       },
     });
-    if (!project) throw new NotFoundException('Proyecto no encontrado');
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
 
     const existing = await this.prisma.operationalProject.findUnique({
@@ -1088,9 +1120,9 @@ export class VentasService {
       });
     }
 
-    const companyId = await resolveRequiredCompanyId(
+    const opsCompanyId = await resolveRequiredCompanyId(
       this.prisma,
-      (salesClient as any).companyId ?? project.opportunity?.companyId,
+      companyId ?? (salesClient as any).companyId ?? project.companyId ?? project.opportunity?.companyId,
     );
     const operationalProject = await this.prisma.operationalProject.create({
       data: {
@@ -1105,7 +1137,7 @@ export class VentasService {
         startDate: patch.startDate,
         endDate: patch.endDate,
         status: patch.status,
-        companyId,
+        companyId: opsCompanyId,
       },
       include: {
         client: { select: { id: true, name: true } },
@@ -1357,15 +1389,10 @@ export class VentasService {
   /**
    * Calcula costos totales y margen de un proyecto
    */
-  async calculateProjectCosts(projectId: number, user?: any) {
-    const project = await this.prisma.salesProject.findUnique({
-      where: { id: projectId },
-      include: { opportunity: true },
+  async calculateProjectCosts(projectId: number, user?: any, companyId?: number | null) {
+    const project = await this.loadSalesProject(projectId, companyId ?? user?.companyId, {
+      opportunity: true,
     });
-
-    if (!project) {
-      throw new NotFoundException(`Project with ID ${projectId} not found`);
-    }
 
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
 
@@ -1405,12 +1432,10 @@ export class VentasService {
   /**
    * Sincroniza costos de campo (viáticos + gastos OT) al proyecto comercial.
    */
-  async syncActualCostsFromField(projectId: number, user?: any) {
-    const project = await this.prisma.salesProject.findUnique({
-      where: { id: projectId },
-      include: { opportunity: true },
+  async syncActualCostsFromField(projectId: number, user?: any, companyId?: number | null) {
+    const project = await this.loadSalesProject(projectId, companyId ?? user?.companyId, {
+      opportunity: true,
     });
-    if (!project) throw new NotFoundException(`Project with ID ${projectId} not found`);
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
 
     const actual = await this.computeProjectActualCosts(projectId);
@@ -1424,7 +1449,7 @@ export class VentasService {
       data: { costViaticos, costOperativo, margin },
     });
 
-    return this.calculateProjectCosts(projectId, user);
+    return this.calculateProjectCosts(projectId, user, companyId ?? user?.companyId);
   }
 
   /**
@@ -1438,15 +1463,11 @@ export class VentasService {
       costOperativo?: number;
     },
     user?: any,
+    companyId?: number | null,
   ) {
-    const project = await this.prisma.salesProject.findUnique({
-      where: { id: projectId },
-      include: { opportunity: true },
+    const project = await this.loadSalesProject(projectId, companyId ?? user?.companyId, {
+      opportunity: true,
     });
-
-    if (!project) {
-      throw new NotFoundException(`Project with ID ${projectId} not found`);
-    }
 
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
 
@@ -1483,8 +1504,8 @@ export class VentasService {
   /**
    * Valida que los costos no excedan el presupuesto
    */
-  async validateProjectBudget(projectId: number, user?: any) {
-    const costs = await this.calculateProjectCosts(projectId, user);
+  async validateProjectBudget(projectId: number, user?: any, companyId?: number | null) {
+    const costs = await this.calculateProjectCosts(projectId, user, companyId ?? user?.companyId);
 
     if (costs.isOverBudget) {
       return {
@@ -1502,29 +1523,25 @@ export class VentasService {
   /**
     * Sincroniza viaticos del proyecto con costViaticos
    */
-    async syncViaticosToProject(projectId: number, user?: any) {
-    const project = await this.prisma.salesProject.findUnique({
-      where: { id: projectId },
-      include: { viaticos: true, opportunity: true },
+  async syncViaticosToProject(projectId: number, user?: any, companyId?: number | null) {
+    const project = await this.loadSalesProject(projectId, companyId ?? user?.companyId, {
+      viaticos: true,
+      opportunity: true,
     });
-
-    if (!project) {
-      throw new NotFoundException(`Project with ID ${projectId} not found`);
-    }
 
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
 
     // Sumar todos los viaticos
-    const totalViaticos = project.viaticos.reduce((sum, v) => {
+    const totalViaticos = project.viaticos.reduce((sum: number, v: any) => {
       return sum + (Number(v.montoSolicitado) || 0);
     }, 0);
 
     // Actualizar proyecto con los costos sincronizados
     await this.updateProjectCosts(projectId, {
       costViaticos: totalViaticos,
-    }, user);
+    }, user, companyId ?? user?.companyId);
 
-    return this.calculateProjectCosts(projectId, user);
+    return this.calculateProjectCosts(projectId, user, companyId ?? user?.companyId);
   }
 
   private pickBestOpportunityQuote(
@@ -1579,28 +1596,25 @@ export class VentasService {
    * Orden de venta al crear proyecto (estilo Odoo Sales Order confirmada).
    * Copia líneas de la cotización firmada o la más reciente vinculada.
    */
-  async ensureProjectSalesOrder(projectId: number, user?: any) {
-    const existing = await this.prisma.salesProjectOrder.findUnique({
-      where: { projectId },
-      include: { lines: { orderBy: { sortOrder: 'asc' } } },
-    });
-    if (existing) return existing;
-
-    const project = await this.prisma.salesProject.findUnique({
-      where: { id: projectId },
-      include: {
-        opportunity: {
-          include: {
-            quotes: {
-              orderBy: { createdAt: 'desc' },
-              include: { cotizacion: { include: { items: true } } },
-            },
+  async ensureProjectSalesOrder(projectId: number, user?: any, companyId?: number | null) {
+    const project = await this.loadSalesProject(projectId, companyId ?? user?.companyId, {
+      opportunity: {
+        include: {
+          quotes: {
+            orderBy: { createdAt: 'desc' },
+            include: { cotizacion: { include: { items: true } } },
           },
         },
       },
     });
-    if (!project) throw new NotFoundException('Proyecto no encontrado');
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
+
+    const orderTenant = companyWhere(project.companyId);
+    const existing = await this.prisma.salesProjectOrder.findFirst({
+      where: { projectId: project.id, ...orderTenant },
+      include: { lines: { orderBy: { sortOrder: 'asc' } } },
+    });
+    if (existing) return existing;
 
     const quoteLink = this.pickBestOpportunityQuote(project.opportunity?.quotes);
     const quoteItems = quoteLink?.cotizacion?.items ?? [];
@@ -1608,65 +1622,64 @@ export class VentasService {
 
     const order = await this.prisma.salesProjectOrder.create({
       data: {
-        projectId,
+        projectId: project.id,
         orderId,
         quoteId: quoteLink?.id ?? null,
         status: 'CONFIRMED',
         createdById: user?.id ?? null,
+        companyId: project.companyId,
       },
     });
 
     await this.copyQuoteItemsToOrderLines(order.id, quoteItems);
 
     await this.prisma.salesProject.update({
-      where: { id: projectId },
+      where: { id: project.id },
       data: { closureOrderId: order.id },
     });
 
-    void this.notificationsService.notifyOrderCreated(projectId, orderId).catch(() => undefined);
+    void this.notificationsService.notifyOrderCreated(project.id, orderId).catch(() => undefined);
 
-    return this.prisma.salesProjectOrder.findUnique({
-      where: { id: order.id },
+    return this.prisma.salesProjectOrder.findFirst({
+      where: { id: order.id, projectId: project.id, ...orderTenant },
       include: { lines: { orderBy: { sortOrder: 'asc' } }, quote: true, createdBy: true },
     });
   }
 
-  async closeProject(projectId: number, user?: any) {
-    const project = await this.prisma.salesProject.findUnique({
-      where: { id: projectId },
-      include: {
-        opportunity: {
-          include: {
-            client: true,
-            quotes: { orderBy: { createdAt: 'desc' }, take: 1, include: { cotizacion: { include: { items: true } } } },
-            owner: true,
-          },
+  async closeProject(projectId: number, user?: any, companyId?: number | null) {
+    const project = await this.loadSalesProject(projectId, companyId ?? user?.companyId, {
+      opportunity: {
+        include: {
+          client: true,
+          quotes: { orderBy: { createdAt: 'desc' }, take: 1, include: { cotizacion: { include: { items: true } } } },
+          owner: true,
         },
-        closureOrder: true,
       },
+      closureOrder: true,
     });
-
-    if (!project) {
-      throw new NotFoundException(`Project with ID ${projectId} not found`);
-    }
 
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
 
-    const validation = await this.validateProjectBudget(projectId, user);
+    const validation = await this.validateProjectBudget(projectId, user, companyId ?? user?.companyId);
     if (!validation.valid) {
       throw new BadRequestException(`Cannot close project: ${validation.message}`);
     }
 
     let order = project.closureOrder;
     if (!order) {
-      order = await this.ensureProjectSalesOrder(projectId, user) as any;
+      order = await this.ensureProjectSalesOrder(projectId, user, companyId ?? user?.companyId) as any;
     }
 
+    const tenantId = requireCompanyId(companyId ?? user?.companyId);
+    const orderScope = { id: order!.id, ...companyWhere(tenantId) };
+
     if (project.status === 'CLOSED' && order) {
-      return this.prisma.salesProjectOrder.findUnique({
-        where: { id: order.id },
+      const closed = await this.prisma.salesProjectOrder.findFirst({
+        where: orderScope,
         include: { project: true, quote: true, createdBy: true, lines: { orderBy: { sortOrder: 'asc' } } },
       });
+      if (!closed) throw new NotFoundException('Orden de proyecto no encontrada');
+      return closed;
     }
 
     const lastQuote = project.opportunity.quotes?.[0];
@@ -1703,8 +1716,14 @@ export class VentasService {
     await fs.writeFile(outPath, orderPdfBuffer);
     const orderPdfUrl = `/uploads/sales-orders/${filename}`;
 
+    const scopedOrder = await this.prisma.salesProjectOrder.findFirst({
+      where: orderScope,
+      select: { id: true },
+    });
+    if (!scopedOrder) throw new NotFoundException('Orden de proyecto no encontrada');
+
     await this.prisma.salesProjectOrder.update({
-      where: { id: order!.id },
+      where: { id: scopedOrder.id },
       data: {
         orderPdfUrl,
         status: 'CLOSED',
@@ -1715,15 +1734,17 @@ export class VentasService {
       where: { id: projectId },
       data: {
         status: 'CLOSED',
-        closureOrderId: order!.id,
+        closureOrderId: scopedOrder.id,
         endDate: new Date(),
       },
     });
 
-    return this.prisma.salesProjectOrder.findUnique({
-      where: { id: order!.id },
+    const updated = await this.prisma.salesProjectOrder.findFirst({
+      where: orderScope,
       include: { project: true, quote: true, createdBy: true, lines: { orderBy: { sortOrder: 'asc' } } },
     });
+    if (!updated) throw new NotFoundException('Orden de proyecto no encontrada');
+    return updated;
   }
 
   /**
@@ -1755,9 +1776,12 @@ export class VentasService {
     };
   }
 
-  async getProjectOrder(projectId: number, user?: any) {
-    const order = await this.prisma.salesProjectOrder.findUnique({
-      where: { projectId },
+  async getProjectOrder(projectId: number, user?: any, companyId?: number | null) {
+    const project = await this.loadSalesProject(projectId, companyId ?? user?.companyId, {
+      opportunity: { include: { client: true } },
+    });
+    const order = await this.prisma.salesProjectOrder.findFirst({
+      where: { projectId: project.id, ...companyWhere(project.companyId) },
       include: {
         project: { include: { opportunity: { include: { client: true } } } },
         quote: true,
@@ -1782,6 +1806,7 @@ export class VentasService {
       },
     });
     if (!order) return null;
+    assertCompanyAccess(order.project, project.companyId, 'Proyecto');
     this.assertOwnerAccess(order.project?.opportunity?.ownerId, user, 'proyecto');
     return order;
   }
@@ -1790,43 +1815,39 @@ export class VentasService {
    * Vista unificada de un proyecto comercial — incluye comercial, operación,
    * orden, factura y costos reales en un solo payload para detalle ejecutivo.
    */
-  async getProjectSummary(projectId: number, user?: any) {
-    const project = await this.prisma.salesProject.findUnique({
-      where: { id: projectId },
-      include: {
-        opportunity: {
-          include: {
-            client: { select: { id: true, name: true, taxId: true, legalName: true } },
-            owner: { select: { id: true, nombre: true, email: true } },
-          },
+  async getProjectSummary(projectId: number, user?: any, companyId?: number | null) {
+    const project = await this.loadSalesProject(projectId, companyId ?? user?.companyId, {
+      opportunity: {
+        include: {
+          client: { select: { id: true, name: true, taxId: true, legalName: true } },
+          owner: { select: { id: true, nombre: true, email: true } },
         },
-        closureOrder: {
-          include: {
-            lines: { orderBy: { sortOrder: 'asc' }, include: { invoiceItem: { select: { id: true } } } },
-            invoices: {
-              select: {
-                id: true,
-                invoiceNumber: true,
-                status: true,
-                totalAmount: true,
-                paidAmount: true,
-                cfdiUuid: true,
-                cfdiStampDate: true,
-                isCancelled: true,
-              },
-              orderBy: { createdAt: 'desc' },
+      },
+      closureOrder: {
+        include: {
+          lines: { orderBy: { sortOrder: 'asc' }, include: { invoiceItem: { select: { id: true } } } },
+          invoices: {
+            select: {
+              id: true,
+              invoiceNumber: true,
+              status: true,
+              totalAmount: true,
+              paidAmount: true,
+              cfdiUuid: true,
+              cfdiStampDate: true,
+              isCancelled: true,
             },
+            orderBy: { createdAt: 'desc' },
           },
         },
-        operationalProject: {
-          include: {
-            engineers: { include: { engineer: { select: { id: true, nombre: true, email: true } } } },
-          },
+      },
+      operationalProject: {
+        include: {
+          engineers: { include: { engineer: { select: { id: true, nombre: true, email: true } } } },
         },
       },
     });
 
-    if (!project) throw new NotFoundException('Proyecto no encontrado');
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
 
     const opProject = project.operationalProject;
@@ -1876,7 +1897,7 @@ export class VentasService {
             id: opProject.id,
             title: opProject.title,
             status: opProject.status,
-            engineers: opProject.engineers?.map((e) => e.engineer) || [],
+            engineers: opProject.engineers?.map((e: any) => e.engineer) || [],
             activityStats,
             progressPercent: activityStats?.total
               ? Math.round((activityStats.completed / activityStats.total) * 100)
@@ -1889,7 +1910,7 @@ export class VentasService {
             orderId: project.closureOrder.orderId,
             status: project.closureOrder.status,
             lineCount: project.closureOrder.lines.length,
-            invoicedLineCount: project.closureOrder.lines.filter((l) => l.invoiceItem).length,
+            invoicedLineCount: project.closureOrder.lines.filter((l: any) => l.invoiceItem).length,
             invoices: project.closureOrder.invoices,
           }
         : null,
@@ -1934,9 +1955,15 @@ export class VentasService {
     return cot;
   }
 
-  async linkCotizacionToOpportunity(cotizacionId: number, opportunityId: number, user?: any, versionLabel?: string) {
+  async linkCotizacionToOpportunity(
+    cotizacionId: number,
+    opportunityId: number,
+    user?: any,
+    versionLabel?: string,
+    companyId?: number | null,
+  ) {
     // Verify opportunity exists and ownership
-    await this.getOpportunity(opportunityId, user);
+    await this.getOpportunity(opportunityId, user, companyId);
 
     // Verify cotization exists
     const cot = await this.prisma.cotizacion.findUnique({
@@ -1962,12 +1989,10 @@ export class VentasService {
     return quote;
   }
 
-  async getProjectViaticos(projectId: number, user?: any) {
-    const project = await this.prisma.salesProject.findUnique({
-      where: { id: projectId },
-      include: { opportunity: true },
+  async getProjectViaticos(projectId: number, user?: any, companyId?: number | null) {
+    const project = await this.loadSalesProject(projectId, companyId ?? user?.companyId, {
+      opportunity: true,
     });
-    if (!project) throw new NotFoundException('Proyecto no encontrado');
 
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
 
@@ -1978,12 +2003,10 @@ export class VentasService {
     });
   }
 
-  async assignViaticosToProject(projectId: number, viaticIds: number[], user?: any) {
-    const project = await this.prisma.salesProject.findUnique({
-      where: { id: projectId },
-      include: { opportunity: true },
+  async assignViaticosToProject(projectId: number, viaticIds: number[], user?: any, companyId?: number | null) {
+    const project = await this.loadSalesProject(projectId, companyId ?? user?.companyId, {
+      opportunity: true,
     });
-    if (!project) throw new NotFoundException('Proyecto no encontrado');
 
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
 
@@ -2041,12 +2064,9 @@ export class VentasService {
 
     // Recalculate project costs if it was linked to a project
     if (projectId) {
-      const project = await this.prisma.salesProject.findUnique({
-        where: { id: projectId },
-        include: { opportunity: true },
+      const project = await this.loadSalesProject(projectId, user?.companyId, {
+        opportunity: true,
       });
-
-      if (!project) throw new NotFoundException('Proyecto no encontrado');
 
       this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
 
@@ -2075,18 +2095,17 @@ export class VentasService {
     }
   }
 
-  async getProjectExpensesSummary(projectId: number, user?: any) {
-    const project = await this.prisma.salesProject.findUnique({
-      where: { id: projectId },
-      include: { viaticos: true, opportunity: true },
+  async getProjectExpensesSummary(projectId: number, user?: any, companyId?: number | null) {
+    const project = await this.loadSalesProject(projectId, companyId ?? user?.companyId, {
+      viaticos: true,
+      opportunity: true,
     });
-    if (!project) throw new NotFoundException('Proyecto no encontrado');
 
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
 
     const viaticosCount = project.viaticos.length;
     const totalViaticoCost = project.viaticos.reduce(
-      (sum, v) => sum + Number(v.montoSolicitado || 0),
+      (sum: number, v: any) => sum + Number(v.montoSolicitado || 0),
       0
     );
 
@@ -2141,19 +2160,21 @@ export class VentasService {
     };
   }
 
-  async createOrderTemplate(dto: CreateOrderTemplateDto, userId?: number) {
-    const existingCount = await this.prisma.orderTemplate.count();
+  async createOrderTemplate(dto: CreateOrderTemplateDto, userId?: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const existingCount = await this.prisma.orderTemplate.count({ where: companyWhere(tenantId) });
     const shouldBeDefault = dto.isDefault ?? existingCount === 0;
 
     if (shouldBeDefault) {
       await this.prisma.orderTemplate.updateMany({
-        where: { isDefault: true },
+        where: { isDefault: true, ...companyWhere(tenantId) },
         data: { isDefault: false },
       });
     }
 
     return this.prisma.orderTemplate.create({
       data: {
+        companyId: tenantId,
         name: dto.name,
         description: dto.description || null,
         isDefault: shouldBeDefault,
@@ -2177,35 +2198,40 @@ export class VentasService {
     });
   }
 
-  async listOrderTemplates(query?: PaginationQueryDto) {
+  async listOrderTemplates(query?: PaginationQueryDto, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const where = companyWhere(tenantId);
     if (query?.limit) {
       const [data, total] = await Promise.all([
-        this.prisma.orderTemplate.findMany({ orderBy: { createdAt: 'desc' }, include: { createdBy: true }, skip: query.skip, take: query.take }),
-        this.prisma.orderTemplate.count(),
+        this.prisma.orderTemplate.findMany({ where, orderBy: { createdAt: 'desc' }, include: { createdBy: true }, skip: query.skip, take: query.take }),
+        this.prisma.orderTemplate.count({ where }),
       ]);
       return buildPaginatedResponse(data, total, query);
     }
     return this.prisma.orderTemplate.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       include: { createdBy: true },
     });
   }
 
-  async getOrderTemplate(id: number) {
-    const template = await this.prisma.orderTemplate.findUnique({
-      where: { id },
+  async getOrderTemplate(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const template = await this.prisma.orderTemplate.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: { createdBy: true },
     });
-    if (!template) throw new NotFoundException('Template no encontrado');
-    return template;
+    assertCompanyAccess(template, tenantId, 'Template');
+    return template!;
   }
 
-  async updateOrderTemplate(id: number, dto: UpdateOrderTemplateDto) {
-    const existing = await this.getOrderTemplate(id);
+  async updateOrderTemplate(id: number, dto: UpdateOrderTemplateDto, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const existing = await this.getOrderTemplate(id, tenantId);
 
     if (dto.isDefault) {
       await this.prisma.orderTemplate.updateMany({
-        where: { isDefault: true, id: { not: id } },
+        where: { isDefault: true, id: { not: id }, ...companyWhere(tenantId) },
         data: { isDefault: false },
       });
     }
@@ -2237,12 +2263,14 @@ export class VentasService {
     });
   }
 
-  async deleteOrderTemplate(id: number) {
-    const target = await this.getOrderTemplate(id);
+  async deleteOrderTemplate(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const target = await this.getOrderTemplate(id, tenantId);
     const deleted = await this.prisma.orderTemplate.delete({ where: { id } });
 
     if (target.isDefault) {
       const fallback = await this.prisma.orderTemplate.findFirst({
+        where: companyWhere(tenantId),
         orderBy: { updatedAt: 'desc' },
       });
       if (fallback) {
@@ -2256,19 +2284,21 @@ export class VentasService {
     return deleted;
   }
 
-  async getDefaultOrderTemplate() {
+  async getDefaultOrderTemplate(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.orderTemplate.findFirst({
-      where: { isDefault: true },
+      where: { isDefault: true, ...companyWhere(tenantId) },
       include: { createdBy: true },
     });
   }
 
-  async setOrderTemplateAsDefault(id: number) {
-    await this.getOrderTemplate(id);
+  async setOrderTemplateAsDefault(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    await this.getOrderTemplate(id, tenantId);
 
-    // Unset all previous defaults
+    // Unset all previous defaults within tenant
     await this.prisma.orderTemplate.updateMany({
-      where: { isDefault: true },
+      where: { isDefault: true, ...companyWhere(tenantId) },
       data: { isDefault: false },
     });
 
@@ -2345,7 +2375,7 @@ export class VentasService {
     };
   }
 
-  async getVendorStatsByPeriod(period: 'week' | 'month' | 'year', user?: any) {
+  async getVendorStatsByPeriod(period: 'week' | 'month' | 'year', user?: any, companyId?: number | null) {
     const now = new Date();
     let startDate = new Date();
 
@@ -2390,10 +2420,12 @@ export class VentasService {
     }
 
     // Get seller users (must have sales panel access configured in role)
+    const tenantId = requireCompanyId(companyId);
     const protectedEmails = ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'];
     const users = await this.prisma.user.findMany({
       where: {
         role: { accesoPanelVentas: true },
+        companyMemberships: { some: { companyId: tenantId } },
         NOT: { role: { accesoConsoleAdmin: true } },
         email: { notIn: protectedEmails },
       },
@@ -2500,11 +2532,11 @@ export class VentasService {
     };
   }
 
-  async getSalesQuotaProgress(period: 'week' | 'month' | 'year', user?: any) {
-    return this.getVendorStatsByPeriod(period, user);
+  async getSalesQuotaProgress(period: 'week' | 'month' | 'year', user?: any, companyId?: number | null) {
+    return this.getVendorStatsByPeriod(period, user, companyId);
   }
 
-  async getExecutiveInsights(period: 'week' | 'month' | 'year', user?: any) {
+  async getExecutiveInsights(period: 'week' | 'month' | 'year', user?: any, companyId?: number | null) {
     const startDate = this.getPeriodStart(period);
     const isManager = this.isSalesTeamManager(user);
     const ownerFilter = !isManager && user?.id ? { ownerId: user.id } : undefined;
@@ -2540,7 +2572,7 @@ export class VentasService {
         },
         _count: { action: true },
       }),
-      this.getVendorStatsByPeriod(period, user),
+      this.getVendorStatsByPeriod(period, user, companyId),
       this.prisma.salesOpportunityNote.groupBy({
         by: ['opportunityId'],
         where: {
@@ -2830,7 +2862,7 @@ export class VentasService {
     };
   }
 
-  async getManagerCockpit(period: 'week' | 'month' | 'year', user?: any) {
+  async getManagerCockpit(period: 'week' | 'month' | 'year', user?: any, companyId?: number | null) {
     const startDate = this.getPeriodStart(period);
     const isManager = this.isSalesTeamManager(user);
     const ownerFilter = !isManager && user?.id ? { ownerId: user.id } : undefined;
@@ -2855,7 +2887,7 @@ export class VentasService {
           description: true,
         },
       }),
-      this.getVendorStatsByPeriod(period, user),
+      this.getVendorStatsByPeriod(period, user, companyId),
       this.prisma.salesOpportunityNote.groupBy({
         by: ['opportunityId'],
         where: {

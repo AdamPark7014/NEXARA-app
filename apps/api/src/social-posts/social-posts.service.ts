@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 export interface CreateSocialPostDto {
   red: string;
@@ -17,23 +18,26 @@ export interface UpdateSocialPostDto extends Partial<CreateSocialPostDto> {}
 export class SocialPostsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: CreateSocialPostDto, autorId: number) {
+  async create(data: CreateSocialPostDto, autorId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.socialPost.create({
       data: {
-        red:       data.red,
-        titulo:    data.titulo,
+        red: data.red,
+        titulo: data.titulo,
         contenido: data.contenido,
-        mediaUrl:  data.mediaUrl,
-        cuando:    new Date(data.cuando),
-        estado:    data.estado ?? 'Borrador',
+        mediaUrl: data.mediaUrl,
+        cuando: new Date(data.cuando),
+        estado: data.estado ?? 'Borrador',
         autorId,
+        companyId: tenantId,
       },
       include: { autor: { select: { id: true, nombre: true } } },
     });
   }
 
-  async findAll(query?: PaginationQueryDto, estado?: string) {
-    const where = estado ? { estado } : undefined;
+  async findAll(query?: PaginationQueryDto, estado?: string, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { ...companyWhere(tenantId), ...(estado ? { estado } : {}) };
     const include = { autor: { select: { id: true, nombre: true } } };
     const orderBy = { cuando: 'asc' as const };
 
@@ -47,17 +51,18 @@ export class SocialPostsService {
     return this.prisma.socialPost.findMany({ where, include, orderBy });
   }
 
-  async findOne(id: number) {
-    const sp = await this.prisma.socialPost.findUnique({
-      where: { id },
+  async findOne(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const sp = await this.prisma.socialPost.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: { autor: { select: { id: true, nombre: true } } },
     });
-    if (!sp) throw new NotFoundException(`SocialPost #${id} not found`);
+    assertCompanyAccess(sp, tenantId, 'SocialPost');
     return sp;
   }
 
-  async update(id: number, data: UpdateSocialPostDto) {
-    await this.findOne(id);
+  async update(id: number, data: UpdateSocialPostDto, companyId?: number | null) {
+    await this.findOne(id, companyId);
     return this.prisma.socialPost.update({
       where: { id },
       data: {
@@ -69,16 +74,16 @@ export class SocialPostsService {
     });
   }
 
-  async setEstado(id: number, estado: string) {
-    await this.findOne(id);
+  async setEstado(id: number, estado: string, companyId?: number | null) {
+    await this.findOne(id, companyId);
     return this.prisma.socialPost.update({
       where: { id },
       data: { estado, updatedAt: new Date() },
     });
   }
 
-  async remove(id: number) {
-    await this.findOne(id);
+  async remove(id: number, companyId?: number | null) {
+    await this.findOne(id, companyId);
     return this.prisma.socialPost.delete({ where: { id } });
   }
 }

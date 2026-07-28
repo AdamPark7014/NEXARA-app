@@ -57,6 +57,9 @@ model Product {
   qualityInspections QualityInspection[]
   ncrs               NonConformanceReport[]
   maintenanceParts   MaintenanceOrderPart[]
+  cycleCountItems    CycleCountItem[]
+  stockReservations  StockReservation[]
+  rfqLines           PurchaseRFQLine[]
 
   @@unique([companyId, sku])
   @@index([companyId])
@@ -78,31 +81,38 @@ model ProductSource {
 }
 
 model Client {
-  id          Int      @id @default(autoincrement())
-  name        String   @db.VarChar(255)
+  id          Int            @id @default(autoincrement())
+  name        String         @db.VarChar(255)
   description String?
-  imageUrl    String?  @db.VarChar(500)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  imageUrl    String?        @db.VarChar(500)
+  companyId   Int
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@index([companyId])
   @@map("clients")
 }
 
 model Project {
-  id         Int      @id @default(autoincrement())
-  slug       String   @unique @db.VarChar(120)
-  title      String   @db.VarChar(220)
-  sector     String   @db.VarChar(180)
+  id         Int            @id @default(autoincrement())
+  slug       String         @db.VarChar(120)
+  title      String         @db.VarChar(220)
+  sector     String         @db.VarChar(180)
   summary    String?
-  impact     String?  @db.VarChar(255)
+  impact     String?        @db.VarChar(255)
   services   String[]
   tags       String[]
   highlights String[]
-  mainImage  String?  @db.VarChar(500)
+  mainImage  String?        @db.VarChar(500)
   gallery    String[]
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  companyId  Int
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, slug])
+  @@index([companyId])
   @@map("projects")
 }
 
@@ -206,49 +216,61 @@ model WorkProject {
   budgetUsed  Decimal?             @db.Decimal(12, 2)
   progress    Int?                 @default(0)
   description String?
+  companyId   Int
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
   deletedAt   DateTime?
   expenses    WorkProjectExpense[]
   payroll     WorkProjectPayroll[]
   logs        WorkProjectLog[]
+  company     CompanyProfile       @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@index([companyId])
   @@map("work_projects")
 }
 
 model WorkProjectExpense {
-  id         Int         @id @default(autoincrement())
+  id         Int            @id @default(autoincrement())
   projectId  Int
-  category   String      @db.VarChar(120)
-  amount     Decimal     @db.Decimal(12, 2)
-  incurredAt DateTime    @default(now())
+  category   String         @db.VarChar(120)
+  amount     Decimal        @db.Decimal(12, 2)
+  incurredAt DateTime       @default(now())
   note       String?
-  project    WorkProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  companyId  Int
+  project    WorkProject    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@index([companyId])
   @@map("work_project_expenses")
 }
 
 model WorkProjectPayroll {
-  id        Int         @id @default(autoincrement())
+  id        Int            @id @default(autoincrement())
   projectId Int
-  employee  String      @db.VarChar(160)
-  amount    Decimal     @db.Decimal(12, 2)
-  paidAt    DateTime    @default(now())
+  employee  String         @db.VarChar(160)
+  amount    Decimal        @db.Decimal(12, 2)
+  paidAt    DateTime       @default(now())
   note      String?
-  project   WorkProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  companyId Int
+  project   WorkProject    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@index([companyId])
   @@map("work_project_payroll")
 }
 
 model WorkProjectLog {
-  id        Int         @id @default(autoincrement())
+  id        Int            @id @default(autoincrement())
   projectId Int
-  label     String      @db.VarChar(160)
-  progress  Int?        @default(0)
+  label     String         @db.VarChar(160)
+  progress  Int?           @default(0)
   note      String?
-  createdAt DateTime    @default(now())
-  project   WorkProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+  companyId Int
+  project   WorkProject    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@index([companyId])
   @@map("work_project_logs")
 }
 
@@ -296,24 +318,33 @@ model ProductCT {
 }
 
 model Brand {
-  id         Int         @id @default(autoincrement())
-  name       String      @unique @db.VarChar(200)
-  normalized String      @unique @db.VarChar(200)
-  createdAt  DateTime    @default(now())
+  id         Int            @id @default(autoincrement())
+  name       String         @db.VarChar(200)
+  normalized String         @db.VarChar(200)
+  companyId  Int
+  createdAt  DateTime       @default(now())
+  company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
   products   Product[]
   productCTs ProductCT[]
 
+  @@unique([companyId, name])
+  @@unique([companyId, normalized])
+  @@index([companyId])
   @@map("brands")
 }
 
 model Supplier {
   id               Int               @id @default(autoincrement())
-  name             String            @unique @db.VarChar(255)
+  name             String            @db.VarChar(255)
   apiUrl           String?           @db.VarChar(500)
   description      String?
   isActive         Boolean           @default(true)
+  /// RFC del proveedor — requerido para DIOT y Contabilidad Electrónica.
+  rfc              String?           @db.VarChar(13)
+  companyId        Int
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+  company          CompanyProfile    @relation(fields: [companyId], references: [id], onDelete: Restrict)
   orderItems       OrderItem[]
   supplierProducts SupplierProduct[]
 
@@ -322,7 +353,10 @@ model Supplier {
   lots           Lot[]                @relation("LotSupplier")
   purchaseOrders PurchaseOrder[]      @relation("SupplierPurchaseOrders")
   evaluations    SupplierEvaluation[] @relation("SupplierEvaluations")
+  rfqLines       PurchaseRFQLine[]    @relation("SupplierRFQLines")
 
+  @@unique([companyId, name])
+  @@index([companyId])
   @@map("suppliers")
 }
 
@@ -416,20 +450,25 @@ model Role {
 }
 
 model Department {
-  id     Int    @id @default(autoincrement())
-  nombre String @unique @db.VarChar(100)
-  users  User[]
+  id        Int            @id @default(autoincrement())
+  nombre    String         @db.VarChar(100)
+  companyId Int
+  users     User[]
+  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   // === ERP Industrial Relations ===
   costCenters          CostCenter[]
   purchaseRequisitions PurchaseRequisition[]
+
+  @@unique([companyId, nombre])
+  @@index([companyId])
 }
 
 model User {
   id                        Int                        @id @default(autoincrement())
   nombre                    String                     @db.VarChar(100)
   email                     String                     @unique @db.VarChar(150)
-  employeeNumber            String?                    @unique @db.VarChar(30)
+  employeeNumber            String?                    @db.VarChar(30)
   passwordHash              String
   roleId                    Int
   // RBAC v2 — clave de rol normalizada (super_admin, ceo, dir_admin, …)
@@ -533,6 +572,10 @@ model User {
   productionLogs          ProductionLog[]        @relation("ProductionLogOperator")
   qualityInspections      QualityInspection[]    @relation("QualityInspector")
   ncrsReported            NonConformanceReport[] @relation("NCRReportedBy")
+  cycleCountsCreated      CycleCount[]           @relation("CycleCountCreator")
+  cycleCountsClosed       CycleCount[]           @relation("CycleCountCloser")
+  stockReservationsCreated StockReservation[]    @relation("StockReservationCreator")
+  purchaseRfqsCreated     PurchaseRFQ[]          @relation("PurchaseRFQCreator")
   ncrsAssigned            NonConformanceReport[] @relation("NCRAssignedTo")
   assetsResponsible       Asset[]                @relation("AssetResponsible")
   maintenanceAssigned     MaintenanceOrder[]     @relation("MaintenanceAssignee")
@@ -666,10 +709,13 @@ model CvCandidate {
   recruiterReviewedBy    User?              @relation("CvRecruiterReviewedBy", fields: [recruiterReviewedById], references: [id])
   adminReviewedBy        User?              @relation("CvAdminReviewedBy", fields: [adminReviewedById], references: [id])
   superadminReviewedBy   User?              @relation("CvSuperadminReviewedBy", fields: [superadminReviewedById], references: [id])
+  companyId              Int
+  company                CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([stage, category, sortOrder])
   @@index([employmentStatus])
   @@index([createdById])
+  @@index([companyId])
 }
 
 model UserProfile {
@@ -715,7 +761,7 @@ model UserDocument {
 
 model Activity {
   id                      Int                     @id @default(autoincrement())
-  anNumber                String                  @unique @db.VarChar(20)
+  anNumber                String                  @db.VarChar(20)
   titulo                  String                  @db.VarChar(200)
   descripcion             String?
   indicaciones            String?
@@ -766,6 +812,7 @@ model Activity {
   companyId               Int
   company                 CompanyProfile          @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, anNumber])
   @@index([projectId])
   @@index([clientId])
   @@index([companyId])
@@ -796,7 +843,7 @@ model ServiceClient {
   state               String?                  @db.VarChar(120)
   country             String?                  @db.VarChar(80)
   accountCode         String?                  @db.VarChar(80)
-  portalEmail         String?                  @unique @db.VarChar(200)
+  portalEmail         String?                  @db.VarChar(200)
   portalPasswordHash  String?
   reportUrl           String?                  @db.VarChar(500)
   reportGeneratedAt   DateTime?
@@ -814,6 +861,7 @@ model ServiceClient {
   operationalProjects OperationalProject[]
   maintenanceContracts MaintenanceContract[]
 
+  @@unique([companyId, portalEmail])
   @@index([companyId])
   @@map("service_clients")
 }
@@ -844,7 +892,7 @@ model ServiceClientBranch {
   placeId            String?               @db.VarChar(180)
   latitud            Decimal?              @db.Decimal(10, 8)
   longitud           Decimal?              @db.Decimal(11, 8)
-  portalEmail        String?               @unique @db.VarChar(200)
+  portalEmail        String?               @db.VarChar(200)
   portalPasswordHash String?
   logoUrl            String?               @db.VarChar(500)
   isActive           Boolean               @default(true)
@@ -854,8 +902,12 @@ model ServiceClientBranch {
   ticketRequests     ClientTicketRequest[]
   inventorySnapshots InventorySnapshot[]
   maintenanceContracts MaintenanceContract[]
+  companyId          Int
+  company            CompanyProfile        @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([clientId, branchNumber])
+  @@unique([companyId, portalEmail])
+  @@index([companyId])
   @@map("service_client_branches")
 }
 
@@ -918,10 +970,13 @@ model InventorySnapshot {
   request       ClientTicketRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
   activity      Activity?            @relation(fields: [activityId], references: [id], onDelete: SetNull)
   items         InventoryItem[]
+  companyId     Int
+  company       CompanyProfile       @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([clientId])
   @@index([branchId])
   @@index([status])
+  @@index([companyId])
   @@map("inventory_snapshots")
 }
 
@@ -990,30 +1045,38 @@ model ServiceSheet {
   survey        Json?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  companyId     Int
   activity      Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@index([companyId])
   @@map("service_sheets")
 }
 
 model Evidence {
-  id                     Int       @id @default(autoincrement())
+  id                     Int             @id @default(autoincrement())
   actividadId            Int
-  tipoEvidencia          String    @db.VarChar(50)
+  tipoEvidencia          String          @db.VarChar(50)
   archivoUrl             String
-  aprobada               Boolean   @default(false)
-  estatus                String    @default("Pendiente") @db.VarChar(50)
-  comentarios            String?   @db.Text
-  observacionesRevision  String?   @db.Text
-  calificacionEficiencia String?   @db.VarChar(20)
-  latitud                Decimal?  @db.Decimal(10, 8)
-  longitud               Decimal?  @db.Decimal(11, 8)
+  aprobada               Boolean         @default(false)
+  estatus                String          @default("Pendiente") @db.VarChar(50)
+  comentarios            String?         @db.Text
+  observacionesRevision  String?         @db.Text
+  calificacionEficiencia String?         @db.VarChar(20)
+  latitud                Decimal?        @db.Decimal(10, 8)
+  longitud               Decimal?        @db.Decimal(11, 8)
   aprobadoPorId          Int?
   revisadoEn             DateTime?
-  subidoEn               DateTime  @default(now())
+  subidoEn               DateTime        @default(now())
   userId                 Int?
-  actividad              Activity  @relation(fields: [actividadId], references: [id], onDelete: Cascade)
-  user                   User?     @relation(fields: [userId], references: [id])
-  aprobadoPor            User?     @relation("EvidenceApprover", fields: [aprobadoPorId], references: [id])
+  companyId              Int
+  actividad              Activity        @relation(fields: [actividadId], references: [id], onDelete: Cascade)
+  user                   User?           @relation(fields: [userId], references: [id])
+  aprobadoPor            User?           @relation("EvidenceApprover", fields: [aprobadoPorId], references: [id])
+  company                CompanyProfile  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([actividadId])
 }
 
 // Nuevo modelo para el flujo de evidencias de actividades (5 pasos)
@@ -1062,7 +1125,10 @@ model ActivityEvidence {
 
   activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
   reviewedBy User?    @relation(fields: [reviewedById], references: [id], onDelete: SetNull)
+  companyId  Int
+  company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@index([companyId])
   @@map("activity_evidences")
 }
 
@@ -1107,6 +1173,10 @@ model VehicleControl {
   solicitante                User          @relation("SolicitanteVehiculo", fields: [solicitanteId], references: [id])
   vehiculo                   VehicleAsset? @relation(fields: [vehicleId], references: [id])
   entregaRevisadoPor         User?         @relation("VehicleDeliveryReviewer", fields: [entregaRevisadoPorId], references: [id])
+  companyId                  Int
+  company                    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
 }
 
 model VehicleAsset {
@@ -1116,6 +1186,7 @@ model VehicleAsset {
   estatus             String           @default("Disponible") @db.VarChar(30)
   activo              Boolean          @default(true)
   notas               String?
+  companyId           Int
   // Checkout / return tracking
   assignedToId        Int?
   assignedAt          DateTime?
@@ -1124,9 +1195,12 @@ model VehicleAsset {
   tiempoUsoMinutos    Int?             // computed on return
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
+  company             CompanyProfile   @relation(fields: [companyId], references: [id], onDelete: Restrict)
   controles           VehicleControl[]
   viaticos            Viatico[]
   assignedTo          User?            @relation("VehicleAssetAssigned", fields: [assignedToId], references: [id])
+
+  @@index([companyId])
 }
 
 model Expense {
@@ -1171,8 +1245,12 @@ model LocationTracking {
   velocidadKmh        Decimal?  @db.Decimal(5, 2)
   estaActivo          Boolean   @default(true)
   ultimaActualizacion DateTime  @default(now())
+  companyId           Int
   actividad           Activity? @relation(fields: [actividadId], references: [id])
   usuario             User      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  company             CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
 }
 
 model Viatico {
@@ -1221,48 +1299,59 @@ enum OrderStatus {
 }
 
 model Attendance {
-  id             Int      @id @default(autoincrement())
+  id             Int            @id @default(autoincrement())
   userId         Int
   type           String // 'entrada' o 'salida'
-  timestamp      DateTime @default(now())
+  timestamp      DateTime       @default(now())
   deviceInfo     String?
   photoUrl       String? // URL de la foto capturada desde la cámara
   entryLatitude  Float? // Ubicación GPS al registrar entrada
   entryLongitude Float? // Ubicación GPS al registrar entrada
   exitLatitude   Float? // Ubicación GPS al registrar salida
   exitLongitude  Float? // Ubicación GPS al registrar salida
-  user           User     @relation(fields: [userId], references: [id])
+  companyId      Int
+  user           User           @relation(fields: [userId], references: [id])
+  company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([userId, timestamp])
 }
 
 model AttendanceDay {
-  id           Int       @id @default(autoincrement())
+  id           Int            @id @default(autoincrement())
   userId       Int
-  date         DateTime  @db.Date
-  totalMinutes Int       @default(0)
+  date         DateTime       @db.Date
+  totalMinutes Int            @default(0)
   lastEntryAt  DateTime?
-  isOpen       Boolean   @default(false)
-  user         User      @relation(fields: [userId], references: [id])
+  isOpen       Boolean        @default(false)
+  companyId    Int
+  user         User           @relation(fields: [userId], references: [id])
+  company      CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
-  @@unique([userId, date])
+  @@unique([companyId, userId, date])
+  @@index([companyId])
 }
 
 model LunchBreak {
-  id               Int       @id @default(autoincrement())
+  id               Int            @id @default(autoincrement())
   userId           Int
-  date             DateTime  @db.Date
+  date             DateTime       @db.Date
   checkinTime      DateTime
   checkoutTime     DateTime?
   checkinPhotoUrl  String // Foto obligatoria al entrar a comida
   checkoutPhotoUrl String? // Foto opcional al volver
-  status           String    @default("IN_PROGRESS") // PENDING, IN_PROGRESS, COMPLETED
-  isCheckinLate    Boolean   @default(false) // Si checkin fue fuera de 15:00-16:00
-  isCheckoutLate   Boolean   @default(false) // Si checkout fue fuera de horario esperado
+  status           String         @default("IN_PROGRESS") // PENDING, IN_PROGRESS, COMPLETED
+  isCheckinLate    Boolean        @default(false) // Si checkin fue fuera de 15:00-16:00
+  isCheckoutLate   Boolean        @default(false) // Si checkout fue fuera de horario esperado
   notes            String? // Comentario si se pasó de hora
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  user             User      @relation(fields: [userId], references: [id])
+  companyId        Int
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  user             User           @relation(fields: [userId], references: [id])
+  company          CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
-  @@unique([userId, date])
+  @@unique([companyId, userId, date])
+  @@index([companyId])
   @@map("lunch_breaks")
 }
 
@@ -1322,22 +1411,29 @@ model ContactMessage {
   status          ContactStatus   @default(NEW)
   responseMessage String?         @db.Text
   respondedAt     DateTime?
+  companyId       Int
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+  companyProfile  CompanyProfile  @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@index([companyId])
   @@map("contact_messages")
 }
 
 model NewsletterSubscriber {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique @db.VarChar(255)
-  name         String?  @db.VarChar(255)
-  source       String?  @db.VarChar(120)
-  pageUrl      String?  @db.VarChar(500)
-  subscribedAt DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id           Int            @id @default(autoincrement())
+  email        String         @db.VarChar(255)
+  name         String?        @db.VarChar(255)
+  source       String?        @db.VarChar(120)
+  pageUrl      String?        @db.VarChar(500)
+  subscribedAt DateTime       @default(now())
+  companyId    Int
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  company      CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, email])
+  @@index([companyId])
   @@map("newsletter_subscribers")
 }
 
@@ -1348,19 +1444,23 @@ enum NewsStatus {
 }
 
 model NewsPost {
-  id            Int        @id @default(autoincrement())
-  title         String     @db.VarChar(220)
-  slug          String     @unique @db.VarChar(220)
-  summary       String?    @db.VarChar(500)
-  content       String     @db.Text
-  coverImageUrl String?    @db.VarChar(500)
-  galleryUrls   String[]   @default([])
-  status        NewsStatus @default(DRAFT)
-  tags          String[]   @default([])
+  id            Int            @id @default(autoincrement())
+  title         String         @db.VarChar(220)
+  slug          String         @db.VarChar(220)
+  summary       String?        @db.VarChar(500)
+  content       String         @db.Text
+  coverImageUrl String?        @db.VarChar(500)
+  galleryUrls   String[]       @default([])
+  status        NewsStatus     @default(DRAFT)
+  tags          String[]       @default([])
   publishedAt   DateTime?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  companyId     Int
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, slug])
+  @@index([companyId, status])
   @@map("news_posts")
 }
 
@@ -1373,20 +1473,23 @@ model NewsPost {
 // y opcionalmente su orden, alt-text accesible y un href cuando se
 // quiera que el slide entero sea clickeable.
 model HeroSlide {
-  id             Int      @id @default(autoincrement())
-  imageUrl       String   @db.VarChar(500)
+  id             Int            @id @default(autoincrement())
+  imageUrl       String         @db.VarChar(500)
   /// Variante móvil del slide (opcional). Si falta, el sitio usa `imageUrl` (desktop).
-  imageUrlMobile String?  @db.VarChar(500)
-  altText        String?  @db.VarChar(200)
-  caption        String?  @db.VarChar(500)
-  href           String?  @db.VarChar(500)
-  position       Int      @default(0)
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  imageUrlMobile String?        @db.VarChar(500)
+  altText        String?        @db.VarChar(200)
+  caption        String?        @db.VarChar(500)
+  href           String?        @db.VarChar(500)
+  position       Int            @default(0)
+  isActive       Boolean        @default(true)
+  companyId      Int
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([position])
   @@index([isActive])
+  @@index([companyId])
   @@map("hero_slides")
 }
 
@@ -1398,48 +1501,78 @@ model HeroSlide {
 // `mediaType` que decide si el hero muestra el carrusel o este video vive
 // en `PageContent` (section = "home_hero"), no aquí.
 model HeroVideo {
-  id             Int      @id @default(autoincrement())
+  id             Int            @id @default(autoincrement())
   /// Video desktop (principal). Lo que ya existía antes de variantes móviles.
-  videoUrl       String   @db.VarChar(500)
+  videoUrl       String         @db.VarChar(500)
   /// Video móvil (opcional). Si falta, el sitio usa `videoUrl`.
-  videoUrlMobile String?  @db.VarChar(500)
-  posterUrl      String?  @db.VarChar(500)
-  title          String?  @db.VarChar(200)
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  videoUrlMobile String?        @db.VarChar(500)
+  posterUrl      String?        @db.VarChar(500)
+  title          String?        @db.VarChar(200)
+  isActive       Boolean        @default(true)
+  companyId      Int
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([isActive])
+  @@index([companyId])
   @@map("hero_video")
 }
 
 model PageContent {
-  id           Int       @id @default(autoincrement())
-  section      String    @unique @db.VarChar(80)
+  id           Int            @id @default(autoincrement())
+  section      String         @db.VarChar(80)
   /// Contenido publicado (sitio público)
   content      Json
   /// Borrador Studio (no afecta sitio hasta publish)
   draftContent Json?
   publishedAt  DateTime?
-  publishedBy  String?   @db.VarChar(255)
-  updatedBy    String?   @db.VarChar(255)
-  updatedAt    DateTime  @updatedAt
-  createdAt    DateTime  @default(now())
+  publishedBy  String?        @db.VarChar(255)
+  updatedBy    String?        @db.VarChar(255)
+  companyId    Int
+  updatedAt    DateTime       @updatedAt
+  createdAt    DateTime       @default(now())
+  company      CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, section])
+  @@index([companyId])
   @@map("page_content")
 }
 
-model FeatureFlag {
-  id          Int      @id @default(autoincrement())
-  key         String   @unique @db.VarChar(120)
-  scope       String   @db.VarChar(60)
-  description String?  @db.VarChar(500)
-  enabled     Boolean  @default(false)
-  metadata    Json?
-  updatedAt   DateTime @updatedAt
-  createdAt   DateTime @default(now())
+/// Snapshot de PageContent tomado justo antes de cada publish — permite
+/// ver el historial de versiones publicadas y revertir a una anterior.
+model PageContentRevision {
+  id          Int            @id @default(autoincrement())
+  section     String         @db.VarChar(80)
+  version     Int
+  content     Json
+  publishedBy String?        @db.VarChar(255)
+  publishedAt DateTime       @default(now())
+  companyId   Int
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, section, version])
+  @@index([section])
+  @@index([companyId])
+  @@map("page_content_revisions")
+}
+
+model FeatureFlag {
+  id          Int             @id @default(autoincrement())
+  key         String          @db.VarChar(120)
+  scope       String          @db.VarChar(60)
+  description String?         @db.VarChar(500)
+  enabled     Boolean         @default(false)
+  metadata    Json?
+  /// Null = flag de plataforma (global). Set = override por tenant.
+  companyId   Int?
+  updatedAt   DateTime        @updatedAt
+  createdAt   DateTime        @default(now())
+  company     CompanyProfile? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([key, companyId])
   @@index([scope])
+  @@index([companyId])
   @@map("feature_flags")
 }
 
@@ -1451,7 +1584,7 @@ enum CotizacionStatus {
 
 model Cotizacion {
   id             Int                     @id @default(autoincrement())
-  quoteNumber    String                  @unique @db.VarChar(40)
+  quoteNumber    String                  @db.VarChar(40)
   issueDate      DateTime
   validUntil     DateTime?
   status         CotizacionStatus        @default(DRAFT)
@@ -1499,6 +1632,7 @@ model Cotizacion {
   @@index([salesClientId])
   @@index([opportunityId])
   @@index([companyId])
+  @@unique([companyId, quoteNumber])
   @@map("cotizaciones")
 }
 
@@ -1726,6 +1860,7 @@ model SalesProject {
   startDate      DateTime?
   endDate        DateTime?
   closureOrderId Int?
+  companyId      Int
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   opportunity    SalesOpportunity   @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
@@ -1733,7 +1868,9 @@ model SalesProject {
   /// Faceta operativa (OPS) del mismo proyecto — 0..1
   operationalProject OperationalProject? @relation("SalesOperationalHandoff")
   viaticos       Viatico[]
+  company        CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@index([companyId])
   @@map("sales_projects")
 }
 
@@ -1748,13 +1885,16 @@ model SalesProjectOrder {
   createdById Int?
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt
+  companyId   Int
   project     SalesProject           @relation("ProjectOrder", fields: [projectId], references: [id], onDelete: Cascade)
   quote       SalesOpportunityQuote? @relation(fields: [quoteId], references: [id])
   template    OrderTemplate?         @relation(fields: [templateId], references: [id], onDelete: SetNull)
   createdBy   User?                  @relation("SalesProjectOrderCreator", fields: [createdById], references: [id])
+  company     CompanyProfile         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   lines       SalesProjectOrderLine[]
   invoices    Invoice[]
 
+  @@index([companyId])
   @@map("sales_project_orders")
 }
 
@@ -1831,11 +1971,15 @@ model OrderTemplate {
   sections        Json?
   customCss       String?             @db.Text
   createdById     Int?
+  companyId       Int
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
   orders          SalesProjectOrder[]
   createdBy       User?               @relation("OrderTemplateCreator", fields: [createdById], references: [id])
+  company         CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@index([companyId])
+  @@index([companyId, isDefault])
   @@map("order_templates")
 }
 
@@ -1963,15 +2107,18 @@ model Notification {
   priority        String?          @default("normal") @db.VarChar(20) // "high", "normal", "low"
   isRead          Boolean          @default(false)
   readAt          DateTime?
+  companyId       Int?
   createdAt       DateTime         @default(now())
 
   // Relaciones
-  user        User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  triggerUser User? @relation("NotificationTriggeredBy", fields: [triggerUserId], references: [id], onDelete: SetNull)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  triggerUser User?            @relation("NotificationTriggeredBy", fields: [triggerUserId], references: [id], onDelete: SetNull)
+  company     CompanyProfile?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   @@index([userId, isRead, createdAt])
   @@index([userId, category])
   @@index([isRead, createdAt])
+  @@index([companyId])
   @@map("notifications")
 }
 
@@ -1990,9 +2137,12 @@ model Fine {
   fechaCreacion DateTime  @default(now())
   fechaPago     DateTime?
   notas         String?
-  usuario       User      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  companyId     Int
+  usuario       User           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([usuarioId, tipo, estatusPago])
+  @@index([companyId])
   @@map("fines")
 }
 
@@ -2061,11 +2211,14 @@ model ToolRequest {
   approver      User?                     @relation("AdminApprovals", fields: [approvedBy], references: [id])
   renewals      ToolRenewal[]             @relation("ToolRequestRenewals")
   notifications ToolRequestNotification[] @relation("ToolRequestNotifications")
+  companyId     Int
+  company       CompanyProfile            @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([usuarioId, status])
   @@index([inventoryItemId])
   @@index([status, requestDate])
   @@index([expectedReturnDate])
+  @@index([companyId])
   @@map("tool_requests")
 }
 
@@ -2073,7 +2226,7 @@ model ToolInventoryItem {
   id                Int                 @id @default(autoincrement())
   toolName          String              @db.VarChar(200)
   model             String              @db.VarChar(200)
-  serialNumber      String              @unique @db.VarChar(200)
+  serialNumber      String              @db.VarChar(200)
   panoramicPhotoUrl String              @db.VarChar(500)
   serialPhotoUrl    String              @db.VarChar(500)
   status            ToolInventoryStatus @default(AVAILABLE)
@@ -2081,6 +2234,7 @@ model ToolInventoryItem {
   updatedById       Int?
   replacementOfId   Int?
   retiredReason     String?             @db.Text
+  companyId         Int
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
@@ -2091,10 +2245,13 @@ model ToolInventoryItem {
   kitAssignments    ToolKitAssignment[] @relation("ToolInventoryAssignments")
   toolRequests      ToolRequest[]       @relation("ToolInventoryToolRequests")
   replacementEvents ToolKitEvent[]      @relation("ToolKitEventReplacementItem")
+  company           CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, serialNumber])
   @@index([status])
   @@index([toolName, model])
   @@index([replacementOfId])
+  @@index([companyId])
   @@map("tool_inventory_items")
 }
 
@@ -2110,16 +2267,19 @@ model ToolKitAssignment {
   isActive         Boolean            @default(true)
   replacementCount Int                @default(0)
   notes            String?            @db.Text
+  companyId        Int
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
   inventoryItem ToolInventoryItem @relation("ToolInventoryAssignments", fields: [inventoryItemId], references: [id], onDelete: Cascade)
   user          User              @relation("ToolKitUserAssignments", fields: [userId], references: [id], onDelete: Cascade)
   assignedBy    User?             @relation("ToolKitAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  company       CompanyProfile    @relation(fields: [companyId], references: [id], onDelete: Restrict)
   events        ToolKitEvent[]    @relation("ToolKitAssignmentEvents")
 
   @@index([userId, isActive])
   @@index([inventoryItemId, isActive])
+  @@index([companyId])
   @@map("tool_kit_assignments")
 }
 
@@ -2147,22 +2307,25 @@ model ToolKitEvent {
 }
 
 model ToolRenewal {
-  id                 Int           @id @default(autoincrement())
+  id                 Int            @id @default(autoincrement())
   toolRequestId      Int
   previousReturnDate DateTime // Fecha de devolución anterior
   newReturnDate      DateTime // Nueva fecha de devolución
-  renewalReason      String?       @db.Text // Razón de la renovación
+  renewalReason      String?        @db.Text // Razón de la renovación
   approvedBy         Int? // Usuario admin que aprobó
-  requestDate        DateTime      @default(now()) // Fecha de solicitud de renovación
+  requestDate        DateTime       @default(now()) // Fecha de solicitud de renovación
   approvalDate       DateTime? // Fecha de aprobación
-  status             RenewalStatus @default(PENDING)
-  createdAt          DateTime      @default(now())
+  status             RenewalStatus  @default(PENDING)
+  companyId          Int
+  createdAt          DateTime       @default(now())
 
-  toolRequest ToolRequest @relation("ToolRequestRenewals", fields: [toolRequestId], references: [id], onDelete: Cascade)
-  approver    User?       @relation("AdminRenewals", fields: [approvedBy], references: [id])
+  toolRequest ToolRequest    @relation("ToolRequestRenewals", fields: [toolRequestId], references: [id], onDelete: Cascade)
+  approver    User?          @relation("AdminRenewals", fields: [approvedBy], references: [id])
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([toolRequestId, status])
   @@index([approvalDate])
+  @@index([companyId])
   @@map("tool_renewals")
 }
 
@@ -2331,7 +2494,7 @@ enum BankReconciliationStatus {
 
 model Account {
   id                 Int                @id @default(autoincrement())
-  code               String             @unique @db.VarChar(30)
+  code               String             @db.VarChar(30)
   name               String             @db.VarChar(200)
   type               AccountType
   parentId           Int?
@@ -2339,16 +2502,23 @@ model Account {
   isActive           Boolean            @default(true)
   currency           String             @default("MXN") @db.VarChar(10)
   balance            Decimal            @default(0) @db.Decimal(16, 2)
+  /// Código de agrupador del catálogo SAT (Contabilidad Electrónica).
+  /// Nullable: requiere mapeo contable explícito por cuenta antes de exportar XML.
+  satAgrupador       String?            @db.VarChar(20)
+  companyId          Int
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   parent             Account?           @relation("AccountHierarchy", fields: [parentId], references: [id])
   children           Account[]          @relation("AccountHierarchy")
+  company            CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
   debitEntries       JournalEntryLine[] @relation("DebitAccount")
   creditEntries      JournalEntryLine[] @relation("CreditAccount")
   costCenterDefaults CostCenter[]       @relation("CostCenterDefaultAccount")
 
+  @@unique([companyId, code])
   @@index([type])
   @@index([parentId])
+  @@index([companyId])
   @@map("accounts")
 }
 
@@ -2360,17 +2530,20 @@ model FiscalPeriod {
   isClosed       Boolean        @default(false)
   closedAt       DateTime?
   closedById     Int?
+  companyId      Int
   createdAt      DateTime       @default(now())
   closedBy       User?          @relation("FiscalPeriodClosedBy", fields: [closedById], references: [id])
+  company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
   journalEntries JournalEntry[]
 
-  @@unique([startDate, endDate])
+  @@unique([companyId, startDate, endDate])
+  @@index([companyId])
   @@map("fiscal_periods")
 }
 
 model JournalEntry {
   id             Int                @id @default(autoincrement())
-  entryNumber    String             @unique @db.VarChar(30)
+  entryNumber    String             @db.VarChar(30)
   date           DateTime           @db.Date
   description    String
   reference      String?            @db.VarChar(100)
@@ -2395,7 +2568,8 @@ model JournalEntry {
   employeePayments EmployeePayment[]
   goodsReceipts  GoodsReceipt[]
 
-  @@unique([reference])
+  @@unique([companyId, entryNumber])
+  @@unique([companyId, reference])
   @@index([date])
   @@index([status])
   @@index([companyId])
@@ -2423,23 +2597,27 @@ model JournalEntryLine {
 
 model CostCenter {
   id               Int                @id @default(autoincrement())
-  code             String             @unique @db.VarChar(30)
+  code             String             @db.VarChar(30)
   name             String             @db.VarChar(200)
   departmentId     Int?
   defaultAccountId Int?
+  companyId        Int
   isActive         Boolean            @default(true)
   createdAt        DateTime           @default(now())
   department       Department?        @relation(fields: [departmentId], references: [id])
   defaultAccount   Account?           @relation("CostCenterDefaultAccount", fields: [defaultAccountId], references: [id])
+  company          CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
   journalLines     JournalEntryLine[]
   budgets          Budget[]
 
+  @@unique([companyId, code])
+  @@index([companyId])
   @@map("cost_centers")
 }
 
 model Invoice {
   id               Int               @id @default(autoincrement())
-  invoiceNumber    String            @unique @db.VarChar(40)
+  invoiceNumber    String            @db.VarChar(40)
   type             InvoiceType
   status           InvoiceStatus     @default(DRAFT)
   issueDate        DateTime          @db.Date
@@ -2505,6 +2683,7 @@ model Invoice {
   @@index([type, status])
   @@index([dueDate])
   @@unique([cfdiUuid])
+  @@unique([companyId, invoiceNumber])
   @@index([emisorRfc])
   @@index([receptorRfc])
   @@index([companyId])
@@ -2567,14 +2746,17 @@ model Payment {
   cfdiPaymentUuid String?         @db.VarChar(80) // UUID del complemento de pago
   // ── end MX ──
   createdById     Int?
+  companyId       Int
   createdAt       DateTime        @default(now())
   invoice         Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   bankAccount     BankAccount?    @relation(fields: [bankAccountId], references: [id])
   createdBy       User?           @relation("PaymentCreator", fields: [createdById], references: [id])
+  company         CompanyProfile  @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([cfdiPaymentUuid])
-  @@unique([speiTrackingKey])
+  @@unique([companyId, speiTrackingKey])
   @@index([invoiceId])
+  @@index([companyId])
   @@map("payments")
 }
 
@@ -2595,13 +2777,16 @@ model BankAccount {
   lastSyncAt      DateTime?
   speiEnabled     Boolean              @default(true)
   cepUrl          String?              @db.VarChar(500) // URL para Comprobante Electrónico de Pago
+  companyId       Int
   // ── end banking ──
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
+  company         CompanyProfile       @relation(fields: [companyId], references: [id], onDelete: Restrict)
   payments        Payment[]
   reconciliations BankReconciliation[]
   transactions    BankTransaction[]
 
+  @@index([companyId])
   @@map("bank_accounts")
 }
 
@@ -2624,11 +2809,14 @@ model BankTransaction {
   beneficiaryRef    String?             @db.VarChar(7) // Referencia numérica Banorte
   // ── end SPEI ──
   importedAt        DateTime            @default(now())
+  companyId         Int
   bankAccount       BankAccount         @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
   reconciliation    BankReconciliation?
+  company           CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([bankAccountId, transactionDate])
-  @@unique([speiTrackingKey])
+  @@index([companyId])
+  @@unique([bankAccountId, speiTrackingKey])
   @@map("bank_transactions")
 }
 
@@ -2642,28 +2830,34 @@ model BankReconciliation {
   reconciledAt      DateTime?
   reconciledById    Int?
   createdAt         DateTime                 @default(now())
+  companyId         Int
   bankAccount       BankAccount              @relation(fields: [bankAccountId], references: [id])
   bankTransaction   BankTransaction          @relation(fields: [bankTransactionId], references: [id])
   reconciledBy      User?                    @relation("ReconciliationUser", fields: [reconciledById], references: [id])
+  company           CompanyProfile           @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([bankAccountId, status])
+  @@index([companyId])
   @@map("bank_reconciliations")
 }
 
 model Budget {
-  id            Int        @id @default(autoincrement())
-  name          String     @db.VarChar(200)
+  id            Int            @id @default(autoincrement())
+  name          String         @db.VarChar(200)
   costCenterId  Int
   year          Int
   month         Int?
-  plannedAmount Decimal    @db.Decimal(14, 2)
-  actualAmount  Decimal    @default(0) @db.Decimal(14, 2)
+  plannedAmount Decimal        @db.Decimal(14, 2)
+  actualAmount  Decimal        @default(0) @db.Decimal(14, 2)
   notes         String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  costCenter    CostCenter @relation(fields: [costCenterId], references: [id])
+  companyId     Int
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  costCenter    CostCenter     @relation(fields: [costCenterId], references: [id])
+  company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
-  @@unique([costCenterId, year, month])
+  @@unique([companyId, costCenterId, year, month])
+  @@index([companyId])
   @@map("budgets")
 }
 
@@ -2690,7 +2884,7 @@ enum ValuationMethod {
 
 model Warehouse {
   id            Int                 @id @default(autoincrement())
-  code          String              @unique @db.VarChar(20)
+  code          String              @db.VarChar(20)
   name          String              @db.VarChar(200)
   address       String?
   city          String?             @db.VarChar(120)
@@ -2705,9 +2899,12 @@ model Warehouse {
   movementsFrom StockMovement[]     @relation("MovementFromWarehouse")
   movementsTo   StockMovement[]     @relation("MovementToWarehouse")
   goodsReceipts GoodsReceipt[]
+  cycleCounts   CycleCount[]
+  stockReservations StockReservation[]
   companyId     Int
   company       CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, code])
   @@index([companyId])
   @@map("warehouses")
 }
@@ -2722,10 +2919,13 @@ model WarehouseLocation {
   shelf       String?      @db.VarChar(20)
   bin         String?      @db.VarChar(20)
   createdAt   DateTime     @default(now())
+  companyId   Int
   warehouse   Warehouse    @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
   stockLevels StockLevel[]
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([warehouseId, code])
+  @@index([companyId])
   @@map("warehouse_locations")
 }
 
@@ -2743,19 +2943,22 @@ model StockLevel {
   valuationMethod ValuationMethod    @default(WEIGHTED_AVERAGE)
   lastCountDate   DateTime?
   updatedAt       DateTime           @updatedAt
+  companyId       Int
   product         Product            @relation(fields: [productId], references: [id])
   warehouse       Warehouse          @relation(fields: [warehouseId], references: [id])
   location        WarehouseLocation? @relation(fields: [locationId], references: [id])
   lotStocks       LotStock[]
+  company         CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([productId, warehouseId, locationId])
   @@index([warehouseId])
+  @@index([companyId])
   @@map("stock_levels")
 }
 
 model StockMovement {
   id                Int               @id @default(autoincrement())
-  movementNumber    String            @unique @db.VarChar(30)
+  movementNumber    String            @db.VarChar(30)
   type              StockMovementType
   productId         Int
   fromWarehouseId   Int?
@@ -2769,6 +2972,7 @@ model StockMovement {
   purchaseOrderId   Int?
   productionOrderId Int?
   createdById       Int?
+  companyId         Int
   createdAt         DateTime          @default(now())
   product           Product           @relation(fields: [productId], references: [id])
   fromWarehouse     Warehouse?        @relation("MovementFromWarehouse", fields: [fromWarehouseId], references: [id])
@@ -2777,28 +2981,35 @@ model StockMovement {
   purchaseOrder     PurchaseOrder?    @relation(fields: [purchaseOrderId], references: [id])
   productionOrder   ProductionOrder?  @relation(fields: [productionOrderId], references: [id])
   createdBy         User?             @relation("StockMovementCreator", fields: [createdById], references: [id])
+  company           CompanyProfile    @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, movementNumber])
   @@index([productId, type])
   @@index([createdAt])
+  @@index([companyId])
   @@map("stock_movements")
 }
 
 model Lot {
   id                 Int                 @id @default(autoincrement())
-  lotNumber          String              @unique @db.VarChar(60)
+  lotNumber          String              @db.VarChar(60)
   productId          Int
   expirationDate     DateTime?
   manufacturingDate  DateTime?
   supplierId         Int?
   notes              String?
+  companyId          Int
   createdAt          DateTime            @default(now())
   product            Product             @relation(fields: [productId], references: [id])
   supplier           Supplier?           @relation("LotSupplier", fields: [supplierId], references: [id])
+  company            CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
   movements          StockMovement[]
   lotStocks          LotStock[]
   qualityInspections QualityInspection[]
 
+  @@unique([companyId, lotNumber])
   @@index([productId])
+  @@index([companyId])
   @@map("lots")
 }
 
@@ -2812,6 +3023,93 @@ model LotStock {
 
   @@unique([lotId, stockLevelId])
   @@map("lot_stocks")
+}
+
+enum CycleCountStatus {
+  SCHEDULED
+  IN_PROGRESS
+  CLOSED
+  CANCELLED
+}
+
+/// Conteo físico programado de un subconjunto de SKUs en un almacén.
+/// Al cerrar, la varianza por producto genera un StockMovement ADJUSTMENT
+/// (reutiliza la misma ruta de ajuste de stock que ya existe, no duplica lógica de WAC).
+model CycleCount {
+  id           Int              @id @default(autoincrement())
+  countNumber  String           @db.VarChar(30)
+  warehouseId  Int
+  status       CycleCountStatus @default(SCHEDULED)
+  scheduledFor DateTime         @db.Date
+  closedAt     DateTime?
+  notes        String?
+  companyId    Int
+  createdById  Int?
+  closedById   Int?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  warehouse    Warehouse        @relation(fields: [warehouseId], references: [id])
+  company      CompanyProfile   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdBy    User?            @relation("CycleCountCreator", fields: [createdById], references: [id])
+  closedBy     User?            @relation("CycleCountCloser", fields: [closedById], references: [id])
+  items        CycleCountItem[]
+
+  @@index([warehouseId])
+  @@index([companyId])
+  @@index([status])
+  @@unique([companyId, countNumber])
+  @@map("cycle_counts")
+}
+
+model CycleCountItem {
+  id           Int        @id @default(autoincrement())
+  cycleCountId Int
+  productId    Int
+  expectedQty  Decimal    @db.Decimal(14, 4)
+  countedQty   Decimal?   @db.Decimal(14, 4)
+  varianceQty  Decimal?   @db.Decimal(14, 4)
+  countedAt    DateTime?
+  notes        String?
+  cycleCount   CycleCount @relation(fields: [cycleCountId], references: [id], onDelete: Cascade)
+  product      Product    @relation(fields: [productId], references: [id])
+
+  @@unique([cycleCountId, productId])
+  @@index([cycleCountId])
+  @@map("cycle_count_items")
+}
+
+enum StockReservationStatus {
+  ACTIVE
+  RELEASED
+  CONSUMED
+}
+
+/// Reserva "soft" de stock: reduce lo disponible (quantity - reservedQty en
+/// StockLevel) sin mover físico. El agregado de reservas activas de un
+/// producto/almacén se refleja en StockLevel.reservedQty.
+model StockReservation {
+  id            Int                     @id @default(autoincrement())
+  productId     Int
+  warehouseId   Int
+  quantity      Decimal                 @db.Decimal(14, 4)
+  status        StockReservationStatus  @default(ACTIVE)
+  reason        String                  @db.VarChar(200)
+  referenceType String?                 @db.VarChar(60)
+  referenceId   Int?
+  expiresAt     DateTime?
+  releasedAt    DateTime?
+  companyId     Int
+  createdById   Int?
+  createdAt     DateTime                @default(now())
+  product       Product                 @relation(fields: [productId], references: [id])
+  warehouse     Warehouse               @relation(fields: [warehouseId], references: [id])
+  company       CompanyProfile          @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdBy     User?                   @relation("StockReservationCreator", fields: [createdById], references: [id])
+
+  @@index([productId, warehouseId])
+  @@index([companyId])
+  @@index([status])
+  @@map("stock_reservations")
 }
 
 // ============================================================================
@@ -2839,7 +3137,7 @@ enum PurchaseOrderStatus {
 
 model PurchaseRequisition {
   id              Int                       @id @default(autoincrement())
-  reqNumber       String                    @unique @db.VarChar(30)
+  reqNumber       String                    @db.VarChar(30)
   title           String                    @db.VarChar(200)
   description     String?
   status          PurchaseRequisitionStatus @default(DRAFT)
@@ -2850,15 +3148,20 @@ model PurchaseRequisition {
   approvedById    Int?
   approvedAt      DateTime?
   rejectionReason String?
+  companyId       Int
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
   department      Department?               @relation(fields: [departmentId], references: [id])
   requestedBy     User                      @relation("RequisitionRequester", fields: [requestedById], references: [id])
   approvedBy      User?                     @relation("RequisitionApprover", fields: [approvedById], references: [id])
+  company         CompanyProfile            @relation(fields: [companyId], references: [id], onDelete: Restrict)
   items           PurchaseRequisitionItem[]
   purchaseOrders  PurchaseOrder[]
+  rfqs            PurchaseRFQ[]
 
+  @@unique([companyId, reqNumber])
   @@index([status])
+  @@index([companyId])
   @@map("purchase_requisitions")
 }
 
@@ -2878,7 +3181,7 @@ model PurchaseRequisitionItem {
 
 model PurchaseOrder {
   id              Int                  @id @default(autoincrement())
-  poNumber        String               @unique @db.VarChar(30)
+  poNumber        String               @db.VarChar(30)
   status          PurchaseOrderStatus  @default(DRAFT)
   supplierId      Int
   requisitionId   Int?
@@ -2907,9 +3210,11 @@ model PurchaseOrder {
   receipts        GoodsReceipt[]
   stockMovements  StockMovement[]
   invoices        Invoice[]
+  awardedRfq      PurchaseRFQ?
 
   @@index([supplierId, status])
   @@index([companyId])
+  @@unique([companyId, poNumber])
   @@map("purchase_orders")
 }
 
@@ -2933,23 +3238,32 @@ model PurchaseOrderItem {
 
 model GoodsReceipt {
   id              Int                @id @default(autoincrement())
-  receiptNumber   String             @unique @db.VarChar(30)
+  receiptNumber   String             @db.VarChar(30)
   purchaseOrderId Int
   warehouseId     Int?
   receiptDate     DateTime           @db.Date
   notes           String?
   receivedById    Int?
   journalEntryId  Int?
+  /// Landed cost: cargos adicionales prorrateados sobre el costo unitario recibido.
+  freightCost     Decimal            @default(0) @db.Decimal(14, 2)
+  insuranceCost   Decimal            @default(0) @db.Decimal(14, 2)
+  customsCost     Decimal            @default(0) @db.Decimal(14, 2)
+  otherLandedCost Decimal            @default(0) @db.Decimal(14, 2)
+  companyId       Int
   createdAt       DateTime           @default(now())
   purchaseOrder   PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id])
   warehouse       Warehouse?         @relation(fields: [warehouseId], references: [id])
   receivedBy      User?              @relation("GoodsReceiptReceiver", fields: [receivedById], references: [id])
   journalEntry    JournalEntry?      @relation(fields: [journalEntryId], references: [id])
+  company         CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
   items           GoodsReceiptItem[]
   invoices        Invoice[]
 
+  @@unique([companyId, receiptNumber])
   @@index([purchaseOrderId])
   @@index([warehouseId])
+  @@index([companyId])
   @@map("goods_receipts")
 }
 
@@ -2961,6 +3275,8 @@ model GoodsReceiptItem {
   quantityRejected    Decimal           @default(0) @db.Decimal(14, 4)
   lotNumber           String?           @db.VarChar(60)
   notes               String?
+  /// Porción del landed cost de la recepción prorrateada a esta línea (por valor).
+  landedCostAllocated Decimal           @default(0) @db.Decimal(14, 4)
   goodsReceipt        GoodsReceipt      @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
   purchaseOrderItem   PurchaseOrderItem @relation(fields: [purchaseOrderItemId], references: [id])
   invoiceItems        InvoiceItem[]
@@ -2969,22 +3285,79 @@ model GoodsReceiptItem {
 }
 
 model SupplierEvaluation {
-  id             Int      @id @default(autoincrement())
+  id             Int            @id @default(autoincrement())
   supplierId     Int
-  evaluationDate DateTime @db.Date
-  qualityScore   Int      @default(0)
-  deliveryScore  Int      @default(0)
-  priceScore     Int      @default(0)
-  serviceScore   Int      @default(0)
-  overallScore   Decimal  @default(0) @db.Decimal(5, 2)
+  evaluationDate DateTime       @db.Date
+  qualityScore   Int            @default(0)
+  deliveryScore  Int            @default(0)
+  priceScore     Int            @default(0)
+  serviceScore   Int            @default(0)
+  overallScore   Decimal        @default(0) @db.Decimal(5, 2)
   notes          String?
   evaluatedById  Int?
-  createdAt      DateTime @default(now())
-  supplier       Supplier @relation("SupplierEvaluations", fields: [supplierId], references: [id])
-  evaluatedBy    User?    @relation("SupplierEvaluator", fields: [evaluatedById], references: [id])
+  companyId      Int
+  createdAt      DateTime       @default(now())
+  supplier       Supplier       @relation("SupplierEvaluations", fields: [supplierId], references: [id])
+  evaluatedBy    User?          @relation("SupplierEvaluator", fields: [evaluatedById], references: [id])
+  company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([supplierId])
+  @@index([companyId])
   @@map("supplier_evaluations")
+}
+
+enum PurchaseRFQStatus {
+  DRAFT
+  SENT
+  QUOTED
+  AWARDED
+  CANCELLED
+}
+
+/// Solicitud de cotización a N proveedores para una requisición. Adjudicar
+/// genera la PurchaseOrder existente (no duplica el flujo OC→GR→stock→AP).
+model PurchaseRFQ {
+  id                     Int                 @id @default(autoincrement())
+  rfqNumber              String              @db.VarChar(30)
+  requisitionId          Int
+  status                 PurchaseRFQStatus   @default(DRAFT)
+  dueDate                DateTime?           @db.Date
+  notes                  String?
+  companyId              Int
+  createdById            Int?
+  awardedPurchaseOrderId Int?                @unique
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  requisition            PurchaseRequisition @relation(fields: [requisitionId], references: [id])
+  company                CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdBy              User?               @relation("PurchaseRFQCreator", fields: [createdById], references: [id])
+  awardedPurchaseOrder   PurchaseOrder?      @relation(fields: [awardedPurchaseOrderId], references: [id])
+  lines                  PurchaseRFQLine[]
+
+  @@index([requisitionId])
+  @@index([companyId])
+  @@unique([companyId, rfqNumber])
+  @@map("purchase_rfqs")
+}
+
+model PurchaseRFQLine {
+  id           Int         @id @default(autoincrement())
+  rfqId        Int
+  supplierId   Int
+  productId    Int?
+  description  String      @db.VarChar(300)
+  quantity     Decimal     @db.Decimal(14, 4)
+  unitPrice    Decimal?    @db.Decimal(14, 2)
+  leadTimeDays Int?
+  notes        String?
+  quotedAt     DateTime?
+  rfq          PurchaseRFQ @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  supplier     Supplier    @relation("SupplierRFQLines", fields: [supplierId], references: [id])
+  product      Product?    @relation(fields: [productId], references: [id])
+
+  @@index([rfqId])
+  @@index([supplierId])
+  @@map("purchase_rfq_lines")
 }
 
 // ============================================================================
@@ -3016,15 +3389,18 @@ model BillOfMaterials {
   isActive         Boolean             @default(true)
   approvedById     Int?
   approvedAt       DateTime?
+  companyId        Int
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   product          Product             @relation("ProductBOM", fields: [productId], references: [id])
   approvedBy       User?               @relation("BOMApprover", fields: [approvedById], references: [id])
+  company          CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
   components       BOMComponent[]
   routings         ProductionRouting[]
   productionOrders ProductionOrder[]
 
-  @@unique([productId, version])
+  @@unique([companyId, productId, version])
+  @@index([companyId])
   @@map("bills_of_materials")
 }
 
@@ -3046,17 +3422,21 @@ model BOMComponent {
 
 model WorkCenter {
   id              Int                 @id @default(autoincrement())
-  code            String              @unique @db.VarChar(20)
+  code            String              @db.VarChar(20)
   name            String              @db.VarChar(200)
   description     String?
   costPerHour     Decimal             @default(0) @db.Decimal(12, 2)
   capacityPerHour Decimal             @default(1) @db.Decimal(10, 2)
   isActive        Boolean             @default(true)
+  companyId       Int
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
+  company         CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
   routings        ProductionRouting[]
   productionLogs  ProductionLog[]
 
+  @@unique([companyId, code])
+  @@index([companyId])
   @@map("work_centers")
 }
 
@@ -3079,7 +3459,7 @@ model ProductionRouting {
 
 model ProductionOrder {
   id               Int                   @id @default(autoincrement())
-  orderNumber      String                @unique @db.VarChar(30)
+  orderNumber      String                @db.VarChar(30)
   bomId            Int
   productId        Int
   status           ProductionOrderStatus @default(PLANNED)
@@ -3095,16 +3475,20 @@ model ProductionOrder {
   priority         String                @default("NORMAL") @db.VarChar(20)
   notes            String?
   createdById      Int?
+  companyId        Int
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
   deletedAt        DateTime?
   bom              BillOfMaterials       @relation(fields: [bomId], references: [id])
   product          Product               @relation(fields: [productId], references: [id])
   createdBy        User?                 @relation("ProductionOrderCreator", fields: [createdById], references: [id])
+  company          CompanyProfile        @relation(fields: [companyId], references: [id], onDelete: Restrict)
   logs             ProductionLog[]
   stockMovements   StockMovement[]
 
+  @@unique([companyId, orderNumber])
   @@index([status])
+  @@index([companyId])
   @@map("production_orders")
 }
 
@@ -3164,7 +3548,7 @@ enum NCRSeverity {
 
 model QualityInspection {
   id                Int                      @id @default(autoincrement())
-  inspectionNumber  String                   @unique @db.VarChar(30)
+  inspectionNumber  String                   @db.VarChar(30)
   type              QualityInspectionType
   result            QualityInspectionResult?
   productId         Int?
@@ -3178,16 +3562,20 @@ model QualityInspection {
   inspectorId       Int?
   notes             String?
   reportUrl         String?                  @db.VarChar(500)
+  companyId         Int
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
   deletedAt         DateTime?
   product           Product?                 @relation(fields: [productId], references: [id])
   lot               Lot?                     @relation(fields: [lotId], references: [id])
   inspector         User?                    @relation("QualityInspector", fields: [inspectorId], references: [id])
+  company           CompanyProfile           @relation(fields: [companyId], references: [id], onDelete: Restrict)
   checklistItems    QualityChecklistItem[]
   ncrs              NonConformanceReport[]
 
+  @@unique([companyId, inspectionNumber])
   @@index([type, result])
+  @@index([companyId])
   @@map("quality_inspections")
 }
 
@@ -3207,7 +3595,7 @@ model QualityChecklistItem {
 
 model NonConformanceReport {
   id               Int                @id @default(autoincrement())
-  ncrNumber        String             @unique @db.VarChar(30)
+  ncrNumber        String             @db.VarChar(30)
   status           NCRStatus          @default(OPEN)
   severity         NCRSeverity        @default(MINOR)
   title            String             @db.VarChar(300)
@@ -3221,6 +3609,7 @@ model NonConformanceReport {
   assignedToId     Int?
   resolvedAt       DateTime?
   closedAt         DateTime?
+  companyId        Int
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   deletedAt        DateTime?
@@ -3228,8 +3617,11 @@ model NonConformanceReport {
   product          Product?           @relation(fields: [productId], references: [id])
   reportedBy       User               @relation("NCRReportedBy", fields: [reportedById], references: [id])
   assignedTo       User?              @relation("NCRAssignedTo", fields: [assignedToId], references: [id])
+  company          CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, ncrNumber])
   @@index([status, severity])
+  @@index([companyId])
   @@map("non_conformance_reports")
 }
 
@@ -3260,7 +3652,7 @@ enum AssetStatus {
 
 model Asset {
   id                   Int                   @id @default(autoincrement())
-  code                 String                @unique @db.VarChar(30)
+  code                 String                @db.VarChar(30)
   name                 String                @db.VarChar(200)
   description          String?
   category             String?               @db.VarChar(100)
@@ -3276,16 +3668,20 @@ model Asset {
   imageUrl             String?               @db.VarChar(500)
   responsibleId        Int?
   parentAssetId        Int?
+  companyId            Int
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   deletedAt            DateTime?
   responsible          User?                 @relation("AssetResponsible", fields: [responsibleId], references: [id])
   parentAsset          Asset?                @relation("AssetHierarchy", fields: [parentAssetId], references: [id])
   childAssets          Asset[]               @relation("AssetHierarchy")
+  company              CompanyProfile        @relation(fields: [companyId], references: [id], onDelete: Restrict)
   maintenanceOrders    MaintenanceOrder[]
   maintenanceSchedules MaintenanceSchedule[]
 
+  @@unique([companyId, code])
   @@index([status])
+  @@index([companyId])
   @@map("assets")
 }
 
@@ -3299,18 +3695,21 @@ model MaintenanceSchedule {
   lastExecutedAt    DateTime?
   nextDueDate       DateTime           @db.Date
   isActive          Boolean            @default(true)
+  companyId         Int
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   asset             Asset              @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  company           CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
   maintenanceOrders MaintenanceOrder[]
 
   @@index([nextDueDate])
+  @@index([companyId])
   @@map("maintenance_schedules")
 }
 
 model MaintenanceOrder {
   id              Int                    @id @default(autoincrement())
-  orderNumber     String                 @unique @db.VarChar(30)
+  orderNumber     String                 @db.VarChar(30)
   assetId         Int
   scheduleId      Int?
   type            MaintenanceType
@@ -3328,6 +3727,7 @@ model MaintenanceOrder {
   totalCost       Decimal                @default(0) @db.Decimal(12, 2)
   assignedToId    Int?
   createdById     Int?
+  companyId       Int
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
   deletedAt       DateTime?
@@ -3335,9 +3735,12 @@ model MaintenanceOrder {
   schedule        MaintenanceSchedule?   @relation(fields: [scheduleId], references: [id])
   assignedTo      User?                  @relation("MaintenanceAssignee", fields: [assignedToId], references: [id])
   createdBy       User?                  @relation("MaintenanceCreator", fields: [createdById], references: [id])
+  company         CompanyProfile         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   parts           MaintenanceOrderPart[]
 
   @@index([assetId, status])
+  @@index([companyId])
+  @@unique([companyId, orderNumber])
   @@map("maintenance_orders")
 }
 
@@ -3393,7 +3796,7 @@ enum WorkPermitStatus {
 
 model SafetyIncident {
   id               Int              @id @default(autoincrement())
-  incidentNumber   String           @unique @db.VarChar(30)
+  incidentNumber   String           @db.VarChar(30)
   title            String           @db.VarChar(300)
   description      String
   severity         IncidentSeverity
@@ -3405,18 +3808,22 @@ model SafetyIncident {
   reportedById     Int
   assignedToId     Int?
   resolvedAt       DateTime?
+  companyId        Int
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   reportedBy       User             @relation("IncidentReporter", fields: [reportedById], references: [id])
   assignedTo       User?            @relation("IncidentAssignee", fields: [assignedToId], references: [id])
+  company          CompanyProfile   @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, incidentNumber])
   @@index([severity, status])
+  @@index([companyId])
   @@map("safety_incidents")
 }
 
 model WorkPermit {
   id            Int              @id @default(autoincrement())
-  permitNumber  String           @unique @db.VarChar(30)
+  permitNumber  String           @db.VarChar(30)
   type          WorkPermitType
   status        WorkPermitStatus @default(REQUESTED)
   title         String           @db.VarChar(200)
@@ -3427,30 +3834,37 @@ model WorkPermit {
   requestedById Int
   approvedById  Int?
   approvedAt    DateTime?
+  companyId     Int
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   requestedBy   User             @relation("PermitRequester", fields: [requestedById], references: [id])
   approvedBy    User?            @relation("PermitApprover", fields: [approvedById], references: [id])
+  company       CompanyProfile   @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, permitNumber])
   @@index([type, status])
+  @@index([companyId])
   @@map("work_permits")
 }
 
 model TrainingRecord {
-  id             Int       @id @default(autoincrement())
+  id             Int            @id @default(autoincrement())
   userId         Int
-  courseName     String    @db.VarChar(200)
+  courseName     String         @db.VarChar(200)
   description    String?
-  provider       String?   @db.VarChar(200)
-  completedDate  DateTime  @db.Date
-  expirationDate DateTime? @db.Date
-  certificateUrl String?   @db.VarChar(500)
-  score          Decimal?  @db.Decimal(5, 2)
-  status         String    @default("VALID") @db.VarChar(30)
-  createdAt      DateTime  @default(now())
-  user           User      @relation("UserTraining", fields: [userId], references: [id])
+  provider       String?        @db.VarChar(200)
+  completedDate  DateTime       @db.Date
+  expirationDate DateTime?      @db.Date
+  certificateUrl String?        @db.VarChar(500)
+  score          Decimal?       @db.Decimal(5, 2)
+  status         String         @default("VALID") @db.VarChar(30)
+  companyId      Int
+  createdAt      DateTime       @default(now())
+  user           User           @relation("UserTraining", fields: [userId], references: [id])
+  company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([userId, expirationDate])
+  @@index([companyId])
   @@map("training_records")
 }
 
@@ -3468,20 +3882,24 @@ enum DocumentStatus {
 
 model DocumentCategory {
   id          Int                @id @default(autoincrement())
-  name        String             @unique @db.VarChar(100)
+  name        String             @db.VarChar(100)
   description String?
   parentId    Int?
+  companyId   Int
   createdAt   DateTime           @default(now())
   parent      DocumentCategory?  @relation("DocCategoryHierarchy", fields: [parentId], references: [id])
   children    DocumentCategory[] @relation("DocCategoryHierarchy")
   documents   ManagedDocument[]
+  company     CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, name])
+  @@index([companyId])
   @@map("document_categories")
 }
 
 model ManagedDocument {
   id             Int               @id @default(autoincrement())
-  documentNumber String            @unique @db.VarChar(40)
+  documentNumber String            @db.VarChar(40)
   title          String            @db.VarChar(300)
   description    String?
   categoryId     Int?
@@ -3495,15 +3913,19 @@ model ManagedDocument {
   createdById    Int
   approvedById   Int?
   approvedAt     DateTime?
+  companyId      Int
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   category       DocumentCategory? @relation(fields: [categoryId], references: [id])
   createdBy      User              @relation("DocumentCreator", fields: [createdById], references: [id])
   approvedBy     User?             @relation("DocumentApprover", fields: [approvedById], references: [id])
+  company        CompanyProfile    @relation(fields: [companyId], references: [id], onDelete: Restrict)
   versions       DocumentVersion[]
   chatChannel    ChatChannel?
 
+  @@unique([companyId, documentNumber])
   @@index([status])
+  @@index([companyId])
   @@map("managed_documents")
 }
 
@@ -3540,15 +3962,20 @@ enum ApprovalStatus {
 
 model WorkflowDefinition {
   id          Int                @id @default(autoincrement())
-  name        String             @unique @db.VarChar(200)
+  name        String             @db.VarChar(200)
   description String?
   entityType  String             @db.VarChar(100)
   status      WorkflowStatus     @default(ACTIVE)
+  companyId   Int
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
   steps       WorkflowStep[]
   instances   WorkflowInstance[]
+  company     CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@index([companyId, entityType, status])
   @@map("workflow_definitions")
 }
 
@@ -3581,13 +4008,16 @@ model WorkflowInstance {
   isComplete  Boolean            @default(false)
   isCancelled Boolean            @default(false)
   startedById Int
+  companyId   Int
   startedAt   DateTime           @default(now())
   completedAt DateTime?
   workflow    WorkflowDefinition @relation(fields: [workflowId], references: [id])
   startedBy   User               @relation("WorkflowStarter", fields: [startedById], references: [id])
+  company     CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
   approvals   WorkflowApproval[]
 
   @@index([entityType, entityId])
+  @@index([companyId])
   @@map("workflow_instances")
 }
 
@@ -3641,18 +4071,22 @@ model AuditLog {
 // ============================================================================
 
 model KpiSnapshot {
-  id          Int      @id @default(autoincrement())
-  kpiName     String   @db.VarChar(100)
-  kpiCategory String   @db.VarChar(60)
-  value       Decimal  @db.Decimal(16, 4)
-  unit        String?  @db.VarChar(30)
-  periodStart DateTime @db.Date
-  periodEnd   DateTime @db.Date
+  id          Int             @id @default(autoincrement())
+  kpiName     String          @db.VarChar(100)
+  kpiCategory String          @db.VarChar(60)
+  value       Decimal         @db.Decimal(16, 4)
+  unit        String?         @db.VarChar(30)
+  periodStart DateTime        @db.Date
+  periodEnd   DateTime        @db.Date
   metadata    Json?
-  createdAt   DateTime @default(now())
+  /// Null only for PUBLIC_TRAFFIC (landing anónima). KPIs de producto exigen companyId.
+  companyId   Int?
+  createdAt   DateTime        @default(now())
+  company     CompanyProfile? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([kpiName, periodStart])
   @@index([kpiCategory])
+  @@index([companyId])
   @@map("kpi_snapshots")
 }
 
@@ -3661,15 +4095,20 @@ model KpiSnapshot {
 // ============================================================================
 
 model SystemSetting {
-  id        Int      @id @default(autoincrement())
-  key       String   @unique @db.VarChar(120)
-  value     String   @db.Text
-  category  String   @db.VarChar(60)
-  label     String?  @db.VarChar(200)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        Int             @id @default(autoincrement())
+  key       String          @db.VarChar(120)
+  value     String          @db.Text
+  category  String          @db.VarChar(60)
+  label     String?         @db.VarChar(200)
+  /// Null = setting de plataforma. Set = override por tenant.
+  companyId Int?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  company   CompanyProfile? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
+  @@unique([key, companyId])
   @@index([category])
+  @@index([companyId])
   @@map("system_settings")
 }
 
@@ -3724,26 +4163,29 @@ enum LeaveStatus {
 }
 
 model LeaveRequest {
-  id              Int         @id @default(autoincrement())
+  id              Int             @id @default(autoincrement())
   userId          Int
   type            LeaveType
-  status          LeaveStatus @default(PENDING)
-  startDate       DateTime    @db.Date
-  endDate         DateTime    @db.Date
+  status          LeaveStatus     @default(PENDING)
+  startDate       DateTime        @db.Date
+  endDate         DateTime        @db.Date
   days            Float
-  reason          String?     @db.Text
+  reason          String?         @db.Text
   approvedById    Int?
   approvedAt      DateTime?
-  rejectionReason String?     @db.VarChar(500)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  rejectionReason String?         @db.VarChar(500)
+  companyId       Int
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
-  user       User  @relation("LeaveRequester", fields: [userId], references: [id])
-  approvedBy User? @relation("LeaveApprover", fields: [approvedById], references: [id])
+  user       User           @relation("LeaveRequester", fields: [userId], references: [id])
+  approvedBy User?          @relation("LeaveApprover", fields: [approvedById], references: [id])
+  company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([userId])
   @@index([status])
   @@index([startDate, endDate])
+  @@index([companyId])
   @@map("leave_requests")
 }
 
@@ -3761,26 +4203,29 @@ enum ReviewStatus {
 }
 
 model PerformanceReview {
-  id                 Int          @id @default(autoincrement())
+  id                 Int            @id @default(autoincrement())
   userId             Int
   reviewerId         Int
   period             ReviewPeriod
-  reviewDate         DateTime     @db.Date
+  reviewDate         DateTime       @db.Date
   overallRating      Float
-  strengths          String?      @db.Text
-  areasOfImprovement String?      @db.Text
-  goals              String?      @db.Text
-  status             ReviewStatus @default(DRAFT)
-  comments           String?      @db.Text
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  strengths          String?        @db.Text
+  areasOfImprovement String?        @db.Text
+  goals              String?        @db.Text
+  status             ReviewStatus   @default(DRAFT)
+  comments           String?        @db.Text
+  companyId          Int
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
-  user     User @relation("ReviewedUser", fields: [userId], references: [id])
-  reviewer User @relation("Reviewer", fields: [reviewerId], references: [id])
+  user     User           @relation("ReviewedUser", fields: [userId], references: [id])
+  reviewer User           @relation("Reviewer", fields: [reviewerId], references: [id])
+  company  CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([userId])
   @@index([reviewerId])
   @@index([period, reviewDate])
+  @@index([companyId])
   @@map("performance_reviews")
 }
 
@@ -3815,10 +4260,11 @@ enum MaintenanceContractVisitStatus {
 
 model MaintenanceContract {
   id                  Int                          @id @default(autoincrement())
-  contractNumber      String                       @unique @db.VarChar(40)
+  contractNumber      String                       @db.VarChar(40)
   clientId            Int
   branchId            Int?
   ownerId             Int?
+  companyId           Int
   title               String                       @db.VarChar(200)
   description         String?
   serviceScope        String?
@@ -3844,11 +4290,14 @@ model MaintenanceContract {
   client              ServiceClient                @relation(fields: [clientId], references: [id])
   branch              ServiceClientBranch?         @relation(fields: [branchId], references: [id])
   owner               User?                        @relation("MaintenanceContractOwner", fields: [ownerId], references: [id])
+  company             CompanyProfile               @relation(fields: [companyId], references: [id], onDelete: Restrict)
   operationalProject  OperationalProject?          @relation("MaintenanceContractProject", fields: [operationalProjectId], references: [id], onDelete: SetNull)
   visits              MaintenanceContractVisit[]
 
   @@index([status, nextVisitDate])
   @@index([clientId, status])
+  @@index([companyId])
+  @@unique([companyId, contractNumber])
   @@map("maintenance_contracts")
 }
 
@@ -3868,9 +4317,12 @@ model MaintenanceContractVisit {
 
   contract            MaintenanceContract              @relation(fields: [contractId], references: [id], onDelete: Cascade)
   assignedTo          User?                            @relation("MaintenanceVisitAssignee", fields: [assignedToId], references: [id])
+  companyId           Int
+  company             CompanyProfile                   @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([contractId, scheduledDate])
   @@index([status, scheduledDate])
+  @@index([companyId])
   @@map("maintenance_contract_visits")
 }
 
@@ -3898,7 +4350,7 @@ enum TenderStatus {
 
 model Tender {
   id                  Int                @id @default(autoincrement())
-  tenderNumber        String             @unique @db.VarChar(60)
+  tenderNumber        String             @db.VarChar(60)
   title               String             @db.VarChar(220)
   description         String?
   tenderType          TenderType         @default(PUBLIC_GOV)
@@ -3934,18 +4386,22 @@ model Tender {
   salesOpportunityId  Int?               @unique
   awardedToCompetitor String?            @db.VarChar(220)
   awardNotes          String?
+  companyId           Int
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
   deletedAt           DateTime?
 
   owner               User?              @relation("TenderOwner", fields: [ownerId], references: [id])
   opportunity         SalesOpportunity?  @relation(fields: [salesOpportunityId], references: [id])
+  company             CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
   documents           TenderDocument[]
   events              TenderEvent[]
   crmActivities       CrmActivity[]
 
+  @@unique([companyId, tenderNumber])
   @@index([status, submissionDeadline])
   @@index([tenderType])
+  @@index([companyId])
   @@map("tenders")
 }
 
@@ -4030,6 +4486,7 @@ model CrmActivity {
   // Recordatorio
   remindAt           DateTime?
   reminderSent       Boolean            @default(false)
+  companyId          Int
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -4038,11 +4495,13 @@ model CrmActivity {
   tender             Tender?            @relation(fields: [tenderId], references: [id], onDelete: SetNull)
   owner              User?              @relation("CrmActivityOwner", fields: [ownerId], references: [id])
   createdBy          User?              @relation("CrmActivityCreator", fields: [createdById], references: [id])
+  company            CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([ownerId, status, dueDate])
   @@index([leadId])
   @@index([opportunityId])
   @@index([tenderId])
+  @@index([companyId])
   @@map("crm_activities")
 }
 
@@ -4072,13 +4531,16 @@ model SalesTarget {
   bonusCommissionPct Decimal         @default(0) @db.Decimal(5, 2)
   bonusThresholdPct Decimal          @default(100) @db.Decimal(5, 2) // 100% = al alcanzar la meta
   notes           String?
+  companyId       Int
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
   owner           User               @relation("SalesTargetOwner", fields: [ownerId], references: [id])
+  company         CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
-  @@unique([ownerId, period, year, month, quarter])
+  @@unique([companyId, ownerId, period, year, month, quarter])
   @@index([year, month])
+  @@index([companyId])
   @@map("sales_targets")
 }
 
@@ -4099,26 +4561,30 @@ enum KbArticleStatus {
 }
 
 model KbCategory {
-  id           Int          @id @default(autoincrement())
-  slug         String       @unique @db.VarChar(120)
-  name         String       @db.VarChar(180)
+  id           Int            @id @default(autoincrement())
+  slug         String         @db.VarChar(120)
+  name         String         @db.VarChar(180)
   description  String?
-  icon         String?      @db.VarChar(60)
-  visibility   KbVisibility @default(PUBLIC)
-  sortOrder    Int          @default(0)
+  icon         String?        @db.VarChar(60)
+  visibility   KbVisibility   @default(PUBLIC)
+  sortOrder    Int            @default(0)
   parentId     Int?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  parent       KbCategory?  @relation("KbCategoryHierarchy", fields: [parentId], references: [id])
-  children     KbCategory[] @relation("KbCategoryHierarchy")
+  companyId    Int
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  parent       KbCategory?    @relation("KbCategoryHierarchy", fields: [parentId], references: [id])
+  children     KbCategory[]   @relation("KbCategoryHierarchy")
   articles     KbArticle[]
+  company      CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, slug])
+  @@index([companyId])
   @@map("kb_categories")
 }
 
 model KbArticle {
   id            Int             @id @default(autoincrement())
-  slug          String          @unique @db.VarChar(180)
+  slug          String          @db.VarChar(180)
   title         String          @db.VarChar(220)
   excerpt       String?
   content       String          @db.Text
@@ -4130,14 +4596,18 @@ model KbArticle {
   viewCount     Int             @default(0)
   helpfulCount  Int             @default(0)
   publishedAt   DateTime?
+  companyId     Int
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
   category      KbCategory?     @relation(fields: [categoryId], references: [id])
   author        User?           @relation("KbArticleAuthor", fields: [authorId], references: [id])
+  company       CompanyProfile  @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, slug])
   @@index([status, publishedAt])
   @@index([categoryId])
+  @@index([companyId])
   @@map("kb_articles")
 }
 
@@ -4204,21 +4674,133 @@ model CompanyProfile {
   salesLeads      SalesLead[]
   cotizaciones    Cotizacion[]
   outboundWebhooks OutboundWebhook[]
+  chatChannels    ChatChannel[]
+  maintenanceContracts MaintenanceContract[]
+  maintenanceContractVisits MaintenanceContractVisit[]
+  accounts        Account[]
+  fiscalPeriods   FiscalPeriod[]
+  bankAccounts    BankAccount[]
+  idempotencyKeys IdempotencyKey[]
+  costCenters     CostCenter[]
+  vehicleAssets   VehicleAsset[]
+  vehicleControls VehicleControl[]
+  inventorySnapshots InventorySnapshot[]
+  serviceClientBranches ServiceClientBranch[]
+  bankTransactions BankTransaction[]
+  bankReconciliations BankReconciliation[]
+  chatMessages ChatMessage[]
+  serviceSheets ServiceSheet[]
+  activityEvidences ActivityEvidence[]
+  locationTrackings LocationTracking[]
+  salesProjectOrders SalesProjectOrder[]
+  warehouseLocations WarehouseLocation[]
+  stockLevels StockLevel[]
+  brands          Brand[]
+  suppliers       Supplier[]
+  evidences       Evidence[]
+  cycleCounts     CycleCount[]
+  stockReservations StockReservation[]
+  purchaseRfqs    PurchaseRFQ[]
+  assets          Asset[]
+  maintenanceOrders MaintenanceOrder[]
+  kpiSnapshots    KpiSnapshot[]
+  notifications   Notification[]
+  leaveRequests   LeaveRequest[]
+  attendances     Attendance[]
+  attendanceDays  AttendanceDay[]
+  lunchBreaks     LunchBreak[]
+  newsPosts       NewsPost[]
+  pageContents    PageContent[]
+  heroSlides      HeroSlide[]
+  heroVideos      HeroVideo[]
+  performanceReviews PerformanceReview[]
+  caseStudies     CaseStudy[]
+  featureFlags    FeatureFlag[]
+  socialPosts     SocialPost[]
+  internalComunicados InternalComunicado[]
+  contactMessages ContactMessage[]
+  newsletterSubscribers NewsletterSubscriber[]
+  departments     Department[]
+  clients         Client[]
+  projects        Project[]
+  tenders         Tender[]
+  crmActivities   CrmActivity[]
+  kbCategories    KbCategory[]
+  kbArticles      KbArticle[]
+  workProjects    WorkProject[]
+  cvCandidates    CvCandidate[]
+  pageContentRevisions PageContentRevision[]
+  salesProjects   SalesProject[]
+  orderTemplates  OrderTemplate[]
+  fines           Fine[]
+  toolRequests    ToolRequest[]
+  toolInventoryItems ToolInventoryItem[]
+  documentCategories DocumentCategory[]
+  managedDocuments ManagedDocument[]
+  workflowDefinitions WorkflowDefinition[]
+  workflowInstances WorkflowInstance[]
+  toolKitAssignments ToolKitAssignment[]
+  purchaseRequisitions PurchaseRequisition[]
+  safetyIncidents SafetyIncident[]
+  workPermits WorkPermit[]
+  trainingRecords TrainingRecord[]
+  salesTargets SalesTarget[]
+  workProjectExpenses WorkProjectExpense[]
+  workProjectPayroll WorkProjectPayroll[]
+  workProjectLogs WorkProjectLog[]
+  toolRenewals ToolRenewal[]
+  budgets Budget[]
+  goodsReceipts GoodsReceipt[]
+  stockMovements StockMovement[]
+  lots Lot[]
+  supplierEvaluations SupplierEvaluation[]
+  billsOfMaterials BillOfMaterials[]
+  workCenters WorkCenter[]
+  productionOrders ProductionOrder[]
+  qualityInspections QualityInspection[]
+  nonConformanceReports NonConformanceReport[]
+  systemSettings SystemSetting[]
+  maintenanceSchedules MaintenanceSchedule[]
+  payments Payment[]
 
   @@map("company_profile")
 }
 
+/// Idempotency-Key store (Stripe-style) — evita mutaciones duplicadas.
+model IdempotencyKey {
+  id           Int            @id @default(autoincrement())
+  key          String         @db.VarChar(120)
+  companyId    Int?
+  userId       Int?
+  method       String         @db.VarChar(10)
+  path         String         @db.VarChar(300)
+  requestHash  String?        @db.VarChar(64)
+  statusCode   Int
+  responseBody Json?
+  createdAt    DateTime       @default(now())
+  expiresAt    DateTime
+  company      CompanyProfile? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, key, method, path])
+  @@index([expiresAt])
+  @@index([companyId])
+  @@map("idempotency_keys")
+}
+
 /// Membresía User ↔ Company (tenant NEXARA). Sin esto el switcher es cosmético.
 model UserCompany {
-  id        Int            @id @default(autoincrement())
-  userId    Int
-  companyId Int
-  isDefault Boolean        @default(false)
-  createdAt DateTime       @default(now())
-  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  id             Int            @id @default(autoincrement())
+  userId         Int
+  companyId      Int
+  isDefault      Boolean        @default(false)
+  /// Número de empleado local al tenant (permite reutilizar códigos entre empresas).
+  employeeNumber String?        @db.VarChar(40)
+  createdAt      DateTime       @default(now())
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([userId, companyId])
+  @@unique([companyId, employeeNumber])
   @@index([companyId])
   @@map("user_companies")
 }
@@ -4265,64 +4847,74 @@ model CompanyUsageEvent {
 // CASOS DE ÉXITO (studio/cases → sitio público /casos)
 // ============================================================================
 model CaseStudy {
-  id          Int      @id @default(autoincrement())
-  titulo      String   @db.VarChar(200)
-  slug        String   @unique @db.VarChar(220)
-  cliente     String   @db.VarChar(200)
-  vertical    String   @db.VarChar(80)
-  impacto     String   @db.VarChar(500)
-  descripcion String?  @db.Text
-  cover       String?  @db.VarChar(10)
-  imageUrl    String?  @db.VarChar(500)
-  publicado   Boolean  @default(false)
+  id          Int            @id @default(autoincrement())
+  titulo      String         @db.VarChar(200)
+  slug        String         @db.VarChar(220)
+  cliente     String         @db.VarChar(200)
+  vertical    String         @db.VarChar(80)
+  impacto     String         @db.VarChar(500)
+  descripcion String?        @db.Text
+  cover       String?        @db.VarChar(10)
+  imageUrl    String?        @db.VarChar(500)
+  publicado   Boolean        @default(false)
   autorId     Int
-  autor       User     @relation("CaseStudyAuthor", fields: [autorId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  companyId   Int
+  autor       User           @relation("CaseStudyAuthor", fields: [autorId], references: [id])
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
+  @@unique([companyId, slug])
   @@index([publicado])
   @@index([slug])
+  @@index([companyId])
 }
 
 // ============================================================================
 // POSTS DE REDES SOCIALES (studio/social — calendario editorial)
 // ============================================================================
 model SocialPost {
-  id        Int      @id @default(autoincrement())
-  red       String   @db.VarChar(40)
-  titulo    String   @db.VarChar(300)
-  contenido String?  @db.Text
-  mediaUrl  String?  @db.VarChar(500)
+  id        Int            @id @default(autoincrement())
+  red       String         @db.VarChar(40)
+  titulo    String         @db.VarChar(300)
+  contenido String?        @db.Text
+  mediaUrl  String?        @db.VarChar(500)
   cuando    DateTime
-  estado    String   @default("Borrador") @db.VarChar(30)
+  estado    String         @default("Borrador") @db.VarChar(30)
   autorId   Int
-  autor     User     @relation("SocialPostAuthor", fields: [autorId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  companyId Int
+  autor     User           @relation("SocialPostAuthor", fields: [autorId], references: [id])
+  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
   @@index([estado, cuando])
+  @@index([companyId])
 }
 
 // ============================================================================
 // COMUNICADOS INTERNOS (erp/news — mensajes al equipo)
 // ============================================================================
 model InternalComunicado {
-  id                 Int       @id @default(autoincrement())
-  titulo             String    @db.VarChar(300)
-  cuerpo             String    @db.Text
-  audiencia          String    @db.VarChar(200)
-  prioridad          String    @default("Normal") @db.VarChar(20)
-  estado             String    @default("Borrador") @db.VarChar(20)
+  id                 Int            @id @default(autoincrement())
+  titulo             String         @db.VarChar(300)
+  cuerpo             String         @db.Text
+  audiencia          String         @db.VarChar(200)
+  prioridad          String         @default("Normal") @db.VarChar(20)
+  estado             String         @default("Borrador") @db.VarChar(20)
   scheduledAt        DateTime?
   sentAt             DateTime?
-  lecturas           Int       @default(0)
-  totalDestinatarios Int       @default(0)
+  lecturas           Int            @default(0)
+  totalDestinatarios Int            @default(0)
   autorId            Int
-  autor              User      @relation("ComunicadoAuthor", fields: [autorId], references: [id])
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  companyId          Int
+  autor              User           @relation("ComunicadoAuthor", fields: [autorId], references: [id])
+  company            CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   @@index([estado, createdAt])
+  @@index([companyId])
 }
 
 // ============================================================================
@@ -4345,24 +4937,29 @@ enum ChatMessageKind {
 model ChatChannel {
   id             Int                 @id @default(autoincrement())
   kind           ChatChannelKind     @default(PUBLIC)
-  slug           String?             @unique @db.VarChar(80)
+  slug           String?             @db.VarChar(80)
   name           String              @db.VarChar(120)
   topic          String?             @db.VarChar(500)
   description    String?             @db.VarChar(1000)
   isArchived     Boolean             @default(false)
   documentId     Int?                @unique
-  dmKey          String?             @unique @db.VarChar(64)
+  dmKey          String?             @db.VarChar(64)
+  companyId      Int
   createdById    Int?
   lastMessageAt  DateTime?
   lastMessagePreview String?         @db.VarChar(280)
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   document       ManagedDocument?    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  company        CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
   createdBy      User?               @relation("ChatChannelCreator", fields: [createdById], references: [id])
   members        ChatChannelMember[]
   messages       ChatMessage[]
 
+  @@unique([companyId, slug])
+  @@unique([companyId, dmKey])
   @@index([kind, lastMessageAt])
+  @@index([companyId])
   @@map("chat_channels")
 }
 
@@ -4403,10 +5000,13 @@ model ChatMessage {
   parent          ChatMessage?          @relation("ChatThread", fields: [parentId], references: [id], onDelete: Cascade)
   replies         ChatMessage[]         @relation("ChatThread")
   reactions       ChatMessageReaction[]
+  companyId       Int
+  company         CompanyProfile        @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([channelId, createdAt])
   @@index([parentId, createdAt])
   @@index([channelId, pinnedAt])
+  @@index([companyId])
   @@map("chat_messages")
 }
 

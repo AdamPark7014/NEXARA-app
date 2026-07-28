@@ -12,6 +12,7 @@ import {
   type TrailEntry,
 } from '../common/rbac/hierarchical-approval.js';
 import { ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
+import { assertCompanyAccess, companyWhere, mergeCompanyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 export interface CreateFineDto {
   usuarioId: number;
@@ -48,9 +49,11 @@ export class FinesService {
       : Number(fine.monto) || 0;
   }
 
-  async create(data: CreateFineDto) {
+  async create(data: CreateFineDto, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const fine = await this.prisma.fine.create({
       data: {
+        companyId: tenantId,
         usuarioId: data.usuarioId,
         tipo: data.tipo,
         razon: data.razon,
@@ -78,7 +81,8 @@ export class FinesService {
     return fine;
   }
 
-  async findAll(currentUser?: any, query?: PaginationQueryDto) {
+  async findAll(currentUser?: any, query?: PaginationQueryDto, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const include = {
       usuario: {
         select: {
@@ -97,16 +101,17 @@ export class FinesService {
       },
     };
 
-    let where: any = undefined;
+    let where: any = { ...companyWhere(tenantId) };
 
     if (currentUser?.isSuperAdmin) {
-      where = undefined;
+      // tenant scope only
     } else if (
       currentUser?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) ||
       currentUser?.permissions?.includes(PERMISSIONS.ACTIVITIES_MANAGE)
     ) {
       // Legacy admin or v2 OPS manager: team scope within same department
       where = {
+        ...companyWhere(tenantId),
         usuario: {
           AND: [
             { departmentId: currentUser.departmentId },
@@ -129,9 +134,10 @@ export class FinesService {
     return this.prisma.fine.findMany({ where, include, orderBy: { fechaCreacion: 'desc' } });
   }
 
-  async findByUser(usuarioId: number) {
+  async findByUser(usuarioId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.fine.findMany({
-      where: { usuarioId },
+      where: { usuarioId, ...companyWhere(tenantId) },
       include: {
         usuario: {
           select: {
@@ -147,9 +153,10 @@ export class FinesService {
     });
   }
 
-  async findByType(tipo: string) {
+  async findByType(tipo: string, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.fine.findMany({
-      where: { tipo },
+      where: { tipo, ...companyWhere(tenantId) },
       include: {
         usuario: {
           select: {
@@ -165,9 +172,10 @@ export class FinesService {
     });
   }
 
-  async findByUserAndType(usuarioId: number, tipo: string) {
+  async findByUserAndType(usuarioId: number, tipo: string, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.fine.findMany({
-      where: { usuarioId, tipo },
+      where: { usuarioId, tipo, ...companyWhere(tenantId) },
       include: {
         usuario: {
           select: {
@@ -183,7 +191,17 @@ export class FinesService {
     });
   }
 
-  async update(id: number, data: UpdateFineDto) {
+  private async findScopedFine(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const fine = await this.prisma.fine.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(fine, tenantId, 'Multa');
+    return fine!;
+  }
+
+  async update(id: number, data: UpdateFineDto, companyId?: number | null) {
+    await this.findScopedFine(id, companyId);
     return this.prisma.fine.update({
       where: { id },
       data,
@@ -199,9 +217,8 @@ export class FinesService {
     });
   }
 
-  async approveOrReject(id: number, actor: any, action: 'approve' | 'reject', note?: string) {
-    const fine = await this.prisma.fine.findUnique({ where: { id } });
-    if (!fine) throw new BadRequestException('Multa no encontrada');
+  async approveOrReject(id: number, actor: any, action: 'approve' | 'reject', note?: string, companyId?: number | null) {
+    const fine = await this.findScopedFine(id, companyId);
     if (['Rechazado', 'Aprobado'].includes(fine.estatusAprobacion)) {
       throw new BadRequestException('Esta multa ya fue cerrada');
     }
@@ -256,18 +273,23 @@ export class FinesService {
     });
   }
 
-  async delete(id: number) {
+  async delete(id: number, companyId?: number | null) {
+    await this.findScopedFine(id, companyId);
     return this.prisma.fine.delete({
       where: { id },
     });
   }
 
-  async getTotalByUser(usuarioId: number, tipo?: string) {
+  async getTotalByUser(usuarioId: number, tipo?: string, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const fines = await this.prisma.fine.findMany({
-      where: {
-        usuarioId,
-        ...(tipo && { tipo }),
-      },
+      where: mergeCompanyWhere(
+        {
+          usuarioId,
+          ...(tipo && { tipo }),
+        },
+        tenantId,
+      ),
       select: {
         monto: true,
       },
@@ -275,12 +297,16 @@ export class FinesService {
     return fines.reduce((sum, fine) => sum + Number(fine.monto), 0);
   }
 
-  async getCountByUser(usuarioId: number, tipo?: string) {
+  async getCountByUser(usuarioId: number, tipo?: string, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.fine.count({
-      where: {
-        usuarioId,
-        ...(tipo && { tipo }),
-      },
+      where: mergeCompanyWhere(
+        {
+          usuarioId,
+          ...(tipo && { tipo }),
+        },
+        tenantId,
+      ),
     });
   }
 }

@@ -13,7 +13,7 @@ describe('ExcelExportController', () => {
       controllers: [ExcelExportController],
       providers: [
         ExcelExportService,
-        { provide: PrismaService, useValue: { viatic: { findMany: jest.fn().mockResolvedValue([{ foo: 'bar' }]) } } },
+        { provide: PrismaService, useValue: { viatico: { findMany: jest.fn().mockResolvedValue([{ foo: 'bar' }]) } } },
       ],
     }).compile();
 
@@ -27,7 +27,7 @@ describe('ExcelExportController', () => {
       setHeader: jest.fn(),
       send: jest.fn(),
     };
-    await controller.exportExcel('viatic', res);
+    await controller.exportExcel('viatic', res, 1);
     expect(res.send).toHaveBeenCalled();
   });
 });

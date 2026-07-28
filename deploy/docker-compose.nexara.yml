@@ -17,6 +17,16 @@ services:
     networks:
       - internal
 
+  redis:
+    image: redis:7-alpine
+    container_name: nexara-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - nexara-redis-data:/data
+    networks:
+      - internal
+
   api:
     build:
       context: ..
@@ -25,10 +35,16 @@ services:
     restart: unless-stopped
     depends_on:
       - db
+      - redis
     environment:
       NODE_ENV: production
       PORT: 3001
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      REDIS_URL: redis://redis:6379
+      # 1 = API also runs BullMQ workers (default). Set 0 when `worker` profile is up.
+      JOBS_RUN_WORKERS: ${JOBS_RUN_WORKERS:-1}
+      # SaaS hard multi-tenant: set to 0 when all clients send X-Company-Id
+      TENANT_ALLOW_PRIMARY_FALLBACK: ${TENANT_ALLOW_PRIMARY_FALLBACK:-1}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
       WEB_URL: ${WEB_URL}
@@ -89,6 +105,32 @@ services:
       - internal
       - proxy
 
+  # Optional dedicated BullMQ consumer: docker compose --profile worker up -d
+  # Pair with JOBS_RUN_WORKERS=0 on api to avoid double-consuming.
+  worker:
+    profiles: ["worker"]
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.api
+    container_name: nexara-worker
+    restart: unless-stopped
+    depends_on:
+      - db
+      - redis
+      - api
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      REDIS_URL: redis://redis:6379
+      JOBS_RUN_WORKERS: "1"
+      JWT_SECRET: ${JWT_SECRET}
+      UPLOADS_ROOT: /app/uploads
+    command: ["sh", "-c", "cd /app/apps/api && node /app/apps/api/dist/worker.js"]
+    volumes:
+      - ../uploads:/app/uploads
+    networks:
+      - internal
+
   web:
     build:
       context: ..
@@ -139,6 +181,7 @@ services:
 
 volumes:
   nexara-postgres-data:
+  nexara-redis-data:
 
 networks:
   internal:

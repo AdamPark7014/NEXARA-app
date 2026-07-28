@@ -316,12 +316,26 @@ export default function AgendaPage() {
           )}
           <Section title={`Hoy (${filteredAgenda.pendingToday.length})`}>
             {filteredAgenda.pendingToday.length === 0
-              ? <EmptyState icon="🎉" title={searchQ || filterType ? "Sin resultados" : "Nada para hoy"} description={searchQ || filterType ? "Prueba con otros filtros." : "No tienes actividades pendientes para hoy."} />
+              ? (
+                <EmptyState
+                  variant="compact"
+                  title={searchQ || filterType ? "Sin resultados" : "Nada para hoy"}
+                  description={searchQ || filterType ? "Prueba con otros filtros." : "Agenda una llamada, visita o tarea para hoy."}
+                  action={!searchQ && !filterType ? <Button size="sm" variant="primary" onClick={() => setShowForm(true)}>Nueva actividad</Button> : undefined}
+                />
+              )
               : filteredAgenda.pendingToday.map((a) => renderItem(a))}
           </Section>
           <Section title={`Próximos 7 días (${filteredAgenda.upcoming.length})`}>
             {filteredAgenda.upcoming.length === 0
-              ? <EmptyState icon="📭" title={searchQ || filterType ? "Sin resultados" : "Sin próximas actividades"} description={searchQ || filterType ? "Prueba con otros filtros." : "Agenda tu siguiente seguimiento."} />
+              ? (
+                <EmptyState
+                  variant="compact"
+                  title={searchQ || filterType ? "Sin resultados" : "Sin próximas actividades"}
+                  description={searchQ || filterType ? "Prueba con otros filtros." : "Programa el siguiente seguimiento comercial."}
+                  action={!searchQ && !filterType ? <Button size="sm" variant="secondary" onClick={() => setShowForm(true)}>Agendar</Button> : undefined}
+                />
+              )
               : filteredAgenda.upcoming.map((a) => renderItem(a))}
           </Section>
         </>

@@ -69,18 +69,28 @@ export class UrlAccessGuard extends AuthGuard('jwt') {
   private resolveRole(user: any): RoleKey | null {
     const validKeys = Object.values(ROLES) as string[];
 
-    // 1) Nueva columna `roleKey` (preferida tras migración)
+    // 1) Nueva columna `roleKey` (preferida — única fuente de verdad)
     if (user.roleKey && validKeys.includes(user.roleKey)) {
       return user.roleKey as RoleKey;
     }
-    // 2) Mapeo desde orgRoleKey legacy
+
+    // 2) Legacy bridge — métrica + warn (deuda de migración)
+    let legacy: RoleKey | null = null;
     if (user.orgRoleKey && LEGACY_TO_V2[user.orgRoleKey]) {
-      return LEGACY_TO_V2[user.orgRoleKey];
+      legacy = LEGACY_TO_V2[user.orgRoleKey];
+    } else if (user.admin) {
+      legacy = LEGACY_TO_V2.admin ?? null;
+    } else if (user.ingeniero) {
+      legacy = LEGACY_TO_V2.ingeniero ?? null;
+    } else if (user.vendedor) {
+      legacy = LEGACY_TO_V2.vendedor ?? null;
     }
-    // 3) Mapeo desde flags booleanos legacy
-    if (user.admin) return LEGACY_TO_V2.admin ?? null;
-    if (user.ingeniero) return LEGACY_TO_V2.ingeniero ?? null;
-    if (user.vendedor) return LEGACY_TO_V2.vendedor ?? null;
-    return null;
+
+    if (legacy) {
+      this.logger.warn(
+        `[RBAC_LEGACY] user=${user.id} resolved via legacy flags → ${legacy}. Migrate roleKey.`,
+      );
+    }
+    return legacy;
   }
 }

@@ -5,7 +5,7 @@ import { LoginDto } from './dto/login.dto.js';
 import * as bcrypt from 'bcryptjs';
 import { PERMISSIONS } from '../common/permissions.js';
 import { NotificationType } from '@prisma/client';
-import { detectDeviceFromUserAgent } from '../common/device-detector.js';
+import { detectDeviceDetails } from '../common/device-detector.js';
 import {
   isPlatformOwnerEmail,
   isSuperAdminEmail,
@@ -552,6 +552,8 @@ export class AuthService {
     // ── Studio / diseño web ──────────────────────────────────────────
     if (roleKey === 'lider_diseno' || roleKey === 'disenador') {
       set.add(PERMISSIONS.PANEL_WEB);
+      set.add(PERMISSIONS.STUDIO_CONTENT_VIEW);
+      set.add(PERMISSIONS.STUDIO_CONTENT_MANAGE);
     }
 
     // ── Ingeniero de campo ───────────────────────────────────────────
@@ -814,8 +816,6 @@ export class AuthService {
     const ipAddress = String(req?.headers?.['x-forwarded-for'] || req?.ip || '')
       .split(',')[0]
       ?.trim();
-    const detectedDevice = detectDeviceFromUserAgent(userAgent, req?.headers);
-
     let user;
     try {
       user = await this.validateUser(loginDto.email, loginDto.password);
@@ -871,10 +871,8 @@ export class AuthService {
     const ipAddress = String(req?.headers?.['x-forwarded-for'] || req?.ip || '')
       .split(',')[0]
       ?.trim();
-    const detectedDeviceRaw = detectDeviceFromUserAgent(userAgent, req?.headers);
-    const detectedDevice = detectedDeviceRaw
-      ? String(detectedDeviceRaw).slice(0, 255)
-      : 'Dispositivo desconocido';
+    const device = detectDeviceDetails(userAgent, req?.headers);
+    const detectedDevice = (device.label || device.summary || 'Este dispositivo').slice(0, 255);
     const isSuperAdmin = this.isSuperAdmin(user.email);
     const permissions = this.resolveUserPermissions(user, isSuperAdmin);
 
@@ -948,10 +946,15 @@ export class AuthService {
       // no bloquear login
     }
 
+    const firstName = String(user.nombre || '')
+      .trim()
+      .split(/\s+/)[0] || 'equipo';
+
     return {
       access_token: this.jwtService.sign(payload, { expiresIn: expiresInRaw as any }),
       loginDevice: detectedDevice,
-      loginGreeting: `Hola ${user.nombre}, bienvenido de nuevo. Accediste desde ${detectedDevice}.`,
+      loginGreeting: `Hola, ${firstName}`,
+      loginDeviceLabel: detectedDevice,
       user: this.mapSessionUser(user, permissions, isSuperAdmin, detectedDevice),
     };
   }

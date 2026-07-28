@@ -115,79 +115,54 @@ export default function SettingsPage() {
     <>
       <PageHeader
         eyebrow="ERP · Gobierno"
-        title="Datos de la empresa"
-        subtitle="Configuración general del sistema: branding, integraciones, certificados y parámetros globales."
+        title="Centro de control"
+        subtitle="Tenant SaaS: integraciones, facturación, API y parámetros de la empresa activa."
         actions={
           <>
-            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva configuración</Button>}
+            <Button variant="ghost" onClick={() => void load()}>Actualizar</Button>
+            {cfg.canCreate && <Button variant="primary" onClick={openNew}>Nuevo parámetro</Button>}
           </>
         }
       />
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
-        <a
-          href="/erp/settings/webhooks"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "10px 14px",
-            borderRadius: 10,
-            border: "1px solid var(--border)",
-            background: "var(--surface)",
-            color: "var(--foreground)",
-            textDecoration: "none",
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          Webhooks outbound →
-        </a>
-        <a
-          href="/erp/settings/api-keys"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "10px 14px",
-            borderRadius: 10,
-            border: "1px solid var(--border)",
-            background: "var(--surface)",
-            color: "var(--foreground)",
-            textDecoration: "none",
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          API keys por empresa →
-        </a>
-        <a
-          href="/erp/settings/billing"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "10px 14px",
-            borderRadius: 10,
-            border: "1px solid var(--border)",
-            background: "var(--surface)",
-            color: "var(--foreground)",
-            textDecoration: "none",
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          Billing / asientos →
-        </a>
-      </div>
+      <Section title="Integraciones enterprise">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+          {[
+            { href: "/erp/settings/billing", title: "Billing & seats", desc: "Plan, asientos, Stripe Checkout / Portal", tone: "accent" as const },
+            { href: "/erp/settings/webhooks", title: "Outbound webhooks", desc: "Eventos firmados HMAC por empresa", tone: "default" as const },
+            { href: "/erp/settings/api-keys", title: "API keys", desc: "Machine auth + scope SCIM", tone: "default" as const },
+            { href: "/erp/companies", title: "Empresas", desc: "Multi-tenant y membresías", tone: "default" as const },
+          ].map((card) => (
+            <a
+              key={card.href}
+              href={card.href}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                padding: 16,
+                borderRadius: 12,
+                border: "1px solid var(--border)",
+                background: "var(--surface)",
+                color: "var(--foreground)",
+                textDecoration: "none",
+                minHeight: 96,
+              }}
+            >
+              <span style={{ fontSize: 14, fontWeight: 700 }}>{card.title}</span>
+              <span style={{ fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.45 }}>{card.desc}</span>
+              <span style={{ marginTop: "auto", fontSize: 12, fontWeight: 600, color: "var(--primary)" }}>Abrir →</span>
+            </a>
+          ))}
+        </div>
+      </Section>
 
       {!loading && settings.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 18 }}>
-          <KpiCard label="Total parámetros" value={settings.length} icon="⚙️" />
-          <KpiCard label="Categorías" value={new Set(settings.map((s) => s.category)).size} icon="🏷️" variant="accent" />
-          <KpiCard label="Con etiqueta" value={settings.filter((s) => !!s.label).length} icon="📝" variant="positive" />
-          <KpiCard label="Sin etiqueta" value={settings.filter((s) => !s.label).length} icon="⚠️" variant={settings.some((s) => !s.label) ? "warning" : "default"} />
+          <KpiCard label="Parámetros" value={settings.length} />
+          <KpiCard label="Categorías" value={new Set(settings.map((s) => s.category)).size} variant="accent" />
+          <KpiCard label="Con etiqueta" value={settings.filter((s) => !!s.label).length} variant="positive" />
+          <KpiCard label="Sin etiqueta" value={settings.filter((s) => !s.label).length} variant={settings.some((s) => !s.label) ? "warning" : "default"} />
         </div>
       )}
 

@@ -15,6 +15,7 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { WorkProjectsService } from './work-projects.service.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 /** @deprecated Use OperationalProject (/operational-projects). Read-only for legacy data. */
 @Controller('work-projects')
@@ -30,15 +31,15 @@ export class WorkProjectsController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   @Get()
-  findAll(@Query() query: PaginationQueryDto) {
-    return this.service.findAll(query);
+  findAll(@Query() query: PaginationQueryDto, @CurrentCompanyId() companyId: number | null) {
+    return this.service.findAll(query, companyId);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.service.findOne(id, companyId);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)

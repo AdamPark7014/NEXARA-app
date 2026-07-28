@@ -1,9 +1,10 @@
-import { Controller, Get, Query, Res, UseGuards, Post, Body } from '@nestjs/common';
+import { Controller, Get, Query, Res, UseGuards, Post, Body, Param, ParseIntPipe } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuditService } from './audit.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { CurrentUser } from '../common/current-user.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
 @Controller('audit')
@@ -67,6 +68,16 @@ export class AuditController {
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   purge(@Body('days') days?: number) {
     return this.svc.purgeOlderThan(days ?? 365);
+  }
+
+  @Post('privacy/erase/:userId')
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.USERS_MANAGE] })
+  eraseSubject(
+    @Param('userId', ParseIntPipe) userId: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.svc.eraseSubject(userId, user?.id, companyId);
   }
 
   @Get('entity-history')

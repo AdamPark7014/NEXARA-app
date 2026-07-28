@@ -1,6 +1,11 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import {
+  assertCompanyAccess,
+  companyWhere,
+  requireCompanyId,
+} from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class WorkflowService {
@@ -10,22 +15,37 @@ export class WorkflowService {
   ) {}
 
   // ── Definiciones ──────────────────────────────────────────────
-  async listDefinitions() {
+  async listDefinitions(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.workflowDefinition.findMany({
+      where: companyWhere(tenantId),
       include: { steps: { orderBy: { stepNumber: 'asc' } }, _count: { select: { instances: true } } },
       orderBy: { name: 'asc' },
     });
   }
 
-  async createDefinition(dto: {
-    name: string;
-    description?: string;
-    entityType: string;
-    steps: Array<{ stepNumber: number; name: string; description?: string; approverRoleId?: number; approverUserId?: number; timeoutHours?: number; autoApproveCondition?: string }>;
-  }) {
+  async createDefinition(
+    dto: {
+      name: string;
+      description?: string;
+      entityType: string;
+      steps: Array<{
+        stepNumber: number;
+        name: string;
+        description?: string;
+        approverRoleId?: number;
+        approverUserId?: number;
+        timeoutHours?: number;
+        autoApproveCondition?: string;
+      }>;
+    },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
     if (!dto.steps?.length) throw new BadRequestException('Define al menos un paso de aprobación');
     return this.prisma.workflowDefinition.create({
       data: {
+        companyId: tenantId,
         name: dto.name.trim(),
         description: dto.description?.trim() || null,
         entityType: dto.entityType.trim().toUpperCase(),
@@ -52,25 +72,43 @@ export class WorkflowService {
     entityId: number;
     workflowDefinitionId?: number;
     startedById: number;
+    companyId?: number | null;
   }) {
-    // Resuelve la definición: por id explícito o por entityType activo
+    const tenantId = requireCompanyId(dto.companyId);
+    // Resuelve la definición: por id explícito o por entityType activo WITHIN company
     const def = dto.workflowDefinitionId
-      ? await this.prisma.workflowDefinition.findUnique({ where: { id: dto.workflowDefinitionId }, include: { steps: { orderBy: { stepNumber: 'asc' } } } })
+      ? await this.prisma.workflowDefinition.findFirst({
+          where: { id: dto.workflowDefinitionId, ...companyWhere(tenantId) },
+          include: { steps: { orderBy: { stepNumber: 'asc' } } },
+        })
       : await this.prisma.workflowDefinition.findFirst({
-          where: { entityType: dto.entityType.toUpperCase(), status: 'ACTIVE' },
+          where: {
+            entityType: dto.entityType.toUpperCase(),
+            status: 'ACTIVE',
+            ...companyWhere(tenantId),
+          },
           include: { steps: { orderBy: { stepNumber: 'asc' } } },
         });
     if (!def) throw new NotFoundException(`Sin definición de workflow para ${dto.entityType}`);
+    assertCompanyAccess(def, tenantId, 'Definición de workflow');
     if (!def.steps.length) throw new BadRequestException('La definición no tiene pasos');
 
     // Evita duplicar instancias abiertas
     const existing = await this.prisma.workflowInstance.findFirst({
-      where: { workflowId: def.id, entityType: dto.entityType.toUpperCase(), entityId: dto.entityId, isComplete: false, isCancelled: false },
+      where: {
+        workflowId: def.id,
+        entityType: dto.entityType.toUpperCase(),
+        entityId: dto.entityId,
+        isComplete: false,
+        isCancelled: false,
+        ...companyWhere(tenantId),
+      },
     });
-    if (existing) return this.getInstance(existing.id);
+    if (existing) return this.getInstance(existing.id, tenantId);
 
     const instance = await this.prisma.workflowInstance.create({
       data: {
+        companyId: tenantId,
         workflowId: def.id,
         entityId: dto.entityId,
         entityType: dto.entityType.toUpperCase(),
@@ -87,12 +125,13 @@ export class WorkflowService {
     if (firstStep.approverUserId) {
       await this.notifyApprover(firstStep.approverUserId, instance.id, def.name, dto.entityType, dto.entityId);
     }
-    return this.getInstance(instance.id);
+    return this.getInstance(instance.id, tenantId);
   }
 
-  async getInstance(id: number) {
-    const instance = await this.prisma.workflowInstance.findUnique({
-      where: { id },
+  async getInstance(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const instance = await this.prisma.workflowInstance.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: {
         workflow: { include: { steps: { orderBy: { stepNumber: 'asc' } } } },
         startedBy: { select: { id: true, nombre: true } },
@@ -105,7 +144,7 @@ export class WorkflowService {
         },
       },
     });
-    if (!instance) throw new NotFoundException('Instancia no encontrada');
+    assertCompanyAccess(instance, tenantId, 'Instancia');
     return instance;
   }
 
@@ -114,11 +153,13 @@ export class WorkflowService {
    * a una entidad concreta. Usado por la tab "Historial de aprobaciones" en
    * cada entidad (cotización, gasto, viático, OC, proyecto).
    */
-  async listInstancesForEntity(entityType: string, entityId: number) {
+  async listInstancesForEntity(entityType: string, entityId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.workflowInstance.findMany({
       where: {
         entityType: entityType.toUpperCase(),
         entityId,
+        ...companyWhere(tenantId),
       },
       include: {
         workflow: {
@@ -139,7 +180,8 @@ export class WorkflowService {
     });
   }
 
-  async listMyPending(userId: number) {
+  async listMyPending(userId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     // Aprobaciones pendientes donde el usuario es approverUser o tiene el rol approverRole.
     // Incluye la cadena COMPLETA de aprobaciones de cada instancia para que la
     // bandeja `/erp/approvals` pueda dibujar el timeline (paso 1 ✓, paso 2 ✓, paso 3 ⏳…).
@@ -150,6 +192,7 @@ export class WorkflowService {
     return this.prisma.workflowApproval.findMany({
       where: {
         status: 'PENDING',
+        instance: { ...companyWhere(tenantId) },
         OR: [
           { step: { approverUserId: userId } },
           { step: { approverRoleId: user?.roleId ?? -1 } },
@@ -187,12 +230,28 @@ export class WorkflowService {
     });
   }
 
-  async decide(approvalId: number, userId: number, decision: 'APPROVED' | 'REJECTED', comments?: string) {
-    const approval = await this.prisma.workflowApproval.findUnique({
-      where: { id: approvalId },
-      include: { instance: { include: { workflow: { include: { steps: { orderBy: { stepNumber: 'asc' } } } } } }, step: true },
+  async decide(
+    approvalId: number,
+    userId: number,
+    decision: 'APPROVED' | 'REJECTED',
+    comments?: string,
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const approval = await this.prisma.workflowApproval.findFirst({
+      where: {
+        id: approvalId,
+        instance: { ...companyWhere(tenantId) },
+      },
+      include: {
+        instance: {
+          include: { workflow: { include: { steps: { orderBy: { stepNumber: 'asc' } } } } },
+        },
+        step: true,
+      },
     });
     if (!approval) throw new NotFoundException('Aprobación no encontrada');
+    assertCompanyAccess(approval.instance, tenantId, 'Instancia');
     if (approval.status !== 'PENDING') throw new BadRequestException('Esta aprobación ya fue decidida');
 
     const actor = await this.prisma.user.findUnique({

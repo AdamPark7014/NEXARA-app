@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDto
+import mx.nexara.mobile.nativeapp.data.api.CrmLeadDto
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.access.PanelId
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
@@ -358,7 +359,7 @@ private fun CotDetailLine(label: String, value: String?) {
 
 data class VentasLeadsUiState(
     val isLoading: Boolean = true,
-    val items: List<Map<String, Any?>> = emptyList(),
+    val items: List<CrmLeadDto> = emptyList(),
     val query: String = "",
 )
 
@@ -372,21 +373,23 @@ class VentasLeadsViewModel(app: Application) : AndroidViewModel(app) {
     fun load() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
-            val items = withContext(Dispatchers.IO) { repo.clientTicketRequests() }
+            val items = withContext(Dispatchers.IO) { repo.clientTicketLeadDtos() }
             _state.update { it.copy(isLoading = false, items = items) }
         }
     }
 
     fun setQuery(q: String) { _state.update { it.copy(query = q) } }
 
-    val filtered: List<Map<String, Any?>> get() {
+    val filtered: List<CrmLeadDto> get() {
         val s = _state.value
         if (s.query.isBlank()) return s.items
         val q = s.query.lowercase()
         return s.items.filter { t ->
-            lStr(t, "description", "descripcion", "title").lowercase().contains(q) ||
-            lStr(t, "branchName", "clientName", "cliente").lowercase().contains(q) ||
-            lStr(t, "status", "estatus").lowercase().contains(q)
+            t.displayTitle.lowercase().contains(q) ||
+            t.clientName.lowercase().contains(q) ||
+            t.branchName.lowercase().contains(q) ||
+            t.status.lowercase().contains(q) ||
+            t.description.lowercase().contains(q)
         }
     }
 }
@@ -402,12 +405,13 @@ fun VentasLeadsScreen() {
     })
     val state by vm.state.collectAsState()
     val items by remember { derivedStateOf { vm.filtered } }
-    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
+    var selected by remember { mutableStateOf<CrmLeadDto?>(null) }
 
     if (selected != null) {
         val lead = selected!!
-        val status = lStr(lead, "status", "estatus", "estado")
+        val status = lead.status
         val color  = cotStatusColorAndroid(status)
+        val raw = lead.raw
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
@@ -415,18 +419,18 @@ fun VentasLeadsScreen() {
                     if (status.isNotBlank()) Text(status.replaceFirstChar { it.uppercase() }, color = color, fontWeight = FontWeight.SemiBold)
                 }
             }
-            item { Text(lStr(lead, "title", "subject", "asunto", "description"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            item { Text(lead.displayTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        LeadDetailLine("Cliente", lStr(lead, "clientName", "cliente"))
-                        LeadDetailLine("Email", lStr(lead, "email", "correo"))
-                        LeadDetailLine("Teléfono", lStr(lead, "phone", "telefono"))
-                        LeadDetailLine("Origen", lStr(lead, "source", "origen", "fuente"))
-                        LeadDetailLine("Asignado a", lStr(lead, "ownerName", "assignedTo"))
+                        LeadDetailLine("Cliente", lead.clientName.ifBlank { lead.branchName })
+                        LeadDetailLine("Email", lStr(raw, "email", "correo"))
+                        LeadDetailLine("Teléfono", lStr(raw, "phone", "telefono"))
+                        LeadDetailLine("Origen", lStr(raw, "source", "origen", "fuente"))
+                        LeadDetailLine("Asignado a", lStr(raw, "ownerName", "assignedTo"))
                         LeadDetailLine("Estado", status)
-                        LeadDetailLine("Fecha", lStr(lead, "createdAt", "fecha").take(10))
-                        val notes = lStr(lead, "notes", "notas")
+                        LeadDetailLine("Fecha", lStr(raw, "createdAt", "fecha").take(10))
+                        val notes = lead.description.ifBlank { lStr(raw, "notes", "notas") }
                         if (notes.isNotBlank()) { Divider(); Text(notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                 }
@@ -455,7 +459,7 @@ fun VentasLeadsScreen() {
         } else if (items.isEmpty()) {
             item { Text("Sin leads", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(20.dp)) }
         } else {
-            items(items, key = { it["id"]?.toString() ?: it.hashCode().toString() }) { lead ->
+            items(items, key = { it.rowKey }) { lead ->
                 Box(Modifier.clickable { selected = lead }) { LeadRowCard(lead) }
             }
         }
@@ -463,11 +467,11 @@ fun VentasLeadsScreen() {
 }
 
 @Composable
-private fun LeadRowCard(lead: Map<String, Any?>) {
-    val description = lStr(lead, "description", "descripcion", "title")
-    val branch      = lStr(lead, "branchName", "clientName", "cliente")
-    val status      = lStr(lead, "status", "estatus")
-    val date        = lStr(lead, "createdAt", "fecha").take(10)
+private fun LeadRowCard(lead: CrmLeadDto) {
+    val description = lead.displayTitle
+    val branch      = lead.branchName.ifBlank { lead.clientName }
+    val status      = lead.status
+    val date        = lStr(lead.raw, "createdAt", "fecha").take(10)
     val color = cotStatusColorAndroid(status)
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))

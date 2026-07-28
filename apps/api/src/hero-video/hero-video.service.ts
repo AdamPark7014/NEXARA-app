@@ -9,6 +9,13 @@ import { UpdateHeroVideoDto } from './dto/update-hero-video.dto.js';
 import { resolveLegacyUploadsDir, resolveUploadsDir } from '../common/uploads-path.js';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import {
+  assertCompanyAccess,
+  companyWhere,
+  requireCompanyId,
+  resolvePublicCompanyId,
+} from '../common/tenant/tenant-scope.js';
+import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 
 interface MulterFile {
   fieldname: string;
@@ -23,30 +30,48 @@ interface MulterFile {
 export class HeroVideoService {
   constructor(private readonly prisma: PrismaService) {}
 
-  publicActive() {
+  private async publicCompanyId() {
+    return withTenantBypassAsync(() => resolvePublicCompanyId(this.prisma));
+  }
+
+  async publicActive() {
+    const companyId = await this.publicCompanyId();
+    return withTenantBypassAsync(() =>
+      this.prisma.heroVideo.findFirst({
+        where: { isActive: true, companyId },
+        orderBy: { id: 'desc' },
+      }),
+    );
+  }
+
+  adminCurrent(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.heroVideo.findFirst({
-      where: { isActive: true },
+      where: companyWhere(tenantId),
       orderBy: { id: 'desc' },
     });
   }
 
-  adminCurrent() {
-    return this.prisma.heroVideo.findFirst({ orderBy: { id: 'desc' } });
-  }
-
-  async findOne(id: number) {
-    const video = await this.prisma.heroVideo.findUnique({ where: { id } });
-    if (!video) throw new NotFoundException(`Video de hero ${id} no encontrado`);
+  async findOne(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const video = await this.prisma.heroVideo.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(video, tenantId, 'Video de hero');
     return video;
   }
 
-  async upsert(opts: {
-    title?: string;
-    video?: MulterFile;
-    videoMobile?: MulterFile;
-    clearMobile?: boolean;
-  }) {
-    const previous = await this.adminCurrent();
+  async upsert(
+    opts: {
+      title?: string;
+      video?: MulterFile;
+      videoMobile?: MulterFile;
+      clearMobile?: boolean;
+    },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const previous = await this.adminCurrent(tenantId);
     const { video, videoMobile, clearMobile, title } = opts;
 
     if (!previous && !video) {
@@ -98,6 +123,7 @@ export class HeroVideoService {
         videoUrlMobile,
         title: title?.trim() || previous?.title || null,
         isActive: true,
+        companyId: tenantId,
       },
     });
 
@@ -109,12 +135,12 @@ export class HeroVideoService {
     return created;
   }
 
-  async upload(title: string | undefined, file?: MulterFile) {
-    return this.upsert({ title, video: file });
+  async upload(title: string | undefined, file?: MulterFile, companyId?: number | null) {
+    return this.upsert({ title, video: file }, companyId);
   }
 
-  async update(id: number, payload: UpdateHeroVideoDto) {
-    await this.findOne(id);
+  async update(id: number, payload: UpdateHeroVideoDto, companyId?: number | null) {
+    await this.findOne(id, companyId);
     return this.prisma.heroVideo.update({
       where: { id },
       data: {
@@ -127,8 +153,8 @@ export class HeroVideoService {
     });
   }
 
-  async remove(id: number) {
-    const existing = await this.findOne(id);
+  async remove(id: number, companyId?: number | null) {
+    const existing = await this.findOne(id, companyId);
     await this.prisma.heroVideo.delete({ where: { id } });
     await this.deleteVideoFile(existing.videoUrl);
     await this.deleteVideoFile(existing.videoUrlMobile);

@@ -23,19 +23,19 @@ enum CrmReportMode {
 @MainActor
 final class CrmReportsVM: ObservableObject {
     @Published var period = "month"
-    @Published var metrics: [String: Any] = [:]
-    @Published var vendors: [[String: Any]] = []
+    @Published var metrics = SalesMetrics()
+    @Published var vendors: [VendorReportItem] = []
     @Published var isLoading = false
     @Published var error: String?
 
     func load() {
         isLoading = true; error = nil
         Task {
-            async let m = CrmRepository.shared.salesMetrics(period: period)
-            async let v = CrmRepository.shared.vendorStats(period: period)
+            async let m = CrmRepository.shared.salesMetricsItem(period: period)
+            async let v = CrmRepository.shared.vendorReportItems(period: period)
             metrics = await m
             vendors = await v
-            if metrics.isEmpty && vendors.isEmpty { error = "No se pudieron cargar los reportes." }
+            if metrics.raw.isEmpty && vendors.isEmpty { error = "No se pudieron cargar los reportes." }
             isLoading = false
         }
     }
@@ -50,7 +50,7 @@ final class CrmReportsVM: ObservableObject {
 struct CrmReportsView: View {
     let mode: CrmReportMode
     @StateObject private var vm = CrmReportsVM()
-    @State private var selectedVendor: [String: Any]?
+    @State private var selectedVendor: VendorReportItem?
 
     var body: some View {
         Group {
@@ -63,21 +63,16 @@ struct CrmReportsView: View {
     }
 
     @ViewBuilder
-    private func vendorDetail(_ v: [String: Any]) -> some View {
-        let name   = crmStr(v, "userName", "nombre", "name").ifBlank("Vendedor")
-        let status = crmStr(v, "status")
-        let statusColor = vendorStatusColor(status)
-        let revenue = crmDouble(v, "revenue")
-        let target  = crmDouble(v, "targetRevenue")
-        let att     = crmDouble(v, "attainmentRevenue")
+    private func vendorDetail(_ v: VendorReportItem) -> some View {
+        let statusColor = vendorStatusColor(v.status)
         List {
             Section { Button("← Reportes") { selectedVendor = nil } }
             Section {
                 HStack {
-                    Text(name).font(.headline)
+                    Text(v.displayName).font(.headline)
                     Spacer()
-                    if !status.isEmpty {
-                        Text(status.replacingOccurrences(of: "-", with: " ").capitalized)
+                    if !v.status.isEmpty {
+                        Text(v.status.replacingOccurrences(of: "-", with: " ").capitalized)
                             .font(.caption2.bold()).foregroundColor(statusColor)
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .background(statusColor.opacity(0.12)).clipShape(Capsule())
@@ -85,21 +80,21 @@ struct CrmReportsView: View {
                 }
             }
             Section("Ventas") {
-                vrRow("Ingresos",       crmFmtMxn(revenue))
-                vrRow("Meta",           crmFmtMxn(target))
-                if target > 0 { vrRow("Cumplimiento", crmFmtPct(att)) }
-                vrRow("Oportunidades",  "\(crmInt(v, "opportunities"))")
-                vrRow("Proyectos",      "\(crmInt(v, "projects"))")
-                vrRow("Leads",          "\(crmInt(v, "leads"))")
-                vrRow("Actividades",    "\(crmInt(v, "activities"))")
-                if let perf = crmOptionalDouble(v, "performance") { vrRow("Performance", crmFmtPct(perf)) }
-                vrRow("Email",          crmStr(v, "email"))
-                vrRow("Rol",            crmStr(v, "role", "rol"))
+                vrRow("Ingresos",       crmFmtMxn(v.revenue))
+                vrRow("Meta",           crmFmtMxn(v.targetRevenue))
+                if v.targetRevenue > 0 { vrRow("Cumplimiento", crmFmtPct(v.attainmentRevenue)) }
+                vrRow("Oportunidades",  "\(v.opportunities)")
+                vrRow("Proyectos",      "\(v.projects)")
+                vrRow("Leads",          "\(v.leads)")
+                vrRow("Actividades",    "\(v.activities)")
+                if v.performance > 0 { vrRow("Performance", crmFmtPct(v.performance)) }
+                vrRow("Email",          v.email)
+                vrRow("Rol",            v.role)
             }
-            if target > 0 {
+            if v.targetRevenue > 0 {
                 Section("Cuota") {
-                    ProgressView(value: min(att / 100, 1)).tint(statusColor)
-                    Text("\(crmFmtPct(att)) de \(crmFmtMxn(target))")
+                    ProgressView(value: min(v.attainmentRevenue / 100, 1)).tint(statusColor)
+                    Text("\(crmFmtPct(v.attainmentRevenue)) de \(crmFmtMxn(v.targetRevenue))")
                         .font(.caption).foregroundColor(statusColor)
                 }
             }
@@ -124,11 +119,15 @@ struct CrmReportsView: View {
 
                 periodChips
 
-                if vm.isLoading && vm.metrics.isEmpty {
+                if vm.isLoading && vm.metrics.raw.isEmpty {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 24)
                 } else if let err = vm.error {
-                    Text(err).foregroundColor(.red)
-                    Button("Reintentar") { vm.load() }.buttonStyle(.bordered)
+                    NxEmptyState(
+                        title: "Sin reportes",
+                        subtitle: err,
+                        actionLabel: "Reintentar",
+                        onAction: { vm.load() }
+                    )
                 } else {
                     content
                 }
@@ -162,7 +161,7 @@ struct CrmReportsView: View {
             metricsGrid(full: true)
             if !vm.vendors.isEmpty {
                 sectionHeader("Equipo de ventas", "\(vm.vendors.count) vendedores")
-                ForEach(vm.vendors, id: \.vendorId) { v in
+                ForEach(vm.vendors) { v in
                     Button { selectedVendor = v } label: { VendorCardView(vendor: v) }.buttonStyle(.plain)
                 }
             }
@@ -171,10 +170,15 @@ struct CrmReportsView: View {
             metricsGrid(full: false)
         case .equipoComparativa:
             if vm.vendors.isEmpty {
-                Text("Sin datos de vendedores para este periodo.").foregroundColor(.secondary)
+                NxEmptyState(
+                    title: "Sin vendedores",
+                    subtitle: "No hay datos de vendedores para este periodo.",
+                    actionLabel: "Actualizar",
+                    onAction: { vm.load() }
+                )
             } else {
                 sectionHeader("Ranking", periodLabel(vm.period))
-                ForEach(vm.vendors.sorted { crmDouble($0, "revenue") > crmDouble($1, "revenue") }, id: \.vendorId) { v in
+                ForEach(vm.vendors.sorted { $0.revenue > $1.revenue }) { v in
                     Button { selectedVendor = v } label: { VendorCardView(vendor: v, showQuota: true) }.buttonStyle(.plain)
                 }
             }
@@ -191,23 +195,24 @@ struct CrmReportsView: View {
     }
 
     private func metricsGrid(full: Bool) -> some View {
+        let m = vm.metrics
         let items: [(String, String, Color)] = if full {
             [
-                ("Ingresos", crmFmtMxn(crmDouble(vm.metrics, "totalRevenue")), .green),
-                ("Pipeline", crmFmtMxn(crmDouble(vm.metrics, "pipelineValue")), .blue),
-                ("Oportunidades", "\(crmInt(vm.metrics, "opportunityCount"))", .teal),
-                ("Proyectos", "\(crmInt(vm.metrics, "projectCount"))", .indigo),
-                ("Conversión", crmFmtPct(crmDouble(vm.metrics, "conversionRate")), .orange),
-                ("Margen prom.", crmFmtPct(crmDouble(vm.metrics, "averageMargin")), .purple),
-                ("Cerrados", "\(crmInt(vm.metrics, "closedProjects"))", .mint),
-                ("Clientes nuevos", "\(crmInt(vm.metrics, "activeClients"))", .pink),
+                ("Ingresos", crmFmtMxn(m.totalRevenue), .green),
+                ("Pipeline", crmFmtMxn(m.pipelineValue), .blue),
+                ("Oportunidades", "\(m.opportunityCount)", .teal),
+                ("Proyectos", "\(m.projectCount)", .indigo),
+                ("Conversión", crmFmtPct(m.conversionRate), .orange),
+                ("Margen prom.", crmFmtPct(m.averageMargin), .purple),
+                ("Cerrados", "\(m.closedProjects)", .mint),
+                ("Clientes nuevos", "\(m.activeClients)", .pink),
             ]
         } else {
             [
-                ("Ingresos", crmFmtMxn(crmDouble(vm.metrics, "totalRevenue")), .green),
-                ("Pipeline", crmFmtMxn(crmDouble(vm.metrics, "pipelineValue")), .blue),
-                ("Conversión", crmFmtPct(crmDouble(vm.metrics, "conversionRate")), .orange),
-                ("Oportunidades", "\(crmInt(vm.metrics, "opportunityCount"))", .teal),
+                ("Ingresos", crmFmtMxn(m.totalRevenue), .green),
+                ("Pipeline", crmFmtMxn(m.pipelineValue), .blue),
+                ("Conversión", crmFmtPct(m.conversionRate), .orange),
+                ("Oportunidades", "\(m.opportunityCount)", .teal),
             ]
         }
 
@@ -219,25 +224,20 @@ struct CrmReportsView: View {
     }
 
     private var growthHighlight: some View {
-        let revenue = crmDouble(vm.metrics, "totalRevenue")
-        let pipeline = crmDouble(vm.metrics, "pipelineValue")
-        let conversion = crmDouble(vm.metrics, "conversionRate")
-        let closed = crmInt(vm.metrics, "closedProjects")
-        let opps = crmInt(vm.metrics, "opportunityCount")
-
+        let m = vm.metrics
         return VStack(alignment: .leading, spacing: 8) {
-            Text("Resumen de crecimiento").font(.headline).foregroundColor(Color(red: 0.02, green: 0.37, blue: 0.27))
-            Text("Ingresos \(crmFmtMxn(revenue)) · Pipeline \(crmFmtMxn(pipeline)) · Conversión \(crmFmtPct(conversion))")
-                .font(.subheadline).foregroundColor(Color(red: 0.02, green: 0.47, blue: 0.34))
-            if opps > 0 {
-                ProgressView(value: Double(closed) / Double(opps))
+            Text("Resumen de crecimiento").font(.headline)
+            Text("Ingresos \(crmFmtMxn(m.totalRevenue)) · Pipeline \(crmFmtMxn(m.pipelineValue)) · Conversión \(crmFmtPct(m.conversionRate))")
+                .font(.subheadline).foregroundColor(.secondary)
+            if m.opportunityCount > 0 {
+                ProgressView(value: Double(m.closedProjects) / Double(m.opportunityCount))
                     .tint(.green)
-                Text("\(closed) de \(opps) oportunidades cerradas").font(.caption2).foregroundColor(.secondary)
+                Text("\(m.closedProjects) de \(m.opportunityCount) oportunidades cerradas").font(.caption2).foregroundColor(.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(Color(red: 0.94, green: 0.99, blue: 0.96))
+        .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
@@ -265,40 +265,33 @@ private struct CrmMetricTile: View {
 }
 
 private struct VendorCardView: View {
-    let vendor: [String: Any]
+    let vendor: VendorReportItem
     var showQuota: Bool = false
 
     var body: some View {
-        let name = crmStr(vendor, "userName", "nombre", "name").ifBlank("Vendedor")
-        let revenue = crmDouble(vendor, "revenue")
-        let status = crmStr(vendor, "status")
-        let statusColor = vendorStatusColor(status)
+        let statusColor = vendorStatusColor(vendor.status)
 
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(name).font(.subheadline).bold()
+                Text(vendor.displayName).font(.subheadline).bold()
                 Spacer()
-                Text(crmFmtMxn(revenue)).font(.subheadline).bold().foregroundColor(.teal)
+                Text(crmFmtMxn(vendor.revenue)).font(.subheadline).bold().foregroundColor(.teal)
             }
             HStack(spacing: 12) {
-                Text("\(crmInt(vendor, "opportunities")) opps").font(.caption2).foregroundColor(.secondary)
-                Text("\(crmInt(vendor, "projects")) proy.").font(.caption2).foregroundColor(.secondary)
-                if let perf = crmOptionalDouble(vendor, "performance") {
-                    Text("\(Int(perf))% perf.").font(.caption2).foregroundColor(.secondary)
+                Text("\(vendor.opportunities) opps").font(.caption2).foregroundColor(.secondary)
+                Text("\(vendor.projects) proy.").font(.caption2).foregroundColor(.secondary)
+                if vendor.performance > 0 {
+                    Text("\(Int(vendor.performance))% perf.").font(.caption2).foregroundColor(.secondary)
                 }
             }
-            if showQuota {
-                let target = crmDouble(vendor, "targetRevenue")
-                let att = crmDouble(vendor, "attainmentRevenue")
-                if target > 0 {
-                    ProgressView(value: min(att / 100, 1))
-                        .tint(statusColor)
-                    Text("Cuota \(crmFmtMxn(target)) · \(crmFmtPct(att)) cumplimiento")
-                        .font(.caption2).foregroundColor(statusColor)
-                }
+            if showQuota, vendor.targetRevenue > 0 {
+                ProgressView(value: min(vendor.attainmentRevenue / 100, 1))
+                    .tint(statusColor)
+                Text("Cuota \(crmFmtMxn(vendor.targetRevenue)) · \(crmFmtPct(vendor.attainmentRevenue)) cumplimiento")
+                    .font(.caption2).foregroundColor(statusColor)
             }
-            if !status.isEmpty {
-                Text(status.replacingOccurrences(of: "-", with: " ").capitalized)
+            if !vendor.status.isEmpty {
+                Text(vendor.status.replacingOccurrences(of: "-", with: " ").capitalized)
                     .font(.caption2.bold()).foregroundColor(statusColor)
                     .padding(.horizontal, 8).padding(.vertical, 2)
                     .background(statusColor.opacity(0.12)).clipShape(Capsule())
@@ -311,30 +304,6 @@ private struct VendorCardView: View {
 }
 
 // MARK: – Shared CRM report helpers
-
-private func crmStr(_ m: [String: Any], _ keys: String...) -> String {
-    for k in keys {
-        if let v = m[k] {
-            let s: String
-            if let ss = v as? String { s = ss }
-            else if let n = v as? NSNumber { s = n.stringValue }
-            else { s = String(describing: v) }
-            if !s.isEmpty && s != "null" { return s }
-        }
-    }
-    return ""
-}
-
-private func crmOptionalDouble(_ m: [String: Any], _ key: String) -> Double? {
-    if let d = m[key] as? Double { return d }
-    if let n = m[key] as? NSNumber { return n.doubleValue }
-    if let s = m[key] as? String { return Double(s) }
-    return nil
-}
-
-private func crmDouble(_ m: [String: Any], _ key: String) -> Double { crmOptionalDouble(m, key) ?? 0 }
-
-private func crmInt(_ m: [String: Any], _ key: String) -> Int { Int(crmDouble(m, key)) }
 
 private func crmFmtMxn(_ v: Double) -> String {
     let n = NumberFormatter()
@@ -350,18 +319,5 @@ private func vendorStatusColor(_ status: String) -> Color {
     case "risk": return .orange
     case "off-track": return .red
     default: return .secondary
-    }
-}
-
-extension String {
-    fileprivate func ifBlank(_ fallback: String) -> String { isEmpty ? fallback : self }
-}
-
-extension [String: Any] {
-    fileprivate var vendorId: String {
-        if let n = self["userId"] as? Int { return "v-\(n)" }
-        if let s = self["userId"] as? String { return "v-\(s)" }
-        if let n = self["id"] as? Int { return "v-\(n)" }
-        return UUID().uuidString
     }
 }

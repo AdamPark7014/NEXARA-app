@@ -4,6 +4,7 @@ import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 @Controller('attendance')
 export class AttendanceController {
@@ -12,31 +13,43 @@ export class AttendanceController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
   @Post()
-  async register(@Body() dto: CreateAttendanceDto, @Req() req: any) {
+  async register(
+    @Body() dto: CreateAttendanceDto,
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
     // req.user.id debe estar disponible si usas JWT
-    return this.attendanceService.register(dto, req.user?.id, req);
+    return this.attendanceService.register(dto, req.user?.id, req, companyId);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
   @Get('current')
-  async current(@Req() req: any) {
-    const day = await this.attendanceService.getCurrentDay(req.user?.id);
+  async current(@Req() req: any, @CurrentCompanyId() companyId: number | null) {
+    const day = await this.attendanceService.getCurrentDay(req.user?.id, companyId);
     return day ?? null;
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
   @Get('history')
-  async history(@Req() req: any, @Query('date') date?: string) {
-    return this.attendanceService.getHistory(req.user?.id, date);
+  async history(
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('date') date?: string,
+  ) {
+    return this.attendanceService.getHistory(req.user?.id, date, companyId);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
   @Get('day')
-  async day(@Req() req: any, @Query('date') date?: string) {
-    return this.attendanceService.getDaySummary(req.user?.id, date);
+  async day(
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('date') date?: string,
+  ) {
+    return this.attendanceService.getDaySummary(req.user?.id, date, companyId);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
@@ -44,10 +57,11 @@ export class AttendanceController {
   @Get('range')
   async range(
     @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
-    return this.attendanceService.getRangeSummary(req.user?.id, from, to);
+    return this.attendanceService.getRangeSummary(req.user?.id, from, to, companyId);
   }
 
   /**
@@ -59,6 +73,7 @@ export class AttendanceController {
   @Get('hierarchy/range')
   async hierarchyRange(
     @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('departmentId') departmentId?: string,
@@ -69,6 +84,7 @@ export class AttendanceController {
       from,
       to,
       departmentId ? parseInt(departmentId) : undefined,
+      companyId,
     );
   }
 }

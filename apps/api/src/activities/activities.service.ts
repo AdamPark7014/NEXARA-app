@@ -5,7 +5,7 @@ import { CreateActivityDto } from './dto/create-activity.dto.js';
 import { UpdateActivityDto } from './dto/update-activity.dto.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { generateTicketReportPdf } from './ticket-report-pdf.js';
-import { companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
+import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -26,11 +26,12 @@ export class ActivitiesService {
   }
 
 
-  private async generateNextAnNumber(): Promise<string> {
+  private async generateNextAnNumber(companyId: number): Promise<string> {
     const [latestNumericAn] = await this.prisma.$queryRaw<Array<{ anNumber: string }>>`
       SELECT "anNumber"
       FROM "Activity"
-      WHERE "anNumber" ~ '\\d+$'
+      WHERE "companyId" = ${companyId}
+        AND "anNumber" ~ '\\d+$'
       ORDER BY CAST(substring("anNumber" FROM '(\\d+)$') AS INTEGER) DESC
       LIMIT 1
     `;
@@ -56,15 +57,16 @@ export class ActivitiesService {
     return `${prefix}${String(next).padStart(padLength, '0')}`;
   }
 
-  async getNextAnNumber(): Promise<string> {
-    return this.generateNextAnNumber();
+  async getNextAnNumber(companyId?: number | null): Promise<string> {
+    const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
+    return this.generateNextAnNumber(resolvedCompanyId);
   }
 
   async create(createActivityDto: CreateActivityDto, companyId?: number | null) {
-    const trimmed = createActivityDto.anNumber?.trim();
-    const anNumber = trimmed ? trimmed : await this.generateNextAnNumber();
     const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
-    
+    const trimmed = createActivityDto.anNumber?.trim();
+    const anNumber = trimmed ? trimmed : await this.generateNextAnNumber(resolvedCompanyId);
+
     const activity = await this.prisma['activity'].create({
       data: { ...createActivityDto, anNumber, companyId: resolvedCompanyId },
       include: { responsable: { select: { nombre: true, id: true } }, creador: { select: { nombre: true } } },
@@ -243,9 +245,9 @@ export class ActivitiesService {
     });
   }
 
-  async findOne(id: number) {
-    return this.prisma['activity'].findUnique({
-      where: { id },
+  async findOne(id: number, companyId?: number | null) {
+    const activity = await this.prisma['activity'].findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
       include: {
         creador: true,
         responsable: true,
@@ -263,11 +265,13 @@ export class ActivitiesService {
         },
       },
     });
+    assertCompanyAccess(activity, companyId, 'Actividad');
+    return activity;
   }
 
-  async generateTicketReport(activityId: number) {
-    const activity = await this.prisma['activity'].findUnique({
-      where: { id: activityId },
+  async generateTicketReport(activityId: number, companyId?: number | null) {
+    const activity = await this.prisma['activity'].findFirst({
+      where: { id: activityId, ...companyWhere(companyId ?? null) },
       include: {
         client: true,
         responsable: true,
@@ -292,7 +296,7 @@ export class ActivitiesService {
         },
       },
     });
-    if (!activity) return null;
+    assertCompanyAccess(activity, companyId, 'Actividad');
 
     const normalizeReportUploadUrl = (value?: string | null) => {
       if (!value) return '';
@@ -451,11 +455,13 @@ export class ActivitiesService {
     id: number,
     updateActivityDto: UpdateActivityDto,
     actor?: { id: number; nombre?: string },
+    companyId?: number | null,
   ) {
-    const prev = await this.prisma['activity'].findUnique({
-      where: { id },
-      select: { estatus: true, responsableId: true, anNumber: true, titulo: true },
+    const prev = await this.prisma['activity'].findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
+      select: { estatus: true, responsableId: true, anNumber: true, titulo: true, companyId: true },
     });
+    assertCompanyAccess(prev, companyId, 'Actividad');
 
     const updatedActivity = await this.prisma['activity'].update({
       where: { id },
@@ -481,7 +487,12 @@ export class ActivitiesService {
     return updatedActivity;
   }
 
-  async remove(id: number) {
+  async remove(id: number, companyId?: number | null) {
+    const existing = await this.prisma['activity'].findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
+      select: { id: true, companyId: true },
+    });
+    assertCompanyAccess(existing, companyId, 'Actividad');
     return this.prisma['activity'].delete({ where: { id } });
   }
 }

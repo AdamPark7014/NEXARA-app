@@ -7,9 +7,14 @@ final class OpsRepository {
     private init() {}
 
     func clientTicketRequests(status: String? = nil) async throws -> [[String: Any]] {
+        try await clientTicketRequestItems(status: status).map { $0.toFlatMap() }
+    }
+
+    func clientTicketRequestItems(status: String? = nil) async throws -> [ClientTicketRequest] {
         var q: [String: String] = [:]
         if let status, !status.isEmpty { q["status"] = status }
         return ApiClient.decodeMapList(try await api.get("client-ticket-requests", query: q))
+            .map { ClientTicketRequest(raw: $0) }
     }
 
     func patchClientTicketStatus(id: Int64, status: String) async throws -> [String: Any] {

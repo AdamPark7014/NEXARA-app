@@ -20,6 +20,14 @@ export class BranchPortalController {
     private readonly serviceClientsService: ServiceClientsService,
   ) {}
 
+  private async resolveClientCompanyId(clientId: number): Promise<number | null> {
+    const client = await this.prisma.serviceClient.findUnique({
+      where: { id: clientId },
+      select: { companyId: true },
+    });
+    return client?.companyId ?? null;
+  }
+
   @Get('profile')
   async profile(@CurrentUser() user: any) {
     const branch = await this.prisma['serviceClientBranch'].findFirst({
@@ -265,7 +273,13 @@ export class BranchPortalController {
     @Query('end') end?: string,
   ) {
     const range = start && end ? { start: new Date(start), end: new Date(end) } : undefined;
-    const { pdf } = await this.serviceClientsService.generateBranchReport(user.clientId, user.branchId, range);
+    const companyId = await this.resolveClientCompanyId(user.clientId);
+    const { pdf } = await this.serviceClientsService.generateBranchReport(
+      user.clientId,
+      user.branchId,
+      range,
+      companyId,
+    );
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename=reporte-tickets-sucursal.pdf');
     return res.send(pdf);
@@ -280,6 +294,7 @@ export class BranchPortalController {
     @Query('to') to?: string,
     @Query('search') search?: string,
   ) {
+    const companyId = await this.resolveClientCompanyId(user.clientId);
     const normalizedOrigin = String(origin || '').toUpperCase();
     const createdByType = ['CLIENT', 'BRANCH', 'CONSOLE'].includes(normalizedOrigin)
       ? (normalizedOrigin as 'CLIENT' | 'BRANCH' | 'CONSOLE')
@@ -295,7 +310,7 @@ export class BranchPortalController {
       from: parsedFrom && !Number.isNaN(parsedFrom.getTime()) ? parsedFrom : undefined,
       to: parsedTo && !Number.isNaN(parsedTo.getTime()) ? parsedTo : undefined,
       search: search?.trim() || undefined,
-    });
+    }, undefined, companyId);
   }
 
   @Post('inventories/upload')
@@ -309,6 +324,7 @@ export class BranchPortalController {
 
   @Post('inventories/sync')
   async syncInventory(@CurrentUser() user: any, @Body() body: any) {
+    const companyId = await this.resolveClientCompanyId(user.clientId);
     return this.inventoriesService.syncManualSnapshot(
       {
         clientId: user.clientId,
@@ -317,6 +333,7 @@ export class BranchPortalController {
       },
       body || {},
       user.branchId,
+      companyId,
     );
   }
 
@@ -326,16 +343,18 @@ export class BranchPortalController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { status?: string },
   ) {
-    const detail = await this.inventoriesService.detail(id);
+    const companyId = await this.resolveClientCompanyId(user.clientId);
+    const detail = await this.inventoriesService.detail(id, companyId);
     if (detail.clientId !== user.clientId || detail.branchId !== user.branchId) {
       throw new BadRequestException('Inventario no pertenece a la sucursal');
     }
-    return this.inventoriesService.updateStatus(id, body?.status || 'PENDING');
+    return this.inventoriesService.updateStatus(id, body?.status || 'PENDING', companyId);
   }
 
   @Get('inventories/:id')
   async inventoryDetail(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number) {
-    const detail = await this.inventoriesService.detail(id);
+    const companyId = await this.resolveClientCompanyId(user.clientId);
+    const detail = await this.inventoriesService.detail(id, companyId);
     if (detail.clientId !== user.clientId || detail.branchId !== user.branchId) {
       throw new BadRequestException('Inventario no pertenece a la sucursal');
     }
@@ -348,11 +367,12 @@ export class BranchPortalController {
     @Param('id', ParseIntPipe) id: number,
     @Res() res: Response,
   ) {
-    const detail = await this.inventoriesService.detail(id);
+    const companyId = await this.resolveClientCompanyId(user.clientId);
+    const detail = await this.inventoriesService.detail(id, companyId);
     if (detail.clientId !== user.clientId || detail.branchId !== user.branchId) {
       throw new BadRequestException('Inventario no pertenece a la sucursal');
     }
-    const result = await this.inventoriesService.generateReport(id);
+    const result = await this.inventoriesService.generateReport(id, companyId);
     if (!result) return res.status(404).send('Inventario no encontrado');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=inventario-${id}.pdf`);

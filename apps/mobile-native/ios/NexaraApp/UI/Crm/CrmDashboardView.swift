@@ -4,18 +4,18 @@ import SwiftUI
 
 @MainActor
 final class CrmDashboardVM: ObservableObject {
-    @Published var cotizaciones: [[String: Any]] = []
+    @Published var cotizaciones: [Cotizacion] = []
     @Published var leads:        [[String: Any]] = []
-    @Published var metrics:      [String: Any] = [:]
+    @Published var metrics = SalesMetrics()
     @Published var isLoading = false
     @Published var error: String?
 
     func load() {
         isLoading = true; error = nil
         Task {
-            async let cots  = ExtraRepository.shared.cotizaciones()
+            async let cots  = ExtraRepository.shared.cotizacionItems()
             async let leads = ExtraRepository.shared.clientTicketRequests()
-            async let mets  = CrmRepository.shared.salesMetrics(period: "month")
+            async let mets  = CrmRepository.shared.salesMetricsItem(period: "month")
             let (c, l, m) = await (cots, leads, mets)
             cotizaciones = c
             self.leads   = l
@@ -58,7 +58,7 @@ struct CrmDashboardView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
                 kpiSection
-                if !vm.metrics.isEmpty { pipelineSection }
+                if !vm.metrics.raw.isEmpty { pipelineSection }
                 if !vm.cotizaciones.isEmpty { statusSection }
                 recentCotSection
                 if !vm.leads.isEmpty { leadsSection }
@@ -71,12 +71,12 @@ struct CrmDashboardView: View {
     // ── KPIs
     private var kpiSection: some View {
         let total    = vm.cotizaciones.count
-        let totalVal = vm.cotizaciones.compactMap { cDouble($0, "total") }.reduce(0, +)
-        let approved = vm.cotizaciones.filter { cStr($0, "estatus").localizedLowercase.contains("aprobad") }.count
-        let approvedV = vm.cotizaciones.filter { cStr($0, "estatus").localizedLowercase.contains("aprobad") }
-                            .compactMap { cDouble($0, "total") }.reduce(0, +)
+        let totalVal = vm.cotizaciones.reduce(0) { $0 + $1.total }
+        let approved = vm.cotizaciones.filter { $0.estatus.localizedLowercase.contains("aprobad") }.count
+        let approvedV = vm.cotizaciones.filter { $0.estatus.localizedLowercase.contains("aprobad") }
+                            .reduce(0) { $0 + $1.total }
         let pending  = vm.cotizaciones.filter {
-            let s = cStr($0, "estatus").localizedLowercase
+            let s = $0.estatus.localizedLowercase
             return s.contains("enviada") || s.contains("borrador")
         }.count
 
@@ -95,9 +95,9 @@ struct CrmDashboardView: View {
             CrmSectionRow(title: "Pipeline del mes", detail: "Ver reportes →")
                 .padding(.horizontal)
             HStack(spacing: 10) {
-                CrmKpi(icon: "💰", label: "Ingresos", value: crmDashFmtMxn(crmDashDouble(vm.metrics, "totalRevenue")), sub: "Periodo actual", accent: .green)
-                CrmKpi(icon: "📊", label: "Pipeline", value: crmDashFmtMxn(crmDashDouble(vm.metrics, "pipelineValue")), sub: "Oportunidades activas", accent: .blue)
-                CrmKpi(icon: "🎯", label: "Conversión", value: crmDashFmtPct(crmDashDouble(vm.metrics, "conversionRate")), sub: "Cierre vs opps", accent: .orange)
+                CrmKpi(icon: "dollarsign.circle", label: "Ingresos", value: crmDashFmtMxn(vm.metrics.totalRevenue), sub: "Periodo actual", accent: .green)
+                CrmKpi(icon: "chart.bar", label: "Pipeline", value: crmDashFmtMxn(vm.metrics.pipelineValue), sub: "Oportunidades activas", accent: .blue)
+                CrmKpi(icon: "target", label: "Conversión", value: crmDashFmtPct(vm.metrics.conversionRate), sub: "Cierre vs opps", accent: .orange)
             }
             .padding(.horizontal)
         }
@@ -105,7 +105,7 @@ struct CrmDashboardView: View {
 
     // ── Status breakdown
     private var statusSection: some View {
-        let groups = Dictionary(grouping: vm.cotizaciones) { cStr($0, "estatus").ifBlank("Sin estado") }
+        let groups = Dictionary(grouping: vm.cotizaciones) { $0.estatus.isEmpty ? "Sin estado" : $0.estatus }
             .sorted { $0.value.count > $1.value.count }
         let total = vm.cotizaciones.count
 
@@ -131,7 +131,7 @@ struct CrmDashboardView: View {
         VStack(alignment: .leading, spacing: 8) {
             CrmSectionRow(title: "Cotizaciones recientes", detail: "Últimas 8")
                 .padding(.horizontal)
-            ForEach(vm.cotizaciones.prefix(8), id: \.crmId) { c in
+            ForEach(vm.cotizaciones.prefix(8)) { c in
                 CrmCotCard(item: c).padding(.horizontal)
             }
         }
@@ -207,35 +207,30 @@ private struct CrmStatusBar: View {
 }
 
 private struct CrmCotCard: View {
-    let item: [String: Any]
+    let item: Cotizacion
     var body: some View {
-        let folio  = cStr(item, "folio").ifBlank("Cot. #\(cStr(item, "id"))")
-        let client = cStr(item, "cliente")
-        let total  = cDouble(item, "total") ?? 0
-        let status = cStr(item, "estatus")
-        let fecha  = cStr(item, "fecha").ifBlank(cStr(item, "createdAt"))
-        let color  = cotColor(status)
+        let color = cotColor(item.estatus)
 
         HStack(spacing: 12) {
             Rectangle().fill(color).frame(width: 4)
                 .clipShape(RoundedRectangle(cornerRadius: 2))
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
-                    Text(folio).font(.subheadline).bold().foregroundColor(.teal)
+                    Text(item.displayFolio).font(.subheadline).bold().foregroundColor(.teal)
                     Spacer()
-                    Text(fmtMxn(total)).font(.subheadline).bold()
+                    Text(fmtMxn(item.total)).font(.subheadline).bold()
                 }
                 HStack {
-                    if !client.isEmpty { Text(client).font(.caption).foregroundColor(.secondary) }
+                    if !item.cliente.isEmpty { Text(item.cliente).font(.caption).foregroundColor(.secondary) }
                     Spacer()
-                    if !status.isEmpty {
-                        Text(status).font(.caption2).bold().foregroundColor(color)
+                    if !item.estatus.isEmpty {
+                        Text(item.estatus).font(.caption2).bold().foregroundColor(color)
                             .padding(.horizontal, 7).padding(.vertical, 2)
                             .background(color.opacity(0.12)).clipShape(Capsule())
                     }
                 }
-                if !fecha.isEmpty {
-                    Text(fecha).font(.caption2).foregroundColor(.secondary)
+                if !item.dateLabel.isEmpty {
+                    Text(item.dateLabel).font(.caption2).foregroundColor(.secondary)
                 }
             }
         }

@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { AccountingService } from '../accounting/accounting.service.js';
-import { assertCompanyAccess, companyWhere } from '../common/tenant/tenant-scope.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 const COGS_MOVEMENT_TYPES = new Set(['DISPATCH', 'SCRAP', 'PRODUCTION_OUT']);
 
@@ -67,12 +67,30 @@ export class WarehouseService {
     return wh!;
   }
 
-  async updateWarehouse(id: number, dto: Partial<{ code: string; name: string; address: string; city: string; state: string; managerId: number; isActive: boolean }>) {
+  async updateWarehouse(
+    id: number,
+    dto: Partial<{ code: string; name: string; address: string; city: string; state: string; managerId: number; isActive: boolean }>,
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const wh = await this.prisma.warehouse.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(wh, tenantId, 'Almacén');
     return this.prisma.warehouse.update({ where: { id }, data: dto as any });
   }
 
   // ── Locations ─────────────────────────────────────────────────────
-  async createLocation(warehouseId: number, dto: { code: string; name: string; aisle?: string; rack?: string; shelf?: string; bin?: string }) {
+  async createLocation(
+    warehouseId: number,
+    dto: { code: string; name: string; aisle?: string; rack?: string; shelf?: string; bin?: string },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const wh = await this.prisma.warehouse.findFirst({
+      where: { id: warehouseId, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(wh, tenantId, 'Almacén');
     return this.prisma.warehouseLocation.create({
       data: {
         warehouseId,
@@ -82,6 +100,7 @@ export class WarehouseService {
         rack: dto.rack?.trim() || null,
         shelf: dto.shelf?.trim() || null,
         bin: dto.bin?.trim() || null,
+        companyId: wh!.companyId,
       },
     });
   }
@@ -100,12 +119,10 @@ export class WarehouseService {
     belowReorder?: boolean;
     companyId?: number | null;
   }) {
-    const where: any = {};
+    const tenantId = requireCompanyId(filters?.companyId);
+    const where: any = { warehouse: companyWhere(tenantId) };
     if (filters?.warehouseId) where.warehouseId = filters.warehouseId;
     if (filters?.productId) where.productId = filters.productId;
-    if (filters?.companyId != null && Number.isFinite(Number(filters.companyId))) {
-      where.warehouse = { companyId: Number(filters.companyId) };
-    }
     if (filters?.belowReorder) {
       // Filter in JS since Prisma can't compare two columns directly
     }
@@ -122,16 +139,23 @@ export class WarehouseService {
     return levels;
   }
 
-  async getStockLevel(id: number) {
-    const sl = await this.prisma.stockLevel.findUnique({
-      where: { id },
+  async getStockLevel(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const sl = await this.prisma.stockLevel.findFirst({
+      where: { id, warehouse: companyWhere(tenantId) },
       include: { product: true, warehouse: true, location: true, lotStocks: { include: { lot: true } } },
     });
     if (!sl) throw new NotFoundException('Stock no encontrado');
+    assertCompanyAccess(sl.warehouse, tenantId, 'Stock');
     return sl;
   }
 
-  async updateStockConfig(id: number, dto: { reorderPoint?: number; minStock?: number; maxStock?: number; valuationMethod?: string }) {
+  async updateStockConfig(
+    id: number,
+    dto: { reorderPoint?: number; minStock?: number; maxStock?: number; valuationMethod?: string },
+    companyId?: number | null,
+  ) {
+    await this.getStockLevel(id, companyId);
     for (const [key, value] of Object.entries({ reorderPoint: dto.reorderPoint, minStock: dto.minStock, maxStock: dto.maxStock })) {
       if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
         throw new BadRequestException(`${key} debe ser un número mayor o igual a cero`);
@@ -149,8 +173,10 @@ export class WarehouseService {
   }
 
   // ── Stock Movements ───────────────────────────────────────────────
-  private async generateMovementNumber(): Promise<string> {
-    const count = await this.prisma.stockMovement.count();
+  private async generateMovementNumber(companyId: number): Promise<string> {
+    const count = await this.prisma.stockMovement.count({
+      where: companyWhere(companyId),
+    });
     return `SM-${String(count + 1).padStart(6, '0')}`;
   }
 
@@ -165,7 +191,8 @@ export class WarehouseService {
     reference?: string;
     notes?: string;
     purchaseOrderId?: number;
-  }, userId: number) {
+  }, userId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const normalizedType = dto.type === 'IN' ? 'RECEIPT'
       : dto.type === 'OUT' ? 'DISPATCH'
       : dto.type;
@@ -182,6 +209,23 @@ export class WarehouseService {
       throw new BadRequestException('La cantidad debe ser mayor a cero');
     }
 
+    if (dto.fromWarehouseId) {
+      const fromWh = await this.prisma.warehouse.findFirst({
+        where: { id: dto.fromWarehouseId, ...companyWhere(tenantId) },
+      });
+      if (!fromWh) throw new BadRequestException('Almacén de origen inválido');
+    }
+    if (dto.toWarehouseId) {
+      const toWh = await this.prisma.warehouse.findFirst({
+        where: { id: dto.toWarehouseId, ...companyWhere(tenantId) },
+      });
+      if (!toWh) throw new BadRequestException('Almacén de destino inválido');
+    }
+    const product = await this.prisma.product.findFirst({
+      where: { id: dto.productId, ...companyWhere(tenantId) },
+    });
+    if (!product) throw new NotFoundException('Producto no encontrado');
+
     // Todo el movimiento — validación de stock disponible, ajuste de niveles y
     // registro del folio — corre en una sola transacción para que nunca quede
     // un StockMovement sin su contraparte en StockLevel (o viceversa).
@@ -190,7 +234,12 @@ export class WarehouseService {
       // WAC desde StockLevel origen si el despacho no trae costo explícito
       if (unitCost <= 0 && dto.fromWarehouseId && COGS_MOVEMENT_TYPES.has(normalizedType)) {
         const level = await tx.stockLevel.findFirst({
-          where: { productId: dto.productId, warehouseId: dto.fromWarehouseId, locationId: null },
+          where: {
+            productId: dto.productId,
+            warehouseId: dto.fromWarehouseId,
+            locationId: null,
+            ...companyWhere(tenantId),
+          },
           select: { unitCost: true },
         });
         unitCost = level && Number(level.unitCost) > 0 ? Number(level.unitCost) : 0;
@@ -198,13 +247,13 @@ export class WarehouseService {
       const totalCost = quantity * unitCost;
 
       if (dto.fromWarehouseId) {
-        await this.decrementStockLevel(tx, dto.productId, dto.fromWarehouseId, quantity);
+        await this.decrementStockLevel(tx, dto.productId, dto.fromWarehouseId, quantity, tenantId);
       }
       if (dto.toWarehouseId) {
-        await this.incrementStockLevel(tx, dto.productId, dto.toWarehouseId, quantity, unitCost);
+        await this.incrementStockLevel(tx, dto.productId, dto.toWarehouseId, quantity, unitCost, tenantId);
       }
 
-      const movementNumber = await this.generateMovementNumber();
+      const movementNumber = await this.generateMovementNumber(tenantId);
       return tx.stockMovement.create({
         data: {
           movementNumber,
@@ -220,6 +269,7 @@ export class WarehouseService {
           notes: dto.notes?.trim() || null,
           purchaseOrderId: dto.purchaseOrderId ?? null,
           createdById: userId,
+          companyId: tenantId,
         },
         include: { product: true, fromWarehouse: true, toWarehouse: true },
       });
@@ -259,9 +309,15 @@ export class WarehouseService {
     productId: number,
     warehouseId: number,
     quantity: number,
+    companyId?: number | null,
   ) {
     const level = await tx.stockLevel.findFirst({
-      where: { productId, warehouseId, locationId: null },
+      where: {
+        productId,
+        warehouseId,
+        locationId: null,
+        ...(companyId != null ? companyWhere(companyId) : {}),
+      },
     });
     const available = level ? Number(level.quantity) - Number(level.reservedQty) : 0;
     if (available < quantity) {
@@ -294,9 +350,15 @@ export class WarehouseService {
     warehouseId: number,
     quantity: number,
     unitCost: number,
+    companyId?: number | null,
   ) {
     const existing = await tx.stockLevel.findFirst({
-      where: { productId, warehouseId, locationId: null },
+      where: {
+        productId,
+        warehouseId,
+        locationId: null,
+        ...(companyId != null ? companyWhere(companyId) : {}),
+      },
     });
     if (existing) {
       const prevQty = Number(existing.quantity);
@@ -314,19 +376,30 @@ export class WarehouseService {
         },
       });
     } else {
+      const warehouse =
+        companyId != null
+          ? { companyId }
+          : await tx.warehouse.findUnique({ where: { id: warehouseId }, select: { companyId: true } });
+      if (!warehouse?.companyId) {
+        throw new BadRequestException('Empresa requerida para crear nivel de stock');
+      }
       await tx.stockLevel.create({
         data: {
           productId,
           warehouseId,
           quantity: new Prisma.Decimal(quantity),
           unitCost: new Prisma.Decimal(unitCost),
+          companyId: warehouse.companyId,
         },
       });
     }
   }
 
-  async listStockMovements(filters?: { productId?: number; warehouseId?: number; type?: string; from?: string; to?: string }) {
-    const where: any = {};
+  async listStockMovements(
+    filters?: { productId?: number; warehouseId?: number; type?: string; from?: string; to?: string },
+    companyId?: number | null,
+  ) {
+    const where: any = { ...companyWhere(companyId ?? null) };
     if (filters?.productId) where.productId = filters.productId;
     if (filters?.type) where.type = filters.type;
     if (filters?.warehouseId) {
@@ -345,7 +418,15 @@ export class WarehouseService {
   }
 
   // ── Lots ──────────────────────────────────────────────────────────
-  async createLot(dto: { lotNumber: string; productId: number; expirationDate?: string; manufacturingDate?: string; supplierId?: number; notes?: string }) {
+  async createLot(
+    dto: { lotNumber: string; productId: number; expirationDate?: string; manufacturingDate?: string; supplierId?: number; notes?: string },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const product = await this.prisma.product.findFirst({
+      where: { id: dto.productId, ...companyWhere(tenantId) },
+    });
+    if (!product) throw new NotFoundException('Producto no encontrado');
     return this.prisma.lot.create({
       data: {
         lotNumber: dto.lotNumber.trim(),
@@ -354,13 +435,14 @@ export class WarehouseService {
         manufacturingDate: dto.manufacturingDate ? new Date(dto.manufacturingDate) : null,
         supplierId: dto.supplierId ?? null,
         notes: dto.notes?.trim() || null,
+        companyId: tenantId,
       },
       include: { product: true },
     });
   }
 
-  async listLots(productId?: number) {
-    const where: any = {};
+  async listLots(productId?: number, companyId?: number | null) {
+    const where: any = { ...companyWhere(companyId ?? null) };
     if (productId) where.productId = productId;
     return this.prisma.lot.findMany({
       where,
@@ -370,8 +452,9 @@ export class WarehouseService {
   }
 
   // ── Stock Valuation Report ────────────────────────────────────────
-  async getStockValuation(warehouseId?: number) {
-    const where: any = {};
+  async getStockValuation(warehouseId?: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { warehouse: companyWhere(tenantId) };
     if (warehouseId) where.warehouseId = warehouseId;
     const levels = await this.prisma.stockLevel.findMany({
       where,
@@ -386,8 +469,10 @@ export class WarehouseService {
   }
 
   // ── Low Stock Alerts ──────────────────────────────────────────────
-  async getLowStockAlerts() {
+  async getLowStockAlerts(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const levels = await this.prisma.stockLevel.findMany({
+      where: { warehouse: companyWhere(tenantId) },
       include: { product: { select: { id: true, name: true, sku: true } }, warehouse: { select: { id: true, code: true, name: true } } },
     });
     return levels.filter((l) => Number(l.quantity) <= Number(l.reorderPoint) && Number(l.reorderPoint) > 0);
@@ -397,7 +482,9 @@ export class WarehouseService {
    * Inteligencia de inventario: rotación, aging, dead stock, ABC,
    * cobertura proyectada y tendencias de movimiento.
    */
-  async getInventoryInsights() {
+  async getInventoryInsights(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const tw = companyWhere(tenantId);
     const now = new Date();
     const d14 = new Date(now.getTime() - 14 * 86_400_000);
     const d30 = new Date(now.getTime() - 30 * 86_400_000);
@@ -405,13 +492,14 @@ export class WarehouseService {
 
     const [levels, movements90, lots] = await Promise.all([
       this.prisma.stockLevel.findMany({
+        where: { warehouse: tw },
         include: {
           product: { select: { id: true, name: true, sku: true, category: true } },
           warehouse: { select: { id: true, code: true, name: true } },
         },
       }),
       this.prisma.stockMovement.findMany({
-        where: { createdAt: { gte: d90 } },
+        where: { ...tw, createdAt: { gte: d90 } },
         select: {
           id: true,
           type: true,
@@ -423,7 +511,7 @@ export class WarehouseService {
         },
       }),
       this.prisma.lot.findMany({
-        where: { expirationDate: { not: null } },
+        where: { ...tw, expirationDate: { not: null } },
         select: { id: true, lotNumber: true, productId: true, expirationDate: true, product: { select: { name: true, sku: true } } },
       }),
     ]);
@@ -672,5 +760,320 @@ export class WarehouseService {
         ...(expiringLots.length ? [{ severity: 'warning' as const, message: `${expiringLots.length} lote(s) caducan en ≤60 días` }] : []),
       ],
     };
+  }
+
+  // ── Cycle Counts ──────────────────────────────────────────────────
+  private async generateCountNumber(companyId: number): Promise<string> {
+    const count = await this.prisma.cycleCount.count({
+      where: companyWhere(companyId),
+    });
+    return `CC-${String(count + 1).padStart(6, '0')}`;
+  }
+
+  /**
+   * Programa un conteo cíclico tomando snapshot del stock actual (expectedQty)
+   * para cada producto del almacén (o el subconjunto indicado).
+   */
+  async scheduleCycleCount(
+    dto: { warehouseId: number; scheduledFor: string; productIds?: number[]; notes?: string },
+    userId: number,
+    companyId?: number | null,
+  ) {
+    const warehouse = await this.prisma.warehouse.findUnique({ where: { id: dto.warehouseId } });
+    assertCompanyAccess(warehouse, companyId ?? null, 'Almacén');
+    const tenantId = requireCompanyId(companyId ?? warehouse!.companyId);
+
+    const levels = await this.prisma.stockLevel.findMany({
+      where: {
+        warehouseId: dto.warehouseId,
+        locationId: null,
+        ...(dto.productIds?.length ? { productId: { in: dto.productIds } } : {}),
+      },
+      select: { productId: true, quantity: true },
+    });
+    if (!levels.length) {
+      throw new BadRequestException('El almacén no tiene existencias para programar un conteo');
+    }
+
+    const countNumber = await this.generateCountNumber(tenantId);
+    return this.prisma.cycleCount.create({
+      data: {
+        countNumber,
+        warehouseId: dto.warehouseId,
+        scheduledFor: new Date(dto.scheduledFor),
+        notes: dto.notes?.trim() || null,
+        companyId: tenantId,
+        createdById: userId,
+        items: {
+          create: levels.map((l) => ({
+            productId: l.productId,
+            expectedQty: l.quantity,
+          })),
+        },
+      },
+      include: { items: { include: { product: { select: { id: true, name: true, sku: true } } } }, warehouse: { select: { id: true, name: true, code: true } } },
+    });
+  }
+
+  async listCycleCounts(filters?: { warehouseId?: number; status?: string; companyId?: number | null }) {
+    const where: any = {};
+    if (filters?.warehouseId) where.warehouseId = filters.warehouseId;
+    if (filters?.status) where.status = filters.status;
+    if (filters?.companyId != null) where.companyId = filters.companyId;
+    return this.prisma.cycleCount.findMany({
+      where,
+      include: {
+        warehouse: { select: { id: true, name: true, code: true } },
+        _count: { select: { items: true } },
+      },
+      orderBy: { scheduledFor: 'desc' },
+    });
+  }
+
+  async getCycleCount(id: number, companyId?: number | null) {
+    const cc = await this.prisma.cycleCount.findUnique({
+      where: { id },
+      include: {
+        warehouse: { select: { id: true, name: true, code: true, companyId: true } },
+        items: { include: { product: { select: { id: true, name: true, sku: true } } } },
+        createdBy: { select: { id: true, nombre: true } },
+        closedBy: { select: { id: true, nombre: true } },
+      },
+    });
+    if (!cc) throw new NotFoundException('Conteo no encontrado');
+    assertCompanyAccess({ companyId: cc.warehouse.companyId }, companyId ?? null, 'Conteo');
+    return cc;
+  }
+
+  /**
+   * Captura el conteo físico de uno o más productos del conteo. Se puede
+   * llamar varias veces (captura incremental) mientras el conteo siga abierto.
+   */
+  async recordCycleCountItems(
+    cycleCountId: number,
+    items: { productId: number; countedQty: number }[],
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const cc = await this.prisma.cycleCount.findFirst({
+      where: { id: cycleCountId, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(cc, tenantId, 'Conteo cíclico');
+    if (cc.status === 'CLOSED' || cc.status === 'CANCELLED') {
+      throw new BadRequestException('El conteo ya está cerrado o cancelado');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        const countedQty = Number(item.countedQty);
+        if (!Number.isFinite(countedQty) || countedQty < 0) {
+          throw new BadRequestException(`Cantidad contada inválida para el producto #${item.productId}`);
+        }
+        const row = await tx.cycleCountItem.findFirst({
+          where: { cycleCountId, productId: item.productId },
+        });
+        if (!row) throw new BadRequestException(`Producto #${item.productId} no forma parte de este conteo`);
+        await tx.cycleCountItem.update({
+          where: { id: row.id },
+          data: {
+            countedQty: new Prisma.Decimal(countedQty),
+            varianceQty: new Prisma.Decimal(countedQty - Number(row.expectedQty)),
+            countedAt: new Date(),
+          },
+        });
+      }
+      if (cc.status === 'SCHEDULED') {
+        await tx.cycleCount.update({ where: { id: cycleCountId }, data: { status: 'IN_PROGRESS' } });
+      }
+    });
+
+    return this.getCycleCount(cycleCountId, tenantId);
+  }
+
+  /**
+   * Cierra el conteo: por cada producto con varianza distinta de cero genera
+   * un StockMovement ADJUSTMENT (reutiliza createStockMovement — misma ruta
+   * atómica y de WAC que usa el resto del módulo) y marca el conteo CLOSED.
+   * Los productos sin captura de conteo se consideran sin varianza (no se ajustan).
+   */
+  async closeCycleCount(cycleCountId: number, userId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const cc = await this.prisma.cycleCount.findFirst({
+      where: { id: cycleCountId, ...companyWhere(tenantId) },
+      include: { items: true, warehouse: true },
+    });
+    assertCompanyAccess(cc, tenantId, 'Conteo cíclico');
+    if (cc.status === 'CLOSED') throw new BadRequestException('El conteo ya está cerrado');
+    if (cc.status === 'CANCELLED') throw new BadRequestException('El conteo está cancelado');
+
+    const pending = cc.items.filter((i) => i.countedQty === null);
+    if (pending.length) {
+      throw new BadRequestException(
+        `Faltan ${pending.length} producto(s) por contar antes de cerrar (o repórtalos con la misma cantidad esperada)`,
+      );
+    }
+
+    for (const item of cc.items) {
+      const variance = Number(item.varianceQty ?? 0);
+      if (variance === 0) continue;
+
+      const level = await this.prisma.stockLevel.findFirst({
+        where: {
+          productId: item.productId,
+          warehouseId: cc.warehouseId,
+          locationId: null,
+          ...companyWhere(tenantId),
+        },
+        select: { unitCost: true },
+      });
+      const unitCost = level ? Number(level.unitCost) : 0;
+
+      await this.createStockMovement(
+        {
+          type: 'ADJUSTMENT',
+          productId: item.productId,
+          ...(variance > 0
+            ? { toWarehouseId: cc.warehouseId }
+            : { fromWarehouseId: cc.warehouseId }),
+          quantity: Math.abs(variance),
+          unitCost,
+          reference: `Conteo cíclico ${cc.countNumber}`,
+          notes: `Ajuste por conteo cíclico: esperado ${item.expectedQty}, contado ${item.countedQty}`,
+        },
+        userId,
+        cc.companyId,
+      );
+    }
+
+    return this.prisma.cycleCount.update({
+      where: { id: cycleCountId },
+      data: { status: 'CLOSED', closedAt: new Date(), closedById: userId },
+      include: { items: { include: { product: { select: { id: true, name: true, sku: true } } } } },
+    });
+  }
+
+  async cancelCycleCount(cycleCountId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const cc = await this.prisma.cycleCount.findFirst({
+      where: { id: cycleCountId, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(cc, tenantId, 'Conteo cíclico');
+    if (cc.status === 'CLOSED') throw new BadRequestException('No se puede cancelar un conteo ya cerrado');
+    return this.prisma.cycleCount.update({ where: { id: cycleCountId }, data: { status: 'CANCELLED' } });
+  }
+
+  // ── Stock Reservations ────────────────────────────────────────────
+  /**
+   * Reserva stock (soft — no mueve físico): reduce el disponible mostrado en
+   * stock/insights y valida que no se reserve más de lo disponible.
+   */
+  async createReservation(
+    dto: {
+      productId: number;
+      warehouseId: number;
+      quantity: number;
+      reason: string;
+      referenceType?: string;
+      referenceId?: number;
+      expiresAt?: string;
+    },
+    userId: number,
+  ) {
+    const quantity = Number(dto.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new BadRequestException('La cantidad a reservar debe ser mayor a cero');
+    }
+    if (!dto.reason?.trim()) {
+      throw new BadRequestException('La reserva requiere un motivo');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const warehouse = await tx.warehouse.findUnique({ where: { id: dto.warehouseId }, select: { companyId: true } });
+      if (!warehouse?.companyId) {
+        throw new BadRequestException('Almacén inválido o sin empresa');
+      }
+      const level = await tx.stockLevel.findFirst({
+        where: {
+          productId: dto.productId,
+          warehouseId: dto.warehouseId,
+          locationId: null,
+          ...companyWhere(warehouse.companyId),
+        },
+      });
+      const available = level ? Number(level.quantity) - Number(level.reservedQty) : 0;
+      if (available < quantity) {
+        throw new BadRequestException(`Disponible insuficiente para reservar: disponible ${available}, solicitado ${quantity}`);
+      }
+
+      const reservation = await tx.stockReservation.create({
+        data: {
+          productId: dto.productId,
+          warehouseId: dto.warehouseId,
+          quantity: new Prisma.Decimal(quantity),
+          reason: dto.reason.trim(),
+          referenceType: dto.referenceType?.trim() || null,
+          referenceId: dto.referenceId ?? null,
+          expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+          companyId: warehouse.companyId,
+          createdById: userId,
+        },
+      });
+
+      await tx.stockLevel.update({
+        where: { id: level!.id },
+        data: { reservedQty: { increment: quantity } },
+      });
+
+      return reservation;
+    });
+  }
+
+  async releaseReservation(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    return this.prisma.$transaction(async (tx) => {
+      const reservation = await tx.stockReservation.findFirst({
+        where: { id, ...companyWhere(tenantId) },
+      });
+      assertCompanyAccess(reservation, tenantId, 'Reserva');
+      if (reservation.status !== 'ACTIVE') {
+        throw new BadRequestException('La reserva ya fue liberada o consumida');
+      }
+
+      const level = await tx.stockLevel.findFirst({
+        where: {
+          productId: reservation.productId,
+          warehouseId: reservation.warehouseId,
+          locationId: null,
+          ...companyWhere(tenantId),
+        },
+      });
+      if (level) {
+        const nextReserved = Math.max(0, Number(level.reservedQty) - Number(reservation.quantity));
+        await tx.stockLevel.update({ where: { id: level.id }, data: { reservedQty: new Prisma.Decimal(nextReserved) } });
+      }
+
+      return tx.stockReservation.update({
+        where: { id },
+        data: { status: 'RELEASED', releasedAt: new Date() },
+      });
+    });
+  }
+
+  async listReservations(filters?: { productId?: number; warehouseId?: number; status?: string; companyId?: number | null }) {
+    const where: any = {};
+    if (filters?.productId) where.productId = filters.productId;
+    if (filters?.warehouseId) where.warehouseId = filters.warehouseId;
+    if (filters?.status) where.status = filters.status;
+    else where.status = 'ACTIVE';
+    if (filters?.companyId != null) where.companyId = filters.companyId;
+    return this.prisma.stockReservation.findMany({
+      where,
+      include: {
+        product: { select: { id: true, name: true, sku: true } },
+        warehouse: { select: { id: true, name: true, code: true } },
+        createdBy: { select: { id: true, nombre: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 }

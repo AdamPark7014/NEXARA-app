@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class CrmActivitiesService {
@@ -9,22 +10,26 @@ export class CrmActivitiesService {
     private readonly notificationHierarchy: NotificationHierarchyService,
   ) {}
 
-  async create(dto: {
-    activityType?: string;
-    subject: string;
-    description?: string;
-    dueDate: string;
-    leadId?: number;
-    opportunityId?: number;
-    tenderId?: number;
-    ownerId?: number;
-    remindAt?: string;
-    createdById?: number;
-  }) {
+  async create(
+    dto: {
+      activityType?: string;
+      subject: string;
+      description?: string;
+      dueDate: string;
+      leadId?: number;
+      opportunityId?: number;
+      tenderId?: number;
+      ownerId?: number;
+      remindAt?: string;
+      createdById?: number;
+    },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
     if (!dto.leadId && !dto.opportunityId && !dto.tenderId) {
       throw new BadRequestException('Una actividad CRM debe asociarse a un lead, oportunidad o licitación');
     }
-    return (this.prisma as any).crmActivity.create({
+    return this.prisma.crmActivity.create({
       data: {
         activityType: (dto.activityType as any) || 'TASK',
         subject: dto.subject.trim(),
@@ -36,6 +41,7 @@ export class CrmActivitiesService {
         tenderId: dto.tenderId ?? null,
         ownerId: dto.ownerId ?? null,
         createdById: dto.createdById ?? null,
+        companyId: tenantId,
       },
       include: {
         owner: { select: { id: true, nombre: true } },
@@ -46,18 +52,22 @@ export class CrmActivitiesService {
     });
   }
 
-  async list(filters?: {
-    ownerId?: number;
-    status?: string;
-    activityType?: string;
-    leadId?: number;
-    opportunityId?: number;
-    tenderId?: number;
-    from?: string;
-    to?: string;
-    overdue?: boolean;
-  }) {
-    const where: any = {};
+  async list(
+    filters?: {
+      ownerId?: number;
+      status?: string;
+      activityType?: string;
+      leadId?: number;
+      opportunityId?: number;
+      tenderId?: number;
+      from?: string;
+      to?: string;
+      overdue?: boolean;
+    },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { ...companyWhere(tenantId) };
     if (filters?.ownerId) where.ownerId = filters.ownerId;
     if (filters?.status) where.status = filters.status;
     if (filters?.activityType) where.activityType = filters.activityType;
@@ -73,7 +83,7 @@ export class CrmActivitiesService {
       where.status = 'PENDING';
       where.dueDate = { lt: new Date() };
     }
-    return (this.prisma as any).crmActivity.findMany({
+    return this.prisma.crmActivity.findMany({
       where,
       include: {
         owner: { select: { id: true, nombre: true } },
@@ -85,10 +95,13 @@ export class CrmActivitiesService {
     });
   }
 
-  async complete(id: number, outcome?: string) {
-    const existing = await (this.prisma as any).crmActivity.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Actividad no encontrada');
-    return (this.prisma as any).crmActivity.update({
+  async complete(id: number, outcome?: string, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const existing = await this.prisma.crmActivity.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(existing, tenantId, 'Actividad CRM');
+    return this.prisma.crmActivity.update({
       where: { id },
       data: {
         status: 'COMPLETED',
@@ -98,27 +111,44 @@ export class CrmActivitiesService {
     });
   }
 
-  async update(id: number, dto: any) {
-    const data: any = { ...dto };
+  async update(id: number, dto: any, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const existing = await this.prisma.crmActivity.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(existing, tenantId, 'Actividad CRM');
+    const { companyId: _omit, ...rest } = dto || {};
+    const data: any = { ...rest };
     if (dto.dueDate) data.dueDate = new Date(dto.dueDate);
     if (dto.remindAt) data.remindAt = new Date(dto.remindAt);
     if (dto.completedAt) data.completedAt = new Date(dto.completedAt);
-    return (this.prisma as any).crmActivity.update({ where: { id }, data });
+    return this.prisma.crmActivity.update({ where: { id }, data });
   }
 
-  async remove(id: number) {
-    return (this.prisma as any).crmActivity.delete({ where: { id } });
+  async remove(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const existing = await this.prisma.crmActivity.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(existing, tenantId, 'Actividad CRM');
+    return this.prisma.crmActivity.delete({ where: { id } });
   }
 
-  async getMyAgenda(ownerId: number) {
+  async getMyAgenda(ownerId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const scope = companyWhere(tenantId);
     const now = new Date();
     const next7 = new Date(now.getTime() + 7 * 86400000);
     const [pendingToday, overdue, upcoming, recentlyCompleted, totalsByType] = await Promise.all([
-      (this.prisma as any).crmActivity.findMany({
+      this.prisma.crmActivity.findMany({
         where: {
+          ...scope,
           ownerId,
           status: 'PENDING',
-          dueDate: { gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()), lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1) },
+          dueDate: {
+            gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+            lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1),
+          },
         },
         include: {
           lead: { select: { id: true, name: true, company: true } },
@@ -127,8 +157,8 @@ export class CrmActivitiesService {
         },
         orderBy: { dueDate: 'asc' },
       }),
-      (this.prisma as any).crmActivity.findMany({
-        where: { ownerId, status: 'PENDING', dueDate: { lt: now } },
+      this.prisma.crmActivity.findMany({
+        where: { ...scope, ownerId, status: 'PENDING', dueDate: { lt: now } },
         include: {
           lead: { select: { id: true, name: true } },
           opportunity: { select: { id: true, title: true } },
@@ -137,8 +167,8 @@ export class CrmActivitiesService {
         orderBy: { dueDate: 'asc' },
         take: 20,
       }),
-      (this.prisma as any).crmActivity.findMany({
-        where: { ownerId, status: 'PENDING', dueDate: { gte: now, lte: next7 } },
+      this.prisma.crmActivity.findMany({
+        where: { ...scope, ownerId, status: 'PENDING', dueDate: { gte: now, lte: next7 } },
         include: {
           lead: { select: { id: true, name: true } },
           opportunity: { select: { id: true, title: true } },
@@ -147,17 +177,17 @@ export class CrmActivitiesService {
         orderBy: { dueDate: 'asc' },
         take: 30,
       }),
-      (this.prisma as any).crmActivity.findMany({
-        where: { ownerId, status: 'COMPLETED' },
+      this.prisma.crmActivity.findMany({
+        where: { ...scope, ownerId, status: 'COMPLETED' },
         include: {
           opportunity: { select: { id: true, title: true } },
         },
         orderBy: { completedAt: 'desc' },
         take: 10,
       }),
-      (this.prisma as any).crmActivity.groupBy({
+      this.prisma.crmActivity.groupBy({
         by: ['activityType'],
-        where: { ownerId, status: 'PENDING' },
+        where: { ...scope, ownerId, status: 'PENDING' },
         _count: { _all: true },
       }),
     ]);

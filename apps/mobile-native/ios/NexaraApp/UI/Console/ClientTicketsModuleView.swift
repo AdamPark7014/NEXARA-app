@@ -2,30 +2,28 @@ import SwiftUI
 
 /// Bandeja de tickets de clientes — paridad web `/ops/support`.
 struct ClientTicketsModuleView: View {
-    @State private var items: [[String: Any]] = []
+    @State private var items: [ClientTicketRequest] = []
     @State private var query = ""
     @State private var statusFilter = "todos"
     @State private var isLoading = true
     @State private var message: String?
     @State private var actingId: Int64?
-    @State private var selected: [String: Any]?
+    @State private var selected: ClientTicketRequest?
 
     private let statuses = ["todos", "NEW", "ASSIGNED", "CLOSED", "APPROVED", "REJECTED"]
 
-    private var filtered: [[String: Any]] {
-        var list = items
-        if !query.isEmpty {
-            let q = query.lowercased()
-            list = list.filter {
-                opsStr($0, "description", "title").lowercased().contains(q) ||
-                opsStr($0, "branchName", "clientName").lowercased().contains(q)
-            }
+    private var filtered: [ClientTicketRequest] {
+        guard !query.isEmpty else { return items }
+        let q = query.lowercased()
+        return items.filter {
+            $0.displayTitle.lowercased().contains(q) ||
+            $0.branchName.lowercased().contains(q) ||
+            $0.clientName.lowercased().contains(q)
         }
-        return list
     }
 
-    private var kpiNew: Int { items.filter { opsStr($0, "status").uppercased() == "NEW" }.count }
-    private var kpiAssigned: Int { items.filter { opsStr($0, "status").uppercased() == "ASSIGNED" }.count }
+    private var kpiNew: Int { items.filter { $0.status.uppercased() == "NEW" }.count }
+    private var kpiAssigned: Int { items.filter { $0.status.uppercased() == "ASSIGNED" }.count }
 
     var body: some View {
         Group {
@@ -88,7 +86,7 @@ struct ClientTicketsModuleView: View {
                 else if filtered.isEmpty {
                     Text("Sin tickets").foregroundColor(.secondary).frame(maxWidth: .infinity).padding(.top, 40)
                 } else {
-                    ForEach(filtered.prefix(80), id: \.opsId) { t in
+                    ForEach(filtered.prefix(80)) { t in
                         Button { selected = t } label: { ticketCard(t) }
                             .buttonStyle(.plain)
                             .padding(.horizontal)
@@ -99,60 +97,57 @@ struct ClientTicketsModuleView: View {
         }
     }
 
-    private func ticketCard(_ t: [String: Any]) -> some View {
-        let urgency = opsStr(t, "urgency").uppercased()
-        let status = opsStr(t, "status")
-        return VStack(alignment: .leading, spacing: 6) {
+    private func ticketCard(_ t: ClientTicketRequest) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(opsStr(t, "description", "title").prefix(120).description)
+                Text(String(t.displayTitle.prefix(120)))
                     .font(.subheadline).bold().multilineTextAlignment(.leading)
                 Spacer()
-                Text(status).font(.caption2).bold()
+                Text(t.status).font(.caption2).bold()
                     .padding(.horizontal, 7).padding(.vertical, 2)
-                    .background(opsStatusColor(status).opacity(0.15))
-                    .foregroundColor(opsStatusColor(status))
+                    .background(opsStatusColor(t.status).opacity(0.15))
+                    .foregroundColor(opsStatusColor(t.status))
                     .clipShape(Capsule())
             }
             HStack {
-                if !opsStr(t, "branchName").isEmpty {
-                    Label(opsStr(t, "branchName"), systemImage: "building.2").font(.caption).foregroundColor(.secondary)
+                if !t.branchName.isEmpty {
+                    Label(t.branchName, systemImage: "building.2").font(.caption).foregroundColor(.secondary)
                 }
                 Spacer()
-                if urgency == "HIGH" {
+                if t.isHighUrgency {
                     Text("ALTA").font(.caption2).bold().foregroundColor(.red)
                 }
             }
-            Text(String(opsStr(t, "createdAt").prefix(16))).font(.caption2).foregroundColor(.secondary)
+            Text(String(t.createdAt.prefix(16))).font(.caption2).foregroundColor(.secondary)
         }
         .padding(12)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    private func detailView(_ t: [String: Any]) -> some View {
-        let id = ConsoleHelpers.mapInt64(t, "id")
-        let status = opsStr(t, "status")
+    private func detailView(_ t: ClientTicketRequest) -> some View {
+        let status = t.status.uppercased()
         return List {
             Section("Solicitud") {
-                row("Descripción", opsStr(t, "description"))
-                row("Tipo", opsStr(t, "requestType"))
-                row("Urgencia", opsStr(t, "urgency"))
-                row("Estado", status)
-                row("Sucursal", opsStr(t, "branchName"))
-                row("Cliente", opsStr(t, "clientName", "client", "name"))
-                row("Creado", opsStr(t, "createdAt"))
+                row("Descripción", t.displayTitle)
+                row("Tipo", t.requestType)
+                row("Urgencia", t.urgency)
+                row("Estado", t.status)
+                row("Sucursal", t.branchName)
+                row("Cliente", t.clientName)
+                row("Creado", t.createdAt)
             }
-            if let id {
+            if t.id > 0 {
                 Section("Acciones") {
-                    if status.uppercased() == "NEW" {
-                        actionButton("Marcar asignado", id: id, status: "ASSIGNED")
+                    if status == "NEW" {
+                        actionButton("Marcar asignado", id: t.id, status: "ASSIGNED")
                     }
-                    if status.uppercased() != "CLOSED" {
-                        actionButton("Cerrar", id: id, status: "CLOSED")
+                    if status != "CLOSED" {
+                        actionButton("Cerrar", id: t.id, status: "CLOSED")
                     }
-                    if ["NEW", "ASSIGNED"].contains(status.uppercased()) {
-                        actionButton("Aprobar", id: id, status: "APPROVED")
-                        actionButton("Rechazar", id: id, status: "REJECTED", destructive: true)
+                    if ["NEW", "ASSIGNED"].contains(status) {
+                        actionButton("Aprobar", id: t.id, status: "APPROVED")
+                        actionButton("Rechazar", id: t.id, status: "REJECTED", destructive: true)
                     }
                 }
             }
@@ -177,7 +172,7 @@ struct ClientTicketsModuleView: View {
         isLoading = true
         defer { isLoading = false }
         let st = statusFilter == "todos" ? nil : statusFilter
-        items = (try? await OpsRepository.shared.clientTicketRequests(status: st)) ?? []
+        items = (try? await OpsRepository.shared.clientTicketRequestItems(status: st)) ?? []
     }
 
     private func patch(_ id: Int64, _ status: String) async {
@@ -205,20 +200,6 @@ private struct opsKpi: View {
     }
 }
 
-private func opsStr(_ m: [String: Any], _ keys: String...) -> String {
-    for k in keys {
-        if let v = m[k] {
-            let s: String
-            if let ss = v as? String { s = ss }
-            else if let n = v as? NSNumber { s = n.stringValue }
-            else if let client = v as? [String: Any] { return opsStr(client, "name", "nombre") }
-            else { s = String(describing: v) }
-            if !s.isEmpty && s != "null" { return s }
-        }
-    }
-    return ""
-}
-
 private func opsStatusColor(_ status: String) -> Color {
     switch status.uppercased() {
     case "CLOSED", "APPROVED": return .green
@@ -226,8 +207,4 @@ private func opsStatusColor(_ status: String) -> Color {
     case "ASSIGNED": return .blue
     default: return .orange
     }
-}
-
-extension [String: Any] {
-    fileprivate var opsId: String { "ct-\(self["id"] ?? UUID().uuidString)" }
 }

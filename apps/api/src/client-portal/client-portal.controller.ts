@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query, Res, UseGuards, BadRequestException, UploadedFile, UploadedFiles, UseInterceptors, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query, Res, UseGuards, BadRequestException, ConflictException, UploadedFile, UploadedFiles, UseInterceptors, Req } from '@nestjs/common';
 import { ClientTicketStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { Response } from 'express';
@@ -12,6 +12,8 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { ServiceClientsService } from '../service-clients/service-clients.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { InventoriesService } from '../inventories/inventories.service.js';
+import { AccountingService } from '../accounting/accounting.service.js';
+import { CotizacionesService } from '../cotizaciones/cotizaciones.service.js';
 import { Request } from 'express';
 import { getUploadSubdir } from '../common/upload-paths.js';
 
@@ -53,6 +55,8 @@ export class ClientPortalController {
     private readonly serviceClientsService: ServiceClientsService,
     private readonly activitiesService: ActivitiesService,
     private readonly inventoriesService: InventoriesService,
+    private readonly accountingService: AccountingService,
+    private readonly cotizacionesService: CotizacionesService,
   ) {}
 
   private normalizeBoolean(value: unknown) {
@@ -63,6 +67,14 @@ export class ClientPortalController {
       if (normalized === 'false' || normalized === '0') return false;
     }
     return undefined;
+  }
+
+  private async resolveClientCompanyId(clientId: number): Promise<number | null> {
+    const client = await this.prisma.serviceClient.findUnique({
+      where: { id: clientId },
+      select: { companyId: true },
+    });
+    return client?.companyId ?? null;
   }
 
   @Get('profile')
@@ -279,15 +291,27 @@ export class ClientPortalController {
     if (!portalEmail) throw new BadRequestException('Usuario de sucursal requerido');
     if (!portalPassword) throw new BadRequestException('Password de sucursal requerido');
 
+    const companyId = await this.resolveClientCompanyId(user.clientId);
+    if (!companyId) throw new BadRequestException('Cliente sin empresa asignada');
+
     const existingBranchNumber = await this.prisma['serviceClientBranch'].findFirst({
-      where: { clientId: user.clientId, branchNumber },
+      where: { clientId: user.clientId, branchNumber, companyId },
     });
     if (existingBranchNumber) throw new BadRequestException('La sucursal ya existe');
 
-    const existingBranch = await this.prisma['serviceClientBranch'].findFirst({
-      where: { portalEmail },
+    // portalEmail is unique per company — same-tenant + cross-kind within company.
+    const sameTenantPortal = await this.prisma['serviceClientBranch'].findFirst({
+      where: { portalEmail, companyId },
+      select: { id: true },
     });
-    if (existingBranch) throw new BadRequestException('El usuario de sucursal ya existe');
+    if (sameTenantPortal) throw new ConflictException('El usuario de sucursal ya existe en esta empresa');
+    const existingClientPortal = await this.prisma['serviceClient'].findFirst({
+      where: { portalEmail, companyId },
+      select: { id: true },
+    });
+    if (existingClientPortal) {
+      throw new ConflictException('El usuario de sucursal ya está en uso por un cliente de esta empresa');
+    }
 
     const portalPasswordHash = await bcrypt.hash(portalPassword, 10);
     const isActive = this.normalizeBoolean(body.isActive);
@@ -295,6 +319,7 @@ export class ClientPortalController {
     return this.prisma['serviceClientBranch'].create({
       data: {
         clientId: user.clientId,
+        companyId,
         name,
         branchNumber,
         address: body.address?.trim() || null,
@@ -331,8 +356,13 @@ export class ClientPortalController {
     @Body() body: any,
     @Req() req: Request,
   ) {
+    const companyId = await this.resolveClientCompanyId(user.clientId);
     const branch = await this.prisma['serviceClientBranch'].findFirst({
-      where: { id, clientId: user.clientId },
+      where: {
+        id,
+        clientId: user.clientId,
+        ...(companyId ? { companyId } : {}),
+      },
     });
     if (!branch) throw new BadRequestException('Sucursal no encontrada');
     const latitud = body.latitud ? Number(body.latitud) : undefined;
@@ -345,15 +375,35 @@ export class ClientPortalController {
     if (!portalEmail) throw new BadRequestException('Usuario de sucursal requerido');
     if (branchNumberInput && branchNumberInput !== branch.branchNumber) {
       const existingBranchNumber = await this.prisma['serviceClientBranch'].findFirst({
-        where: { clientId: user.clientId, branchNumber: branchNumberInput },
+        where: {
+          clientId: user.clientId,
+          branchNumber: branchNumberInput,
+          ...(companyId ? { companyId } : {}),
+        },
       });
       if (existingBranchNumber) throw new BadRequestException('La sucursal ya existe');
     }
+    // portalEmail is unique per company — same-tenant + cross-kind within company.
     if (portalEmailInput && portalEmailInput !== branch.portalEmail) {
-      const existingBranch = await this.prisma['serviceClientBranch'].findFirst({
-        where: { portalEmail: portalEmailInput },
+      const sameTenantPortal = await this.prisma['serviceClientBranch'].findFirst({
+        where: {
+          portalEmail: portalEmailInput,
+          ...(companyId ? { companyId } : {}),
+          id: { not: branch.id },
+        },
+        select: { id: true },
       });
-      if (existingBranch) throw new BadRequestException('El usuario de sucursal ya existe');
+      if (sameTenantPortal) throw new ConflictException('El usuario de sucursal ya existe en esta empresa');
+      const existingClientPortal = await this.prisma['serviceClient'].findFirst({
+        where: {
+          portalEmail: portalEmailInput,
+          ...(companyId ? { companyId } : {}),
+        },
+        select: { id: true },
+      });
+      if (existingClientPortal) {
+        throw new ConflictException('El usuario de sucursal ya está en uso por un cliente de esta empresa');
+      }
     }
 
     const portalPassword = body.portalPassword ? String(body.portalPassword).trim() : '';
@@ -370,6 +420,7 @@ export class ClientPortalController {
         ? (body.logoUrl?.trim() || null)
         : undefined;
 
+    // companyId is never taken from body — stamp from parent client if missing.
     const data: Record<string, any> = {
       name: body.name?.trim() || branch.name,
       branchNumber,
@@ -385,6 +436,7 @@ export class ClientPortalController {
       isActive,
     };
     if (portalPasswordHash) data.portalPasswordHash = portalPasswordHash;
+    if (companyId && branch.companyId == null) data.companyId = companyId;
     return this.prisma['serviceClientBranch'].update({
       where: { id },
       data,
@@ -716,6 +768,7 @@ export class ClientPortalController {
     @Query('to') to?: string,
     @Query('search') search?: string,
   ) {
+    const companyId = await this.resolveClientCompanyId(user.clientId);
     const normalizedOrigin = String(origin || '').toUpperCase();
     const createdByType = ['CLIENT', 'BRANCH', 'CONSOLE'].includes(normalizedOrigin)
       ? (normalizedOrigin as 'CLIENT' | 'BRANCH' | 'CONSOLE')
@@ -731,7 +784,7 @@ export class ClientPortalController {
       from: parsedFrom && !Number.isNaN(parsedFrom.getTime()) ? parsedFrom : undefined,
       to: parsedTo && !Number.isNaN(parsedTo.getTime()) ? parsedTo : undefined,
       search: search?.trim() || undefined,
-    });
+    }, undefined, companyId);
   }
 
   @Post('inventories/upload')
@@ -749,6 +802,7 @@ export class ClientPortalController {
     if (!branchId || Number.isNaN(branchId)) {
       throw new BadRequestException('branchId requerido');
     }
+    const companyId = await this.resolveClientCompanyId(user.clientId);
 
     return this.inventoriesService.syncManualSnapshot(
       {
@@ -758,6 +812,7 @@ export class ClientPortalController {
       },
       body || {},
       user.clientId,
+      companyId,
     );
   }
 
@@ -767,7 +822,8 @@ export class ClientPortalController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { decision?: string },
   ) {
-    const detail = await this.inventoriesService.detail(id);
+    const companyId = await this.resolveClientCompanyId(user.clientId);
+    const detail = await this.inventoriesService.detail(id, companyId);
     if (detail.clientId !== user.clientId) {
       throw new BadRequestException('Inventario no pertenece al cliente');
     }
@@ -775,12 +831,13 @@ export class ClientPortalController {
     if (!['APPROVED', 'REJECTED'].includes(decision)) {
       throw new BadRequestException('Decision invalida');
     }
-    return this.inventoriesService.updateStatus(id, decision);
+    return this.inventoriesService.updateStatus(id, decision, companyId);
   }
 
   @Get('inventories/:id')
   async inventoryDetail(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number) {
-    const detail = await this.inventoriesService.detail(id);
+    const companyId = await this.resolveClientCompanyId(user.clientId);
+    const detail = await this.inventoriesService.detail(id, companyId);
     if (detail.clientId !== user.clientId) {
       throw new BadRequestException('Inventario no pertenece al cliente');
     }
@@ -793,15 +850,102 @@ export class ClientPortalController {
     @Param('id', ParseIntPipe) id: number,
     @Res() res: Response,
   ) {
-    const detail = await this.inventoriesService.detail(id);
+    const companyId = await this.resolveClientCompanyId(user.clientId);
+    const detail = await this.inventoriesService.detail(id, companyId);
     if (detail.clientId !== user.clientId) {
       throw new BadRequestException('Inventario no pertenece al cliente');
     }
-    const result = await this.inventoriesService.generateReport(id);
+    const result = await this.inventoriesService.generateReport(id, companyId);
     if (!result) return res.status(404).send('Inventario no encontrado');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=inventario-${id}.pdf`);
     return res.send(result.pdf);
+  }
+
+  // ── Facturas (CFDI) ──────────────────────────────────────────────
+  @Get('invoices')
+  async invoices(@CurrentUser() user: any) {
+    return this.prisma.invoice.findMany({
+      where: {
+        type: 'ACCOUNTS_RECEIVABLE',
+        isCancelled: false,
+        client: { serviceClientId: user.clientId },
+      },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        status: true,
+        issueDate: true,
+        dueDate: true,
+        subtotal: true,
+        taxAmount: true,
+        totalAmount: true,
+        paidAmount: true,
+        currency: true,
+        cfdiUuid: true,
+        pdfUrl: true,
+        cfdiXml: true,
+      },
+      orderBy: { issueDate: 'desc' },
+    });
+  }
+
+  private async findOwnInvoiceOrFail(user: any, id: number) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, type: 'ACCOUNTS_RECEIVABLE', client: { serviceClientId: user.clientId } },
+      select: { id: true },
+    });
+    if (!invoice) throw new BadRequestException('Factura no encontrada');
+  }
+
+  @Get('invoices/:id/pdf')
+  async invoicePdf(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    await this.findOwnInvoiceOrFail(user, id);
+    const pdf = await this.accountingService.getInvoicePdf(id);
+    res.redirect(pdf.url);
+  }
+
+  @Get('invoices/:id/xml')
+  async invoiceXml(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    await this.findOwnInvoiceOrFail(user, id);
+    const xml = await this.accountingService.getInvoiceXml(id);
+    res.setHeader('Content-Type', xml.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${xml.filename}"`);
+    res.send(xml.body);
+  }
+
+  // ── Cotizaciones ─────────────────────────────────────────────────
+  @Get('quotes')
+  async quotes(@CurrentUser() user: any) {
+    return this.prisma.cotizacion.findMany({
+      where: { salesClient: { serviceClientId: user.clientId }, deletedAt: null },
+      select: {
+        id: true,
+        quoteNumber: true,
+        status: true,
+        issueDate: true,
+        validUntil: true,
+        projectName: true,
+        currency: true,
+        total: true,
+        sentAt: true,
+        signedAt: true,
+      },
+      orderBy: { issueDate: 'desc' },
+    });
+  }
+
+  @Get('quotes/:id/pdf')
+  async quotePdf(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    const quote = await this.prisma.cotizacion.findFirst({
+      where: { id, salesClient: { serviceClientId: user.clientId }, deletedAt: null },
+      select: { id: true, quoteNumber: true },
+    });
+    if (!quote) throw new BadRequestException('Cotización no encontrada');
+    const pdf = await this.cotizacionesService.getPdfBuffer(id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=${quote.quoteNumber}.pdf`);
+    res.send(pdf);
   }
 
   @Get('report')
@@ -812,7 +956,8 @@ export class ClientPortalController {
     @Query('end') end?: string,
   ) {
     const range = start && end ? { start: new Date(start), end: new Date(end) } : undefined;
-    const { pdf } = await this.serviceClientsService.generateReport(user.clientId, range);
+    const companyId = await this.resolveClientCompanyId(user.clientId);
+    const { pdf } = await this.serviceClientsService.generateReport(user.clientId, range, companyId);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename=reporte-tickets.pdf');
     res.send(pdf);

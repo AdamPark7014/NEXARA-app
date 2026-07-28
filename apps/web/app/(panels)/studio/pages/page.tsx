@@ -30,6 +30,8 @@ import {
   uploadPageMedia,
   resolvePageMediaUrl,
   mergePageVisuals,
+  listPageRevisions,
+  rollbackPageSection,
   DEFAULT_METRICAS,
   DEFAULT_SERVICIOS,
   DEFAULT_PROCESO,
@@ -48,6 +50,7 @@ import {
   type PageImageSlot,
   type PageImageLayout,
   type PageImagePosition,
+  type PageContentRevisionRow,
 } from "@/lib/page-content-api";
 import {
   PAGE_SEO_KEYS,
@@ -119,6 +122,10 @@ export default function StudioPagesPage() {
   const [saving, setSaving] = useState(false);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [revisions, setRevisions] = useState<PageContentRevisionRow[]>([]);
+  const [loadingRevisions, setLoadingRevisions] = useState(false);
+  const [restoringVersion, setRestoringVersion] = useState<number | null>(null);
 
   const [metricas, setMetricas]     = useState<MetricaItem[]>(DEFAULT_METRICAS);
   const [servicios, setServicios]   = useState<ServicioItem[]>(DEFAULT_SERVICIOS);
@@ -301,6 +308,43 @@ export default function StudioPagesPage() {
     }
   };
 
+  const activeSectionKey = (): string | null => buildActiveSectionPayload()?.section ?? null;
+
+  const loadRevisions = useCallback(async () => {
+    const section = activeSectionKey();
+    if (!token || !section) return;
+    setLoadingRevisions(true);
+    try {
+      setRevisions(await listPageRevisions(section as HomeSection, token));
+    } catch (err) {
+      toast.error("Error al cargar historial: " + (err as Error).message);
+      setRevisions([]);
+    } finally {
+      setLoadingRevisions(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, mode, activeTextTab, activeVisualTab, activeSeoTab]);
+
+  useEffect(() => {
+    if (showHistory) void loadRevisions();
+  }, [showHistory, loadRevisions]);
+
+  const handleRollback = async (version: number) => {
+    const section = activeSectionKey();
+    if (!token || !section) return;
+    setRestoringVersion(version);
+    try {
+      await rollbackPageSection(section as HomeSection, version, token, user?.email ?? undefined);
+      toast.success(`Versión ${version} restaurada y publicada.`);
+      await loadAll();
+      await loadRevisions();
+    } catch (err) {
+      toast.error("Error al restaurar: " + (err as Error).message);
+    } finally {
+      setRestoringVersion(null);
+    }
+  };
+
   const addSlot = () => {
     const slot: PageImageSlot = {
       id: newSlotId(),
@@ -393,6 +437,9 @@ export default function StudioPagesPage() {
               }
             >
               Ver pagina
+            </Button>
+            <Button variant="secondary" onClick={() => setShowHistory((v) => !v)}>
+              {showHistory ? "Ocultar historial" : "Historial"}
             </Button>
             <Button variant="secondary" onClick={handleSave} disabled={saving || !!uploadingKey}>
               {saving ? "Guardando…" : "Guardar borrador"}
@@ -487,6 +534,45 @@ export default function StudioPagesPage() {
           SEO
         </button>
       </div>
+
+      {showHistory && (
+        <div style={{ margin: "0 24px 16px", padding: 16, borderRadius: 12, border: "1px solid var(--border)", background: "var(--surface-2)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>
+              Historial de versiones · <code style={{ fontSize: 12 }}>{activeSectionKey()}</code>
+            </p>
+            <Button variant="ghost" size="sm" onClick={() => setShowHistory(false)}>Cerrar</Button>
+          </div>
+          {loadingRevisions ? (
+            <p style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Cargando historial…</p>
+          ) : revisions.length === 0 ? (
+            <p style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>Sin versiones publicadas todavía para esta sección.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {revisions.map((rev, idx) => (
+                <div key={rev.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--border)" }}>
+                  <div style={{ fontSize: 12.5 }}>
+                    <strong>v{rev.version}</strong>{idx === 0 ? <Tag variant="positive">actual</Tag> : null}
+                    {" · "}
+                    {new Date(rev.publishedAt).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    {rev.publishedBy ? ` · ${rev.publishedBy}` : ""}
+                  </div>
+                  {idx !== 0 && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={restoringVersion === rev.version}
+                      onClick={() => void handleRollback(rev.version)}
+                    >
+                      {restoringVersion === rev.version ? "Restaurando…" : "Restaurar esta versión"}
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {mode === "textos" && (
         <div style={{ display: "flex", gap: 8, padding: "0 24px 4px", flexWrap: "wrap" }}>

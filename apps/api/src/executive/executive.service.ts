@@ -1,12 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class ExecutiveService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** Snapshot completo C-Level con datos de todos los módulos. */
-  async getCLevelDashboard() {
+  async getCLevelDashboard(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const tw = companyWhere(tenantId);
+
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
@@ -54,85 +58,93 @@ export class ExecutiveService {
       topProjectTypes,
     ] = await Promise.all([
       this.prisma.salesOpportunity.aggregate({
-        where: { stage: 'WON' as any, closedAt: { gte: startOfMonth, lte: endOfMonth } },
+        where: { ...tw, stage: 'WON' as any, closedAt: { gte: startOfMonth, lte: endOfMonth } },
         _sum: { value: true },
       }),
       this.prisma.salesOpportunity.aggregate({
-        where: { stage: 'WON' as any, closedAt: { gte: startOfPrevMonth, lte: endOfPrevMonth } },
+        where: { ...tw, stage: 'WON' as any, closedAt: { gte: startOfPrevMonth, lte: endOfPrevMonth } },
         _sum: { value: true },
       }),
       this.prisma.salesOpportunity.aggregate({
-        where: { stage: 'WON' as any, closedAt: { gte: startOfYear } },
+        where: { ...tw, stage: 'WON' as any, closedAt: { gte: startOfYear } },
         _sum: { value: true },
       }),
       this.prisma.salesOpportunity.count({
-        where: { stage: 'WON' as any, closedAt: { gte: startOfMonth, lte: endOfMonth } },
+        where: { ...tw, stage: 'WON' as any, closedAt: { gte: startOfMonth, lte: endOfMonth } },
       }),
       this.prisma.salesOpportunity.aggregate({
-        where: { stage: { notIn: ['WON' as any, 'LOST' as any] } },
+        where: { ...tw, stage: { notIn: ['WON' as any, 'LOST' as any] } },
         _sum: { value: true },
         _count: { _all: true },
       }),
       this.prisma.salesLead.count({
-        where: { score: { gte: 70 }, status: { in: ['NEW' as any, 'CONTACTED' as any, 'QUALIFIED' as any] } },
+        where: { ...tw, score: { gte: 70 }, status: { in: ['NEW' as any, 'CONTACTED' as any, 'QUALIFIED' as any] } },
       }).catch(() => 0),
       (this.prisma as any).tender.count({
-        where: { status: { in: ['PROSPECT', 'INTERESTED', 'IN_PREP', 'SUBMITTED', 'EVALUATION'] } },
+        where: { ...tw, status: { in: ['PROSPECT', 'INTERESTED', 'IN_PREP', 'SUBMITTED', 'EVALUATION'] } },
       }).catch(() => 0),
-      (this.prisma as any).tender.count({ where: { status: 'AWARDED' } }).catch(() => 0),
+      (this.prisma as any).tender.count({ where: { ...tw, status: 'AWARDED' } }).catch(() => 0),
       this.prisma.operationalProject.count({
-        where: { status: 'ACTIVE' as any, deletedAt: null },
+        where: { ...tw, status: 'ACTIVE' as any, deletedAt: null },
       }).catch(() => 0),
       this.prisma.activity.count({
-        where: { estatus: { in: ['Pendiente', 'En Proceso', 'Asignado'] } },
+        where: { ...tw, estatus: { in: ['Pendiente', 'En Proceso', 'Asignado'] } },
       }).catch(() => 0),
       this.prisma.activity.count({
-        where: { estatus: { in: ['Pendiente', 'En Proceso'] }, fechaEntregaEsperada: { lt: now } },
+        where: { ...tw, estatus: { in: ['Pendiente', 'En Proceso'] }, fechaEntregaEsperada: { lt: now } },
       }).catch(() => 0),
       this.prisma.activity.count({
-        where: { estatus: 'Finalizado', fechaFinalizacion: { gte: startOfMonth, lte: endOfMonth } },
+        where: { ...tw, estatus: 'Finalizado', fechaFinalizacion: { gte: startOfMonth, lte: endOfMonth } },
       }).catch(() => 0),
       this.prisma.invoice.aggregate({
-        where: { issueDate: { gte: startOfMonth, lte: endOfMonth }, status: { not: 'CANCELLED' }, type: 'ACCOUNTS_RECEIVABLE' },
+        where: { ...tw, issueDate: { gte: startOfMonth, lte: endOfMonth }, status: { not: 'CANCELLED' }, type: 'ACCOUNTS_RECEIVABLE' },
         _sum: { totalAmount: true },
         _count: { _all: true },
       }).catch(() => ({ _sum: { totalAmount: 0 }, _count: { _all: 0 } } as any)),
       this.prisma.invoice.aggregate({
-        where: { type: 'ACCOUNTS_RECEIVABLE', status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] } },
+        where: { ...tw, type: 'ACCOUNTS_RECEIVABLE', status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] } },
         _sum: { totalAmount: true },
       }).catch(() => ({ _sum: { totalAmount: 0 } } as any)),
       this.prisma.invoice.aggregate({
-        where: { type: 'ACCOUNTS_PAYABLE', status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] } },
+        where: { ...tw, type: 'ACCOUNTS_PAYABLE', status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] } },
         _sum: { totalAmount: true },
       }).catch(() => ({ _sum: { totalAmount: 0 } } as any)),
       this.prisma.invoice.count({
-        where: { status: 'OVERDUE' as any },
+        where: { ...tw, status: 'OVERDUE' as any },
       }).catch(() => 0),
       this.prisma.bankAccount.aggregate({
-        where: { isActive: true },
+        where: { ...tw, isActive: true },
         _sum: { currentBalance: true },
       }).catch(() => ({ _sum: { currentBalance: 0 } } as any)),
       this.prisma.activity.count({
-        where: { ticketType: { not: null }, estatus: { in: ['Pendiente', 'En Proceso', 'Asignado'] } },
+        where: { ...tw, ticketType: { not: null }, estatus: { in: ['Pendiente', 'En Proceso', 'Asignado'] } },
       }).catch(() => 0),
       this.prisma.activity.count({
-        where: { ticketType: { not: null }, estatus: 'Finalizado', fechaFinalizacion: { gte: startOfMonth, lte: endOfMonth } },
+        where: { ...tw, ticketType: { not: null }, estatus: 'Finalizado', fechaFinalizacion: { gte: startOfMonth, lte: endOfMonth } },
       }).catch(() => 0),
-      this.prisma.salesClient.count().catch(() => 0),
-      (this.prisma as any).maintenanceContract.count({ where: { status: 'ACTIVE' } }).catch(() => 0),
+      this.prisma.salesClient.count({ where: { ...tw } }).catch(() => 0),
+      (this.prisma as any).maintenanceContract.count({ where: { ...tw, status: 'ACTIVE' } }).catch(() => 0),
+      // MaintenanceContractVisit has no companyId — scope via contract relation
       (this.prisma as any).maintenanceContractVisit.count({
-        where: { scheduledDate: { gte: now, lte: new Date(now.getTime() + 30 * 86400000) }, status: { in: ['SCHEDULED', 'GENERATED'] } },
+        where: {
+          contract: tw,
+          scheduledDate: { gte: now, lte: new Date(now.getTime() + 30 * 86400000) },
+          status: { in: ['SCHEDULED', 'GENERATED'] },
+        },
       }).catch(() => 0),
-      this.prisma.user.count().catch(() => 0),
-      this.prisma.purchaseRequisition.count({ where: { status: 'SUBMITTED' } }).catch(() => 0),
-      this.prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'SENT'] } } }).catch(() => 0),
+      this.prisma.user.count({
+        where: { companyMemberships: { some: { companyId: tenantId } } },
+      }).catch(() => 0),
+      this.prisma.purchaseRequisition.count({ where: { ...tw, status: 'SUBMITTED' } }).catch(() => 0),
+      this.prisma.purchaseOrder.count({ where: { ...tw, status: { in: ['DRAFT', 'SENT'] } } }).catch(() => 0),
+      // stockItem is optional / may lack companyId — scope defensively if field exists
       (this.prisma as any).stockItem?.findMany({
-        where: { currentQuantity: { lte: { _ref: 'minQuantity' } as any } },
+        where: { ...tw, currentQuantity: { lte: { _ref: 'minQuantity' } as any } },
         take: 5,
       }).catch(() => []) ?? [],
       this.prisma.salesOpportunity.groupBy({
         by: ['ownerId'],
-        where: { stage: 'WON' as any, closedAt: { gte: startOfMonth, lte: endOfMonth } },
+        where: { ...tw, stage: 'WON' as any, closedAt: { gte: startOfMonth, lte: endOfMonth } },
         _sum: { value: true },
         _count: { _all: true },
         orderBy: { _sum: { value: 'desc' } },
@@ -140,7 +152,7 @@ export class ExecutiveService {
       }).catch(() => []),
       this.prisma.operationalProject.groupBy({
         by: ['projectType'],
-        where: { status: 'COMPLETED' as any, actualEndDate: { gte: startOfYear } },
+        where: { ...tw, status: 'COMPLETED' as any, actualEndDate: { gte: startOfYear } },
         _count: { _all: true },
       }).catch(() => []),
     ]);

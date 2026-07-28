@@ -1,16 +1,6 @@
 import SwiftUI
 
-// MARK: – Model
-
-private struct Candidate: Identifiable {
-    let id: Int
-    let fullName: String
-    let email: String?
-    let whatsapp: String?
-    let category: String?
-    let stage: String?
-    let employmentStatus: String?
-}
+// MARK: – Stage helpers
 
 private let STAGE_LABEL: [String: String] = [
     "INBOX": "Postulado",
@@ -39,48 +29,31 @@ private func stageColor(_ key: String) -> Color {
     }
 }
 
-private func parseCandidate(_ m: [String: Any]) -> Candidate? {
-    guard let id = m["id"] as? Int ?? (m["id"] as? String).flatMap(Int.init) else { return nil }
-    let fullName = (m["fullName"] as? String) ?? (m["nombre"] as? String) ?? "Candidato #\(id)"
-    return Candidate(
-        id: id,
-        fullName: fullName,
-        email: m["email"] as? String,
-        whatsapp: m["whatsapp"] as? String,
-        category: m["category"] as? String,
-        stage: m["stage"] as? String ?? m["status"] as? String,
-        employmentStatus: m["employmentStatus"] as? String
-    )
-}
-
 // MARK: – View
 
 struct RecruitingView: View {
-    @State private var candidates: [Candidate] = []
+    @State private var candidates: [CandidateItem] = []
     @State private var isLoading = true
     @State private var error: String?
     @State private var query = ""
     @State private var showRejected = false
-    @State private var selected: Candidate?
+    @State private var selected: CandidateItem?
 
-    private var filtered: [Candidate] {
+    private var filtered: [CandidateItem] {
         candidates.filter { c in
-            let stg = c.stage ?? ""
-            let isRejected = stg.contains("REJECTED")
-            if !showRejected && isRejected { return false }
+            if !showRejected && c.isRejected { return false }
             if query.isEmpty { return true }
             let q = query.lowercased()
-            return c.fullName.lowercased().contains(q)
-                || (c.email?.lowercased().contains(q) ?? false)
-                || (c.category?.lowercased().contains(q) ?? false)
+            return c.displayName.lowercased().contains(q)
+                || c.email.lowercased().contains(q)
+                || c.category.lowercased().contains(q)
         }
     }
 
-    private var grouped: [(String, [Candidate])] {
-        var dict: [String: [Candidate]] = [:]
+    private var grouped: [(String, [CandidateItem])] {
+        var dict: [String: [CandidateItem]] = [:]
         for c in filtered {
-            let key = c.stage ?? "INBOX"
-            dict[key, default: []].append(c)
+            dict[c.stageKey, default: []].append(c)
         }
         return STAGE_ORDER
             .filter { dict[$0] != nil }
@@ -108,64 +81,55 @@ struct RecruitingView: View {
     }
 
     @ViewBuilder
-    private func candidateDetail(_ c: Candidate) -> some View {
-        let color = stageColor(c.stage ?? "")
+    private func candidateDetail(_ c: CandidateItem) -> some View {
+        let color = stageColor(c.stageKey)
         List {
             Section { Button("← Candidatos") { selected = nil } }
             Section {
                 HStack {
                     ZStack {
                         Circle().fill(color.opacity(0.15)).frame(width: 56, height: 56)
-                        Text(String(c.fullName.prefix(1))).font(.title2).bold().foregroundColor(color)
+                        Text(String(c.displayName.prefix(1))).font(.title2).bold().foregroundColor(color)
                     }
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(c.fullName).font(.headline)
-                        if let stage = c.stage {
-                            Text(STAGE_LABEL[stage] ?? stage).font(.caption).foregroundColor(color)
-                                .padding(.horizontal, 8).padding(.vertical, 2)
-                                .background(color.opacity(0.12)).clipShape(Capsule())
-                        }
+                        Text(c.displayName).font(.headline)
+                        Text(STAGE_LABEL[c.stageKey] ?? c.stageKey)
+                            .font(.caption).foregroundColor(color)
                     }
                 }
-                .padding(.vertical, 4)
             }
             Section("Contacto") {
-                if let email = c.email, !email.isEmpty {
-                    Link(destination: URL(string: "mailto:\(email)")!) {
-                        Label(email, systemImage: "envelope")
-                    }
-                }
-                if let ws = c.whatsapp, !ws.isEmpty {
-                    Link(destination: URL(string: "https://wa.me/\(ws.filter(\.isNumber))")!) {
-                        Label(ws, systemImage: "phone.fill")
-                    }
-                }
+                if !c.email.isEmpty { labeled("Email", c.email) }
+                if !c.whatsapp.isEmpty { labeled("WhatsApp", c.whatsapp) }
+                if !c.category.isEmpty { labeled("Categoría", c.category) }
+                if !c.position.isEmpty { labeled("Posición", c.position) }
+                if !c.experience.isEmpty { labeled("Experiencia", c.experience) }
+                if !c.expectedSalary.isEmpty { labeled("Salario", c.expectedSalary) }
+                if !c.source.isEmpty { labeled("Fuente", c.source) }
+                if !c.cvUrl.isEmpty { labeled("CV", c.cvUrl) }
             }
-            Section("Perfil") {
-                if let cat = c.category, !cat.isEmpty {
-                    HStack { Text("Posición").foregroundColor(.secondary); Spacer(); Text(cat) }
-                }
-                if let emp = c.employmentStatus, !emp.isEmpty {
-                    HStack { Text("Situación laboral").foregroundColor(.secondary); Spacer(); Text(emp) }
-                }
+            if !c.notes.isEmpty {
+                Section("Notas") { Text(c.notes).font(.subheadline) }
             }
         }
         .listStyle(.insetGrouped)
     }
 
+    @ViewBuilder private func labeled(_ k: String, _ v: String) -> some View {
+        HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary).multilineTextAlignment(.trailing) }
+    }
+
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // KPI strip
                 HStack(spacing: 0) {
                     kpiChip("Total", "\(candidates.count)", .primary)
-                    kpiChip("Proceso", "\(candidates.filter { !($0.stage ?? "").contains("REJECTED") && $0.stage != "APPROVED" }.count)", .blue)
-                    kpiChip("Contratados", "\(candidates.filter { $0.stage == "APPROVED" }.count)", .green)
-                    kpiChip("Rechazados", "\(candidates.filter { ($0.stage ?? "").contains("REJECTED") }.count)", .red)
+                    kpiChip("Proceso", "\(candidates.filter { !$0.isRejected && !$0.isApproved }.count)", .blue)
+                    kpiChip("Contratados", "\(candidates.filter { $0.isApproved }.count)", .green)
+                    kpiChip("Rechazados", "\(candidates.filter { $0.isRejected }.count)", .red)
                 }
                 .padding(.horizontal)
 
-                // Search + toggle
                 HStack {
                     HStack {
                         Image(systemName: "magnifyingglass").foregroundColor(.secondary)
@@ -197,7 +161,7 @@ struct RecruitingView: View {
     }
 
     @ViewBuilder
-    private func stageSection(_ key: String, _ list: [Candidate]) -> some View {
+    private func stageSection(_ key: String, _ list: [CandidateItem]) -> some View {
         let color = stageColor(key)
         let label = STAGE_LABEL[key] ?? key
 
@@ -233,38 +197,37 @@ struct RecruitingView: View {
 
     private func load() async {
         isLoading = true; error = nil
-        let raw = await ExtraRepository.shared.cvs()
-        candidates = raw.compactMap { parseCandidate($0) }
+        candidates = await ExtraRepository.shared.candidateItems()
         isLoading = false
     }
 }
 
 private struct CandidateCard: View {
-    let candidate: Candidate
+    let candidate: CandidateItem
     let stageColor: Color
 
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
                 Circle().fill(stageColor.opacity(0.15)).frame(width: 44, height: 44)
-                Text(String(candidate.fullName.prefix(1))).font(.title3).bold().foregroundColor(stageColor)
+                Text(String(candidate.displayName.prefix(1))).font(.headline).foregroundColor(stageColor)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(candidate.fullName).font(.subheadline).bold()
-                if let cat = candidate.category, !cat.isEmpty {
-                    Text(cat).font(.caption).foregroundColor(.secondary)
+                Text(candidate.displayName).font(.subheadline).bold()
+                if !candidate.category.isEmpty {
+                    Text(candidate.category).font(.caption).foregroundColor(.secondary)
                 }
-                if let email = candidate.email, !email.isEmpty {
-                    Text(email).font(.caption2).foregroundColor(.secondary)
+                if !candidate.email.isEmpty {
+                    Text(candidate.email).font(.caption2).foregroundColor(.secondary)
                 }
             }
             Spacer()
-            if let ws = candidate.whatsapp, !ws.isEmpty {
-                Image(systemName: "phone.fill").font(.caption).foregroundColor(.green)
+            if !candidate.whatsapp.isEmpty {
+                Image(systemName: "phone.fill").font(.caption).foregroundColor(.secondary)
             }
         }
         .padding(12)
         .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }

@@ -20,6 +20,7 @@ import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CreateContactMessageDto } from './dto/create-contact-message.dto.js';
 import { InboundContactMessageDto } from './dto/inbound-contact-message.dto.js';
 import { UpdateContactMessageDto } from './dto/update-contact-message.dto.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 @Controller('contact-messages')
 export class ContactMessagesController {
@@ -45,15 +46,20 @@ export class ContactMessagesController {
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
-  findAll(@Query('status') status?: string, @Query('category') category?: string, @Query() query?: PaginationQueryDto) {
-    return this.contactMessagesService.findAll(status, category, query);
+  findAll(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('status') status?: string,
+    @Query('category') category?: string,
+    @Query() query?: PaginationQueryDto,
+  ) {
+    return this.contactMessagesService.findAll(status, category, query, companyId);
   }
 
   @Get(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.contactMessagesService.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.contactMessagesService.findOne(id, companyId);
   }
 
   @Put(':id')
@@ -62,14 +68,15 @@ export class ContactMessagesController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateContactMessageDto: UpdateContactMessageDto,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.contactMessagesService.update(id, updateContactMessageDto);
+    return this.contactMessagesService.update(id, updateContactMessageDto, companyId);
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.contactMessagesService.remove(id);
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.contactMessagesService.remove(id, companyId);
   }
 }

@@ -114,19 +114,30 @@ export class RbacGuard extends AuthGuard('jwt') {
     return true;
   }
 
-  /** Resuelve el rol v2 desde el user del JWT, soportando legacy. */
+  /** Resuelve el rol v2 desde el user del JWT — preferir `roleKey`, warn en legacy. */
   private resolveV2Role(user: any): RoleKey | null {
     const validKeys = Object.values(ROLES) as string[];
     if (user.roleKey && validKeys.includes(user.roleKey)) {
       return user.roleKey as RoleKey;
     }
+
+    let legacy: RoleKey | null = null;
     if (user.orgRoleKey && LEGACY_TO_V2[user.orgRoleKey]) {
-      return LEGACY_TO_V2[user.orgRoleKey];
+      legacy = LEGACY_TO_V2[user.orgRoleKey];
+    } else if (user.admin) {
+      legacy = LEGACY_TO_V2.admin ?? null;
+    } else if (user.ingeniero) {
+      legacy = LEGACY_TO_V2.ingeniero ?? null;
+    } else if (user.vendedor) {
+      legacy = LEGACY_TO_V2.vendedor ?? null;
     }
-    if (user.admin) return LEGACY_TO_V2.admin ?? null;
-    if (user.ingeniero) return LEGACY_TO_V2.ingeniero ?? null;
-    if (user.vendedor) return LEGACY_TO_V2.vendedor ?? null;
-    return null;
+
+    if (legacy) {
+      this.logger.warn(
+        `[RBAC_LEGACY] user=${user.id} resolved via legacy flags → ${legacy}. Migrate roleKey.`,
+      );
+    }
+    return legacy;
   }
 }
 

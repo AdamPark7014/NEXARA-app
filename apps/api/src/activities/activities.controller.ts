@@ -75,13 +75,15 @@ export class ActivitiesController {
   @UseInterceptors(FileInterceptor('file'))
   async import(
     @UploadedFile() file: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     if (!file) {
       throw new BadRequestException('Archivo requerido');
     }
     try {
-      return await this.excelImport.importExcel('activity', file.buffer);
+      return await this.excelImport.importExcel('activity', file.buffer, companyId);
     } catch (e) {
+      if (e instanceof ForbiddenException) throw e;
       throw new BadRequestException(
         e instanceof Error ? e.message : 'Archivo inválido o error de importación',
       );
@@ -91,8 +93,8 @@ export class ActivitiesController {
   @Get('next-an')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
-  async getNextAn() {
-    const next = await this.activitiesService.getNextAnNumber();
+  async getNextAn(@CurrentCompanyId() companyId: number | null) {
+    const next = await this.activitiesService.getNextAnNumber(companyId);
     return { next };
   }
 
@@ -118,7 +120,7 @@ export class ActivitiesController {
       );
     }
 
-    const targetUser = await this.usersService.findOne(createActivityDto.responsableId);
+    const targetUser = await this.usersService.findOne(createActivityDto.responsableId, companyId);
     if (!targetUser) {
       throw new ForbiddenException('Usuario responsable no encontrado');
     }
@@ -156,15 +158,19 @@ export class ActivitiesController {
   @Get(':id')
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
-  findOne(@Param('id') id: string) {
-    return this.activitiesService.findOne(+id);
+  findOne(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
+    return this.activitiesService.findOne(+id, companyId);
   }
 
   @Get(':id/report')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
-  async report(@Param('id') id: string, @Res() res: Response) {
-    const result = await this.activitiesService.generateTicketReport(+id);
+  async report(
+    @Param('id') id: string,
+    @CurrentCompanyId() companyId: number | null,
+    @Res() res: Response,
+  ) {
+    const result = await this.activitiesService.generateTicketReport(+id, companyId);
     if (!result) return res.status(404).send('Ticket no encontrado');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=reporte-ticket-${id}.pdf`);
@@ -178,9 +184,10 @@ export class ActivitiesController {
     @Param('id') id: string,
     @Body() updateActivityDto: UpdateActivityDto,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     const actor = user?.id ? { id: user.id, nombre: user.nombre } : undefined;
-    return this.activitiesService.update(+id, updateActivityDto, actor);
+    return this.activitiesService.update(+id, updateActivityDto, actor, companyId);
   }
 
   /** Ingeniero de campo: actualizar estatus de su propia OT (iniciar/finalizar). */
@@ -197,8 +204,9 @@ export class ActivitiesController {
     @Param('id') id: string,
     @Body() body: { estatus?: string; fechaInicio?: string; fechaFinalizacion?: string },
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    const activity = await this.activitiesService.findOne(+id);
+    const activity = await this.activitiesService.findOne(+id, companyId);
     if (!activity) throw new ForbiddenException('Actividad no encontrada');
     if (!user?.isSuperAdmin && activity.responsableId !== user.id) {
       throw new ForbiddenException('Solo puedes actualizar actividades asignadas a ti');
@@ -208,14 +216,14 @@ export class ActivitiesController {
     if (body.fechaInicio) allowed.fechaInicio = body.fechaInicio;
     if (body.fechaFinalizacion) allowed.fechaFinalizacion = body.fechaFinalizacion;
     const actor = user?.id ? { id: user.id, nombre: user.nombre } : undefined;
-    return this.activitiesService.update(+id, allowed, actor);
+    return this.activitiesService.update(+id, allowed, actor, companyId);
   }
 
   @Delete(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
-  remove(@Param('id') id: string) {
-    return this.activitiesService.remove(+id);
+  remove(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
+    return this.activitiesService.remove(+id, companyId);
   }
 
   /**

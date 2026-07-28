@@ -563,6 +563,48 @@ export async function uploadPageMedia(
   return res.json();
 }
 
+export interface PageContentRevisionRow {
+  id: number;
+  section: string;
+  version: number;
+  content: Record<string, unknown>;
+  publishedBy: string | null;
+  publishedAt: string;
+}
+
+export async function listPageRevisions(
+  section: HomeSection,
+  token: string,
+): Promise<PageContentRevisionRow[]> {
+  const res = await fetch(buildApiUrl(`studio/page-content/${section}/revisions`), {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Error ${res.status} al cargar el historial de "${section}"`);
+  return res.json();
+}
+
+export async function rollbackPageSection(
+  section: HomeSection,
+  version: number,
+  token: string,
+  updatedBy?: string,
+): Promise<PageContentRow> {
+  const res = await fetch(buildApiUrl(`studio/page-content/${section}/revisions/${version}/rollback`), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ updatedBy }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Error ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
 export async function listAllPageSections(token: string): Promise<PageContentRow[]> {
   const res = await fetch(buildApiUrl("studio/page-content"), {
     headers: { Authorization: `Bearer ${token}` },

@@ -32,6 +32,7 @@ import {
 } from './dto/review-cv.dto.js';
 import { CvsService } from './cvs.service.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 @Controller('cvs')
 @UseGuards(AuthGuard('jwt'), RbacGuard)
@@ -65,7 +66,12 @@ export class CvsController {
   @Post()
   @RBAC({ anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] })
   @UseInterceptors(FileInterceptor('file', { dest: getCvsUploadDir(__dirname) }))
-  async create(@CurrentUser() user: any, @Body() body: CreateCvDto, @UploadedFile() file?: any) {
+  async create(
+    @CurrentUser() user: any,
+    @Body() body: CreateCvDto,
+    @UploadedFile() file?: any,
+    @CurrentCompanyId() companyId?: number | null,
+  ) {
     if (!file) {
       throw new BadRequestException('Debes subir un archivo de CV (PDF o imagen)');
     }
@@ -80,16 +86,20 @@ export class CvsController {
           .map((tag) => tag.trim())
           .filter(Boolean);
 
-    return this.cvsService.create(user, {
-      fullName: body.fullName,
-      email: body.email,
-      whatsapp: body.whatsapp,
-      category: body.category,
-      tags,
-      employmentStatus: body.employmentStatus,
-      recruiterNotes: body.recruiterNotes,
-      cvFileUrl: `/uploads/cvs/${file.filename}`,
-    });
+    return this.cvsService.create(
+      user,
+      {
+        fullName: body.fullName,
+        email: body.email,
+        whatsapp: body.whatsapp,
+        category: body.category,
+        tags,
+        employmentStatus: body.employmentStatus,
+        recruiterNotes: body.recruiterNotes,
+        cvFileUrl: `/uploads/cvs/${file.filename}`,
+      },
+      companyId,
+    );
   }
 
   @Get()
@@ -102,56 +112,90 @@ export class CvsController {
     @Query('employmentStatus') employmentStatus?: string,
     @Query('onlyMine') onlyMine?: string,
     @Query() pagination?: PaginationQueryDto,
+    @CurrentCompanyId() companyId?: number | null,
   ) {
-    return this.cvsService.list(user, { search, category, stage, employmentStatus, onlyMine }, pagination);
+    return this.cvsService.list(user, { search, category, stage, employmentStatus, onlyMine }, pagination, companyId);
   }
 
   @Get('summary/stats')
   @RBAC({ anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] })
-  summary(@CurrentUser() user: any) {
-    return this.cvsService.summary(user);
+  summary(@CurrentUser() user: any, @CurrentCompanyId() companyId?: number | null) {
+    return this.cvsService.summary(user, companyId);
   }
 
   @Get(':id')
   @RBAC({ anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] })
-  getOne(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number) {
-    return this.cvsService.getById(user, id);
+  getOne(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId?: number | null,
+  ) {
+    return this.cvsService.getById(user, id, companyId);
   }
 
   @Patch(':id/recruiter-review')
   @RBAC({ anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
-  recruiterReview(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number, @Body() body: RecruiterReviewCvDto) {
-    return this.cvsService.recruiterReview(user, id, body);
+  recruiterReview(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: RecruiterReviewCvDto,
+    @CurrentCompanyId() companyId?: number | null,
+  ) {
+    return this.cvsService.recruiterReview(user, id, body, companyId);
   }
 
   @Patch(':id/admin-review')
   @RBAC({ anyPermissions: [PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] })
-  adminReview(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number, @Body() body: AdminReviewCvDto) {
-    return this.cvsService.adminReview(user, id, body);
+  adminReview(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: AdminReviewCvDto,
+    @CurrentCompanyId() companyId?: number | null,
+  ) {
+    return this.cvsService.adminReview(user, id, body, companyId);
   }
 
   @Patch(':id/superadmin-review')
   @RBAC({ anyPermissions: [PERMISSIONS.CVS_SUPERADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] })
-  superadminReview(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number, @Body() body: SuperadminReviewCvDto) {
-    return this.cvsService.superadminReview(user, id, body);
+  superadminReview(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: SuperadminReviewCvDto,
+    @CurrentCompanyId() companyId?: number | null,
+  ) {
+    return this.cvsService.superadminReview(user, id, body, companyId);
   }
 
   @Patch(':id/move')
   @RBAC({ anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] })
-  move(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number, @Body() body: MoveCvDto) {
-    return this.cvsService.move(user, id, body.stage, body.sortOrder);
+  move(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: MoveCvDto,
+    @CurrentCompanyId() companyId?: number | null,
+  ) {
+    return this.cvsService.move(user, id, body.stage, body.sortOrder, companyId);
   }
 
   @Patch('reorder/stage')
   @RBAC({ anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] })
-  reorder(@CurrentUser() user: any, @Body() body: ReorderCvDto) {
-    return this.cvsService.reorder(user, body.stage, body.orderedIds || []);
+  reorder(
+    @CurrentUser() user: any,
+    @Body() body: ReorderCvDto,
+    @CurrentCompanyId() companyId?: number | null,
+  ) {
+    return this.cvsService.reorder(user, body.stage, body.orderedIds || [], companyId);
   }
 
   @Get(':id/download')
   @RBAC({ anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] })
-  async download(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number, @Res() res: Response) {
-    const row = await this.cvsService.getById(user, id);
+  async download(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+    @CurrentCompanyId() companyId?: number | null,
+  ) {
+    const row = await this.cvsService.getById(user, id, companyId);
     const fileName = basename(row.cvFileUrl || 'cv.pdf');
     const absolutePath = join(this.cvsUploadDir, fileName);
 
@@ -166,8 +210,13 @@ export class CvsController {
 
   @Get(':id/preview')
   @RBAC({ anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] })
-  async preview(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number, @Res() res: Response) {
-    const row = await this.cvsService.getById(user, id);
+  async preview(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+    @CurrentCompanyId() companyId?: number | null,
+  ) {
+    const row = await this.cvsService.getById(user, id, companyId);
     const fileName = basename(row.cvFileUrl || 'cv.pdf');
     const absolutePath = join(this.cvsUploadDir, fileName);
 
@@ -182,7 +231,11 @@ export class CvsController {
 
   @Get(':id/user-prefill')
   @RBAC({ anyPermissions: [PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.USERS_MANAGE] })
-  getUserPrefill(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number) {
-    return this.cvsService.getUserPrefill(user, id);
+  getUserPrefill(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId?: number | null,
+  ) {
+    return this.cvsService.getUserPrefill(user, id, companyId);
   }
 }

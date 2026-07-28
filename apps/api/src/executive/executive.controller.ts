@@ -3,6 +3,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { ExecutiveService } from './executive.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 @Controller('executive')
 @UseGuards(AuthGuard('jwt'), RbacGuard)
@@ -11,7 +12,7 @@ export class ExecutiveController {
 
   @Get('c-level')
   @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.SALES_REPORTS_VIEW, PERMISSIONS.CONTABILIDAD_VIEW] })
-  cLevel() {
-    return this.service.getCLevelDashboard();
+  cLevel(@CurrentCompanyId() companyId: number | null) {
+    return this.service.getCLevelDashboard(companyId);
   }
 }

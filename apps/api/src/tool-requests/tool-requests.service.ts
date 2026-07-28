@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { assertCompanyAccess, companyWhere, mergeCompanyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 const FIELD_KIT_ROLE_KEYS = ['ing_campo', 'ing_soporte'] as const;
 const BROAD_KIT_ASSIGN_SCOPE = new Set(['ceo', 'dir_operaciones', 'arquitecto', 'super_admin']);
@@ -98,19 +99,29 @@ export class ToolRequestsService {
     private notificationHierarchy: NotificationHierarchyService,
   ) {}
 
-  async create(data: CreateToolRequestDto) {
+  async create(data: CreateToolRequestDto, companyId?: number | null) {
     const inventoryItemId = Number(data.inventoryItemId);
     if (!Number.isFinite(inventoryItemId) || inventoryItemId <= 0) {
       throw new BadRequestException('Debes seleccionar una herramienta del inventario');
     }
 
-    const inventoryItem = await (this.prisma as any).toolInventoryItem.findUnique({
-      where: { id: inventoryItemId },
+    const inventoryScope =
+      companyId != null && Number(companyId) > 0
+        ? { id: inventoryItemId, ...companyWhere(companyId) }
+        : { id: inventoryItemId };
+
+    const inventoryItem = await (this.prisma as any).toolInventoryItem.findFirst({
+      where: inventoryScope,
     });
 
     if (!inventoryItem) {
       throw new BadRequestException('La herramienta seleccionada no existe en inventario');
     }
+
+    const tenantId =
+      inventoryItem.companyId != null && Number(inventoryItem.companyId) > 0
+        ? Number(inventoryItem.companyId)
+        : requireCompanyId(companyId);
 
     if (inventoryItem.status !== 'AVAILABLE') {
       throw new BadRequestException('La herramienta seleccionada no está disponible en inventario');
@@ -120,6 +131,7 @@ export class ToolRequestsService {
       where: {
         inventoryItemId,
         status: { in: ['PENDING', 'APPROVED', 'IN_USE'] },
+        ...companyWhere(tenantId),
       },
       select: { id: true },
     });
@@ -142,6 +154,7 @@ export class ToolRequestsService {
 
     const toolRequest = await this.prisma.toolRequest.create({
       data: {
+        companyId: tenantId,
         usuarioId: data.usuarioId,
         inventoryItemId,
         toolName,
@@ -176,7 +189,8 @@ export class ToolRequestsService {
     return toolRequest;
   }
 
-  async findAll(currentUser?: any, query?: PaginationQueryDto) {
+  async findAll(currentUser?: any, query?: PaginationQueryDto, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const include = {
       usuario: {
         select: { id: true, nombre: true, email: true, departmentId: true, department: { select: { id: true, nombre: true } }, role: { select: { id: true, nombre: true, accesoConsoleAdmin: true } } },
@@ -184,13 +198,14 @@ export class ToolRequestsService {
       approver: { select: { id: true, nombre: true, email: true } },
     };
 
-    let where: any = undefined;
+    let where: any = { ...companyWhere(tenantId) };
 
     if (currentUser?.isSuperAdmin) {
-      where = undefined;
+      // tenant scope only
     } else if (currentUser?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) || currentUser?.permissions?.includes(PERMISSIONS.TOOLS_MANAGE)) {
       // Admin consola o manager v2 (coord_operaciones, etc.): ve solicitudes de su departamento
       where = {
+        ...companyWhere(tenantId),
         usuario: {
           AND: [
             { departmentId: currentUser.departmentId },
@@ -213,9 +228,13 @@ export class ToolRequestsService {
     return this.prisma.toolRequest.findMany({ where, include, orderBy: { requestDate: 'desc' } });
   }
 
-  async findByUser(usuarioId: number) {
+  async findByUser(usuarioId: number, companyId?: number | null) {
+    const where: any = { usuarioId };
+    if (companyId != null && Number(companyId) > 0) {
+      Object.assign(where, companyWhere(companyId));
+    }
     return this.prisma.toolRequest.findMany({
-      where: { usuarioId },
+      where,
       include: {
         approver: {
           select: {
@@ -231,9 +250,13 @@ export class ToolRequestsService {
     });
   }
 
-  async findByStatus(status: ToolRequestStatus) {
+  async findByStatus(status: ToolRequestStatus, companyId?: number | null) {
+    const where: any = { status };
+    if (companyId != null && Number(companyId) > 0) {
+      Object.assign(where, companyWhere(companyId));
+    }
     return this.prisma.toolRequest.findMany({
-      where: { status },
+      where,
       include: {
         usuario: {
           select: {
@@ -256,14 +279,18 @@ export class ToolRequestsService {
     });
   }
 
-  async findActiveByUser(usuarioId: number) {
-    return this.prisma.toolRequest.findMany({
-      where: {
-        usuarioId,
-        status: {
-          in: ['APPROVED', 'IN_USE'],
-        },
+  async findActiveByUser(usuarioId: number, companyId?: number | null) {
+    const where: any = {
+      usuarioId,
+      status: {
+        in: ['APPROVED', 'IN_USE'],
       },
+    };
+    if (companyId != null && Number(companyId) > 0) {
+      Object.assign(where, companyWhere(companyId));
+    }
+    return this.prisma.toolRequest.findMany({
+      where,
       include: {
         approver: {
           select: {
@@ -279,9 +306,13 @@ export class ToolRequestsService {
     });
   }
 
-  async findById(id: number) {
-    return this.prisma.toolRequest.findUnique({
-      where: { id },
+  async findById(id: number, companyId?: number | null) {
+    const where =
+      companyId != null && Number(companyId) > 0
+        ? { id, ...companyWhere(companyId) }
+        : { id };
+    const row = await this.prisma.toolRequest.findFirst({
+      where,
       include: {
         usuario: {
           select: {
@@ -305,12 +336,20 @@ export class ToolRequestsService {
         },
       },
     });
+    if (companyId != null && Number(companyId) > 0) {
+      assertCompanyAccess(row, companyId, 'Solicitud de herramienta');
+    }
+    return row;
   }
 
-  async update(id: number, data: UpdateToolRequestDto) {
+  async update(id: number, data: UpdateToolRequestDto, companyId?: number | null) {
     // Get current tool request to check for status changes
-    const currentToolRequest = await this.prisma.toolRequest.findUnique({
-      where: { id },
+    const where =
+      companyId != null && Number(companyId) > 0
+        ? { id, ...companyWhere(companyId) }
+        : { id };
+    const currentToolRequest = await this.prisma.toolRequest.findFirst({
+      where,
       include: {
         usuario: {
           select: {
@@ -320,6 +359,9 @@ export class ToolRequestsService {
         },
       },
     });
+    if (companyId != null && Number(companyId) > 0) {
+      assertCompanyAccess(currentToolRequest, companyId, 'Solicitud de herramienta');
+    }
 
     const updated = await this.prisma.toolRequest.update({
       where: { id },
@@ -357,19 +399,9 @@ export class ToolRequestsService {
     return updated;
   }
 
-  async approve(id: number, approvedBy: number) {
-    const toolRequest = await this.prisma.toolRequest.findUnique({
-      where: { id },
-      include: {
-        usuario: {
-          select: {
-            id: true,
-            nombre: true,
-            email: true,
-          },
-        },
-      },
-    });
+  async approve(id: number, approvedBy: number, companyId?: number | null) {
+    const toolRequest = await this.findById(id, companyId);
+    if (!toolRequest) throw new Error('Solicitud no encontrada');
 
     const approved = await this.prisma.toolRequest.update({
       where: { id },
@@ -402,20 +434,19 @@ export class ToolRequestsService {
     return approved;
   }
 
-  async deliver(id: number) {
-    const request = await this.prisma.toolRequest.findUnique({
-      where: { id },
-      select: { id: true, inventoryItemId: true },
-    });
-
+  async deliver(id: number, companyId?: number | null) {
+    const request = await this.findById(id, companyId);
     if (!request) {
       throw new Error('Solicitud no encontrada');
     }
 
     return (this.prisma as any).$transaction(async (tx: any) => {
       if (request.inventoryItemId) {
-        const inventoryItem = await tx.toolInventoryItem.findUnique({
-          where: { id: request.inventoryItemId },
+        const inventoryItem = await tx.toolInventoryItem.findFirst({
+          where: {
+            id: request.inventoryItemId,
+            ...(companyId != null && Number(companyId) > 0 ? companyWhere(companyId) : {}),
+          },
           select: { status: true },
         });
 
@@ -452,13 +483,14 @@ export class ToolRequestsService {
     });
   }
 
-  async return(id: number, damageDescription?: string, damagePhotoUrl?: string) {
+  async return(
+    id: number,
+    damageDescription?: string,
+    damagePhotoUrl?: string,
+    companyId?: number | null,
+  ) {
     const status = damageDescription ? 'DAMAGED' : 'RETURNED';
-    const request = await this.prisma.toolRequest.findUnique({
-      where: { id },
-      select: { id: true, inventoryItemId: true },
-    });
-
+    const request = await this.findById(id, companyId);
     if (!request) {
       throw new Error('Solicitud no encontrada');
     }
@@ -496,7 +528,8 @@ export class ToolRequestsService {
     });
   }
 
-  async reject(id: number, approvedBy: number, adminNotes: string) {
+  async reject(id: number, approvedBy: number, adminNotes: string, companyId?: number | null) {
+    await this.findById(id, companyId);
     return this.prisma.toolRequest.update({
       where: { id },
       data: {
@@ -516,25 +549,28 @@ export class ToolRequestsService {
     });
   }
 
-  async delete(id: number) {
+  async delete(id: number, companyId?: number | null) {
+    await this.findById(id, companyId);
     return this.prisma.toolRequest.delete({
       where: { id },
     });
   }
 
-  async getStatsByUser(usuarioId: number) {
+  async getStatsByUser(usuarioId: number, companyId?: number | null) {
+    const scope =
+      companyId != null && Number(companyId) > 0 ? companyWhere(companyId) : {};
     const [inUse, pending, returned, damaged] = await Promise.all([
       this.prisma.toolRequest.count({
-        where: { usuarioId, status: 'IN_USE' },
+        where: { usuarioId, status: 'IN_USE', ...scope },
       }),
       this.prisma.toolRequest.count({
-        where: { usuarioId, status: 'PENDING' },
+        where: { usuarioId, status: 'PENDING', ...scope },
       }),
       this.prisma.toolRequest.count({
-        where: { usuarioId, status: 'RETURNED' },
+        where: { usuarioId, status: 'RETURNED', ...scope },
       }),
       this.prisma.toolRequest.count({
-        where: { usuarioId, status: 'DAMAGED' },
+        where: { usuarioId, status: 'DAMAGED', ...scope },
       }),
     ]);
 
@@ -547,8 +583,9 @@ export class ToolRequestsService {
     };
   }
 
-  async getInventory(search?: string, includeRetired = false) {
-    const where: any = {};
+  async getInventory(search?: string, includeRetired = false, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { ...companyWhere(tenantId) };
 
     if (!includeRetired) {
       where.status = { not: 'RETIRED' };
@@ -586,19 +623,23 @@ export class ToolRequestsService {
     });
   }
 
-  async searchInventoryOptions(search: string) {
+  async searchInventoryOptions(search: string, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const q = (search || '').trim();
     if (!q) return [];
 
     return (this.prisma as any).toolInventoryItem.findMany({
-      where: {
-        status: 'AVAILABLE',
-        OR: [
-          { toolName: { contains: q, mode: 'insensitive' } },
-          { model: { contains: q, mode: 'insensitive' } },
-          { serialNumber: { contains: q, mode: 'insensitive' } },
-        ],
-      },
+      where: mergeCompanyWhere(
+        {
+          status: 'AVAILABLE',
+          OR: [
+            { toolName: { contains: q, mode: 'insensitive' } },
+            { model: { contains: q, mode: 'insensitive' } },
+            { serialNumber: { contains: q, mode: 'insensitive' } },
+          ],
+        },
+        tenantId,
+      ),
       select: {
         id: true,
         toolName: true,
@@ -613,9 +654,11 @@ export class ToolRequestsService {
     });
   }
 
-  async createInventoryItem(data: CreateInventoryItemDto, currentUserId: number) {
+  async createInventoryItem(data: CreateInventoryItemDto, currentUserId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return (this.prisma as any).toolInventoryItem.create({
       data: {
+        companyId: tenantId,
         toolName: data.toolName,
         model: data.model,
         serialNumber: data.serialNumber,
@@ -627,7 +670,18 @@ export class ToolRequestsService {
     });
   }
 
-  async updateInventoryItem(id: number, data: UpdateInventoryItemDto, currentUserId: number) {
+  async updateInventoryItem(
+    id: number,
+    data: UpdateInventoryItemDto,
+    currentUserId: number,
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const existing = await (this.prisma as any).toolInventoryItem.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+      select: { id: true, companyId: true },
+    });
+    assertCompanyAccess(existing, tenantId, 'Herramienta de inventario');
     return (this.prisma as any).toolInventoryItem.update({
       where: { id },
       data: {
@@ -637,13 +691,22 @@ export class ToolRequestsService {
     });
   }
 
-  async replaceInventoryItem(id: number, data: ReplaceInventoryItemDto, currentUserId: number) {
-    const current = await (this.prisma as any).toolInventoryItem.findUnique({ where: { id } });
-    if (!current) throw new Error('Herramienta no encontrada');
+  async replaceInventoryItem(
+    id: number,
+    data: ReplaceInventoryItemDto,
+    currentUserId: number,
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const current = await (this.prisma as any).toolInventoryItem.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(current, tenantId, 'Herramienta de inventario');
 
     return (this.prisma as any).$transaction(async (tx: any) => {
       const replacement = await tx.toolInventoryItem.create({
         data: {
+          companyId: tenantId,
           toolName: data.toolName,
           model: data.model,
           serialNumber: data.serialNumber,
@@ -688,9 +751,10 @@ export class ToolRequestsService {
     return Boolean(dbUser?.email && this.superAdminEmails.includes(String(dbUser.email).toLowerCase()));
   }
 
-  async getMyKit(userId: number) {
+  async getMyKit(userId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return (this.prisma as any).toolKitAssignment.findMany({
-      where: { userId, isActive: true },
+      where: { userId, isActive: true, ...companyWhere(tenantId) },
       include: {
         inventoryItem: true,
         events: {
@@ -737,7 +801,9 @@ export class ToolRequestsService {
   async getUsersKit(
     currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
     userId?: number,
+    companyId?: number | null,
   ) {
+    const tenantId = requireCompanyId(companyId);
     const userFilter = await this.kitVisibilityUserFilter(currentUser);
     if (userFilter === null) return [];
 
@@ -748,6 +814,7 @@ export class ToolRequestsService {
 
     const assignments = await (this.prisma as any).toolKitAssignment.findMany({
       where: {
+        ...companyWhere(tenantId),
         ...(userId ? { userId } : {}),
         user: whereUser,
       },
@@ -779,11 +846,13 @@ export class ToolRequestsService {
   async assignKitItem(
     data: AssignKitItemDto,
     currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+    companyId?: number | null,
   ) {
-    const inventoryItem = await (this.prisma as any).toolInventoryItem.findUnique({
-      where: { id: data.inventoryItemId },
+    const tenantId = requireCompanyId(companyId);
+    const inventoryItem = await (this.prisma as any).toolInventoryItem.findFirst({
+      where: { id: data.inventoryItemId, ...companyWhere(tenantId) },
     });
-    if (!inventoryItem) throw new Error('Herramienta de inventario no encontrada');
+    assertCompanyAccess(inventoryItem, tenantId, 'Herramienta de inventario');
     if (inventoryItem.status !== 'AVAILABLE') {
       throw new Error('La herramienta seleccionada no está disponible para asignación');
     }
@@ -792,6 +861,7 @@ export class ToolRequestsService {
       where: {
         inventoryItemId: data.inventoryItemId,
         isActive: true,
+        ...companyWhere(tenantId),
       },
       select: { id: true },
     });
@@ -853,6 +923,7 @@ export class ToolRequestsService {
           notes: data.notes,
           assignedById: currentUser.id,
           isActive: true,
+          companyId: tenantId,
         },
         include: {
           user: { select: { id: true, nombre: true, email: true } },
@@ -876,9 +947,11 @@ export class ToolRequestsService {
     assignmentId: number,
     data: ReportKitEventDto,
     currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+    companyId?: number | null,
   ) {
-    const assignment = await (this.prisma as any).toolKitAssignment.findUnique({
-      where: { id: assignmentId },
+    const tenantId = requireCompanyId(companyId);
+    const assignment = await (this.prisma as any).toolKitAssignment.findFirst({
+      where: { id: assignmentId, ...companyWhere(tenantId) },
       include: {
         user: {
           select: {
@@ -889,8 +962,7 @@ export class ToolRequestsService {
         },
       },
     });
-
-    if (!assignment) throw new Error('Asignación no encontrada');
+    assertCompanyAccess(assignment, tenantId, 'Asignación de kit');
 
     const isSuperAdmin = await this.isSuperAdminByEmail(currentUser.id, currentUser);
     const isAdmin = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
@@ -922,16 +994,24 @@ export class ToolRequestsService {
     eventId: number,
     data: ResolveKitEventDto,
     currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+    companyId?: number | null,
   ) {
+    const tenantId = requireCompanyId(companyId);
     const isSuperAdmin = await this.isSuperAdminByEmail(currentUser.id, currentUser);
-    const isAdmin = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
+    const isAdmin = Boolean(
+      currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) ||
+      currentUser.permissions?.includes(PERMISSIONS.TOOLS_MANAGE),
+    );
 
     if (!isSuperAdmin && !isAdmin) {
       throw new Error('No tienes permisos para resolver incidentes de kit');
     }
 
-    const event = await (this.prisma as any).toolKitEvent.findUnique({
-      where: { id: eventId },
+    const event = await (this.prisma as any).toolKitEvent.findFirst({
+      where: {
+        id: eventId,
+        assignment: companyWhere(tenantId),
+      },
       include: {
         assignment: {
           include: {
@@ -947,16 +1027,14 @@ export class ToolRequestsService {
                 id: true,
                 toolName: true,
                 model: true,
+                companyId: true,
               },
             },
           },
         },
       },
     });
-
-    if (!event) {
-      throw new Error('Incidente no encontrado');
-    }
+    assertCompanyAccess(event?.assignment, tenantId, 'Incidente de kit');
 
     if (event.resolution !== 'PENDING') {
       throw new Error('Este incidente ya fue resuelto');
@@ -979,6 +1057,7 @@ export class ToolRequestsService {
       if (!replacementItemId && data.resolution === 'EQUIPMENT_FAILURE') {
         const autoReplacement = await tx.toolInventoryItem.findFirst({
           where: {
+            ...companyWhere(tenantId),
             status: 'AVAILABLE',
             toolName: event.assignment.inventoryItem.toolName,
             model: event.assignment.inventoryItem.model,
@@ -1005,14 +1084,15 @@ export class ToolRequestsService {
             monto: fineAmount,
             referenciaId: event.assignmentId,
             estatusPago: 'Pendiente',
+            companyId: tenantId,
           },
         });
         fineId = fine.id;
       }
 
       if (replacementItemId) {
-        const replacement = await tx.toolInventoryItem.findUnique({
-          where: { id: replacementItemId },
+        const replacement = await tx.toolInventoryItem.findFirst({
+          where: { id: replacementItemId, ...companyWhere(tenantId) },
         });
         if (!replacement || replacement.status !== 'AVAILABLE') {
           throw new Error('La herramienta de reemplazo no está disponible');
@@ -1037,6 +1117,7 @@ export class ToolRequestsService {
             assignedById: currentUser.id,
             isActive: true,
             notes: data.notes || `Reemplazo por incidente #${event.id}`,
+            companyId: tenantId,
           },
         });
 
@@ -1071,19 +1152,9 @@ export class ToolRequestsService {
   }
 
   // Renovaciones (Extensions)
-  async requestRenewal(data: CreateRenewalDto, usuarioId: number) {
+  async requestRenewal(data: CreateRenewalDto, usuarioId: number, companyId?: number | null) {
     // Verificar que la herramienta pertenece al usuario
-    const toolRequest = await this.prisma.toolRequest.findUnique({
-      where: { id: data.toolRequestId },
-      include: {
-        usuario: {
-          select: {
-            nombre: true,
-            id: true,
-          },
-        },
-      },
-    });
+    const toolRequest = await this.findById(data.toolRequestId, companyId);
 
     if (!toolRequest || toolRequest.usuarioId !== usuarioId) {
       throw new Error('No tienes permiso para renovar esta solicitud');
@@ -1096,6 +1167,7 @@ export class ToolRequestsService {
         newReturnDate: data.newReturnDate,
         renewalReason: data.renewalReason,
         status: 'PENDING',
+        companyId: requireCompanyId(companyId ?? toolRequest.companyId),
       },
       include: {
         toolRequest: {
@@ -1126,9 +1198,11 @@ export class ToolRequestsService {
   async findRenewals(
     toolRequestId?: number,
     status?: RenewalStatus,
-    currentUser?: { id: number; isSuperAdmin?: boolean; permissions?: string[]; departmentId?: number }
+    currentUser?: { id: number; isSuperAdmin?: boolean; permissions?: string[]; departmentId?: number },
+    companyId?: number | null,
   ) {
-    const where: any = {};
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { ...companyWhere(tenantId) };
     if (toolRequestId) where.toolRequestId = toolRequestId;
     if (status) where.status = status;
 
@@ -1138,17 +1212,14 @@ export class ToolRequestsService {
       const isConsoleAdmin = currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN);
 
       if (!isSuperAdmin && isConsoleAdmin) {
-        // Admin console: solo ve renovaciones de usuarios en su departamento
         where.toolRequest = {
           usuario: {
             departmentId: currentUser.departmentId,
           },
         };
       } else if (!isSuperAdmin && !isConsoleAdmin) {
-        // Usuario normal: no debería ver esta lista
         return [];
       }
-      // SuperAdmin: ve todas (sin filtro adicional)
     }
 
     return this.prisma.toolRenewal.findMany({
@@ -1187,10 +1258,12 @@ export class ToolRequestsService {
 
   async approveRenewal(
     renewalId: number,
-    approver: { id: number; isSuperAdmin?: boolean; permissions?: string[]; departmentId?: number }
+    approver: { id: number; isSuperAdmin?: boolean; permissions?: string[]; departmentId?: number },
+    companyId?: number | null,
   ) {
-    const renewal = await this.prisma.toolRenewal.findUnique({
-      where: { id: renewalId },
+    const tenantId = requireCompanyId(companyId);
+    const renewal = await this.prisma.toolRenewal.findFirst({
+      where: { id: renewalId, ...companyWhere(tenantId) },
       include: {
         toolRequest: {
           include: {
@@ -1204,8 +1277,7 @@ export class ToolRequestsService {
         },
       },
     });
-
-    if (!renewal) throw new Error('Renovación no encontrada');
+    assertCompanyAccess(renewal, tenantId, 'Renovación');
 
     // Validar permisos
     const isSuperAdmin = approver.isSuperAdmin === true;
@@ -1259,10 +1331,12 @@ export class ToolRequestsService {
   async rejectRenewal(
     renewalId: number,
     approver: { id: number; isSuperAdmin?: boolean; permissions?: string[]; departmentId?: number },
-    reason: string
+    reason: string,
+    companyId?: number | null,
   ) {
-    const renewal = await this.prisma.toolRenewal.findUnique({
-      where: { id: renewalId },
+    const tenantId = requireCompanyId(companyId);
+    const renewal = await this.prisma.toolRenewal.findFirst({
+      where: { id: renewalId, ...companyWhere(tenantId) },
       include: {
         toolRequest: {
           include: {
@@ -1276,8 +1350,7 @@ export class ToolRequestsService {
         },
       },
     });
-
-    if (!renewal) throw new Error('Renovación no encontrada');
+    assertCompanyAccess(renewal, tenantId, 'Renovación');
 
     // Validar permisos
     const isSuperAdmin = approver.isSuperAdmin === true;

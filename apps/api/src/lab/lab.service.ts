@@ -1,59 +1,96 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 
+/**
+ * Feature flags: `companyId = null` = platform/global.
+ * Tenant overrides use the same key with a concrete companyId.
+ * Lab UI manages platform flags; product AI resolves tenant → platform.
+ */
 @Injectable()
 export class LabService {
   constructor(private readonly prisma: PrismaService) {}
 
   // ── Feature flags ────────────────────────────────────────────────
-  listFlags(scope?: string) {
+  listFlags(scope?: string, companyId?: number | null) {
+    const where: any = {};
+    if (scope) where.scope = scope;
+    // Lab default: platform flags only (null). Pass companyId to include tenant overrides.
+    if (companyId == null) {
+      where.companyId = null;
+    } else {
+      where.OR = [{ companyId: null }, { companyId }];
+    }
     return this.prisma.featureFlag.findMany({
-      where: scope ? { scope } : undefined,
+      where,
       orderBy: [{ scope: 'asc' }, { key: 'asc' }],
     });
   }
 
-  async setFlag(key: string, enabled: boolean) {
-    const flag = await this.prisma.featureFlag.findUnique({ where: { key } });
+  async setFlag(key: string, enabled: boolean, companyId: number | null = null) {
+    const flag = await this.prisma.featureFlag.findFirst({
+      where: { key, companyId },
+    });
     if (!flag) throw new NotFoundException(`Flag ${key} no existe`);
-    return this.prisma.featureFlag.update({ where: { key }, data: { enabled } });
+    return this.prisma.featureFlag.update({
+      where: { id: flag.id },
+      data: { enabled },
+    });
   }
 
-  upsertFlag(input: { key: string; scope: string; description?: string; enabled?: boolean; metadata?: any }) {
-    return this.prisma.featureFlag.upsert({
-      where: { key: input.key },
-      create: {
+  async upsertFlag(input: {
+    key: string;
+    scope: string;
+    description?: string;
+    enabled?: boolean;
+    metadata?: any;
+    companyId?: number | null;
+  }) {
+    const companyId = input.companyId ?? null;
+    const existing = await this.prisma.featureFlag.findFirst({
+      where: { key: input.key, companyId },
+    });
+    const data = {
+      scope: input.scope,
+      description: input.description ?? null,
+      enabled: input.enabled ?? false,
+      metadata: input.metadata ?? undefined,
+    };
+    if (existing) {
+      return this.prisma.featureFlag.update({ where: { id: existing.id }, data });
+    }
+    return this.prisma.featureFlag.create({
+      data: {
         key: input.key,
-        scope: input.scope,
-        description: input.description ?? null,
-        enabled: input.enabled ?? false,
-        metadata: input.metadata ?? undefined,
-      },
-      update: {
-        scope: input.scope,
-        description: input.description ?? null,
-        enabled: input.enabled ?? false,
-        metadata: input.metadata ?? undefined,
+        companyId,
+        ...data,
       },
     });
   }
 
-  async deleteFlag(key: string) {
-    await this.prisma.featureFlag.delete({ where: { key } });
+  async deleteFlag(key: string, companyId: number | null = null) {
+    const flag = await this.prisma.featureFlag.findFirst({ where: { key, companyId } });
+    if (!flag) throw new NotFoundException(`Flag ${key} no existe`);
+    await this.prisma.featureFlag.delete({ where: { id: flag.id } });
     return { ok: true };
   }
 
-  async isEnabled(key: string): Promise<boolean> {
-    const flag = await this.prisma.featureFlag.findUnique({ where: { key } });
-    return Boolean(flag?.enabled);
+  /**
+   * Resolve enabled: tenant override wins over platform flag.
+   */
+  async isEnabled(key: string, companyId?: number | null): Promise<boolean> {
+    if (companyId != null) {
+      const tenant = await this.prisma.featureFlag.findFirst({
+        where: { key, companyId },
+      });
+      if (tenant) return Boolean(tenant.enabled);
+    }
+    const platform = await this.prisma.featureFlag.findFirst({
+      where: { key, companyId: null },
+    });
+    return Boolean(platform?.enabled);
   }
 
   // ── AI Sandbox ────────────────────────────────────────────────────
-  /**
-   * Ejecuta un prompt contra un proveedor de IA configurado por env.
-   * Si no hay clave configurada, devuelve un mensaje claro indicando cómo
-   * habilitarlo. Soporta Anthropic (Claude) y OpenAI (GPT).
-   */
   async runAiPrompt(input: { model: string; prompt: string; systemPrompt?: string }): Promise<{
     output: string;
     model: string;

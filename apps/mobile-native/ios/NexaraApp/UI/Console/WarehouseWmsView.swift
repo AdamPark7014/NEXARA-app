@@ -409,21 +409,33 @@ struct WarehouseWmsView: View {
     }
 
     private var productPicker: some View {
-        let sourceMaps: [[String: Any]] = vm.products.isEmpty
-            ? vm.stock.map { $0.toFlatMap() }
-            : vm.products.map { $0.toFlatMap() }
         let q = (vm.skuQuery.isEmpty ? vm.query : vm.skuQuery).lowercased()
-        let ranked: [(Int, [String: Any])] = sourceMaps.map { p in
-            let sku = whStr(p, "sku", "code").lowercased()
-            let name = whStr(p, "name", "productName", "nombre").lowercased()
-            let score: Int
-            if q.isEmpty { score = 3 }
-            else if sku == q { score = 0 }
-            else if sku.hasPrefix(q) { score = 1 }
-            else if sku.contains(q) || name.contains(q) { score = 2 }
-            else { score = 9 }
-            return (score, p)
-        }.filter { $0.0 < 9 || q.isEmpty }.sorted { $0.0 < $1.0 }
+        let ranked: [(Int, String, String, Int64?)] = {
+            if !vm.products.isEmpty {
+                return vm.products.map { p ->
+                    let sku = p.sku.lowercased()
+                    let name = p.name.lowercased()
+                    let score: Int
+                    if q.isEmpty { score = 3 }
+                    else if sku == q { score = 0 }
+                    else if sku.hasPrefix(q) { score = 1 }
+                    else if sku.contains(q) || name.contains(q) { score = 2 }
+                    else { score = 9 }
+                    return (score, p.name, p.sku, p.id)
+                }.filter { $0.0 < 9 || q.isEmpty }.sorted { $0.0 < $1.0 }
+            }
+            return vm.stock.map { s ->
+                let sku = s.sku.lowercased()
+                let name = s.name.lowercased()
+                let score: Int
+                if q.isEmpty { score = 3 }
+                else if sku == q { score = 0 }
+                else if sku.hasPrefix(q) { score = 1 }
+                else if sku.contains(q) || name.contains(q) { score = 2 }
+                else { score = 9 }
+                return (score, s.name, s.sku, s.productId)
+            }.filter { $0.0 < 9 || q.isEmpty }.sorted { $0.0 < $1.0 }
+        }()
 
         return List {
             Section {
@@ -442,12 +454,12 @@ struct WarehouseWmsView: View {
                 Text("Prioriza coincidencia exacta de SKU")
                     .font(.caption2).foregroundColor(.secondary)
             }
-            ForEach(ranked.prefix(80), id: \.1.whKey) { score, p in
-                let sku = whStr(p, "sku", "code")
+            ForEach(Array(ranked.prefix(80).enumerated()), id: \.offset) { _, row in
+                let (_, name, sku, pid) = row
                 let exact = !q.isEmpty && sku.lowercased() == q
                 Button {
-                    productId = whInt64(p, "productId", "id")
-                    var label = whStr(p, "name", "productName", "sku")
+                    productId = pid
+                    var label = name.isEmpty ? "Producto" : name
                     if !sku.isEmpty { label += " (\(sku))" }
                     productLabel = label
                     pickProduct = false
@@ -455,13 +467,13 @@ struct WarehouseWmsView: View {
                     vm.skuQuery = ""
                 } label: {
                     VStack(alignment: .leading) {
-                        Text(whStr(p, "name", "productName")).bold()
+                        Text(name.isEmpty ? "Producto" : name).bold()
                         Text(exact ? "✓ SKU \(sku)" : sku)
                             .font(.caption)
                             .foregroundColor(exact ? .teal : .secondary)
                     }
                 }
-                .listRowBackground(exact ? Color.teal.opacity(0.12) : nil)
+                .listRowBackground(exact ? Color.teal.opacity(0.12) : Color(.secondarySystemGroupedBackground))
             }
         }
     }

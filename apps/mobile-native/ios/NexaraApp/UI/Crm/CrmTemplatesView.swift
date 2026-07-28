@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct CrmTemplatesView: View {
-    @State private var items: [[String: Any]] = []
+    @State private var items: [OrderTemplate] = []
     @State private var isLoading = true
     @State private var error: String?
     @State private var actionError: String?
@@ -23,11 +23,12 @@ struct CrmTemplatesView: View {
             if isLoading {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error, items.isEmpty {
-                VStack(spacing: 12) {
-                    Text(error).foregroundColor(.red).multilineTextAlignment(.center)
-                    Button("Reintentar") { Task { await reload() } }
-                }
-                .padding()
+                NxEmptyState(
+                    title: "No se pudieron cargar",
+                    subtitle: error,
+                    actionLabel: "Reintentar",
+                    onAction: { Task { await reload() } }
+                )
             } else {
                 List {
                     Section {
@@ -39,9 +40,14 @@ struct CrmTemplatesView: View {
                         Section { Text(actionError).foregroundColor(.red).font(.footnote) }
                     }
                     if items.isEmpty {
-                        Section { Text("Sin plantillas. Crea la primera con +.").foregroundColor(.secondary) }
+                        Section {
+                            NxEmptyState(
+                                title: "Sin plantillas",
+                                subtitle: "Crea la primera plantilla corporativa con +."
+                            )
+                        }
                     } else {
-                        ForEach(Array(items.enumerated()), id: \.offset) { _, tpl in
+                        ForEach(items) { tpl in
                             templateRow(tpl)
                         }
                     }
@@ -74,37 +80,32 @@ struct CrmTemplatesView: View {
     }
 
     @ViewBuilder
-    private func templateRow(_ tpl: [String: Any]) -> some View {
-        let tplName = tkStr(tpl, "name", "nombre")
-        let isDefault = tkBool(tpl, "isDefault", "is_default")
-        let colorHex = tkStr(tpl, "primaryColor", "primary_color").isEmpty ? "#0f6ad6" : tkStr(tpl, "primaryColor", "primary_color")
-        let swatch = Color(hex: colorHex) ?? Color(red: 0.06, green: 0.42, blue: 0.84)
+    private func templateRow(_ tpl: OrderTemplate) -> some View {
+        let swatch = Color(hex: tpl.colorHex) ?? Color(red: 0.06, green: 0.42, blue: 0.84)
 
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Circle().fill(swatch).frame(width: 12, height: 12)
-                Text(tplName.isEmpty ? "—" : tplName).font(.headline)
-                if isDefault {
+                Text(tpl.displayName).font(.headline)
+                if tpl.isDefault {
                     Label("Predeterminada", systemImage: "star.fill")
                         .font(.caption2)
                         .foregroundColor(.green)
                 }
             }
-            let desc = tkStr(tpl, "description", "descripcion")
-            if !desc.isEmpty {
-                Text(desc).font(.caption).foregroundColor(.secondary)
+            if !tpl.description.isEmpty {
+                Text(tpl.description).font(.caption).foregroundColor(.secondary)
             }
-            let company = tkStr(tpl, "companyName", "company_name")
-            if !company.isEmpty {
-                Text(company).font(.subheadline)
+            if !tpl.companyName.isEmpty {
+                Text(tpl.companyName).font(.subheadline)
             }
             HStack(spacing: 12) {
-                if !isDefault, let id = tkId(tpl) {
-                    Button("Predeterminar") { Task { await setDefault(id) } }
+                if !tpl.isDefault, tpl.id > 0 {
+                    Button("Predeterminar") { Task { await setDefault(Int(tpl.id)) } }
                         .font(.caption)
                 }
-                if let id = tkId(tpl) {
-                    Button(role: .destructive) { confirmDeleteId = id } label: {
+                if tpl.id > 0 {
+                    Button(role: .destructive) { confirmDeleteId = Int(tpl.id) } label: {
                         Label("Eliminar", systemImage: "trash")
                     }
                     .font(.caption)
@@ -160,7 +161,7 @@ struct CrmTemplatesView: View {
         isLoading = true
         defer { isLoading = false }
         do {
-            items = try await CrmRepository.shared.orderTemplates()
+            items = try await CrmRepository.shared.orderTemplateItems()
             error = nil
         } catch {
             self.error = error.localizedDescription
@@ -203,30 +204,6 @@ struct CrmTemplatesView: View {
         } catch {
             actionError = error.localizedDescription
         }
-    }
-
-    private func tkStr(_ m: [String: Any], _ keys: String...) -> String {
-        for k in keys {
-            if let s = m[k] as? String, !s.isEmpty { return s }
-            if let n = m[k] { let s = "\(n)"; if s != "nil" && !s.isEmpty { return s } }
-        }
-        return ""
-    }
-
-    private func tkBool(_ m: [String: Any], _ keys: String...) -> Bool {
-        for k in keys {
-            if let b = m[k] as? Bool { return b }
-            if let n = m[k] as? Int { return n != 0 }
-            if let s = m[k] as? String { return s == "true" || s == "1" }
-        }
-        return false
-    }
-
-    private func tkId(_ m: [String: Any]) -> Int? {
-        if let n = m["id"] as? Int { return n }
-        if let n = m["id"] as? Double { return Int(n) }
-        if let s = m["id"] as? String { return Int(s) }
-        return nil
     }
 }
 

@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ActivityWorkType, ClientTicketStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
-import { companyWhere } from '../common/tenant/tenant-scope.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class ClientTicketRequestsService {
@@ -26,14 +26,17 @@ export class ClientTicketRequestsService {
     });
   }
 
-  async assign(id: number, activityId: number) {
-    const request = await this.prisma.clientTicketRequest.findUnique({
-      where: { id },
+  async assign(id: number, activityId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const request = await this.prisma.clientTicketRequest.findFirst({
+      where: { id, ...companyWhere(tenantId) },
     });
-    if (!request) throw new NotFoundException('Solicitud no encontrada');
+    assertCompanyAccess(request, tenantId, 'Solicitud');
 
-    const activity = await this.prisma.activity.findUnique({ where: { id: activityId } });
-    if (!activity) throw new NotFoundException('Actividad no encontrada');
+    const activity = await this.prisma.activity.findFirst({
+      where: { id: activityId, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(activity, tenantId, 'Actividad');
 
     const workType: ActivityWorkType =
       request.requestType === 'PREVENTIVE_INVENTORY' ? 'PREVENTIVE_INVENTORY' : 'ISSUE';
@@ -57,6 +60,7 @@ export class ClientTicketRequestsService {
           where: {
             clientId: request.clientId,
             branchId: request.branchId,
+            ...companyWhere(tenantId),
           },
           orderBy: { createdAt: 'desc' },
           include: { items: true },
@@ -76,6 +80,7 @@ export class ClientTicketRequestsService {
             activityId,
             clientId: request.clientId,
             branchId: request.branchId,
+            companyId: tenantId,
             title: `Mantenimiento e inventario ${activity.anNumber || `ACT-${activity.id}`}`,
             status: 'PENDING',
             previousCount: previous?.currentCount ?? previous?.items?.length ?? 0,
@@ -91,8 +96,13 @@ export class ClientTicketRequestsService {
     });
   }
 
-  updateStatus(id: number, status: ClientTicketStatus) {
-    return this.prisma['clientTicketRequest'].update({
+  async updateStatus(id: number, status: ClientTicketStatus, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const request = await this.prisma.clientTicketRequest.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(request, tenantId, 'Solicitud');
+    return this.prisma.clientTicketRequest.update({
       where: { id },
       data: { status },
     });

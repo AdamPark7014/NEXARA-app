@@ -16,8 +16,8 @@ export class JournalEntriesController {
   @Post()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_MANAGE] })
-  create(@CurrentUser() user: { id: number }, @Body() dto: CreateJournalEntryDto) {
-    return this.service.createJournalEntry(dto, user.id);
+  create(@CurrentUser() user: { id: number }, @Body() dto: CreateJournalEntryDto, @CurrentCompanyId() companyId: number | null) {
+    return this.service.createJournalEntry({ ...dto, companyId }, user.id);
   }
 
   @Get()
@@ -40,14 +40,22 @@ export class JournalEntriesController {
   @Patch(':id/post')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_POST] })
-  post(@Param('id') id: string, @CurrentUser() user: { id: number }) {
-    return this.service.postJournalEntry(+id, user.id);
+  post(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: number },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.postJournalEntry(+id, user.id, companyId);
   }
 
   @Post(':id/reverse')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_POST] })
-  reverse(@Param('id') id: string, @CurrentUser() user: { id: number }) {
-    return this.service.reverseJournalEntry(+id, user.id);
+  reverse(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: number },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.reverseJournalEntry(+id, user.id, companyId);
   }
 }

@@ -40,7 +40,7 @@ export default function PageHeader({
         border: isHero ? "1px solid var(--nx-panel-hairline)" : "none",
         borderRadius: isHero ? "var(--nx-panel-radius)" : 0,
         boxShadow: isHero ? "var(--nx-panel-elev-1)" : "none",
-        overflow: "hidden",
+        overflow: isHero ? "hidden" : "visible",
       }}
     >
       {isHero && (

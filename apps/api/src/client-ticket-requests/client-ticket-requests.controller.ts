@@ -34,12 +34,13 @@ export class ClientTicketRequestsController {
   assign(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { activityId?: number },
+    @CurrentCompanyId() companyId: number | null,
   ) {
     const activityId = Number(body.activityId);
     if (!activityId || Number.isNaN(activityId)) {
       throw new BadRequestException('activityId invalido');
     }
-    return this.service.assign(id, activityId);
+    return this.service.assign(id, activityId, companyId);
   }
 
   @Patch(':id/status')
@@ -47,10 +48,11 @@ export class ClientTicketRequestsController {
   updateStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { status?: string },
+    @CurrentCompanyId() companyId: number | null,
   ) {
     if (!body.status) throw new BadRequestException('status requerido');
     const status = this.normalizeStatus(body.status);
     if (!status) throw new BadRequestException('status invalido');
-    return this.service.updateStatus(id, status);
+    return this.service.updateStatus(id, status, companyId);
   }
 }

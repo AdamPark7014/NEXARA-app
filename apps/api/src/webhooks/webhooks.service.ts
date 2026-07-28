@@ -8,6 +8,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
+import { JobQueueService } from '../jobs/job-queue.service.js';
 
 export const WEBHOOK_EVENTS = [
   'invoice.paid',
@@ -28,7 +29,10 @@ export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number] | string;
 export class WebhooksService {
   private readonly logger = new Logger(WebhooksService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jobs: JobQueueService,
+  ) {}
 
   listCatalog() {
     return { events: WEBHOOK_EVENTS };
@@ -106,6 +110,42 @@ export class WebhooksService {
     });
   }
 
+  /** Dead-letter queue: entregas fallidas del tenant. */
+  async listDlq(companyId?: number | null, limit = 50) {
+    const cid = companyId != null && Number.isFinite(Number(companyId)) ? Number(companyId) : null;
+    return this.prisma.webhookDelivery.findMany({
+      where: {
+        status: 'failed',
+        webhook: { ...companyWhere(cid) },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(100, Math.max(1, limit)),
+      include: {
+        webhook: { select: { id: true, name: true, url: true, companyId: true } },
+      },
+    });
+  }
+
+  async replayDelivery(deliveryId: number, companyId?: number | null) {
+    const delivery = await this.prisma.webhookDelivery.findUnique({
+      where: { id: deliveryId },
+      include: { webhook: true },
+    });
+    if (!delivery) throw new NotFoundException('Delivery no encontrada');
+    assertCompanyAccess(delivery.webhook, companyId, 'Webhook');
+    await this.prisma.webhookDelivery.update({
+      where: { id: deliveryId },
+      data: {
+        status: 'pending',
+        nextRetryAt: new Date(),
+        responseCode: null,
+        responseBody: null,
+      },
+    });
+    await this.deliver(deliveryId);
+    return this.prisma.webhookDelivery.findUnique({ where: { id: deliveryId } });
+  }
+
   /**
    * Emite solo a webhooks del tenant.
    * Sin companyId no se hace broadcast global (evita leak cross-tenant).
@@ -145,6 +185,30 @@ export class WebhooksService {
           nextRetryAt: new Date(),
         },
       });
+      // Persist delivery then enqueue durable retry path (in-process / BullMQ-ready).
+      void this.jobs
+        .enqueue(
+          'webhook.deliver',
+          {
+            url: hook.url,
+            body: delivery.payload,
+            headers: hook.secret
+              ? {
+                  'X-Nexara-Event': event,
+                  'X-Nexara-Delivery': String(delivery.id),
+                  'X-Nexara-Signature': `sha256=${createHmac('sha256', hook.secret)
+                    .update(JSON.stringify(delivery.payload))
+                    .digest('hex')}`,
+                }
+              : {
+                  'X-Nexara-Event': event,
+                  'X-Nexara-Delivery': String(delivery.id),
+                },
+            deliveryId: delivery.id,
+          },
+          { maxAttempts: 5 },
+        )
+        .catch(() => undefined);
       void this.deliver(delivery.id).catch((err) =>
         this.logger.warn(`Webhook delivery ${delivery.id} falló: ${(err as Error).message}`),
       );

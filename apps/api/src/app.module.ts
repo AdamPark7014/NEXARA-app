@@ -87,11 +87,16 @@ import { SocialPostsModule } from './social-posts/social-posts.module.js';
 import { InternalComunicadosModule } from './internal-comunicados/internal-comunicados.module.js';
 import { WebhooksModule } from './webhooks/webhooks.module.js';
 import { ScimModule } from './scim/scim.module.js';
+import { ObservabilityModule } from './observability/observability.module.js';
+import { JobsModule } from './jobs/jobs.module.js';
+import { AiModule } from './ai/ai.module.js';
 
 @Module({
   imports: [
     CoreModule,
     ExcelModule,
+    ObservabilityModule,
+    JobsModule,
     RealtimeModule, // @Global() — inyectable desde cualquier módulo
     PrismaModule,
     ClientsModule,
@@ -171,6 +176,7 @@ import { ScimModule } from './scim/scim.module.js';
     LabModule,
     WebhooksModule,
     ScimModule,
+    AiModule,
   ],
   controllers: [AppController, ExcelExportController, ExcelImportController],
   providers: [

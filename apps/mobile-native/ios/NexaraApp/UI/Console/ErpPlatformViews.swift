@@ -4,22 +4,22 @@ import SwiftUI
 
 @MainActor
 final class ErpBiVM: ObservableObject {
-    @Published var dashboard: [String: Any] = [:]
-    @Published var computedKpis: [[String: Any]] = []
-    @Published var margin: [[String: Any]] = []
-    @Published var engineers: [[String: Any]] = []
-    @Published var clientsRoi: [[String: Any]] = []
+    @Published var dashboard = AnalyticsDashboard(raw: [:])
+    @Published var computedKpis: [ComputedKpi] = []
+    @Published var margin: [BiMarginRow] = []
+    @Published var engineers: [BiEngineerRow] = []
+    @Published var clientsRoi: [BiClientRoi] = []
     @Published var isLoading = false
     @Published var error: String?
 
     func load() {
         isLoading = true; error = nil
         Task {
-            async let d = ExtraRepository.shared.analyticsDashboardMap()
-            async let k = ExtraRepository.shared.analyticsComputedKpis()
-            async let m = ExtraRepository.shared.biMarginByType()
-            async let e = ExtraRepository.shared.biEngineers()
-            async let c = ExtraRepository.shared.biClientsRoi()
+            async let d = ExtraRepository.shared.analyticsDashboardItem()
+            async let k = ExtraRepository.shared.analyticsComputedKpiItems()
+            async let m = ExtraRepository.shared.biMarginRows()
+            async let e = ExtraRepository.shared.biEngineerRows()
+            async let c = ExtraRepository.shared.biClientRoiRows()
             dashboard = await d; computedKpis = await k; margin = await m; engineers = await e; clientsRoi = await c
             isLoading = false
         }
@@ -57,10 +57,10 @@ struct ErpBiView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Resumen ejecutivo").font(.headline)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                ErpTile(label: "Ingresos", value: platFmtMxn(platDbl(vm.dashboard, "revenue")), accent: .green)
-                ErpTile(label: "Gastos", value: platFmtMxn(platDbl(vm.dashboard, "expenses")), accent: .red)
-                ErpTile(label: "OC abiertas", value: "\(platInt(vm.dashboard, "openPurchaseOrders"))", accent: .blue)
-                ErpTile(label: "Mant. activos", value: "\(platInt(vm.dashboard, "pendingMaintenanceOrders"))", accent: .orange)
+                ErpTile(label: "Ingresos", value: platFmtMxn(vm.dashboard.revenue), accent: .green)
+                ErpTile(label: "Gastos", value: platFmtMxn(vm.dashboard.expenses), accent: .red)
+                ErpTile(label: "OC abiertas", value: "\(vm.dashboard.openPurchaseOrders)", accent: .blue)
+                ErpTile(label: "Mant. activos", value: "\(vm.dashboard.pendingMaintenanceOrders)", accent: .orange)
             }
         }
     }
@@ -68,16 +68,15 @@ struct ErpBiView: View {
     private var computedSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("KPIs en tiempo real").font(.headline).padding(.top, 8)
-            ForEach(Array(vm.computedKpis.enumerated()), id: \.offset) { _, kpi in
-                let status = platStr(kpi, "status")
-                let accent: Color = status == "danger" ? .red : status == "warning" ? .orange : status == "ok" ? .green : .secondary
+            ForEach(vm.computedKpis) { kpi in
+                let accent: Color = kpi.status == "danger" ? .red : kpi.status == "warning" ? .orange : kpi.status == "ok" ? .green : .secondary
                 HStack {
                     VStack(alignment: .leading) {
-                        Text(platStr(kpi, "name")).font(.subheadline)
-                        Text(platStr(kpi, "unit")).font(.caption2).foregroundColor(.secondary)
+                        Text(kpi.name).font(.subheadline)
+                        Text(kpi.unit).font(.caption2).foregroundColor(.secondary)
                     }
                     Spacer()
-                    Text(platFmtValue(kpi["value"])).bold().foregroundColor(accent)
+                    Text(kpi.value.map { platFmtValue($0) } ?? kpi.valueLabel).bold().foregroundColor(accent)
                 }
                 .padding(10).background(accent.opacity(0.1)).clipShape(RoundedRectangle(cornerRadius: 10))
             }
@@ -87,11 +86,11 @@ struct ErpBiView: View {
     private var marginSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Margen por línea").font(.headline).padding(.top, 8)
-            ForEach(vm.margin, id: \.platRowId) { row in
+            ForEach(vm.margin) { row in
                 PlatListRow(
-                    title: platStr(row, "projectType"),
-                    subtitle: "\(platInt(row, "count")) proy. · \(platFmtPct(platDbl(row, "marginPercent")))",
-                    trailing: platFmtMxn(platDbl(row, "margin"))
+                    title: row.projectType,
+                    subtitle: "\(row.count) proy. · \(platFmtPct(row.marginPercent))",
+                    trailing: platFmtMxn(row.margin)
                 )
             }
         }
@@ -100,11 +99,11 @@ struct ErpBiView: View {
     private var engineersSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Ranking ingenieros").font(.headline).padding(.top, 8)
-            ForEach(vm.engineers, id: \.platRowId) { row in
+            ForEach(vm.engineers) { row in
                 PlatListRow(
-                    title: platStr(row, "engineerName", "nombre"),
-                    subtitle: "\(platInt(row, "completed"))/\(platInt(row, "totalActivities")) OT",
-                    trailing: platFmtPct(platDbl(row, "completionRate"))
+                    title: row.engineerName,
+                    subtitle: "\(row.completed)/\(row.totalActivities) OT",
+                    trailing: platFmtPct(row.completionRate)
                 )
             }
         }
@@ -113,11 +112,11 @@ struct ErpBiView: View {
     private var clientsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("ROI por cliente").font(.headline).padding(.top, 8)
-            ForEach(vm.clientsRoi, id: \.platRowId) { row in
+            ForEach(vm.clientsRoi) { row in
                 PlatListRow(
-                    title: platStr(row, "clientName"),
-                    subtitle: "\(platInt(row, "projects")) proy.",
-                    trailing: platFmtPct(platDbl(row, "roi"))
+                    title: row.clientName,
+                    subtitle: "\(row.projects) proy.",
+                    trailing: platFmtPct(row.roi)
                 )
             }
         }
@@ -128,14 +127,14 @@ struct ErpBiView: View {
 
 @MainActor
 final class ExecutiveVM: ObservableObject {
-    @Published var data: [String: Any] = [:]
+    @Published var data = ExecutiveCLevel(raw: [:])
     @Published var isLoading = false
     @Published var error: String?
 
     func load() {
         isLoading = true
         Task {
-            data = await ExtraRepository.shared.executiveCLevel()
+            data = await ExtraRepository.shared.executiveCLevelItem()
             isLoading = false
         }
     }
@@ -151,20 +150,31 @@ struct ExecutiveView: View {
                 Text("KPIs cross-módulo del negocio").font(.caption).foregroundColor(.secondary)
                 if vm.isLoading { ProgressView() }
                 else {
-                    let h = vm.data["headlineKpis"] as? [String: Any] ?? [:]
-                    let ops = vm.data["operations"] as? [String: Any] ?? [:]
+                    let h = vm.data.headline
+                    let ops = vm.data.operations
                     Text("Finanzas y ventas").font(.headline)
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                        ErpTile(label: "Ingresos MTD", value: platFmtMxn(platDbl(h, "revenueMtd")), accent: .green)
-                        ErpTile(label: "Pipeline", value: platFmtMxn(platDbl(h, "pipelineValue")), accent: .blue)
-                        ErpTile(label: "Caja", value: platFmtMxn(platDbl(h, "cashOnHand")), accent: .teal)
-                        ErpTile(label: "CxC", value: platFmtMxn(platDbl(h, "arOutstanding")), accent: .orange)
+                        ErpTile(label: "Ingresos MTD", value: platFmtMxn(h.revenueMtd), accent: .green)
+                        ErpTile(label: "Pipeline", value: platFmtMxn(h.pipelineValue), accent: .blue)
+                        ErpTile(label: "Caja", value: platFmtMxn(h.cashOnHand), accent: .teal)
+                        ErpTile(label: "CxC", value: platFmtMxn(h.arOutstanding), accent: .orange)
                     }
                     Text("Operaciones").font(.headline).padding(.top, 8)
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                        ErpTile(label: "OT abiertas", value: "\(platInt(ops, "otOpen"))", accent: .indigo)
-                        ErpTile(label: "OT vencidas", value: "\(platInt(ops, "otOverdue"))", accent: .red)
-                        ErpTile(label: "Tickets", value: "\(platInt(ops, "ticketsOpen"))", accent: .purple)
+                        ErpTile(label: "OT abiertas", value: "\(ops.otOpen)", accent: .indigo)
+                        ErpTile(label: "OT vencidas", value: "\(ops.otOverdue)", accent: .red)
+                        ErpTile(label: "Tickets", value: "\(ops.ticketsOpen)", accent: .purple)
+                    }
+                    if !vm.data.alerts.isEmpty {
+                        Text("Alertas").font(.headline).padding(.top, 8)
+                        ForEach(vm.data.alerts) { a in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(a.title).font(.subheadline.bold())
+                                if !a.detail.isEmpty { Text(a.detail).font(.caption).foregroundColor(.secondary) }
+                            }
+                            .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.orange.opacity(0.12)).clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
                     }
                 }
             }
@@ -180,23 +190,23 @@ struct ExecutiveView: View {
 
 @MainActor
 final class ApprovalsVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [WorkflowApproval] = []
     @Published var isLoading = false
-    @Published var actingId: Int?
+    @Published var actingId: Int64?
     @Published var error: String?
     @Published var message: String?
-    @Published var rejectNotes: [Int: String] = [:]
+    @Published var rejectNotes: [Int64: String] = [:]
 
     func load() {
         isLoading = true
         Task {
-            items = await ExtraRepository.shared.workflowPending()
+            items = await ExtraRepository.shared.workflowApprovals()
             isLoading = false
             actingId = nil
         }
     }
 
-    func decide(id: Int, approved: Bool) {
+    func decide(id: Int64, approved: Bool) {
         let comments = rejectNotes[id]?.trimmingCharacters(in: .whitespacesAndNewlines)
         if !approved && (comments == nil || comments?.isEmpty == true) {
             error = "Indica el motivo de rechazo"
@@ -238,22 +248,21 @@ struct ApprovalsView: View {
             if vm.items.isEmpty && !vm.isLoading {
                 Text("Sin aprobaciones pendientes.").foregroundColor(.secondary)
             }
-            ForEach(vm.items, id: \.platRowId) { item in
-                let id = platInt(item, "id")
+            ForEach(vm.items) { item in
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(approvalTitle(item)).font(.headline)
-                    Text(approvalSubtitle(item)).font(.caption).foregroundColor(.secondary)
+                    Text(item.displayTitle).font(.headline)
+                    Text(item.displaySubtitle).font(.caption).foregroundColor(.secondary)
                     TextField("Comentario / motivo rechazo", text: Binding(
-                        get: { vm.rejectNotes[id] ?? "" },
-                        set: { vm.rejectNotes[id] = $0 }
+                        get: { vm.rejectNotes[item.id] ?? "" },
+                        set: { vm.rejectNotes[item.id] = $0 }
                     ))
                     HStack {
-                        Button("Aprobar") { vm.decide(id: id, approved: true) }
+                        Button("Aprobar") { vm.decide(id: item.id, approved: true) }
                             .buttonStyle(.borderedProminent).tint(.green)
-                            .disabled(vm.actingId == id)
-                        Button("Rechazar") { vm.decide(id: id, approved: false) }
+                            .disabled(vm.actingId == item.id)
+                        Button("Rechazar") { vm.decide(id: item.id, approved: false) }
                             .buttonStyle(.bordered).tint(.red)
-                            .disabled(vm.actingId == id)
+                            .disabled(vm.actingId == item.id)
                     }
                 }
                 .padding(.vertical, 4)
@@ -270,16 +279,16 @@ struct ApprovalsView: View {
 @MainActor
 final class NocVM: ObservableObject {
     @Published var summary: [String: Any] = [:]
-    @Published var alerts: [[String: Any]] = []
-    @Published var devices: [[String: Any]] = []
+    @Published var alerts: [NocAlert] = []
+    @Published var devices: [NocDevice] = []
     @Published var isLoading = false
 
     func load() {
         isLoading = true
         Task {
             async let s = ExtraRepository.shared.nocSummary()
-            async let a = ExtraRepository.shared.nocAlerts()
-            async let d = ExtraRepository.shared.nocDevices()
+            async let a = ExtraRepository.shared.nocAlertItems()
+            async let d = ExtraRepository.shared.nocDeviceItems()
             summary = await s; alerts = await a; devices = await d
             isLoading = false
         }
@@ -290,15 +299,12 @@ struct NocView: View {
     @StateObject private var vm = NocVM()
     @State private var sevFilter = "todos"
 
-    private var filteredAlerts: [[String: Any]] {
+    private var filteredAlerts: [NocAlert] {
         switch sevFilter {
         case "critical":
-            return vm.alerts.filter { platStr($0, "severity").lowercased() == "critical" }
+            return vm.alerts.filter(\.isCritical)
         case "warning":
-            return vm.alerts.filter {
-                let s = platStr($0, "severity").lowercased()
-                return s == "warning" || s == "high" || s == "medium"
-            }
+            return vm.alerts.filter(\.isWarningBand)
         default:
             return vm.alerts
         }
@@ -322,17 +328,16 @@ struct NocView: View {
                         Text("Warning").tag("warning")
                     }
                     .pickerStyle(.segmented)
-                    ForEach(filteredAlerts.prefix(20), id: \.platRowId) { a in
-                        let sev = platStr(a, "severity")
+                    ForEach(filteredAlerts.prefix(20)) { a in
                         HStack(alignment: .top) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(platStr(a, "title", "deviceName")).font(.subheadline.bold())
-                                Text(platStr(a, "message")).font(.caption).foregroundColor(.secondary)
+                                Text(a.displayTitle).font(.subheadline.bold())
+                                Text(a.message).font(.caption).foregroundColor(.secondary)
                             }
                             Spacer()
-                            Text(sev)
+                            Text(a.severity)
                                 .font(.caption2.bold())
-                                .foregroundColor(sev.lowercased() == "critical" ? .red : .orange)
+                                .foregroundColor(a.isCritical ? .red : .orange)
                         }
                     }
                 } header: {
@@ -341,15 +346,15 @@ struct NocView: View {
             }
             if !vm.devices.isEmpty {
                 Section("Dispositivos") {
-                    ForEach(vm.devices.prefix(20), id: \.platRowId) { d in
+                    ForEach(vm.devices.prefix(20)) { d in
                         HStack {
                             VStack(alignment: .leading) {
-                                Text(platStr(d, "name")).font(.subheadline)
-                                Text("\(platStr(d, "type")) · \(platStr(d, "clientName"))").font(.caption2).foregroundColor(.secondary)
+                                Text(d.displayName).font(.subheadline)
+                                Text("\(d.type) · \(d.clientName)").font(.caption2).foregroundColor(.secondary)
                             }
                             Spacer()
-                            Text(platStr(d, "status")).font(.caption.bold())
-                                .foregroundColor(deviceStatusColor(platStr(d, "status")))
+                            Text(d.status).font(.caption.bold())
+                                .foregroundColor(deviceStatusColor(d.status))
                         }
                     }
                 }
@@ -373,12 +378,12 @@ struct NocView: View {
 
 @MainActor
 final class SlaVM: ObservableObject {
-    @Published var stats: [String: Any] = [:]
+    @Published var stats = SlaStats(raw: [:])
     @Published var isLoading = false
 
     func load() {
         isLoading = true
-        Task { stats = await ExtraRepository.shared.slaStats(); isLoading = false }
+        Task { stats = await ExtraRepository.shared.slaStatsItem(); isLoading = false }
     }
 }
 
@@ -388,21 +393,33 @@ struct SlaView: View {
     var body: some View {
         List {
             if vm.isLoading { ProgressView() }
-            let resp = vm.stats["responseSla"] as? [String: Any] ?? [:]
-            let resol = vm.stats["resolutionSla"] as? [String: Any] ?? [:]
             Section("Resumen") {
-                LabeledContent("Tickets", value: "\(platInt(vm.stats, "total"))")
-                LabeledContent("Abiertos", value: "\(platInt(vm.stats, "stillOpen"))")
+                LabeledContent("Tickets", value: "\(vm.stats.total)")
+                LabeledContent("Abiertos", value: "\(vm.stats.stillOpen)")
             }
             Section("Tiempo de respuesta") {
-                LabeledContent("A tiempo", value: "\(platInt(resp, "onTime"))")
-                LabeledContent("Tarde", value: "\(platInt(resp, "late"))")
-                LabeledContent("Cumplimiento", value: platFmtPct(platDbl(resp, "compliancePercent")))
+                LabeledContent("A tiempo", value: "\(vm.stats.response.onTime)")
+                LabeledContent("Tarde", value: "\(vm.stats.response.late)")
+                LabeledContent("Cumplimiento", value: platFmtPct(vm.stats.response.compliancePercent))
             }
             Section("Tiempo de resolución") {
-                LabeledContent("A tiempo", value: "\(platInt(resol, "onTime"))")
-                LabeledContent("Tarde", value: "\(platInt(resol, "late"))")
-                LabeledContent("Cumplimiento", value: platFmtPct(platDbl(resol, "compliancePercent")))
+                LabeledContent("A tiempo", value: "\(vm.stats.resolution.onTime)")
+                LabeledContent("Tarde", value: "\(vm.stats.resolution.late)")
+                LabeledContent("Cumplimiento", value: platFmtPct(vm.stats.resolution.compliancePercent))
+            }
+            if !vm.stats.recentBreaches.isEmpty {
+                Section("Incumplimientos recientes") {
+                    ForEach(vm.stats.recentBreaches.prefix(15)) { b in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(b.displayTitle).font(.subheadline.bold())
+                                Text("\(b.type) · \(b.priority)").font(.caption).foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Text(String(format: "+%.0fh", b.hoursLate)).font(.caption.bold()).foregroundColor(.red)
+                        }
+                    }
+                }
             }
         }
         .navigationTitle("SLA")
@@ -415,26 +432,27 @@ struct SlaView: View {
 
 @MainActor
 final class MaintContractsVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [MaintenanceContract] = []
     @Published var isLoading = false
 
     func load() {
         isLoading = true
-        Task { items = await ExtraRepository.shared.maintenanceContracts(); isLoading = false }
+        Task { items = await ExtraRepository.shared.maintenanceContractItems(); isLoading = false }
     }
 }
 
 struct MaintenanceContractsView: View {
     @StateObject private var vm = MaintContractsVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: MaintenanceContract?
     @State private var query = ""
 
-    private var filtered: [[String: Any]] {
+    private var filtered: [MaintenanceContract] {
         guard !query.isEmpty else { return vm.items }
         let q = query.lowercased()
         return vm.items.filter {
-            platStr($0, "name", "title", "contractNumber").lowercased().contains(q) ||
-            platStr($0, "clientName", "cliente").lowercased().contains(q)
+            $0.displayTitle.lowercased().contains(q) ||
+            $0.clientName.lowercased().contains(q) ||
+            $0.contractNumber.lowercased().contains(q)
         }
     }
 
@@ -462,20 +480,19 @@ struct MaintenanceContractsView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if filtered.isEmpty { Spacer(); Text("Sin contratos activos.").foregroundColor(.secondary); Spacer() }
             else {
-                List(filtered, id: \.platRowId) { c in
+                List(filtered) { c in
                     Button { selected = c } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(platStr(c, "name", "title", "contractNumber")).font(.headline)
-                                Text(platStr(c, "clientName", "cliente")).font(.caption).foregroundColor(.secondary)
+                                Text(c.displayTitle).font(.headline)
+                                Text(c.clientName).font(.caption).foregroundColor(.secondary)
                             }
                             Spacer()
-                            let st = platStr(c, "status", "estado")
-                            if !st.isEmpty {
-                                Text(st.capitalized).font(.caption2).bold()
-                                    .foregroundColor(mcStatusColor(st))
+                            if !c.status.isEmpty {
+                                Text(c.status.capitalized).font(.caption2).bold()
+                                    .foregroundColor(mcStatusColor(c.status))
                                     .padding(.horizontal, 7).padding(.vertical, 2)
-                                    .background(mcStatusColor(st).opacity(0.13)).clipShape(Capsule())
+                                    .background(mcStatusColor(c.status).opacity(0.13)).clipShape(Capsule())
                             }
                         }
                         .padding(.vertical, 2)
@@ -488,17 +505,19 @@ struct MaintenanceContractsView: View {
     }
 
     @ViewBuilder
-    private func contractDetail(_ c: [String: Any]) -> some View {
-        let activities = (c["activities"] as? [[String: Any]]) ?? (c["actividades"] as? [[String: Any]]) ?? []
-        let slaList    = (c["sla"] as? [[String: Any]]) ?? (c["slaEntries"] as? [[String: Any]]) ?? []
-        let inventory  = (c["inventory"] as? [[String: Any]]) ?? (c["inventario"] as? [[String: Any]]) ?? []
-
-        _ContractDetailTabs(contract: c, activities: activities, slaList: slaList, inventory: inventory, onBack: { selected = nil })
+    private func contractDetail(_ c: MaintenanceContract) -> some View {
+        _ContractDetailTabs(
+            contract: c,
+            activities: c.activities,
+            slaList: c.slaEntries,
+            inventory: c.inventory,
+            onBack: { selected = nil }
+        )
     }
 }
 
 private struct _ContractDetailTabs: View {
-    let contract: [String: Any]
+    let contract: MaintenanceContract
     let activities: [[String: Any]]
     let slaList: [[String: Any]]
     let inventory: [[String: Any]]
@@ -528,29 +547,32 @@ private struct _ContractDetailTabs: View {
                     HStack {
                         Button("← Lista") { onBack() }
                         Spacer()
-                        let st = platStr(contract, "status", "estado")
-                        if !st.isEmpty {
-                            Text(st.capitalized).font(.caption).bold().foregroundColor(mcStatusColor(st))
+                        if !contract.status.isEmpty {
+                            Text(contract.status.capitalized).font(.caption).bold().foregroundColor(mcStatusColor(contract.status))
                                 .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(mcStatusColor(st).opacity(0.12)).clipShape(Capsule())
+                                .background(mcStatusColor(contract.status).opacity(0.12)).clipShape(Capsule())
                         }
                     }
                 }
 
                 switch tab {
-                case 0: // Info
+                case 0:
                     Section("Contrato") {
-                        mcRow("Número", platStr(contract, "contractNumber", "number", "folio"))
-                        mcRow("Nombre", platStr(contract, "name", "title"))
-                        mcRow("Cliente", platStr(contract, "clientName", "cliente"))
-                        mcRow("Tipo", platStr(contract, "type", "tipo", "contractType"))
-                        mcRow("Estado", platStr(contract, "status", "estado"))
-                        mcRow("Inicio", String(platStr(contract, "startDate", "fechaInicio").prefix(10)))
-                        mcRow("Vencimiento", String(platStr(contract, "expiresAt", "endDate", "fechaFin").prefix(10)))
-                        mcRow("Monto", platStr(contract, "amount", "monto", "total"))
-                        mcRow("Renovación", platStr(contract, "renewal", "renovacion"))
+                        mcRow("Número", contract.contractNumber)
+                        mcRow("Nombre", contract.title)
+                        mcRow("Cliente", contract.clientName)
+                        mcRow("Frecuencia", contract.frequency)
+                        mcRow("Estado", contract.status)
+                        mcRow("Inicio", String(contract.startDate.prefix(10)))
+                        mcRow("Vencimiento", String(contract.endDate.prefix(10)))
+                        if let fee = contract.monthlyFee {
+                            mcRow("Monto", "\(contract.currency) \(Int(fee))")
+                        }
+                        if let h = contract.slaResponseHours {
+                            mcRow("Resp. SLA", "\(h)h")
+                        }
                     }
-                case 1: // Actividades
+                case 1:
                     if activities.isEmpty {
                         Section { Text("Sin actividades.").foregroundColor(.secondary) }
                     } else {
@@ -564,7 +586,7 @@ private struct _ContractDetailTabs: View {
                             }
                         }
                     }
-                case 2: // SLA
+                case 2:
                     if slaList.isEmpty {
                         Section { Text("Sin métricas SLA.").foregroundColor(.secondary) }
                     } else {
@@ -578,7 +600,7 @@ private struct _ContractDetailTabs: View {
                             }
                         }
                     }
-                default: // Inventario
+                default:
                     if inventory.isEmpty {
                         Section { Text("Sin inventario registrado.").foregroundColor(.secondary) }
                     } else {
@@ -586,7 +608,7 @@ private struct _ContractDetailTabs: View {
                             ForEach(Array(inventory.enumerated()), id: \.offset) { _, item in
                                 HStack {
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(platStr(item, "name", "nombre", "description")).font(.subheadline.bold())
+                                        Text(platStr(item, "name", "nombre", "description", "itemName")).font(.subheadline.bold())
                                         Text(platStr(item, "serial", "serialNumber", "modelo")).font(.caption).foregroundColor(.secondary)
                                     }
                                     Spacer()
@@ -676,18 +698,6 @@ private func platFmtValue(_ v: Any?) -> String {
     if let d = v as? Double { return d > 1000 ? platFmtMxn(d) : String(format: "%.1f", d) }
     if let n = v as? NSNumber { return n.stringValue }
     return v.map { String(describing: $0) } ?? "—"
-}
-
-private func approvalTitle(_ item: [String: Any]) -> String {
-    if let inst = item["instance"] as? [String: Any], let wf = inst["workflow"] as? [String: Any], let name = wf["name"] as? String, !name.isEmpty { return name }
-    return platStr(item, "title", "entityType")
-}
-
-private func approvalSubtitle(_ item: [String: Any]) -> String {
-    var parts: [String] = []
-    if let inst = item["instance"] as? [String: Any], let eid = inst["entityId"] { parts.append("Entidad #\(eid)") }
-    if let step = item["step"] as? [String: Any], let n = step["stepNumber"] { parts.append("Paso \(n)") }
-    return parts.joined(separator: " · ")
 }
 
 extension [String: Any] {

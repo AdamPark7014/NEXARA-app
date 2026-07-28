@@ -4,7 +4,7 @@
  * ERP · Outbound Webhooks — integraciones enterprise
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -47,22 +47,37 @@ export default function WebhooksSettingsPage() {
   const token = user?.token ?? "";
   const canManage = Boolean(user?.isSuperAdmin || user?.permissions?.includes("console.admin") || user?.permissions?.includes("company.settings.manage"));
 
+  type DlqRow = {
+    id: number;
+    event: string;
+    status: string;
+    attempts: number;
+    responseCode?: number | null;
+    responseBody?: string | null;
+    createdAt: string;
+    webhook?: { id: number; name: string; url: string };
+  };
+
   const [hooks, setHooks] = useState<WebhookRow[]>([]);
+  const [dlq, setDlq] = useState<DlqRow[]>([]);
   const [catalog, setCatalog] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ name: "", url: "", events: [] as string[] });
   const [saving, setSaving] = useState(false);
+  const [replaying, setReplaying] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
-      const [list, cat] = await Promise.all([
+      const [list, cat, dead] = await Promise.all([
         apiFetch("webhooks", token),
         apiFetch("webhooks/catalog", token).catch(() => ({ events: [] })),
+        apiFetch("webhooks/dlq", token).catch(() => []),
       ]);
       setHooks(Array.isArray(list) ? list : []);
       setCatalog(Array.isArray(cat?.events) ? cat.events : []);
+      setDlq(Array.isArray(dead) ? dead : []);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudieron cargar webhooks");
     } finally {
@@ -129,6 +144,19 @@ export default function WebhooksSettingsPage() {
     }
   };
 
+  const replay = async (deliveryId: number) => {
+    setReplaying(deliveryId);
+    try {
+      await apiFetch(`webhooks/deliveries/${deliveryId}/replay`, token, { method: "POST", body: "{}" });
+      toast.success("Reintento encolado");
+      void load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Replay falló");
+    } finally {
+      setReplaying(null);
+    }
+  };
+
   const inp: React.CSSProperties = {
     width: "100%", padding: "8px 10px", border: "1px solid var(--border)",
     borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13,
@@ -181,6 +209,33 @@ export default function WebhooksSettingsPage() {
             </div>
           </Section>
 
+          <Section title={`Dead letter (${dlq.length})`}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {dlq.map((d) => (
+                <div key={d.id} style={{ padding: 12, border: "1px solid var(--border)", borderRadius: 10, display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                  <div>
+                    <strong style={{ fontSize: 13 }}>{d.event}</strong>
+                    <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                      {d.webhook?.name ?? `hook #${d.webhook?.id}`} · intentos {d.attempts}
+                      {d.responseCode != null ? ` · HTTP ${d.responseCode}` : ""}
+                    </div>
+                    {d.responseBody ? (
+                      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4, maxWidth: 520, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {d.responseBody}
+                      </div>
+                    ) : null}
+                  </div>
+                  <Button size="sm" variant="secondary" disabled={replaying === d.id} onClick={() => void replay(d.id)}>
+                    {replaying === d.id ? "Reintentando…" : "Replay"}
+                  </Button>
+                </div>
+              ))}
+              {!dlq.length && (
+                <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Sin entregas fallidas — cola limpia.</span>
+              )}
+            </div>
+          </Section>
+
           <Section title={`${hooks.length} endpoints`}>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {hooks.map((h) => (
@@ -207,7 +262,13 @@ export default function WebhooksSettingsPage() {
                   </div>
                 </div>
               ))}
-              {!hooks.length && <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Sin webhooks configurados</span>}
+              {!hooks.length && (
+                <EmptyState
+                  variant="compact"
+                  title="Sin webhooks"
+                  description="Crea un endpoint arriba para recibir invoice.paid, stock.low, ticket.sla_breach y más."
+                />
+              )}
             </div>
           </Section>
         </>

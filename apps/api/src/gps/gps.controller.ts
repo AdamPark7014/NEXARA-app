@@ -4,6 +4,7 @@ import { CreateGpsDto } from './dto/create-gps.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
 @Controller('gps')
@@ -14,14 +15,21 @@ export class GpsController {
   @Post()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.GPS_VIEW] })
-  create(@CurrentUser() user: any, @Body() createGpsDto: CreateGpsDto) {
+  create(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() createGpsDto: CreateGpsDto,
+  ) {
     if (createGpsDto.usuarioId && createGpsDto.usuarioId !== user.id) {
       throw new ForbiddenException('Solo puedes registrar tu propia ubicacion');
     }
-    return this.gpsService.create({
-      ...createGpsDto,
-      usuarioId: user.id,
-    });
+    return this.gpsService.create(
+      {
+        ...createGpsDto,
+        usuarioId: user.id,
+      },
+      companyId,
+    );
   }
 
   @Get('me')
@@ -43,21 +51,22 @@ export class GpsController {
   })
   getTrajectory(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Query('date') date?: string,
     @Query('userId') userId?: string,
   ) {
     const targetId = userId ? Number(userId) : user.id;
     if (!Number.isFinite(targetId) || targetId <= 0) {
-      return this.gpsService.getMyTrajectory(user.id, date);
+      return this.gpsService.getMyTrajectory(user.id, date, companyId);
     }
-    return this.gpsService.getTrajectoryForUser(user, targetId, date);
+    return this.gpsService.getTrajectoryForUser(user, targetId, date, companyId);
   }
 
   @Get('team')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.GPS_MANAGE] })
-  findTeam(@CurrentUser() user: any) {
-    return this.gpsService.findTeamLocations(user);
+  findTeam(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    return this.gpsService.findTeamLocations(user, companyId);
   }
 
   @Patch('consent')

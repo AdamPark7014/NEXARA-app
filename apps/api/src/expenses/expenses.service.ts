@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
@@ -8,7 +8,7 @@ import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 import { generateExpensesReportPdf } from './expenses-report-pdf.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
-import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
+import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 const ADMIN_EXPENSE_ACTIVITY_AN = 'SYS-ADMIN-GASTOS';
 
@@ -62,13 +62,13 @@ export class ExpensesService {
 
   /** OT interna para gastos administrativos (renta, SaaS, servicios). */
   private async ensureAdministrativeActivity(usuarioId: number): Promise<number> {
+    const companyId = await resolveRequiredCompanyId(this.prisma);
     const existing = await this.prisma.activity.findFirst({
-      where: { anNumber: ADMIN_EXPENSE_ACTIVITY_AN, deletedAt: null },
+      where: { anNumber: ADMIN_EXPENSE_ACTIVITY_AN, deletedAt: null, ...companyWhere(companyId) },
       select: { id: true },
     });
     if (existing) return existing.id;
 
-    const companyId = await resolveRequiredCompanyId(this.prisma);
     const created = await this.prisma.activity.create({
       data: {
         anNumber: ADMIN_EXPENSE_ACTIVITY_AN,
@@ -97,6 +97,7 @@ export class ExpensesService {
           entityType: 'EXPENSE',
           entityId: expense.id,
           userId: createExpenseDto.usuarioId,
+          companyId: expense.companyId ?? companyId,
           payload: { amount: Number(createExpenseDto.montoSolicitado || 0) },
         })
         .catch(() => undefined);
@@ -157,6 +158,7 @@ export class ExpensesService {
         entityType: 'EXPENSE',
         entityId: expense.id,
         userId: dto.usuarioId,
+        companyId: expense.companyId ?? companyId,
         payload: { amount: Number(dto.monto) },
       })
       .catch(() => undefined);
@@ -174,11 +176,13 @@ export class ExpensesService {
       fecha: string;
       ticketEvidenciaUrl: string;
     }>,
+    companyId?: number | null,
   ) {
+    const tenantId = requireCompanyId(companyId);
     const existing = await this.prisma.expense.findFirst({
-      where: { id, deletedAt: null, isAdministrative: true },
+      where: { id, deletedAt: null, isAdministrative: true, ...companyWhere(tenantId) },
     });
-    if (!existing) throw new NotFoundException('Gasto no encontrado');
+    assertCompanyAccess(existing, tenantId, 'Gasto');
     if (existing.estatusPago === STATUS.PAGADO) {
       throw new BadRequestException('No se puede editar un gasto ya pagado');
     }
@@ -211,11 +215,17 @@ export class ExpensesService {
     });
   }
 
-  async approveOrReject(id: number, action: 'approve' | 'reject', note?: string, actorId?: number) {
+  async approveOrReject(
+    id: number,
+    action: 'approve' | 'reject',
+    note?: string,
+    actorId?: number,
+    companyId?: number | null,
+  ) {
     const existing = await this.prisma.expense.findFirst({
-      where: { id, deletedAt: null, isAdministrative: true },
+      where: { id, deletedAt: null, isAdministrative: true, ...companyWhere(companyId ?? null) },
     });
-    if (!existing) throw new NotFoundException('Gasto no encontrado');
+    assertCompanyAccess(existing, companyId, 'Gasto');
     if (existing.estatusPago !== STATUS.PENDIENTE) {
       throw new BadRequestException('Solo se pueden autorizar gastos pendientes');
     }
@@ -251,11 +261,11 @@ export class ExpensesService {
     return updated;
   }
 
-  async markPagado(id: number, actorId?: number) {
+  async markPagado(id: number, actorId?: number, companyId?: number | null) {
     const existing = await this.prisma.expense.findFirst({
-      where: { id, deletedAt: null, isAdministrative: true },
+      where: { id, deletedAt: null, isAdministrative: true, ...companyWhere(companyId ?? null) },
     });
-    if (!existing) throw new NotFoundException('Gasto no encontrado');
+    assertCompanyAccess(existing, companyId, 'Gasto');
     if (existing.estatusPago !== STATUS.APROBADO && existing.estatusPago !== STATUS.PAGADO) {
       throw new BadRequestException('El gasto debe estar aprobado para marcarlo como pagado');
     }
@@ -346,16 +356,24 @@ export class ExpensesService {
     return row;
   }
 
-  update(id: number, updateExpenseDto: UpdateExpenseDto) {
+  async update(id: number, updateExpenseDto: UpdateExpenseDto, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const existing = await this.prisma.expense.findFirst({
+      where: { id, deletedAt: null, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(existing, tenantId, 'Gasto');
     return this.prisma.expense.update({
       where: { id },
       data: updateExpenseDto,
     });
   }
 
-  async remove(id: number, actorId?: number) {
-    const existing = await this.prisma.expense.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) throw new NotFoundException('Gasto no encontrado');
+  async remove(id: number, actorId?: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const existing = await this.prisma.expense.findFirst({
+      where: { id, deletedAt: null, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(existing, tenantId, 'Gasto');
     const updated = await this.prisma.expense.update({
       where: { id },
       data: { deletedAt: new Date(), estatusPago: STATUS.RECHAZADO },

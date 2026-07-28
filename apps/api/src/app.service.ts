@@ -1,6 +1,7 @@
 // ...existing code...
 import { Injectable, Inject, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service.js';
+import { resolveRequiredCompanyId } from './common/tenant/tenant-scope.js';
 
 @Injectable()
 export class AppService {
@@ -115,11 +116,19 @@ export class AppService {
     if (Array.isArray(activities)) {
       for (const dto of activities) {
         try {
+          const companyId = dto.companyId ?? (await resolveRequiredCompanyId(this.prisma));
           const exists = await this.prisma['activity'].findUnique({
-            where: { anNumber: dto.anNumber },
+            where: {
+              companyId_anNumber: {
+                companyId,
+                anNumber: dto.anNumber,
+              },
+            },
           });
           if (!exists) {
-            await this.prisma['activity'].create({ data: dto });
+            await this.prisma['activity'].create({
+              data: { ...dto, companyId },
+            });
             a++;
           }
         } catch (err) {

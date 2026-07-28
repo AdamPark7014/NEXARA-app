@@ -25,6 +25,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { WorkflowService } from './workflow.service.js';
 
 export type AutoApprovalContext = {
@@ -39,6 +40,8 @@ export type AutoApprovalContext = {
   entityId: number;
   /** Usuario que originó la acción (será `startedBy` del workflow). */
   userId: number;
+  /** Empresa activa — fail-closed al resolver definiciones. */
+  companyId?: number | null;
   /** Payload arbitrario evaluado por la regla. */
   payload: Record<string, unknown>;
 };
@@ -115,14 +118,27 @@ export class AutoApprovalService {
     const skipped: string[] = [];
 
     const candidates = RULES[context.entityType] || [];
+    let tenantId: number;
+    try {
+      tenantId = requireCompanyId(context.companyId);
+    } catch {
+      this.logger.warn(
+        `AutoApproval: companyId requerido para ${context.entityType}#${context.entityId}`,
+      );
+      return { triggered, skipped: candidates.map((r) => r.workflowName) };
+    }
+
     for (const rule of candidates) {
       try {
         if (!rule.shouldTrigger(context.payload)) {
           continue;
         }
 
-        const def = await this.prisma.workflowDefinition.findUnique({
-          where: { name: rule.workflowName },
+        const def = await this.prisma.workflowDefinition.findFirst({
+          where: {
+            name: rule.workflowName,
+            ...companyWhere(tenantId),
+          },
           select: { id: true, status: true },
         });
 
@@ -143,6 +159,7 @@ export class AutoApprovalService {
           entityId: context.entityId,
           workflowDefinitionId: def.id,
           startedById: context.userId,
+          companyId: tenantId,
         });
         triggered.push(rule.workflowName);
         this.logger.log(

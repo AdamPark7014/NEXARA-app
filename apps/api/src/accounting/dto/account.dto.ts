@@ -72,6 +72,11 @@ export class UpdateAccountDto {
   @IsOptional()
   @IsString()
   currency?: string;
+
+  /** Código de agrupador SAT (Contabilidad Electrónica) — mapeo contable manual. */
+  @IsOptional()
+  @IsString()
+  satAgrupador?: string;
 }
 
 export class CreateCostCenterDto {

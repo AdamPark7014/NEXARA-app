@@ -4,7 +4,7 @@ import SwiftUI
 
 @MainActor
 final class ExpensesVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [ExpenseItem] = []
     @Published var query = ""
     @Published var categoryFilter = "todos"
     @Published var statusFilter = "todos" // todos | pendiente | aprobado
@@ -20,49 +20,46 @@ final class ExpensesVM: ObservableObject {
     }
 
     var categories: [String] {
-        var cats = Array(Set(items.compactMap { expStr($0, "category", "categoria") }.filter { !$0.isEmpty })).sorted()
+        var cats = Array(Set(items.map(\.category).filter { !$0.isEmpty })).sorted()
         return ["todos"] + cats
     }
 
-    var filtered: [[String: Any]] {
+    var filtered: [ExpenseItem] {
         var list = items
         if categoryFilter != "todos" {
-            list = list.filter { expStr($0, "category", "categoria").lowercased() == categoryFilter.lowercased() }
+            list = list.filter { $0.category.lowercased() == categoryFilter.lowercased() }
         }
         if statusFilter != "todos" {
-            list = list.filter { expStatus($0).lowercased().contains(statusFilter) }
+            list = list.filter { $0.status.lowercased().contains(statusFilter) }
         }
         if !query.isEmpty {
             let q = query.lowercased()
-            list = list.filter { row in
-                expStr(row, "concept", "concepto", "descripcion").lowercased().contains(q) ||
-                expStr(row, "category", "categoria").lowercased().contains(q) ||
-                expStatus(row).lowercased().contains(q)
+            list = list.filter {
+                $0.concept.lowercased().contains(q) ||
+                $0.category.lowercased().contains(q) ||
+                $0.status.lowercased().contains(q)
             }
         }
         return list
     }
 
-    var totalAmount: Double {
-        items.reduce(0.0) { $0 + (expDouble($1, "amount", "total", "monto", "montoSolicitado") ?? 0) }
-    }
+    var totalAmount: Double { items.reduce(0) { $0 + $1.amount } }
 
     var pendingTotal: Double {
-        items.filter { expStatus($0).lowercased().contains("pendiente") }
-            .reduce(0.0) { $0 + (expDouble($1, "amount", "total", "monto", "montoSolicitado") ?? 0) }
+        items.filter(\.isPending).reduce(0) { $0 + $1.amount }
     }
 
     var categoryTotals: [(category: String, total: Double)] {
-        let grouped = Dictionary(grouping: items) { expStr($0, "category", "categoria").ifBlankExp("Sin categoría") }
+        let grouped = Dictionary(grouping: items) { $0.category.isEmpty ? "Sin categoría" : $0.category }
         return grouped.map { (cat, rows) in
-            (category: cat, total: rows.reduce(0) { $0 + (expDouble($1, "amount", "total", "monto", "montoSolicitado") ?? 0) })
+            (category: cat, total: rows.reduce(0) { $0 + $1.amount })
         }.sorted { $0.total > $1.total }
     }
 
     func load() {
         isLoading = true
         Task {
-            items = await ExtraRepository.shared.expenses()
+            items = await ExtraRepository.shared.expenseItems()
             isLoading = false
         }
     }
@@ -106,7 +103,7 @@ final class ExpensesVM: ObservableObject {
 
 struct ExpensesView: View {
     @StateObject private var vm = ExpensesVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: ExpenseItem?
     @State private var showCreate = false
     @State private var concepto = ""
     @State private var montoText = ""
@@ -211,7 +208,7 @@ struct ExpensesView: View {
                     Text("Sin gastos").foregroundColor(.secondary).frame(maxWidth: .infinity).padding(.top, 40)
                 } else {
                     VStack(spacing: 6) {
-                        ForEach(vm.filtered.prefix(50), id: \.expId) { exp in
+                        ForEach(vm.filtered.prefix(50)) { exp in
                             Button { selected = exp; rejectNote = ""; vm.message = nil } label: {
                                 ExpenseCard(item: exp).padding(.horizontal)
                             }
@@ -272,27 +269,20 @@ struct ExpensesView: View {
     }
 
     @ViewBuilder
-    private func expDetail(_ exp: [String: Any]) -> some View {
-        let concept = expStr(exp, "concept", "concepto", "descripcion")
-        let amount = expDouble(exp, "amount", "total", "monto", "montoSolicitado")
-        let status = expStatus(exp)
-        let category = expStr(exp, "category", "categoria")
-        let pending = status.lowercased().contains("pendiente")
-        let id = ConsoleHelpers.mapInt64(exp, "id")
+    private func expDetail(_ exp: ExpenseItem) -> some View {
         List {
             Section { Button("← Gastos") { selected = nil } }
             Section("Gasto") {
-                eRow("Concepto", concept)
-                if let a = amount { HStack { Text("Monto"); Spacer(); Text(fmtExp(a)).foregroundColor(.red) } }
-                eRow("Categoría", category)
-                eRow("Estatus", status)
-                eRow("Responsable", expStr(exp, "userName", "usuario", "nombre"))
-                eRow("Fecha", String(expStr(exp, "createdAt", "fecha").prefix(10)))
-                eRow("Referencia", expStr(exp, "reference", "referencia"))
+                eRow("Concepto", exp.displayConcept)
+                HStack { Text("Monto"); Spacer(); Text(fmtExp(exp.amount)).foregroundColor(.red) }
+                eRow("Categoría", exp.category)
+                eRow("Estatus", exp.status)
+                eRow("Responsable", exp.userName)
+                eRow("Fecha", String(exp.createdAt.prefix(10)))
+                eRow("Referencia", exp.reference)
             }
-            let notes = expStr(exp, "notes", "notas", "description")
-            if !notes.isEmpty { Section("Notas") { Text(notes).font(.subheadline) } }
-            if vm.canManage && pending, let id {
+            if !exp.notes.isEmpty { Section("Notas") { Text(exp.notes).font(.subheadline) } }
+            if vm.canManage && exp.isPending, exp.id > 0 {
                 Section("Decisión") {
                     TextField("Nota / motivo rechazo", text: $rejectNote, axis: .vertical).lineLimit(2...4)
                     if let msg = vm.message {
@@ -300,7 +290,7 @@ struct ExpensesView: View {
                     }
                     Button(vm.acting ? "…" : "Aprobar") {
                         Task {
-                            if await vm.decide(id: id, approve: true, note: rejectNote.nilIfEmptyExp) {
+                            if await vm.decide(id: exp.id, approve: true, note: rejectNote.nilIfEmptyExp) {
                                 selected = nil
                             }
                         }
@@ -308,7 +298,7 @@ struct ExpensesView: View {
                     .disabled(vm.acting)
                     Button(vm.acting ? "…" : "Rechazar", role: .destructive) {
                         Task {
-                            if await vm.decide(id: id, approve: false, note: rejectNote) {
+                            if await vm.decide(id: exp.id, approve: false, note: rejectNote) {
                                 selected = nil
                             }
                         }
@@ -328,34 +318,29 @@ struct ExpensesView: View {
 // MARK: – Card
 
 private struct ExpenseCard: View {
-    let item: [String: Any]
+    let item: ExpenseItem
     var body: some View {
-        let concept = expStr(item, "concept", "concepto", "descripcion")
-        let category = expStr(item, "category", "categoria")
-        let amount = expDouble(item, "amount", "total", "monto", "montoSolicitado")
-        let date = String(expStr(item, "createdAt", "fecha").prefix(10))
-        let status = expStatus(item)
-
         HStack(spacing: 12) {
             ZStack {
                 Circle().fill(Color.red.opacity(0.12)).frame(width: 40, height: 40)
                 Image(systemName: "arrow.down.circle.fill").foregroundColor(.red).font(.system(size: 18))
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(concept.isEmpty ? "Sin concepto" : concept).font(.subheadline).bold()
+                Text(item.displayConcept).font(.subheadline).bold()
                 HStack(spacing: 6) {
-                    if !category.isEmpty { Text(category.capitalized).font(.caption).foregroundColor(.secondary) }
-                    if !status.isEmpty {
-                        Text(status).font(.caption2)
+                    if !item.category.isEmpty { Text(item.category.capitalized).font(.caption).foregroundColor(.secondary) }
+                    if !item.status.isEmpty {
+                        Text(item.status).font(.caption2)
                             .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(status.lowercased().contains("pendiente") ? Color.orange.opacity(0.15) : Color.green.opacity(0.15))
+                            .background(item.isPending ? Color.orange.opacity(0.15) : Color.green.opacity(0.15))
                             .clipShape(Capsule())
                     }
                 }
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                if let a = amount { Text(fmtExp(a)).font(.subheadline).bold().foregroundColor(.red) }
+                Text(fmtExp(item.amount)).font(.subheadline).bold().foregroundColor(.red)
+                let date = String(item.createdAt.prefix(10))
                 if !date.isEmpty { Text(date).font(.caption2).foregroundColor(.secondary) }
             }
         }
@@ -367,36 +352,6 @@ private struct ExpenseCard: View {
 
 // MARK: – Helpers
 
-private func expStatus(_ m: [String: Any]) -> String {
-    expStr(m, "estatusPago", "estatus", "status")
-}
-
-private func expStr(_ m: [String: Any], _ keys: String...) -> String {
-    for k in keys {
-        if let v = m[k] {
-            let s: String
-            if let ss = v as? String { s = ss }
-            else if let n = v as? NSNumber { s = n.stringValue }
-            else if let nested = v as? [String: Any] {
-                s = expStr(nested, "nombre", "name", "email")
-            } else { s = String(describing: v) }
-            if !s.isEmpty && s != "null" { return s }
-        }
-    }
-    return ""
-}
-
-private func expDouble(_ m: [String: Any], _ keys: String...) -> Double? {
-    for k in keys {
-        if let v = m[k] {
-            if let d = v as? Double { return d }
-            if let n = v as? NSNumber { return n.doubleValue }
-            if let s = v as? String, let d = Double(s) { return d }
-        }
-    }
-    return nil
-}
-
 private func fmtExp(_ v: Double) -> String {
     if v >= 1_000_000 { return String(format: "$%.1fM", v / 1_000_000) }
     if v >= 1_000 { return String(format: "$%.0fK", v / 1_000) }
@@ -405,14 +360,5 @@ private func fmtExp(_ v: Double) -> String {
 }
 
 extension String {
-    fileprivate func ifBlankExp(_ fallback: String) -> String { isEmpty ? fallback : self }
     fileprivate var nilIfEmptyExp: String? { isEmpty ? nil : self }
-}
-
-extension [String: Any] {
-    fileprivate var expId: String {
-        if let n = self["id"] as? Int { return "exp-\(n)" }
-        if let s = self["id"] as? String { return "exp-\(s)" }
-        return UUID().uuidString
-    }
 }

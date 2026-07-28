@@ -154,17 +154,22 @@ export class ExpensesController {
   approve(
     @Param('id') id: string,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Body() body: { action?: 'approve' | 'reject'; note?: string },
   ) {
     const action = body.action === 'reject' ? 'reject' : 'approve';
-    return this.expensesService.approveOrReject(+id, action, body.note, user?.id);
+    return this.expensesService.approveOrReject(+id, action, body.note, user?.id, companyId);
   }
 
   @Patch(':id/pagado')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
-  markPagado(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.expensesService.markPagado(+id, user?.id);
+  markPagado(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.expensesService.markPagado(+id, user?.id, companyId);
   }
 
   @Patch(':id')
@@ -174,6 +179,7 @@ export class ExpensesController {
   update(
     @CurrentUser() _user: any,
     @Param('id') id: string,
+    @CurrentCompanyId() companyId: number | null,
     @Body() body: UpdateExpenseDto & Record<string, unknown>,
     @UploadedFile() file?: any,
   ) {
@@ -189,26 +195,34 @@ export class ExpensesController {
       body.categoria !== undefined ||
       ticketEvidenciaUrl !== undefined
     ) {
-      return this.expensesService.updateAdministrative(+id, {
-        concepto: body.concepto ? String(body.concepto) : undefined,
-        monto: body.monto !== undefined ? Number(body.monto) : undefined,
-        categoria: body.categoria ? String(body.categoria) : undefined,
-        esRecurrente:
-          body.esRecurrente !== undefined
-            ? Boolean(body.esRecurrente === true || body.esRecurrente === 'true')
-            : undefined,
-        fecha: body.fecha ? String(body.fecha) : undefined,
-        ticketEvidenciaUrl,
-      });
+      return this.expensesService.updateAdministrative(
+        +id,
+        {
+          concepto: body.concepto ? String(body.concepto) : undefined,
+          monto: body.monto !== undefined ? Number(body.monto) : undefined,
+          categoria: body.categoria ? String(body.categoria) : undefined,
+          esRecurrente:
+            body.esRecurrente !== undefined
+              ? Boolean(body.esRecurrente === true || body.esRecurrente === 'true')
+              : undefined,
+          fecha: body.fecha ? String(body.fecha) : undefined,
+          ticketEvidenciaUrl,
+        },
+        companyId,
+      );
     }
     const { estatusPago: _e, usuarioId: _u, ...safe } = body as UpdateExpenseDto & Record<string, unknown>;
-    return this.expensesService.update(+id, safe as UpdateExpenseDto);
+    return this.expensesService.update(+id, safe as UpdateExpenseDto, companyId);
   }
 
   @Delete(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
-  remove(@CurrentUser() user: any, @Param('id') id: string) {
-    return this.expensesService.remove(+id, user?.id);
+  remove(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.expensesService.remove(+id, user?.id, companyId);
   }
 }

@@ -15,14 +15,14 @@ export class PurchaseOrdersController {
 
   @Get('suppliers')
   @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_VIEW] })
-  listSuppliers() {
-    return this.svc.listSuppliers();
+  listSuppliers(@CurrentCompanyId() companyId: number | null) {
+    return this.svc.listSuppliers(companyId);
   }
 
   @Post('suppliers')
   @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_MANAGE] })
-  createSupplier(@Body() dto: any) {
-    return this.svc.createSupplier(dto);
+  createSupplier(@Body() dto: any, @CurrentCompanyId() companyId: number | null) {
+    return this.svc.createSupplier(dto, companyId);
   }
 
   @Post()
@@ -47,8 +47,8 @@ export class PurchaseOrdersController {
 
   @Get('dashboard')
   @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_VIEW] })
-  dashboard() {
-    return this.svc.getProcurementDashboard();
+  dashboard(@CurrentCompanyId() companyId: number | null) {
+    return this.svc.getProcurementDashboard(companyId);
   }
 
   @Get('dashboard/pdf')
@@ -56,10 +56,11 @@ export class PurchaseOrdersController {
   async dashboardPdf(
     @Query('fromDate') fromDate: string | undefined,
     @Query('toDate') toDate: string | undefined,
+    @CurrentCompanyId() companyId: number | null,
     @Res() res: Response
   ) {
     try {
-      const data = await this.svc.getProcurementDashboardForPdf(fromDate, toDate);
+      const data = await this.svc.getProcurementDashboardForPdf(fromDate, toDate, companyId);
       const payload = {
         ...data,
         fromDate: fromDate ?? data.fromDate ?? new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10),
@@ -82,7 +83,11 @@ export class PurchaseOrdersController {
 
   @Patch(':id/approve')
   @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_APPROVE] })
-  approve(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.svc.approvePurchaseOrder(id, user.id);
+  approve(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.svc.approvePurchaseOrder(id, user.id, companyId);
   }
 }

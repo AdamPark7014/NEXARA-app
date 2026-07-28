@@ -61,20 +61,30 @@ export class VentasLeadsController {
   @Get(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.ventasService.getLead(id, user);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.getLead(id, user, companyId);
   }
 
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateSalesLeadDto, @CurrentUser() user: any) {
-    const updated = await this.ventasService.updateLead(id, dto, user);
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateSalesLeadDto,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const updated = await this.ventasService.updateLead(id, dto, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'lead.update',
       entityType: 'lead',
       entityId: updated.id,
       actorId: user?.id,
+      companyId,
       metadata: { status: updated.status },
     });
     return updated;
@@ -83,13 +93,18 @@ export class VentasLeadsController {
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    const removed = await this.ventasService.deleteLead(id, user);
+  async remove(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const removed = await this.ventasService.deleteLead(id, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'lead.delete',
       entityType: 'lead',
       entityId: removed.id,
       actorId: user?.id,
+      companyId,
     });
     return removed;
   }

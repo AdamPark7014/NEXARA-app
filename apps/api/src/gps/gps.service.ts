@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { CreateGpsDto } from './dto/create-gps.dto.js';
 
 @Injectable()
@@ -14,10 +15,11 @@ export class GpsService {
     return today;
   }
 
-  create(createGpsDto: CreateGpsDto) {
+  async create(createGpsDto: CreateGpsDto, companyId?: number | null) {
     if (createGpsDto.usuarioId === undefined) {
       throw new Error('usuarioId requerido');
     }
+    const resolvedCompanyId = await resolveRequiredCompanyId(this.prisma, companyId);
     const data: Prisma.LocationTrackingUncheckedCreateInput = {
       usuarioId: createGpsDto.usuarioId,
       latitud: createGpsDto.latitud,
@@ -25,6 +27,7 @@ export class GpsService {
       velocidadKmh: createGpsDto.velocidadKmh ?? null,
       estaActivo: createGpsDto.estaActivo ?? true,
       ultimaActualizacion: createGpsDto.ultimaActualizacion,
+      companyId: resolvedCompanyId,
       ...(createGpsDto.actividadId ? { actividadId: createGpsDto.actividadId } : {}),
     };
     return this.prisma['locationTracking'].create({ data });
@@ -36,8 +39,8 @@ export class GpsService {
       where: { id: userId },
       select: { locationConsent: true },
     });
-    const openDay = await this.prisma.attendanceDay.findUnique({
-      where: { userId_date: { userId, date: today } },
+    const openDay = await this.prisma.attendanceDay.findFirst({
+      where: { userId, date: today, isOpen: true },
       select: { isOpen: true },
     });
     const effectiveConsent = Boolean(user?.locationConsent && openDay?.isOpen);
@@ -90,12 +93,16 @@ export class GpsService {
     return Boolean(user.permissions?.includes(permission));
   }
 
-  async findTeamLocations(requester: {
-    id: number;
-    departmentId?: number;
-    permissions?: string[];
-    isSuperAdmin?: boolean;
-  }) {
+  async findTeamLocations(
+    requester: {
+      id: number;
+      departmentId?: number;
+      permissions?: string[];
+      isSuperAdmin?: boolean;
+    },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
     const today = this.getTodayDateOnly();
     const canSeeAll =
       this.hasPermission(requester, PERMISSIONS.CONSOLE_ADMIN) ||
@@ -104,6 +111,7 @@ export class GpsService {
     const userFilter: any = {
       locationConsent: true,
       attendanceDays: { some: { date: today, isOpen: true } },
+      companyMemberships: { some: { companyId: tenantId } },
     };
 
     if (!canSeeAll && requester.departmentId) {
@@ -121,6 +129,7 @@ export class GpsService {
       where: {
         usuarioId: { in: allowedUsers.map((u) => u.id) },
         estaActivo: true,
+        ...companyWhere(tenantId),
       },
       orderBy: { ultimaActualizacion: 'desc' },
       include: {
@@ -133,12 +142,14 @@ export class GpsService {
   }
 
   /** All GPS points for userId on a given date (YYYY-MM-DD), ordered asc. Used for trajectory view. */
-  async getMyTrajectory(userId: number, date?: string) {
+  async getMyTrajectory(userId: number, date?: string, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const { start, end } = this.parseDateRange(date);
     return this.prisma['locationTracking'].findMany({
       where: {
         usuarioId: userId,
         ultimaActualizacion: { gte: start, lte: end },
+        ...companyWhere(tenantId),
       },
       orderBy: { ultimaActualizacion: 'asc' },
     });
@@ -153,6 +164,7 @@ export class GpsService {
     },
     targetUserId: number,
     date?: string,
+    companyId?: number | null,
   ) {
     const canManage =
       requester.isSuperAdmin ||
@@ -181,7 +193,7 @@ export class GpsService {
       }
     }
 
-    return this.getMyTrajectory(targetUserId, date);
+    return this.getMyTrajectory(targetUserId, date, companyId);
   }
 
   private parseDateRange(date?: string) {

@@ -7,7 +7,7 @@ import Image from "next/image";
 import { io, Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "../lib/permissions";
-import { getDeviceIdentityHeaders } from "@/lib/device-identity";
+import { getDeviceIdentityHeaders, getLocalDeviceLabel } from "@/lib/device-identity";
 import { getUserHomeUrl, getUserHomeUrlAbsolute } from "@/lib/panel-home";
 import { isCapacitorNative } from "@/lib/capacitor-env";
 import { setSharedCookie, SHARED_COOKIE_KEYS } from "@/lib/shared-cookies";
@@ -91,6 +91,22 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           const domainFlag = isProduction ? "; Domain=.nexara.com.mx" : "";
           document.cookie = `nx_session=1; Path=/; SameSite=Lax; Max-Age=86400${domainFlag}${secureFlag}`;
         }
+        const firstName =
+          String(data.user?.nombre || "")
+            .trim()
+            .split(/\s+/)[0] || "equipo";
+        const title =
+          typeof data.loginGreeting === "string" && data.loginGreeting.trim()
+            ? data.loginGreeting.trim()
+            : `Hola, ${firstName}`;
+        const device =
+          (typeof data.loginDeviceLabel === "string" && data.loginDeviceLabel.trim()) ||
+          (typeof data.loginDevice === "string" && data.loginDevice.trim()) ||
+          (await getLocalDeviceLabel());
+        window.sessionStorage.setItem(
+          "nexara_login_greeting",
+          JSON.stringify({ title, device }),
+        );
         setUser(userData);
         window.history.replaceState({}, "", window.location.pathname);
         if (smartRedirect) {
@@ -135,11 +151,27 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
     setIsLoading(true);
     try {
       const deviceHeaders = await getDeviceIdentityHeaders();
+      const companySlugFromHost = (() => {
+        if (typeof window === "undefined") return null;
+        const params = new URLSearchParams(window.location.search);
+        const fromQuery = params.get("company") || params.get("companySlug");
+        if (fromQuery?.trim()) return fromQuery.trim().toLowerCase();
+        const host = window.location.hostname.toLowerCase();
+        // e.g. acme.tickets.nexara.com.mx or acme.localhost
+        const parts = host.split(".");
+        if (parts.length >= 3 && parts[0] && !["www", "core", "app", "tickets", "localhost"].includes(parts[0])) {
+          return parts[0];
+        }
+        return null;
+      })();
       const payload = {
         email,
         password,
         ...(mfaCode.trim() ? { mfaCode: mfaCode.trim() } : {}),
         ...(requiredPermission === PERMISSIONS.PANEL_VENTAS ? { panel: "ventas" } : {}),
+        ...(companySlugFromHost && (mode === "tickets" || mode === "client" || mode === "branch")
+          ? { companySlug: companySlugFromHost }
+          : {}),
       };
 
       const loginToEndpoint = async (endpoint: string) => {
@@ -224,8 +256,23 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         throw new Error("No tienes permisos para acceder a este panel");
       }
 
-      if (typeof window !== 'undefined' && data.loginGreeting) {
-        window.sessionStorage.setItem('nexara_login_greeting', data.loginGreeting);
+      if (typeof window !== 'undefined') {
+        const firstName =
+          String(data.user?.nombre || '')
+            .trim()
+            .split(/\s+/)[0] || 'equipo';
+        const title =
+          typeof data.loginGreeting === 'string' && data.loginGreeting.trim()
+            ? data.loginGreeting.trim()
+            : `Hola, ${firstName}`;
+        const device =
+          (typeof data.loginDeviceLabel === 'string' && data.loginDeviceLabel.trim()) ||
+          (typeof data.loginDevice === 'string' && data.loginDevice.trim()) ||
+          (await getLocalDeviceLabel());
+        window.sessionStorage.setItem(
+          'nexara_login_greeting',
+          JSON.stringify({ title, device }),
+        );
       }
 
       // Setear cookie de sesión inmediatamente (sin esperar al ciclo de

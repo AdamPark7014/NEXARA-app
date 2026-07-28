@@ -302,7 +302,14 @@ export default function MaintenancePage() {
           <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
         )}
         {!loading && !error && (
-          <DataTable columns={columns} rows={visibleItems} rowKey={w => w.id} emptyTitle="Sin ordenes de mantenimiento" emptyDescription="Crea la primera orden de trabajo." />
+          <DataTable
+            columns={columns}
+            rows={visibleItems}
+            rowKey={w => w.id}
+            emptyTitle="Sin ordenes de mantenimiento"
+            emptyDescription="Crea la primera orden de trabajo para programar preventivos o correctivos."
+            emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={openNew}>Nueva OT</Button> : undefined}
+          />
         )}
       </Section>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />

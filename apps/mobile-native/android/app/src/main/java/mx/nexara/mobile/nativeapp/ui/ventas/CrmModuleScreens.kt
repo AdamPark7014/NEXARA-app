@@ -34,6 +34,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.crm.CrmRepository
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
+import mx.nexara.mobile.nativeapp.data.api.CrmOpportunityDto
+import mx.nexara.mobile.nativeapp.data.api.CrmClientDto
+import mx.nexara.mobile.nativeapp.data.api.CrmProductDto
+import mx.nexara.mobile.nativeapp.data.api.CrmLeadDto
+import mx.nexara.mobile.nativeapp.data.api.CrmSalesProjectDto
+import mx.nexara.mobile.nativeapp.data.api.CotizacionDto
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -89,18 +95,18 @@ private fun CrmStageChip(text: String) {
 
 // ── Oportunidades ─────────────────────────────────────────────────────────────
 
-data class CrmListUiState(
+data class CrmListUiState<T>(
     val isLoading: Boolean = true,
     val error: String? = null,
     val query: String = "",
-    val items: List<Map<String, Any?>> = emptyList(),
-    val selected: Map<String, Any?>? = null,
+    val items: List<T> = emptyList(),
+    val selected: T? = null,
 )
 
 class CrmOportunidadesViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = CrmRepository(app.applicationContext)
-    private val _state = MutableStateFlow(CrmListUiState())
-    val state: StateFlow<CrmListUiState> = _state
+    private val _state = MutableStateFlow(CrmListUiState<CrmOpportunityDto>())
+    val state: StateFlow<CrmListUiState<CrmOpportunityDto>> = _state
 
     init { refresh() }
 
@@ -108,7 +114,7 @@ class CrmOportunidadesViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             try {
-                val list = withContext(Dispatchers.IO) { repo.oportunidades() }
+                val list = withContext(Dispatchers.IO) { repo.opportunityDtos() }
                 _state.update { it.copy(isLoading = false, items = list) }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.message) }
@@ -117,7 +123,7 @@ class CrmOportunidadesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setQuery(q: String) = _state.update { it.copy(query = q) }
-    fun select(item: Map<String, Any?>?) = _state.update { it.copy(selected = item) }
+    fun select(item: CrmOpportunityDto?) = _state.update { it.copy(selected = item) }
 
     fun createOpportunity(form: OpportunityFormState, onCreated: (Long) -> Unit) {
         viewModelScope.launch {
@@ -132,12 +138,11 @@ class CrmOportunidadesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    val filtered: List<Map<String, Any?>> get() {
+    val filtered: List<CrmOpportunityDto> get() {
         val q = _state.value.query.trim().lowercase()
         if (q.isBlank()) return _state.value.items
         return _state.value.items.filter {
-            mStr(it, "title", "name", "titulo").lowercase().contains(q) ||
-                mStr(it, "stage", "etapa").lowercase().contains(q)
+            it.title.lowercase().contains(q) || it.stage.lowercase().contains(q)
         }
     }
 }
@@ -153,17 +158,17 @@ fun VentasOportunidadesScreen() {
     var creating by remember { mutableStateOf(false) }
 
     if (state.selected != null) {
-        val id = mStr(state.selected!!, "id").toLongOrNull()
-        if (id != null) {
+        val id = state.selected!!.id
+        if (id > 0L) {
             VentasOpportunityDetailScreen(oppId = id, onBack = { vm.select(null) })
             return
         }
         CrmDetailScaffold(
-            title = mStr(state.selected!!, "title", "name", "titulo"),
+            title = state.selected!!.displayTitle,
             rows = listOf(
-                "Etapa" to mStr(state.selected!!, "stage", "etapa", "status"),
-                "Valor" to fmtMxnShort(mDouble(state.selected!!, "value", "amount") ?: 0.0),
-                "Cliente" to mStr(state.selected!!, "clientName", "cliente"),
+                "Etapa" to state.selected!!.stageKey,
+                "Valor" to fmtMxnShort(state.selected!!.value),
+                "Cliente" to state.selected!!.clientName,
             ),
             onBack = { vm.select(null) },
         )
@@ -188,17 +193,17 @@ fun VentasOportunidadesScreen() {
                 placeholder = "Buscar oportunidad…",
                 emptyText = "Sin oportunidades",
                 items = items,
-                key = { mStr(it, "id") },
+                key = { it.rowKey },
             ) { item ->
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable { vm.select(item) },
                     shape = RoundedCornerShape(12.dp),
                 ) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(mStr(item, "title", "name", "titulo").ifBlank { "—" }, fontWeight = FontWeight.SemiBold)
+                        Text(item.displayTitle, fontWeight = FontWeight.SemiBold)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            CrmStageChip(mStr(item, "stage", "etapa", "status"))
-                            Text(fmtMxnShort(mDouble(item, "value", "amount") ?: 0.0), fontWeight = FontWeight.Bold)
+                            CrmStageChip(item.stageKey)
+                            Text(fmtMxnShort(item.value), fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -219,7 +224,7 @@ fun VentasOportunidadesScreen() {
                 vm.createOpportunity(createForm) { id ->
                     creating = false
                     showCreate = false
-                    vm.select(mapOf("id" to id))
+                    vm.select(CrmOpportunityDto(id = id))
                 }
             },
         )
@@ -230,8 +235,8 @@ fun VentasOportunidadesScreen() {
 
 class CrmClientesViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = CrmRepository(app.applicationContext)
-    private val _state = MutableStateFlow(CrmListUiState())
-    val state: StateFlow<CrmListUiState> = _state
+    private val _state = MutableStateFlow(CrmListUiState<CrmClientDto>())
+    val state: StateFlow<CrmListUiState<CrmClientDto>> = _state
 
     init { refresh() }
 
@@ -239,7 +244,7 @@ class CrmClientesViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             try {
-                val list = withContext(Dispatchers.IO) { repo.clientes() }
+                val list = withContext(Dispatchers.IO) { repo.clientDtos() }
                 _state.update { it.copy(isLoading = false, items = list) }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.message) }
@@ -248,14 +253,12 @@ class CrmClientesViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setQuery(q: String) = _state.update { it.copy(query = q) }
-    fun select(item: Map<String, Any?>?) = _state.update { it.copy(selected = item) }
+    fun select(item: CrmClientDto?) = _state.update { it.copy(selected = item) }
 
-    val filtered: List<Map<String, Any?>> get() {
+    val filtered: List<CrmClientDto> get() {
         val q = _state.value.query.trim().lowercase()
         if (q.isBlank()) return _state.value.items
-        return _state.value.items.filter {
-            mStr(it, "name", "nombre", "razonSocial").lowercase().contains(q)
-        }
+        return _state.value.items.filter { it.name.lowercase().contains(q) }
     }
 }
 
@@ -280,15 +283,15 @@ fun VentasClientesScreen() {
         placeholder = "Buscar cliente…",
         emptyText = "Sin clientes",
         items = items,
-        key = { mStr(it, "id") },
+        key = { it.rowKey },
     ) { item ->
         Card(
             modifier = Modifier.fillMaxWidth().clickable { vm.select(item) },
             shape = RoundedCornerShape(12.dp),
         ) {
             Column(Modifier.padding(14.dp)) {
-                Text(mStr(item, "name", "nombre", "razonSocial"), fontWeight = FontWeight.SemiBold)
-                Text(mStr(item, "email", "rfc"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(item.displayName, fontWeight = FontWeight.SemiBold)
+                Text(item.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -298,8 +301,8 @@ fun VentasClientesScreen() {
 
 class CrmProductsViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = CrmRepository(app.applicationContext)
-    private val _state = MutableStateFlow(CrmListUiState())
-    val state: StateFlow<CrmListUiState> = _state
+    private val _state = MutableStateFlow(CrmListUiState<CrmProductDto>())
+    val state: StateFlow<CrmListUiState<CrmProductDto>> = _state
 
     init { refresh() }
 
@@ -308,7 +311,7 @@ class CrmProductsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val q = _state.value.query.ifBlank { null }
-                val list = withContext(Dispatchers.IO) { repo.products(q) }
+                val list = withContext(Dispatchers.IO) { repo.productDtos(q) }
                 _state.update { it.copy(isLoading = false, items = list) }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.message) }
@@ -327,7 +330,7 @@ fun VentasProductsScreen() {
     val ctx = LocalContext.current
     val vm: CrmProductsViewModel = viewModel(factory = crmVmFactory<CrmProductsViewModel>(ctx))
     val state by vm.state.collectAsState()
-    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
+    var selected by remember { mutableStateOf<CrmProductDto?>(null) }
 
     if (selected != null) {
         ProductDetailView(product = selected!!, onBack = { selected = null })
@@ -343,36 +346,37 @@ fun VentasProductsScreen() {
         placeholder = "Buscar producto…",
         emptyText = "Sin productos",
         items = state.items,
-        key = { mStr(it, "id") },
+        key = { it.rowKey },
     ) { item ->
         Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().clickable { selected = item }) {
             Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(mStr(item, "name", "nombre"), fontWeight = FontWeight.SemiBold)
-                    Text(mStr(item, "sku", "code"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(item.displayName, fontWeight = FontWeight.SemiBold)
+                    Text(item.sku, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text(fmtMxnShort(mDouble(item, "price", "precio") ?: 0.0), fontWeight = FontWeight.Bold)
+                Text(fmtMxnShort(item.price), fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
 @Composable
-private fun ProductDetailView(product: Map<String, Any?>, onBack: () -> Unit) {
+private fun ProductDetailView(product: CrmProductDto, onBack: () -> Unit) {
+    val raw = product.raw
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { OutlinedButton(onClick = onBack) { Text("← Productos") } }
         item {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(mStr(product, "name", "nombre").ifBlank { "Producto" }, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(product.displayName, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Divider()
-                    ProductRow("SKU / Código", mStr(product, "sku", "code", "codigo"))
-                    ProductRow("Precio", fmtMxnShort(mDouble(product, "price", "precio") ?: 0.0))
-                    ProductRow("Categoría", mStr(product, "category", "categoria", "tipo"))
-                    ProductRow("Stock", mStr(product, "stock", "quantity", "inventario"))
-                    ProductRow("Unidad", mStr(product, "unit", "unidad"))
-                    ProductRow("Proveedor", mStr(product, "supplier", "proveedor"))
-                    val desc = mStr(product, "description", "descripcion", "notas")
+                    ProductRow("SKU / Código", product.sku)
+                    ProductRow("Precio", fmtMxnShort(product.price))
+                    ProductRow("Categoría", mStr(raw, "category", "categoria", "tipo"))
+                    ProductRow("Stock", mStr(raw, "stock", "quantity", "inventario"))
+                    ProductRow("Unidad", mStr(raw, "unit", "unidad"))
+                    ProductRow("Proveedor", mStr(raw, "supplier", "proveedor"))
+                    val desc = mStr(raw, "description", "descripcion", "notas")
                     if (desc.isNotBlank()) {
                         Spacer(Modifier.height(4.dp))
                         Text("Descripción", fontWeight = FontWeight.Medium)
@@ -397,8 +401,8 @@ private fun ProductRow(label: String, value: String) {
 
 class CrmProyectosViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = CrmRepository(app.applicationContext)
-    private val _state = MutableStateFlow(CrmListUiState())
-    val state: StateFlow<CrmListUiState> = _state
+    private val _state = MutableStateFlow(CrmListUiState<CrmSalesProjectDto>())
+    val state: StateFlow<CrmListUiState<CrmSalesProjectDto>> = _state
 
     init { refresh() }
 
@@ -406,7 +410,7 @@ class CrmProyectosViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             try {
-                val list = withContext(Dispatchers.IO) { repo.proyectos() }
+                val list = withContext(Dispatchers.IO) { repo.projectDtos() }
                 _state.update { it.copy(isLoading = false, items = list) }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.message) }
@@ -420,7 +424,7 @@ fun VentasProyectosScreen() {
     val ctx = LocalContext.current
     val vm: CrmProyectosViewModel = viewModel(factory = crmVmFactory<CrmProyectosViewModel>(ctx))
     val state by vm.state.collectAsState()
-    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
+    var selected by remember { mutableStateOf<CrmSalesProjectDto?>(null) }
 
     if (selected != null) {
         CrmProjectDetailScreen(project = selected!!, onBack = { selected = null })
@@ -436,7 +440,7 @@ fun VentasProyectosScreen() {
         placeholder = "",
         emptyText = "Sin proyectos",
         items = state.items,
-        key = { mStr(it, "id") },
+        key = { it.rowKey },
         showSearch = false,
     ) { item ->
         Card(
@@ -444,11 +448,16 @@ fun VentasProyectosScreen() {
             modifier = Modifier.fillMaxWidth().clickable { selected = item },
         ) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(mStr(item, "name", "title", "nombre"), fontWeight = FontWeight.SemiBold)
+                Text(item.displayName, fontWeight = FontWeight.SemiBold)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    CrmStageChip(mStr(item, "status", "estado"))
-                    val client = (item["client"] as? Map<*, *>)?.let { mStr(it as Map<String, Any?>, "name", "nombre") } ?: ""
-                    if (client.isNotBlank()) Text(client, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    CrmStageChip(item.status)
+                    if (item.clientName.isNotBlank()) {
+                        Text(
+                            item.clientName,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
@@ -456,15 +465,15 @@ fun VentasProyectosScreen() {
 }
 
 @Composable
-private fun CrmProjectDetailScreen(project: Map<String, Any?>, onBack: () -> Unit) {
-    val ctx = LocalContext.current
+private fun CrmProjectDetailScreen(project: CrmSalesProjectDto, onBack: () -> Unit) {
     var tab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Info", "Costos", "Orden")
+    val raw = project.raw
 
     Column(Modifier.fillMaxSize()) {
         OutlinedButton(onClick = onBack, modifier = Modifier.padding(12.dp)) { Text("← Volver") }
         Text(
-            mStr(project, "name", "title", "nombre").ifBlank { "Proyecto" },
+            project.displayName,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 16.dp),
@@ -477,26 +486,37 @@ private fun CrmProjectDetailScreen(project: Map<String, Any?>, onBack: () -> Uni
         when (tab) {
             0 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 fun r(k: String, v: String) { if (v.isNotBlank()) item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(k, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(v) } } }
-                item { CrmStageChip(mStr(project, "status", "estado")) }
-                r("Cliente", run { val c = project["client"] as? Map<String, Any?>; c?.let { mStr(it, "name", "nombre") } ?: mStr(project, "clientName") })
-                r("Responsable", mStr(project, "ownerName", "assignedName", "vendorName"))
-                r("Tipo", mStr(project, "type", "tipo", "projectType"))
-                r("Inicio", mStr(project, "startDate", "startAt", "createdAt").take(10))
-                r("Fin", mStr(project, "endDate", "closedAt").take(10))
-                r("Descripción", mStr(project, "description", "descripcion", "notes"))
+                item { CrmStageChip(project.status) }
+                r("Cliente", project.clientName)
+                r("Responsable", project.ownerName)
+                r("Tipo", project.projectType)
+                r("Presupuesto", if (project.budget != 0.0) fmtMxnShort(project.budget) else "")
+                r("Margen", if (project.margin != 0.0) fmtMxnShort(project.margin) else "")
+                r("Inicio", project.startDate.take(10))
+                r("Fin", project.endDate.take(10))
+                r("Descripción", project.scopeSummary)
             }
             1 -> {
-                val costs = ((project["costs"] ?: project["costos"] ?: project["expenses"]) as? List<*>)
+                val nestedCosts = ((raw["costs"] ?: raw["costos"] ?: raw["expenses"]) as? List<*>)
                     ?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
-                if (costs.isEmpty()) {
+                val costRows = if (nestedCosts.isNotEmpty()) {
+                    nestedCosts.map { c ->
+                        mStr(c, "concept", "concepto", "description", "name").ifBlank { "Costo" } to
+                            (mDouble(c, "amount", "total") ?: 0.0)
+                    }
+                } else {
+                    project.costRows
+                }
+                if (costRows.isEmpty()) {
                     Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Sin costos registrados", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 } else {
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(costs, key = { mStr(it, "id") }) { c ->
+                        items(costRows.size) { i ->
+                            val (label, amount) = costRows[i]
                             Card(Modifier.fillMaxWidth()) {
                                 Row(Modifier.fillMaxWidth().padding(12.dp), Arrangement.SpaceBetween) {
-                                    Text(mStr(c, "concept", "concepto", "description", "name").ifBlank { "Costo" }, Modifier.weight(1f))
-                                    Text(fmtMxnShort(mDouble(c, "amount", "total") ?: 0.0), fontWeight = FontWeight.Bold)
+                                    Text(label, Modifier.weight(1f))
+                                    Text(fmtMxnShort(amount), fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -504,7 +524,7 @@ private fun CrmProjectDetailScreen(project: Map<String, Any?>, onBack: () -> Uni
                 }
             }
             else -> {
-                val orden = (project["closingOrder"] ?: project["workOrder"] ?: project["orden"]) as? Map<String, Any?>
+                val orden = (raw["closingOrder"] ?: raw["workOrder"] ?: raw["orden"] ?: raw["closureOrder"]) as? Map<String, Any?>
                 if (orden == null) {
                     Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Sin orden de cierre", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 } else {
@@ -535,10 +555,10 @@ class VentasLeadsApiViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
             val leads = withContext(Dispatchers.IO) {
-                runCatching { crmRepo.leads() }.getOrDefault(emptyList())
+                runCatching { crmRepo.leadDtos() }.getOrDefault(emptyList())
             }
             val items = if (leads.isEmpty()) {
-                withContext(Dispatchers.IO) { extraRepo.clientTicketRequests() }
+                withContext(Dispatchers.IO) { extraRepo.clientTicketLeadDtos() }
             } else {
                 leads
             }
@@ -548,13 +568,15 @@ class VentasLeadsApiViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setQuery(q: String) = _state.update { it.copy(query = q) }
 
-    val filtered: List<Map<String, Any?>> get() {
+    val filtered: List<CrmLeadDto> get() {
         val s = _state.value
         if (s.query.isBlank()) return s.items
         val q = s.query.lowercase()
         return s.items.filter { t ->
-            mStr(t, "description", "descripcion", "title").lowercase().contains(q) ||
-                mStr(t, "branchName", "clientName", "cliente").lowercase().contains(q)
+            t.displayTitle.lowercase().contains(q) ||
+                t.clientName.lowercase().contains(q) ||
+                t.branchName.lowercase().contains(q) ||
+                t.description.lowercase().contains(q)
         }
     }
 }
@@ -582,7 +604,7 @@ fun VentasLeadsApiScreen() {
         } else if (items.isEmpty()) {
             item { Text("Sin leads", modifier = Modifier.padding(20.dp)) }
         } else {
-            items(items, key = { it["id"]?.toString() ?: it.hashCode().toString() }) { lead ->
+            items(items, key = { it.rowKey }) { lead ->
                 CrmLeadCard(lead)
             }
         }
@@ -592,7 +614,7 @@ fun VentasLeadsApiScreen() {
 // ── Shared composables ────────────────────────────────────────────────────────
 
 @Composable
-private fun CrmListScaffold(
+private fun <T> CrmListScaffold(
     isLoading: Boolean,
     error: String?,
     onRetry: () -> Unit,
@@ -600,10 +622,10 @@ private fun CrmListScaffold(
     onQuery: (String) -> Unit,
     placeholder: String,
     emptyText: String,
-    items: List<Map<String, Any?>>,
-    key: (Map<String, Any?>) -> String,
+    items: List<T>,
+    key: (T) -> String,
     showSearch: Boolean = true,
-    row: @Composable (Map<String, Any?>) -> Unit,
+    row: @Composable (T) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -628,14 +650,14 @@ private fun CrmListScaffold(
 }
 
 @Composable
-private fun CrmClientDetailScreen(client: Map<String, Any?>, onBack: () -> Unit) {
+private fun CrmClientDetailScreen(client: CrmClientDto, onBack: () -> Unit) {
     val ctx = LocalContext.current
-    val clientName = mStr(client, "name", "nombre", "razonSocial")
-    val clientId = mStr(client, "id")
-    val serviceClientId = mStr(client, "serviceClientId", "scId").ifBlank { clientId }
+    val clientName = client.displayName
+    val clientId = client.id.toString()
+    val serviceClientId = mStr(client.raw, "serviceClientId", "scId").ifBlank { clientId }
     var tab by remember { mutableIntStateOf(0) }
-    var cotizaciones by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
-    var oportunidades by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var cotizaciones by remember { mutableStateOf<List<CotizacionDto>>(emptyList()) }
+    var oportunidades by remember { mutableStateOf<List<CrmOpportunityDto>>(emptyList()) }
     var tickets by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
     var sucursales by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
     var servicios by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
@@ -646,22 +668,12 @@ private fun CrmClientDetailScreen(client: Map<String, Any?>, onBack: () -> Unit)
         val extraRepo = ExtraRepository(ctx)
         val prefix = clientName.take(6).lowercase()
         val c = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { crm.cotizaciones() }
-        val o = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { crm.oportunidades() }
+        val o = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { crm.opportunityDtos() }
         val t = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { extraRepo.clientTicketRequests() }
         val s = if (serviceClientId.isNotBlank()) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { extraRepo.serviceClientBranches(serviceClientId) } else emptyList()
         val sv = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { extraRepo.maintenanceContracts(clientId = clientId.ifBlank { null }) }
-        cotizaciones = c
-            .filter { (it.cliente ?: "").lowercase().contains(prefix) }
-            .map { cot ->
-                mapOf(
-                    "id" to cot.id,
-                    "folio" to cot.folio,
-                    "cliente" to cot.cliente,
-                    "total" to cot.total,
-                    "estatus" to cot.estatus,
-                )
-            }
-        oportunidades = o.filter { (mStr(it, "clientName", "cliente")).lowercase().contains(prefix) }
+        cotizaciones = c.filter { (it.cliente ?: "").lowercase().contains(prefix) }
+        oportunidades = o.filter { it.clientName.lowercase().contains(prefix) }
         tickets = t.filter { tk ->
             val cn = (mStr(tk, "clientName", "branchName")).lowercase()
             clientName.isEmpty() || cn.contains(prefix)
@@ -684,25 +696,25 @@ private fun CrmClientDetailScreen(client: Map<String, Any?>, onBack: () -> Unit)
         when (tab) {
             0 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 fun r(k: String, v: String) { if (v.isNotBlank()) item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(k, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(v) } } }
-                r("RFC", mStr(client, "rfc"))
-                r("Email", mStr(client, "email"))
-                r("Teléfono", mStr(client, "phone", "telefono"))
-                r("Ciudad", mStr(client, "city", "ciudad"))
-                r("Estado", mStr(client, "state", "estado"))
-                r("País", mStr(client, "country", "pais"))
+                r("RFC", client.rfc)
+                r("Email", client.email)
+                r("Teléfono", client.phone.ifBlank { mStr(client.raw, "telefono") })
+                r("Ciudad", mStr(client.raw, "city", "ciudad"))
+                r("Estado", mStr(client.raw, "state", "estado"))
+                r("País", mStr(client.raw, "country", "pais"))
             }
             1 -> if (cotizaciones.isEmpty()) {
                 Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Sin cotizaciones", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             } else {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(cotizaciones, key = { mStr(it, "id") }) { cot ->
+                    items(cotizaciones, key = { it.id }) { cot ->
                         Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(14.dp)) {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text(mStr(cot, "folio").ifBlank { "Cot #${mStr(cot, "id")}" }, fontWeight = FontWeight.Bold)
-                                    Text(fmtMxnShort(mDouble(cot, "total") ?: 0.0), fontWeight = FontWeight.Bold)
+                                    Text(cot.folio?.takeIf { it.isNotBlank() } ?: "Cot #${cot.id}", fontWeight = FontWeight.Bold)
+                                    Text(fmtMxnShort(cot.total ?: 0.0), fontWeight = FontWeight.Bold)
                                 }
-                                Text(mStr(cot, "estatus"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(cot.estatus.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -712,13 +724,13 @@ private fun CrmClientDetailScreen(client: Map<String, Any?>, onBack: () -> Unit)
                 Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Sin oportunidades", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             } else {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(oportunidades, key = { mStr(it, "id") }) { o ->
+                    items(oportunidades, key = { it.rowKey }) { o ->
                         Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(14.dp)) {
-                                Text(mStr(o, "title", "name").ifBlank { "Oportunidad" }, fontWeight = FontWeight.Bold)
+                                Text(o.displayTitle, fontWeight = FontWeight.Bold)
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    CrmStageChip(mStr(o, "stage", "etapa"))
-                                    Text(fmtMxnShort(mDouble(o, "value") ?: 0.0), fontWeight = FontWeight.SemiBold)
+                                    Text(o.stageKey, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    if (o.value > 0.0) Text(fmtMxnShort(o.value), fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -807,14 +819,14 @@ private fun fmtMxnShort(v: Double): String = when {
 }
 
 @Composable
-private fun CrmLeadCard(lead: Map<String, Any?>) {
-    val description = mStr(lead, "description", "descripcion", "title")
-    val branch = mStr(lead, "branchName", "clientName", "cliente")
-    val status = mStr(lead, "status", "estatus")
-    val date = mStr(lead, "createdAt", "fecha").take(10)
+private fun CrmLeadCard(lead: CrmLeadDto) {
+    val description = lead.displayTitle
+    val branch = lead.branchName.ifBlank { lead.clientName }
+    val status = lead.status
+    val date = mStr(lead.raw, "createdAt", "fecha").take(10)
     Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(description.ifBlank { "Sin descripción" }.take(60), fontWeight = FontWeight.SemiBold)
+            Text(description.take(60), fontWeight = FontWeight.SemiBold)
             if (branch.isNotBlank()) {
                 Text(branch, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -834,28 +846,30 @@ private fun CrmLeadCard(lead: Map<String, Any?>) {
 @Composable
 fun VentasPipelineScreen() {
     val ctx = LocalContext.current
-    val vm: CrmOportunidadesViewModel = viewModel(factory = crmVmFactory<CrmOportunidadesViewModel>(ctx))
-    val state by vm.state.collectAsState()
+    val repo = remember(ctx) { CrmRepository(ctx.applicationContext) }
+    var items by remember { mutableStateOf<List<mx.nexara.mobile.nativeapp.data.api.CrmOpportunityDto>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    LaunchedEffect(repo) {
+        isLoading = true
+        items = runCatching { withContext(Dispatchers.IO) { repo.opportunityDtos() } }.getOrDefault(emptyList())
+        isLoading = false
+    }
     val stageOrder = OPPORTUNITY_STAGES.map { it.first }
-    val grouped = remember(state.items) {
-        val map = state.items.groupBy { mStr(it, "stage", "etapa").ifBlank { "Sin etapa" } }
+    val grouped = remember(items) {
+        val map = items.groupBy { it.stageKey }
         val ordered = stageOrder.mapNotNull { key ->
             val label = OPPORTUNITY_STAGES.firstOrNull { it.first == key }?.second ?: key
-            val items = map[key] ?: map[label]
-            if (items.isNullOrEmpty()) null else (label to items)
+            val list = map[key] ?: map[label]
+            if (list.isNullOrEmpty()) null else (label to list)
         }
         val extras = map.filterKeys { key ->
             stageOrder.none { it == key } && OPPORTUNITY_STAGES.none { it.second == key }
         }.toList().sortedBy { it.first }
         ordered + extras
     }
-    val totalValue = state.items.sumOf { mDouble(it, "value", "amount") ?: 0.0 }
-    val weighted = state.items.sumOf {
-        val v = mDouble(it, "value", "amount") ?: 0.0
-        val p = (mDouble(it, "probability") ?: 20.0) / 100.0
-        v * p
-    }
-    val won = state.items.count { mStr(it, "stage", "etapa").equals("WON", true) || mStr(it, "stage").equals("Ganada", true) }
+    val totalValue = items.sumOf { it.value }
+    val weighted = items.sumOf { it.weightedValue }
+    val won = items.count { it.isWon }
 
     LazyColumn(
         Modifier.fillMaxSize(),
@@ -877,42 +891,40 @@ fun VentasPipelineScreen() {
                 CrmKpiMini(Modifier.weight(1f), "Ganadas", "$won")
             }
         }
-        if (state.isLoading) {
+        if (isLoading) {
             item { Box(Modifier.fillMaxWidth().padding(40.dp), Alignment.Center) { CircularProgressIndicator() } }
         }
-        grouped.forEach { (stage, items) ->
-            val stageValue = items.sumOf { mDouble(it, "value", "amount") ?: 0.0 }
+        grouped.forEach { (stage, stageItems) ->
+            val stageValue = stageItems.sumOf { it.value }
             item {
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                     Text(stage, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        "${items.size} · ${fmtMxnShort(stageValue)}",
+                        "${stageItems.size} · ${fmtMxnShort(stageValue)}",
                         style = MaterialTheme.typography.labelMedium,
                         color = CrmGreen,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
             }
-            items(items, key = { mStr(it, "id") }) { o ->
+            items(stageItems, key = { it.rowKey }) { o ->
                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(mStr(o, "title", "name"), fontWeight = FontWeight.SemiBold)
+                        Text(o.displayTitle, fontWeight = FontWeight.SemiBold)
                         Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                            Text(fmtMxnShort(mDouble(o, "value", "amount") ?: 0.0), color = CrmGreen, fontWeight = FontWeight.Bold)
-                            val prob = mDouble(o, "probability")
-                            if (prob != null) {
-                                Text("${prob.toInt()}% prob.", style = MaterialTheme.typography.labelSmall)
+                            Text(fmtMxnShort(o.value), color = CrmGreen, fontWeight = FontWeight.Bold)
+                            if (o.probability > 0) {
+                                Text("${o.probability.toInt()}% prob.", style = MaterialTheme.typography.labelSmall)
                             }
                         }
-                        val client = mStr(o, "clientName", "accountName")
-                        if (client.isNotBlank()) {
-                            Text(client, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (o.clientName.isNotBlank()) {
+                            Text(o.clientName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
             }
         }
-        if (!state.isLoading && grouped.isEmpty()) {
+        if (!isLoading && grouped.isEmpty()) {
             item {
                 Text("Sin oportunidades en pipeline", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -934,42 +946,60 @@ private fun CrmKpiMini(modifier: Modifier, label: String, value: String) {
 fun VentasAgendaScreen() {
     val ctx = LocalContext.current
     val repo = remember(ctx) { CrmRepository(ctx.applicationContext) }
-    var items by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var items by remember { mutableStateOf<List<mx.nexara.mobile.nativeapp.data.api.CalendarEventDto>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var query by remember { mutableStateOf("") }
-    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
-    LaunchedEffect(repo) { loading = true; items = runCatching { withContext(Dispatchers.IO) { repo.calendarEvents() } }.getOrDefault(emptyList()); loading = false }
+    var selected by remember { mutableStateOf<mx.nexara.mobile.nativeapp.data.api.CalendarEventDto?>(null) }
+    LaunchedEffect(repo) {
+        loading = true
+        items = runCatching { withContext(Dispatchers.IO) { repo.calendarEventDtos() } }.getOrDefault(emptyList())
+        loading = false
+    }
 
     if (selected != null) {
         val ev = selected!!
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { OutlinedButton(onClick = { selected = null }) { Text("← Agenda") } }
-            item { Text(mStr(ev, "title", "subject"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            item { Text(ev.displayTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DetailLine("Tipo", mStr(ev, "type", "tipo"))
-                        DetailLine("Inicio", mStr(ev, "startAt", "start", "fecha").take(16))
-                        DetailLine("Fin", mStr(ev, "endAt", "end", "fin").take(16))
-                        DetailLine("Responsable", mStr(ev, "ownerName", "attendeeName"))
-                        DetailLine("Descripción", mStr(ev, "description", "notes"))
-                        DetailLine("Ubicación", mStr(ev, "location", "ubicacion"))
-                        DetailLine("Resultado", mStr(ev, "result", "resultado"))
+                        DetailLine("Tipo", ev.type)
+                        DetailLine("Inicio", ev.start.take(16))
+                        DetailLine("Fin", ev.end.take(16))
+                        DetailLine("Responsable", ev.ownerName)
+                        DetailLine("Descripción", ev.description)
+                        DetailLine("Ubicación", ev.location)
+                        DetailLine("Resultado", ev.result)
                     }
                 }
             }
         }
         return
     }
-    val filtered = items.filter { query.isBlank() || mStr(it, "title", "subject").lowercase().contains(query.lowercase()) || mStr(it, "ownerName").lowercase().contains(query.lowercase()) }
-    CrmListScaffold(isLoading = loading, error = null, onRetry = {}, query = query, onQuery = { query = it }, placeholder = "Buscar evento…", emptyText = "Sin eventos", items = filtered, key = { mStr(it, "id") }) { ev ->
-        Card(Modifier.fillMaxWidth().clickable { selected = ev }, shape = RoundedCornerShape(12.dp)) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(mStr(ev, "title", "subject"), fontWeight = FontWeight.SemiBold)
-                val date = mStr(ev, "startAt", "start", "fecha").take(16)
-                if (date.isNotBlank()) Text(date, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                val owner = mStr(ev, "ownerName", "attendeeName")
-                if (owner.isNotBlank()) Text(owner, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val filtered = items.filter {
+        query.isBlank() ||
+            it.displayTitle.lowercase().contains(query.lowercase()) ||
+            it.ownerName.lowercase().contains(query.lowercase())
+    }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item { CrmSearchField(query, { query = it }, "Buscar evento…") }
+        when {
+            loading -> item { Box(Modifier.fillMaxWidth().padding(40.dp), Alignment.Center) { CircularProgressIndicator() } }
+            filtered.isEmpty() -> item { Text("Sin eventos", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(16.dp)) }
+            else -> items(filtered, key = { it.rowKey }) { ev ->
+                Card(Modifier.fillMaxWidth().clickable { selected = ev }, shape = RoundedCornerShape(12.dp)) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(ev.displayTitle, fontWeight = FontWeight.SemiBold)
+                        val date = ev.start.take(16)
+                        if (date.isNotBlank()) Text(date, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (ev.ownerName.isNotBlank()) Text(ev.ownerName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
         }
     }
@@ -979,12 +1009,16 @@ fun VentasAgendaScreen() {
 fun VentasTendersScreen() {
     val ctx = LocalContext.current
     val repo = remember(ctx) { CrmRepository(ctx.applicationContext) }
-    var items by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var items by remember { mutableStateOf<List<mx.nexara.mobile.nativeapp.data.api.TenderDto>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var query by remember { mutableStateOf("") }
     var statusFilter by remember { mutableStateOf("todos") }
-    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
-    LaunchedEffect(repo) { loading = true; items = runCatching { withContext(Dispatchers.IO) { repo.tenders() } }.getOrDefault(emptyList()); loading = false }
+    var selected by remember { mutableStateOf<mx.nexara.mobile.nativeapp.data.api.TenderDto?>(null) }
+    LaunchedEffect(repo) {
+        loading = true
+        items = runCatching { withContext(Dispatchers.IO) { repo.tenderDtos() } }.getOrDefault(emptyList())
+        loading = false
+    }
 
     if (selected != null) {
         val t = selected!!
@@ -992,47 +1026,53 @@ fun VentasTendersScreen() {
             item {
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                     OutlinedButton(onClick = { selected = null }) { Text("← Licitaciones") }
-                    Text(mStr(t, "status", "estado"), color = CrmGreen, fontWeight = FontWeight.SemiBold)
+                    Text(t.status, color = CrmGreen, fontWeight = FontWeight.SemiBold)
                 }
             }
-            item { Text(mStr(t, "title", "name"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            item { Text(t.displayTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DetailLine("Cliente", mStr(t, "clientName", "cliente"))
-                        DetailLine("Estado", mStr(t, "status", "estado"))
-                        DetailLine("Monto", fmtMxnShort(mDouble(t, "amount", "value", "monto") ?: 0.0))
-                        DetailLine("Fecha límite", mStr(t, "deadline", "dueDate").take(10))
-                        DetailLine("Descripción", mStr(t, "description", "notes"))
-                        DetailLine("Resultado", mStr(t, "result", "resultado"))
-                        DetailLine("Responsable", mStr(t, "ownerName", "responsable"))
+                        DetailLine("Cliente", t.clientName)
+                        DetailLine("Estado", t.status)
+                        DetailLine("Monto", fmtMxnShort(t.amount))
+                        DetailLine("Fecha límite", t.deadline.take(10))
+                        DetailLine("Descripción", t.description)
+                        DetailLine("Resultado", t.result)
+                        DetailLine("Responsable", t.ownerName)
                     }
                 }
             }
         }
         return
     }
-    val allStatuses = listOf("todos") + items.mapNotNull { mStr(it, "status", "estado").lowercase().takeIf { s -> s.isNotBlank() } }.distinct().sorted()
-    val filtered = items.filter { (statusFilter == "todos" || mStr(it, "status", "estado").equals(statusFilter, true)) && (query.isBlank() || mStr(it, "title", "name").lowercase().contains(query.lowercase()) || mStr(it, "clientName", "cliente").lowercase().contains(query.lowercase())) }
+    val allStatuses = listOf("todos") + items.map { it.statusLower }.filter { it.isNotBlank() }.distinct().sorted()
+    val filtered = items.filter {
+        (statusFilter == "todos" || it.status.equals(statusFilter, true)) &&
+            (query.isBlank() || it.displayTitle.lowercase().contains(query.lowercase()) || it.clientName.lowercase().contains(query.lowercase()))
+    }
 
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (items.isNotEmpty()) item {
             Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp)) {
                 KpiChip("Total", "${items.size}", null, Modifier.weight(1f))
-                KpiChip("Activas", "${items.count { listOf("activo","abierto","open").contains(mStr(it, "status", "estado").lowercase()) }}", Color(0xFF2E7D32), Modifier.weight(1f))
-                KpiChip("Cerradas", "${items.count { listOf("cerrado","closed","ganado","perdido").contains(mStr(it, "status", "estado").lowercase()) }}", Color(0xFF64748B), Modifier.weight(1f))
+                KpiChip("Activas", "${items.count { it.isActive }}", Color(0xFF2E7D32), Modifier.weight(1f))
+                KpiChip("Cerradas", "${items.count { it.isClosed }}", Color(0xFF64748B), Modifier.weight(1f))
             }
         }
         item { OutlinedTextField(value = query, onValueChange = { query = it }, placeholder = { Text("Buscar licitación…") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
         item { Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) { allStatuses.forEach { s -> FilterChip(selected = statusFilter == s, onClick = { statusFilter = s }, label = { Text(s, style = MaterialTheme.typography.labelSmall) }) } } }
         if (loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
         if (filtered.isEmpty()) { item { Text("Sin licitaciones", color = MaterialTheme.colorScheme.onSurfaceVariant) }; return@LazyColumn }
-        items(filtered, key = { mStr(it, "id") }) { t ->
+        items(filtered, key = { it.rowKey }) { t ->
             Card(Modifier.fillMaxWidth().clickable { selected = t }, shape = RoundedCornerShape(12.dp)) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Text(mStr(t, "title", "name"), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); Text(mStr(t, "status", "estado"), color = CrmGreen, style = MaterialTheme.typography.labelSmall) }
-                    val client = mStr(t, "clientName", "cliente"); if (client.isNotBlank()) Text(client, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    val dl = mStr(t, "deadline", "dueDate").take(10); if (dl.isNotBlank()) Text("Vence: $dl", style = MaterialTheme.typography.labelSmall, color = Color(0xFFE65100))
+                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                        Text(t.displayTitle, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text(t.status, color = CrmGreen, style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (t.clientName.isNotBlank()) Text(t.clientName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val dl = t.deadline.take(10); if (dl.isNotBlank()) Text("Vence: $dl", style = MaterialTheme.typography.labelSmall, color = Color(0xFFE65100))
                 }
             }
         }
@@ -1043,14 +1083,18 @@ fun VentasTendersScreen() {
 fun VentasTargetsScreen() {
     val ctx = LocalContext.current
     val repo = remember(ctx) { CrmRepository(ctx.applicationContext) }
-    var items by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var items by remember { mutableStateOf<List<mx.nexara.mobile.nativeapp.data.api.SalesTargetDto>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var query by remember { mutableStateOf("") }
-    LaunchedEffect(repo) { loading = true; items = runCatching { withContext(Dispatchers.IO) { repo.salesTargets() } }.getOrDefault(emptyList()); loading = false }
+    LaunchedEffect(repo) {
+        loading = true
+        items = runCatching { withContext(Dispatchers.IO) { repo.salesTargetDtos() } }.getOrDefault(emptyList())
+        loading = false
+    }
 
-    val totalTarget = items.sumOf { mDouble(it, "targetAmount", "amount") ?: 0.0 }
-    val totalActual = items.sumOf { mDouble(it, "actualAmount", "actual", "currentAmount") ?: 0.0 }
-    val filtered = items.filter { query.isBlank() || mStr(it, "ownerName", "userName").lowercase().contains(query.lowercase()) }
+    val totalTarget = items.sumOf { it.targetAmount }
+    val totalActual = items.sumOf { it.actualAmount }
+    val filtered = items.filter { query.isBlank() || it.ownerName.lowercase().contains(query.lowercase()) }
 
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (items.isNotEmpty()) item {
@@ -1063,19 +1107,17 @@ fun VentasTargetsScreen() {
         item { OutlinedTextField(value = query, onValueChange = { query = it }, placeholder = { Text("Buscar vendedor…") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
         if (loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
         if (filtered.isEmpty()) { item { Text("Sin metas definidas", color = MaterialTheme.colorScheme.onSurfaceVariant) }; return@LazyColumn }
-        items(filtered, key = { mStr(it, "id", "ownerName") }) { t ->
-            val target = mDouble(t, "targetAmount", "amount") ?: 0.0
-            val actual = mDouble(t, "actualAmount", "actual", "currentAmount") ?: 0.0
-            val pct = if (target > 0) (actual / target).coerceIn(0.0, 1.0).toFloat() else 0f
+        items(filtered, key = { it.rowKey }) { t ->
+            val pct = t.progress
             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                        Text(mStr(t, "ownerName", "userName"), fontWeight = FontWeight.Bold)
-                        Text(fmtMxnShort(actual), fontWeight = FontWeight.Bold, color = if (pct >= 1f) Color(0xFF2E7D32) else Color(0xFFE65100))
+                        Text(t.ownerName, fontWeight = FontWeight.Bold)
+                        Text(fmtMxnShort(t.actualAmount), fontWeight = FontWeight.Bold, color = if (pct >= 1f) Color(0xFF2E7D32) else Color(0xFFE65100))
                     }
-                    Text("${mStr(t, "year")} / ${mStr(t, "month")}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${t.year} / ${t.month}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     LinearProgressIndicator(progress = { pct }, modifier = Modifier.fillMaxWidth(), color = if (pct >= 1f) Color(0xFF2E7D32) else Color(0xFFE65100))
-                    Text("Meta: ${fmtMxnShort(target)} · ${(pct * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Meta: ${fmtMxnShort(t.targetAmount)} · ${(pct * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -1086,14 +1128,18 @@ fun VentasTargetsScreen() {
 fun VentasSalesTeamScreen() {
     val ctx = LocalContext.current
     val repo = remember(ctx) { CrmRepository(ctx.applicationContext) }
-    var items by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var items by remember { mutableStateOf<List<mx.nexara.mobile.nativeapp.data.api.SalesTeamMemberDto>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var query by remember { mutableStateOf("") }
-    LaunchedEffect(repo) { loading = true; items = runCatching { withContext(Dispatchers.IO) { repo.salesTeam() } }.getOrDefault(emptyList()); loading = false }
+    LaunchedEffect(repo) {
+        loading = true
+        items = runCatching { withContext(Dispatchers.IO) { repo.salesTeamMemberDtos() } }.getOrDefault(emptyList())
+        loading = false
+    }
 
-    val totalSales = items.sumOf { mDouble(it, "totalVentas", "salesTotal", "amount") ?: 0.0 }
-    val maxSales = items.maxOfOrNull { mDouble(it, "totalVentas", "salesTotal", "amount") ?: 0.0 } ?: 1.0
-    val filtered = items.filter { query.isBlank() || mStr(it, "nombre", "name", "userName").lowercase().contains(query.lowercase()) }
+    val totalSales = items.sumOf { it.totalSales }
+    val maxSales = items.maxOfOrNull { it.totalSales } ?: 1.0
+    val filtered = items.filter { query.isBlank() || it.name.lowercase().contains(query.lowercase()) }
 
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (items.isNotEmpty()) item {
@@ -1106,22 +1152,20 @@ fun VentasSalesTeamScreen() {
         item { OutlinedTextField(value = query, onValueChange = { query = it }, placeholder = { Text("Buscar vendedor…") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
         if (loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
         if (filtered.isEmpty()) { item { Text("Sin datos de equipo", color = MaterialTheme.colorScheme.onSurfaceVariant) }; return@LazyColumn }
-        items(filtered, key = { mStr(it, "id", "nombre") }) { v ->
-            val sales = mDouble(v, "totalVentas", "salesTotal", "amount") ?: 0.0
-            val pct = (if (maxSales > 0) sales / maxSales else 0.0).coerceIn(0.0, 1.0).toFloat()
+        items(filtered, key = { it.rowKey }) { v ->
+            val pct = (if (maxSales > 0) v.totalSales / maxSales else 0.0).coerceIn(0.0, 1.0).toFloat()
             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                         Column {
-                            Text(mStr(v, "nombre", "name", "userName"), fontWeight = FontWeight.Bold)
-                            val role = mStr(v, "role", "puesto", "cargo"); if (role.isNotBlank()) Text(role, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(v.name, fontWeight = FontWeight.Bold)
+                            if (v.role.isNotBlank()) Text(v.role, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Text(fmtMxnShort(sales), fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                        Text(fmtMxnShort(v.totalSales), fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
                     }
-                    val leads = mStr(v, "totalLeads", "leads"); val opps = mStr(v, "totalOportunidades", "oportunidades")
-                    if (leads.isNotBlank() || opps.isNotBlank()) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        if (leads.isNotBlank()) Text("$leads leads", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (opps.isNotBlank()) Text("$opps opps", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (v.totalLeads.isNotBlank() || v.totalOpps.isNotBlank()) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (v.totalLeads.isNotBlank()) Text("${v.totalLeads} leads", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (v.totalOpps.isNotBlank()) Text("${v.totalOpps} opps", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     LinearProgressIndicator(progress = { pct }, modifier = Modifier.fillMaxWidth(), color = Color(0xFF2E7D32))
                 }

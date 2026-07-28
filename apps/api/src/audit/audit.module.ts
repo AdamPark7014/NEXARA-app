@@ -4,6 +4,7 @@ import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuditService } from './audit.service.js';
 import { AuditController } from './audit.controller.js';
 import { MutationAuditInterceptor } from './mutation-audit.interceptor.js';
+import { IdempotencyInterceptor } from '../common/idempotency/idempotency.interceptor.js';
 
 @Module({
   imports: [PrismaModule],
@@ -12,6 +13,10 @@ import { MutationAuditInterceptor } from './mutation-audit.interceptor.js';
     {
       provide: APP_INTERCEPTOR,
       useClass: MutationAuditInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: IdempotencyInterceptor,
     },
   ],
   controllers: [AuditController],

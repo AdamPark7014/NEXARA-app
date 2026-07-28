@@ -368,7 +368,14 @@ export default function OpsViaticsPage() {
           <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
         )}
         {!loading && !error && (
-          <DataTable columns={columns} rows={visibleItems} rowKey={(v) => v.id} emptyTitle="Sin viáticos" emptyDescription="No hay gastos de campo registrados." />
+          <DataTable
+            columns={columns}
+            rows={visibleItems}
+            rowKey={(v) => v.id}
+            emptyTitle="Sin viáticos"
+            emptyDescription="Registra el primer gasto de campo o espera solicitudes del equipo en sitio."
+            emptyAction={<Button size="sm" variant="secondary" onClick={() => void load()}>Actualizar lista</Button>}
+          />
         )}
       </Section>
 

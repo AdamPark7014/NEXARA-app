@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CreateServiceClientDto } from './dto/create-service-client.dto.js';
@@ -9,7 +9,11 @@ import { randomBytes } from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
 import { generateClientReportPdf } from './client-report-pdf.js';
-import { companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
+import {
+  assertCompanyAccess,
+  companyWhere,
+  resolveRequiredCompanyId,
+} from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class ServiceClientsService {
@@ -17,6 +21,47 @@ export class ServiceClientsService {
 
   private get db() {
     return this.prisma as any;
+  }
+
+  /**
+   * portalEmail is unique per companyId. Blocks same-tenant same-kind dups and
+   * cross-kind shadowing (client ↔ branch) within the same company.
+   */
+  private async assertPortalEmailAvailable(
+    kind: 'client' | 'branch',
+    portalEmail: string,
+    companyId?: number | null,
+    excludeId?: number,
+  ) {
+    const email = portalEmail.trim().toLowerCase();
+    if (!email) return;
+    const tenantId = companyId != null && Number(companyId) > 0 ? Number(companyId) : null;
+    if (tenantId == null) {
+      throw new ConflictException('Empresa requerida para validar el usuario del portal');
+    }
+    const exclude = excludeId != null ? { id: { not: excludeId } } : {};
+    const model = kind === 'client' ? this.db.serviceClient : this.db.serviceClientBranch;
+    const otherModel = kind === 'client' ? this.db.serviceClientBranch : this.db.serviceClient;
+    const sameTenantMsg =
+      kind === 'client'
+        ? 'El usuario del portal ya existe en esta empresa'
+        : 'El usuario de sucursal ya existe en esta empresa';
+    const crossKindMsg =
+      kind === 'client'
+        ? 'El usuario del portal ya está en uso por una sucursal de esta empresa'
+        : 'El usuario de sucursal ya está en uso por un cliente de esta empresa';
+
+    const sameTenant = await model.findFirst({
+      where: { portalEmail: email, ...companyWhere(tenantId), ...exclude },
+      select: { id: true },
+    });
+    if (sameTenant) throw new ConflictException(sameTenantMsg);
+
+    const crossKind = await otherModel.findFirst({
+      where: { portalEmail: email, ...companyWhere(tenantId) },
+      select: { id: true },
+    });
+    if (crossKind) throw new ConflictException(crossKindMsg);
   }
 
   private buildPortalEmail(name: string) {
@@ -245,7 +290,7 @@ export class ServiceClientsService {
     });
   }
 
-  async create(dto: CreateServiceClientDto, logoUrl?: string) {
+  async create(dto: CreateServiceClientDto, logoUrl?: string, companyId?: number | null) {
     const generatedPassword = dto.portalPassword ? null : this.buildPortalPassword();
     const generatedEmail = dto.portalEmail ? null : this.buildPortalEmail(dto.name);
 
@@ -253,7 +298,12 @@ export class ServiceClientsService {
       ? await bcrypt.hash(dto.portalPassword || generatedPassword || '', 10)
       : undefined;
 
-    const companyId = await resolveRequiredCompanyId(this.db);
+    const tenantId = await resolveRequiredCompanyId(this.db, companyId);
+    const portalEmail = (dto.portalEmail?.trim() || generatedEmail || null)?.toLowerCase() || null;
+    if (portalEmail) {
+      await this.assertPortalEmailAvailable('client', portalEmail, tenantId);
+    }
+
     const client = await this.db.serviceClient.create({
       data: {
         name: dto.name.trim(),
@@ -266,10 +316,10 @@ export class ServiceClientsService {
         state: dto.state?.trim() || null,
         country: dto.country?.trim() || null,
         accountCode: dto.accountCode?.trim() || null,
-        portalEmail: (dto.portalEmail?.trim() || generatedEmail || null),
+        portalEmail,
         portalPasswordHash,
         isActive: dto.isActive ?? true,
-        companyId,
+        companyId: tenantId,
       },
     });
 
@@ -401,9 +451,11 @@ export class ServiceClientsService {
     });
   }
 
-  async findOne(id: number) {
-    const client = await this.db.serviceClient.findUnique({ where: { id } });
-    if (!client) throw new NotFoundException('Cliente no encontrado');
+  async findOne(id: number, companyId?: number | null) {
+    const client = await this.db.serviceClient.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
+    });
+    assertCompanyAccess(client, companyId, 'Cliente');
     return client;
   }
 
@@ -412,11 +464,14 @@ export class ServiceClientsService {
    * agregadas de OT, proyectos, contratos, facturación, tickets, y la
    * timeline reciente. Pensada para la página `/console/clients/[id]`.
    */
-  async clientSnapshot(id: number) {
-    const client = await this.db.serviceClient.findUnique({
-      where: { id },
+  async clientSnapshot(id: number, companyId?: number | null) {
+    const client = await this.db.serviceClient.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
       include: {
-        branches: { orderBy: { createdAt: 'desc' } },
+        branches: {
+          where: companyWhere(companyId ?? null),
+          orderBy: { createdAt: 'desc' },
+        },
         _count: {
           select: {
             branches: true,
@@ -428,7 +483,7 @@ export class ServiceClientsService {
         },
       },
     });
-    if (!client) throw new NotFoundException('Cliente no encontrado');
+    assertCompanyAccess(client, companyId, 'Cliente');
 
     const since = new Date();
     since.setDate(since.getDate() - 90);
@@ -621,9 +676,8 @@ export class ServiceClientsService {
     };
   }
 
-  async update(id: number, dto: UpdateServiceClientDto, logoUrl?: string) {
-    const existing = await this.db.serviceClient.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Cliente no encontrado');
+  async update(id: number, dto: UpdateServiceClientDto, logoUrl?: string, companyId?: number | null) {
+    const existing = await this.findOne(id, companyId);
 
     const normalizeBoolean = (value: unknown) => {
       if (typeof value === 'boolean') return value;
@@ -641,8 +695,21 @@ export class ServiceClientsService {
       ? await bcrypt.hash(dto.portalPassword, 10)
       : undefined;
 
+    const portalEmailInput = dto.portalEmail?.trim();
+    const portalEmail =
+      portalEmailInput !== undefined ? (portalEmailInput.toLowerCase() || null) : undefined;
+    if (portalEmail && portalEmail !== existing.portalEmail) {
+      await this.assertPortalEmailAvailable(
+        'client',
+        portalEmail,
+        companyId ?? existing.companyId,
+        existing.id,
+      );
+    }
+
+    // companyId is intentionally omitted from data — tenant stamp is immutable.
     return this.db.serviceClient.update({
-      where: { id },
+      where: { id: existing.id },
       data: {
         name: dto.name?.trim(),
         logoUrl: logoUrl || undefined,
@@ -654,27 +721,28 @@ export class ServiceClientsService {
         state: dto.state?.trim(),
         country: dto.country?.trim(),
         accountCode: dto.accountCode?.trim(),
-        portalEmail: dto.portalEmail?.trim(),
+        portalEmail,
         portalPasswordHash,
         isActive: normalizedIsActive,
       },
     });
   }
 
-  async getPortalByEmail(email: string) {
+  async getPortalByEmail(email: string, companyId?: number | null) {
     if (!email) throw new BadRequestException('Email requerido');
-    const client = await this.db.serviceClient.findFirst({
-      where: { portalEmail: email.toLowerCase() },
-    });
+    const where: any = { portalEmail: email.toLowerCase() };
+    if (companyId != null && Number(companyId) > 0) {
+      Object.assign(where, companyWhere(companyId));
+    }
+    const client = await this.db.serviceClient.findFirst({ where });
     if (!client || !client.portalPasswordHash) {
       throw new NotFoundException('Cliente no encontrado');
     }
     return client;
   }
 
-  async generateReport(clientId: number, range?: { start: Date; end: Date }) {
-    const client = await this.db.serviceClient.findUnique({ where: { id: clientId } });
-    if (!client) throw new NotFoundException('Cliente no encontrado');
+  async generateReport(clientId: number, range?: { start: Date; end: Date }, companyId?: number | null) {
+    const client = await this.findOne(clientId, companyId);
 
     const rangeFilter = range && !Number.isNaN(range.start.getTime()) && !Number.isNaN(range.end.getTime())
       ? { fechaAsignacion: { gte: range.start, lte: range.end } }
@@ -752,15 +820,14 @@ export class ServiceClientsService {
     return { pdf, reportUrl };
   }
 
-  async generateBranchReport(clientId: number, branchId: number, range?: { start: Date; end: Date }) {
-    const client = await this.db.serviceClient.findUnique({ where: { id: clientId } });
-    if (!client) throw new NotFoundException('Cliente no encontrado');
+  async generateBranchReport(clientId: number, branchId: number, range?: { start: Date; end: Date }, companyId?: number | null) {
+    const client = await this.findOne(clientId, companyId);
 
     const branch = await this.db.serviceClientBranch.findFirst({
-      where: { id: branchId, clientId },
-      select: { id: true, name: true, branchNumber: true },
+      where: { id: branchId, clientId, ...companyWhere(companyId ?? client.companyId ?? null) },
+      select: { id: true, name: true, branchNumber: true, companyId: true },
     });
-    if (!branch) throw new NotFoundException('Sucursal no encontrada');
+    assertCompanyAccess(branch, companyId ?? client.companyId, 'Sucursal');
 
     const rangeFilter = range && !Number.isNaN(range.start.getTime()) && !Number.isNaN(range.end.getTime())
       ? { fechaAsignacion: { gte: range.start, lte: range.end } }
@@ -862,23 +929,39 @@ export class ServiceClientsService {
     city?: string;
     state?: string;
     country?: string;
-  }) {
+    portalEmail?: string;
+  }, companyId?: number | null) {
+    const tenantId = await resolveRequiredCompanyId(this.db, companyId);
+    const client = await this.db.serviceClient.findFirst({
+      where: { id: clientId, ...companyWhere(tenantId) },
+      select: { id: true, companyId: true },
+    });
+    assertCompanyAccess(client, tenantId, 'Cliente');
+
+    const portalEmail = dto.portalEmail?.trim().toLowerCase() || null;
+    if (portalEmail) {
+      await this.assertPortalEmailAvailable('branch', portalEmail, tenantId);
+    }
+
     return this.db.serviceClientBranch.create({
       data: {
-        clientId,
+        clientId: client.id,
+        companyId: tenantId,
         name: dto.name.trim(),
         branchNumber: dto.branchNumber?.trim() || null,
         address: dto.address?.trim() || null,
         city: dto.city?.trim() || null,
         state: dto.state?.trim() || null,
         country: dto.country?.trim() || null,
+        portalEmail,
       },
     });
   }
 
-  async listBranches(clientId: number) {
+  async listBranches(clientId: number, companyId?: number | null) {
+    await this.findOne(clientId, companyId);
     return this.db.serviceClientBranch.findMany({
-      where: { clientId },
+      where: { clientId, ...companyWhere(companyId ?? null) },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -886,12 +969,12 @@ export class ServiceClientsService {
   async createTicketRequest(
     clientId: number,
     dto: { description: string; branchId?: number; urgency?: string; requestType?: string },
+    companyId?: number | null,
   ) {
     const description = dto.description?.trim();
     if (!description) throw new BadRequestException('Descripción requerida');
 
-    const client = await this.db.serviceClient.findUnique({ where: { id: clientId } });
-    if (!client) throw new NotFoundException('Cliente de servicio no encontrado');
+    const client = await this.findOne(clientId, companyId);
 
     let branch: {
       id: number;
@@ -908,7 +991,12 @@ export class ServiceClientsService {
 
     if (dto.branchId) {
       branch = await this.db.serviceClientBranch.findFirst({
-        where: { id: dto.branchId, clientId, isActive: true },
+        where: {
+          id: dto.branchId,
+          clientId,
+          isActive: true,
+          ...companyWhere(companyId ?? client.companyId ?? null),
+        },
       });
       if (!branch) throw new BadRequestException('Sucursal no encontrada');
     }

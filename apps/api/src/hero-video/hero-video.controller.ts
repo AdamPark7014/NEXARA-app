@@ -24,6 +24,7 @@ import { createReadStream } from 'fs';
 import { HeroVideoService } from './hero-video.service.js';
 import { UpdateHeroVideoDto } from './dto/update-hero-video.dto.js';
 import { resolveLegacyUploadsDir, resolveUploadsDir } from '../common/uploads-path.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 interface MulterFile {
   fieldname: string;
@@ -123,8 +124,8 @@ export class HeroVideoController {
 
   @Get()
   @UseGuards(AuthGuard('jwt'))
-  adminCurrent() {
-    return this.heroVideoService.adminCurrent();
+  adminCurrent(@CurrentCompanyId() companyId: number | null) {
+    return this.heroVideoService.adminCurrent(companyId);
   }
 
   @Post()
@@ -140,6 +141,7 @@ export class HeroVideoController {
     @Body('clearMobile') clearMobileRaw: string | undefined,
     @UploadedFiles()
     files?: { video?: MulterFile[]; videoMobile?: MulterFile[] },
+    @CurrentCompanyId() companyId?: number | null,
   ) {
     const video = files?.video?.[0];
     const videoMobile = files?.videoMobile?.[0];
@@ -151,19 +153,23 @@ export class HeroVideoController {
       video,
       videoMobile,
       clearMobile,
-    });
+    }, companyId);
   }
 
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'))
-  update(@Param('id', ParseIntPipe) id: number, @Body() payload: UpdateHeroVideoDto) {
-    return this.heroVideoService.update(id, payload);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() payload: UpdateHeroVideoDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.heroVideoService.update(id, payload, companyId);
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'))
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.heroVideoService.remove(id);
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.heroVideoService.remove(id, companyId);
   }
 
   // ── Validación común ───────────────────────────────────────────────

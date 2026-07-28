@@ -136,6 +136,10 @@ export const PERMISSIONS = {
   // Product catalog (IT/CCTV)
   CATALOG_VIEW: 'catalog.view',
   CATALOG_MANAGE: 'catalog.manage',
+
+  // Studio (CMS del sitio público) — granular, no depende solo de PANEL_WEB/CONSOLE_ADMIN
+  STUDIO_CONTENT_VIEW: 'studio.content.view',
+  STUDIO_CONTENT_MANAGE: 'studio.content.manage',
 } as const;
 
 export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];

@@ -75,9 +75,9 @@ struct ClientsView: View {
 }
 
 struct ProjectsView: View {
-    @State private var projects: [[String: Any]] = []
+    @State private var projects: [OperationalProjectItem] = []
     @State private var isLoading = true
-    @State private var selected: [String: Any]?
+    @State private var selected: OperationalProjectItem?
     @State private var message: String?
 
     var body: some View {
@@ -93,31 +93,27 @@ struct ProjectsView: View {
         List {
             if isLoading { ProgressView() }
             if let message { Text(message).font(.footnote).foregroundColor(.green) }
-            ForEach(projects, id: \.projKey) { p in
+            ForEach(projects) { p in
                 Button { selected = p } label: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(ConsoleHelpers.mapStr(p, "title", "name", "nombre")).font(.headline)
-                        OpsStatusChip(text: ConsoleHelpers.mapStr(p, "status", "estado"))
+                        Text(p.displayTitle).font(.headline)
+                        OpsStatusChip(text: p.status)
                     }
                 }
             }
         }
     }
 
-    private func projectDetail(_ p: [String: Any]) -> some View {
+    private func projectDetail(_ p: OperationalProjectItem) -> some View {
         OpsProjectDetailView(project: p, onBack: { selected = nil }, onPatch: { id, status in
             await patch(id, status)
         })
     }
 
-    @ViewBuilder private func row(_ label: String, _ value: String) -> some View {
-        if !value.isEmpty { HStack { Text(label); Spacer(); Text(value).foregroundColor(.secondary) } }
-    }
-
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        projects = (try? await ConsoleRepository.shared.operationalProjects()) ?? []
+        projects = (try? await ConsoleRepository.shared.operationalProjectItems()) ?? []
     }
 
     private func patch(_ id: Int64, _ status: String) async {
@@ -265,30 +261,18 @@ extension [String: Any] {
 // MARK: - OPS Project Detail (tabbed)
 
 struct OpsProjectDetailView: View {
-    let project: [String: Any]
+    let project: OperationalProjectItem
     let onBack: () -> Void
     let onPatch: (Int64, String) async -> Void
 
     @State private var tab = 0
     private let tabs = ["Info", "Actividades", "Ingenieros"]
 
-    private func pStr(_ keys: String...) -> String {
-        for k in keys {
-            let v = ConsoleHelpers.mapStr(project, k)
-            if !v.isEmpty { return v }
-        }
-        return ""
-    }
-
-    private func nestedList(_ key: String) -> [[String: Any]] {
-        (project[key] as? [[String: Any]]) ?? []
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 Button("← Volver", action: onBack)
-                Text(pStr("title", "name", "nombre").isEmpty ? "Proyecto" : pStr("title", "name", "nombre"))
+                Text(project.displayTitle)
                     .font(.headline).lineLimit(1)
                 Spacer()
             }
@@ -309,27 +293,26 @@ struct OpsProjectDetailView: View {
     }
 
     private var infoTab: some View {
-        let projectId = ConsoleHelpers.mapInt64(project, "id")
-        return List {
+        List {
             Section {
-                OpsStatusChip(text: pStr("status", "estado"))
+                OpsStatusChip(text: project.status)
             }
             Section("Datos generales") {
-                pRow("Cliente", pStr("clientName") + nestedName("client"))
-                pRow("Responsable", pStr("vendorName") + nestedName("vendor"))
-                pRow("Tipo", pStr("projectType", "tipo"))
-                pRow("Sitios", pStr("siteCount"))
-                pRow("Inicio", String(pStr("startDate").prefix(10)))
-                pRow("Fin planeado", String(pStr("endDate").prefix(10)))
-                pRow("Fin real", String(pStr("actualEndDate").prefix(10)))
-                pRow("Descripción", pStr("description", "descripcion"))
-                pRow("Alcance", pStr("scopeSummary"))
+                pRow("Cliente", project.clientName)
+                pRow("Responsable", project.vendorName)
+                pRow("Tipo", project.projectType)
+                pRow("Sitios", project.siteCount)
+                pRow("Inicio", String(project.startDate.prefix(10)))
+                pRow("Fin planeado", String(project.endDate.prefix(10)))
+                pRow("Fin real", String(project.actualEndDate.prefix(10)))
+                pRow("Descripción", project.description)
+                pRow("Alcance", project.scopeSummary)
             }
-            if let id = projectId {
+            if project.id > 0 {
                 Section("Cambiar estado") {
-                    Button("Marcar activo")     { Task { await onPatch(id, "ACTIVE") } }
-                    Button("Poner en pausa")   { Task { await onPatch(id, "ON_HOLD") } }
-                    Button("Marcar completado") { Task { await onPatch(id, "COMPLETED") } }
+                    Button("Marcar activo")     { Task { await onPatch(project.id, "ACTIVE") } }
+                    Button("Poner en pausa")   { Task { await onPatch(project.id, "ON_HOLD") } }
+                    Button("Marcar completado") { Task { await onPatch(project.id, "COMPLETED") } }
                 }
             }
         }
@@ -337,7 +320,7 @@ struct OpsProjectDetailView: View {
     }
 
     private var actividadesTab: some View {
-        let acts = nestedList("activities") + nestedList("actividades")
+        let acts = project.activities
         return Group {
             if acts.isEmpty {
                 VStack { Spacer(); Text("Sin actividades vinculadas").foregroundColor(.secondary); Spacer() }
@@ -359,7 +342,7 @@ struct OpsProjectDetailView: View {
     }
 
     private var ingenierosTab: some View {
-        let engs = nestedList("engineers") + nestedList("ingenieros")
+        let engs = project.engineers
         return Group {
             if engs.isEmpty {
                 VStack { Spacer(); Text("Sin ingenieros asignados").foregroundColor(.secondary); Spacer() }
@@ -382,12 +365,6 @@ struct OpsProjectDetailView: View {
         if !value.isEmpty {
             HStack { Text(label).foregroundColor(.secondary); Spacer(); Text(value).multilineTextAlignment(.trailing) }
         }
-    }
-
-    private func nestedName(_ key: String) -> String {
-        guard let obj = project[key] as? [String: Any] else { return "" }
-        let n = ConsoleHelpers.mapStr(obj, "nombre", "name")
-        return n.isEmpty ? "" : " (\(n))"
     }
 }
 

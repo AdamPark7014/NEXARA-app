@@ -11,6 +11,12 @@ import { NewsStatus } from '@prisma/client';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import nodemailer from 'nodemailer';
+import {
+  companyWhere,
+  requireCompanyId,
+  resolvePublicCompanyId,
+} from '../common/tenant/tenant-scope.js';
+import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 
 interface MulterFile {
   fieldname: string;
@@ -34,10 +40,15 @@ export class NewsService {
     return this.prisma;
   }
 
-  async create(payload: CreateNewsPostDto, files?: NewsFiles) {
+  private async publicCompanyId() {
+    return withTenantBypassAsync(() => resolvePublicCompanyId(this.prisma));
+  }
+
+  async create(payload: CreateNewsPostDto, files?: NewsFiles, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const title = payload.title.trim();
     const slugBase = this.slugify(payload.slug?.trim() || title);
-    const slug = await this.ensureUniqueSlug(slugBase);
+    const slug = await this.ensureUniqueSlug(slugBase, undefined, tenantId);
 
     const status = payload.status ?? NewsStatus.DRAFT;
     const publishedAt = this.resolvePublishedAt(status, payload.publishedAt);
@@ -60,6 +71,7 @@ export class NewsService {
         status,
         publishedAt,
         tags: this.normalizeTags(payload.tags),
+        companyId: tenantId,
       },
     });
 
@@ -72,10 +84,19 @@ export class NewsService {
     return post;
   }
 
-  async list(search?: string, status?: string, query?: PaginationQueryDto, options?: { includeDrafts?: boolean }) {
+  async list(
+    search?: string,
+    status?: string,
+    query?: PaginationQueryDto,
+    options?: { includeDrafts?: boolean; companyId?: number | null; publicSite?: boolean },
+  ) {
+    const tenantId = options?.publicSite
+      ? await this.publicCompanyId()
+      : requireCompanyId(options?.companyId);
     const term = search?.trim();
     const normalizedStatus = this.normalizeStatus(status);
     const where = {
+      ...companyWhere(tenantId),
       ...(term
         ? {
             OR: [
@@ -91,18 +112,35 @@ export class NewsService {
         : { status: NewsStatus.PUBLISHED }),
     };
 
+    const run = <T>(fn: () => Promise<T>) =>
+      options?.publicSite ? withTenantBypassAsync(fn) : fn();
+
     if (query?.limit) {
-      const [data, total] = await Promise.all([
-        this.db.newsPost.findMany({ where, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
-        this.db.newsPost.count({ where }),
-      ]);
+      const [data, total] = await run(() =>
+        Promise.all([
+          this.db.newsPost.findMany({ where, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
+          this.db.newsPost.count({ where }),
+        ]),
+      );
       return buildPaginatedResponse(data, total, query);
     }
-    return this.db.newsPost.findMany({ where, orderBy: { createdAt: 'desc' } });
+    return run(() => this.db.newsPost.findMany({ where, orderBy: { createdAt: 'desc' } }));
   }
 
-  async findOne(id: number, options?: { includeDrafts?: boolean }) {
-    const post = await this.db.newsPost.findUnique({ where: { id } });
+  async findOne(
+    id: number,
+    options?: { includeDrafts?: boolean; companyId?: number | null; publicSite?: boolean },
+  ) {
+    const tenantId = options?.publicSite
+      ? await this.publicCompanyId()
+      : requireCompanyId(options?.companyId);
+    const run = <T>(fn: () => Promise<T>) =>
+      options?.publicSite ? withTenantBypassAsync(fn) : fn();
+    const post = await run(() =>
+      this.db.newsPost.findFirst({
+        where: { id, ...companyWhere(tenantId) },
+      }),
+    );
     if (!post) {
       throw new NotFoundException(`Noticia con ID ${id} no encontrada`);
     }
@@ -112,12 +150,22 @@ export class NewsService {
     return post;
   }
 
-  async findBySlug(slug: string, options?: { includeDrafts?: boolean }) {
+  async findBySlug(
+    slug: string,
+    options?: { includeDrafts?: boolean; companyId?: number | null; publicSite?: boolean },
+  ) {
     const safe = slug?.trim().toLowerCase();
     if (!safe) {
       throw new NotFoundException('Noticia no encontrada');
     }
-    const post = await this.db.newsPost.findUnique({ where: { slug: safe } });
+    const tenantId = options?.publicSite
+      ? await this.publicCompanyId()
+      : requireCompanyId(options?.companyId);
+    const post = await (options?.publicSite
+      ? withTenantBypassAsync(() =>
+          this.db.newsPost.findFirst({ where: { slug: safe, companyId: tenantId } }),
+        )
+      : this.db.newsPost.findFirst({ where: { slug: safe, companyId: tenantId } }));
     if (!post) {
       throw new NotFoundException(`Noticia "${safe}" no encontrada`);
     }
@@ -127,11 +175,12 @@ export class NewsService {
     return post;
   }
 
-  async update(id: number, payload: UpdateNewsPostDto) {
-    const existing = await this.findOne(id, { includeDrafts: true });
+  async update(id: number, payload: UpdateNewsPostDto, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const existing = await this.findOne(id, { includeDrafts: true, companyId: tenantId });
 
     const nextSlugBase = payload.slug?.trim() ? this.slugify(payload.slug.trim()) : undefined;
-    const slug = nextSlugBase ? await this.ensureUniqueSlug(nextSlugBase, id) : existing.slug;
+    const slug = nextSlugBase ? await this.ensureUniqueSlug(nextSlugBase, id, tenantId) : existing.slug;
 
     const status = payload.status ?? existing.status;
     const publishedAt = this.resolvePublishedAt(status, payload.publishedAt, existing.publishedAt);
@@ -162,8 +211,8 @@ export class NewsService {
     return updated;
   }
 
-  async remove(id: number) {
-    await this.findOne(id, { includeDrafts: true });
+  async remove(id: number, companyId?: number | null) {
+    await this.findOne(id, { includeDrafts: true, companyId });
     return this.db.newsPost.delete({ where: { id } });
   }
 
@@ -242,15 +291,17 @@ export class NewsService {
       .slice(0, 200);
   }
 
-  private async ensureUniqueSlug(base: string, excludeId?: number) {
+  private async ensureUniqueSlug(base: string, excludeId?: number, companyId?: number) {
     const safeBase = base || `news-${Date.now()}`;
     let candidate = safeBase;
     let suffix = 1;
+    const tenantId = companyId ?? 0;
 
     while (
       await this.db.newsPost.findFirst({
         where: {
           slug: candidate,
+          companyId: tenantId,
           ...(excludeId ? { id: { not: excludeId } } : {}),
         },
       })
@@ -287,8 +338,10 @@ export class NewsService {
     content: string;
     coverImageUrl: string | null;
     publishedAt: Date | null;
+    companyId: number;
   }) {
     const subscribers = await this.db.newsletterSubscriber.findMany({
+      where: { companyId: post.companyId },
       orderBy: { subscribedAt: 'desc' },
     });
 

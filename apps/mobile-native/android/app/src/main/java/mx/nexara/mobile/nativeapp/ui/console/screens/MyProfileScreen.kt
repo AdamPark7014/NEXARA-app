@@ -9,7 +9,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,6 +27,7 @@ import coil.compose.AsyncImage
 import mx.nexara.mobile.nativeapp.R
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
+import mx.nexara.mobile.nativeapp.security.AppLock
 
 /**
  * Pantalla nativa para "Mi perfil" usando la sesión guardada.
@@ -38,6 +42,8 @@ fun MyProfileScreen(
     val repo = remember(context) { AuthRepository(context) }
     val user = repo.loadSession()
     val isSuperAdmin = user?.isSuperAdmin == true
+    var appLockEnabled by remember { mutableStateOf(AppLock.isEnabled(context)) }
+    val lockAvailable = remember(context) { AppLock.canAuthenticate(context) }
     val Teal = Color(0xFF0D9488)
     val Slate = Color(0xFF0F172A)
     val Sub = Color(0xFF64748B)
@@ -134,6 +140,42 @@ fun MyProfileScreen(
                     if (user.clientId != null) ProfileInfoRow("Client ID", user.clientId.toString(), Teal, Sub)
                     if (user.branchId != null) ProfileInfoRow("Branch ID", user.branchId.toString(), Teal, Sub)
                     ProfileInfoRow("ID de usuario", user.id.toString(), Teal, Sub)
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(1.dp),
+            ) {
+                Row(
+                    Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text("Bloqueo de app", fontWeight = FontWeight.SemiBold, color = Slate)
+                        Text(
+                            if (lockAvailable) {
+                                "Biometría o PIN al volver a la app"
+                            } else {
+                                "No disponible en este dispositivo"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Sub,
+                        )
+                    }
+                    Switch(
+                        checked = appLockEnabled,
+                        enabled = lockAvailable,
+                        onCheckedChange = { on ->
+                            appLockEnabled = on
+                            AppLock.setEnabled(context, on)
+                        },
+                    )
                 }
             }
         }

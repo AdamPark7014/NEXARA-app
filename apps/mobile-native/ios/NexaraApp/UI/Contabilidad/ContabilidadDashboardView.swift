@@ -4,23 +4,23 @@ import SwiftUI
 
 @MainActor
 final class ContabilidadDashboardVM: ObservableObject {
-    @Published var invoices:     [[String: Any]] = []
-    @Published var expenses:     [[String: Any]] = []
-    @Published var bankAccounts: [[String: Any]] = []
+    @Published var invoices: [InvoiceItem] = []
+    @Published var expenses: [ExpenseItem] = []
+    @Published var bankAccounts: [BankAccountItem] = []
     @Published var isLoading = false
     @Published var error: String?
 
     func load() {
         isLoading = true; error = nil
         Task {
-            async let inv  = ExtraRepository.shared.invoices()
-            async let exp  = ExtraRepository.shared.expenses()
-            async let bank = ExtraRepository.shared.bankAccounts()
+            async let inv = ExtraRepository.shared.invoiceItems()
+            async let exp = ExtraRepository.shared.expenseItems()
+            async let bank = ExtraRepository.shared.bankAccountItems()
             let (i, e, b) = await (inv, exp, bank)
-            invoices     = i
-            expenses     = e
+            invoices = i
+            expenses = e
             bankAccounts = b
-            isLoading    = false
+            isLoading = false
         }
     }
 }
@@ -35,11 +35,12 @@ struct ContabilidadDashboardView: View {
             if vm.isLoading && vm.invoices.isEmpty {
                 ProgressView().frame(maxWidth: .infinity).padding(.top, 60)
             } else if let err = vm.error {
-                VStack(spacing: 12) {
-                    Text("No se pudo cargar").font(.headline)
-                    Text(err).font(.footnote).foregroundColor(.secondary)
-                    Button("Reintentar") { vm.load() }.buttonStyle(.bordered)
-                }.padding()
+                NxEmptyState(
+                    title: "No se pudo cargar",
+                    subtitle: err,
+                    actionLabel: "Reintentar",
+                    onAction: { vm.load() }
+                )
             } else {
                 content
             }
@@ -67,51 +68,50 @@ struct ContabilidadDashboardView: View {
         }
     }
 
-    // ── KPIs
     private var kpiSection: some View {
-        let invTotal  = vm.invoices.compactMap { cfDouble($0, "total") }.reduce(0, +)
-        let invPaid   = vm.invoices.filter { cfStr($0, "status").localizedLowercase.contains("pagad") || cfStr($0, "status").localizedLowercase.contains("cobrad") }.count
-        let expTotal  = vm.expenses.compactMap { cfDouble($0, "monto") }.reduce(0, +)
-        let balance   = vm.bankAccounts.compactMap { cfDouble($0, "balance", "saldo") }.reduce(0, +)
+        let invTotal = vm.invoices.compactMap(\.total).reduce(0, +)
+        let invPaid = vm.invoices.filter {
+            $0.status.localizedLowercase.contains("pagad") || $0.status.localizedLowercase.contains("cobrad")
+        }.count
+        let expTotal = vm.expenses.reduce(0) { $0 + $1.amount }
+        let balance = vm.bankAccounts.reduce(0) { $0 + $1.balance }
+        let pending = vm.invoices.filter { $0.status.localizedLowercase.contains("pendiente") }.count
 
         return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            CfKpi(icon: "🧾", label: "Facturación", value: fmtMxn(invTotal), sub: "\(invPaid) cobradas", accent: .teal)
-            CfKpi(icon: "📊", label: "Gastos", value: fmtMxn(expTotal), sub: "\(vm.expenses.count) registros", accent: .orange)
-            CfKpi(icon: "🏦", label: "Saldo bancario", value: fmtMxn(balance), sub: "\(vm.bankAccounts.count) cuentas", accent: .green)
-            CfKpi(icon: "📋", label: "Facturas", value: "\(vm.invoices.count)", sub: "\(vm.invoices.filter { cfStr($0, "status").localizedLowercase.contains("pendiente") }.count) pendientes", accent: .blue)
+            CfKpi(icon: "doc.text", label: "Facturación", value: fmtMxn(invTotal), sub: "\(invPaid) cobradas", accent: .teal)
+            CfKpi(icon: "chart.bar", label: "Gastos", value: fmtMxn(expTotal), sub: "\(vm.expenses.count) registros", accent: .orange)
+            CfKpi(icon: "building.columns", label: "Saldo bancario", value: fmtMxn(balance), sub: "\(vm.bankAccounts.count) cuentas", accent: .green)
+            CfKpi(icon: "list.bullet.rectangle", label: "Facturas", value: "\(vm.invoices.count)", sub: "\(pending) pendientes", accent: .blue)
         }
         .padding(.horizontal)
     }
 
-    // ── Bank accounts
     @ViewBuilder
     private var bankSection: some View {
         if !vm.bankAccounts.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 CfSectionRow(title: "Cuentas bancarias", detail: "\(vm.bankAccounts.count) cuentas")
                     .padding(.horizontal)
-                ForEach(vm.bankAccounts, id: \.cfId) { b in
+                ForEach(vm.bankAccounts) { b in
                     BankRow(item: b).padding(.horizontal)
                 }
             }
         }
     }
 
-    // ── Invoices
     @ViewBuilder
     private var invoiceSection: some View {
         if !vm.invoices.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 CfSectionRow(title: "Facturas recientes", detail: "Últimas 8")
                     .padding(.horizontal)
-                ForEach(vm.invoices.prefix(8), id: \.cfId) { inv in
+                ForEach(vm.invoices.prefix(8)) { inv in
                     InvoiceRow(item: inv).padding(.horizontal)
                 }
             }
         }
     }
 
-    // ── Expenses
     @ViewBuilder
     private var expenseSection: some View {
         if !vm.expenses.isEmpty {
@@ -120,7 +120,7 @@ struct ContabilidadDashboardView: View {
                     .padding(.horizontal)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(vm.expenses.prefix(8), id: \.cfId) { e in
+                        ForEach(vm.expenses.prefix(8)) { e in
                             ExpenseCard(item: e)
                         }
                     }
@@ -138,7 +138,7 @@ private struct CfKpi: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                Text(icon).font(.title3)
+                Image(systemName: icon).foregroundColor(accent)
                 Text(label).font(.caption).foregroundColor(accent).lineLimit(1)
             }
             Text(value).font(.title2).bold()
@@ -163,26 +163,20 @@ private struct CfSectionRow: View {
 }
 
 private struct BankRow: View {
-    let item: [String: Any]
+    let item: BankAccountItem
     var body: some View {
-        let name    = cfStr(item, "name", "nombre").ifBlank("Cuenta")
-        let bank    = cfStr(item, "bank", "banco")
-        let acct    = cfStr(item, "accountNumber", "numeroCuenta")
-        let balance = cfDouble(item, "balance", "saldo") ?? 0
-        let cur     = cfStr(item, "currency", "moneda")
-
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(name).font(.subheadline).bold()
-                Text([bank, acct.isEmpty ? "" : "****\(acct.suffix(4))"].filter { !$0.isEmpty }.joined(separator: " · "))
+                Text(item.displayName).font(.subheadline).bold()
+                Text([item.bank, item.maskedNumber].filter { !$0.isEmpty }.joined(separator: " · "))
                     .font(.caption).foregroundColor(.secondary)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                Text(fmtMxn(balance))
+                Text(fmtMxn(item.balance))
                     .font(.subheadline).bold()
-                    .foregroundColor(balance >= 0 ? .green : .red)
-                if !cur.isEmpty { Text(cur).font(.caption2).foregroundColor(.secondary) }
+                    .foregroundColor(item.balance >= 0 ? .green : .red)
+                if !item.currency.isEmpty { Text(item.currency).font(.caption2).foregroundColor(.secondary) }
             }
         }
         .padding(12)
@@ -192,28 +186,23 @@ private struct BankRow: View {
 }
 
 private struct InvoiceRow: View {
-    let item: [String: Any]
+    let item: InvoiceItem
     var body: some View {
-        let folio  = cfStr(item, "folio").ifBlank("Factura #\(cfStr(item, "id"))")
-        let client = cfStr(item, "clientName", "cliente")
-        let total  = cfDouble(item, "total") ?? 0
-        let status = cfStr(item, "status", "estatus")
-        let color  = invColor(status)
-
+        let color = invColor(item.status)
         HStack(spacing: 12) {
             Rectangle().fill(color).frame(width: 4)
                 .clipShape(RoundedRectangle(cornerRadius: 2))
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
-                    Text(folio).font(.subheadline).bold().foregroundColor(.teal)
+                    Text(item.displayFolio).font(.subheadline).bold().foregroundColor(.teal)
                     Spacer()
-                    Text(fmtMxn(total)).font(.subheadline).bold()
+                    Text(fmtMxn(item.total ?? 0)).font(.subheadline).bold()
                 }
                 HStack {
-                    if !client.isEmpty { Text(client).font(.caption).foregroundColor(.secondary) }
+                    if !item.clientName.isEmpty { Text(item.clientName).font(.caption).foregroundColor(.secondary) }
                     Spacer()
-                    if !status.isEmpty {
-                        Text(status).font(.caption2).bold().foregroundColor(color)
+                    if !item.status.isEmpty {
+                        Text(item.status).font(.caption2).bold().foregroundColor(color)
                             .padding(.horizontal, 7).padding(.vertical, 2)
                             .background(color.opacity(0.12)).clipShape(Capsule())
                     }
@@ -227,16 +216,13 @@ private struct InvoiceRow: View {
 }
 
 private struct ExpenseCard: View {
-    let item: [String: Any]
+    let item: ExpenseItem
     var body: some View {
-        let amount  = cfDouble(item, "monto", "amount") ?? 0
-        let concept = cfStr(item, "concepto", "concept", "descripcion").ifBlank("Gasto")
-        let status  = cfStr(item, "estatus", "status").ifBlank("–")
         VStack(alignment: .leading, spacing: 6) {
-            Text("📊").font(.title2)
-            Text(fmtMxn(amount)).font(.headline).bold()
-            Text(concept).font(.caption).foregroundColor(.secondary).lineLimit(2)
-            Text(status).font(.caption2).bold().foregroundColor(.orange)
+            Image(systemName: "chart.bar.fill").font(.title2).foregroundColor(.orange)
+            Text(fmtMxn(item.amount)).font(.headline).bold()
+            Text(item.displayConcept).font(.caption).foregroundColor(.secondary).lineLimit(2)
+            Text(item.status.isEmpty ? "–" : item.status).font(.caption2).bold().foregroundColor(.orange)
                 .padding(.horizontal, 7).padding(.vertical, 2)
                 .background(Color.orange.opacity(0.12)).clipShape(Capsule())
         }
@@ -245,32 +231,6 @@ private struct ExpenseCard: View {
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
-}
-
-// MARK: – Helpers
-
-private func cfStr(_ m: [String: Any], _ keys: String...) -> String {
-    for k in keys {
-        if let v = m[k] {
-            let s: String
-            if let ss = v as? String { s = ss }
-            else if let n = v as? NSNumber { s = n.stringValue }
-            else { s = String(describing: v) }
-            if !s.isEmpty && s != "null" { return s }
-        }
-    }
-    return ""
-}
-
-private func cfDouble(_ m: [String: Any], _ keys: String...) -> Double? {
-    for k in keys {
-        if let v = m[k] {
-            if let d = v as? Double { return d }
-            if let n = v as? NSNumber { return n.doubleValue }
-            if let s = v as? String, let d = Double(s) { return d }
-        }
-    }
-    return nil
 }
 
 private func fmtMxn(_ v: Double) -> String {
@@ -285,16 +245,4 @@ private func invColor(_ s: String) -> Color {
     if l.contains("pendiente") { return .orange }
     if l.contains("cancelad") { return .red }
     return .secondary
-}
-
-extension String {
-    fileprivate func ifBlank(_ fallback: String) -> String { isEmpty ? fallback : self }
-}
-
-extension [String: Any] {
-    fileprivate var cfId: String {
-        if let n = self["id"] as? Int { return String(n) }
-        if let s = self["id"] as? String { return s }
-        return UUID().uuidString
-    }
 }

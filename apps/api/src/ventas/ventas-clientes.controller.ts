@@ -66,8 +66,12 @@ export class VentasClientesController {
   @Get(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.ventasService.getClient(id, user);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.getClient(id, user, companyId);
   }
 
   @Get(':id/facturas')
@@ -80,20 +84,30 @@ export class VentasClientesController {
       PERMISSIONS.CONTABILIDAD_VIEW,
     ],
   })
-  listFacturas(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.ventasService.listClientInvoices(id, user);
+  listFacturas(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.listClientInvoices(id, user, companyId);
   }
 
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateSalesClientDto, @CurrentUser() user: any) {
-    const updated = await this.ventasService.updateClient(id, dto, user);
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateSalesClientDto,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const updated = await this.ventasService.updateClient(id, dto, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'client.update',
       entityType: 'client',
       entityId: updated.id,
       actorId: user?.id,
+      companyId,
       metadata: { name: updated.name },
     });
     return updated;
@@ -102,13 +116,18 @@ export class VentasClientesController {
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    const removed = await this.ventasService.deleteClient(id, user);
+  async remove(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const removed = await this.ventasService.deleteClient(id, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'client.delete',
       entityType: 'client',
       entityId: removed.id,
       actorId: user?.id,
+      companyId,
     });
     return removed;
   }
@@ -116,13 +135,18 @@ export class VentasClientesController {
   @Post(':id/provision-service-client')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async provisionServiceClient(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    const result = await this.ventasService.provisionServiceClient(id, user);
+  async provisionServiceClient(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const result = await this.ventasService.provisionServiceClient(id, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'client.provision_service',
       entityType: 'client',
       entityId: id,
       actorId: user?.id,
+      companyId,
       metadata: {
         serviceClientId: result.serviceClient.id,
         created: result.created,
@@ -140,6 +164,7 @@ export class VentasClientesController {
     @Body('type') type: string,
     @UploadedFiles() files: any[],
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     if (!type || !type.trim()) throw new BadRequestException('Tipo de documento requerido');
     if (!files || files.length === 0) throw new BadRequestException('No hay archivos');
@@ -154,12 +179,13 @@ export class VentasClientesController {
       url: `/uploads/sales-docs/${file.filename}`,
       name: file.originalname,
     }));
-    const result = await this.ventasService.addClientDocuments(id, type.trim(), payload, user);
+    const result = await this.ventasService.addClientDocuments(id, type.trim(), payload, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'client.document.upload',
       entityType: 'client',
       entityId: id,
       actorId: user?.id,
+      companyId,
       metadata: { type: type.trim(), count: payload.length },
     });
     return result;

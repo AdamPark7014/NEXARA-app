@@ -827,10 +827,10 @@ textarea:disabled {
     line-height: 1.6;
   }
 
-  /* NO limitar .public-layout-content ni secciones del sitio público:
-     eso metía max-width 1380px + bandas laterales con el fondo del wrapper. */
-  body:not(:has(.public-friendly)) :where(main, section, article),
-  body:not(:has(.public-friendly)) .public-layout-content {
+  /* NO limitar sitio público ni paneles AppShell:
+     max-width 1380px en <main> del shell rompía el grid y cortaba la derecha. */
+  body:not(:has(.public-friendly)):not(:has(.nx-app-shell)) :where(main, section, article),
+  body:not(:has(.public-friendly)):not(:has(.nx-app-shell)) .public-layout-content {
     max-width: var(--content-max);
     margin-inline: auto;
   }
@@ -840,6 +840,17 @@ textarea:disabled {
   .public-friendly :where(main, section, article) {
     max-width: none;
     width: 100%;
+    margin-inline: 0;
+  }
+
+  .nx-app-shell,
+  .nx-app-shell :where(main) {
+    max-width: none;
+    margin-inline: 0;
+  }
+
+  .nx-app-shell :where(section, article) {
+    max-width: none;
     margin-inline: 0;
   }
 

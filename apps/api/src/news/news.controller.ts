@@ -27,6 +27,7 @@ import { NewsService } from './news.service.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CreateNewsPostDto } from './dto/create-news-post.dto.js';
 import { UpdateNewsPostDto } from './dto/update-news-post.dto.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 interface MulterFile {
   fieldname: string;
@@ -48,14 +49,18 @@ export class NewsController {
 
   @Post()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'coverImage', maxCount: 1 },
       { name: 'gallery', maxCount: 8 },
     ]),
   )
-  create(@Body() payload: CreateNewsPostDto, @UploadedFiles() files: NewsFiles) {
+  create(
+    @Body() payload: CreateNewsPostDto,
+    @UploadedFiles() files: NewsFiles,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
     const coverImage = files?.coverImage?.[0];
     const gallery = files?.gallery || [];
 
@@ -64,23 +69,31 @@ export class NewsController {
 
     const normalized = this.parseListFields(payload);
 
-    return this.newsService.create(normalized, {
-      coverImage,
-      gallery,
-    });
+    return this.newsService.create(
+      normalized,
+      {
+        coverImage,
+        gallery,
+      },
+      companyId,
+    );
   }
 
   @Get()
   list(@Query('search') search?: string, @Query('status') status?: string, @Query() query?: PaginationQueryDto) {
-    // Público: solo publicadas. El Studio usa endpoints autenticados abajo.
-    return this.newsService.list(search, status, query, { includeDrafts: false });
+    return this.newsService.list(search, status, query, { includeDrafts: false, publicSite: true });
   }
 
   @Get('admin')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
-  listAdmin(@Query('search') search?: string, @Query('status') status?: string, @Query() query?: PaginationQueryDto) {
-    return this.newsService.list(search, status, query, { includeDrafts: true });
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  listAdmin(
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query() query?: PaginationQueryDto,
+    @CurrentCompanyId() companyId?: number | null,
+  ) {
+    return this.newsService.list(search, status, query, { includeDrafts: true, companyId });
   }
 
   @Get('image/:filename')
@@ -110,36 +123,37 @@ export class NewsController {
 
   @Get('by-slug/:slug')
   findBySlug(@Param('slug') slug: string) {
-    return this.newsService.findBySlug(slug, { includeDrafts: false });
+    return this.newsService.findBySlug(slug, { includeDrafts: false, publicSite: true });
   }
 
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.newsService.findOne(id, { includeDrafts: false });
+    return this.newsService.findOne(id, { includeDrafts: false, publicSite: true });
   }
 
   @Get('admin/:id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
-  findOneAdmin(@Param('id', ParseIntPipe) id: number) {
-    return this.newsService.findOne(id, { includeDrafts: true });
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  findOneAdmin(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.newsService.findOne(id, { includeDrafts: true, companyId });
   }
 
   @Put(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() payload: UpdateNewsPostDto,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.newsService.update(id, payload);
+    return this.newsService.update(id, payload, companyId);
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.newsService.remove(id);
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.newsService.remove(id, companyId);
   }
 
   private validateImages(files: MulterFile[]) {

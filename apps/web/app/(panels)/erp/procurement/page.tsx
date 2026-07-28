@@ -15,7 +15,7 @@ import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 
-type ProcTab = "orders" | "requisitions" | "receipts";
+type ProcTab = "orders" | "requisitions" | "receipts" | "rfq";
 
 interface PurchaseOrder {
   id: number;
@@ -46,6 +46,56 @@ interface GoodsReceipt {
   purchaseOrder?: { id: number; poNumber: string };
   receivedBy?: { nombre?: string };
 }
+
+interface RfqLine {
+  id: number;
+  supplierId: number;
+  productId?: number | null;
+  description: string;
+  quantity: number | string;
+  unitPrice?: number | string | null;
+  leadTimeDays?: number | null;
+  notes?: string | null;
+  supplier?: { id: number; name: string };
+  product?: { id: number; name: string; sku: string } | null;
+}
+
+interface Rfq {
+  id: number;
+  rfqNumber: string;
+  status: "DRAFT" | "SENT" | "QUOTED" | "AWARDED" | "CANCELLED";
+  dueDate?: string | null;
+  notes?: string | null;
+  requisition?: { id: number; reqNumber: string; title: string };
+  lines?: RfqLine[];
+  _count?: { lines: number };
+  awardedPurchaseOrder?: { id: number; poNumber: string } | null;
+}
+
+interface RfqComparisonSupplier {
+  supplierId: number;
+  supplierName: string;
+  lines: RfqLine[];
+  totalPrice: number;
+  maxLeadTimeDays: number;
+  quotedLines: number;
+  totalLines: number;
+}
+
+interface RfqComparison {
+  rfq: Rfq;
+  suppliers: RfqComparisonSupplier[];
+  bestPriceSupplierId: number | null;
+  bestLeadTimeSupplierId: number | null;
+}
+
+const RFQ_STATUS: Record<string, string> = {
+  DRAFT: "Borrador",
+  SENT: "Enviada",
+  QUOTED: "Cotizada",
+  AWARDED: "Adjudicada",
+  CANCELLED: "Cancelada",
+};
 
 interface PoLine {
   id: number;
@@ -159,6 +209,7 @@ export default function ProcurementPage() {
   const [receiptPoId, setReceiptPoId] = useState("");
   const [receiptNotes, setReceiptNotes] = useState("");
   const [receiptWarehouseId, setReceiptWarehouseId] = useState("");
+  const [receiptLandedCost, setReceiptLandedCost] = useState({ freightCost: "", insuranceCost: "", customsCost: "", otherLandedCost: "" });
   const [warehouses, setWarehouses] = useState<Array<{ id: number; code: string; name: string }>>([]);
   const [savingReceipt, setSavingReceipt] = useState(false);
 
@@ -167,6 +218,19 @@ export default function ProcurementPage() {
   const [rejectReqReason, setRejectReqReason] = useState("");
   const [rejectingReq, setRejectingReq] = useState(false);
   const [rejectReqErr, setRejectReqErr] = useState<string | null>(null);
+
+  // ── RFQ multi-proveedor ────────────────────────────────────────────────
+  const [rfqs, setRfqs] = useState<Rfq[]>([]);
+  const [suppliers, setSuppliers] = useState<Array<{ id: number; name: string; rfc?: string | null }>>([]);
+  const [savingSupplierRfcId, setSavingSupplierRfcId] = useState<number | null>(null);
+  const [showRfqForm, setShowRfqForm] = useState(false);
+  const [rfqForm, setRfqForm] = useState<{ requisitionId: string; supplierIds: number[]; dueDate: string; notes: string }>({ requisitionId: "", supplierIds: [], dueDate: "", notes: "" });
+  const [savingRfq, setSavingRfq] = useState(false);
+  const [rfqComparison, setRfqComparison] = useState<RfqComparison | null>(null);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [quoteDraft, setQuoteDraft] = useState<Record<number, { unitPrice: string; leadTimeDays: string }>>({});
+  const [savingQuoteLineId, setSavingQuoteLineId] = useState<number | null>(null);
+  const [awardingSupplierId, setAwardingSupplierId] = useState<number | null>(null);
 
   const [detailKind, setDetailKind] = useState<"order" | "req" | null>(null);
   const [poDetail, setPoDetail] = useState<PoDetail | null>(null);
@@ -191,6 +255,15 @@ export default function ProcurementPage() {
         setOrders(unwrapList<PurchaseOrder>(await apiFetch("procurement/purchase-orders", token)));
       } else if (tab === "requisitions") {
         setRequisitions(unwrapList<Requisition>(await apiFetch("procurement/requisitions", token)));
+      } else if (tab === "rfq") {
+        const [rfqRows, reqRows, supplierRows] = await Promise.all([
+          apiFetch<Rfq[] | { data: Rfq[] }>("procurement/rfq", token),
+          apiFetch<Requisition[] | { data: Requisition[] }>("procurement/requisitions", token),
+          apiFetch<Array<{ id: number; name: string }> | { data: Array<{ id: number; name: string }> }>("procurement/purchase-orders/suppliers", token),
+        ]);
+        setRfqs(unwrapList<Rfq>(rfqRows));
+        setRequisitions(unwrapList<Requisition>(reqRows));
+        setSuppliers(unwrapList<{ id: number; name: string }>(supplierRows));
       } else {
         const qs = poId ? `?purchaseOrderId=${poId}` : "";
         setReceipts(unwrapList<GoodsReceipt>(await apiFetch(`procurement/goods-receipts${qs}`, token)));
@@ -464,6 +537,10 @@ export default function ProcurementPage() {
           warehouseId: receiptWarehouseId ? Number(receiptWarehouseId) : undefined,
           receiptDate: new Date().toISOString().slice(0, 10),
           notes: receiptNotes.trim() || undefined,
+          freightCost: receiptLandedCost.freightCost ? Number(receiptLandedCost.freightCost) : undefined,
+          insuranceCost: receiptLandedCost.insuranceCost ? Number(receiptLandedCost.insuranceCost) : undefined,
+          customsCost: receiptLandedCost.customsCost ? Number(receiptLandedCost.customsCost) : undefined,
+          otherLandedCost: receiptLandedCost.otherLandedCost ? Number(receiptLandedCost.otherLandedCost) : undefined,
           items,
         }),
       });
@@ -472,6 +549,7 @@ export default function ProcurementPage() {
       setReceiptNotes("");
       setReceiptWarehouseId("");
       setReceiptLines([]);
+      setReceiptLandedCost({ freightCost: "", insuranceCost: "", customsCost: "", otherLandedCost: "" });
       toast.success("Recepción registrada · stock y factura AP generados");
       if (detailKind === "order" && poDetail?.id === poNum) {
         void loadOrderDetail(poDetail.id);
@@ -483,6 +561,142 @@ export default function ProcurementPage() {
       setSavingReceipt(false);
     }
   };
+
+  const saveSupplierRfc = async (supplierId: number, name: string, rfc: string) => {
+    if (!token) return;
+    setSavingSupplierRfcId(supplierId);
+    try {
+      await apiFetch("procurement/purchase-orders/suppliers", token, {
+        method: "POST",
+        body: JSON.stringify({ name, rfc: rfc.trim().toUpperCase() || undefined }),
+      });
+      setSuppliers(prev => prev.map(s => s.id === supplierId ? { ...s, rfc: rfc.trim().toUpperCase() || null } : s));
+    } catch (e) {
+      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo guardar el RFC"));
+    } finally {
+      setSavingSupplierRfcId(null);
+    }
+  };
+
+  const submitCreateRfq = async () => {
+    if (!token || !rfqForm.requisitionId || !rfqForm.supplierIds.length) return;
+    setSavingRfq(true);
+    try {
+      await apiFetch("procurement/rfq", token, {
+        method: "POST",
+        body: JSON.stringify({
+          requisitionId: Number(rfqForm.requisitionId),
+          supplierIds: rfqForm.supplierIds,
+          dueDate: rfqForm.dueDate || undefined,
+          notes: rfqForm.notes.trim() || undefined,
+        }),
+      });
+      setShowRfqForm(false);
+      setRfqForm({ requisitionId: "", supplierIds: [], dueDate: "", notes: "" });
+      toast.success("RFQ enviada a los proveedores seleccionados");
+      void load();
+    } catch (e) {
+      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo crear la RFQ"));
+    } finally {
+      setSavingRfq(false);
+    }
+  };
+
+  const openRfqComparison = async (id: number) => {
+    if (!token) return;
+    setComparisonLoading(true);
+    setRfqComparison(null);
+    try {
+      const comparison = await apiFetch<RfqComparison>(`procurement/rfq/${id}/compare`, token);
+      setRfqComparison(comparison);
+      const draft: Record<number, { unitPrice: string; leadTimeDays: string }> = {};
+      for (const s of comparison.suppliers) {
+        for (const l of s.lines) {
+          draft[l.id] = { unitPrice: l.unitPrice != null ? String(l.unitPrice) : "", leadTimeDays: l.leadTimeDays != null ? String(l.leadTimeDays) : "" };
+        }
+      }
+      setQuoteDraft(draft);
+    } catch (e) {
+      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo cargar la comparación"));
+    } finally {
+      setComparisonLoading(false);
+    }
+  };
+
+  const submitQuoteLine = async (lineId: number) => {
+    if (!token || !rfqComparison) return;
+    const draft = quoteDraft[lineId];
+    if (!draft || !draft.unitPrice) return;
+    setSavingQuoteLineId(lineId);
+    try {
+      await apiFetch(`procurement/rfq/${rfqComparison.rfq.id}/lines/${lineId}/quote`, token, {
+        method: "POST",
+        body: JSON.stringify({
+          unitPrice: Number(draft.unitPrice),
+          leadTimeDays: draft.leadTimeDays ? Number(draft.leadTimeDays) : undefined,
+        }),
+      });
+      void openRfqComparison(rfqComparison.rfq.id);
+    } catch (e) {
+      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo guardar la cotización"));
+    } finally {
+      setSavingQuoteLineId(null);
+    }
+  };
+
+  const submitAwardRfq = async (supplierId: number) => {
+    if (!token || !rfqComparison) return;
+    setAwardingSupplierId(supplierId);
+    try {
+      await apiFetch(`procurement/rfq/${rfqComparison.rfq.id}/award`, token, {
+        method: "POST",
+        body: JSON.stringify({ supplierId }),
+      });
+      toast.success("RFQ adjudicada — orden de compra generada");
+      setRfqComparison(null);
+      void load();
+    } catch (e) {
+      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo adjudicar"));
+    } finally {
+      setAwardingSupplierId(null);
+    }
+  };
+
+  const submitCancelRfq = async (id: number) => {
+    if (!token) return;
+    try {
+      await apiFetch(`procurement/rfq/${id}/cancel`, token, { method: "PATCH" });
+      void load();
+    } catch (e) {
+      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo cancelar"));
+    }
+  };
+
+  const rfqColumns: Column<Rfq>[] = [
+    { key: "rfqNumber", label: "RFQ", render: (r) => <code style={{ fontSize: 11.5 }}>{r.rfqNumber}</code>, width: 110 },
+    { key: "requisition", label: "Requisición", render: (r) => (
+      <div>
+        <div style={{ fontSize: 13 }}>{r.requisition?.title ?? "—"}</div>
+        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{r.requisition?.reqNumber}</div>
+      </div>
+    ) },
+    { key: "lines", label: "Proveedores/líneas", render: (r) => <span style={{ fontSize: 12 }}>{r._count?.lines ?? r.lines?.length ?? 0} líneas</span>, width: 130 },
+    { key: "status", label: "Estado", width: 130, render: (r) => (
+      <Tag variant={r.status === "AWARDED" ? "positive" : r.status === "CANCELLED" ? "default" : r.status === "QUOTED" ? "accent" : "neutral"}>
+        {RFQ_STATUS[r.status] ?? r.status}
+      </Tag>
+    ) },
+    { key: "actions", label: "", width: 180, render: (r) => (
+      <div style={{ display: "flex", gap: 6 }}>
+        <Button size="sm" variant="secondary" onClick={() => void openRfqComparison(r.id)}>
+          {r.status === "AWARDED" ? "Ver" : "Comparar"}
+        </Button>
+        {(r.status === "SENT" || r.status === "QUOTED") && (
+          <Button size="sm" variant="ghost" onClick={() => void submitCancelRfq(r.id)}>Cancelar</Button>
+        )}
+      </div>
+    ) },
+  ];
 
   const orderColumns: Column<PurchaseOrder>[] = [
     { key: "poNumber", label: "OC", render: (o) => <code style={{ fontSize: 11.5 }}>{o.poNumber}</code>, width: 130 },
@@ -615,6 +829,9 @@ export default function ProcurementPage() {
             {cfg.canCreate && tab === "receipts" && (
               <Button variant="primary" iconLeft="+" onClick={() => setShowReceiptForm(true)}>Registrar recepción</Button>
             )}
+            {cfg.canCreate && tab === "rfq" && (
+              <Button variant="primary" iconLeft="+" onClick={() => setShowRfqForm(true)}>Nueva RFQ</Button>
+            )}
           </>
         }
       />
@@ -687,6 +904,176 @@ export default function ProcurementPage() {
         </div>
       )}
 
+      {/* ── Formulario: Nueva RFQ ─────────────────────────────────────── */}
+      {showRfqForm && (
+        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
+          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Nueva RFQ (solicitud de cotización)</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Requisición *</label>
+              <select value={rfqForm.requisitionId} onChange={(e) => setRfqForm((f) => ({ ...f, requisitionId: e.target.value }))} style={inp}>
+                <option value="">Seleccionar…</option>
+                {requisitions.map((r) => <option key={r.id} value={r.id}>{r.reqNumber} — {r.title}</option>)}
+              </select>
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Proveedores a cotizar *</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {suppliers.length === 0 && <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin proveedores — agrega uno en Órdenes de compra.</span>}
+                {suppliers.map((s) => {
+                  const checked = rfqForm.supplierIds.includes(s.id);
+                  return (
+                    <label key={s.id} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 8, border: `1px solid ${checked ? "var(--primary)" : "var(--border)"}`, background: checked ? "color-mix(in srgb, var(--primary) 8%, transparent)" : "var(--surface)", fontSize: 12.5, cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => setRfqForm((f) => ({ ...f, supplierIds: e.target.checked ? [...f.supplierIds, s.id] : f.supplierIds.filter((id) => id !== s.id) }))}
+                      />
+                      {s.name}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Fecha límite de respuesta</label>
+              <input type="date" value={rfqForm.dueDate} onChange={(e) => setRfqForm((f) => ({ ...f, dueDate: e.target.value }))} style={inp} />
+            </div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Notas</label>
+              <input value={rfqForm.notes} onChange={(e) => setRfqForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Condiciones, referencias…" style={inp} />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Button variant="ghost" onClick={() => setShowRfqForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void submitCreateRfq()} disabled={savingRfq || !rfqForm.requisitionId || !rfqForm.supplierIds.length}>
+              {savingRfq ? "Enviando…" : "Enviar RFQ"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {tab === "rfq" && suppliers.length > 0 && (
+        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 16, marginBottom: 18 }}>
+          <p style={{ margin: "0 0 4px", fontWeight: 700, fontSize: 13 }}>Proveedores · RFC para DIOT</p>
+          <p style={{ margin: "0 0 12px", fontSize: 12, color: "var(--text-secondary)" }}>
+            El RFC alimenta el reporte DIOT en Contabilidad → Cumplimiento SAT.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 8 }}>
+            {suppliers.map((s) => (
+              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 12.5, flex: 1 }}>{s.name}</span>
+                <input
+                  defaultValue={s.rfc ?? ""}
+                  placeholder="RFC"
+                  disabled={savingSupplierRfcId === s.id}
+                  onBlur={(e) => { if (e.target.value.trim().toUpperCase() !== (s.rfc ?? "")) void saveSupplierRfc(s.id, s.name, e.target.value); }}
+                  style={{ ...inp, width: 140, borderColor: s.rfc ? "var(--border)" : "var(--warning)" }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Comparación de cotizaciones ──────────────────────────────── */}
+      {(comparisonLoading || rfqComparison) && (
+        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
+          {comparisonLoading ? (
+            <p style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Cargando comparación…</p>
+          ) : rfqComparison ? (
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>
+                  {rfqComparison.rfq.rfqNumber} · {rfqComparison.rfq.requisition?.title} · <Tag variant={rfqComparison.rfq.status === "AWARDED" ? "positive" : "accent"}>{RFQ_STATUS[rfqComparison.rfq.status]}</Tag>
+                </p>
+                <Button variant="ghost" size="sm" onClick={() => setRfqComparison(null)}>Cerrar</Button>
+              </div>
+              {rfqComparison.rfq.status === "AWARDED" && rfqComparison.rfq.awardedPurchaseOrder && (
+                <p style={{ fontSize: 12.5, marginBottom: 12 }}>
+                  Adjudicada → <Link href={`/erp/procurement?tab=orders&id=${rfqComparison.rfq.awardedPurchaseOrder.id}`} style={{ color: "var(--primary)" }}>{rfqComparison.rfq.awardedPurchaseOrder.poNumber}</Link>
+                </p>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {rfqComparison.suppliers.map((s) => {
+                  const isBestPrice = s.supplierId === rfqComparison.bestPriceSupplierId;
+                  const isBestLeadTime = s.supplierId === rfqComparison.bestLeadTimeSupplierId;
+                  const complete = s.quotedLines === s.totalLines;
+                  return (
+                    <div key={s.supplierId} style={{ border: `1px solid ${isBestPrice ? "var(--success)" : "var(--border)"}`, borderRadius: 10, padding: 14, background: "var(--surface)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <strong style={{ fontSize: 13.5 }}>{s.supplierName}</strong>
+                          {isBestPrice && <Tag variant="positive">Mejor precio</Tag>}
+                          {isBestLeadTime && <Tag variant="accent">Mejor entrega</Tag>}
+                          <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{s.quotedLines}/{s.totalLines} cotizadas</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <Money value={s.totalPrice} />
+                          {rfqComparison.rfq.status !== "AWARDED" && rfqComparison.rfq.status !== "CANCELLED" && cfg.canApprove && (
+                            <Button size="sm" variant="primary" disabled={!complete || awardingSupplierId === s.supplierId} onClick={() => void submitAwardRfq(s.supplierId)}>
+                              {awardingSupplierId === s.supplierId ? "Adjudicando…" : "Adjudicar"}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                        <thead>
+                          <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+                            <th style={{ textAlign: "left", padding: "6px 8px" }}>Artículo</th>
+                            <th style={{ textAlign: "right", padding: "6px 8px" }}>Cant.</th>
+                            <th style={{ textAlign: "right", padding: "6px 8px", width: 110 }}>Precio unit.</th>
+                            <th style={{ textAlign: "right", padding: "6px 8px", width: 90 }}>Días entrega</th>
+                            <th style={{ padding: "6px 8px", width: 70 }} />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {s.lines.map((l) => {
+                            const draft = quoteDraft[l.id] ?? { unitPrice: "", leadTimeDays: "" };
+                            const editable = rfqComparison.rfq.status !== "AWARDED" && rfqComparison.rfq.status !== "CANCELLED";
+                            return (
+                              <tr key={l.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                                <td style={{ padding: "6px 8px" }}>{l.description}</td>
+                                <td style={{ padding: "6px 8px", textAlign: "right" }}>{Number(l.quantity)}</td>
+                                <td style={{ padding: "6px 8px" }}>
+                                  <input
+                                    type="number" min={0} step="0.01"
+                                    disabled={!editable}
+                                    value={draft.unitPrice}
+                                    onChange={(e) => setQuoteDraft((q) => ({ ...q, [l.id]: { ...draft, unitPrice: e.target.value } }))}
+                                    style={{ ...inp, textAlign: "right" }}
+                                  />
+                                </td>
+                                <td style={{ padding: "6px 8px" }}>
+                                  <input
+                                    type="number" min={0}
+                                    disabled={!editable}
+                                    value={draft.leadTimeDays}
+                                    onChange={(e) => setQuoteDraft((q) => ({ ...q, [l.id]: { ...draft, leadTimeDays: e.target.value } }))}
+                                    style={{ ...inp, textAlign: "right" }}
+                                  />
+                                </td>
+                                <td style={{ padding: "6px 8px", textAlign: "right" }}>
+                                  {editable && (
+                                    <Button size="sm" variant="ghost" disabled={!draft.unitPrice || savingQuoteLineId === l.id} onClick={() => void submitQuoteLine(l.id)}>
+                                      {savingQuoteLineId === l.id ? "…" : "Guardar"}
+                                    </Button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : null}
+        </div>
+      )}
+
       {!loading && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 18 }}>
           <KpiCard label="Requisiciones pendientes" value={requisitions.filter(r => r.status === "PENDING").length} variant={requisitions.filter(r => r.status === "PENDING").length > 0 ? "warning" : "positive"} icon="📋" />
@@ -732,10 +1119,13 @@ export default function ProcurementPage() {
         <button type="button" style={tabStyle(tab === "receipts")} onClick={() => setTab("receipts")}>
           Recepciones
         </button>
+        <button type="button" style={tabStyle(tab === "rfq")} onClick={() => setTab("rfq")}>
+          RFQ · Comparar proveedores
+        </button>
       </div>
 
       <FilterToolbar
-        search={{ value: searchQ, onChange: setSearchQ, placeholder: tab === "orders" ? "Buscar OC, proveedor…" : tab === "requisitions" ? "Buscar requisición, título…" : "Buscar recepción, OC…" }}
+        search={{ value: searchQ, onChange: setSearchQ, placeholder: tab === "orders" ? "Buscar OC, proveedor…" : tab === "requisitions" ? "Buscar requisición, título…" : tab === "rfq" ? "Buscar RFQ, requisición…" : "Buscar recepción, OC…" }}
         selects={tab === "orders" ? [{
           label: "Estado",
           value: filterPoStatus,
@@ -750,7 +1140,7 @@ export default function ProcurementPage() {
           allowAll: true,
         }] : []}
         onClear={() => { setSearchQ(""); setFilterPoStatus(""); setFilterReqStatus(""); }}
-        resultCount={loading ? null : tab === "orders" ? visibleOrders.length : tab === "requisitions" ? visibleReqs.length : visibleReceipts.length}
+        resultCount={loading ? null : tab === "orders" ? visibleOrders.length : tab === "requisitions" ? visibleReqs.length : tab === "rfq" ? rfqs.length : visibleReceipts.length}
         rightActions={tab === "orders" && orders.length > 0 ? (
           <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleOrders, [
             { key: "poNumber", label: "OC" },
@@ -841,6 +1231,40 @@ export default function ProcurementPage() {
                 </tbody>
               </table>
               <p style={{ fontSize: 11.5, color: "var(--text-tertiary)", margin: "8px 0 0" }}>Puedes registrar recepción parcial por partida.</p>
+
+              <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: "var(--surface)", border: "1px solid var(--border)" }}>
+                <p style={{ margin: "0 0 8px", fontWeight: 700, fontSize: 12.5 }}>Landed cost (opcional)</p>
+                <p style={{ margin: "0 0 10px", fontSize: 11.5, color: "var(--text-secondary)" }}>
+                  Se prorratea por valor entre las partidas de producto recibidas y se suma al costo unitario (WAC).
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                  <div>
+                    <label style={{ fontSize: 11, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Flete</label>
+                    <input type="number" min={0} step="0.01" value={receiptLandedCost.freightCost} onChange={(e) => setReceiptLandedCost((f) => ({ ...f, freightCost: e.target.value }))} style={inp} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Seguro</label>
+                    <input type="number" min={0} step="0.01" value={receiptLandedCost.insuranceCost} onChange={(e) => setReceiptLandedCost((f) => ({ ...f, insuranceCost: e.target.value }))} style={inp} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Aranceles</label>
+                    <input type="number" min={0} step="0.01" value={receiptLandedCost.customsCost} onChange={(e) => setReceiptLandedCost((f) => ({ ...f, customsCost: e.target.value }))} style={inp} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Otros</label>
+                    <input type="number" min={0} step="0.01" value={receiptLandedCost.otherLandedCost} onChange={(e) => setReceiptLandedCost((f) => ({ ...f, otherLandedCost: e.target.value }))} style={inp} />
+                  </div>
+                </div>
+                {(() => {
+                  const total = ["freightCost", "insuranceCost", "customsCost", "otherLandedCost"]
+                    .reduce((s, k) => s + (Number(receiptLandedCost[k as keyof typeof receiptLandedCost]) || 0), 0);
+                  return total > 0 ? (
+                    <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "var(--text-secondary)" }}>
+                      Total a prorratear: <strong>${total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</strong>
+                    </p>
+                  ) : null;
+                })()}
+              </div>
             </div>
           )}
           {receiptErr && (
@@ -849,7 +1273,7 @@ export default function ProcurementPage() {
             </div>
           )}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
-            <Button variant="ghost" onClick={() => { setShowReceiptForm(false); setReceiptErr(null); setReceiptLines([]); }}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => { setShowReceiptForm(false); setReceiptErr(null); setReceiptLines([]); setReceiptLandedCost({ freightCost: "", insuranceCost: "", customsCost: "", otherLandedCost: "" }); }}>Cancelar</Button>
             <Button variant="primary" onClick={() => void saveReceipt()} disabled={savingReceipt}>{savingReceipt ? "Registrando…" : "Registrar entrada"}</Button>
           </div>
         </div>
@@ -948,17 +1372,65 @@ export default function ProcurementPage() {
               ? `${visibleOrders.length} órdenes`
               : tab === "requisitions"
                 ? `${visibleReqs.length} requisiciones`
-                : `${visibleReceipts.length} recepciones`
+                : tab === "rfq"
+                  ? `${rfqs.length} RFQ`
+                  : `${visibleReceipts.length} recepciones`
         }
       >
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+        ) : tab === "rfq" ? (
+          <DataTable
+            columns={rfqColumns}
+            rows={rfqs}
+            rowKey={(r) => r.id}
+            emptyTitle="Sin RFQ"
+            emptyDescription="Envía una solicitud de cotización a varios proveedores para comparar precio y tiempo de entrega antes de emitir la OC."
+            emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={() => setShowRfqForm(true)}>Nueva RFQ</Button> : undefined}
+          />
         ) : tab === "orders" ? (
-          <DataTable columns={orderColumns} rows={visibleOrders} rowKey={(o) => o.id} onRowClick={(o) => void loadOrderDetail(o.id)} emptyTitle="Sin órdenes" emptyDescription="Las OC se generan desde requisiciones aprobadas." />
+          <DataTable
+            columns={orderColumns}
+            rows={visibleOrders}
+            rowKey={(o) => o.id}
+            onRowClick={(o) => void loadOrderDetail(o.id)}
+            emptyTitle="Sin órdenes"
+            emptyDescription="Crea una OC directa o aprueba una requisición para generar la primera."
+            emptyAction={
+              cfg.canCreate ? (
+                <Button size="sm" variant="primary" onClick={() => { setShowPoForm(true); setShowReqForm(false); }}>
+                  Nueva OC
+                </Button>
+              ) : (
+                <Button size="sm" variant="secondary" onClick={() => setTab("requisitions")}>Ver requisiciones</Button>
+              )
+            }
+          />
         ) : tab === "requisitions" ? (
-          <DataTable columns={reqColumns} rows={visibleReqs} rowKey={(r) => r.id} onRowClick={(r) => void loadReqDetail(r.id)} emptyTitle="Sin requisiciones" emptyDescription="No hay solicitudes de compra pendientes." />
+          <DataTable
+            columns={reqColumns}
+            rows={visibleReqs}
+            rowKey={(r) => r.id}
+            onRowClick={(r) => void loadReqDetail(r.id)}
+            emptyTitle="Sin requisiciones"
+            emptyDescription="Solicita materiales o servicios para que compras genere la OC."
+            emptyAction={
+              cfg.canCreate ? (
+                <Button size="sm" variant="primary" onClick={() => { setShowReqForm(true); setShowPoForm(false); }}>
+                  Nueva requisición
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
-          <DataTable columns={receiptColumns} rows={visibleReceipts} rowKey={(r) => r.id} emptyTitle="Sin recepciones" emptyDescription="Registra la entrada de mercancía contra una OC." />
+          <DataTable
+            columns={receiptColumns}
+            rows={visibleReceipts}
+            rowKey={(r) => r.id}
+            emptyTitle="Sin recepciones"
+            emptyDescription="Cuando llegue mercancía, registra la recepción contra una OC abierta."
+            emptyAction={<Button size="sm" variant="secondary" onClick={() => setTab("orders")}>Ver órdenes</Button>}
+          />
         )}
       </Section>
 

@@ -321,7 +321,16 @@ export default function SupportSlaPage() {
               rowKey={(b) => `${b.id}-${b.type}`}
               onRowClick={(b) => router.push(`/ops/activities/${b.id}`)}
               emptyTitle="Sin incumplimientos"
-              emptyDescription={searchQ || filterPriority || filterType ? "Sin resultados para ese filtro." : "Ningún ticket rompió su SLA en los últimos 30 días. 🎉"}
+              emptyDescription={
+                searchQ || filterPriority || filterType
+                  ? "Sin resultados para ese filtro."
+                  : "Ningún ticket rompió su SLA en los últimos 30 días."
+              }
+              emptyAction={
+                <Link href="/ops/support" style={{ textDecoration: "none" }}>
+                  <Button size="sm" variant="secondary">Ver bandeja de soporte</Button>
+                </Link>
+              }
             />
           </Section>
         </>

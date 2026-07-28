@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
-import { resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
+import { resolveRequiredCompanyId, companyWhere, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
 
 const FREQUENCY_DAYS: Record<string, number> = {
   WEEKLY: 7,
@@ -24,8 +24,10 @@ export class MaintenanceContractsService {
   ) {}
 
   // ── Contracts ──────────────────────────────────────────────────────
-  private async generateContractNumber(): Promise<string> {
-    const count = await (this.prisma as any).maintenanceContract.count();
+  private async generateContractNumber(companyId: number): Promise<string> {
+    const count = await (this.prisma as any).maintenanceContract.count({
+      where: companyWhere(companyId),
+    });
     return `MC-${String(count + 1).padStart(5, '0')}`;
   }
 
@@ -33,6 +35,7 @@ export class MaintenanceContractsService {
     clientId: number;
     branchId?: number | null;
     ownerId?: number | null;
+    companyId?: number | null;
     title: string;
     description?: string;
     serviceScope?: string;
@@ -50,15 +53,26 @@ export class MaintenanceContractsService {
     if (!FREQUENCY_DAYS[dto.frequency]) {
       throw new BadRequestException('Frecuencia inválida');
     }
-    const contractNumber = await this.generateContractNumber();
     const start = new Date(dto.startDate);
 
+    const companyId = await resolveRequiredCompanyId(
+      this.prisma,
+      dto.companyId ??
+        (
+          await this.prisma.serviceClient.findUnique({
+            where: { id: dto.clientId },
+            select: { companyId: true },
+          })
+        )?.companyId,
+    );
+    const contractNumber = await this.generateContractNumber(companyId);
     const contract = await (this.prisma as any).maintenanceContract.create({
       data: {
         contractNumber,
         clientId: dto.clientId,
         branchId: dto.branchId ?? null,
         ownerId: dto.ownerId ?? null,
+        companyId,
         title: dto.title.trim(),
         description: dto.description?.trim() || null,
         serviceScope: dto.serviceScope?.trim() || null,
@@ -81,8 +95,13 @@ export class MaintenanceContractsService {
     return contract;
   }
 
-  async listContracts(filters?: { status?: string; clientId?: number; ownerId?: number }) {
-    const where: any = { deletedAt: null };
+  async listContracts(filters?: {
+    status?: string;
+    clientId?: number;
+    ownerId?: number;
+    companyId?: number | null;
+  }) {
+    const where: any = { deletedAt: null, ...companyWhere(filters?.companyId ?? null) };
     if (filters?.status) where.status = filters.status;
     if (filters?.clientId) where.clientId = filters.clientId;
     if (filters?.ownerId) where.ownerId = filters.ownerId;
@@ -98,9 +117,9 @@ export class MaintenanceContractsService {
     });
   }
 
-  async getContract(id: number) {
-    const contract = await (this.prisma as any).maintenanceContract.findUnique({
-      where: { id },
+  async getContract(id: number, companyId?: number | null) {
+    const contract = await (this.prisma as any).maintenanceContract.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
       include: {
         client: true,
         branch: true,
@@ -112,19 +131,34 @@ export class MaintenanceContractsService {
         },
       },
     });
-    if (!contract) throw new NotFoundException('Contrato no encontrado');
+    assertCompanyAccess(contract, companyId, 'Contrato');
     return contract;
   }
 
-  async updateContract(id: number, dto: any) {
+  async updateContract(id: number, dto: any, companyId?: number | null) {
+    const existing = await (this.prisma as any).maintenanceContract.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
+    });
+    assertCompanyAccess(existing, companyId, 'Contrato');
+
     const data: any = { ...dto };
+    delete data.companyId;
+    delete data.id;
     if (dto.startDate) data.startDate = new Date(dto.startDate);
     if (dto.endDate) data.endDate = new Date(dto.endDate);
     if (dto.monthlyFee !== undefined) data.monthlyFee = new Prisma.Decimal(dto.monthlyFee);
     return (this.prisma as any).maintenanceContract.update({ where: { id }, data });
   }
 
-  async setStatus(id: number, status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'EXPIRED' | 'CANCELLED') {
+  async setStatus(
+    id: number,
+    status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'EXPIRED' | 'CANCELLED',
+    companyId?: number | null,
+  ) {
+    const existing = await (this.prisma as any).maintenanceContract.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
+    });
+    assertCompanyAccess(existing, companyId, 'Contrato');
     return (this.prisma as any).maintenanceContract.update({ where: { id }, data: { status } });
   }
 
@@ -150,12 +184,23 @@ export class MaintenanceContractsService {
     await (this.prisma as any).maintenanceContractVisit.upsert({
       where: { contractId_scheduledDate: { contractId, scheduledDate: nextDate } },
       update: {},
-      create: { contractId, scheduledDate: nextDate, status: 'SCHEDULED' },
+      create: {
+        contractId,
+        scheduledDate: nextDate,
+        status: 'SCHEDULED',
+        companyId: contract.companyId,
+      },
     });
   }
 
-  async listVisits(filters?: { contractId?: number; status?: string; from?: string; to?: string }) {
-    const where: any = {};
+  async listVisits(filters?: {
+    contractId?: number;
+    status?: string;
+    from?: string;
+    to?: string;
+    companyId?: number | null;
+  }) {
+    const where: any = { ...companyWhere(filters?.companyId ?? null) };
     if (filters?.contractId) where.contractId = filters.contractId;
     if (filters?.status) where.status = filters.status;
     if (filters?.from || filters?.to) {
@@ -187,9 +232,13 @@ export class MaintenanceContractsService {
    * Genera Actividad (OT operativa) para una visita programada y la enlaza al contrato.
    * Crea OperationalProject si el contrato no tiene uno y respeta el SLA del contrato.
    */
-  async materializeVisitAsActivity(visitId: number, options?: { assignedToId?: number }) {
-    const visit = await (this.prisma as any).maintenanceContractVisit.findUnique({
-      where: { id: visitId },
+  async materializeVisitAsActivity(
+    visitId: number,
+    options?: { assignedToId?: number },
+    companyId?: number | null,
+  ) {
+    const visit = await (this.prisma as any).maintenanceContractVisit.findFirst({
+      where: { id: visitId, ...companyWhere(companyId ?? null) },
       include: {
         contract: {
           include: {
@@ -201,6 +250,7 @@ export class MaintenanceContractsService {
       },
     });
     if (!visit) throw new NotFoundException('Visita no encontrada');
+    assertCompanyAccess(visit, companyId, 'Visita');
     if (visit.activityId) {
       return { alreadyExists: true, activityId: visit.activityId };
     }
@@ -211,9 +261,9 @@ export class MaintenanceContractsService {
     }
 
     let operationalProjectId = visit.operationalProjectId || contract.operationalProjectId;
-    const companyId = await resolveRequiredCompanyId(
+    const tenantId = await resolveRequiredCompanyId(
       this.prisma,
-      (contract.client as any)?.companyId,
+      companyId ?? visit.companyId ?? contract.companyId,
     );
     if (!operationalProjectId) {
       // Proyecto OPS dedicado al contrato — NUNCA reutilizar un proyecto comercial del cliente.
@@ -229,7 +279,7 @@ export class MaintenanceContractsService {
           startDate: contract.startDate,
           endDate: contract.endDate || null,
           status: 'ACTIVE' as any,
-          companyId,
+          companyId: tenantId,
         },
       });
       operationalProjectId = created.id;
@@ -245,7 +295,7 @@ export class MaintenanceContractsService {
     const fechaMaxima = new Date(fechaAsignacion);
     fechaMaxima.setHours(fechaMaxima.getHours() + contract.slaResolutionHours);
 
-    const anNumber = await this.generateNextAnNumber();
+    const anNumber = await this.generateNextAnNumber(tenantId);
     const activity = await this.prisma.activity.create({
       data: {
         anNumber,
@@ -267,7 +317,7 @@ export class MaintenanceContractsService {
         responsableId: responsibleId,
         fechaAsignacion,
         fechaMaxima,
-        companyId,
+        companyId: tenantId,
       },
     });
 
@@ -296,13 +346,15 @@ export class MaintenanceContractsService {
     return { alreadyExists: false, activityId: activity.id, anNumber, operationalProjectId };
   }
 
-  async markVisitCompleted(visitId: number) {
-    const visit = await (this.prisma as any).maintenanceContractVisit.findUnique({
-      where: { id: visitId },
+  async markVisitCompleted(visitId: number, companyId?: number | null) {
+    const visit = await (this.prisma as any).maintenanceContractVisit.findFirst({
+      where: { id: visitId, ...companyWhere(companyId ?? null) },
+      include: { contract: { select: { id: true, companyId: true } } },
     });
     if (!visit) throw new NotFoundException('Visita no encontrada');
+    assertCompanyAccess(visit, companyId, 'Visita');
     if (!visit.activityId) {
-      await this.materializeVisitAsActivity(visitId);
+      await this.materializeVisitAsActivity(visitId, undefined, companyId ?? visit.companyId);
     }
 
     const updated = await (this.prisma as any).maintenanceContractVisit.update({
@@ -335,7 +387,7 @@ export class MaintenanceContractsService {
     let generated = 0;
     for (const visit of visits) {
       try {
-        await this.materializeVisitAsActivity(visit.id);
+        await this.materializeVisitAsActivity(visit.id, undefined, visit.companyId);
         generated += 1;
       } catch (err) {
         this.logger.error(`No se generó OT para visita ${visit.id}: ${(err as Error).message}`);
@@ -345,10 +397,11 @@ export class MaintenanceContractsService {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────
-  private async generateNextAnNumber(): Promise<string> {
+  private async generateNextAnNumber(companyId: number): Promise<string> {
     const [latest] = await this.prisma.$queryRaw<Array<{ anNumber: string }>>`
       SELECT "anNumber" FROM "Activity"
-      WHERE "anNumber" ~ '\\d+$'
+      WHERE "companyId" = ${companyId}
+        AND "anNumber" ~ '\\d+$'
       ORDER BY CAST(substring("anNumber" FROM '(\\d+)$') AS INTEGER) DESC
       LIMIT 1
     `;

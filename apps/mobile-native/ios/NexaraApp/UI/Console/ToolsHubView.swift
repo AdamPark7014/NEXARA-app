@@ -55,10 +55,10 @@ private enum ToolsSection: String, CaseIterable, Hashable {
 // MARK: - Sub-screens
 
 private struct ToolRequestsView: View {
-    @State private var mine: [[String: Any]] = []
+    @State private var mine: [ToolItem] = []
     @State private var isLoading = true
     @State private var query = ""
-    @State private var selected: [String: Any]?
+    @State private var selected: ToolItem?
 
     var body: some View {
         Group {
@@ -75,23 +75,22 @@ private struct ToolRequestsView: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
-        mine = (try? await ConsoleRepository.shared.myToolRequests()) ?? []
+        mine = (try? await ConsoleRepository.shared.myToolRequestItems()) ?? []
     }
 
-    private func filtered(_ items: [[String: Any]]) -> [[String: Any]] {
+    private func filtered(_ items: [ToolItem]) -> [ToolItem] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter {
-            ConsoleHelpers.mapStr($0, "toolName", "name", "nombre").lowercased().contains(q) ||
-            ConsoleHelpers.mapStr($0, "status", "estado").lowercased().contains(q)
+            $0.title.lowercased().contains(q) || $0.status.lowercased().contains(q)
         }
     }
 }
 
 private struct ToolMyKitView: View {
-    @State private var items: [[String: Any]] = []
+    @State private var items: [ToolItem] = []
     @State private var isLoading = true
-    @State private var selected: [String: Any]?
+    @State private var selected: ToolItem?
 
     var body: some View {
         Group {
@@ -108,22 +107,29 @@ private struct ToolMyKitView: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await ConsoleRepository.shared.myToolKit()) ?? []
+        items = (try? await ConsoleRepository.shared.myToolKitItems()) ?? []
     }
 }
 
 private struct ToolInventoryView: View {
-    @State private var items: [[String: Any]] = []
+    @State private var items: [ToolItem] = []
     @State private var isLoading = true
     @State private var query = ""
-    @State private var selected: [String: Any]?
+    @State private var selected: ToolItem?
 
     var body: some View {
         Group {
             if let s = selected { toolDetail(s, backLabel: "← Inventario", onBack: { selected = nil }) }
             else {
-                toolList(items: items.filter { query.isEmpty || ConsoleHelpers.mapStr($0, "name", "nombre").lowercased().contains(query.lowercased()) },
-                         isLoading: isLoading, query: $query, empty: "Inventario vacío", onSelect: { selected = $0 })
+                toolList(
+                    items: items.filter {
+                        query.isEmpty || $0.title.lowercased().contains(query.lowercased())
+                    },
+                    isLoading: isLoading,
+                    query: $query,
+                    empty: "Inventario vacío",
+                    onSelect: { selected = $0 }
+                )
             }
         }
         .task { await load() }
@@ -134,12 +140,12 @@ private struct ToolInventoryView: View {
         isLoading = true
         defer { isLoading = false }
         let q = query.isEmpty ? nil : query
-        items = (try? await ConsoleRepository.shared.toolInventory(search: q)) ?? []
+        items = (try? await ConsoleRepository.shared.toolInventoryItems(search: q)) ?? []
     }
 }
 
 private struct ToolRenewalsView: View {
-    @State private var items: [[String: Any]] = []
+    @State private var items: [ToolRenewal] = []
     @State private var isLoading = true
     @State private var rejectionReason = ""
     @State private var actingId: Int64?
@@ -160,7 +166,7 @@ private struct ToolRenewalsView: View {
                 else if items.isEmpty {
                     Text("Sin renovaciones pendientes").foregroundColor(.secondary).padding(.top, 40)
                 } else {
-                    ForEach(items.prefix(80), id: \.renewalKey) { item in
+                    ForEach(items.prefix(80)) { item in
                         renewalCard(item)
                     }
                 }
@@ -171,28 +177,25 @@ private struct ToolRenewalsView: View {
         .refreshable { await load() }
     }
 
-    private func renewalCard(_ item: [String: Any]) -> some View {
-        let id = ConsoleHelpers.mapInt64(item, "id")
-        let busy = actingId == id
+    private func renewalCard(_ item: ToolRenewal) -> some View {
+        let busy = actingId == item.id
         return VStack(alignment: .leading, spacing: 8) {
-            Text(renewalTitle(item)).font(.subheadline).bold()
-            Text("De: \(ConsoleHelpers.mapStr(item, "previousReturnDate"))")
+            Text(item.title).font(.subheadline).bold()
+            Text("De: \(item.previousReturnDate)")
                 .font(.caption).foregroundColor(.secondary)
-            Text("A: \(ConsoleHelpers.mapStr(item, "newReturnDate"))")
+            Text("A: \(item.newReturnDate)")
                 .font(.caption).foregroundColor(.secondary)
-            Text("Estatus: \(ConsoleHelpers.mapStr(item, "status", "estado"))")
+            Text("Estatus: \(item.status)")
                 .font(.caption).foregroundColor(.secondary)
             HStack {
                 Button(busy ? "Procesando…" : "Aprobar") {
-                    guard let id else { return }
-                    Task { await approve(id) }
+                    Task { await approve(item.id) }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(actingId != nil)
 
                 Button(busy ? "Procesando…" : "Rechazar") {
-                    guard let id else { return }
-                    Task { await reject(id) }
+                    Task { await reject(item.id) }
                 }
                 .buttonStyle(.bordered)
                 .disabled(actingId != nil)
@@ -205,21 +208,10 @@ private struct ToolRenewalsView: View {
         .padding(.horizontal)
     }
 
-    private func renewalTitle(_ item: [String: Any]) -> String {
-        if let tr = item["toolRequest"] as? [String: Any] {
-            let tool = ConsoleHelpers.mapStr(tr, "toolName", "name")
-            if let u = tr["usuario"] as? [String: Any] {
-                return "\(ConsoleHelpers.mapStr(u, "nombre", "name")) · \(tool)"
-            }
-            return ConsoleHelpers.mapStr(tr, "userName", "toolName", "name")
-        }
-        return ConsoleHelpers.mapStr(item, "toolName", "userName", "name")
-    }
-
     private func load() async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await ConsoleRepository.shared.toolRenewalsPending()) ?? []
+        items = (try? await ConsoleRepository.shared.toolRenewalItems()) ?? []
     }
 
     private func approve(_ id: Int64) async {
@@ -255,9 +247,9 @@ private struct ToolRenewalsView: View {
 }
 
 private struct ToolKitsUsersView: View {
-    @State private var items: [[String: Any]] = []
+    @State private var items: [ToolItem] = []
     @State private var isLoading = true
-    @State private var selected: [String: Any]?
+    @State private var selected: ToolItem?
 
     var body: some View {
         Group {
@@ -274,18 +266,18 @@ private struct ToolKitsUsersView: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await ConsoleRepository.shared.toolKitsUsers()) ?? []
+        items = (try? await ConsoleRepository.shared.toolKitsUserItems()) ?? []
     }
 }
 
 @ViewBuilder
 private func toolList(
-    items: [[String: Any]],
+    items: [ToolItem],
     isLoading: Bool,
     query: Binding<String>,
     showSearch: Bool = true,
     empty: String,
-    onSelect: (([String: Any]) -> Void)? = nil
+    onSelect: ((ToolItem) -> Void)? = nil
 ) -> some View {
     ScrollView {
         VStack(spacing: 10) {
@@ -303,11 +295,11 @@ private func toolList(
             else if items.isEmpty {
                 Text(empty).foregroundColor(.secondary).padding(.top, 40)
             } else {
-                ForEach(items.prefix(80), id: \.toolKey) { item in
+                ForEach(items.prefix(80)) { item in
                     let card = VStack(alignment: .leading, spacing: 4) {
-                        Text(ConsoleHelpers.mapStr(item, "toolName", "name", "nombre", "userName"))
+                        Text(item.title.isEmpty ? "Herramienta" : item.title)
                             .font(.subheadline).bold()
-                        Text(ConsoleHelpers.mapStr(item, "status", "estado", "code", "sku"))
+                        Text(item.subtitle.isEmpty ? item.status : item.subtitle)
                             .font(.caption).foregroundColor(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -329,26 +321,25 @@ private func toolList(
 }
 
 @ViewBuilder
-private func toolDetail(_ item: [String: Any], backLabel: String, onBack: @escaping () -> Void) -> some View {
-    let name = ConsoleHelpers.mapStr(item, "toolName", "name", "nombre", "userName")
+private func toolDetail(_ item: ToolItem, backLabel: String, onBack: @escaping () -> Void) -> some View {
+    let name = item.title
     List {
         Section { Button(backLabel, action: onBack) }
         Section("Herramienta") {
-            tRow("Nombre",       ConsoleHelpers.mapStr(item, "toolName", "name", "nombre"))
-            tRow("Código",       ConsoleHelpers.mapStr(item, "code", "sku", "codigo"))
-            tRow("Categoría",    ConsoleHelpers.mapStr(item, "category", "categoria", "type", "tipo"))
-            tRow("Estado",       ConsoleHelpers.mapStr(item, "status", "estado", "condition", "condicion"))
-            tRow("Ubicación",    ConsoleHelpers.mapStr(item, "location", "ubicacion"))
-            tRow("Usuario",      ConsoleHelpers.mapStr(item, "userName", "usuario"))
-            tRow("Fecha inicio", ConsoleHelpers.mapStr(item, "startDate", "fechaInicio", "assignedDate"))
-            tRow("Fecha fin",    ConsoleHelpers.mapStr(item, "endDate", "returnDate", "fechaFin"))
-            tRow("Marca",        ConsoleHelpers.mapStr(item, "brand", "marca"))
-            tRow("Modelo",       ConsoleHelpers.mapStr(item, "model", "modelo"))
-            tRow("Serial",       ConsoleHelpers.mapStr(item, "serialNumber", "serial"))
+            tRow("Nombre", name)
+            tRow("Código", item.code)
+            tRow("Categoría", item.category)
+            tRow("Estado", item.status)
+            tRow("Ubicación", item.location)
+            tRow("Usuario", item.userName)
+            tRow("Fecha inicio", item.startDate)
+            tRow("Fecha fin", item.endDate)
+            tRow("Marca", item.brand)
+            tRow("Modelo", item.model)
+            tRow("Serial", item.serial)
         }
-        let notes = ConsoleHelpers.mapStr(item, "notes", "notas", "description", "descripcion", "reason", "motivo")
-        if !notes.isEmpty {
-            Section("Notas") { Text(notes).font(.footnote) }
+        if !item.notes.isEmpty {
+            Section("Notas") { Text(item.notes).font(.footnote) }
         }
     }
     .listStyle(.insetGrouped)
@@ -359,16 +350,5 @@ private func toolDetail(_ item: [String: Any], backLabel: String, onBack: @escap
 @ViewBuilder private func tRow(_ label: String, _ value: String) -> some View {
     if !value.isEmpty {
         HStack { Text(label).foregroundColor(.secondary); Spacer(); Text(value).multilineTextAlignment(.trailing) }
-    }
-}
-
-extension [String: Any] {
-    fileprivate var toolKey: String {
-        if let id = self["id"] { return "tool-\(id)" }
-        return UUID().uuidString
-    }
-    fileprivate var renewalKey: String {
-        if let id = self["id"] { return "renew-\(id)" }
-        return UUID().uuidString
     }
 }

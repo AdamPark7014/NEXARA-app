@@ -10,6 +10,7 @@ import {
   CreateComunicadoDto,
   UpdateComunicadoDto,
 } from './internal-comunicados.service.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 @Controller('internal-comunicados')
 @UseGuards(AuthGuard('jwt'))
@@ -17,32 +18,44 @@ export class InternalComunicadosController {
   constructor(private readonly svc: InternalComunicadosService) {}
 
   @Post()
-  create(@Body() body: CreateComunicadoDto, @CurrentUser() user: any) {
-    return this.svc.create(body, user.id);
+  create(
+    @Body() body: CreateComunicadoDto,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.svc.create(body, user.id, companyId);
   }
 
   @Get()
-  findAll(@Query() query: PaginationQueryDto, @Query('estado') estado?: string) {
-    return this.svc.findAll(query, estado);
+  findAll(
+    @Query() query: PaginationQueryDto,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('estado') estado?: string,
+  ) {
+    return this.svc.findAll(query, estado, companyId);
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.svc.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.svc.findOne(id, companyId);
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateComunicadoDto) {
-    return this.svc.update(id, body);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateComunicadoDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.svc.update(id, body, companyId);
   }
 
   @Patch(':id/enviar')
-  enviar(@Param('id', ParseIntPipe) id: number) {
-    return this.svc.enviar(id);
+  enviar(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.svc.enviar(id, companyId);
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.svc.remove(id);
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.svc.remove(id, companyId);
   }
 }

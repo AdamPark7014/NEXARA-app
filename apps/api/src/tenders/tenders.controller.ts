@@ -4,6 +4,7 @@ import { TendersService } from './tenders.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 const TENDERS_VIEW = [PERMISSIONS.TENDERS_VIEW, PERMISSIONS.TENDERS_MANAGE, PERMISSIONS.SALES_VIEW, PERMISSIONS.SALES_MANAGE, PERMISSIONS.CONSOLE_ADMIN];
 const TENDERS_MANAGE = [PERMISSIONS.TENDERS_MANAGE, PERMISSIONS.SALES_MANAGE, PERMISSIONS.CONSOLE_ADMIN];
@@ -15,36 +16,48 @@ export class TendersController {
 
   @Post()
   @RBAC({ anyPermissions: TENDERS_MANAGE })
-  create(@Body() dto: any, @CurrentUser() user: any) {
-    return this.service.create({ ...dto, ownerId: dto.ownerId ?? user?.id });
+  create(
+    @Body() dto: any,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.create({ ...dto, ownerId: dto.ownerId ?? user?.id }, companyId);
   }
 
   @Get()
   @RBAC({ anyPermissions: TENDERS_VIEW })
   list(
+    @CurrentCompanyId() companyId: number | null,
     @Query('status') status?: string,
     @Query('tenderType') tenderType?: string,
     @Query('ownerId') ownerId?: string,
   ) {
-    return this.service.list({ status, tenderType, ownerId: ownerId ? +ownerId : undefined });
+    return this.service.list(
+      { status, tenderType, ownerId: ownerId ? +ownerId : undefined },
+      companyId,
+    );
   }
 
   @Get('dashboard')
   @RBAC({ anyPermissions: TENDERS_VIEW })
-  dashboard() {
-    return this.service.getDashboard();
+  dashboard(@CurrentCompanyId() companyId: number | null) {
+    return this.service.getDashboard(companyId);
   }
 
   @Get(':id')
   @RBAC({ anyPermissions: TENDERS_VIEW })
-  getOne(@Param('id', ParseIntPipe) id: number) {
-    return this.service.getOne(id);
+  getOne(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.service.getOne(id, companyId);
   }
 
   @Patch(':id')
   @RBAC({ anyPermissions: TENDERS_MANAGE })
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: any) {
-    return this.service.update(id, dto);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.update(id, dto, companyId);
   }
 
   @Patch(':id/status')
@@ -52,35 +65,34 @@ export class TendersController {
   setStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { status: string; awardedToCompetitor?: string; awardNotes?: string },
+    @CurrentCompanyId() companyId: number | null,
   ) {
     return this.service.setStatus(id, body.status, {
       awardedToCompetitor: body.awardedToCompetitor,
       awardNotes: body.awardNotes,
-    });
+    }, companyId);
   }
 
   @Post(':id/promote-opportunity')
   @RBAC({ anyPermissions: TENDERS_MANAGE })
-  promote(@Param('id', ParseIntPipe) id: number) {
-    return this.service.promoteToOpportunity(id);
+  promote(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.service.promoteToOpportunity(id, companyId);
   }
 
-  // Documents
   @Get(':id/documents')
   @RBAC({ anyPermissions: TENDERS_VIEW })
-  listDocs(@Param('id', ParseIntPipe) id: number) {
-    return this.service.listDocuments(id);
+  listDocs(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.service.listDocuments(id, companyId);
   }
 
   @Post(':id/documents')
   @RBAC({ anyPermissions: TENDERS_MANAGE })
-  addDoc(@Param('id', ParseIntPipe) id: number, @Body() dto: any, @CurrentUser() user: any) {
-    return this.service.addDocument(id, { ...dto, uploadedBy: user?.id });
-  }
-
-  @Post(':id/events')
-  @RBAC({ anyPermissions: TENDERS_MANAGE })
-  addEvent(@Param('id', ParseIntPipe) id: number, @Body() dto: any) {
-    return this.service.addEvent(id, dto);
+  addDoc(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: any,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.addDocument(id, { ...dto, uploadedBy: user?.id }, companyId);
   }
 }

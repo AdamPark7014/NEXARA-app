@@ -5,6 +5,7 @@ import { saveBase64Photo } from '../../common/file-upload.util';
 import { ActivitiesService } from '../activities.service.js';
 import { PERMISSIONS } from '../../common/permissions.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
@@ -267,25 +268,28 @@ export class ActivityEvidenceService {
     };
   }
 
+  private async loadActivityForTenant(activityId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const activity = await this.prisma.activity.findFirst({
+      where: { id: activityId, ...companyWhere(tenantId) },
+      select: { id: true, estatus: true, companyId: true, workType: true },
+    });
+    assertCompanyAccess(activity, tenantId, 'Actividad');
+    return activity!;
+  }
+
   /**
    * Obtener o crear el registro de evidencias de una actividad
    */
-  async getOrCreateActivityEvidence(activityId: number) {
-    const activity = await this.prisma.activity.findUnique({
-      where: { id: activityId },
-      select: { id: true, estatus: true },
-    });
-
-    if (!activity) {
-      throw new NotFoundException('Actividad no encontrada');
-    }
+  async getOrCreateActivityEvidence(activityId: number, companyId?: number | null) {
+    const activity = await this.loadActivityForTenant(activityId, companyId);
 
     if (activity.estatus === 'Aprobada') {
       throw new ForbiddenException('La actividad ya fue aprobada y no permite nuevas evidencias');
     }
 
-    let evidence = await this.prisma.activityEvidence.findUnique({
-      where: { activityId },
+    let evidence = await this.prisma.activityEvidence.findFirst({
+      where: { activityId, ...companyWhere(activity.companyId) },
     });
 
     if (evidence?.reviewStatus === 'APPROVED') {
@@ -300,6 +304,7 @@ export class ActivityEvidenceService {
       evidence = await this.prisma.activityEvidence.create({
         data: {
           activityId,
+          companyId: activity.companyId,
           status: 'ENTRY_PHOTO',
         },
       });
@@ -316,8 +321,9 @@ export class ActivityEvidenceService {
     photoUrl: string,
     latitude: number,
     longitude: number,
+    companyId?: number | null,
   ) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId);
+    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
 
     if (evidence.status !== 'ENTRY_PHOTO') {
       throw new BadRequestException('Ya se ha guardado la foto de entrada');
@@ -338,12 +344,9 @@ export class ActivityEvidenceService {
   /**
    * Guardar fotos de evidencia (4-8 fotos)
    */
-  async saveEvidencePhotos(activityId: number, photoUrls: string[]) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId);
-    const activity = await this.prisma.activity.findUnique({
-      where: { id: activityId },
-      select: { workType: true },
-    });
+  async saveEvidencePhotos(activityId: number, photoUrls: string[], companyId?: number | null) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
+    const activity = await this.loadActivityForTenant(activityId, companyId);
     const isInventoryFlow = activity?.workType === 'PREVENTIVE_INVENTORY';
 
     if (evidence.status !== 'EVIDENCE_PHOTOS') {
@@ -377,8 +380,8 @@ export class ActivityEvidenceService {
   /**
    * Guardar hoja de servicio PDF
    */
-  async saveServiceSheetPdf(activityId: number, pdfUrl: string) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId);
+  async saveServiceSheetPdf(activityId: number, pdfUrl: string, companyId?: number | null) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
 
     if (evidence.status !== 'SERVICE_SHEET_PDF') {
       throw new BadRequestException('No estás en el paso correcto para guardar la hoja de servicio');
@@ -397,8 +400,8 @@ export class ActivityEvidenceService {
   /**
    * Completar plantilla de hoja de servicio interna
    */
-  async completeServiceSheetForm(activityId: number, data: any) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId);
+  async completeServiceSheetForm(activityId: number, data: any, companyId?: number | null) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
 
     if (evidence.status !== 'SERVICE_SHEET_DATA') {
       throw new BadRequestException('No estás en el paso correcto para completar la plantilla');
@@ -422,8 +425,9 @@ export class ActivityEvidenceService {
     photoUrl: string,
     latitude: number,
     longitude: number,
+    companyId?: number | null,
   ) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId);
+    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
 
     if (evidence.status !== 'EXIT_PHOTO') {
       throw new BadRequestException('No estás en el paso correcto para guardar la foto de salida');
@@ -465,9 +469,10 @@ export class ActivityEvidenceService {
   async getActivityEvidence(
     activityId: number,
     requester?: { id: number; permissions?: string[]; isSuperAdmin?: boolean },
+    companyId?: number | null,
   ) {
-    const evidence = await this.prisma.activityEvidence.findUnique({
-      where: { activityId },
+    const evidence = await this.prisma.activityEvidence.findFirst({
+      where: { activityId, ...companyWhere(companyId ?? null) },
       include: {
         activity: true,
       },
@@ -476,6 +481,8 @@ export class ActivityEvidenceService {
     if (!evidence) {
       throw new NotFoundException('Evidencias no encontradas');
     }
+
+    assertCompanyAccess(evidence, companyId, 'Evidencia');
 
     if (requester?.id) {
       const isResponsible = evidence.activity.responsableId === requester.id;
@@ -1043,8 +1050,8 @@ export class ActivityEvidenceService {
   /**
    * Actualizar foto de evidencia (remover y reemplazar)
    */
-  async updateEvidencePhoto(activityId: number, index: number, newPhotoUrl: string) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId);
+  async updateEvidencePhoto(activityId: number, index: number, newPhotoUrl: string, companyId?: number | null) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
 
     if (!evidence.evidencePhotos || evidence.evidencePhotos.length === 0) {
       throw new BadRequestException('No hay fotos de evidencia para actualizar');
@@ -1068,8 +1075,8 @@ export class ActivityEvidenceService {
   /**
    * Remover foto de evidencia
    */
-  async removeEvidencePhoto(activityId: number, index: number) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId);
+  async removeEvidencePhoto(activityId: number, index: number, companyId?: number | null) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
 
     if (!evidence.evidencePhotos || evidence.evidencePhotos.length === 0) {
       throw new BadRequestException('No hay fotos de evidencia para remover');
@@ -1079,10 +1086,7 @@ export class ActivityEvidenceService {
       throw new BadRequestException('Índice de foto inválido');
     }
 
-    const activity = await this.prisma.activity.findUnique({
-      where: { id: activityId },
-      select: { workType: true },
-    });
+    const activity = await this.loadActivityForTenant(activityId, companyId);
     const minPhotos = activity?.workType === 'PREVENTIVE_INVENTORY' ? 1 : 4;
     if (evidence.evidencePhotos.length <= minPhotos) {
       throw new BadRequestException(`Mínimo ${minPhotos} foto${minPhotos > 1 ? 's' : ''} de evidencia son requeridas`);
@@ -1101,8 +1105,8 @@ export class ActivityEvidenceService {
   /**
    * Aprobar evidencias (Admin)
    */
-  async approveEvidence(activityId: number, reviewerId: number, notes?: string) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId);
+  async approveEvidence(activityId: number, reviewerId: number, notes?: string, companyId?: number | null) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
 
     if (evidence.status !== 'COMPLETED') {
       throw new BadRequestException('Las evidencias deben estar completadas antes de aprobar');
@@ -1163,9 +1167,12 @@ export class ActivityEvidenceService {
       rejectedSteps?: string[];
       resetFullFlow?: boolean;
     },
+    companyId?: number | null,
   ) {
-    const evidence = await this.prisma.activityEvidence.findUnique({
-      where: { activityId },
+    await this.loadActivityForTenant(activityId, companyId);
+
+    const evidence = await this.prisma.activityEvidence.findFirst({
+      where: { activityId, ...companyWhere(companyId ?? null) },
     });
 
     if (!evidence || evidence.status !== 'COMPLETED') {
@@ -1267,8 +1274,8 @@ export class ActivityEvidenceService {
   /**
    * Reenviar paso específico (Usuario corrige)
    */
-  async resubmitStep(activityId: number, step: string, data: any) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId);
+  async resubmitStep(activityId: number, step: string, data: any, companyId?: number | null) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId, companyId);
 
     if (evidence.reviewStatus !== 'REJECTED') {
       throw new BadRequestException('Solo puedes reenviar si fue rechazada');
@@ -1304,10 +1311,7 @@ export class ActivityEvidenceService {
         break;
 
       case 'EVIDENCE_PHOTOS': {
-        const activity = await this.prisma.activity.findUnique({
-          where: { id: activityId },
-          select: { workType: true },
-        });
+        const activity = await this.loadActivityForTenant(activityId, companyId);
         const isInventoryFlow = activity?.workType === 'PREVENTIVE_INVENTORY';
 
         if (isInventoryFlow) {

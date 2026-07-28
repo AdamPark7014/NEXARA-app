@@ -7,6 +7,7 @@ import { generateServiceSheetPdf } from './service-sheet-pdf.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { PERMISSIONS } from '../common/permissions.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class ServiceSheetsService {
@@ -15,11 +16,17 @@ export class ServiceSheetsService {
     private readonly serviceClientsService: ServiceClientsService,
   ) {}
 
-  async upsert(activityId: number, dto: UpsertServiceSheetDto) {
-    const activity = await this.prisma['activity'].findUnique({
-      where: { id: activityId },
+  private async loadActivityForTenant(activityId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const activity = await this.prisma['activity'].findFirst({
+      where: { id: activityId, ...companyWhere(tenantId) },
     });
-    if (!activity) throw new NotFoundException('Actividad no encontrada');
+    assertCompanyAccess(activity, tenantId, 'Actividad');
+    return activity!;
+  }
+
+  async upsert(activityId: number, dto: UpsertServiceSheetDto, companyId?: number | null) {
+    const activity = await this.loadActivityForTenant(activityId, companyId);
 
     const sheet = await this.prisma['serviceSheet'].upsert({
       where: { activityId },
@@ -34,6 +41,7 @@ export class ServiceSheetsService {
       },
       create: {
         activityId,
+        companyId: activity.companyId,
         managerName: dto.managerName?.trim() || null,
         managerRole: dto.managerRole?.trim() || null,
         workSummary: dto.workSummary || null,
@@ -44,11 +52,12 @@ export class ServiceSheetsService {
       },
     });
 
-    await this.tryFinalizeActivity(activityId);
+    await this.tryFinalizeActivity(activityId, companyId);
     return sheet;
   }
 
-  async findAll(user: any) {
+  async findAll(user: any, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const isSuperAdmin = Boolean(user?.isSuperAdmin);
     const isConsoleAdmin = Boolean(user?.permissions?.includes?.(PERMISSIONS.CONSOLE_ADMIN));
     const departmentId = user?.departmentId;
@@ -56,22 +65,36 @@ export class ServiceSheetsService {
 
     const isOpsManager = isConsoleAdmin || Boolean(user?.permissions?.includes?.(PERMISSIONS.ACTIVITIES_MANAGE));
 
-    let where: Prisma.ServiceSheetWhereInput | undefined;
+    const tenantScope: Prisma.ServiceSheetWhereInput = {
+      activity: companyWhere(tenantId) as Prisma.ActivityWhereInput,
+    };
+
+    let where: Prisma.ServiceSheetWhereInput;
     if (isSuperAdmin) {
-      where = undefined;
+      where = tenantScope;
     } else if (isOpsManager && departmentId) {
       where = {
-        activity: {
-          responsable: {
-            departmentId,
+        AND: [
+          tenantScope,
+          {
+            activity: {
+              responsable: {
+                departmentId,
+              },
+            },
           },
-        },
+        ],
       };
     } else if (userId) {
       where = {
-        activity: {
-          responsableId: userId,
-        },
+        AND: [
+          tenantScope,
+          {
+            activity: {
+              responsableId: userId,
+            },
+          },
+        ],
       };
     } else {
       where = { id: -1 };
@@ -100,18 +123,26 @@ export class ServiceSheetsService {
     }));
   }
 
-  async findByActivity(activityId: number) {
-    const sheet = await this.prisma['serviceSheet'].findUnique({ where: { activityId } });
+  async findByActivity(activityId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const sheet = await this.prisma['serviceSheet'].findFirst({
+      where: {
+        activityId,
+        activity: companyWhere(tenantId) as Prisma.ActivityWhereInput,
+      },
+    });
     if (!sheet) throw new NotFoundException('Hoja de servicio no encontrada');
     return sheet;
   }
 
-  async getPdf(activityId: number) {
-    const activity = await this.prisma['activity'].findUnique({
-      where: { id: activityId },
+  async getPdf(activityId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const activity = await this.prisma['activity'].findFirst({
+      where: { id: activityId, ...companyWhere(tenantId) },
       include: { client: true, serviceSheet: true },
     });
-    if (!activity || !activity.serviceSheet) {
+    assertCompanyAccess(activity, tenantId, 'Actividad');
+    if (!activity.serviceSheet) {
       throw new NotFoundException('Hoja de servicio no encontrada');
     }
 
@@ -165,12 +196,25 @@ export class ServiceSheetsService {
     return pdf;
   }
 
-  async tryFinalizeActivity(activityId: number) {
-    const activity = await this.prisma['activity'].findUnique({
-      where: { id: activityId },
+  async tryFinalizeActivity(activityId: number, companyId?: number | null) {
+    const tenantId =
+      companyId != null && Number.isFinite(Number(companyId)) && Number(companyId) > 0
+        ? Number(companyId)
+        : null;
+    const activity = await this.prisma['activity'].findFirst({
+      where: tenantId
+        ? { id: activityId, ...companyWhere(tenantId) }
+        : { id: activityId },
       include: { serviceSheet: true },
     });
     if (!activity || !activity.serviceSheet) return;
+    if (tenantId != null) {
+      try {
+        assertCompanyAccess(activity, tenantId, 'Actividad');
+      } catch {
+        return;
+      }
+    }
 
     if (!this.isServiceSheetComplete(activity.serviceSheet)) return;
 
@@ -182,7 +226,10 @@ export class ServiceSheetsService {
     ];
 
     const evidences = await this.prisma['evidence'].findMany({
-      where: { actividadId: activityId },
+      where: {
+        actividadId: activityId,
+        ...(tenantId != null ? companyWhere(tenantId) : {}),
+      },
       select: { tipoEvidencia: true },
     });
 
@@ -201,7 +248,11 @@ export class ServiceSheetsService {
     }
 
     if (!activity.serviceSheet.pdfUrl) {
-      await this.getPdf(activityId);
+      if (tenantId != null) {
+        await this.getPdf(activityId, tenantId);
+      } else {
+        await this.getPdf(activityId, activity.companyId);
+      }
     }
 
     await this.serviceClientsService.requestClientSurvey(activityId);

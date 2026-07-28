@@ -80,20 +80,30 @@ export class VentasOportunidadesController {
   @Get(':id/cotizaciones')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  listQuotes(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.ventasService.listOpportunityQuotes(id, user);
+  listQuotes(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.listOpportunityQuotes(id, user, companyId);
   }
 
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateSalesOpportunityDto, @CurrentUser() user: any) {
-    const updated = await this.ventasService.updateOpportunity(id, dto, user);
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateSalesOpportunityDto,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const updated = await this.ventasService.updateOpportunity(id, dto, user, companyId);
     await this.ventasService.createAuditEvent({
       action: dto?.stage ? 'opportunity.stage.update' : 'opportunity.update',
       entityType: 'opportunity',
       entityId: updated.id,
       actorId: user?.id,
+      companyId,
       metadata: { stage: updated.stage, probability: updated.probability },
     });
     return updated;
@@ -102,13 +112,18 @@ export class VentasOportunidadesController {
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    const removed = await this.ventasService.deleteOpportunity(id, user);
+  async remove(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const removed = await this.ventasService.deleteOpportunity(id, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'opportunity.delete',
       entityType: 'opportunity',
       entityId: removed.id,
       actorId: user?.id,
+      companyId,
     });
     return removed;
   }
@@ -120,13 +135,15 @@ export class VentasOportunidadesController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreateSalesOpportunityNoteDto,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.ventasService.addOpportunityNote(id, dto, user).then(async (note) => {
+    return this.ventasService.addOpportunityNote(id, dto, user, companyId).then(async (note) => {
       await this.ventasService.createAuditEvent({
         action: 'opportunity.note.add',
         entityType: 'opportunity',
         entityId: id,
         actorId: user?.id,
+        companyId,
         metadata: { noteId: note.id },
       });
       return note;
@@ -141,6 +158,7 @@ export class VentasOportunidadesController {
     @Param('id', ParseIntPipe) id: number,
     @UploadedFiles() files: any[],
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     if (!files || files.length === 0) throw new BadRequestException('No hay archivos');
     const invalid = files.find((file) => {
@@ -157,12 +175,13 @@ export class VentasOportunidadesController {
       kind: (file.mimetype || '').includes('pdf') ? 'pdf' : 'image',
     }));
 
-    const evidences = await this.ventasService.addOpportunityEvidence(id, payload, user);
+    const evidences = await this.ventasService.addOpportunityEvidence(id, payload, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'opportunity.evidence.add',
       entityType: 'opportunity',
       entityId: id,
       actorId: user?.id,
+      companyId,
       metadata: { count: payload.length },
     });
     return evidences;
@@ -175,13 +194,15 @@ export class VentasOportunidadesController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreateSalesOpportunityQuoteDto,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.ventasService.addOpportunityQuote(id, dto, user).then(async (quote) => {
+    return this.ventasService.addOpportunityQuote(id, dto, user, companyId).then(async (quote) => {
       await this.ventasService.createAuditEvent({
         action: 'opportunity.quote.add',
         entityType: 'opportunity',
         entityId: id,
         actorId: user?.id,
+        companyId,
         metadata: { quoteId: quote.id },
       });
       return quote;
@@ -197,6 +218,7 @@ export class VentasOportunidadesController {
     @UploadedFile() file: any,
     @Body('versionLabel') versionLabel: string,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     if (!file) throw new BadRequestException('Archivo requerido');
     const name = (file.originalname || '').toLowerCase();
@@ -206,12 +228,13 @@ export class VentasOportunidadesController {
       pdfUrl: `/uploads/sales-quotes/${file.filename}`,
       versionLabel: versionLabel?.trim() || undefined,
     };
-    const quote = await this.ventasService.addOpportunityQuote(id, payload, user);
+    const quote = await this.ventasService.addOpportunityQuote(id, payload, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'opportunity.quote.upload',
       entityType: 'opportunity',
       entityId: id,
       actorId: user?.id,
+      companyId,
       metadata: { quoteId: quote.id },
     });
     return quote;

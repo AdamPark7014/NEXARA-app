@@ -13,6 +13,7 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { getOrgTier, ORG_ROLE_KEYS, ORG_TIER, type OrgRoleKey } from '../common/org-roles.js';
 import { isSuperAdminEmail } from '../common/platform-accounts.js';
 import { resolveUploadsDir } from '../common/uploads-path.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 
 type UploadedChatFile = {
   originalname: string;
@@ -47,10 +48,21 @@ export class ChatService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  async ensureDefaults(userId: number) {
+  private async resolveUserCompanyId(userId: number, explicit?: number | null): Promise<number> {
+    if (explicit != null && Number.isFinite(Number(explicit))) return Number(explicit);
+    const membership = await this.prisma.userCompany.findFirst({
+      where: { userId },
+      orderBy: [{ isDefault: 'desc' }, { id: 'asc' }],
+      select: { companyId: true },
+    });
+    return resolveRequiredCompanyId(this.prisma, membership?.companyId ?? null);
+  }
+
+  async ensureDefaults(userId: number, companyId?: number | null) {
+    const cid = await this.resolveUserCompanyId(userId, companyId);
     // Soft-retire the old DMS channel so Chat is not tied to Documents.
     await this.prisma.chatChannel.updateMany({
-      where: { slug: 'documentos', isArchived: false },
+      where: { slug: 'documentos', companyId: cid, isArchived: false },
       data: {
         isArchived: true,
         topic: 'Archivado — usar Chat general',
@@ -73,30 +85,42 @@ export class ChatService {
     ];
 
     for (const d of defaults) {
-      const channel = await this.prisma.chatChannel.upsert({
-        where: { slug: d.slug },
-        create: {
-          kind: ChatChannelKind.PUBLIC,
-          slug: d.slug,
-          name: d.name,
-          topic: d.topic,
-          description: d.description,
-          createdById: userId,
-        },
-        update: {
-          topic: d.topic,
-          description: d.description,
-          isArchived: false,
-        },
+      let channel = await this.prisma.chatChannel.findFirst({
+        where: { slug: d.slug, companyId: cid },
       });
-      await this.syncOrgChannelMembers(channel.id);
+      if (!channel) {
+        channel = await this.prisma.chatChannel.create({
+          data: {
+            kind: ChatChannelKind.PUBLIC,
+            slug: d.slug,
+            name: d.name,
+            topic: d.topic,
+            description: d.description,
+            createdById: userId,
+            companyId: cid,
+          },
+        });
+      } else {
+        channel = await this.prisma.chatChannel.update({
+          where: { id: channel.id },
+          data: {
+            topic: d.topic,
+            description: d.description,
+            isArchived: false,
+          },
+        });
+      }
+      await this.syncOrgChannelMembers(channel.id, cid);
     }
   }
 
-  /** Une a todos los usuarios activos al canal org y saca a los inactivos. */
-  async syncOrgChannelMembers(channelId: number) {
+  /** Une a usuarios activos de la empresa al canal org y saca a los inactivos. */
+  async syncOrgChannelMembers(channelId: number, companyId?: number) {
+    const memberWhere = companyId
+      ? { isActive: true, companyMemberships: { some: { companyId } } }
+      : { isActive: true };
     const activeUsers = await this.prisma.user.findMany({
-      where: { isActive: true },
+      where: memberWhere,
       select: { id: true },
     });
     if (activeUsers.length) {
@@ -118,9 +142,10 @@ export class ChatService {
   }
 
   /** Alta de un usuario nuevo en canales org (#general, #anuncios). */
-  async addUserToOrgChannels(userId: number) {
+  async addUserToOrgChannels(userId: number, companyId?: number | null) {
+    const cid = await this.resolveUserCompanyId(userId, companyId);
     const channels = await this.prisma.chatChannel.findMany({
-      where: { slug: { in: ['general', 'anuncios'] }, isArchived: false },
+      where: { slug: { in: ['general', 'anuncios'] }, companyId: cid, isArchived: false },
       select: { id: true },
     });
     for (const ch of channels) {
@@ -199,14 +224,26 @@ export class ChatService {
     channelId: number,
     userId: number,
     opts?: { write?: boolean },
+    companyId?: number | null,
   ) {
     const write = Boolean(opts?.write);
-    const channel = await this.prisma.chatChannel.findUnique({
-      where: { id: channelId },
-      include: {
-        members: { where: { userId }, take: 1 },
-      },
-    });
+    const channel =
+      companyId != null
+        ? await this.prisma.chatChannel.findFirst({
+            where: { id: channelId, ...companyWhere(companyId) },
+            include: {
+              members: { where: { userId }, take: 1 },
+            },
+          })
+        : await this.prisma.chatChannel.findUnique({
+            where: { id: channelId },
+            include: {
+              members: { where: { userId }, take: 1 },
+            },
+          });
+    if (companyId != null) {
+      assertCompanyAccess(channel, companyId, 'Canal');
+    }
     if (!channel || channel.isArchived || channel.kind === ChatChannelKind.DOCUMENT) {
       throw new NotFoundException('Canal no encontrado');
     }
@@ -247,13 +284,15 @@ export class ChatService {
     throw new ForbiddenException('No tienes acceso a este canal');
   }
 
-  async listChannels(userId: number) {
-    await this.ensureDefaults(userId);
+  async listChannels(userId: number, companyId?: number | null) {
+    const cid = await this.resolveUserCompanyId(userId, companyId);
+    await this.ensureDefaults(userId, cid);
     const scope = await this.resolveChatScope(userId);
 
     const where: Prisma.ChatChannelWhereInput = {
       isArchived: false,
       kind: { not: ChatChannelKind.DOCUMENT },
+      ...companyWhere(cid),
     };
 
     if (scope.isOmniscient) {
@@ -351,8 +390,8 @@ export class ChatService {
     });
   }
 
-  async getChannel(channelId: number, userId: number) {
-    const access = await this.assertChannelAccess(channelId, userId);
+  async getChannel(channelId: number, userId: number, companyId?: number | null) {
+    const access = await this.assertChannelAccess(channelId, userId, undefined, companyId);
     const channel = access.channel;
     const members = await this.prisma.chatChannelMember.findMany({
       where: { channelId, user: { isActive: true } },
@@ -411,7 +450,9 @@ export class ChatService {
   async createChannel(
     userId: number,
     input: { name: string; kind?: 'PUBLIC' | 'PRIVATE'; topic?: string; description?: string },
+    companyId?: number | null,
   ) {
+    const cid = await this.resolveUserCompanyId(userId, companyId);
     const name = input.name?.trim();
     if (!name || name.length < 2) throw new BadRequestException('Nombre de canal inválido');
     const kind = input.kind === 'PRIVATE' ? ChatChannelKind.PRIVATE : ChatChannelKind.PUBLIC;
@@ -425,7 +466,7 @@ export class ChatService {
     const slug = kind === ChatChannelKind.PUBLIC ? slugBase || `canal-${Date.now()}` : null;
 
     if (slug) {
-      const exists = await this.prisma.chatChannel.findUnique({ where: { slug } });
+      const exists = await this.prisma.chatChannel.findFirst({ where: { slug, companyId: cid } });
       if (exists) throw new BadRequestException('Ya existe un canal con ese nombre');
     }
 
@@ -437,21 +478,23 @@ export class ChatService {
         topic: input.topic?.trim() || null,
         description: input.description?.trim() || null,
         createdById: userId,
+        companyId: cid,
         members: {
           create: { userId, role: 'owner' },
         },
       },
     });
 
-    return this.getChannel(channel.id, userId);
+    return this.getChannel(channel.id, userId, cid);
   }
 
   private dmKey(a: number, b: number) {
     return [a, b].sort((x, y) => x - y).join(':');
   }
 
-  async openDirect(userId: number, otherUserId: number) {
+  async openDirect(userId: number, otherUserId: number, companyId?: number | null) {
     if (userId === otherUserId) throw new BadRequestException('No puedes abrir un DM contigo mismo');
+    const cid = await this.resolveUserCompanyId(userId, companyId);
     const other = await this.prisma.user.findFirst({
       where: { id: otherUserId, isActive: true },
       select: authorSelect,
@@ -459,7 +502,7 @@ export class ChatService {
     if (!other) throw new NotFoundException('Usuario no encontrado');
 
     const key = this.dmKey(userId, otherUserId);
-    let channel = await this.prisma.chatChannel.findUnique({ where: { dmKey: key } });
+    let channel = await this.prisma.chatChannel.findFirst({ where: { dmKey: key, companyId: cid } });
     if (!channel) {
       channel = await this.prisma.chatChannel.create({
         data: {
@@ -468,6 +511,7 @@ export class ChatService {
           name: other.nombre || other.email || `Usuario ${other.id}`,
           topic: 'Mensaje directo',
           createdById: userId,
+          companyId: cid,
           members: {
             create: [
               { userId, role: 'member' },
@@ -494,7 +538,7 @@ export class ChatService {
         ? other.nombre || other.email
         : channel.name;
 
-    const detail = await this.getChannel(channel.id, userId);
+    const detail = await this.getChannel(channel.id, userId, cid);
     return { ...detail, name: display, peer: other, self: me };
   }
 
@@ -502,8 +546,9 @@ export class ChatService {
     channelId: number,
     userId: number,
     opts?: { beforeId?: number; aroundId?: number; limit?: number; parentId?: number | null },
+    companyId?: number | null,
   ) {
-    await this.assertChannelAccess(channelId, userId);
+    await this.assertChannelAccess(channelId, userId, undefined, companyId);
     const limit = Math.min(Math.max(opts?.limit ?? 50, 1), 100);
     const parentId = opts?.parentId === undefined ? null : opts.parentId;
 
@@ -603,8 +648,13 @@ export class ChatService {
     };
   }
 
-  async postMessage(channelId: number, userId: number, input: PostMessageInput) {
-    const access = await this.assertChannelAccess(channelId, userId, { write: true });
+  async postMessage(
+    channelId: number,
+    userId: number,
+    input: PostMessageInput,
+    companyId?: number | null,
+  ) {
+    const access = await this.assertChannelAccess(channelId, userId, { write: true }, companyId);
     const channel = access.channel;
     const body = (input.body ?? '').trim();
     if (!body && !input.attachmentUrl) {
@@ -629,6 +679,7 @@ export class ChatService {
         body: body || (input.attachmentName ? `Archivo: ${input.attachmentName}` : ''),
         attachmentUrl: input.attachmentUrl ?? null,
         attachmentName: input.attachmentName ?? null,
+        companyId: channel.companyId,
       },
       include: {
         author: { select: authorSelect },
@@ -717,8 +768,8 @@ export class ChatService {
     );
   }
 
-  async markRead(channelId: number, userId: number) {
-    const access = await this.assertChannelAccess(channelId, userId);
+  async markRead(channelId: number, userId: number, companyId?: number | null) {
+    const access = await this.assertChannelAccess(channelId, userId, undefined, companyId);
     if (access.readOnly) return { ok: true };
     await this.prisma.chatChannelMember.upsert({
       where: { channelId_userId: { channelId, userId } },
@@ -728,15 +779,25 @@ export class ChatService {
     return { ok: true };
   }
 
-  async toggleReaction(messageId: number, userId: number, emoji: string) {
+  async toggleReaction(
+    messageId: number,
+    userId: number,
+    emoji: string,
+    companyId?: number | null,
+  ) {
     const clean = (emoji ?? '').trim().slice(0, 32);
     if (!clean) throw new BadRequestException('Emoji inválido');
 
     const message = await this.prisma.chatMessage.findFirst({
-      where: { id: messageId, deletedAt: null },
+      where: {
+        id: messageId,
+        deletedAt: null,
+        ...(companyId != null ? companyWhere(companyId) : {}),
+      },
     });
     if (!message) throw new NotFoundException('Mensaje no encontrado');
-    await this.assertChannelAccess(message.channelId, userId, { write: true });
+    if (companyId != null) assertCompanyAccess(message, companyId, 'Mensaje');
+    await this.assertChannelAccess(message.channelId, userId, { write: true }, companyId);
 
     const existing = await this.prisma.chatMessageReaction.findUnique({
       where: {
@@ -766,12 +827,14 @@ export class ChatService {
     return payload;
   }
 
-  async listColleagues(userId: number, q?: string) {
+  async listColleagues(userId: number, q?: string, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const query = (q ?? '').trim();
     return this.prisma.user.findMany({
       where: {
         isActive: true,
         id: { not: userId },
+        companyMemberships: { some: { companyId: tenantId } },
         ...(query
           ? {
               OR: [
@@ -791,8 +854,10 @@ export class ChatService {
     userId: number,
     q: string,
     kind?: 'USER' | 'ACTIVITY' | 'EVIDENCE',
+    companyId?: number | null,
   ) {
     const query = (q ?? '').trim().slice(0, 100);
+    const tenantId = requireCompanyId(companyId);
     const scope = await this.resolveChatScope(userId);
     const scopedUserIds = [userId, ...scope.reportIds];
     const activityScope: Prisma.ActivityWhereInput = scope.isOmniscient
@@ -809,6 +874,7 @@ export class ChatService {
         ? this.prisma.user.findMany({
             where: {
               isActive: true,
+              companyMemberships: { some: { companyId: tenantId } },
               ...(query
                 ? {
                     OR: [
@@ -909,21 +975,31 @@ export class ChatService {
     ];
   }
 
-  async editMessage(messageId: number, userId: number, body: string) {
+  async editMessage(
+    messageId: number,
+    userId: number,
+    body: string,
+    companyId?: number | null,
+  ) {
     const clean = (body ?? '').trim();
     if (!clean) throw new BadRequestException('El mensaje no puede estar vacío');
     if (clean.length > 8000) throw new BadRequestException('Mensaje demasiado largo');
 
     const message = await this.prisma.chatMessage.findFirst({
-      where: { id: messageId, deletedAt: null },
+      where: {
+        id: messageId,
+        deletedAt: null,
+        ...(companyId != null ? companyWhere(companyId) : {}),
+      },
     });
     if (!message) throw new NotFoundException('Mensaje no encontrado');
+    if (companyId != null) assertCompanyAccess(message, companyId, 'Mensaje');
     if (message.authorId !== userId) throw new ForbiddenException('Solo puedes editar tus mensajes');
     const editDeadline = message.createdAt.getTime() + 60 * 60 * 1000;
     if (Date.now() > editDeadline) {
       throw new ForbiddenException('Los mensajes solo se pueden editar durante la primera hora');
     }
-    await this.assertChannelAccess(message.channelId, userId, { write: true });
+    await this.assertChannelAccess(message.channelId, userId, { write: true }, companyId);
 
     const updated = await this.prisma.chatMessage.update({
       where: { id: messageId },
@@ -953,8 +1029,13 @@ export class ChatService {
     return payload;
   }
 
-  async updateTopic(channelId: number, userId: number, topic: string) {
-    await this.assertChannelAccess(channelId, userId, { write: true });
+  async updateTopic(
+    channelId: number,
+    userId: number,
+    topic: string,
+    companyId?: number | null,
+  ) {
+    await this.assertChannelAccess(channelId, userId, { write: true }, companyId);
     const clean = (topic ?? '').trim().slice(0, 500);
     const channel = await this.prisma.chatChannel.update({
       where: { id: channelId },
@@ -964,19 +1045,29 @@ export class ChatService {
       id: channelId,
       topic: channel.topic,
     });
-    return this.getChannel(channelId, userId);
+    return this.getChannel(channelId, userId, companyId);
   }
 
-  async addMember(channelId: number, userId: number, targetUserId: number) {
-    const access = await this.assertChannelAccess(channelId, userId, { write: true });
+  async addMember(
+    channelId: number,
+    userId: number,
+    targetUserId: number,
+    companyId?: number | null,
+  ) {
+    const access = await this.assertChannelAccess(channelId, userId, { write: true }, companyId);
     if (
       access.channel.kind !== ChatChannelKind.PUBLIC &&
       access.channel.kind !== ChatChannelKind.PRIVATE
     ) {
       throw new BadRequestException('Este tipo de conversación no admite invitaciones');
     }
+    const tenantId = requireCompanyId(companyId);
     const target = await this.prisma.user.findFirst({
-      where: { id: targetUserId, isActive: true },
+      where: {
+        id: targetUserId,
+        isActive: true,
+        companyMemberships: { some: { companyId: tenantId } },
+      },
       select: { id: true },
     });
     if (!target) throw new NotFoundException('Usuario no encontrado');
@@ -989,11 +1080,17 @@ export class ChatService {
 
     this.realtime.emitToRoom(this.room(channelId), 'chat:members-changed', { channelId });
     this.realtime.emitToUser(targetUserId, 'chat:members-changed', { channelId });
-    return this.getChannel(channelId, userId);
+    return this.getChannel(channelId, userId, companyId);
   }
 
-  async leaveChannel(channelId: number, userId: number) {
-    const channel = await this.prisma.chatChannel.findUnique({ where: { id: channelId } });
+  async leaveChannel(channelId: number, userId: number, companyId?: number | null) {
+    const channel =
+      companyId != null
+        ? await this.prisma.chatChannel.findFirst({
+            where: { id: channelId, ...companyWhere(companyId) },
+          })
+        : await this.prisma.chatChannel.findUnique({ where: { id: channelId } });
+    if (companyId != null) assertCompanyAccess(channel, companyId, 'Canal');
     if (!channel) throw new NotFoundException('Canal no encontrado');
     if (channel.kind === ChatChannelKind.DIRECT) {
       throw new BadRequestException('No puedes salir de un mensaje directo');
@@ -1006,8 +1103,13 @@ export class ChatService {
     return { ok: true };
   }
 
-  async setChannelMuted(channelId: number, userId: number, muted: boolean) {
-    const access = await this.assertChannelAccess(channelId, userId);
+  async setChannelMuted(
+    channelId: number,
+    userId: number,
+    muted: boolean,
+    companyId?: number | null,
+  ) {
+    const access = await this.assertChannelAccess(channelId, userId, undefined, companyId);
     if (access.supervised || access.readOnly) {
       throw new ForbiddenException('No puedes silenciar una conversación en solo lectura');
     }
@@ -1017,11 +1119,11 @@ export class ChatService {
       create: { channelId, userId, role: 'member', mutedUntil },
       update: { mutedUntil },
     });
-    return this.getChannel(channelId, userId);
+    return this.getChannel(channelId, userId, companyId);
   }
 
-  async listPinnedMessages(channelId: number, userId: number) {
-    await this.assertChannelAccess(channelId, userId);
+  async listPinnedMessages(channelId: number, userId: number, companyId?: number | null) {
+    await this.assertChannelAccess(channelId, userId, undefined, companyId);
     const rows = await this.prisma.chatMessage.findMany({
       where: {
         channelId,
@@ -1039,12 +1141,17 @@ export class ChatService {
     return { messages: rows.map((m) => this.serializeMessage(m)) };
   }
 
-  async togglePin(messageId: number, userId: number) {
+  async togglePin(messageId: number, userId: number, companyId?: number | null) {
     const message = await this.prisma.chatMessage.findFirst({
-      where: { id: messageId, deletedAt: null },
+      where: {
+        id: messageId,
+        deletedAt: null,
+        ...(companyId != null ? companyWhere(companyId) : {}),
+      },
     });
     if (!message) throw new NotFoundException('Mensaje no encontrado');
-    await this.assertChannelAccess(message.channelId, userId, { write: true });
+    if (companyId != null) assertCompanyAccess(message, companyId, 'Mensaje');
+    await this.assertChannelAccess(message.channelId, userId, { write: true }, companyId);
 
     const updated = await this.prisma.chatMessage.update({
       where: { id: messageId },
@@ -1063,10 +1170,10 @@ export class ChatService {
     return payload;
   }
 
-  async searchMessages(userId: number, q: string, channelId?: number) {
+  async searchMessages(userId: number, q: string, channelId?: number, companyId?: number | null) {
     const query = (q ?? '').trim();
     if (query.length < 2) return { messages: [] };
-    if (channelId) await this.assertChannelAccess(channelId, userId);
+    if (channelId) await this.assertChannelAccess(channelId, userId, undefined, companyId);
 
     const scope = await this.resolveChatScope(userId);
     const where: Prisma.ChatChannelWhereInput = {

@@ -7,33 +7,57 @@ final class CrmRepository {
     private init() {}
 
     func cotizaciones() async throws -> [[String: Any]] {
+        try await cotizacionItems().map(\.raw)
+    }
+
+    func cotizacionItems() async throws -> [Cotizacion] {
         if let data = try? await api.get("ventas/cotizaciones") {
-            let list = ApiClient.decodeMapList(data)
+            let list = ApiClient.decodeMapList(data).map { Cotizacion(raw: $0) }
             if !list.isEmpty { return list }
         }
-        return ApiClient.decodeMapList(try await api.get("cotizaciones"))
+        return ApiClient.decodeMapList(try await api.get("cotizaciones")).map { Cotizacion(raw: $0) }
     }
 
     func oportunidades() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("ventas/oportunidades"))
+        try await opportunityItems().map(\.raw)
+    }
+
+    func opportunityItems() async throws -> [CrmOpportunity] {
+        ApiClient.decodeMapList(try await api.get("ventas/oportunidades")).map { CrmOpportunity(raw: $0) }
     }
 
     func clientes() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("ventas/clientes"))
+        try await clientItems().map(\.raw)
+    }
+
+    func clientItems() async throws -> [CrmClient] {
+        ApiClient.decodeMapList(try await api.get("ventas/clientes")).map { CrmClient(raw: $0) }
     }
 
     func leads() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("ventas/leads"))
+        try await leadItems().map(\.raw)
+    }
+
+    func leadItems() async throws -> [CrmLead] {
+        ApiClient.decodeMapList(try await api.get("ventas/leads")).map { CrmLead(raw: $0) }
     }
 
     func proyectos() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("ventas/proyectos"))
+        try await projectItems().map(\.raw)
+    }
+
+    func projectItems() async throws -> [CrmSalesProject] {
+        ApiClient.decodeMapList(try await api.get("ventas/proyectos")).map { CrmSalesProject(raw: $0) }
+    }
+
+    func productos(search: String? = nil) async throws -> [CrmProduct] {
+        var q: [String: String] = [:]
+        if let s = search, !s.isEmpty { q["search"] = s }
+        return ApiClient.decodeMapList(try await api.get("catalog/products", query: q)).map { CrmProduct(raw: $0) }
     }
 
     func products(search: String? = nil) async throws -> [[String: Any]] {
-        var q: [String: String] = [:]
-        if let s = search, !s.isEmpty { q["search"] = s }
-        return ApiClient.decodeMapList(try await api.get("catalog/products", query: q))
+        try await productos(search: search).map(\.raw)
     }
 
     func salesDashboardRaw() async throws -> Data {
@@ -41,34 +65,65 @@ final class CrmRepository {
     }
 
     func calendarEvents() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("calendar/events"))
+        try await calendarEventItems().map(\.raw)
+    }
+
+    func calendarEventItems() async throws -> [CalendarEvent] {
+        ApiClient.decodeMapList(try await api.get("calendar/events")).map { CalendarEvent(raw: $0) }
     }
 
     func tenders() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("tenders"))
+        try await tenderItems().map(\.raw)
+    }
+
+    func tenderItems() async throws -> [Tender] {
+        ApiClient.decodeMapList(try await api.get("tenders")).map { Tender(raw: $0) }
     }
 
     func salesTargets() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("sales-targets"))
+        try await salesTargetItems().map(\.raw)
+    }
+
+    func salesTargetItems() async throws -> [SalesTarget] {
+        ApiClient.decodeMapList(try await api.get("sales-targets")).map { SalesTarget(raw: $0) }
     }
 
     func salesTeam(period: String = "month") async throws -> [[String: Any]] {
+        try await salesTeamMemberItems(period: period).map(\.raw)
+    }
+
+    func salesTeamMemberItems(period: String = "month") async throws -> [SalesTeamMember] {
         ApiClient.decodeMapList(try await api.get("ventas/reportes/vendedores", query: ["period": period]))
+            .map { SalesTeamMember(raw: $0) }
     }
 
     func salesMetrics(period: String = "month") async -> [String: Any] {
+        await salesMetricsItem(period: period).raw
+    }
+
+    func salesMetricsItem(period: String = "month") async -> SalesMetrics {
         guard let data = try? await api.get("ventas/reportes/metricas", query: ["period": period]),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
-        return obj
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return SalesMetrics()
+        }
+        return SalesMetrics(raw: obj)
     }
 
     func vendorStats(period: String = "month") async -> [[String: Any]] {
+        await vendorReportItems(period: period).map(\.raw)
+    }
+
+    func vendorReportItems(period: String = "month") async -> [VendorReportItem] {
         guard let data = try? await api.get("ventas/reportes/vendedores", query: ["period": period]) else { return [] }
-        return ApiClient.decodeMapList(data)
+        return ApiClient.decodeMapList(data).map { VendorReportItem(raw: $0) }
     }
 
     func orderTemplates() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("ventas/order-templates"))
+        try await orderTemplateItems().map(\.raw)
+    }
+
+    func orderTemplateItems() async throws -> [OrderTemplate] {
+        ApiClient.decodeMapList(try await api.get("ventas/order-templates")).map(OrderTemplate.init)
     }
 
     func createOrderTemplate(_ fields: [String: String]) async throws {
@@ -84,9 +139,15 @@ final class CrmRepository {
     }
 
     func getOpportunity(id: Int) async throws -> [String: Any] {
+        try await opportunityDetail(id: id).raw
+    }
+
+    func opportunityDetail(id: Int) async throws -> CrmOpportunityDetail {
         let data = try await api.get("ventas/oportunidades/\(id)")
-        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
-        return obj
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return CrmOpportunityDetail()
+        }
+        return CrmOpportunityDetail(raw: obj)
     }
 
     func addOpportunityNote(id: Int, message: String) async throws {

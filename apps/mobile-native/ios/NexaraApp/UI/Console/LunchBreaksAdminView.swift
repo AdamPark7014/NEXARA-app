@@ -2,32 +2,26 @@ import SwiftUI
 
 /// Comidas del equipo (admin) — paridad Android `LunchBreaksModuleScreen`.
 struct LunchBreaksAdminView: View {
-    @State private var items: [[String: Any]] = []
+    @State private var items: [LunchBreak] = []
     @State private var query = ""
     @State private var isLoading = true
-    @State private var selected: [String: Any]?
+    @State private var selected: LunchBreak?
 
-    private var filtered: [[String: Any]] {
+    private var filtered: [LunchBreak] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter {
-            ConsoleHelpers.mapStr($0, "userName", "usuario").lowercased().contains(q) ||
-            ConsoleHelpers.mapStr($0, "reason", "motivo", "status", "estatus").lowercased().contains(q)
+            $0.userName.lowercased().contains(q) ||
+            $0.status.lowercased().contains(q) ||
+            $0.notes.lowercased().contains(q)
         }
     }
 
     private var lateCount: Int {
-        items.filter {
-            ($0["isCheckinLate"] as? Bool == true) || ($0["isCheckoutLate"] as? Bool == true)
-        }.count
+        items.filter { $0.isCheckinLate || $0.isCheckoutLate }.count
     }
 
-    private var activeCount: Int {
-        items.filter {
-            let s = ConsoleHelpers.mapStr($0, "status", "estatus").lowercased()
-            return s.contains("active") || s.contains("open") || s.contains("abiert")
-        }.count
-    }
+    private var activeCount: Int { items.filter(\.isActive).count }
 
     var body: some View {
         Group {
@@ -52,30 +46,27 @@ struct LunchBreaksAdminView: View {
 
             if isLoading { ProgressView() }
 
-            ForEach(filtered, id: \.lbKey) { row in
+            ForEach(filtered) { row in
                 Button { selected = row } label: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(ConsoleHelpers.mapStr(row, "userName", "usuario")).font(.headline).foregroundColor(.primary)
-                        let checkin = ConsoleHelpers.mapStr(row, "checkinTime", "startedAt")
-                        let checkout = ConsoleHelpers.mapStr(row, "checkoutTime", "endedAt")
-                        if !checkin.isEmpty || !checkout.isEmpty {
-                            Text([checkin, checkout].filter { !$0.isEmpty }.joined(separator: " → "))
-                                .font(.caption).foregroundColor(.secondary)
+                        Text(row.userName).font(.headline).foregroundColor(.primary)
+                        if !row.timeRange.isEmpty {
+                            Text(row.timeRange).font(.caption).foregroundColor(.secondary)
                         }
                         HStack(spacing: 8) {
-                            OpsStatusChip(text: ConsoleHelpers.mapStr(row, "status", "estatus"))
-                            if row["isCheckinLate"] as? Bool == true {
+                            OpsStatusChip(text: row.status)
+                            if row.isCheckinLate {
                                 Text("Entrada tarde").font(.caption2).foregroundColor(.red)
                                     .padding(.horizontal, 6).padding(.vertical, 2)
                                     .background(Color.red.opacity(0.1)).clipShape(Capsule())
                             }
-                            if row["isCheckoutLate"] as? Bool == true {
+                            if row.isCheckoutLate {
                                 Text("Salida tarde").font(.caption2).foregroundColor(.red)
                                     .padding(.horizontal, 6).padding(.vertical, 2)
                                     .background(Color.red.opacity(0.1)).clipShape(Capsule())
                             }
                             Spacer()
-                            Text(String(ConsoleHelpers.mapStr(row, "date", "startedAt", "createdAt").prefix(16)))
+                            Text(String(row.date.prefix(16)))
                                 .font(.caption2).foregroundColor(.secondary)
                         }
                     }
@@ -88,38 +79,34 @@ struct LunchBreaksAdminView: View {
     }
 
     @ViewBuilder
-    private func lunchDetail(_ row: [String: Any]) -> some View {
-        let userName = ConsoleHelpers.mapStr(row, "userName", "usuario")
+    private func lunchDetail(_ row: LunchBreak) -> some View {
         List {
             Section { Button("← Comidas") { selected = nil } }
             Section("Empleado") {
-                lbRow("Nombre",     userName)
-                lbRow("Estatus",    ConsoleHelpers.mapStr(row, "status", "estatus"))
-                lbRow("Fecha",      String(ConsoleHelpers.mapStr(row, "date", "startedAt", "createdAt").prefix(16)))
+                lbRow("Nombre",     row.userName)
+                lbRow("Estatus",    row.status)
+                lbRow("Fecha",      String(row.date.prefix(16)))
             }
             Section("Horario") {
-                lbRow("Entrada",    ConsoleHelpers.mapStr(row, "checkinTime", "startedAt"))
-                lbRow("Salida",     ConsoleHelpers.mapStr(row, "checkoutTime", "endedAt"))
-                lbRow("Duración",   ConsoleHelpers.mapStr(row, "duration", "duracion"))
-                lbRow("Supervisor", ConsoleHelpers.mapStr(row, "supervisorName", "supervisor", "approvedBy"))
+                lbRow("Entrada",    row.checkinTime)
+                lbRow("Salida",     row.checkoutTime)
             }
-            if row["isCheckinLate"] as? Bool == true || row["isCheckoutLate"] as? Bool == true {
+            if row.isCheckinLate || row.isCheckoutLate {
                 Section("Alertas") {
-                    if row["isCheckinLate"] as? Bool == true {
+                    if row.isCheckinLate {
                         Label("Entrada tarde", systemImage: "exclamationmark.triangle.fill").foregroundColor(.red)
                     }
-                    if row["isCheckoutLate"] as? Bool == true {
+                    if row.isCheckoutLate {
                         Label("Salida tarde", systemImage: "exclamationmark.triangle.fill").foregroundColor(.red)
                     }
                 }
             }
-            let notes = ConsoleHelpers.mapStr(row, "notes", "reason", "motivo", "observaciones")
-            if !notes.isEmpty {
-                Section("Notas") { Text(notes).font(.footnote) }
+            if !row.notes.isEmpty {
+                Section("Notas") { Text(row.notes).font(.footnote) }
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle(userName.isEmpty ? "Comida" : userName)
+        .navigationTitle(row.userName.isEmpty ? "Comida" : row.userName)
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -132,7 +119,7 @@ struct LunchBreaksAdminView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        items = await ExtraRepository.shared.teamLunchBreaks()
+        items = await ExtraRepository.shared.teamLunchBreakItems()
     }
 }
 
@@ -148,8 +135,4 @@ private struct LunchKpiPill: View {
         .background(accent.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
-}
-
-private extension [String: Any] {
-    var lbKey: String { "lb-\(self["id"] ?? UUID().uuidString)" }
 }

@@ -4,7 +4,7 @@ import SwiftUI
 
 @MainActor
 final class MyLunchBreaksVM: ObservableObject {
-    @Published var breaks: [[String: Any]] = []
+    @Published var breaks: [LunchBreak] = []
     @Published var isLoading = false
     @Published var actionLoading = false
     @Published var actionMessage: String?
@@ -13,7 +13,7 @@ final class MyLunchBreaksVM: ObservableObject {
     func load() {
         isLoading = true; error = nil
         Task {
-            breaks    = await ExtraRepository.shared.myLunchBreaks()
+            breaks    = await ExtraRepository.shared.myLunchBreakItems()
             isLoading = false
         }
     }
@@ -81,12 +81,12 @@ struct MyLunchBreaksView: View {
         return fmt.string(from: Date())
     }
 
-    private var todayBreak: [String: Any]? {
-        vm.breaks.first { (lbStr($0, "date") ?? "").hasPrefix(today) }
+    private var todayBreak: LunchBreak? {
+        vm.breaks.first { $0.date.hasPrefix(today) }
     }
 
-    private var isCheckedIn: Bool  { todayBreak?["checkinTime"] != nil }
-    private var isCheckedOut: Bool { todayBreak?["checkoutTime"] != nil }
+    private var isCheckedIn: Bool  { !(todayBreak?.checkinTime.isEmpty ?? true) }
+    private var isCheckedOut: Bool { !(todayBreak?.checkoutTime.isEmpty ?? true) }
 
     var body: some View {
         ScrollView {
@@ -117,13 +117,13 @@ struct MyLunchBreaksView: View {
             if isCheckedOut {
                 HStack {
                     Text("✅").font(.title2)
-                    Text("Comida completada: \(lbStr(todayBreak, "checkinTime")?.prefix(5) ?? "–") → \(lbStr(todayBreak, "checkoutTime")?.prefix(5) ?? "–")")
+                    Text("Comida completada: \(String((todayBreak?.checkinTime ?? "–").prefix(5))) → \(String((todayBreak?.checkoutTime ?? "–").prefix(5)))")
                         .font(.subheadline).foregroundColor(.green)
                 }
             } else if isCheckedIn {
                 HStack {
                     Text("🟡").font(.title2)
-                    Text("En comida desde \(lbStr(todayBreak, "checkinTime")?.prefix(5) ?? "–")")
+                    Text("En comida desde \(String((todayBreak?.checkinTime ?? "–").prefix(5)))")
                         .font(.subheadline).foregroundColor(.orange)
                 }
             } else {
@@ -224,7 +224,7 @@ struct MyLunchBreaksView: View {
             } else if vm.breaks.isEmpty {
                 Text("Sin registros de comida").foregroundColor(.secondary).padding()
             } else {
-                ForEach(vm.breaks, id: \.lbId) { l in
+                ForEach(vm.breaks) { l in
                     LunchBreakRow(item: l)
                 }
             }
@@ -235,12 +235,12 @@ struct MyLunchBreaksView: View {
 // MARK: – Subview
 
 private struct LunchBreakRow: View {
-    let item: [String: Any]
+    let item: LunchBreak
     var body: some View {
-        let date     = lbStr(item, "date") ?? "–"
-        let checkin  = lbStr(item, "checkinTime")?.prefix(5) ?? "–"
-        let checkout = lbStr(item, "checkoutTime")?.prefix(5)
-        let isLate   = (item["isCheckinLate"] as? Bool == true) || (item["isCheckoutLate"] as? Bool == true)
+        let date     = item.date.isEmpty ? "–" : item.date
+        let checkin  = item.checkinTime.isEmpty ? "–" : String(item.checkinTime.prefix(5))
+        let checkout = item.checkoutTime.isEmpty ? nil : String(item.checkoutTime.prefix(5))
+        let isLate   = item.isCheckinLate || item.isCheckoutLate
 
         HStack {
             VStack(alignment: .leading, spacing: 2) {
@@ -264,17 +264,3 @@ private struct LunchBreakRow: View {
 // MARK: – Helpers
 
 private enum LunchAction { case checkin, checkout }
-
-private func lbStr(_ m: [String: Any]?, _ key: String) -> String? {
-    guard let m else { return nil }
-    if let s = m[key] as? String, !s.isEmpty && s != "null" { return s }
-    return nil
-}
-
-extension [String: Any] {
-    fileprivate var lbId: String {
-        if let n = self["id"] as? Int { return String(n) }
-        if let s = self["id"] as? String { return s }
-        return UUID().uuidString
-    }
-}

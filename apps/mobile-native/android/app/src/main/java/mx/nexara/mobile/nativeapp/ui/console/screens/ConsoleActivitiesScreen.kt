@@ -30,8 +30,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ActivityDto
+import mx.nexara.mobile.nativeapp.data.api.ActivityEvidenceDetailDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 
 // ── State & ViewModel ────────────────────────────────────────────────────────
 
@@ -149,23 +151,15 @@ fun ActivityDetailScreen(
     val repo = remember(context) { ConsoleRepository(context) }
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("Info", "Evidencias", "Viáticos", "Aprobaciones")
-    var evidence by remember { mutableStateOf<Map<String, Any?>>(emptyMap()) }
+    var evidence by remember { mutableStateOf<ActivityEvidenceDetailDto?>(null) }
     var loadingEv by remember { mutableStateOf(true) }
     val statusColor = activStatusColor(activity.estatus)
 
     LaunchedEffect(activity.id) {
         loadingEv = true
-        runCatching {
-            withContext(Dispatchers.IO) {
-                val dto = repo.evidenceByActivity(activity.id)
-                val map = mutableMapOf<String, Any?>()
-                dto.javaClass.declaredFields.forEach { f ->
-                    f.isAccessible = true
-                    map[f.name] = f.get(dto)
-                }
-                map
-            }
-        }.onSuccess { evidence = it }
+        evidence = runCatching {
+            withContext(Dispatchers.IO) { repo.evidenceByActivity(activity.id) }
+        }.getOrNull()
         loadingEv = false
     }
 
@@ -188,7 +182,7 @@ fun ActivityDetailScreen(
             Button(
                 onClick = { onCaptureEvidence(activity.id) },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            ) { Text("📸 Capturar / continuar evidencias") }
+            ) { Text("Capturar / continuar evidencias") }
         }
 
         TabRow(selectedTabIndex = selectedTab) {
@@ -230,7 +224,7 @@ private fun ActivityInfoTab(a: ActivityDto, statusColor: Color) {
 
 @Composable
 private fun ActivityEvidenceTab(
-    ev: Map<String, Any?>,
+    ev: ActivityEvidenceDetailDto?,
     loading: Boolean,
     onCapture: (() -> Unit)? = null,
 ) {
@@ -238,9 +232,10 @@ private fun ActivityEvidenceTab(
         Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
         return
     }
-    val photos = (ev["evidencePhotos"] as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
-    val entryPhoto = ev["entryPhoto"] as? String
-    val exitPhoto = ev["exitPhoto"] as? String
+    val photos = ev?.evidencePhotos.orEmpty()
+    val entryPhoto = ev?.entryPhotoUrl
+    val exitPhoto = ev?.exitPhotoUrl
+    val pdf = ev?.serviceSheetPdfUrl
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (onCapture != null) {
             item {
@@ -249,18 +244,37 @@ private fun ActivityEvidenceTab(
                 }
             }
         }
-        if (entryPhoto != null) item {
-            Text("📷 Foto de entrada: ${entryPhoto.take(60)}...", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+        if (ev != null) {
+            item {
+                Text("Estado: ${ev.status}", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            }
+            if (!ev.reviewStatus.isNullOrBlank()) {
+                item {
+                    Text("Revisión: ${ev.reviewStatus}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
-        if (exitPhoto != null) item {
-            Text("🚪 Foto de salida: ${exitPhoto.take(60)}...", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+        if (!entryPhoto.isNullOrBlank()) item {
+            Text("Foto de entrada: ${entryPhoto.take(80)}", fontSize = 13.sp)
         }
-        if (photos.isEmpty() && entryPhoto == null && exitPhoto == null) item {
-            Text("Sin evidencias registradas", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 20.dp))
+        if (!exitPhoto.isNullOrBlank()) item {
+            Text("Foto de salida: ${exitPhoto.take(80)}", fontSize = 13.sp)
+        }
+        if (!pdf.isNullOrBlank()) item {
+            Text("PDF hoja de servicio: ${pdf.take(80)}", fontSize = 13.sp)
+        }
+        if (photos.isEmpty() && entryPhoto.isNullOrBlank() && exitPhoto.isNullOrBlank() && pdf.isNullOrBlank()) {
+            item {
+                NxEmptyState(
+                    title = "Sin evidencias",
+                    subtitle = "Aún no hay capturas para esta actividad.",
+                    actionLabel = if (onCapture != null) "Capturar" else null,
+                    onAction = onCapture,
+                )
+            }
         } else {
-            items(photos) { p ->
-                val url = p["photoUrl"] as? String ?: ""
-                Text("📸 ${url.take(80)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            items(photos.size) { i ->
+                Text("Foto ${i + 1}: ${photos[i].take(80)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -433,10 +447,11 @@ fun ConsoleActivitiesScreen(
             }
             if (teamFiltered.isEmpty()) {
                 item {
-                    Text(
-                        "Sin actividades con este filtro",
-                        color = Color(0xFF94A3B8),
-                        modifier = Modifier.padding(vertical = 8.dp),
+                    NxEmptyState(
+                        title = "Sin actividades",
+                        subtitle = "No hay actividades del equipo con este filtro.",
+                        actionLabel = "Actualizar",
+                        onAction = { vm.loadAll(isAdmin = isAdmin, isSuperAdmin = isSuperAdmin, currentUserId = user?.id) },
                     )
                     Spacer(Modifier.height(8.dp))
                 }
@@ -478,10 +493,11 @@ fun ConsoleActivitiesScreen(
             }
             if (myFiltered.isEmpty()) {
                 item {
-                    Text(
-                        "Sin actividades asignadas con este filtro",
-                        color = Color(0xFF94A3B8),
-                        modifier = Modifier.padding(vertical = 8.dp),
+                    NxEmptyState(
+                        title = "Sin actividades",
+                        subtitle = "No tienes actividades asignadas con este filtro.",
+                        actionLabel = "Actualizar",
+                        onAction = { vm.loadAll(isAdmin = isAdmin, isSuperAdmin = isSuperAdmin, currentUserId = user?.id) },
                     )
                 }
             } else {

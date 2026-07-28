@@ -3,6 +3,8 @@ export type DeviceIdentity = {
   model?: string;
   serial?: string;
   source?: string;
+  platform?: string;
+  browser?: string;
 };
 
 const STORAGE_KEY = 'nexara_device_identity';
@@ -24,6 +26,8 @@ const getStoredIdentity = (): DeviceIdentity => {
       model: normalize(parsed?.model, 120),
       serial: normalize(parsed?.serial, 120),
       source: normalize(parsed?.source, 40),
+      platform: normalize(parsed?.platform, 80),
+      browser: normalize(parsed?.browser, 40),
     };
   } catch {
     return {};
@@ -53,30 +57,107 @@ const getOrCreateDeviceId = (): string => {
   return nextId;
 };
 
+/** Fuerza lectura de plataforma / navegador desde el cliente (siempre). */
+const detectBrowserEnvironment = (): Required<
+  Pick<DeviceIdentity, 'platform' | 'browser' | 'name' | 'model' | 'source'>
+> => {
+  if (typeof navigator === 'undefined') {
+    return { platform: '', browser: '', name: '', model: '', source: 'unknown' };
+  }
+
+  const ua = String(navigator.userAgent || '').toLowerCase();
+  const platformRaw = String(navigator.platform || '');
+
+  const browser = (() => {
+    if (/edg\//.test(ua)) return 'Edge';
+    if (/opr\/|opera/.test(ua)) return 'Opera';
+    if (/chrome\//.test(ua) && !/edg\//.test(ua) && !/opr\//.test(ua)) return 'Chrome';
+    if (/firefox\//.test(ua) || /fxios\//.test(ua)) return 'Firefox';
+    if (/safari\//.test(ua) && !/chrome\//.test(ua)) return 'Safari';
+    return 'Navegador';
+  })();
+
+  const platform = (() => {
+    if (/win/.test(ua) || /win/.test(platformRaw.toLowerCase())) return 'Windows';
+    if (/android/.test(ua)) return 'Android';
+    if (/iphone|ipad|ipod/.test(ua)) return 'iOS';
+    if (/mac/.test(ua) || /mac/.test(platformRaw.toLowerCase())) return 'macOS';
+    if (/cros/.test(ua)) return 'ChromeOS';
+    if (/linux/.test(ua)) return 'Linux';
+    return platformRaw || 'Desconocido';
+  })();
+
+  const kind = /mobile|iphone|android/.test(ua)
+    ? 'Móvil'
+    : /ipad|tablet/.test(ua)
+      ? 'Tablet'
+      : 'Escritorio';
+
+  const model = (() => {
+    if (/iphone/.test(ua)) return 'iPhone';
+    if (/ipad/.test(ua)) return 'iPad';
+    if (/android/.test(ua)) return 'Android';
+    if (platform === 'macOS') return 'Mac';
+    if (platform === 'Windows') return 'PC';
+    if (platform === 'ChromeOS') return 'Chromebook';
+    return kind;
+  })();
+
+  return {
+    platform,
+    browser,
+    name: `${kind} ${platform}`.trim(),
+    model: `${browser} · ${platform}`,
+    source: 'navigator',
+  };
+};
+
 const getUserAgentHints = async (): Promise<Partial<DeviceIdentity>> => {
   if (typeof navigator === 'undefined') return {};
 
   const nav = navigator as Navigator & {
     userAgentData?: {
       platform?: string;
+      brands?: { brand: string; version: string }[];
+      mobile?: boolean;
       getHighEntropyValues?: (hints: string[]) => Promise<Record<string, unknown>>;
     };
   };
 
   const uaData = nav.userAgentData;
-  if (!uaData?.getHighEntropyValues) return {};
+  if (!uaData) return {};
 
   try {
-    const hints = await uaData.getHighEntropyValues(['model', 'platform']);
-    const model = normalize(hints?.model, 120);
-    const platform = normalize(hints?.platform || uaData.platform, 80);
+    const baseBrand =
+      uaData.brands?.find((b) => !/not.?a.?brand/i.test(b.brand))?.brand || '';
+    let model = '';
+    let platform = normalize(uaData.platform, 80);
+
+    if (uaData.getHighEntropyValues) {
+      const hints = await uaData.getHighEntropyValues([
+        'model',
+        'platform',
+        'platformVersion',
+        'fullVersionList',
+      ]);
+      model = normalize(hints?.model, 120);
+      platform = normalize(hints?.platform || platform, 80);
+    }
+
     return {
-      model,
-      name: platform ? `${platform} device` : '',
+      model: model || normalize(baseBrand, 80),
+      platform,
+      browser: normalize(baseBrand, 40),
+      name: platform
+        ? `${uaData.mobile ? 'Móvil' : 'Escritorio'} ${platform}`
+        : '',
       source: 'ua-client-hints',
     };
   } catch {
-    return {};
+    return {
+      platform: normalize(uaData.platform, 80),
+      source: 'ua-client-hints',
+    };
   }
 };
 
@@ -88,6 +169,8 @@ export const saveDeviceIdentity = (identity: DeviceIdentity): void => {
     model: normalize(identity.model, 120),
     serial: normalize(identity.serial, 120),
     source: normalize(identity.source || 'manual', 40),
+    platform: normalize(identity.platform, 80),
+    browser: normalize(identity.browser, 40),
   };
 
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -95,11 +178,17 @@ export const saveDeviceIdentity = (identity: DeviceIdentity): void => {
 
 export const getDeviceIdentityHeaders = async (): Promise<Record<string, string>> => {
   const stored = getStoredIdentity();
+  const env = detectBrowserEnvironment();
   const hinted = await getUserAgentHints();
   const deviceId = getOrCreateDeviceId();
 
-  const name = normalize(stored.name || hinted.name, 120);
-  const model = normalize(stored.model || hinted.model, 120);
+  const platform = normalize(stored.platform || hinted.platform || env.platform, 80);
+  const browser = normalize(stored.browser || hinted.browser || env.browser, 40);
+  const name = normalize(stored.name || hinted.name || env.name, 120);
+  const model = normalize(
+    stored.model || hinted.model || (browser && platform ? `${browser} · ${platform}` : env.model),
+    120,
+  );
   const serial = normalize(stored.serial, 120);
 
   const headers: Record<string, string> = {};
@@ -107,6 +196,17 @@ export const getDeviceIdentityHeaders = async (): Promise<Record<string, string>
   if (name) headers['X-Device-Name'] = name;
   if (model) headers['X-Device-Model'] = model;
   if (serial) headers['X-Device-Serial'] = serial;
+  if (platform) headers['Sec-CH-UA-Platform'] = `"${platform}"`;
+  if (browser) headers['X-Device-Browser'] = browser;
 
   return headers;
+};
+
+/** Etiqueta corta para la nube de bienvenida (lado cliente). */
+export const getLocalDeviceLabel = async (): Promise<string> => {
+  const headers = await getDeviceIdentityHeaders();
+  const model = headers['X-Device-Model'];
+  if (model) return model;
+  const name = headers['X-Device-Name'];
+  return name || 'Este dispositivo';
 };
