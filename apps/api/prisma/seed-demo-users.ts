@@ -212,10 +212,22 @@ const ROLE_NOMBRE_HINTS: Record<string, string[]> = {
   arquitecto: ['Arquitecto'],
 };
 
-async function ensureDepartment(name: string): Promise<number> {
-  const existing = await prisma.department.findUnique({ where: { nombre: name } });
+async function resolvePrimaryCompanyId(): Promise<number> {
+  const primary =
+    (await prisma.companyProfile.findFirst({ where: { isPrimary: true }, select: { id: true } })) ||
+    (await prisma.companyProfile.findFirst({ orderBy: { id: 'asc' }, select: { id: true } }));
+  if (!primary) {
+    throw new Error('No CompanyProfile found — create a company before seeding users');
+  }
+  return primary.id;
+}
+
+async function ensureDepartment(name: string, companyId: number): Promise<number> {
+  const existing = await prisma.department.findUnique({
+    where: { companyId_nombre: { companyId, nombre: name } },
+  });
   if (existing) return existing.id;
-  const created = await prisma.department.create({ data: { nombre: name } });
+  const created = await prisma.department.create({ data: { nombre: name, companyId } });
   return created.id;
 }
 
@@ -233,36 +245,60 @@ async function ensureV2Roles() {
   }
 }
 
-/** Evita P2002 cuando otro usuario ya tiene el mismo employeeNumber en producción. */
+/** Evita P2002 cuando otro usuario ya tiene el mismo employeeNumber en el tenant. */
 async function resolveEmployeeNumber(
   email: string,
+  companyId: number,
   desired?: string,
   existing?: string | null,
 ): Promise<string | null | undefined> {
   if (!desired) return existing ?? null;
 
-  const conflict = await prisma.user.findFirst({
-    where: { employeeNumber: desired, NOT: { email } },
-    select: { email: true, isActive: true },
+  const conflict = await prisma.userCompany.findFirst({
+    where: {
+      companyId,
+      employeeNumber: desired,
+      user: { NOT: { email } },
+    },
+    select: { user: { select: { email: true, isActive: true } } },
   });
   if (conflict) {
-    if (!conflict.isActive) {
-      await prisma.user.update({
-        where: { email: conflict.email },
+    if (!conflict.user.isActive) {
+      await prisma.userCompany.updateMany({
+        where: { companyId, employeeNumber: desired },
         data: { employeeNumber: null },
       });
       console.warn(
-        `   ↪ employeeNumber ${desired} liberado de ${conflict.email} (cuenta inactiva/legacy)`,
+        `   ↪ employeeNumber ${desired} liberado de ${conflict.user.email} (cuenta inactiva/legacy)`,
       );
       return desired;
     }
     console.warn(
-      `   ⚠️  employeeNumber ${desired} ya asignado a ${conflict.email} — se mantiene ${existing ?? 'sin número'} para ${email}`,
+      `   ⚠️  employeeNumber ${desired} ya asignado a ${conflict.user.email} — se mantiene ${existing ?? 'sin número'} para ${email}`,
     );
     return existing ?? null;
   }
 
   return desired;
+}
+
+async function ensureUserCompany(
+  userId: number,
+  companyId: number,
+  employeeNumber?: string | null,
+) {
+  await prisma.userCompany.upsert({
+    where: { userId_companyId: { userId, companyId } },
+    create: {
+      userId,
+      companyId,
+      isDefault: true,
+      employeeNumber: employeeNumber ?? undefined,
+    },
+    update: {
+      ...(employeeNumber != null ? { employeeNumber } : {}),
+    },
+  });
 }
 
 async function resolveRole(v2RoleKey: string) {
@@ -292,6 +328,8 @@ async function resolveRole(v2RoleKey: string) {
 async function seedDemoUsers() {
   console.log('🌱 [demo-users] Upsert de usuarios demo…');
   await ensureV2Roles();
+  const companyId = await resolvePrimaryCompanyId();
+  console.log(`   🏢 companyId=${companyId}`);
 
   // Etiqueta formal del rol CEO (sin "Dueño").
   const ceoRenamed = await prisma.role.updateMany({
@@ -314,19 +352,25 @@ async function seedDemoUsers() {
       console.warn(`   ⚠️  Rol ${u.roleKey} no existe en DB — se omite ${u.email}`);
       continue;
     }
-    const departmentId = await ensureDepartment(u.departmentName);
+    const departmentId = await ensureDepartment(u.departmentName, companyId);
     const passwordHash = bcryptjs.hashSync(u.password, 10);
 
-    const existing = await prisma.user.findUnique({ where: { email: u.email } });
+    const existing = await prisma.user.findUnique({
+      where: { email: u.email },
+      include: { companyMemberships: { where: { companyId }, take: 1 } },
+    });
     const needsPasswordFix =
       !existing ||
       existing.passwordHash === PLACEHOLDER_PASSWORD_HASH ||
       !(await bcryptjs.compare(u.password, existing.passwordHash));
 
+    const existingEmp =
+      existing?.companyMemberships?.[0]?.employeeNumber ?? existing?.employeeNumber ?? null;
     const employeeNumber = await resolveEmployeeNumber(
       u.email,
+      companyId,
       u.employeeNumber,
-      existing?.employeeNumber,
+      existingEmp,
     );
 
     if (existing) {
@@ -341,13 +385,16 @@ async function seedDemoUsers() {
           employeeNumber,
           puesto: u.puesto ?? existing.puesto,
           isActive: true,
+          failedLoginCount: 0,
+          lockedUntil: null,
         },
       });
+      await ensureUserCompany(existing.id, companyId, employeeNumber);
       if (needsPasswordFix) passwordsFixed += 1;
       console.log(`   ✏️  ${u.email} actualizado (${u.roleKey})`);
       updated += 1;
     } else {
-      await prisma.user.create({
+      const createdUser = await prisma.user.create({
         data: {
           nombre: u.nombre,
           email: u.email,
@@ -360,6 +407,7 @@ async function seedDemoUsers() {
           isActive: true,
         },
       });
+      await ensureUserCompany(createdUser.id, companyId, employeeNumber);
       console.log(`   ✨ ${u.email} creado (${u.roleKey})`);
       created += 1;
     }
