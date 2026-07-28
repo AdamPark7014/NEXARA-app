@@ -180,7 +180,8 @@ export class JobQueueService implements OnModuleInit, OnModuleDestroy {
   }
 
   private queueName(name: string) {
-    return `nexara:${name}`;
+    // BullMQ rejects ":" in queue names; keep a stable prefix without colons.
+    return `nexara-${String(name).replace(/:/g, '-')}`;
   }
 
   private ensureQueue(name: string) {
