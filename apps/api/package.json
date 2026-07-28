@@ -10,7 +10,7 @@
     "dev": "nest start --watch",
     "dev:worker": "node -r ts-node/register/transpile-only ./src/worker.ts",
     "prebuild": "node ../../scripts/clear-build-cache.js api",
-    "build": "cross-env NODE_OPTIONS=--max-old-space-size=1024 nest build",
+    "build": "cross-env NODE_OPTIONS=--max-old-space-size=3072 nest build",
     "test": "jest --config jest.config.js --runInBand",
     "test:cov": "jest --config jest.config.js --coverage --runInBand",
     "user:reset-password": "ts-node ./src/users/reset-user-password.ts",
