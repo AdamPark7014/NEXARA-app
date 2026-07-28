@@ -352,6 +352,7 @@ export class AttendanceService {
             velocidadKmh: null,
             estaActivo: true,
             ultimaActualizacion: now,
+            companyId: tenantId,
           },
         });
       }

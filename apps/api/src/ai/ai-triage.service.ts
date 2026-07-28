@@ -164,7 +164,9 @@ export class AiTriageService {
       signal: AbortSignal.timeout(12_000),
     });
     if (!res.ok) return null;
-    const data = await res.json();
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
     const content = data?.choices?.[0]?.message?.content;
     if (!content) return null;
     return JSON.parse(content) as {

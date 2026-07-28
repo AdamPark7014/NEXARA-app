@@ -40,11 +40,13 @@ export class ClientsService {
       imageUrl = await this.saveImage(imageFile);
     }
 
+    const companyId = await withTenantBypassAsync(() => resolvePublicCompanyId(this.prisma));
     return await this.db['client'].create({
       data: {
         name: createClientDto.name,
         description: createClientDto.description || null,
         imageUrl: imageUrl || null,
+        companyId,
       },
     });
   }
