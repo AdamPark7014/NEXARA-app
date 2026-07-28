@@ -22,16 +22,47 @@ const READ_ACTIONS = new Set([
   'findUnique', 'findUniqueOrThrow', 'findFirstOrThrow',
 ]);
 
+/** True when where already constrains tenant (field or compound unique like companyId_section). */
+function whereAlreadyHasCompanyScope(where: unknown): boolean {
+  if (!where || typeof where !== 'object') return false;
+  const w = where as Record<string, unknown>;
+  if (Object.prototype.hasOwnProperty.call(w, 'companyId')) return true;
+  for (const [key, value] of Object.entries(w)) {
+    if (key === 'AND' || key === 'OR' || key === 'NOT') {
+      const parts = Array.isArray(value) ? value : [value];
+      if (parts.some((part) => whereAlreadyHasCompanyScope(part))) return true;
+      continue;
+    }
+    if (
+      value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      Object.prototype.hasOwnProperty.call(value, 'companyId')
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Inject tenant filter. Never wrap compound unique wheres in `AND` — that breaks
+ * findUnique/update/delete (`Unknown argument companyId_section`).
+ */
 function injectTenantWhere(args: any, companyId: number | null) {
   if (!args) args = {};
   if (!args.where) args.where = {};
   const scopeId = companyId != null && companyId > 0 ? companyId : -1;
-  // Do not override an explicit companyId filter already set by the caller.
-  if (args.where.companyId === undefined && args.where.AND === undefined) {
-    args.where = { AND: [args.where, { companyId: scopeId }] };
-  } else if (args.where.companyId === undefined) {
-    args.where = { AND: [args.where, { companyId: scopeId }] };
+  if (whereAlreadyHasCompanyScope(args.where)) {
+    return args;
   }
+  const keys = Object.keys(args.where);
+  // Flat merge works for findFirst/count/updateMany; findUnique is downgraded by caller.
+  if (keys.length === 1 && keys[0] === 'id') {
+    args.where = { ...args.where, companyId: scopeId };
+    return args;
+  }
+  args.where = { AND: [args.where, { companyId: scopeId }] };
   return args;
 }
 
@@ -114,7 +145,61 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           ? Number(store.companyId)
           : null;
 
-      if (READ_ACTIONS.has(params.action) || params.action === 'update' || params.action === 'updateMany' || params.action === 'delete' || params.action === 'deleteMany') {
+      const scopeId =
+        companyId != null && companyId > 0 ? companyId : -1;
+      const mutatingUnique =
+        params.action === 'update' || params.action === 'delete';
+      const needsWhereInject =
+        READ_ACTIONS.has(params.action) ||
+        mutatingUnique ||
+        params.action === 'updateMany' ||
+        params.action === 'deleteMany';
+
+      if (needsWhereInject) {
+        const before = params.args?.where;
+        const alreadyScoped = whereAlreadyHasCompanyScope(before);
+
+        // findUnique + AND/extra fields is invalid — downgrade when we must inject.
+        if (
+          !alreadyScoped &&
+          (params.action === 'findUnique' || params.action === 'findUniqueOrThrow')
+        ) {
+          params.action =
+            params.action === 'findUniqueOrThrow' ? 'findFirstOrThrow' : 'findFirst';
+        }
+
+        // update/delete require WhereUniqueInput — cannot add companyId/AND.
+        // Use *Many with id+companyId, then re-fetch the row for update callers.
+        if (
+          !alreadyScoped &&
+          mutatingUnique &&
+          before &&
+          typeof before === 'object' &&
+          Object.keys(before).length === 1 &&
+          Object.prototype.hasOwnProperty.call(before, 'id')
+        ) {
+          const id = (before as { id: number | string }).id;
+          const data = params.args?.data;
+          if (params.action === 'update') {
+            const many = await next({
+              ...params,
+              action: 'updateMany',
+              args: { where: { id, companyId: scopeId }, data },
+            });
+            if (!many || many.count === 0) return null;
+            return next({
+              ...params,
+              action: 'findFirst',
+              args: { where: { id, companyId: scopeId } },
+            });
+          }
+          return next({
+            ...params,
+            action: 'deleteMany',
+            args: { where: { id, companyId: scopeId } },
+          });
+        }
+
         params.args = injectTenantWhere(params.args, companyId);
       }
 
