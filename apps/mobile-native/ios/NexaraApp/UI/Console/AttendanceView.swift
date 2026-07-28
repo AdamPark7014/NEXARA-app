@@ -4,61 +4,76 @@ import SwiftUI
 
 @MainActor
 final class AttendanceVM: ObservableObject {
-    @Published var records: [[String: Any]] = []
-    @Published var rangeUsers: [[String: Any]] = []
-    @Published var current: [String: Any]?
+    @Published var records: [AttendanceEvent] = []
+    @Published var current: AttendanceCurrent?
     @Published var weekFrom = ConsoleHelpers.weekRange().from
     @Published var weekTo = ConsoleHelpers.weekRange().to
-    @Published var query   = ""
+    @Published var query = ""
     @Published var isLoading = false
+    @Published var loadError: String?
     @Published var checkInLoading = false
     @Published var checkInMessage: String?
 
-    var isCheckedIn: Bool { current?["isOpen"] as? Bool == true }
+    var isCheckedIn: Bool { current?.isOpen == true }
 
-    var filtered: [[String: Any]] {
+    var filtered: [AttendanceEvent] {
         guard !query.isEmpty else { return records }
         let q = query.lowercased()
-        return records.filter { row in
-            attStr(row, "userName", "usuario", "nombre").lowercased().contains(q) ||
-            attStr(row, "type", "tipo").lowercased().contains(q)
+        return records.filter {
+            $0.userName.lowercased().contains(q) || $0.type.lowercased().contains(q)
         }
     }
 
     var summary: (total: Int, entries: Int, exits: Int, lates: Int) {
-        let total   = records.count
-        let entries = records.filter { attStr($0, "type", "tipo").lowercased().contains("entrada") || attStr($0, "type").lowercased() == "in" }.count
-        let exits   = records.filter { attStr($0, "type", "tipo").lowercased().contains("salida") || attStr($0, "type").lowercased() == "out" }.count
-        let lates   = records.filter { $0["isLate"] as? Bool == true }.count
+        let total = records.count
+        let entries = records.filter {
+            let t = $0.type.lowercased()
+            return t.contains("entrada") || t == "in"
+        }.count
+        let exits = records.filter {
+            let t = $0.type.lowercased()
+            return t.contains("salida") || t == "out"
+        }.count
+        let lates = records.filter(\.isLate).count
         return (total, entries, exits, lates)
     }
 
     func load() {
         isLoading = true
+        loadError = nil
         Task {
-            current = try? await ConsoleRepository.shared.attendanceCurrent()
-            if let range = try? await ConsoleRepository.shared.attendanceRange(from: weekFrom, to: weekTo) {
-                rangeUsers = range["users"] as? [[String: Any]] ?? []
-                records = flattenRange(range)
-            } else {
-                records = await ExtraRepository.shared.attendance()
+            do {
+                current = try await ConsoleRepository.shared.attendanceCurrentItem()
+                let range = try await ConsoleRepository.shared.attendanceRangeItem(from: weekFrom, to: weekTo)
+                if range.events.isEmpty {
+                    records = await ExtraRepository.shared.attendanceEventItems()
+                } else {
+                    records = range.events
+                }
+            } catch {
+                records = await ExtraRepository.shared.attendanceEventItems()
+                if records.isEmpty {
+                    loadError = error.localizedDescription
+                }
             }
             isLoading = false
         }
     }
 
     func checkIn(_ type: String) {
-        checkInLoading = true; checkInMessage = nil
+        checkInLoading = true
+        checkInMessage = nil
         Task {
             do {
                 let coord = await DeviceLocation.shared.current()
-                let res = try await ConsoleRepository.shared.attendanceCheckIn(
+                let res = try await ConsoleRepository.shared.attendanceCheckInResult(
                     type: type,
                     lat: coord?.latitude,
                     lng: coord?.longitude
                 )
-                let base = (res["message"] as? String)
-                    ?? (type == "entrada" ? "✅ Entrada registrada" : "✅ Salida registrada")
+                let base = res.message.isEmpty
+                    ? (type == "entrada" ? "Entrada registrada" : "Salida registrada")
+                    : res.message
                 let geo: String
                 if let c = coord {
                     if let acc = c.accuracyM, acc > 100 {
@@ -74,26 +89,10 @@ final class AttendanceVM: ObservableObject {
                 checkInMessage = base + geo
                 load()
             } catch {
-                checkInMessage = "❌ \(error.localizedDescription)"
+                checkInMessage = "Error: \(error.localizedDescription)"
             }
             checkInLoading = false
         }
-    }
-
-    private func flattenRange(_ range: [String: Any]) -> [[String: Any]] {
-        guard let users = range["users"] as? [[String: Any]] else { return [] }
-        var out: [[String: Any]] = []
-        for u in users {
-            let name = ConsoleHelpers.mapStr(u, "userName")
-            if let events = u["attendances"] as? [[String: Any]] {
-                for e in events {
-                    var row = e
-                    row["userName"] = name
-                    out.append(row)
-                }
-            }
-        }
-        return out
     }
 }
 
@@ -101,7 +100,7 @@ final class AttendanceVM: ObservableObject {
 
 struct AttendanceView: View {
     @StateObject private var vm = AttendanceVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: AttendanceEvent?
 
     var body: some View {
         Group {
@@ -117,25 +116,23 @@ struct AttendanceView: View {
     }
 
     @ViewBuilder
-    private func attDetail(_ rec: [String: Any]) -> some View {
-        let name  = attStr(rec, "userName", "usuario", "nombre")
-        let type_ = attStr(rec, "type", "tipo")
+    private func attDetail(_ rec: AttendanceEvent) -> some View {
         List {
             Section { Button("← Asistencia") { selected = nil } }
             Section("Registro") {
-                attRow("Empleado",  name)
-                attRow("Tipo",      type_.capitalized)
-                attRow("Fecha",     String(attStr(rec, "createdAt", "date", "timestamp").prefix(19)))
-                attRow("Ubicación", attStr(rec, "location", "ubicacion", "address"))
-                attRow("Dispositivo", attStr(rec, "device", "dispositivo"))
-                if rec["isLate"] as? Bool == true {
+                attRow("Empleado", rec.displayName)
+                attRow("Tipo", rec.type.capitalized)
+                attRow("Fecha", String(rec.timestamp.prefix(19)))
+                attRow("Ubicación", rec.location)
+                attRow("Dispositivo", rec.device)
+                if rec.isLate {
                     Label("Registro tarde", systemImage: "exclamationmark.triangle.fill").foregroundColor(.red)
                 }
-                attRow("Observaciones", attStr(rec, "notes", "notas", "observaciones"))
+                attRow("Observaciones", rec.notes)
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle(name.isEmpty ? "Registro" : name)
+        .navigationTitle(rec.displayName)
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -148,23 +145,29 @@ struct AttendanceView: View {
     private var attList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // Check-in card
                 checkInCard
 
                 Text("Semana: \(vm.weekFrom) → \(vm.weekTo)")
                     .font(.caption).foregroundColor(.secondary).padding(.horizontal)
 
-                // KPI strip
+                if let err = vm.loadError {
+                    NxAlertBanner(alert: NxAlert(id: "att-err", title: "No se pudo cargar", subtitle: err, tone: .danger))
+                        .padding(.horizontal)
+                    Button("Reintentar") { vm.load() }
+                        .buttonStyle(.bordered)
+                        .padding(.horizontal)
+                }
+
                 if !vm.records.isEmpty {
                     let s = vm.summary
                     HStack(spacing: 0) {
-                        AttKpi(label: "Total",    value: "\(s.total)",   color: .primary)
+                        AttKpi(label: "Total", value: "\(s.total)", color: .primary)
                         Divider().frame(height: 36)
                         AttKpi(label: "Entradas", value: "\(s.entries)", color: .teal)
                         Divider().frame(height: 36)
-                        AttKpi(label: "Salidas",  value: "\(s.exits)",   color: .blue)
+                        AttKpi(label: "Salidas", value: "\(s.exits)", color: .blue)
                         Divider().frame(height: 36)
-                        AttKpi(label: "Tardanzas",value: "\(s.lates)",   color: .red)
+                        AttKpi(label: "Tardanzas", value: "\(s.lates)", color: .red)
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 6)
@@ -173,7 +176,6 @@ struct AttendanceView: View {
                     .padding(.horizontal)
                 }
 
-                // Search
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundColor(.secondary)
                     TextField("Buscar empleado o tipo…", text: $vm.query)
@@ -189,15 +191,18 @@ struct AttendanceView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal)
 
-                // List
                 if vm.isLoading {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                 } else if vm.filtered.isEmpty {
-                    Text("Sin registros").foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity).padding(.top, 40)
+                    NxEmptyState(
+                        title: "Sin registros",
+                        subtitle: "No hay asistencias en esta semana. Marca entrada para comenzar.",
+                        actionLabel: "Actualizar",
+                        onAction: { vm.load() }
+                    )
                 } else {
                     VStack(spacing: 6) {
-                        ForEach(vm.filtered.prefix(50), id: \.attId) { rec in
+                        ForEach(vm.filtered.prefix(50)) { rec in
                             Button { selected = rec } label: {
                                 AttendanceRow(item: rec)
                             }
@@ -226,20 +231,19 @@ struct AttendanceView: View {
                 requestOnAppear: true
             )
             HStack {
-                Text(vm.isCheckedIn ? "🟢 Jornada abierta" : "⚪ Sin entrada hoy")
+                Text(vm.isCheckedIn ? "Jornada abierta" : "Sin entrada hoy")
                     .font(.subheadline).bold()
                 Spacer()
-                if let mins = vm.current?["totalMinutes"] as? Int, mins > 0 {
+                if let mins = vm.current?.totalMinutes, mins > 0 {
                     Text("\(mins) min").font(.caption).foregroundColor(.secondary)
                 }
             }
             if let msg = vm.checkInMessage {
-                Text(msg).font(.footnote).foregroundColor(msg.hasPrefix("❌") ? .red : .green)
+                Text(msg).font(.footnote)
+                    .foregroundColor(msg.hasPrefix("Error") ? .red : .green)
             }
             HStack(spacing: 12) {
-                Button {
-                    vm.checkIn("entrada")
-                } label: {
+                Button { vm.checkIn("entrada") } label: {
                     Label("Entrada", systemImage: "arrow.right.circle.fill")
                         .frame(maxWidth: .infinity)
                 }
@@ -247,9 +251,7 @@ struct AttendanceView: View {
                 .tint(.teal)
                 .disabled(vm.checkInLoading || vm.isCheckedIn)
 
-                Button {
-                    vm.checkIn("salida")
-                } label: {
+                Button { vm.checkIn("salida") } label: {
                     Label("Salida", systemImage: "arrow.left.circle.fill")
                         .frame(maxWidth: .infinity)
                 }
@@ -281,13 +283,9 @@ private struct AttKpi: View {
 }
 
 private struct AttendanceRow: View {
-    let item: [String: Any]
+    let item: AttendanceEvent
     var body: some View {
-        let name   = attStr(item, "userName", "usuario", "nombre")
-        let type_  = attStr(item, "type", "tipo")
-        let date   = String(attStr(item, "createdAt", "date", "timestamp").prefix(16))
-        let isLate = item["isLate"] as? Bool == true
-        let (icon, color) = typeStyle(type_)
+        let (icon, color) = typeStyle(item.type)
 
         HStack(spacing: 12) {
             ZStack {
@@ -295,13 +293,15 @@ private struct AttendanceRow: View {
                 Image(systemName: icon).foregroundColor(color).font(.system(size: 18))
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(name.isEmpty ? "Desconocido" : name).font(.subheadline).bold()
-                Text(type_.capitalized).font(.caption).foregroundColor(color)
+                Text(item.displayName).font(.subheadline).bold()
+                Text(item.type.capitalized).font(.caption).foregroundColor(color)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                if !date.isEmpty { Text(date).font(.caption2).foregroundColor(.secondary) }
-                if isLate {
+                if !item.dateLabel.isEmpty {
+                    Text(item.dateLabel).font(.caption2).foregroundColor(.secondary)
+                }
+                if item.isLate {
                     Text("Tarde").font(.caption2).bold().foregroundColor(.white)
                         .padding(.horizontal, 6).padding(.vertical, 2)
                         .background(Color.red).clipShape(Capsule())
@@ -322,28 +322,5 @@ private struct AttendanceRow: View {
         } else {
             return ("clock.fill", .orange)
         }
-    }
-}
-
-// MARK: – Helpers
-
-private func attStr(_ m: [String: Any], _ keys: String...) -> String {
-    for k in keys {
-        if let v = m[k] {
-            let s: String
-            if let ss = v as? String { s = ss }
-            else if let n = v as? NSNumber { s = n.stringValue }
-            else { s = String(describing: v) }
-            if !s.isEmpty && s != "null" { return s }
-        }
-    }
-    return ""
-}
-
-extension [String: Any] {
-    fileprivate var attId: String {
-        if let n = self["id"] as? Int { return "att-\(n)" }
-        if let s = self["id"] as? String { return "att-\(s)" }
-        return UUID().uuidString
     }
 }

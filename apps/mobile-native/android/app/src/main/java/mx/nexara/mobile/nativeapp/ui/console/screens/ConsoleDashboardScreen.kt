@@ -66,7 +66,7 @@ data class DashboardUiState(
     val weekFrom: String = "",
     val weekTo: String = "",
     val executive: Map<String, Any?> = emptyMap(),
-    val approvals: List<Map<String, Any?>> = emptyList(),
+    val approvals: List<mx.nexara.mobile.nativeapp.data.api.WorkflowApprovalDto> = emptyList(),
 )
 
 class ConsoleDashboardViewModel(app: Application) : AndroidViewModel(app) {
@@ -106,7 +106,7 @@ class ConsoleDashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val activities = withContext(Dispatchers.IO) { repo.activitiesFetch() }
                 val attendance = withContext(Dispatchers.IO) { runCatching { repo.attendanceRange(from, to) }.getOrNull() }
                 val executive  = withContext(Dispatchers.IO) { runCatching { extraRepo.executiveCLevel() }.getOrElse { emptyMap() } }
-                val approvals  = withContext(Dispatchers.IO) { runCatching { extraRepo.workflowPending() }.getOrElse { emptyList() } }
+                val approvals  = withContext(Dispatchers.IO) { runCatching { extraRepo.workflowApprovals() }.getOrElse { emptyList() } }
                 _state.update {
                     it.copy(
                         isLoading = false,
@@ -151,12 +151,12 @@ fun ConsoleDashboardScreen(
     val context = LocalContext.current
     val user = remember { AuthRepository(context).loadSession() }
     val isAdministrativo = user?.isAdministrativoRole() == true
-    var nocAlerts by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var nocAlerts by remember { mutableStateOf<List<mx.nexara.mobile.nativeapp.data.api.NocAlertDto>>(emptyList()) }
 
     if (isOps) {
         val extraRepo = remember { ExtraRepository(context) }
         androidx.compose.runtime.LaunchedEffect(Unit) {
-            nocAlerts = withContext(Dispatchers.IO) { extraRepo.nocAlerts() }
+            nocAlerts = withContext(Dispatchers.IO) { extraRepo.nocAlertDtos() }
         }
     }
 
@@ -305,13 +305,11 @@ fun ConsoleDashboardScreen(
             item { SectionHeader(title = "Aprobaciones pendientes", subtitle = "${state.approvals.size} esperando") }
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(state.approvals.take(8)) { a ->
-                        val id = (a["id"] as? Number)?.toLong()
-                            ?: (a["approvalId"] as? Number)?.toLong()
-                            ?: 0L
-                        val title   = (a["title"] ?: a["stepName"] ?: a["entityType"])?.toString() ?: "Aprobación"
-                        val who     = (a["requestedBy"] ?: a["userName"] ?: a["solicita"])?.toString() ?: ""
-                        val urgency = (a["urgencia"] ?: a["priority"] ?: "normal").toString()
+                    items(state.approvals.take(8), key = { it.rowKey }) { a ->
+                        val id = a.id
+                        val title = a.displayTitle
+                        val who = a.requestedByName
+                        val urgency = a.urgencyLabel
                         val uColor  = when (urgency.lowercase()) {
                             "alta","high" -> RedColor; "media","medium" -> AmberColor; else -> BlueColor
                         }
@@ -584,11 +582,15 @@ fun ConsoleDashboardScreen(
         // ── OPS: NOC Alerts ────────────────────────────────────────────────
         if (isOps && nocAlerts.isNotEmpty()) {
             item { SectionHeader("Alertas NOC", "${nocAlerts.size} activas") }
-            items(nocAlerts.take(5), key = { it["id"]?.toString() ?: it.hashCode().toString() }) { alert ->
-                val severity = (alert["severity"] as? String ?: "info").lowercase()
-                val alertColor = when (severity) { "critical" -> Color(0xFFEF4444); "warning" -> Color(0xFFF59E0B); else -> Color(0xFF3B82F6) }
-                val device = alert["deviceName"] as? String ?: "Dispositivo"
-                val title = alert["title"] as? String ?: alert["message"] as? String ?: "Alerta"
+            items(nocAlerts.take(5), key = { it.rowKey }) { alert ->
+                val severity = alert.severity.lowercase()
+                val alertColor = when {
+                    alert.isCritical -> Color(0xFFEF4444)
+                    alert.isWarningBand -> Color(0xFFF59E0B)
+                    else -> Color(0xFF3B82F6)
+                }
+                val device = alert.deviceName.ifBlank { "Dispositivo" }
+                val title = alert.displayTitle.ifBlank { alert.message.ifBlank { "Alerta" } }
                 Card(
                     modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),

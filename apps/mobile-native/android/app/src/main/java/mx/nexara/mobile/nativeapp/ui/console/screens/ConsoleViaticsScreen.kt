@@ -55,6 +55,7 @@ import mx.nexara.mobile.nativeapp.data.api.ViaticDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.common.CapturedMedia
 import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpi
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpiGrid
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
@@ -439,7 +440,12 @@ fun ConsoleViaticsScreen(
 
         if (filtered.isEmpty()) {
             Box(Modifier.fillMaxSize(), Alignment.Center) {
-                Text("Sin viáticos — crea tu primera solicitud", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                NxEmptyState(
+                    title = "Sin viáticos",
+                    subtitle = "Crea tu primera solicitud de viático con el botón +.",
+                    actionLabel = "Nueva solicitud",
+                    onAction = { showCreate = true },
+                )
             }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {

@@ -21,6 +21,7 @@ import { Response } from 'express';
 import { FileInterceptor, FilesInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { VehiclesService } from './vehicles.service.js';
 import { UsersService } from '../users/users.service.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
@@ -42,9 +43,13 @@ export class VehiclesController {
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VEHICLES_VIEW] })
-  async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
+  async findAll(
+    @CurrentUser() user: any,
+    @Query() query: PaginationQueryDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
     if (user.isSuperAdmin) {
-      return this.vehiclesService.findAll(query);
+      return this.vehiclesService.findAll(query, companyId);
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) || user.permissions?.includes(PERMISSIONS.VEHICLES_REVIEW)) {
       // Admin consola o manager v2: ve sus propios vehículos + vehículos de usuarios normales
       const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
@@ -54,16 +59,20 @@ export class VehiclesController {
           .filter((u: any) => u.role && !u.role.accesoConsoleAdmin)
           .map((u: any) => u.id),
       ];
-      return this.vehiclesService.findByAllowedUsers(allowedUserIds);
+      return this.vehiclesService.findByAllowedUsers(allowedUserIds, companyId);
     } else {
-      return this.vehiclesService.findByResponsible(user.id);
+      return this.vehiclesService.findByResponsible(user.id, companyId);
     }
   }
 
   @Post()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VEHICLES_REQUEST] })
-  async createRequest(@CurrentUser() user: any, @Body() body: any) {
+  async createRequest(
+    @CurrentUser() user: any,
+    @Body() body: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
     const actividadId = Number(body.actividadId);
     if (!actividadId || Number.isNaN(actividadId)) {
       throw new BadRequestException('actividadId invalido');
@@ -76,18 +85,21 @@ export class VehiclesController {
       throw new BadRequestException('La fecha fin debe ser mayor a la fecha inicio');
     }
 
-    return this.vehiclesService.create({
-      actividadId,
-      solicitanteId: user.id,
-      vehicleId: body.vehicleId ? Number(body.vehicleId) : null,
-      nombreVehiculo: body.nombreVehiculo || null,
-      placasVehiculo: body.placasVehiculo || null,
-      motivoUso: body.motivoUso || null,
-      estatusAprobacion: 'Pendiente',
-      fechaSolicitud: new Date(),
-      fechaInicioSolicitada: fechaInicioSolicitada || null,
-      fechaFinSolicitada: fechaFinSolicitada || null,
-    });
+    return this.vehiclesService.create(
+      {
+        actividadId,
+        solicitanteId: user.id,
+        vehicleId: body.vehicleId ? Number(body.vehicleId) : null,
+        nombreVehiculo: body.nombreVehiculo || null,
+        placasVehiculo: body.placasVehiculo || null,
+        motivoUso: body.motivoUso || null,
+        estatusAprobacion: 'Pendiente',
+        fechaSolicitud: new Date(),
+        fechaInicioSolicitada: fechaInicioSolicitada || null,
+        fechaFinSolicitada: fechaFinSolicitada || null,
+      },
+      companyId,
+    );
   }
 
   @Patch(':id/approve')
@@ -97,9 +109,10 @@ export class VehiclesController {
     @Param('id') id: string,
     @CurrentUser() user: any,
     @Body() body: { action?: 'approve' | 'reject'; note?: string; fechaInicioAprobada?: string; fechaFinAprobada?: string },
+    @CurrentCompanyId() companyId: number | null,
   ) {
     const action = body.action === 'reject' ? 'reject' : 'approve';
-    return this.vehiclesService.approveOrReject(+id, user, action, body);
+    return this.vehiclesService.approveOrReject(+id, user, action, body, companyId);
   }
 
   @Post(':id/start-use')
@@ -117,12 +130,20 @@ export class VehiclesController {
     @Param('id') id: string,
     @Body() body: any,
     @UploadedFiles() uploaded: Record<string, any[]>,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     const fileMap: Record<string, string> = {};
     for (const [key, arr] of Object.entries(uploaded ?? {})) {
       if (arr?.[0]?.filename) fileMap[key] = `/uploads/vehicles/${arr[0].filename}`;
     }
-    return this.vehiclesService.startUse(+id, user.id, fileMap, Number(body.odometroKm), Number(body.combustiblePct));
+    return this.vehiclesService.startUse(
+      +id,
+      user.id,
+      fileMap,
+      Number(body.odometroKm),
+      Number(body.combustiblePct),
+      companyId,
+    );
   }
 
   @Post(':id/end-use')
@@ -140,12 +161,20 @@ export class VehiclesController {
     @Param('id') id: string,
     @Body() body: any,
     @UploadedFiles() uploaded: Record<string, any[]>,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     const fileMap: Record<string, string> = {};
     for (const [key, arr] of Object.entries(uploaded ?? {})) {
       if (arr?.[0]?.filename) fileMap[key] = `/uploads/vehicles/${arr[0].filename}`;
     }
-    return this.vehiclesService.endUse(+id, user.id, fileMap, Number(body.odometroKm), Number(body.combustiblePct));
+    return this.vehiclesService.endUse(
+      +id,
+      user.id,
+      fileMap,
+      Number(body.odometroKm),
+      Number(body.combustiblePct),
+      companyId,
+    );
   }
 
   @Post('notify-expiring')
@@ -162,6 +191,7 @@ export class VehiclesController {
     @CurrentUser() user: any,
     @Param('id') id: string,
     @Body() body: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     const updateData: any = {
       estatusAprobacion: body.estatusAprobacion,
@@ -178,7 +208,7 @@ export class VehiclesController {
       updateData.fechaFin = updateData.fechaFinAprobada || undefined;
     }
 
-    return this.vehiclesService.update(+id, updateData);
+    return this.vehiclesService.update(+id, updateData, companyId);
   }
 
   @Post(':id/delivery-evidence')
@@ -189,6 +219,7 @@ export class VehiclesController {
     @CurrentUser() user: any,
     @Param('id') id: string,
     @UploadedFiles() files: any[],
+    @CurrentCompanyId() companyId: number | null,
   ) {
     if (!files || files.length === 0) {
       throw new BadRequestException('Archivos requeridos');
@@ -197,8 +228,7 @@ export class VehiclesController {
       throw new BadRequestException('Debes subir minimo 5 fotos de entrega');
     }
 
-    const record = await this.vehiclesService.findOne(+id);
-    if (!record) throw new BadRequestException('Solicitud no encontrada');
+    const record = await this.vehiclesService.findOne(+id, companyId);
     if (!user.isSuperAdmin && !user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) && !user.permissions?.includes(PERMISSIONS.VEHICLES_REVIEW) && record.solicitanteId !== user.id) {
       throw new ForbiddenException('No puedes modificar esta solicitud');
     }
@@ -209,7 +239,7 @@ export class VehiclesController {
     return this.vehiclesService.update(+id, {
       entregaFotos,
       entregaEstatus: 'En revision',
-    });
+    }, companyId);
   }
 
   @Patch(':id/delivery-review')
@@ -219,6 +249,7 @@ export class VehiclesController {
     @CurrentUser() user: any,
     @Param('id') id: string,
     @Body() body: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     const approved = Boolean(body.entregaAprobada);
     return this.vehiclesService.update(+id, {
@@ -227,7 +258,7 @@ export class VehiclesController {
       entregaObservaciones: body.entregaObservaciones || null,
       entregaRevisadoPorId: user.id,
       entregaRevisadoEn: new Date(),
-    });
+    }, companyId);
   }
 
   @Post(':id/renewal')
@@ -237,9 +268,9 @@ export class VehiclesController {
     @CurrentUser() user: any,
     @Param('id') id: string,
     @Body() body: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    const record = await this.vehiclesService.findOne(+id);
-    if (!record) throw new BadRequestException('Solicitud no encontrada');
+    const record = await this.vehiclesService.findOne(+id, companyId);
     if (!user.isSuperAdmin && !user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) && !user.permissions?.includes(PERMISSIONS.VEHICLES_REVIEW) && record.solicitanteId !== user.id) {
       throw new ForbiddenException('No puedes modificar esta solicitud');
     }
@@ -254,7 +285,7 @@ export class VehiclesController {
       renovacionSolicitadaInicio: start,
       renovacionSolicitadaFin: end,
       renovacionEstatus: 'Pendiente',
-    });
+    }, companyId);
   }
 
   @Patch(':id/renewal-review')
@@ -263,20 +294,21 @@ export class VehiclesController {
   async reviewRenewal(
     @Param('id') id: string,
     @Body() body: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     const approved = Boolean(body.renovacionAprobada);
     return this.vehiclesService.update(+id, {
       renovacionEstatus: approved ? 'Aprobada' : 'Rechazada',
       fechaFinAprobada: approved && body.fechaFinAprobada ? new Date(body.fechaFinAprobada) : undefined,
       fechaFin: approved && body.fechaFinAprobada ? new Date(body.fechaFinAprobada) : undefined,
-    });
+    }, companyId);
   }
 
   @Get('inventory')
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.VEHICLES_VIEW, PERMISSIONS.VEHICLES_REQUEST, PERMISSIONS.VEHICLES_INVENTORY] })
-  listInventory(@Query() query: PaginationQueryDto) {
-    return this.vehiclesService.listAssets(query);
+  listInventory(@Query() query: PaginationQueryDto, @CurrentCompanyId() companyId: number | null) {
+    return this.vehiclesService.listAssets(query, companyId);
   }
 
   @Get('analytics/usage')
@@ -289,31 +321,38 @@ export class VehiclesController {
   @Post('inventory')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VEHICLES_INVENTORY] })
-  createInventory(@Body() body: any) {
+  createInventory(@Body() body: any, @CurrentCompanyId() companyId: number | null) {
     if (!body.nombre) {
       throw new BadRequestException('Nombre requerido');
     }
-    return this.vehiclesService.createAsset({
-      nombre: body.nombre,
-      placas: body.placas || null,
-      estatus: body.estatus || 'Disponible',
-      activo: body.activo !== false,
-      notas: body.notas || null,
-    });
+    return this.vehiclesService.createAsset(
+      {
+        nombre: body.nombre,
+        placas: body.placas || null,
+        estatus: body.estatus || 'Disponible',
+        activo: body.activo !== false,
+        notas: body.notas || null,
+      },
+      companyId,
+    );
   }
 
   @Patch('inventory/:id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VEHICLES_INVENTORY] })
-  updateInventory(@Param('id') id: string, @Body() body: any) {
-    return this.vehiclesService.updateAsset(+id, body);
+  updateInventory(
+    @Param('id') id: string,
+    @Body() body: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.vehiclesService.updateAsset(+id, body, companyId);
   }
 
   @Delete('inventory/:id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VEHICLES_INVENTORY] })
-  removeInventory(@Param('id') id: string) {
-    return this.vehiclesService.removeAsset(+id);
+  removeInventory(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
+    return this.vehiclesService.removeAsset(+id, companyId);
   }
 
   // ── Checkout: engineer takes "before" photos and marks vehicle as taken ──────
@@ -325,8 +364,9 @@ export class VehiclesController {
     @CurrentUser() user: any,
     @Param('id') id: string,
     @UploadedFiles() files: any[],
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    const asset = await this.vehiclesService.getAsset(+id);
+    const asset = await this.vehiclesService.getAsset(+id, companyId);
     if (!asset) throw new BadRequestException('Vehículo no encontrado');
     if (asset.estatus === 'Asignado') {
       throw new BadRequestException('El vehículo ya está asignado');
@@ -339,7 +379,7 @@ export class VehiclesController {
       salidaFotos: photoUrls,
       devolucionFotos: null,
       tiempoUsoMinutos: null,
-    });
+    }, companyId);
   }
 
   // ── Return: engineer takes "after" photos, system logs time used ─────────────
@@ -351,8 +391,9 @@ export class VehiclesController {
     @CurrentUser() user: any,
     @Param('id') id: string,
     @UploadedFiles() files: any[],
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    const asset = await this.vehiclesService.getAsset(+id);
+    const asset = await this.vehiclesService.getAsset(+id, companyId);
     if (!asset) throw new BadRequestException('Vehículo no encontrado');
     if (!user.isSuperAdmin && !user.permissions?.includes(PERMISSIONS.VEHICLES_INVENTORY) && asset.assignedToId !== user.id) {
       throw new ForbiddenException('Solo el asignatario puede devolver el vehículo');
@@ -367,7 +408,7 @@ export class VehiclesController {
       assignedAt: null,
       devolucionFotos: photoUrls,
       tiempoUsoMinutos: minutosUso,
-    });
+    }, companyId);
   }
 
   // Exportar vehículos (CSV o JSON)
@@ -378,10 +419,11 @@ export class VehiclesController {
     @CurrentUser() user: any,
     @Param('format') format: string,
     @Res() res: Response,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     let result: any;
     if (user.isSuperAdmin) {
-      result = await this.vehiclesService.findAll();
+      result = await this.vehiclesService.findAll(undefined, companyId);
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) || user.permissions?.includes(PERMISSIONS.VEHICLES_REVIEW)) {
       // Admin consola o manager v2: ve sus propios vehículos + vehículos de usuarios normales
       const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
@@ -391,9 +433,9 @@ export class VehiclesController {
           .filter((u: any) => u.role && !u.role.accesoConsoleAdmin)
           .map((u: any) => u.id),
       ];
-      result = await this.vehiclesService.findByAllowedUsers(allowedUserIds);
+      result = await this.vehiclesService.findByAllowedUsers(allowedUserIds, companyId);
     } else {
-      result = await this.vehiclesService.findByResponsible(user.id);
+      result = await this.vehiclesService.findByResponsible(user.id, companyId);
     }
     const data: any[] = Array.isArray(result) ? result : result.data;
     if (format === 'xlsx') {
@@ -402,7 +444,7 @@ export class VehiclesController {
       res.attachment('vehiculos.xlsx');
       return res.send(Buffer.from(buffer));
     }
-    throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON están deshabilitados.');
+    throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON estan deshabilitados.');
   }
 
   // Importar vehículos desde archivo JSON
@@ -413,6 +455,7 @@ export class VehiclesController {
   async import(
     @UploadedFile() file: any,
     @Res() res: Response,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     if (!file) {
       return res
@@ -425,7 +468,7 @@ export class VehiclesController {
       return res.status(HttpStatus.OK).json({ imported: typeof result === 'number' ? result : 0 });
     } catch (err) {
       try {
-        const result = await this.excelImport.importExcel('vehicle', file.buffer);
+        const result = await this.excelImport.importExcel('vehicle', file.buffer, companyId);
         return res.status(HttpStatus.OK).json(result);
       } catch (excelErr) {
         let errorMsg = '';
@@ -436,8 +479,10 @@ export class VehiclesController {
         } else {
           errorMsg = String(excelErr);
         }
+        const status =
+          excelErr instanceof ForbiddenException ? HttpStatus.FORBIDDEN : HttpStatus.BAD_REQUEST;
         return res
-          .status(HttpStatus.BAD_REQUEST)
+          .status(status)
           .json({ message: 'Error al importar', error: errorMsg });
       }
     }

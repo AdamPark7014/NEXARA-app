@@ -253,7 +253,15 @@ export default function ServiceClientDetailPage() {
         actions={<Link href={`/ops/activities`} style={{ fontSize: 12, color: "var(--primary)" }}>Ver todas →</Link>}
       >
         {activities.length === 0 ? (
-          <EmptyState icon="🔧" title="Sin actividades" description="No hay órdenes de trabajo registradas para este cliente." />
+          <EmptyState
+            title="Sin actividades"
+            description="No hay órdenes de trabajo registradas para este cliente."
+            action={
+              <Link href={`/ops/activities?clientId=${client?.id ?? ""}`} style={{ textDecoration: "none" }}>
+                <Button size="sm" variant="primary">Crear OT</Button>
+              </Link>
+            }
+          />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {activities.map((a) => (

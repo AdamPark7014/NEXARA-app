@@ -50,6 +50,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.api.ServiceSheetListDto
 import mx.nexara.mobile.nativeapp.data.ops.OpsRepository
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.util.mergeIntoNotes
@@ -95,8 +96,8 @@ data class ClientTicketsUiState(
     val message: String? = null,
     val query: String = "",
     val statusFilter: String = "todos",
-    val items: List<Map<String, Any?>> = emptyList(),
-    val selected: Map<String, Any?>? = null,
+    val items: List<mx.nexara.mobile.nativeapp.data.api.OpsClientTicketRequestDto> = emptyList(),
+    val selected: mx.nexara.mobile.nativeapp.data.api.OpsClientTicketRequestDto? = null,
     val acting: Boolean = false,
 )
 
@@ -113,14 +114,15 @@ class ClientTicketsViewModel(app: Application) : AndroidViewModel(app) {
         refresh()
     }
 
-    fun select(item: Map<String, Any?>?) = _state.update { it.copy(selected = item) }
+    fun select(item: mx.nexara.mobile.nativeapp.data.api.OpsClientTicketRequestDto?) =
+        _state.update { it.copy(selected = item) }
 
     fun refresh() {
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             try {
                 val st = _state.value.statusFilter.takeIf { it != "todos" }
-                val list = withContext(Dispatchers.IO) { repo.clientTicketRequests(st) }
+                val list = withContext(Dispatchers.IO) { repo.clientTicketRequestDtos(st) }
                 _state.update { it.copy(loading = false, items = list) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message) }
@@ -141,12 +143,13 @@ class ClientTicketsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun filtered(): List<Map<String, Any?>> {
+    fun filtered(): List<mx.nexara.mobile.nativeapp.data.api.OpsClientTicketRequestDto> {
         val q = _state.value.query.trim().lowercase()
         if (q.isBlank()) return _state.value.items
         return _state.value.items.filter {
-            str(it, "description", "title").lowercase().contains(q) ||
-                str(it, "branchName", "clientName").lowercase().contains(q)
+            it.displayTitle.lowercase().contains(q) ||
+                it.branchName.lowercase().contains(q) ||
+                it.clientName.lowercase().contains(q)
         }
     }
 }
@@ -157,17 +160,17 @@ fun ClientTicketsModuleScreen(vm: ClientTicketsViewModel = viewModel()) {
     val selected = s.selected
 
     if (selected != null) {
-        val id = str(selected, "id").toLongOrNull()
-        val status = str(selected, "status").uppercase()
+        val id = selected.id
+        val status = selected.status.uppercase()
         LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { Text("Ticket de cliente", style = MaterialTheme.typography.titleLarge) }
-            item { DetailLine("Descripción", str(selected, "description", "title")) }
-            item { DetailLine("Tipo", str(selected, "requestType")) }
-            item { DetailLine("Urgencia", str(selected, "urgency")) }
-            item { DetailLine("Estado", str(selected, "status")) }
-            item { DetailLine("Sucursal", str(selected, "branchName")) }
-            item { DetailLine("Cliente", str(selected, "clientName", "client")) }
-            if (id != null) {
+            item { DetailLine("Descripción", selected.displayTitle) }
+            item { DetailLine("Tipo", selected.requestType) }
+            item { DetailLine("Urgencia", selected.urgency) }
+            item { DetailLine("Estado", selected.status) }
+            item { DetailLine("Sucursal", selected.branchName) }
+            item { DetailLine("Cliente", selected.clientName) }
+            if (id > 0) {
                 if (status == "NEW") {
                     item { ActionBtn("Marcar asignado", s.acting) { vm.patchStatus(id, "ASSIGNED") } }
                 }
@@ -189,8 +192,8 @@ fun ClientTicketsModuleScreen(vm: ClientTicketsViewModel = viewModel()) {
     }
 
     val statuses = listOf("todos", "NEW", "ASSIGNED", "CLOSED", "APPROVED", "REJECTED")
-    val kpiNew = s.items.count { str(it, "status").equals("NEW", true) }
-    val kpiAssigned = s.items.count { str(it, "status").equals("ASSIGNED", true) }
+    val kpiNew = s.items.count { it.status.equals("NEW", true) }
+    val kpiAssigned = s.items.count { it.status.equals("ASSIGNED", true) }
 
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { Text("Tickets de clientes", style = MaterialTheme.typography.titleLarge) }
@@ -230,16 +233,16 @@ fun ClientTicketsModuleScreen(vm: ClientTicketsViewModel = viewModel()) {
         } else if (vm.filtered().isEmpty()) {
             item { Text("Sin tickets", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         } else {
-            items(vm.filtered().take(80), key = { rowId(it) }) { t ->
+            items(vm.filtered().take(80), key = { it.rowKey }) { t ->
                 Card(
                     onClick = { vm.select(t) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 ) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(str(t, "description", "title"), fontWeight = FontWeight.Bold)
-                        Text(str(t, "branchName"), style = MaterialTheme.typography.bodySmall)
-                        Text(str(t, "status"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Text(t.displayTitle, fontWeight = FontWeight.Bold)
+                        Text(t.branchName, style = MaterialTheme.typography.bodySmall)
+                        Text(t.status, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -478,13 +481,13 @@ fun ServiceSheetsModuleScreen() {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as Application
     val repo = remember { OpsRepository(app) }
     var loading by remember { mutableStateOf(true) }
-    var items by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var items by remember { mutableStateOf<List<ServiceSheetListDto>>(emptyList()) }
     var query by remember { mutableStateOf("") }
-    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
+    var selected by remember { mutableStateOf<ServiceSheetListDto?>(null) }
 
     LaunchedEffect(Unit) {
         loading = true
-        items = withContext(Dispatchers.IO) { repo.serviceSheets() }
+        items = withContext(Dispatchers.IO) { repo.serviceSheetDtos() }
         loading = false
     }
 
@@ -494,28 +497,26 @@ fun ServiceSheetsModuleScreen() {
             item {
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                     OutlinedButton(onClick = { selected = null }) { Text("← Volver") }
-                    KpiChip(str(s, "status", "estado").ifBlank { "—" }, null)
+                    KpiChip(s.status.ifBlank { "—" }, null)
                 }
             }
             item { Text("Hoja de servicio", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DetailLine("Folio", str(s, "folio", "number", "folioNumber"))
-                        DetailLine("Cliente", str(s, "clientName", "cliente"))
-                        DetailLine("Sucursal", str(s, "branchName", "sucursal"))
-                        DetailLine("AN / Actividad", str(s, "anNumber", "activityAn", "activityId"))
-                        DetailLine("Técnico", str(s, "technicianName", "userName", "responsable"))
-                        DetailLine("Fecha visita", str(s, "visitDate", "scheduledDate", "createdAt").take(10))
-                        DetailLine("Hora entrada", str(s, "checkIn", "entryTime", "horaEntrada"))
-                        DetailLine("Hora salida", str(s, "checkOut", "exitTime", "horaSalida"))
+                        DetailLine("Folio", s.displayTitle)
+                        DetailLine("Cliente", s.clientName)
+                        DetailLine("Tipo", s.serviceType)
+                        DetailLine("AN / Actividad", if (s.activityId > 0L) s.activityId.toString() else "")
+                        DetailLine("Técnico", s.technicianName)
+                        DetailLine("Fecha visita", s.createdAt.take(10))
+                        DetailLine("Resumen", s.workSummary)
                     }
                 }
             }
-            val materials = ((s["materials"] ?: s["materiales"]) as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
-            if (materials.isNotEmpty()) {
+            if (s.equipmentList.isNotEmpty()) {
                 item { Text("Materiales utilizados", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
-                items(materials, key = { str(it, "id").ifBlank { it.hashCode().toString() } }) { m ->
+                items(s.equipmentList, key = { str(it, "id").ifBlank { it.hashCode().toString() } }) { m ->
                     Card(Modifier.fillMaxWidth()) {
                         Row(Modifier.fillMaxWidth().padding(12.dp), Arrangement.SpaceBetween) {
                             Text(str(m, "name", "nombre", "description").ifBlank { "Material" }, Modifier.weight(1f))
@@ -525,20 +526,21 @@ fun ServiceSheetsModuleScreen() {
                     }
                 }
             }
-            val obs = str(s, "observations", "observaciones", "notes", "description")
-            if (obs.isNotBlank()) {
+            if (s.observations.isNotBlank()) {
                 item { Text("Observaciones", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
-                item { Card(Modifier.fillMaxWidth()) { Text(obs, Modifier.padding(14.dp), style = MaterialTheme.typography.bodyMedium) } }
+                item { Card(Modifier.fillMaxWidth()) { Text(s.observations, Modifier.padding(14.dp), style = MaterialTheme.typography.bodyMedium) } }
             }
-            val signed = str(s, "signedAt", "firmadoAt", "clientSignature")
             item {
                 Text("Firma del cliente", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                if (signed.isBlank()) {
+                if (s.signedName.isBlank()) {
                     Text("Sin firma del cliente", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    DetailLine("Firmado por", str(s, "signedByName", "clientName", "signerName"))
-                    DetailLine("Fecha", signed.take(10))
+                    DetailLine("Firmado por", s.signedName)
+                    DetailLine("Fecha", s.createdAt.take(10))
                 }
+            }
+            if (s.pdfUrl.isNotBlank()) {
+                item { DetailLine("PDF", s.pdfUrl) }
             }
         }
         return
@@ -547,8 +549,9 @@ fun ServiceSheetsModuleScreen() {
     val filtered = if (query.isBlank()) items else {
         val q = query.lowercase()
         items.filter {
-            str(it, "folio", "number").lowercase().contains(q) ||
-                str(it, "clientName").lowercase().contains(q)
+            it.displayTitle.lowercase().contains(q) ||
+                it.clientName.lowercase().contains(q) ||
+                it.serviceType.lowercase().contains(q)
         }
     }
 
@@ -564,11 +567,14 @@ fun ServiceSheetsModuleScreen() {
         }
         if (loading) item { CircularProgressIndicator() }
         else if (filtered.isEmpty()) item { Text("Sin hojas de servicio") }
-        else items(filtered.take(80), key = { rowId(it) }) { row ->
+        else items(filtered.take(80), key = { it.rowKey }) { row ->
             Card(onClick = { selected = row }, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) {
-                    Text(str(row, "folio", "number"), fontWeight = FontWeight.Bold)
-                    Text(str(row, "clientName", "anNumber"), style = MaterialTheme.typography.bodySmall)
+                    Text(row.displayTitle, fontWeight = FontWeight.Bold)
+                    Text(
+                        listOf(row.clientName, row.status).filter { it.isNotBlank() }.joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
         }

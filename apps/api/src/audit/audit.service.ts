@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 @Injectable()
@@ -127,6 +127,91 @@ export class AuditService {
       where: { createdAt: { lt: cutoff } },
     });
     return { deleted: result.count, cutoff: cutoff.toISOString() };
+  }
+
+  /**
+   * GDPR / LFPDPPP — derecho de cancelación / olvido (anonymize, no hard-delete histórico fiscal).
+   */
+  async eraseSubject(userId: number, actorId?: number, companyId?: number | null) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    if (user.roleKey === 'super_admin') {
+      throw new BadRequestException('No se puede borrar un super_admin');
+    }
+
+    const stamp = Date.now();
+    const anonymizedEmail = `erased+${userId}.${stamp}@privacy.nexara.local`;
+    const anonymizedName = `Usuario eliminado #${userId}`;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          nombre: anonymizedName,
+          email: anonymizedEmail,
+          employeeNumber: null,
+          passwordHash: `ERASED:${stamp}`,
+          avatarUrl: null,
+          isActive: false,
+          estadoRRHH: 'Baja',
+          mfaEnabled: false,
+          mfaSecret: null,
+          oidcProvider: null,
+          oidcSubject: null,
+          lastLoginIp: null,
+          lastLoginDevice: null,
+          lockedUntil: new Date(),
+        } as any,
+      });
+
+      // Perfil RRHH si existe
+      try {
+        await tx.userProfile.updateMany({
+          where: { userId },
+          data: {
+            telefono: null,
+            direccion: null,
+            colonia: null,
+            ciudad: null,
+            estado: null,
+            codigoPostal: null,
+            curp: null,
+            rfc: null,
+            ineNumero: null,
+            nss: null,
+            contactoEmergenciaNombre: null,
+            contactoEmergenciaTelefono: null,
+            fechaNacimiento: null,
+            observaciones: 'PII erased (GDPR/LFPDPPP)',
+          },
+        });
+      } catch {
+        // schema drift
+      }
+
+      await tx.auditLog.create({
+        data: {
+          action: 'privacy.erase',
+          entityType: 'User',
+          entityId: userId,
+          userId: actorId ?? null,
+          companyId: companyId ?? null,
+          source: 'api',
+          changes: {
+            reason: 'GDPR/LFPDPPP subject erase',
+            anonymizedEmail,
+          },
+        } as any,
+      });
+    });
+
+    return {
+      ok: true,
+      userId,
+      anonymized: true,
+      email: anonymizedEmail,
+      at: new Date().toISOString(),
+    };
   }
 
   async getEntityHistory(entityType: string, entityId: number) {

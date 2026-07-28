@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class HrService {
@@ -8,12 +9,17 @@ export class HrService {
 
   // ── Leave Requests ────────────────────────────────────────────────
 
-  async createLeave(dto: {
-    type: string;
-    startDate: string;
-    endDate: string;
-    reason?: string;
-  }, userId: number) {
+  async createLeave(
+    dto: {
+      type: string;
+      startDate: string;
+      endDate: string;
+      reason?: string;
+    },
+    userId: number,
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
     const start = new Date(dto.startDate);
     const end = new Date(dto.endDate);
     if (end < start) throw new BadRequestException('La fecha de fin no puede ser anterior a la de inicio');
@@ -28,13 +34,19 @@ export class HrService {
         endDate: end,
         days,
         reason: dto.reason?.trim() || null,
+        companyId: tenantId,
       },
       include: { user: { select: { id: true, nombre: true } } },
     });
   }
 
-  async listLeaves(query?: PaginationQueryDto, filters?: { status?: string; type?: string; userId?: number }) {
-    const where: any = {};
+  async listLeaves(
+    companyId?: number | null,
+    query?: PaginationQueryDto,
+    filters?: { status?: string; type?: string; userId?: number },
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { ...companyWhere(tenantId) };
     if (filters?.status) where.status = filters.status;
     if (filters?.type) where.type = filters.type;
     if (filters?.userId) where.userId = filters.userId;
@@ -71,21 +83,21 @@ export class HrService {
     });
   }
 
-  async getLeave(id: number) {
-    const leave = await this.prisma.leaveRequest.findUnique({
-      where: { id },
+  async getLeave(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const leave = await this.prisma.leaveRequest.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: {
         user: { select: { id: true, nombre: true, email: true } },
         approvedBy: { select: { id: true, nombre: true } },
       },
     });
-    if (!leave) throw new NotFoundException('Solicitud de permiso no encontrada');
+    assertCompanyAccess(leave, tenantId, 'Solicitud de permiso');
     return leave;
   }
 
-  async approveLeave(id: number, approverId: number) {
-    const leave = await this.prisma.leaveRequest.findUnique({ where: { id } });
-    if (!leave) throw new NotFoundException('Solicitud de permiso no encontrada');
+  async approveLeave(id: number, approverId: number, companyId?: number | null) {
+    const leave = await this.getLeave(id, companyId);
     if (leave.status !== 'PENDING') throw new BadRequestException('Solo se pueden aprobar solicitudes pendientes');
 
     return this.prisma.leaveRequest.update({
@@ -95,9 +107,8 @@ export class HrService {
     });
   }
 
-  async rejectLeave(id: number, approverId: number, rejectionReason?: string) {
-    const leave = await this.prisma.leaveRequest.findUnique({ where: { id } });
-    if (!leave) throw new NotFoundException('Solicitud de permiso no encontrada');
+  async rejectLeave(id: number, approverId: number, rejectionReason?: string, companyId?: number | null) {
+    const leave = await this.getLeave(id, companyId);
     if (leave.status !== 'PENDING') throw new BadRequestException('Solo se pueden rechazar solicitudes pendientes');
 
     return this.prisma.leaveRequest.update({
@@ -112,9 +123,8 @@ export class HrService {
     });
   }
 
-  async cancelLeave(id: number, userId: number) {
-    const leave = await this.prisma.leaveRequest.findUnique({ where: { id } });
-    if (!leave) throw new NotFoundException('Solicitud de permiso no encontrada');
+  async cancelLeave(id: number, userId: number, companyId?: number | null) {
+    const leave = await this.getLeave(id, companyId);
     if (leave.userId !== userId) throw new BadRequestException('Solo el solicitante puede cancelar');
     if (leave.status !== 'PENDING') throw new BadRequestException('Solo se pueden cancelar solicitudes pendientes');
 
@@ -124,7 +134,8 @@ export class HrService {
     });
   }
 
-  async getLeaveBalance(userId: number, year?: number) {
+  async getLeaveBalance(userId: number, companyId?: number | null, year?: number) {
+    const tenantId = requireCompanyId(companyId);
     const y = year ?? new Date().getFullYear();
     const startOfYear = new Date(`${y}-01-01`);
     const endOfYear = new Date(`${y}-12-31`);
@@ -132,6 +143,7 @@ export class HrService {
     const approved = await this.prisma.leaveRequest.findMany({
       where: {
         userId,
+        ...companyWhere(tenantId),
         status: 'APPROVED',
         startDate: { gte: startOfYear },
         endDate: { lte: endOfYear },
@@ -149,16 +161,21 @@ export class HrService {
 
   // ── Performance Reviews ───────────────────────────────────────────
 
-  async createReview(dto: {
-    userId: number;
-    period: string;
-    reviewDate: string;
-    overallRating: number;
-    strengths?: string;
-    areasOfImprovement?: string;
-    goals?: string;
-    comments?: string;
-  }, reviewerId: number) {
+  async createReview(
+    dto: {
+      userId: number;
+      period: string;
+      reviewDate: string;
+      overallRating: number;
+      strengths?: string;
+      areasOfImprovement?: string;
+      goals?: string;
+      comments?: string;
+    },
+    reviewerId: number,
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
     if (dto.overallRating < 1 || dto.overallRating > 5) {
       throw new BadRequestException('La calificación debe estar entre 1 y 5');
     }
@@ -174,6 +191,7 @@ export class HrService {
         areasOfImprovement: dto.areasOfImprovement?.trim() || null,
         goals: dto.goals?.trim() || null,
         comments: dto.comments?.trim() || null,
+        companyId: tenantId,
       },
       include: {
         user: { select: { id: true, nombre: true } },
@@ -182,8 +200,13 @@ export class HrService {
     });
   }
 
-  async listReviews(query?: PaginationQueryDto, filters?: { period?: string; status?: string; userId?: number; reviewerId?: number }) {
-    const where: any = {};
+  async listReviews(
+    query?: PaginationQueryDto,
+    filters?: { period?: string; status?: string; userId?: number; reviewerId?: number },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { ...companyWhere(tenantId) };
     if (filters?.period) where.period = filters.period;
     if (filters?.status) where.status = filters.status;
     if (filters?.userId) where.userId = filters.userId;
@@ -222,33 +245,38 @@ export class HrService {
     });
   }
 
-  async getReview(id: number) {
-    const review = await this.prisma.performanceReview.findUnique({
-      where: { id },
+  async getReview(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const review = await this.prisma.performanceReview.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: {
         user: { select: { id: true, nombre: true, email: true } },
         reviewer: { select: { id: true, nombre: true } },
       },
     });
-    if (!review) throw new NotFoundException('Evaluación de desempeño no encontrada');
+    assertCompanyAccess(review, tenantId, 'Evaluación de desempeño');
     return review;
   }
 
-  async updateReview(id: number, dto: any) {
-    return this.prisma.performanceReview.update({ where: { id }, data: dto });
+  async updateReview(id: number, dto: any, companyId?: number | null) {
+    await this.getReview(id, companyId);
+    const { companyId: _omit, ...safe } = dto || {};
+    return this.prisma.performanceReview.update({ where: { id }, data: safe });
   }
 
-  async submitReview(id: number) {
+  async submitReview(id: number, companyId?: number | null) {
+    await this.getReview(id, companyId);
     return this.prisma.performanceReview.update({
       where: { id },
       data: { status: 'SUBMITTED' },
     });
   }
 
-  async acknowledgeReview(id: number) {
-    const review = await this.prisma.performanceReview.findUnique({ where: { id } });
-    if (!review) throw new NotFoundException('Evaluación de desempeño no encontrada');
-    if (review.status !== 'SUBMITTED') throw new BadRequestException('Solo se pueden acusar de recibido evaluaciones enviadas');
+  async acknowledgeReview(id: number, companyId?: number | null) {
+    const review = await this.getReview(id, companyId);
+    if (review.status !== 'SUBMITTED') {
+      throw new BadRequestException('Solo se pueden acusar de recibido evaluaciones enviadas');
+    }
 
     return this.prisma.performanceReview.update({
       where: { id },
@@ -258,15 +286,17 @@ export class HrService {
 
   // ── HR Dashboard / People Intelligence ────────────────────────────
 
-  async getDashboard() {
-    return this.getPeopleInsights();
+  async getDashboard(companyId?: number | null) {
+    return this.getPeopleInsights(companyId);
   }
 
   /**
    * Inteligencia de personas: asistencia, puntualidad, carga, leaves,
    * reviews, rotación y rankings — alimenta /erp/hr/kpis.
    */
-  async getPeopleInsights() {
+  async getPeopleInsights(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const scope = companyWhere(tenantId);
     const now = new Date();
     const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const d30 = new Date(now.getTime() - 30 * 86_400_000);
@@ -285,14 +315,17 @@ export class HrService {
       leavesPendingList,
       recentReviews,
     ] = await Promise.all([
-      this.prisma.leaveRequest.count({ where: { status: 'PENDING' } }),
+      this.prisma.leaveRequest.count({ where: { status: 'PENDING', ...scope } }),
       this.prisma.leaveRequest.count({
-        where: { status: 'APPROVED', startDate: { gte: startMonth } },
+        where: { status: 'APPROVED', startDate: { gte: startMonth }, ...scope },
       }),
       this.prisma.performanceReview.count(),
       this.prisma.performanceReview.aggregate({ _avg: { overallRating: true } }),
       this.prisma.user.findMany({
-        where: { email: { notIn: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] } },
+        where: {
+          email: { notIn: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] },
+          companyMemberships: { some: { companyId: tenantId } },
+        },
         select: {
           id: true,
           nombre: true,
@@ -304,21 +337,29 @@ export class HrService {
         },
       }),
       this.prisma.attendanceDay.findMany({
-        where: { date: { gte: d30 } },
+        where: {
+          date: { gte: d30 },
+          user: { companyMemberships: { some: { companyId: tenantId } } },
+        },
         select: { userId: true, date: true, totalMinutes: true, lastEntryAt: true, isOpen: true },
       }),
       this.prisma.attendance.findMany({
-        where: { type: 'entrada', timestamp: { gte: d30 } },
+        where: {
+          type: 'entrada',
+          timestamp: { gte: d30 },
+          user: { companyMemberships: { some: { companyId: tenantId } } },
+        },
         select: { userId: true, timestamp: true },
       }),
       this.prisma.lunchBreak.count({
         where: {
           date: { gte: d30 },
           OR: [{ isCheckinLate: true }, { isCheckoutLate: true }],
+          user: { companyMemberships: { some: { companyId: tenantId } } },
         },
       }),
       this.prisma.leaveRequest.findMany({
-        where: { status: 'PENDING' },
+        where: { status: 'PENDING', ...scope },
         take: 8,
         orderBy: { createdAt: 'asc' },
         include: { user: { select: { id: true, nombre: true } } },
@@ -326,6 +367,9 @@ export class HrService {
       this.prisma.performanceReview.findMany({
         take: 8,
         orderBy: { reviewDate: 'desc' },
+        where: {
+          user: { companyMemberships: { some: { companyId: tenantId } } },
+        },
         include: {
           user: { select: { id: true, nombre: true } },
           reviewer: { select: { id: true, nombre: true } },

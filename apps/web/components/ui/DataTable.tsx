@@ -49,7 +49,7 @@ export default function DataTable<T>({
   emptyAction,
 }: Props<T>) {
   if (rows.length === 0) {
-    return <EmptyState icon="📭" title={emptyTitle} description={emptyDescription} action={emptyAction} />;
+    return <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />;
   }
 
   const cellPaddingY = density === "compact" ? 8 : 12;

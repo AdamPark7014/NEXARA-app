@@ -6,6 +6,7 @@ import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
+import mx.nexara.mobile.nativeapp.data.api.OpsClientTicketRequestDto
 import mx.nexara.mobile.nativeapp.data.api.OpsApi
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import java.lang.reflect.ParameterizedType
@@ -43,7 +44,10 @@ class OpsRepository(context: Context) {
     }
 
     suspend fun clientTicketRequests(status: String? = null) =
-        parseMaps(api.getClientTicketRequestsRaw(status))
+        clientTicketRequestDtos(status).map { it.toFlatMap() }
+
+    suspend fun clientTicketRequestDtos(status: String? = null): List<OpsClientTicketRequestDto> =
+        parseMaps(api.getClientTicketRequestsRaw(status)).map { OpsClientTicketRequestDto.fromRaw(it) }
 
     suspend fun patchClientTicketStatus(id: Long, status: String) {
         api.patchClientTicketStatus(id, mapOf("status" to status))
@@ -76,5 +80,6 @@ class OpsRepository(context: Context) {
     suspend fun purchaseOrders() = extra.purchaseOrders()
     suspend fun purchaseOrderDtos() = extra.purchaseOrderDtos()
     suspend fun goodsReceiptDtos() = extra.goodsReceiptDtos()
-    suspend fun serviceSheets() = extra.serviceSheets()
+    suspend fun serviceSheets() = serviceSheetDtos()
+    suspend fun serviceSheetDtos() = extra.serviceSheetDtos()
 }

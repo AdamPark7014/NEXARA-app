@@ -1,4 +1,3 @@
-import { UpdateEvidenceDto } from './dto/update-evidence.dto.js';
 import {
   Controller,
   Get,
@@ -9,19 +8,25 @@ import {
   UploadedFile,
   UploadedFiles,
   BadRequestException,
+  ForbiddenException,
   Query,
+  Res,
+  Patch,
+  Delete,
+  Body,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
-import { Patch, Delete, Body } from '@nestjs/common';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { EvidencesService } from './evidences.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
+import { UpdateEvidenceDto } from './dto/update-evidence.dto.js';
 
 @Controller('evidences')
 export class EvidencesController {
@@ -41,8 +46,12 @@ export class EvidencesController {
       PERMISSIONS.CONSOLE_ADMIN,
     ],
   })
-  findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
-    return this.evidencesService.findForHierarchy(user, query);
+  findAll(
+    @CurrentUser() user: any,
+    @Query() query: PaginationQueryDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.evidencesService.findForHierarchy(user, query, companyId);
   }
 
   @Post()
@@ -53,6 +62,7 @@ export class EvidencesController {
     @CurrentUser() user: any,
     @UploadedFiles() files: any[],
     @Body() body: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     if (!files || files.length === 0) {
       throw new BadRequestException('Archivo requerido');
@@ -76,19 +86,19 @@ export class EvidencesController {
       longitud: Number.isFinite(longitud) ? longitud : undefined,
     }));
 
-    return Promise.all(payloads.map((payload) => this.evidencesService.create(payload)));
+    return Promise.all(payloads.map((payload) => this.evidencesService.create(payload, companyId)));
   }
 
-  // Exportar evidencias (CSV o JSON)
   @Get('export/:format')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.EVIDENCES_EXPORT] })
   async export(
     @CurrentUser() user: any,
     @Param('format') format: string,
-    res: Response,
+    @CurrentCompanyId() companyId: number | null,
+    @Res() res: Response,
   ) {
-    const result = await this.evidencesService.findForHierarchy(user);
+    const result = await this.evidencesService.findForHierarchy(user, undefined, companyId);
     const data: any[] = Array.isArray(result) ? result : (result as any).data;
     if (format === 'xlsx') {
       const buffer = await this.excelExport.exportToExcel(data, 'evidences');
@@ -96,26 +106,26 @@ export class EvidencesController {
       res.attachment('evidencias.xlsx');
       return res.send(Buffer.from(buffer));
     }
-    throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON están deshabilitados.');
+    throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON estan deshabilitados.');
   }
 
-  // Importar evidencias desde archivo JSON
   @Post('import')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.EVIDENCES_IMPORT] })
   @UseInterceptors(FileInterceptor('file'))
-  async import(@UploadedFile() file: any) {
+  async import(@UploadedFile() file: any, @CurrentCompanyId() companyId: number | null) {
     if (!file) {
       throw new BadRequestException('Archivo requerido');
     }
     try {
       const json = JSON.parse(file.buffer.toString());
-      const result = await this.evidencesService.importMany(json);
+      const result = await this.evidencesService.importMany(json, companyId);
       return { message: 'Importación exitosa', count: result.length };
     } catch (e) {
       try {
-        return await this.excelImport.importExcel('evidence', file.buffer);
+        return await this.excelImport.importExcel('evidence', file.buffer, companyId);
       } catch (excelError) {
+        if (excelError instanceof ForbiddenException) throw excelError;
         throw new BadRequestException(
           excelError instanceof Error ? excelError.message : 'Archivo inválido o error de importación',
         );
@@ -130,6 +140,7 @@ export class EvidencesController {
     @CurrentUser() user: any,
     @Param('id') id: string,
     @Body() updateEvidenceDto: UpdateEvidenceDto,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     const shouldStampReview =
       updateEvidenceDto.aprobada !== undefined ||
@@ -142,20 +153,24 @@ export class EvidencesController {
       updateEvidenceDto.revisadoEn = new Date();
     }
 
-    return this.evidencesService.update(+id, updateEvidenceDto);
+    return this.evidencesService.update(+id, updateEvidenceDto, companyId);
   }
 
   @Delete(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.EVIDENCES_REVIEW] })
-  remove(@Param('id') id: string) {
-    return this.evidencesService.remove(+id);
+  remove(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
+    return this.evidencesService.remove(+id, companyId);
   }
 
   @Delete('self/:id')
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.EVIDENCES_CREATE] })
-  removeOwn(@CurrentUser() user: any, @Param('id') id: string) {
-    return this.evidencesService.removeOwn(+id, user.id);
+  removeOwn(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.evidencesService.removeOwn(+id, user.id, companyId);
   }
 }

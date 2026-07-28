@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
 import { CreateLunchBreakDto, UpdateLunchBreakDto } from './dto/lunch-break.dto.js';
+import { companyWhere, requireCompanyId } from '../../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class LunchBreaksService {
@@ -10,14 +11,17 @@ export class LunchBreaksService {
     private notificationHierarchy: NotificationHierarchyService,
   ) {}
 
-  async createCheckin(usuarioId: number, data: CreateLunchBreakDto) {
+  async createCheckin(usuarioId: number, data: CreateLunchBreakDto, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     // Verificar si ya existe un registro de comida hoy
-    const existingLunch = await this.prisma.lunchBreak.findUnique({
+    const existingLunch = await this.prisma.lunchBreak.findFirst({
       where: {
-        userId_date: { userId: usuarioId, date: today },
+        userId: usuarioId,
+        date: today,
+        ...companyWhere(tenantId),
       },
     });
 
@@ -66,6 +70,7 @@ export class LunchBreaksService {
           isCheckinLate: isLate,
           notes,
           status: 'IN_PROGRESS',
+          companyId: tenantId,
         },
         include: { user: { select: { nombre: true, email: true, id: true } } },
       });
@@ -81,13 +86,16 @@ export class LunchBreaksService {
     return lunchBreak;
   }
 
-  async createCheckout(usuarioId: number, data: UpdateLunchBreakDto) {
+  async createCheckout(usuarioId: number, data: UpdateLunchBreakDto, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const lunch = await this.prisma.lunchBreak.findUnique({
+    const lunch = await this.prisma.lunchBreak.findFirst({
       where: {
-        userId_date: { userId: usuarioId, date: today },
+        userId: usuarioId,
+        date: today,
+        ...companyWhere(tenantId),
       },
     });
 
@@ -135,8 +143,14 @@ export class LunchBreaksService {
     return lunchBreak;
   }
 
-  async getUserLunchBreaks(usuarioId: number, startDate?: Date, endDate?: Date) {
-    const where: any = { userId: usuarioId };
+  async getUserLunchBreaks(
+    usuarioId: number,
+    startDate?: Date,
+    endDate?: Date,
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { userId: usuarioId, ...companyWhere(tenantId) };
 
     if (startDate && endDate) {
       where.date = {
@@ -152,8 +166,9 @@ export class LunchBreaksService {
     });
   }
 
-  async getAllLunchBreaks(startDate?: Date, endDate?: Date) {
-    const where: any = {};
+  async getAllLunchBreaks(startDate?: Date, endDate?: Date, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { ...companyWhere(tenantId) };
 
     if (startDate && endDate) {
       where.date = {
@@ -169,12 +184,13 @@ export class LunchBreaksService {
     });
   }
 
-  async getTodayLunchBreaks() {
+  async getTodayLunchBreaks(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     return await this.prisma.lunchBreak.findMany({
-      where: { date: today },
+      where: { date: today, ...companyWhere(tenantId) },
       include: { user: { select: { id: true, nombre: true, email: true, role: true } } },
       orderBy: { checkinTime: 'desc' },
     });

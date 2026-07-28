@@ -135,6 +135,9 @@ data class GoodsReceiptDto(
     val quantity: Double? = null,
     val createdAt: String = "",
 ) {
+    val rowKey: String
+        get() = "gr-${id ?: 0}-$receiptNumber"
+
     val displayTitle: String
         get() = receiptNumber.ifBlank { poNumber.ifBlank { "Recepción" } }
 

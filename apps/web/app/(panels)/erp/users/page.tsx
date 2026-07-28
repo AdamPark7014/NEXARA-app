@@ -536,6 +536,23 @@ export default function UsersPage() {
     });
   };
 
+  const eraseSubject = (u: ApiUser) => {
+    setConfirmState({
+      message: `GDPR/LFPDPPP: anonimizar PII de "${u.nombre}" (${u.email}). Se desactiva la cuenta; el histórico fiscal/operativo se conserva.`,
+      confirmLabel: "Anonimizar PII",
+      fn: async () => {
+        try {
+          await apiFetch(`audit/privacy/erase/${u.id}`, token, { method: "POST", body: "{}" });
+          toast.success("Sujeto anonimizado");
+          setDrawerUser(null);
+          void load();
+        } catch (e) {
+          toast.error(formatApiError(e, "No se pudo anonimizar"));
+        }
+      },
+    });
+  };
+
   const unlockUser = async (u: ApiUser) => {
     try {
       await apiFetch(`users/${u.id}/unlock`, token, { method: "POST", body: "{}" });
@@ -1029,11 +1046,14 @@ export default function UsersPage() {
               </div>
             )}
 
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
               <Button variant={drawerTab === "sessions" ? "primary" : "ghost"} size="sm" onClick={() => setDrawerTab("sessions")}>Sesiones</Button>
               <Button variant={drawerTab === "activity" ? "primary" : "ghost"} size="sm" onClick={() => setDrawerTab("activity")}>Actividad</Button>
               {cfg.canAssign && (
                 <Button variant="secondary" size="sm" onClick={() => forceLogout(drawerUser)}>Force logout</Button>
+              )}
+              {cfg.canAssign && !drawerUser.email?.includes("@privacy.nexara.local") && (
+                <Button variant="danger" size="sm" onClick={() => eraseSubject(drawerUser)}>Borrar PII</Button>
               )}
             </div>
 

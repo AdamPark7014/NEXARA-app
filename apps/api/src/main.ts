@@ -342,6 +342,7 @@ async function bootstrap() {
       'X-Device-Name',
       'X-Device-Model',
       'X-Device-Serial',
+      'X-Device-Browser',
       'Sec-CH-UA-Model',
       'Sec-CH-UA-Platform',
     ],

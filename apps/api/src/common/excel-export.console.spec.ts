@@ -17,10 +17,11 @@ describe('ExcelExportController (console models)', () => {
         {
           provide: PrismaService,
           useValue: {
-            viatic: { findMany: jest.fn().mockResolvedValue([{ foo: 'bar' }]) },
-            vehicle: { findMany: jest.fn().mockResolvedValue([{ foo: 'car' }]) },
+            viatico: { findMany: jest.fn().mockResolvedValue([{ foo: 'bar' }]) },
+            vehicleControl: { findMany: jest.fn().mockResolvedValue([{ foo: 'car' }]) },
             activity: { findMany: jest.fn().mockResolvedValue([{ foo: 'act' }]) },
             evidence: { findMany: jest.fn().mockResolvedValue([{ foo: 'ev' }]) },
+            user: { findMany: jest.fn().mockResolvedValue([{ id: 1, nombre: 'A' }]) },
           },
         },
       ],
@@ -41,7 +42,19 @@ describe('ExcelExportController (console models)', () => {
       setHeader: jest.fn(),
       send: jest.fn(),
     };
-    await controller.exportExcel(model, res);
+    await controller.exportExcel(model, res, 1);
+    expect(res.send).toHaveBeenCalled();
+  });
+
+  it('should scope User export by company membership', async () => {
+    const res: any = {
+      setHeader: jest.fn(),
+      send: jest.fn(),
+    };
+    await controller.exportExcel('user', res, 42);
+    expect((prisma as any).user.findMany).toHaveBeenCalledWith({
+      where: { companyMemberships: { some: { companyId: 42 } } },
+    });
     expect(res.send).toHaveBeenCalled();
   });
 });

@@ -25,6 +25,7 @@ import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CreateProjectDto } from './dto/create-project.dto.js';
 import { UpdateProjectDto } from './dto/update-project.dto.js';
 import { RbacGuard } from '../common/rbac.guard.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 interface MulterFile {
   fieldname: string;
@@ -55,6 +56,7 @@ export class ProjectsController {
   async create(
     @Body() createProjectDto: CreateProjectDto,
     @UploadedFiles() files: ProjectFiles,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     const mainImage = files?.mainImage?.[0];
     const gallery = files?.gallery || [];
@@ -64,15 +66,19 @@ export class ProjectsController {
 
     const payload = this.parseListFields(createProjectDto);
 
-    return this.projectsService.create(payload, {
-      mainImage,
-      gallery,
-    });
+    return this.projectsService.create(
+      payload,
+      {
+        mainImage,
+        gallery,
+      },
+      companyId,
+    );
   }
 
   @Get()
   findAll(@Query() query: PaginationQueryDto) {
-    return this.projectsService.findAll(query);
+    return this.projectsService.findAll(query, null, true);
   }
 
   @Get('catalog-pdf/download')
@@ -126,6 +132,7 @@ export class ProjectsController {
   )
   async update(
     @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
     @Body() updateProjectDto: UpdateProjectDto,
     @UploadedFiles() files: ProjectFiles,
   ) {
@@ -137,22 +144,33 @@ export class ProjectsController {
 
     const payload = this.parseListFields(updateProjectDto);
 
-    return this.projectsService.update(id, payload, {
-      mainImage,
-      gallery,
-    });
+    return this.projectsService.update(
+      id,
+      payload,
+      {
+        mainImage,
+        gallery,
+      },
+      companyId,
+    );
   }
 
   @Delete(':id')
   @UseGuards(RbacGuard)
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.projectsService.remove(id);
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.projectsService.remove(id, companyId);
   }
 
   @Post(':id/delete')
   @UseGuards(RbacGuard)
-  removeViaPost(@Param('id', ParseIntPipe) id: number) {
-    return this.projectsService.remove(id);
+  removeViaPost(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.projectsService.remove(id, companyId);
   }
 
   private validateImages(files: MulterFile[]) {

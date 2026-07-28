@@ -33,11 +33,12 @@ import java.util.Locale
 data class ErpBiState(
     val loading: Boolean = true,
     val error: String? = null,
-    val dashboard: Map<String, Any?> = emptyMap(),
-    val computedKpis: List<Map<String, Any?>> = emptyList(),
-    val margin: List<Map<String, Any?>> = emptyList(),
-    val engineers: List<Map<String, Any?>> = emptyList(),
-    val clientsRoi: List<Map<String, Any?>> = emptyList(),
+    val dashboard: mx.nexara.mobile.nativeapp.data.api.AnalyticsDashboardDto =
+        mx.nexara.mobile.nativeapp.data.api.AnalyticsDashboardDto(),
+    val computedKpis: List<mx.nexara.mobile.nativeapp.data.api.ComputedKpiDto> = emptyList(),
+    val margin: List<mx.nexara.mobile.nativeapp.data.api.BiMarginRowDto> = emptyList(),
+    val engineers: List<mx.nexara.mobile.nativeapp.data.api.BiEngineerRowDto> = emptyList(),
+    val clientsRoi: List<mx.nexara.mobile.nativeapp.data.api.BiClientRoiDto> = emptyList(),
 )
 
 class ErpBiViewModel(app: Application) : AndroidViewModel(app) {
@@ -49,11 +50,11 @@ class ErpBiViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             try {
-                val dash = withContext(Dispatchers.IO) { repo.analyticsDashboardMap() }
-                val kpis = withContext(Dispatchers.IO) { repo.analyticsComputedKpisList() }
-                val margin = withContext(Dispatchers.IO) { repo.biMarginByType() }
-                val engineers = withContext(Dispatchers.IO) { repo.biEngineers() }
-                val clients = withContext(Dispatchers.IO) { repo.biClientsRoi() }
+                val dash = withContext(Dispatchers.IO) { repo.analyticsDashboardDto() }
+                val kpis = withContext(Dispatchers.IO) { repo.analyticsComputedKpiDtos() }
+                val margin = withContext(Dispatchers.IO) { repo.biMarginRowDtos() }
+                val engineers = withContext(Dispatchers.IO) { repo.biEngineerRowDtos() }
+                val clients = withContext(Dispatchers.IO) { repo.biClientRoiDtos() }
                 _state.update {
                     it.copy(loading = false, dashboard = dash, computedKpis = kpis, margin = margin, engineers = engineers, clientsRoi = clients)
                 }
@@ -81,7 +82,7 @@ fun ErpBiScreen() {
             }
         }
 
-        if (state.loading && state.dashboard.isEmpty()) {
+        if (state.loading && state.dashboard.isEmpty) {
             item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             return@LazyColumn
         }
@@ -97,20 +98,20 @@ fun ErpBiScreen() {
             ErpSectionTitle("Resumen ejecutivo")
             val d = state.dashboard
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "Ingresos", erpFmtMxn(erpDbl(d, "revenue")), Color(0xFF059669))
-                ErpMetricTile(Modifier.weight(1f), "Gastos", erpFmtMxn(erpDbl(d, "expenses")), Color(0xFFEF4444))
+                ErpMetricTile(Modifier.weight(1f), "Ingresos", erpFmtMxn(d.revenue), Color(0xFF059669))
+                ErpMetricTile(Modifier.weight(1f), "Gastos", erpFmtMxn(d.expenses), Color(0xFFEF4444))
             }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "OC abiertas", "${erpInt(d, "openPurchaseOrders")}", Color(0xFF3B82F6))
-                ErpMetricTile(Modifier.weight(1f), "Mant. activos", "${erpInt(d, "pendingMaintenanceOrders")}", Color(0xFFF59E0B))
-                ErpMetricTile(Modifier.weight(1f), "Stock bajo", "${erpInt(d, "lowStockAlerts")}", Color(0xFF8B5CF6))
+                ErpMetricTile(Modifier.weight(1f), "OC abiertas", "${d.openPurchaseOrders}", Color(0xFF3B82F6))
+                ErpMetricTile(Modifier.weight(1f), "Mant. activos", "${d.pendingMaintenanceOrders}", Color(0xFFF59E0B))
+                ErpMetricTile(Modifier.weight(1f), "Stock bajo", "${d.lowStockAlerts}", Color(0xFF8B5CF6))
             }
         }
 
         if (state.computedKpis.isNotEmpty()) {
             item { ErpSectionTitle("KPIs en tiempo real") }
-            val grouped = state.computedKpis.groupBy { erpStr(it, "category").ifBlank { "General" } }
+            val grouped = state.computedKpis.groupBy { it.category }
             grouped.forEach { (cat, items) ->
                 item {
                     Text(cat, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
@@ -125,29 +126,29 @@ fun ErpBiScreen() {
 
         if (state.margin.isNotEmpty()) {
             item {
-                val totalBudget = state.margin.sumOf { erpDbl(it, "budget") }
-                val totalMargin = state.margin.sumOf { erpDbl(it, "margin") }
+                val totalBudget = state.margin.sumOf { it.budget }
+                val totalMargin = state.margin.sumOf { it.margin }
                 ErpSectionTitle("Margen por línea", erpFmtMxn(totalMargin))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ErpMetricTile(Modifier.weight(1f), "Presupuesto", erpFmtMxn(totalBudget), Color(0xFF0D9488))
                     ErpMetricTile(Modifier.weight(1f), "Margen total", erpFmtMxn(totalMargin), Color(0xFF059669))
                 }
             }
-            items(state.margin, key = { erpStr(it, "projectType") }) { row ->
+            items(state.margin, key = { it.rowKey }) { row ->
                 MarginRowCard(row)
             }
         }
 
         if (state.engineers.isNotEmpty()) {
             item { ErpSectionTitle("Ranking ingenieros (90d)") }
-            items(state.engineers, key = { erpStr(it, "engineerId", "id") }) { eng ->
+            items(state.engineers, key = { it.rowKey }) { eng ->
                 EngineerRowCard(eng)
             }
         }
 
         if (state.clientsRoi.isNotEmpty()) {
             item { ErpSectionTitle("ROI por cliente") }
-            items(state.clientsRoi, key = { erpStr(it, "clientId", "id") }) { c ->
+            items(state.clientsRoi, key = { it.rowKey }) { c ->
                 ClientRoiCard(c)
             }
         }
@@ -157,9 +158,8 @@ fun ErpBiScreen() {
 }
 
 @Composable
-private fun ComputedKpiRow(kpi: Map<String, Any?>) {
-    val status = erpStr(kpi, "status")
-    val accent = when (status) {
+private fun ComputedKpiRow(kpi: mx.nexara.mobile.nativeapp.data.api.ComputedKpiDto) {
+    val accent = when (kpi.status) {
         "danger" -> Color(0xFFEF4444)
         "warning" -> Color(0xFFF59E0B)
         "ok" -> Color(0xFF059669)
@@ -168,44 +168,49 @@ private fun ComputedKpiRow(kpi: Map<String, Any?>) {
     Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = accent.copy(0.08f))) {
         Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
-                Text(erpStr(kpi, "name"), fontWeight = FontWeight.Medium, color = Color(0xFF0F172A))
-                Text(erpStr(kpi, "unit"), style = MaterialTheme.typography.labelSmall, color = Color(0xFF64748B))
+                Text(kpi.name, fontWeight = FontWeight.Medium, color = Color(0xFF0F172A))
+                Text(kpi.unit, style = MaterialTheme.typography.labelSmall, color = Color(0xFF64748B))
             }
-            Text("${erpFmtValue(kpi["value"])}", fontWeight = FontWeight.Bold, color = accent)
+            Text(kpi.value?.let { erpFmtValue(it) } ?: kpi.valueLabel, fontWeight = FontWeight.Bold, color = accent)
         }
     }
 }
 
 @Composable
-private fun MarginRowCard(row: Map<String, Any?>) {
+private fun MarginRowCard(row: mx.nexara.mobile.nativeapp.data.api.BiMarginRowDto) {
     ErpListCard(
-        title = erpStr(row, "projectType"),
-        subtitle = "${erpInt(row, "count")} proyectos · ${erpFmtPct(erpDbl(row, "marginPercent"))} margen",
-        trailing = erpFmtMxn(erpDbl(row, "margin")),
+        title = row.projectType,
+        subtitle = "${row.count} proyectos · ${erpFmtPct(row.marginPercent)} margen",
+        trailing = erpFmtMxn(row.margin),
     )
 }
 
 @Composable
-private fun EngineerRowCard(row: Map<String, Any?>) {
+private fun EngineerRowCard(row: mx.nexara.mobile.nativeapp.data.api.BiEngineerRowDto) {
     ErpListCard(
-        title = erpStr(row, "engineerName", "nombre"),
-        subtitle = "${erpInt(row, "completed")}/${erpInt(row, "totalActivities")} OT · ${erpFmtPct(erpDbl(row, "completionRate"))} cierre",
-        trailing = row["avgDurationMin"]?.let { "${it} min" } ?: "—",
+        title = row.engineerName,
+        subtitle = "${row.completed}/${row.totalActivities} OT · ${erpFmtPct(row.completionRate)} cierre",
+        trailing = row.avgDurationMin?.let { "${it.toInt()} min" } ?: "—",
     )
 }
 
 @Composable
-private fun ClientRoiCard(row: Map<String, Any?>) {
+private fun ClientRoiCard(row: mx.nexara.mobile.nativeapp.data.api.BiClientRoiDto) {
     ErpListCard(
-        title = erpStr(row, "clientName", "nombre"),
-        subtitle = "${erpInt(row, "projects")} proy. · ${erpFmtMxn(erpDbl(row, "revenue"))}",
-        trailing = erpFmtPct(erpDbl(row, "roi")),
+        title = row.clientName,
+        subtitle = "${row.projects} proy. · ${erpFmtMxn(row.revenue)}",
+        trailing = erpFmtPct(row.roi),
     )
 }
 
 // ── Vista ejecutiva C-Level ─────────────────────────────────────────────────
 
-data class ExecutiveState(val loading: Boolean = true, val error: String? = null, val data: Map<String, Any?> = emptyMap())
+data class ExecutiveState(
+    val loading: Boolean = true,
+    val error: String? = null,
+    val data: mx.nexara.mobile.nativeapp.data.api.ExecutiveCLevelDto =
+        mx.nexara.mobile.nativeapp.data.api.ExecutiveCLevelDto(),
+)
 
 class ExecutiveViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ExtraRepository(app.applicationContext)
@@ -216,7 +221,7 @@ class ExecutiveViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             try {
-                val data = withContext(Dispatchers.IO) { repo.executiveCLevel() }
+                val data = withContext(Dispatchers.IO) { repo.executiveCLevelDto() }
                 _state.update { it.copy(loading = false, data = data) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message) }
@@ -231,10 +236,10 @@ fun ExecutiveScreen() {
     val state by vm.state.collectAsState()
     LaunchedEffect(Unit) { vm.load() }
 
-    val headline = erpMap(state.data["headlineKpis"])
-    val ops = erpMap(state.data["operations"])
-    val finance = erpMap(state.data["finance"])
-    val alerts = state.data["alerts"] as? List<*> ?: emptyList<Any>()
+    val headline = state.data.headline
+    val ops = state.data.operations
+    val finance = state.data.finance
+    val alerts = state.data.alerts
 
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
@@ -247,38 +252,37 @@ fun ExecutiveScreen() {
         item {
             ErpSectionTitle("Finanzas y ventas")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "Ingresos MTD", erpFmtMxn(erpDbl(headline, "revenueMtd")), Color(0xFF059669))
-                ErpMetricTile(Modifier.weight(1f), "Pipeline", erpFmtMxn(erpDbl(headline, "pipelineValue")), Color(0xFF3B82F6))
+                ErpMetricTile(Modifier.weight(1f), "Ingresos MTD", erpFmtMxn(headline.revenueMtd), Color(0xFF059669))
+                ErpMetricTile(Modifier.weight(1f), "Pipeline", erpFmtMxn(headline.pipelineValue), Color(0xFF3B82F6))
             }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "Caja", erpFmtMxn(erpDbl(headline, "cashOnHand")), Color(0xFF0D9488))
-                ErpMetricTile(Modifier.weight(1f), "CxC", erpFmtMxn(erpDbl(headline, "arOutstanding")), Color(0xFFF59E0B))
+                ErpMetricTile(Modifier.weight(1f), "Caja", erpFmtMxn(headline.cashOnHand), Color(0xFF0D9488))
+                ErpMetricTile(Modifier.weight(1f), "CxC", erpFmtMxn(headline.arOutstanding), Color(0xFFF59E0B))
             }
         }
 
         item {
             ErpSectionTitle("Operaciones")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "OT abiertas", "${erpInt(ops, "otOpen")}", Color(0xFF6366F1))
-                ErpMetricTile(Modifier.weight(1f), "OT vencidas", "${erpInt(ops, "otOverdue")}", Color(0xFFEF4444))
-                ErpMetricTile(Modifier.weight(1f), "Tickets", "${erpInt(ops, "ticketsOpen")}", Color(0xFF8B5CF6))
+                ErpMetricTile(Modifier.weight(1f), "OT abiertas", "${ops.otOpen}", Color(0xFF6366F1))
+                ErpMetricTile(Modifier.weight(1f), "OT vencidas", "${ops.otOverdue}", Color(0xFFEF4444))
+                ErpMetricTile(Modifier.weight(1f), "Tickets", "${ops.ticketsOpen}", Color(0xFF8B5CF6))
             }
         }
 
         item {
             ErpSectionTitle("Facturación")
-            ErpMetricTile(Modifier.fillMaxWidth(), "Facturado MTD", erpFmtMxn(erpDbl(finance, "invoicedMtd")), Color(0xFF059669))
+            ErpMetricTile(Modifier.fillMaxWidth(), "Facturado MTD", erpFmtMxn(finance.invoicedMtd), Color(0xFF059669))
         }
 
         if (alerts.isNotEmpty()) {
             item { ErpSectionTitle("Alertas", "${alerts.size}") }
-            items(alerts.filterIsInstance<Map<*, *>>()) { alert ->
-                val map = erpMap(alert)
+            items(alerts, key = { it.rowKey }) { alert ->
                 Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF7ED))) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(erpStr(map, "title", "message"), fontWeight = FontWeight.SemiBold)
-                        Text(erpStr(map, "detail", "description"), style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                        Text(alert.title, fontWeight = FontWeight.SemiBold)
+                        Text(alert.detail, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
                     }
                 }
             }
@@ -292,7 +296,7 @@ data class ApprovalsState(
     val loading: Boolean = true,
     val error: String? = null,
     val message: String? = null,
-    val items: List<Map<String, Any?>> = emptyList(),
+    val items: List<mx.nexara.mobile.nativeapp.data.api.WorkflowApprovalDto> = emptyList(),
     val acting: Long? = null,
 )
 
@@ -305,7 +309,7 @@ class ApprovalsViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             try {
-                val items = withContext(Dispatchers.IO) { repo.workflowPending() }
+                val items = withContext(Dispatchers.IO) { repo.workflowApprovals() }
                 _state.update { it.copy(loading = false, items = items, acting = null) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message) }
@@ -358,13 +362,13 @@ fun ApprovalsScreen() {
             item { Text("Sin aprobaciones pendientes.", color = Color(0xFF64748B)) }
             return@LazyColumn
         }
-        items(state.items, key = { erpStr(it, "id", "approvalId") }) { item ->
-            val id = erpLong(item, "id", "approvalId")
+        items(state.items, key = { it.rowKey }) { item ->
+            val id = item.id
             val note = rejectNotes[id].orEmpty()
             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(approvalTitle(item), fontWeight = FontWeight.SemiBold)
-                    Text(approvalSubtitle(item), style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                    Text(item.displayTitle, fontWeight = FontWeight.SemiBold)
+                    Text(item.displaySubtitle, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
                     OutlinedTextField(
                         value = note,
                         onValueChange = { rejectNotes = rejectNotes + (id to it) },
@@ -392,7 +396,13 @@ fun ApprovalsScreen() {
 
 // ── NOC ─────────────────────────────────────────────────────────────────────
 
-data class NocState(val loading: Boolean = true, val error: String? = null, val summary: Map<String, Any?> = emptyMap(), val alerts: List<Map<String, Any?>> = emptyList(), val devices: List<Map<String, Any?>> = emptyList())
+data class NocState(
+    val loading: Boolean = true,
+    val error: String? = null,
+    val summary: Map<String, Any?> = emptyMap(),
+    val alerts: List<mx.nexara.mobile.nativeapp.data.api.NocAlertDto> = emptyList(),
+    val devices: List<mx.nexara.mobile.nativeapp.data.api.NocDeviceDto> = emptyList(),
+)
 
 class NocViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ExtraRepository(app.applicationContext)
@@ -404,8 +414,8 @@ class NocViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val summary = withContext(Dispatchers.IO) { repo.nocSummary() }
-                val alerts = withContext(Dispatchers.IO) { repo.nocAlerts() }
-                val devices = withContext(Dispatchers.IO) { repo.nocDevices() }
+                val alerts = withContext(Dispatchers.IO) { repo.nocAlertDtos() }
+                val devices = withContext(Dispatchers.IO) { repo.nocDeviceDtos() }
                 _state.update { it.copy(loading = false, summary = summary, alerts = alerts, devices = devices) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message) }
@@ -423,11 +433,8 @@ fun NocModuleScreen() {
 
     val filteredAlerts = remember(state.alerts, sevFilter) {
         when (sevFilter) {
-            "critical" -> state.alerts.filter { erpStr(it, "severity").equals("critical", true) }
-            "warning" -> state.alerts.filter {
-                val s = erpStr(it, "severity").lowercase()
-                s == "warning" || s == "high" || s == "medium"
-            }
+            "critical" -> state.alerts.filter { it.isCritical }
+            "warning" -> state.alerts.filter { it.isWarningBand }
             else -> state.alerts
         }
     }
@@ -461,19 +468,26 @@ fun NocModuleScreen() {
                     }
                 }
             }
-            items(filteredAlerts.take(20), key = { erpStr(it, "id") }) { a ->
-                val sev = erpStr(a, "severity")
-                val color = if (sev.equals("critical", true)) Color(0xFFEF4444) else Color(0xFFF59E0B)
-                ErpListCard(erpStr(a, "title", "deviceName"), erpStr(a, "message"), trailing = sev, accent = color)
+            items(filteredAlerts.take(20), key = { it.rowKey }) { a ->
+                val color = if (a.isCritical) Color(0xFFEF4444) else Color(0xFFF59E0B)
+                ErpListCard(a.displayTitle, a.message, trailing = a.severity, accent = color)
             }
         }
 
         if (state.devices.isNotEmpty()) {
             item { ErpSectionTitle("Dispositivos") }
-            items(state.devices.take(20), key = { erpStr(it, "id") }) { d ->
-                val st = erpStr(d, "status")
-                val color = when (st) { "ONLINE" -> Color(0xFF059669); "OFFLINE", "ALERT" -> Color(0xFFEF4444); else -> Color(0xFFF59E0B) }
-                ErpListCard(erpStr(d, "name"), "${erpStr(d, "type")} · ${erpStr(d, "clientName")}", trailing = st, accent = color)
+            items(state.devices.take(20), key = { it.rowKey }) { d ->
+                val color = when (d.status.uppercase()) {
+                    "ONLINE" -> Color(0xFF059669)
+                    "OFFLINE", "ALERT" -> Color(0xFFEF4444)
+                    else -> Color(0xFFF59E0B)
+                }
+                ErpListCard(
+                    d.displayName,
+                    "${d.type} · ${d.clientName}",
+                    trailing = d.status,
+                    accent = color,
+                )
             }
         }
     }
@@ -481,7 +495,11 @@ fun NocModuleScreen() {
 
 // ── SLA ─────────────────────────────────────────────────────────────────────
 
-data class SlaState(val loading: Boolean = true, val error: String? = null, val stats: Map<String, Any?> = emptyMap())
+data class SlaState(
+    val loading: Boolean = true,
+    val error: String? = null,
+    val stats: mx.nexara.mobile.nativeapp.data.api.SlaStatsDto = mx.nexara.mobile.nativeapp.data.api.SlaStatsDto(),
+)
 
 class SlaViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ExtraRepository(app.applicationContext)
@@ -492,7 +510,7 @@ class SlaViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             try {
-                val stats = withContext(Dispatchers.IO) { repo.slaStats() }
+                val stats = withContext(Dispatchers.IO) { repo.slaStatsDto() }
                 _state.update { it.copy(loading = false, stats = stats) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message) }
@@ -507,9 +525,9 @@ fun SlaModuleScreen() {
     val state by vm.state.collectAsState()
     LaunchedEffect(Unit) { vm.load() }
 
-    val resp = erpMap(state.stats["responseSla"])
-    val resol = erpMap(state.stats["resolutionSla"])
-    val breaches = state.stats["recentBreaches"] as? List<*> ?: emptyList<Any>()
+    val resp = state.stats.response
+    val resol = state.stats.resolution
+    val breaches = state.stats.recentBreaches
 
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
@@ -520,31 +538,30 @@ fun SlaModuleScreen() {
 
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "Tickets", "${erpInt(state.stats, "total")}", Color(0xFF3B82F6))
-                ErpMetricTile(Modifier.weight(1f), "Abiertos", "${erpInt(state.stats, "stillOpen")}", Color(0xFFF59E0B))
+                ErpMetricTile(Modifier.weight(1f), "Tickets", "${state.stats.total}", Color(0xFF3B82F6))
+                ErpMetricTile(Modifier.weight(1f), "Abiertos", "${state.stats.stillOpen}", Color(0xFFF59E0B))
             }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "Resp. a tiempo", "${erpInt(resp, "onTime")}", Color(0xFF059669))
-                ErpMetricTile(Modifier.weight(1f), "Resp. tarde", "${erpInt(resp, "late")}", Color(0xFFEF4444))
-                ErpMetricTile(Modifier.weight(1f), "% resp.", erpFmtPct(erpDbl(resp, "compliancePercent")), Color(0xFF0D9488))
+                ErpMetricTile(Modifier.weight(1f), "Resp. a tiempo", "${resp.onTime}", Color(0xFF059669))
+                ErpMetricTile(Modifier.weight(1f), "Resp. tarde", "${resp.late}", Color(0xFFEF4444))
+                ErpMetricTile(Modifier.weight(1f), "% resp.", erpFmtPct(resp.compliancePercent), Color(0xFF0D9488))
             }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "Res. a tiempo", "${erpInt(resol, "onTime")}", Color(0xFF059669))
-                ErpMetricTile(Modifier.weight(1f), "Res. tarde", "${erpInt(resol, "late")}", Color(0xFFEF4444))
-                ErpMetricTile(Modifier.weight(1f), "% res.", erpFmtPct(erpDbl(resol, "compliancePercent")), Color(0xFF0D9488))
+                ErpMetricTile(Modifier.weight(1f), "Res. a tiempo", "${resol.onTime}", Color(0xFF059669))
+                ErpMetricTile(Modifier.weight(1f), "Res. tarde", "${resol.late}", Color(0xFFEF4444))
+                ErpMetricTile(Modifier.weight(1f), "% res.", erpFmtPct(resol.compliancePercent), Color(0xFF0D9488))
             }
         }
 
         if (breaches.isNotEmpty()) {
             item { ErpSectionTitle("Incumplimientos recientes") }
-            items(breaches.filterIsInstance<Map<*, *>>().take(15)) { b ->
-                val map = erpMap(b)
+            items(breaches.take(15), key = { it.rowKey }) { b ->
                 ErpListCard(
-                    erpStr(map, "titulo", "anNumber"),
-                    "${erpStr(map, "type")} · ${erpStr(map, "priority")}",
-                    trailing = "+${erpFmtValue(map["hoursLate"])}h",
+                    b.displayTitle,
+                    "${b.type} · ${b.priority}",
+                    trailing = "+${b.hoursLate.toInt()}h",
                     accent = Color(0xFFEF4444),
                 )
             }
@@ -554,7 +571,11 @@ fun SlaModuleScreen() {
 
 // ── Contratos de mantenimiento ──────────────────────────────────────────────
 
-data class MaintContractsState(val loading: Boolean = true, val error: String? = null, val items: List<Map<String, Any?>> = emptyList())
+data class MaintContractsState(
+    val loading: Boolean = true,
+    val error: String? = null,
+    val items: List<mx.nexara.mobile.nativeapp.data.api.MaintenanceContractDto> = emptyList(),
+)
 
 class MaintContractsViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ExtraRepository(app.applicationContext)
@@ -565,7 +586,7 @@ class MaintContractsViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             try {
-                val items = withContext(Dispatchers.IO) { repo.maintenanceContracts() }
+                val items = withContext(Dispatchers.IO) { repo.maintenanceContractDtos() }
                 _state.update { it.copy(loading = false, items = items) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message) }
@@ -578,7 +599,7 @@ class MaintContractsViewModel(app: Application) : AndroidViewModel(app) {
 fun MaintenanceContractsScreen() {
     val vm: MaintContractsViewModel = viewModel()
     val state by vm.state.collectAsState()
-    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
+    var selected by remember { mutableStateOf<mx.nexara.mobile.nativeapp.data.api.MaintenanceContractDto?>(null) }
     var query by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { vm.load() }
 
@@ -586,9 +607,9 @@ fun MaintenanceContractsScreen() {
         val c = selected!!
         var tab by remember { mutableStateOf(0) }
         val tabs = listOf("Info", "Actividades", "SLA", "Inventario")
-        val activities = (c["activities"] as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
-        val slaList    = (c["sla"] as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
-        val inventory  = (c["inventory"] as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
+        val activities = c.activities
+        val slaList = c.slaEntries
+        val inventory = c.inventory
         Column(Modifier.fillMaxSize()) {
             ScrollableTabRow(selectedTabIndex = tab, edgePadding = 0.dp) {
                 tabs.forEachIndexed { i, t -> Tab(selected = tab == i, onClick = { tab = i }, text = { Text(t) }) }
@@ -597,8 +618,7 @@ fun MaintenanceContractsScreen() {
                 item {
                     Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, androidx.compose.ui.Alignment.CenterVertically) {
                         OutlinedButton(onClick = { selected = null }) { Text("← Lista") }
-                        val st = erpStr(c, "status", "estado")
-                        if (st.isNotBlank()) Text(st, color = mcStatusColor(st), fontWeight = FontWeight.SemiBold)
+                        if (c.status.isNotBlank()) Text(c.status, color = mcStatusColor(c.status), fontWeight = FontWeight.SemiBold)
                     }
                 }
                 when (tab) {
@@ -607,15 +627,15 @@ fun MaintenanceContractsScreen() {
                         item {
                             Card(Modifier.fillMaxWidth()) {
                                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    DetailLine("Número", erpStr(c, "contractNumber", "number", "folio"))
-                                    DetailLine("Nombre", erpStr(c, "name", "title"))
-                                    DetailLine("Cliente", erpStr(c, "clientName", "cliente"))
-                                    DetailLine("Tipo", erpStr(c, "type", "tipo"))
-                                    DetailLine("Estado", erpStr(c, "status", "estado"))
-                                    DetailLine("Inicio", erpStr(c, "startDate", "fechaInicio").take(10))
-                                    DetailLine("Vencimiento", erpStr(c, "expiresAt", "endDate", "fechaFin").take(10))
-                                    DetailLine("Monto", erpStr(c, "amount", "monto"))
-                                    DetailLine("Resp. SLA", erpStr(c, "slaResponseHours").let { if (it.isNotBlank()) "${it}h" else "" })
+                                    DetailLine("Número", c.contractNumber)
+                                    DetailLine("Nombre", c.title)
+                                    DetailLine("Cliente", c.clientName)
+                                    DetailLine("Frecuencia", c.frequency)
+                                    DetailLine("Estado", c.status)
+                                    DetailLine("Inicio", c.startDate.take(10))
+                                    DetailLine("Vencimiento", c.endDate.take(10))
+                                    c.monthlyFee?.let { DetailLine("Monto", "${c.currency} ${it.toInt()}") }
+                                    c.slaResponseHours?.let { DetailLine("Resp. SLA", "${it}h") }
                                 }
                             }
                         }
@@ -647,7 +667,7 @@ fun MaintenanceContractsScreen() {
                             Card(Modifier.fillMaxWidth()) {
                                 Row(Modifier.fillMaxWidth().padding(12.dp), Arrangement.SpaceBetween) {
                                     Column(Modifier.weight(1f)) {
-                                        Text(erpStr(item, "name", "nombre"), fontWeight = FontWeight.Bold)
+                                        Text(erpStr(item, "name", "nombre", "itemName"), fontWeight = FontWeight.Bold)
                                         val serial = erpStr(item, "serial", "serialNumber")
                                         if (serial.isNotBlank()) Text(serial, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
@@ -665,8 +685,9 @@ fun MaintenanceContractsScreen() {
 
     val filtered = if (query.isBlank()) state.items else state.items.filter { c ->
         val q = query.lowercase()
-        erpStr(c, "name", "title", "contractNumber").lowercase().contains(q) ||
-                erpStr(c, "clientName", "cliente").lowercase().contains(q)
+        c.displayTitle.lowercase().contains(q) ||
+            c.clientName.lowercase().contains(q) ||
+            c.contractNumber.lowercase().contains(q)
     }
 
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -678,17 +699,19 @@ fun MaintenanceContractsScreen() {
         }
         if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
         if (filtered.isEmpty()) { item { Text("Sin contratos activos.", color = Color(0xFF64748B)) }; return@LazyColumn }
-        items(filtered, key = { erpStr(it, "id") }) { c ->
-            val statusColor = mcStatusColor(erpStr(c, "status", "estado"))
+        items(filtered, key = { it.rowKey }) { c ->
+            val statusColor = mcStatusColor(c.status)
             Card(Modifier.fillMaxWidth().clickable { selected = c }) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, androidx.compose.ui.Alignment.CenterVertically) {
-                        Text(erpStr(c, "name", "title", "contractNumber"), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        val st = erpStr(c, "status", "estado")
-                        if (st.isNotBlank()) Text(st, color = statusColor, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelSmall)
+                        Text(c.displayTitle, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        if (c.status.isNotBlank()) Text(c.status, color = statusColor, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelSmall)
                     }
-                    Text(erpStr(c, "clientName", "client"), style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
-                    val dates = listOfNotNull(erpStr(c, "startDate").take(10).takeIf { it.isNotBlank() }, erpStr(c, "expiresAt", "endDate").take(10).takeIf { it.isNotBlank() }).joinToString(" → ")
+                    Text(c.clientName, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                    val dates = listOfNotNull(
+                        c.startDate.take(10).takeIf { it.isNotBlank() },
+                        c.endDate.take(10).takeIf { it.isNotBlank() },
+                    ).joinToString(" → ")
                     if (dates.isNotBlank()) Text(dates, style = MaterialTheme.typography.labelSmall, color = Color(0xFF64748B))
                 }
             }
@@ -767,27 +790,3 @@ private fun erpDbl(m: Map<String, Any?>, key: String): Double = when (val v = m[
     is Number -> v.toDouble(); is String -> v.toDoubleOrNull() ?: 0.0; else -> 0.0
 }
 private fun erpInt(m: Map<String, Any?>, key: String) = erpDbl(m, key).toInt()
-private fun erpLong(m: Map<String, Any?>, vararg keys: String): Long {
-    for (k in keys) {
-        val v = m[k]
-        if (v is Number) return v.toLong()
-        if (v is String) v.toLongOrNull()?.let { return it }
-    }
-    return 0L
-}
-
-private fun approvalTitle(item: Map<String, Any?>): String {
-    val inst = erpMap(item["instance"])
-    val wf = erpMap(inst["workflow"])
-    val name = wf["name"]?.toString()
-    if (!name.isNullOrBlank()) return name
-    return erpStr(item, "title", "entityType")
-}
-
-private fun approvalSubtitle(item: Map<String, Any?>): String {
-    val inst = erpMap(item["instance"])
-    val entityId = inst["entityId"]?.toString()
-    val step = erpMap(item["step"])
-    val stepNum = step["stepNumber"]?.toString()
-    return listOfNotNull(entityId?.let { "Entidad #$it" }, stepNum?.let { "Paso $it" }).joinToString(" · ")
-}

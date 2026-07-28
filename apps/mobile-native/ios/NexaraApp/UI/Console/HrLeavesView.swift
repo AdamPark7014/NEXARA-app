@@ -4,38 +4,39 @@ import SwiftUI
 
 @MainActor
 final class HrLeavesVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [HrLeave] = []
     @Published var query        = ""
     @Published var typeFilter   = "todos"
     @Published var isLoading    = false
 
     var types: [String] {
-        var t = Array(Set(items.compactMap { hrStr($0, "type", "tipo").ifBlankHr(nil) })).sorted()
+        var t = Array(Set(items.map(\.type).filter { !$0.isEmpty })).sorted()
         return ["todos"] + t
     }
 
-    var filtered: [[String: Any]] {
+    var filtered: [HrLeave] {
         var list = items
         if typeFilter != "todos" {
-            list = list.filter { hrStr($0, "type", "tipo").lowercased() == typeFilter.lowercased() }
+            list = list.filter { $0.type.lowercased() == typeFilter.lowercased() }
         }
         if !query.isEmpty {
             let q = query.lowercased()
             list = list.filter { row in
-                hrStr(row, "reason", "motivo", "type").lowercased().contains(q) ||
-                hrStr(row, "userName", "employeeName", "nombre").lowercased().contains(q)
+                row.displayReason.lowercased().contains(q) ||
+                row.userName.lowercased().contains(q) ||
+                row.type.lowercased().contains(q)
             }
         }
         return list
     }
 
-    var pendingCount: Int { items.filter { hrStr($0, "status", "estado").lowercased() == "pendiente" }.count }
-    var approvedCount: Int { items.filter { hrStr($0, "status", "estado").lowercased() == "aprobado" }.count }
+    var pendingCount: Int { items.filter { $0.status.lowercased() == "pendiente" }.count }
+    var approvedCount: Int { items.filter { $0.status.lowercased() == "aprobado" }.count }
 
     func load() {
         isLoading = true
         Task {
-            items     = await ExtraRepository.shared.hrLeaves()
+            items     = await ExtraRepository.shared.hrLeaveItems()
             isLoading = false
         }
     }
@@ -45,7 +46,7 @@ final class HrLeavesVM: ObservableObject {
 
 struct HrLeavesView: View {
     @StateObject private var vm = HrLeavesVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: HrLeave?
 
     var body: some View {
         Group {
@@ -58,38 +59,34 @@ struct HrLeavesView: View {
     }
 
     @ViewBuilder
-    private func leaveDetail(_ leave: [String: Any]) -> some View {
-        let reason = hrStr(leave, "reason", "motivo", "type")
-        let user   = hrStr(leave, "userName", "employeeName", "nombre")
-        let status = hrStr(leave, "status", "estado")
-        let color  = hrStatusColor(status)
+    private func leaveDetail(_ leave: HrLeave) -> some View {
+        let color = hrStatusColor(leave.status)
         List {
             Section { Button("← Permisos") { selected = nil } }
             Section {
                 HStack {
-                    Text(reason.isEmpty ? hrStr(leave, "type", "tipo").capitalized : reason)
+                    Text(leave.displayReason)
                         .font(.headline)
                     Spacer()
-                    Text(status.capitalized).font(.caption).bold().foregroundColor(color)
+                    Text(leave.status.capitalized).font(.caption).bold().foregroundColor(color)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(color.opacity(0.12)).clipShape(Capsule())
                 }
             }
             Section("Detalles") {
-                hrRow("Empleado",    user)
-                hrRow("Tipo",        hrStr(leave, "type", "tipo").capitalized)
-                hrRow("Inicio",      String(hrStr(leave, "startDate", "startAt").prefix(10)))
-                hrRow("Fin",         String(hrStr(leave, "endDate", "endAt").prefix(10)))
-                hrRow("Días",        hrStr(leave, "days", "diasSolicitados", "totalDays"))
-                hrRow("Aprobado por", hrStr(leave, "approvedBy", "approverName", "aprobadoPor"))
+                hrRow("Empleado",    leave.userName)
+                hrRow("Tipo",        leave.type.capitalized)
+                hrRow("Inicio",      String(leave.startDate.prefix(10)))
+                hrRow("Fin",         String(leave.endDate.prefix(10)))
+                hrRow("Días",        leave.days)
+                hrRow("Aprobado por", leave.approverName)
             }
-            let notes = hrStr(leave, "notes", "notas", "comments", "comentarios")
-            if !notes.isEmpty {
-                Section("Notas") { Text(notes).font(.footnote) }
+            if !leave.notes.isEmpty {
+                Section("Notas") { Text(leave.notes).font(.footnote) }
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle(user.isEmpty ? "Permiso" : user)
+        .navigationTitle(leave.userName.isEmpty ? "Permiso" : leave.userName)
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -102,7 +99,6 @@ struct HrLeavesView: View {
     private var leaveList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                // KPI strip
                 if !vm.items.isEmpty {
                     HStack(spacing: 0) {
                         HrKpi(label: "Solicitudes",value: "\(vm.items.count)",     color: .primary)
@@ -117,7 +113,6 @@ struct HrLeavesView: View {
                     .padding(.horizontal)
                 }
 
-                // Search
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundColor(.secondary)
                     TextField("Buscar permiso…", text: $vm.query).autocorrectionDisabled()
@@ -130,7 +125,6 @@ struct HrLeavesView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal)
 
-                // Type chips
                 if vm.types.count > 1 {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
@@ -149,14 +143,13 @@ struct HrLeavesView: View {
                     }
                 }
 
-                // List
                 if vm.isLoading {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                 } else if vm.filtered.isEmpty {
                     Text("Sin solicitudes").foregroundColor(.secondary).frame(maxWidth: .infinity).padding(.top, 40)
                 } else {
                     VStack(spacing: 6) {
-                        ForEach(vm.filtered.prefix(50), id: \.hrId) { leave in
+                        ForEach(vm.filtered.prefix(50)) { leave in
                             Button { selected = leave } label: {
                                 HrLeaveCard(item: leave)
                             }
@@ -175,32 +168,26 @@ struct HrLeavesView: View {
 // MARK: – Card
 
 private struct HrLeaveCard: View {
-    let item: [String: Any]
+    let item: HrLeave
     var body: some View {
-        let reason  = hrStr(item, "reason", "motivo", "type")
-        let user    = hrStr(item, "userName", "employeeName", "nombre")
-        let status  = hrStr(item, "status", "estado")
-        let type_   = hrStr(item, "type", "tipo")
-        let startD  = String(hrStr(item, "startDate", "startAt", "createdAt").prefix(10))
-        let endD    = String(hrStr(item, "endDate", "endAt").prefix(10))
-        let color   = hrStatusColor(status)
+        let color = hrStatusColor(item.status)
 
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(reason.isEmpty ? type_.capitalized : reason).font(.subheadline).bold().lineLimit(2)
+                Text(item.displayReason).font(.subheadline).bold().lineLimit(2)
                 Spacer()
-                Text(status.capitalized).font(.caption2).bold().foregroundColor(color)
+                Text(item.status.capitalized).font(.caption2).bold().foregroundColor(color)
                     .padding(.horizontal, 7).padding(.vertical, 2)
                     .background(color.opacity(0.12)).clipShape(Capsule())
             }
-            if !user.isEmpty { Label(user, systemImage: "person").font(.caption).foregroundColor(.secondary) }
+            if !item.userName.isEmpty { Label(item.userName, systemImage: "person").font(.caption).foregroundColor(.secondary) }
             HStack {
-                if !type_.isEmpty {
-                    Label(type_.capitalized, systemImage: "tag").font(.caption2).foregroundColor(.secondary)
+                if !item.type.isEmpty {
+                    Label(item.type.capitalized, systemImage: "tag").font(.caption2).foregroundColor(.secondary)
                 }
                 Spacer()
-                if !startD.isEmpty {
-                    Text(endD.isEmpty ? startD : "\(startD) → \(endD)").font(.caption2).foregroundColor(.secondary)
+                if !item.dateRange.isEmpty {
+                    Text(item.dateRange).font(.caption2).foregroundColor(.secondary)
                 }
             }
         }
@@ -223,36 +210,11 @@ private struct HrKpi: View {
     }
 }
 
-private func hrStr(_ m: [String: Any], _ keys: String...) -> String {
-    for k in keys {
-        if let v = m[k] {
-            let s: String
-            if let ss = v as? String { s = ss }
-            else if let n = v as? NSNumber { s = n.stringValue }
-            else { s = String(describing: v) }
-            if !s.isEmpty && s != "null" { return s }
-        }
-    }
-    return ""
-}
-
 private func hrStatusColor(_ status: String) -> Color {
     switch status.lowercased() {
     case "aprobado", "approved": return .green
     case "pendiente", "pending": return .orange
     case "rechazado", "rejected", "denied": return .red
     default: return .secondary
-    }
-}
-
-extension String {
-    fileprivate func ifBlankHr(_ fallback: String?) -> String? { isEmpty ? fallback : self }
-}
-
-extension [String: Any] {
-    fileprivate var hrId: String {
-        if let n = self["id"] as? Int { return "hr-\(n)" }
-        if let s = self["id"] as? String { return "hr-\(s)" }
-        return UUID().uuidString
     }
 }

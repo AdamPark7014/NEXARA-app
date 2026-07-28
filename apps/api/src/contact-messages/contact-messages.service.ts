@@ -8,7 +8,8 @@ import { UpdateContactMessageDto } from './dto/update-contact-message.dto.js';
 import { ContactStatus } from '@prisma/client';
 import { NewsletterService } from '../newsletter/newsletter.service.js';
 import nodemailer from 'nodemailer';
-import { resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
+import { resolvePublicCompanyId, resolveRequiredCompanyId, companyWhere, requireCompanyId, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
+import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 
 @Injectable()
 export class ContactMessagesService {
@@ -23,20 +24,24 @@ export class ContactMessagesService {
   }
 
   async create(createContactMessageDto: CreateContactMessageDto) {
-    const message = await this.db.contactMessage.create({
-      data: {
-        name: createContactMessageDto.name,
-        email: createContactMessageDto.email,
-        phone: createContactMessageDto.phone || null,
-        company: createContactMessageDto.company || null,
-        subject: createContactMessageDto.subject || null,
-        category: createContactMessageDto.category || 'SOPORTE',
-        message: createContactMessageDto.message,
-        newsletter: createContactMessageDto.newsletter ?? false,
-        source: createContactMessageDto.source || null,
-        pageUrl: createContactMessageDto.pageUrl || null,
-      },
-    });
+    const companyId = await withTenantBypassAsync(() => resolvePublicCompanyId(this.db));
+    const message = await withTenantBypassAsync(() =>
+      this.db.contactMessage.create({
+        data: {
+          name: createContactMessageDto.name,
+          email: createContactMessageDto.email,
+          phone: createContactMessageDto.phone || null,
+          company: createContactMessageDto.company || null,
+          subject: createContactMessageDto.subject || null,
+          category: createContactMessageDto.category || 'SOPORTE',
+          message: createContactMessageDto.message,
+          newsletter: createContactMessageDto.newsletter ?? false,
+          source: createContactMessageDto.source || null,
+          pageUrl: createContactMessageDto.pageUrl || null,
+          companyId,
+        },
+      }),
+    );
 
     // Notify the new contact via realtime
     this.realtimeGateway.emit('contacts:changed', {
@@ -58,7 +63,7 @@ export class ContactMessagesService {
           name: message.name,
           source: message.source || 'contact-message',
           pageUrl: message.pageUrl || undefined,
-        });
+        }, message.companyId);
       } catch (err) {
         console.warn('[contact-messages] Newsletter sync failed', err);
       }
@@ -80,8 +85,21 @@ export class ContactMessagesService {
    * Crea un SalesLead automáticamente desde un ContactMessage con scoring inicial heurístico.
    * Score = base 30 + signals (empresa +20, teléfono +15, mensaje >100 chars +10, dominio empresarial +10).
    */
-  private async createLeadFromContact(message: { id: number; name: string; email: string; phone: string | null; company: string | null; subject: string | null; message: string; source: string | null; pageUrl: string | null }) {
-    const existing = await this.db.salesLead.findFirst({ where: { email: message.email } });
+  private async createLeadFromContact(message: {
+    id: number;
+    name: string;
+    email: string;
+    phone: string | null;
+    company: string | null;
+    subject: string | null;
+    message: string;
+    source: string | null;
+    pageUrl: string | null;
+    companyId: number;
+  }) {
+    const existing = await this.db.salesLead.findFirst({
+      where: { email: message.email, companyId: message.companyId },
+    });
     if (existing) {
       return existing;
     }
@@ -95,7 +113,7 @@ export class ContactMessagesService {
     if ((message.subject || message.message || '').match(/cctv|cableado|licitaci|proyecto|presupuesto|cotiza|sucursal/i)) score += 10;
     score = Math.min(score, 99);
 
-    const companyId = await resolveRequiredCompanyId(this.db);
+    const companyId = message.companyId || (await resolveRequiredCompanyId(this.db));
     const lead = await this.db.salesLead.create({
       data: {
         name: message.name,
@@ -114,23 +132,23 @@ export class ContactMessagesService {
     return lead;
   }
 
-  async findAll(status?: string, category?: string, query?: PaginationQueryDto) {
+  async findAll(status?: string, category?: string, query?: PaginationQueryDto, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const normalizedStatus = this.normalizeStatus(status);
     const normalizedCategory = category?.toUpperCase().trim();
     const validCategory = normalizedCategory === 'SOPORTE' || normalizedCategory === 'VENTAS' ? normalizedCategory : undefined;
-    const where: any = {};
+    const where: any = { ...companyWhere(tenantId) };
     if (normalizedStatus) where.status = normalizedStatus;
     if (validCategory) where.category = validCategory;
-    const finalWhere = Object.keys(where).length ? where : undefined;
     if (query?.limit) {
       const [data, total] = await Promise.all([
-        this.db.contactMessage.findMany({ where: finalWhere, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
-        this.db.contactMessage.count({ where: finalWhere }),
+        this.db.contactMessage.findMany({ where, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
+        this.db.contactMessage.count({ where }),
       ]);
       return buildPaginatedResponse(data, total, query);
     }
     return await this.db.contactMessage.findMany({
-      where: finalWhere,
+      where,
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -250,11 +268,12 @@ export class ContactMessagesService {
     }
   }
 
-  async findOne(id: number) {
-    const message = await this.db.contactMessage.findUnique({ where: { id } });
-    if (!message) {
-      throw new NotFoundException(`Contacto con ID ${id} no encontrado`);
-    }
+  async findOne(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const message = await this.db.contactMessage.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(message, tenantId, 'Contacto');
     return message;
   }
 
@@ -281,8 +300,8 @@ export class ContactMessagesService {
     return this.create(payload);
   }
 
-  async update(id: number, updateContactMessageDto: UpdateContactMessageDto) {
-    const existing = await this.findOne(id);
+  async update(id: number, updateContactMessageDto: UpdateContactMessageDto, companyId?: number | null) {
+    const existing = await this.findOne(id, companyId);
 
     const status = this.normalizeStatus(updateContactMessageDto.status);
     const responseMessage = updateContactMessageDto.responseMessage || undefined;
@@ -379,8 +398,8 @@ export class ContactMessagesService {
     return message;
   }
 
-  async remove(id: number) {
-    await this.findOne(id);
+  async remove(id: number, companyId?: number | null) {
+    await this.findOne(id, companyId);
     const removed = await this.db.contactMessage.delete({
       where: { id },
     });

@@ -5,28 +5,44 @@ import styles from './LoginWelcomeBanner.module.css';
 
 const STORAGE_KEY = 'nexara_login_greeting';
 
+type GreetingPayload = {
+  title: string;
+  device?: string;
+};
+
+const parseGreeting = (raw: string): GreetingPayload => {
+  try {
+    const parsed = JSON.parse(raw) as Partial<GreetingPayload>;
+    if (parsed && typeof parsed.title === 'string' && parsed.title.trim()) {
+      return {
+        title: parsed.title.trim(),
+        device: typeof parsed.device === 'string' ? parsed.device.trim() : undefined,
+      };
+    }
+  } catch {
+    // Legacy plain string from older API builds.
+  }
+  return { title: raw.trim() };
+};
+
 export default function LoginWelcomeBanner() {
-  const [message, setMessage] = useState<string | null>(null);
+  const [greeting, setGreeting] = useState<GreetingPayload | null>(null);
   const [isClosing, setIsClosing] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const greeting = window.sessionStorage.getItem(STORAGE_KEY);
-    if (!greeting) return;
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
 
-    setMessage(greeting);
+    setGreeting(parseGreeting(raw));
     setIsClosing(false);
     window.sessionStorage.removeItem(STORAGE_KEY);
 
-    // Start fade-out shortly before removing the banner from the DOM.
-    const fadeTimer = window.setTimeout(() => {
-      setIsClosing(true);
-    }, 4500);
-
+    const fadeTimer = window.setTimeout(() => setIsClosing(true), 4200);
     const removeTimer = window.setTimeout(() => {
-      setMessage(null);
+      setGreeting(null);
       setIsClosing(false);
-    }, 5000);
+    }, 4800);
 
     return () => {
       window.clearTimeout(fadeTimer);
@@ -34,12 +50,22 @@ export default function LoginWelcomeBanner() {
     };
   }, []);
 
-  if (!message) return null;
+  if (!greeting) return null;
 
   return (
-    <div className={`${styles.banner} ${isClosing ? styles.closing : ""}`} role="status" aria-live="polite">
-      <strong className={styles.title}>Bienvenido</strong>
-      <span>{message}</span>
+    <div
+      className={`${styles.cloud} ${isClosing ? styles.closing : ''}`}
+      role="status"
+      aria-live="polite"
+    >
+      <div className={styles.glow} aria-hidden />
+      <p className={styles.hello}>{greeting.title}</p>
+      {greeting.device ? (
+        <p className={styles.device}>
+          <span className={styles.deviceDot} aria-hidden />
+          {greeting.device}
+        </p>
+      ) : null}
     </div>
   );
 }

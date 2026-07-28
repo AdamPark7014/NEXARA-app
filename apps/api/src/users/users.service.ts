@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
@@ -7,6 +7,8 @@ import { UpdateUserDto } from './dto/update-user.dto.js';
 import * as bcrypt from 'bcryptjs';
 import { PERMISSIONS } from '../common/permissions.js';
 import { ChatService } from '../chat/chat.service.js';
+import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 
 /** Roles que reciben OT, kits de herramientas y asignaciones de campo. */
 const FIELD_ASSIGNEE_ROLE_KEYS = ['ing_campo', 'ing_soporte'] as const;
@@ -74,10 +76,46 @@ export class UsersService {
     });
   }
 
+  /** Users belonging to the active tenant via UserCompany. */
+  private companyMembershipFilter(companyId: number): Prisma.UserWhereInput {
+    return { companyMemberships: { some: { companyId } } };
+  }
+
+  /**
+   * Fail-closed IDOR guard: user must belong to the active company.
+   * Super-admin exemption only when `isSuperAdmin` is explicitly true
+   * (prefer still requiring membership for normal admin ops).
+   */
+  async assertUserInCompany(
+    userId: number,
+    companyId: number | null | undefined,
+    opts?: { isSuperAdmin?: boolean },
+  ): Promise<{ id: number }> {
+    if (opts?.isSuperAdmin === true) {
+      const user = await this.prisma.user.findFirst({
+        where: { id: userId },
+        select: { id: true },
+      });
+      if (!user) throw new NotFoundException('Usuario no encontrado');
+      return user;
+    }
+    const tenantId = requireCompanyId(companyId);
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        companyMemberships: { some: { companyId: tenantId } },
+      },
+      select: { id: true },
+    });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    return user;
+  }
+
   private async resolveEmployeeNumber(
     employeeNumber: string | undefined,
     fallbackId: number,
     excludeUserId?: number,
+    companyId?: number | null,
     opts?: { tx?: Prisma.TransactionClient; skipClear?: boolean },
   ) {
     const normalized = this.normalizeEmployeeNumber(employeeNumber) || this.formatEmployeeNumberFromId(fallbackId);
@@ -86,9 +124,38 @@ export class UsersService {
       await this.clearEmployeeNumberForProtectedUsers();
     }
 
-    const userDelegate = opts?.tx?.user ?? this.prisma.user;
+    const db = opts?.tx ?? this.prisma;
+    const tenantId =
+      companyId != null && Number.isFinite(Number(companyId)) && Number(companyId) > 0
+        ? Number(companyId)
+        : null;
 
-    const existing = await userDelegate.findFirst({
+    // Prefer tenant-local uniqueness via UserCompany.(companyId, employeeNumber).
+    if (tenantId != null) {
+      const peerMembership = await db.userCompany.findFirst({
+        where: {
+          companyId: tenantId,
+          employeeNumber: normalized,
+          ...(excludeUserId ? { userId: { not: excludeUserId } } : {}),
+        },
+        select: {
+          user: { select: { id: true, email: true, nombre: true } },
+        },
+      });
+
+      if (peerMembership?.user) {
+        const existing = peerMembership.user;
+        if (this.isProtectedSuperAdminEmail(existing.email)) {
+          throw new ConflictException('El numero de empleado ya existe (reservado por un usuario protegido no visible en la lista)');
+        }
+        throw new ConflictException(`El numero de empleado ya existe (usuario: ${existing.nombre || existing.email})`);
+      }
+
+      return normalized;
+    }
+
+    // No company scope: fall back to global User.employeeNumber (compat).
+    const existing = await db.user.findFirst({
       where: {
         employeeNumber: normalized,
         email: { notIn: this.superAdminEmails },
@@ -99,13 +166,24 @@ export class UsersService {
 
     if (existing) {
       if (this.isProtectedSuperAdminEmail(existing.email)) {
-        throw new BadRequestException('El numero de empleado ya existe (reservado por un usuario protegido no visible en la lista)');
+        throw new ConflictException('El numero de empleado ya existe (reservado por un usuario protegido no visible en la lista)');
       }
 
-      throw new BadRequestException(`El numero de empleado ya existe (usuario: ${existing.nombre || existing.email})`);
+      throw new ConflictException(`El numero de empleado ya existe (usuario: ${existing.nombre || existing.email})`);
     }
 
     return normalized;
+  }
+
+  /** Extract a sortable sequence from an employee number (prefix suffix or digits). */
+  private employeeNumberSequence(value?: string | null): number {
+    const normalized = this.normalizeEmployeeNumber(value);
+    if (!normalized) return 0;
+    if (normalized.startsWith(this.employeeNumberPrefix)) {
+      return Number.parseInt(normalized.slice(this.employeeNumberPrefix.length).replace(/\D+/g, ''), 10) || 0;
+    }
+    const digits = normalized.replace(/\D+/g, '');
+    return digits ? Number.parseInt(digits, 10) || 0 : 0;
   }
 
   private mapUserUniqueConstraintError(e: Prisma.PrismaClientKnownRequestError): BadRequestException | null {
@@ -117,13 +195,32 @@ export class UsersService {
       return new BadRequestException('Este correo electrónico ya está registrado.');
     }
     if (joined.includes('employeenumber') || joined.includes('employee_number')) {
-      return new BadRequestException('Ese número de empleado ya está en uso.');
+      // Race on UserCompany @@unique([companyId, employeeNumber]).
+      return new BadRequestException('Número de empleado ya en uso en esta empresa');
     }
     return new BadRequestException('Ya existe un registro duplicado; revisa el correo o el número de empleado.');
   }
 
-  async getNextEmployeeNumber() {
+  async getNextEmployeeNumber(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const memberships = await this.prisma.userCompany.findMany({
+      where: { companyId: tenantId, employeeNumber: { not: null } },
+      select: { employeeNumber: true },
+    });
+
+    let maxSeq = 0;
+    for (const row of memberships) {
+      const seq = this.employeeNumberSequence(row.employeeNumber);
+      if (seq > maxSeq) maxSeq = seq;
+    }
+
+    if (maxSeq > 0) {
+      return this.formatEmployeeNumberFromId(maxSeq + 1);
+    }
+
+    // Fallback when no tenant-local numbers yet: derive from membership user ids.
     const lastUser = await this.prisma['user'].findFirst({
+      where: this.companyMembershipFilter(tenantId),
       orderBy: { id: 'desc' },
       select: { id: true },
     });
@@ -158,14 +255,28 @@ export class UsersService {
     return this.superAdminEmails.includes(normalized);
   }
 
-  async findAllVisible(currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean }, query?: PaginationQueryDto) {
+  async findAllVisible(
+    currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean },
+    query?: PaginationQueryDto,
+    companyId?: number | null,
+  ) {
     // Implementation moved below with IAM enrichment (risk, sessions).
-    return this.findAllVisibleIam(currentUser, query);
+    return this.findAllVisibleIam(currentUser, query, companyId);
   }
 
   /** Plantilla RRHH — lista todos los usuarios activos con campos HR */
-  async findHrStaff(currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] }, query?: PaginationQueryDto) {
-    const where: any = { NOT: { email: { in: this.superAdminEmails } } };
+  async findHrStaff(
+    currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+    query?: PaginationQueryDto,
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const where: Prisma.UserWhereInput = {
+      AND: [
+        this.companyMembershipFilter(tenantId),
+        { NOT: { email: { in: this.superAdminEmails } } },
+      ],
+    };
     const select = {
       id: true, nombre: true, email: true, employeeNumber: true,
       avatarUrl: true, fechaCreacion: true,
@@ -185,7 +296,12 @@ export class UsersService {
   }
 
   /** Actualiza campos RRHH de un usuario */
-  async updateHrFields(id: number, body: { puesto?: string; tipoContrato?: string; estadoRRHH?: string; isActive?: boolean; fechaIngreso?: string }) {
+  async updateHrFields(
+    id: number,
+    body: { puesto?: string; tipoContrato?: string; estadoRRHH?: string; isActive?: boolean; fechaIngreso?: string },
+    companyId?: number | null,
+  ) {
+    await this.assertUserInCompany(id, companyId);
     const data: any = {};
     if (body.puesto !== undefined) data.puesto = body.puesto.trim() || null;
     if (body.tipoContrato !== undefined) data.tipoContrato = body.tipoContrato || null;
@@ -219,18 +335,33 @@ export class UsersService {
     throw new BadRequestException('Rol inválido');
   }
 
-  private async resolveDepartmentId(value: unknown) {
+  private async resolveDepartmentId(value: unknown, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     if (value === undefined || value === null) return undefined;
-    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const dept = await this.prisma.department.findFirst({
+        where: { id: value, ...companyWhere(tenantId) },
+        select: { id: true },
+      });
+      if (!dept) throw new BadRequestException('Departamento inválido para esta empresa');
+      return dept.id;
+    }
     if (typeof value === 'string') {
       const trimmed = value.trim();
       if (!trimmed) return undefined;
       const parsed = Number(trimmed);
-      if (Number.isFinite(parsed)) return parsed;
-      const department = await this.prisma['department'].upsert({
-        where: { nombre: trimmed },
+      if (Number.isFinite(parsed)) {
+        const dept = await this.prisma.department.findFirst({
+          where: { id: parsed, ...companyWhere(tenantId) },
+          select: { id: true },
+        });
+        if (!dept) throw new BadRequestException('Departamento inválido para esta empresa');
+        return dept.id;
+      }
+      const department = await this.prisma.department.upsert({
+        where: { companyId_nombre: { companyId: tenantId, nombre: trimmed } },
         update: {},
-        create: { nombre: trimmed },
+        create: { nombre: trimmed, companyId: tenantId },
         select: { id: true },
       });
       if (department?.id) return department.id;
@@ -241,54 +372,73 @@ export class UsersService {
   private async resolveManagerId(
     value: unknown,
     tx: Prisma.TransactionClient | PrismaService = this.prisma,
+    companyId?: number | null,
   ): Promise<number | null> {
     if (value === null) return null;
-    if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+      if (companyId != null && Number.isFinite(Number(companyId)) && Number(companyId) > 0) {
+        const member = await tx.user.findFirst({
+          where: {
+            id: value,
+            companyMemberships: { some: { companyId: Number(companyId) } },
+          },
+          select: { id: true },
+        });
+        if (!member) throw new BadRequestException('Manager no pertenece a la empresa activa');
+      }
+      return value;
+    }
     if (typeof value === 'string') {
       const trimmed = value.trim();
       if (trimmed) {
         const parsed = Number(trimmed);
-        if (Number.isFinite(parsed) && parsed > 0) return parsed;
+        if (Number.isFinite(parsed) && parsed > 0) {
+          return this.resolveManagerId(parsed, tx, companyId);
+        }
       }
     } else if (value !== undefined) {
       return null;
     }
 
+    const ceoWhere: any = {
+      email: { equals: 'gerencia@nexara.com.mx', mode: 'insensitive' },
+    };
+    if (companyId != null && Number.isFinite(Number(companyId)) && Number(companyId) > 0) {
+      ceoWhere.companyMemberships = { some: { companyId: Number(companyId) } };
+    }
     const ceo = await tx.user.findFirst({
-      where: { email: { equals: 'gerencia@nexara.com.mx', mode: 'insensitive' } },
+      where: ceoWhere,
       select: { id: true },
     });
     return ceo?.id ?? null;
   }
 
-  async create(createUserDto: CreateUserDto) {
+  async create(createUserDto: CreateUserDto, companyId?: number | null) {
     await this.clearEmployeeNumberForProtectedUsers();
+    const tenantId = requireCompanyId(companyId);
 
-    // Seat limit del tenant primario (billing SaaS)
-    const primary = await this.prisma.companyProfile.findFirst({
-      where: { isPrimary: true, isActive: true },
+    // Seat limit del tenant activo (billing SaaS)
+    const company = await this.prisma.companyProfile.findFirst({
+      where: { id: tenantId, isActive: true },
       select: { id: true, seatLimit: true, billingStatus: true },
-      orderBy: { id: 'asc' },
     });
-    if (primary) {
-      if (primary.billingStatus === 'suspended') {
+    if (company) {
+      if (company.billingStatus === 'suspended') {
         throw new BadRequestException('Empresa suspendida por billing — no se pueden crear usuarios');
       }
       const seatsUsed = await this.prisma.userCompany.count({
-        where: { companyId: primary.id, user: { isActive: true } },
+        where: { companyId: company.id, user: { isActive: true } },
       });
-      const activeUsers = await this.prisma.user.count({ where: { isActive: true } });
-      const used = Math.max(seatsUsed, activeUsers);
-      if (used >= primary.seatLimit) {
+      if (seatsUsed >= company.seatLimit) {
         throw new BadRequestException(
-          `Límite de asientos alcanzado (${used}/${primary.seatLimit}). Amplía el plan en Billing.`,
+          `Límite de asientos alcanzado (${seatsUsed}/${company.seatLimit}). Amplía el plan en Billing.`,
         );
       }
     }
 
     const hash = await bcrypt.hash(createUserDto.password, 10);
     const roleId = await this.resolveRoleId(createUserDto.roleId);
-    const departmentId = await this.resolveDepartmentId(createUserDto.departmentId);
+    const departmentId = await this.resolveDepartmentId(createUserDto.departmentId, tenantId);
     if (!departmentId) throw new BadRequestException('Departamento requerido');
     const emailNorm = createUserDto.email.trim().toLowerCase();
 
@@ -319,20 +469,39 @@ export class UsersService {
             avatarUrl: createUserDto.avatarUrl,
             passwordHash: hash,
             passwordChangedAt: new Date(),
-            managerId: await this.resolveManagerId(createUserDto.managerId, tx),
+            managerId: await this.resolveManagerId(createUserDto.managerId, tx, tenantId),
           },
         });
 
-        if (this.isProtectedSuperAdminEmail(createdUser.email)) {
+        const isProtected = this.isProtectedSuperAdminEmail(createdUser.email);
+        const employeeNumber = isProtected
+          ? null
+          : await this.resolveEmployeeNumber(
+              createUserDto.employeeNumber,
+              createdUser.id,
+              createdUser.id,
+              tenantId,
+              { tx, skipClear: true },
+            );
+
+        const existingMemberships = await tx.userCompany.count({
+          where: { userId: createdUser.id },
+        });
+        await tx.userCompany.upsert({
+          where: { userId_companyId: { userId: createdUser.id, companyId: tenantId } },
+          update: { employeeNumber },
+          create: {
+            userId: createdUser.id,
+            companyId: tenantId,
+            isDefault: existingMemberships === 0,
+            employeeNumber,
+          },
+        });
+
+        if (isProtected) {
           return this.withEmployeeNumber(createdUser);
         }
 
-        const employeeNumber = await this.resolveEmployeeNumber(
-          createUserDto.employeeNumber,
-          createdUser.id,
-          createdUser.id,
-          { tx, skipClear: true },
-        );
         const updatedUser = await tx.user.update({
           where: { id: createdUser.id },
           data: { employeeNumber },
@@ -342,7 +511,7 @@ export class UsersService {
       await this.chat.addUserToOrgChannels(created.id);
       return created;
     } catch (e) {
-      if (e instanceof BadRequestException) throw e;
+      if (e instanceof BadRequestException || e instanceof ConflictException) throw e;
       if (e instanceof Prisma.PrismaClientKnownRequestError) {
         const mapped = this.mapUserUniqueConstraintError(e);
         if (mapped) throw mapped;
@@ -352,10 +521,22 @@ export class UsersService {
   }
 
 
-  async findAll(query?: PaginationQueryDto) {
+  async findAll(query?: PaginationQueryDto, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const membership = this.companyMembershipFilter(tenantId);
     const include = { role: true, department: true };
     if (query?.limit) {
-      const where = query.search ? { OR: [{ nombre: { contains: query.search, mode: 'insensitive' as const } }, { email: { contains: query.search, mode: 'insensitive' as const } }] } : undefined;
+      const searchWhere = query.search
+        ? {
+            OR: [
+              { nombre: { contains: query.search, mode: 'insensitive' as const } },
+              { email: { contains: query.search, mode: 'insensitive' as const } },
+            ],
+          }
+        : undefined;
+      const where: Prisma.UserWhereInput = searchWhere
+        ? { AND: [membership, searchWhere] }
+        : membership;
       const [data, total] = await Promise.all([
         this.prisma['user'].findMany({ where, include, skip: query.skip, take: query.take, orderBy: { fechaCreacion: 'desc' } }),
         this.prisma['user'].count({ where }),
@@ -367,13 +548,19 @@ export class UsersService {
       };
     }
     const users = await this.prisma['user'].findMany({
+      where: membership,
       include,
     });
     return this.withEmployeeNumberList(users);
   }
 
-  async findAssignableUsers(currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean; role?: any }) {
+  async findAssignableUsers(
+    currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean; role?: any },
+    companyId?: number | null,
+  ) {
     try {
+      const tenantId = requireCompanyId(companyId);
+      const membership = this.companyMembershipFilter(tenantId);
       // SuperAdmin emails (siempre excluir)
       const superAdminEmails = this.superAdminEmails;
 
@@ -393,6 +580,7 @@ export class UsersService {
         return this.prisma['user'].findMany({
           where: {
             AND: [
+              membership,
               { id: { not: currentUser.id } },
               { email: { notIn: superAdminEmails } },
             ],
@@ -414,6 +602,7 @@ export class UsersService {
         return this.prisma['user'].findMany({
           where: {
             AND: [
+              membership,
               { id: { not: currentUser.id } },
               { email: { notIn: superAdminEmails } },
             ],
@@ -427,6 +616,7 @@ export class UsersService {
         // OPS manager: asigna a ingenieros de campo bajo su jerarquía (organigrama NEXARA).
         const assignerRoleKey = String(userInDb.roleKey || userInDb.role?.orgRoleKey || '').toLowerCase();
         const fieldAssigneeFilter: Prisma.UserWhereInput[] = [
+          membership,
           { isActive: true },
           { email: { notIn: superAdminEmails } },
           { roleKey: { in: [...FIELD_ASSIGNEE_ROLE_KEYS] } },
@@ -446,6 +636,7 @@ export class UsersService {
       // Usuario normal sin permisos: retorna vacío
       return [];
     } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
       console.error('Error finding assignable users:', error);
       return [];
     }
@@ -454,11 +645,33 @@ export class UsersService {
   /** Cuentas que no deben aparecer en la página pública "Nosotros / equipo" (ej. solo panel ventas). */
   private readonly excludedPublicTeamEmails = ['vendedor@nexara.com.mx', ...this.superAdminEmails];
 
-  async findPublicTeam(limit = 12) {
+  /** Public site company: PUBLIC_COMPANY_ID > explicit X-Company-Id > isPrimary. Never all tenants. */
+  private async resolvePublicTeamCompanyId(explicit?: number | null): Promise<number> {
+    const fromEnv = Number(process.env.PUBLIC_COMPANY_ID);
+    if (Number.isFinite(fromEnv) && fromEnv > 0) return fromEnv;
+    if (explicit != null && Number.isFinite(Number(explicit)) && Number(explicit) > 0) {
+      return requireCompanyId(explicit);
+    }
+    const primary = await withTenantBypassAsync(() =>
+      this.prisma.companyProfile.findFirst({
+        where: { isPrimary: true, isActive: true },
+        select: { id: true },
+        orderBy: { id: 'asc' },
+      }),
+    );
+    if (!primary?.id) {
+      throw new ForbiddenException('No hay empresa configurada para contenido público');
+    }
+    return primary.id;
+  }
+
+  async findPublicTeam(limit = 12, companyId?: number | null) {
     const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(24, Math.trunc(limit))) : 12;
+    const tenantId = await this.resolvePublicTeamCompanyId(companyId);
     return this.prisma['user'].findMany({
       where: {
         email: { notIn: this.excludedPublicTeamEmails },
+        companyMemberships: { some: { companyId: tenantId } },
       },
       select: {
         id: true,
@@ -485,8 +698,10 @@ export class UsersService {
     });
   }
 
-  listDepartments() {
-    return this.prisma['department'].findMany({
+  listDepartments(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    return this.prisma.department.findMany({
+      where: companyWhere(tenantId),
       select: { id: true, nombre: true },
       orderBy: { nombre: 'asc' },
     });
@@ -502,14 +717,18 @@ export class UsersService {
     });
   }
 
-  findOne(id: number) {
+  async findOne(id: number, companyId?: number | null, opts?: { isSuperAdmin?: boolean }) {
+    await this.assertUserInCompany(id, companyId, opts);
     return this.prisma['user'].findUnique({
       where: { id },
       include: { role: true, department: true },
     }).then((user) => (user ? this.withEmployeeNumber(user) : user));
   }
 
-  async getProfile(userId: number) {
+  async getProfile(userId: number, companyId?: number | null) {
+    if (companyId !== undefined) {
+      await this.assertUserInCompany(userId, companyId);
+    }
     return this.prisma['user'].findUnique({
       where: { id: userId },
       include: {
@@ -607,7 +826,8 @@ export class UsersService {
     return created;
   }
 
-  async updateProfileReview(userId: number, data: any) {
+  async updateProfileReview(userId: number, data: any, companyId?: number | null) {
+    await this.assertUserInCompany(userId, companyId);
     return this.prisma['userProfile'].update({
       where: { userId },
       data,
@@ -621,7 +841,8 @@ export class UsersService {
     });
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto) {
+  async update(id: number, updateUserDto: UpdateUserDto, companyId?: number | null) {
+    await this.assertUserInCompany(id, companyId);
     await this.clearEmployeeNumberForProtectedUsers();
 
     const data: any = { ...updateUserDto };
@@ -644,32 +865,59 @@ export class UsersService {
       data.roleId = await this.resolveRoleId(data.roleId);
     }
     if (data.departmentId !== undefined) {
-      data.departmentId = await this.resolveDepartmentId(data.departmentId);
+      data.departmentId = await this.resolveDepartmentId(data.departmentId, companyId);
     }
     if (data.managerId !== undefined) {
-      data.managerId = await this.resolveManagerId(data.managerId);
+      data.managerId = await this.resolveManagerId(data.managerId, this.prisma, companyId);
     }
+    const syncMembershipEmployeeNumber =
+      isProtectedUser || updateUserDto.employeeNumber !== undefined;
+
     if (isProtectedUser) {
       data.employeeNumber = null;
     } else if (data.employeeNumber !== undefined) {
-      data.employeeNumber = await this.resolveEmployeeNumber(data.employeeNumber, id, id);
+      data.employeeNumber = await this.resolveEmployeeNumber(data.employeeNumber, id, id, companyId);
     }
     if (data.avatarUrl !== undefined) {
       const normalizedAvatar = String(data.avatarUrl ?? '').trim();
       data.avatarUrl = normalizedAvatar ? normalizedAvatar : null;
     }
-    return this.prisma['user'].update({
-      where: { id },
-      data,
-    }).then((user) => this.withEmployeeNumber(user));
+
+    try {
+      const user = await this.prisma['user'].update({
+        where: { id },
+        data,
+      });
+
+      if (syncMembershipEmployeeNumber && companyId != null) {
+        const tenantId = requireCompanyId(companyId);
+        await this.prisma.userCompany.updateMany({
+          where: { userId: id, companyId: tenantId },
+          data: { employeeNumber: data.employeeNumber ?? null },
+        });
+      }
+
+      return this.withEmployeeNumber(user);
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError) {
+        const mapped = this.mapUserUniqueConstraintError(e);
+        if (mapped) throw mapped;
+      }
+      throw e;
+    }
   }
 
-  remove(id: number) {
+  async remove(id: number, companyId?: number | null) {
+    await this.assertUserInCompany(id, companyId);
     return this.prisma['user'].delete({ where: { id } });
   }
 
  
-  async setManager(userId: number, managerId: number | null) {
+  async setManager(userId: number, managerId: number | null, companyId?: number | null) {
+    await this.assertUserInCompany(userId, companyId);
+    if (managerId != null) {
+      await this.assertUserInCompany(managerId, companyId);
+    }
     return this.prisma['user'].update({
       where: { id: userId },
       data: { managerId: managerId ?? null },
@@ -677,9 +925,14 @@ export class UsersService {
     });
   }
 
-  async getOrgchart() {
+  async getOrgchart(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const users = await this.prisma['user'].findMany({
-      where: { isActive: true, email: { notIn: this.superAdminEmails } },
+      where: {
+        isActive: true,
+        email: { notIn: this.superAdminEmails },
+        ...this.companyMembershipFilter(tenantId),
+      },
       select: {
         id: true,
         nombre: true,
@@ -796,8 +1049,14 @@ export class UsersService {
     };
   }
 
-  private async findAllVisibleIam(currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean }, query?: PaginationQueryDto) {
-    const excludeSuperAdmins = {
+  private async findAllVisibleIam(
+    currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean },
+    query?: PaginationQueryDto,
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const membership = this.companyMembershipFilter(tenantId);
+    const excludeSuperAdmins: Prisma.UserWhereInput = {
       NOT: { email: { in: this.superAdminEmails } },
     };
     const include = {
@@ -807,13 +1066,13 @@ export class UsersService {
       _count: { select: { sessions: { where: { revokedAt: null, expiresAt: { gt: new Date() } } } } },
     };
 
-    let where: any;
+    let where: Prisma.UserWhereInput;
     if (currentUser.isSuperAdmin) {
-      where = excludeSuperAdmins;
+      where = { AND: [membership, excludeSuperAdmins] };
     } else if (this.canViewUsersDirectory(currentUser)) {
-      where = { AND: [{ role: { accesoConsoleAdmin: false } }, excludeSuperAdmins] };
+      where = { AND: [membership, { role: { accesoConsoleAdmin: false } }, excludeSuperAdmins] };
     } else {
-      where = { id: currentUser.id, ...excludeSuperAdmins };
+      where = { AND: [membership, { id: currentUser.id }, excludeSuperAdmins] };
     }
 
     if (query?.limit) {
@@ -838,12 +1097,21 @@ export class UsersService {
   }
 
   /** Dashboard IAM: KPIs, tendencias, rankings de riesgo. */
-  async getIamInsights(currentUser: { isSuperAdmin?: boolean; permissions?: string[] }) {
+  async getIamInsights(
+    currentUser: { isSuperAdmin?: boolean; permissions?: string[] },
+    companyId?: number | null,
+  ) {
     if (!this.canViewUsersDirectory(currentUser)) {
       throw new ForbiddenException('Sin permiso para ver insights IAM');
     }
 
-    const exclude = { email: { notIn: this.superAdminEmails } };
+    const tenantId = requireCompanyId(companyId);
+    const exclude: Prisma.UserWhereInput = {
+      AND: [
+        this.companyMembershipFilter(tenantId),
+        { email: { notIn: this.superAdminEmails } },
+      ],
+    };
     const now = new Date();
     const d7 = new Date(now.getTime() - 7 * 86_400_000);
     const d30 = new Date(now.getTime() - 30 * 86_400_000);
@@ -1004,7 +1272,8 @@ export class UsersService {
     };
   }
 
-  async listUserSessions(userId: number) {
+  async listUserSessions(userId: number, companyId?: number | null) {
+    await this.assertUserInCompany(userId, companyId);
     return this.prisma.userSession.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -1023,9 +1292,10 @@ export class UsersService {
     });
   }
 
-  async revokeSession(sessionId: number, reason = 'admin_revoke') {
+  async revokeSession(sessionId: number, companyId?: number | null, reason = 'admin_revoke') {
     const session = await this.prisma.userSession.findUnique({ where: { id: sessionId } });
     if (!session) throw new NotFoundException('Sesión no encontrada');
+    await this.assertUserInCompany(session.userId, companyId);
     if (session.revokedAt) return session;
     return this.prisma.userSession.update({
       where: { id: sessionId },
@@ -1033,7 +1303,8 @@ export class UsersService {
     });
   }
 
-  async revokeAllUserSessions(userId: number, reason = 'admin_force_logout') {
+  async revokeAllUserSessions(userId: number, companyId?: number | null, reason = 'admin_force_logout') {
+    await this.assertUserInCompany(userId, companyId);
     const result = await this.prisma.userSession.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date(), revokeReason: reason },
@@ -1050,7 +1321,8 @@ export class UsersService {
     return { revoked: result.count };
   }
 
-  async unlockUser(userId: number) {
+  async unlockUser(userId: number, companyId?: number | null) {
+    await this.assertUserInCompany(userId, companyId);
     return this.prisma.user.update({
       where: { id: userId },
       data: { lockedUntil: null, failedLoginCount: 0 },
@@ -1058,11 +1330,15 @@ export class UsersService {
     });
   }
 
-  async bulkSetActive(ids: number[], isActive: boolean) {
+  async bulkSetActive(ids: number[], isActive: boolean, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const safeIds = ids.filter((id) => Number.isFinite(id) && id > 0);
     if (!safeIds.length) throw new BadRequestException('Sin IDs válidos');
     const users = await this.prisma.user.findMany({
-      where: { id: { in: safeIds } },
+      where: {
+        id: { in: safeIds },
+        companyMemberships: { some: { companyId: tenantId } },
+      },
       select: { id: true, email: true },
     });
     const allowed = users
@@ -1081,7 +1357,8 @@ export class UsersService {
     return { updated: result.count, skipped: safeIds.length - allowed.length };
   }
 
-  async getUserAuthActivity(userId: number, limit = 40) {
+  async getUserAuthActivity(userId: number, companyId?: number | null, limit = 40) {
+    await this.assertUserInCompany(userId, companyId);
     return this.prisma.auditLog.findMany({
       where: {
         OR: [

@@ -118,7 +118,7 @@ private fun CameraBarcodePreview(onBarcode: (String) -> Unit) {
         val listener = Runnable {
             val cameraProvider = cameraProviderFuture.get()
             val preview = Preview.Builder().build().also {
-                it.surfaceProvider = previewView.surfaceProvider
+                it.setSurfaceProvider(previewView.surfaceProvider)
             }
             val resolutionSelector = ResolutionSelector.Builder()
                 .setResolutionStrategy(

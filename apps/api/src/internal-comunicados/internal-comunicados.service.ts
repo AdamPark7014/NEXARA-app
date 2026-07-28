@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 export interface CreateComunicadoDto {
   titulo: string;
@@ -18,24 +19,27 @@ export interface UpdateComunicadoDto extends Partial<CreateComunicadoDto> {}
 export class InternalComunicadosService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: CreateComunicadoDto, autorId: number) {
+  async create(data: CreateComunicadoDto, autorId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.internalComunicado.create({
       data: {
-        titulo:             data.titulo,
-        cuerpo:             data.cuerpo,
-        audiencia:          data.audiencia,
-        prioridad:          data.prioridad ?? 'Normal',
-        estado:             data.estado ?? 'Borrador',
-        scheduledAt:        data.scheduledAt ? new Date(data.scheduledAt) : null,
+        titulo: data.titulo,
+        cuerpo: data.cuerpo,
+        audiencia: data.audiencia,
+        prioridad: data.prioridad ?? 'Normal',
+        estado: data.estado ?? 'Borrador',
+        scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
         totalDestinatarios: data.totalDestinatarios ?? 0,
         autorId,
+        companyId: tenantId,
       },
       include: { autor: { select: { id: true, nombre: true } } },
     });
   }
 
-  async findAll(query?: PaginationQueryDto, estado?: string) {
-    const where = estado ? { estado } : undefined;
+  async findAll(query?: PaginationQueryDto, estado?: string, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { ...companyWhere(tenantId), ...(estado ? { estado } : {}) };
     const include = { autor: { select: { id: true, nombre: true } } };
     const orderBy = { createdAt: 'desc' as const };
 
@@ -49,17 +53,18 @@ export class InternalComunicadosService {
     return this.prisma.internalComunicado.findMany({ where, include, orderBy });
   }
 
-  async findOne(id: number) {
-    const c = await this.prisma.internalComunicado.findUnique({
-      where: { id },
+  async findOne(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const c = await this.prisma.internalComunicado.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: { autor: { select: { id: true, nombre: true } } },
     });
-    if (!c) throw new NotFoundException(`Comunicado #${id} not found`);
+    assertCompanyAccess(c, tenantId, 'Comunicado');
     return c;
   }
 
-  async update(id: number, data: UpdateComunicadoDto) {
-    await this.findOne(id);
+  async update(id: number, data: UpdateComunicadoDto, companyId?: number | null) {
+    await this.findOne(id, companyId);
     return this.prisma.internalComunicado.update({
       where: { id },
       data: {
@@ -71,16 +76,16 @@ export class InternalComunicadosService {
     });
   }
 
-  async enviar(id: number) {
-    await this.findOne(id);
+  async enviar(id: number, companyId?: number | null) {
+    await this.findOne(id, companyId);
     return this.prisma.internalComunicado.update({
       where: { id },
       data: { estado: 'Enviado', sentAt: new Date(), updatedAt: new Date() },
     });
   }
 
-  async remove(id: number) {
-    await this.findOne(id);
+  async remove(id: number, companyId?: number | null) {
+    await this.findOne(id, companyId);
     return this.prisma.internalComunicado.delete({ where: { id } });
   }
 }

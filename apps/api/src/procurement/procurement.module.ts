@@ -11,6 +11,7 @@ import { RequisitionsController } from './requisitions.controller.js';
 import { PurchaseOrdersController } from './purchase-orders.controller.js';
 import { GoodsReceiptsController } from './goods-receipts.controller.js';
 import { SupplierEvaluationsController } from './supplier-evaluations.controller.js';
+import { RfqController } from './rfq.controller.js';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { SupplierEvaluationsController } from './supplier-evaluations.controller
     AccountingModule,
     AuditModule,
   ],
-  controllers: [RequisitionsController, PurchaseOrdersController, GoodsReceiptsController, SupplierEvaluationsController],
+  controllers: [RequisitionsController, PurchaseOrdersController, GoodsReceiptsController, SupplierEvaluationsController, RfqController],
   providers: [ProcurementService],
   exports: [ProcurementService],
 })

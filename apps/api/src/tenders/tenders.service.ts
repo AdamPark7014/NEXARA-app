@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class TendersService {
@@ -10,10 +11,10 @@ export class TendersService {
     private readonly notificationHierarchy: NotificationHierarchyService,
   ) {}
 
-  private async generateTenderNumber(): Promise<string> {
+  private async generateTenderNumber(companyId: number): Promise<string> {
     const year = new Date().getFullYear();
-    const count = await (this.prisma as any).tender.count({
-      where: { tenderNumber: { startsWith: `LIC-${year}` } },
+    const count = await this.prisma.tender.count({
+      where: { companyId, tenderNumber: { startsWith: `LIC-${year}` } },
     });
     return `LIC-${year}-${String(count + 1).padStart(5, '0')}`;
   }
@@ -43,11 +44,12 @@ export class TendersService {
     technicalRequirements?: string;
     legalRequirements?: string;
     ownerId?: number;
-  }) {
-    const tenderNumber = await this.generateTenderNumber();
+  }, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const tenderNumber = await this.generateTenderNumber(tenantId);
     const expectedMargin = (dto.ourBidAmount || 0) - (dto.estimatedCost || 0);
 
-    const tender = await (this.prisma as any).tender.create({
+    const tender = await this.prisma.tender.create({
       data: {
         tenderNumber,
         title: dto.title.trim(),
@@ -75,19 +77,22 @@ export class TendersService {
         technicalRequirements: dto.technicalRequirements?.trim() || null,
         legalRequirements: dto.legalRequirements?.trim() || null,
         ownerId: dto.ownerId ?? null,
+        companyId: tenantId,
       },
-      include: { owner: { select: { id: true, nombre: true } } },
+      include: { owner: { select: { id: true, nombre: true } },
+      },
     });
 
     return tender;
   }
 
-  async list(filters?: { status?: string; tenderType?: string; ownerId?: number }) {
-    const where: any = { deletedAt: null };
+  async list(filters?: { status?: string; tenderType?: string; ownerId?: number }, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { deletedAt: null, ...companyWhere(tenantId) };
     if (filters?.status) where.status = filters.status;
     if (filters?.tenderType) where.tenderType = filters.tenderType;
     if (filters?.ownerId) where.ownerId = filters.ownerId;
-    return (this.prisma as any).tender.findMany({
+    return this.prisma.tender.findMany({
       where,
       include: {
         owner: { select: { id: true, nombre: true } },
@@ -98,9 +103,10 @@ export class TendersService {
     });
   }
 
-  async getOne(id: number) {
-    const tender = await (this.prisma as any).tender.findUnique({
-      where: { id },
+  async getOne(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const tender = await this.prisma.tender.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: {
         owner: { select: { id: true, nombre: true, email: true } },
         opportunity: { select: { id: true, title: true, stage: true, value: true } },
@@ -108,15 +114,15 @@ export class TendersService {
         events: { orderBy: { occursAt: 'asc' } },
       },
     });
-    if (!tender) throw new NotFoundException('Licitación no encontrada');
+    assertCompanyAccess(tender, tenantId, 'Licitación');
     return tender;
   }
 
-  async update(id: number, dto: any) {
-    const existing = await (this.prisma as any).tender.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Licitación no encontrada');
+  async update(id: number, dto: any, companyId?: number | null) {
+    const existing = await this.getOne(id, companyId);
 
-    const data: any = { ...dto };
+    const { companyId: _omit, ...rest } = dto || {};
+    const data: any = { ...rest };
     if (dto.publishDate) data.publishDate = new Date(dto.publishDate);
     if (dto.questionsDeadline) data.questionsDeadline = new Date(dto.questionsDeadline);
     if (dto.submissionDeadline) data.submissionDeadline = new Date(dto.submissionDeadline);
@@ -129,21 +135,24 @@ export class TendersService {
     if (dto.estimatedCost !== undefined) data.estimatedCost = new Prisma.Decimal(dto.estimatedCost);
     if (dto.guaranteeAmount !== undefined) data.guaranteeAmount = new Prisma.Decimal(dto.guaranteeAmount);
 
-    // Recompute expected margin
     const bid = Number(data.ourBidAmount ?? existing.ourBidAmount);
     const cost = Number(data.estimatedCost ?? existing.estimatedCost);
     data.expectedMargin = new Prisma.Decimal(bid - cost);
 
-    return (this.prisma as any).tender.update({
+    return this.prisma.tender.update({
       where: { id },
       data,
       include: { owner: { select: { id: true, nombre: true } } },
     });
   }
 
-  async setStatus(id: number, status: string, opts?: { awardedToCompetitor?: string; awardNotes?: string }) {
-    const tender = await (this.prisma as any).tender.findUnique({ where: { id } });
-    if (!tender) throw new NotFoundException('Licitación no encontrada');
+  async setStatus(
+    id: number,
+    status: string,
+    opts?: { awardedToCompetitor?: string; awardNotes?: string },
+    companyId?: number | null,
+  ) {
+    const tender = await this.getOne(id, companyId);
 
     const data: any = { status };
     if (status === 'AWARDED' || status === 'LOST') {
@@ -152,12 +161,12 @@ export class TendersService {
     if (opts?.awardedToCompetitor) data.awardedToCompetitor = opts.awardedToCompetitor;
     if (opts?.awardNotes) data.awardNotes = opts.awardNotes;
 
-    const updated = await (this.prisma as any).tender.update({ where: { id }, data });
+    const updated = await this.prisma.tender.update({ where: { id }, data });
 
     if (status === 'AWARDED') {
       try {
-        await this.promoteToOpportunity(id);
-      } catch (e) {
+        await this.promoteToOpportunity(id, companyId);
+      } catch {
         // swallow — promotion is optional
       }
     }
@@ -166,9 +175,8 @@ export class TendersService {
   }
 
   /** Si se gana la licitación, crea SalesOpportunity en stage WON y vincula. */
-  async promoteToOpportunity(tenderId: number) {
-    const tender = await (this.prisma as any).tender.findUnique({ where: { id: tenderId } });
-    if (!tender) throw new NotFoundException('Licitación no encontrada');
+  async promoteToOpportunity(tenderId: number, companyId?: number | null) {
+    const tender = await this.getOne(tenderId, companyId);
     if (tender.salesOpportunityId) {
       return this.prisma.salesOpportunity.findUnique({ where: { id: tender.salesOpportunityId } });
     }
@@ -176,15 +184,7 @@ export class TendersService {
       throw new BadRequestException('Solo licitaciones adjudicadas se promueven a oportunidad');
     }
 
-    const companyId =
-      (
-        await this.prisma.companyProfile.findFirst({
-          where: { isPrimary: true, isActive: true },
-          select: { id: true },
-          orderBy: { id: 'asc' },
-        })
-      )?.id;
-    if (!companyId) throw new BadRequestException('No hay empresa configurada');
+    const tenantId = requireCompanyId(companyId ?? tender.companyId);
 
     const opportunity = await this.prisma.salesOpportunity.create({
       data: {
@@ -195,11 +195,11 @@ export class TendersService {
         probability: 100,
         ownerId: tender.ownerId ?? null,
         closedAt: tender.awardDate || new Date(),
-        companyId,
+        companyId: tenantId,
       },
     });
 
-    await (this.prisma as any).tender.update({
+    await this.prisma.tender.update({
       where: { id: tenderId },
       data: { salesOpportunityId: opportunity.id },
     });
@@ -208,8 +208,13 @@ export class TendersService {
   }
 
   // ── Documents ─────────────────────────────────────────────────────
-  async addDocument(tenderId: number, dto: { documentType: string; name: string; url?: string; notes?: string; uploadedBy?: number }) {
-    return (this.prisma as any).tenderDocument.create({
+  async addDocument(
+    tenderId: number,
+    dto: { documentType: string; name: string; url?: string; notes?: string; uploadedBy?: number },
+    companyId?: number | null,
+  ) {
+    await this.getOne(tenderId, companyId);
+    return this.prisma.tenderDocument.create({
       data: {
         tenderId,
         documentType: dto.documentType as any,
@@ -221,16 +226,22 @@ export class TendersService {
     });
   }
 
-  async listDocuments(tenderId: number) {
-    return (this.prisma as any).tenderDocument.findMany({
+  async listDocuments(tenderId: number, companyId?: number | null) {
+    await this.getOne(tenderId, companyId);
+    return this.prisma.tenderDocument.findMany({
       where: { tenderId },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   // ── Events ────────────────────────────────────────────────────────
-  async addEvent(tenderId: number, dto: { eventName: string; description?: string; occursAt: string }) {
-    return (this.prisma as any).tenderEvent.create({
+  async addEvent(
+    tenderId: number,
+    dto: { eventName: string; description?: string; occursAt: string },
+    companyId?: number | null,
+  ) {
+    await this.getOne(tenderId, companyId);
+    return this.prisma.tenderEvent.create({
       data: {
         tenderId,
         eventName: dto.eventName.trim(),
@@ -241,27 +252,32 @@ export class TendersService {
   }
 
   // ── Dashboard ─────────────────────────────────────────────────────
-  async getDashboard() {
+  async getDashboard(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const scope = { deletedAt: null, ...companyWhere(tenantId) };
     const [byStatus, byType, totalValue, upcoming] = await Promise.all([
-      (this.prisma as any).tender.groupBy({
+      this.prisma.tender.groupBy({
         by: ['status'],
         _count: { _all: true },
         _sum: { ourBidAmount: true },
-        where: { deletedAt: null },
+        where: scope,
       }),
-      (this.prisma as any).tender.groupBy({
+      this.prisma.tender.groupBy({
         by: ['tenderType'],
         _count: { _all: true },
         _sum: { ourBidAmount: true },
-        where: { deletedAt: null },
+        where: scope,
       }),
-      (this.prisma as any).tender.aggregate({
+      this.prisma.tender.aggregate({
         _sum: { ourBidAmount: true, expectedMargin: true },
-        where: { deletedAt: null, status: { in: ['IN_REVIEW', 'PREPARING_BID', 'SUBMITTED'] } },
-      }),
-      (this.prisma as any).tender.findMany({
         where: {
-          deletedAt: null,
+          ...scope,
+          status: { in: ['IN_REVIEW', 'PREPARING_BID', 'SUBMITTED'] },
+        },
+      }),
+      this.prisma.tender.findMany({
+        where: {
+          ...scope,
           submissionDeadline: { gte: new Date(), lte: new Date(Date.now() + 30 * 86400000) },
           status: { in: ['IN_REVIEW', 'PREPARING_BID'] },
         },

@@ -1,9 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import fs from 'fs/promises';
 import path from 'path';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { generateInventoryReportPdf } from './inventory-report-pdf.js';
+import {
+  assertCompanyAccess,
+  companyWhere,
+  resolveRequiredCompanyId,
+} from '../common/tenant/tenant-scope.js';
 
 type SyncInventoryInput = {
   snapshotId?: number;
@@ -75,9 +80,27 @@ export class InventoriesService {
     }));
   }
 
+  private async assertClientInTenant(clientId: number, companyId: number) {
+    const client = await this.prisma.serviceClient.findFirst({
+      where: { id: clientId, ...companyWhere(companyId) },
+      select: { id: true, companyId: true },
+    });
+    assertCompanyAccess(client, companyId, 'Cliente');
+    return client;
+  }
+
+  private async assertActivityInTenant(activityId: number, companyId: number) {
+    const activity = await this.prisma.activity.findFirst({
+      where: { id: activityId, ...companyWhere(companyId) },
+    });
+    assertCompanyAccess(activity, companyId, 'Actividad');
+    return activity;
+  }
+
   private async findPreviousSnapshot(
     clientId: number,
     branchId: number,
+    companyId: number,
     excludeSnapshotId?: number,
   ) {
     return this.prisma.inventorySnapshot.findFirst({
@@ -85,6 +108,7 @@ export class InventoriesService {
         clientId,
         branchId,
         status: { in: ['COMPLETED', 'APPROVED'] },
+        ...companyWhere(companyId),
         ...(excludeSnapshotId ? { id: { not: excludeSnapshotId } } : {}),
       },
       orderBy: [{ approvedAt: 'desc' }, { completedAt: 'desc' }, { updatedAt: 'desc' }],
@@ -150,8 +174,14 @@ export class InventoriesService {
       search?: string;
     },
     query?: PaginationQueryDto,
+    companyId?: number | null,
   ) {
-    const where: Record<string, any> = {};
+    const cid = await resolveRequiredCompanyId(this.prisma, companyId);
+    if (filters?.clientId) {
+      await this.assertClientInTenant(filters.clientId, cid);
+    }
+
+    const where: Record<string, any> = { ...companyWhere(cid) };
     if (filters?.clientId) where.clientId = filters.clientId;
     if (filters?.branchId) where.branchId = filters.branchId;
     if (filters?.status) where.status = filters.status;
@@ -196,9 +226,10 @@ export class InventoriesService {
     });
   }
 
-  async detail(id: number) {
-    const snapshot = await this.prisma.inventorySnapshot.findUnique({
-      where: { id },
+  async detail(id: number, companyId?: number | null) {
+    const cid = await resolveRequiredCompanyId(this.prisma, companyId);
+    const snapshot = await this.prisma.inventorySnapshot.findFirst({
+      where: { id, ...companyWhere(cid) },
       include: {
         client: true,
         branch: true,
@@ -208,16 +239,16 @@ export class InventoriesService {
       },
     });
 
-    if (!snapshot) throw new NotFoundException('Inventario no encontrado');
+    assertCompanyAccess(snapshot, cid, 'Inventario');
     return snapshot;
   }
 
-  async getByActivity(activityId: number) {
-    const activity = await this.prisma.activity.findUnique({ where: { id: activityId } });
-    if (!activity) throw new NotFoundException('Actividad no encontrada');
+  async getByActivity(activityId: number, companyId?: number | null) {
+    const cid = await resolveRequiredCompanyId(this.prisma, companyId);
+    const activity = await this.assertActivityInTenant(activityId, cid);
 
-    let snapshot = await this.prisma.inventorySnapshot.findUnique({
-      where: { activityId },
+    let snapshot = await this.prisma.inventorySnapshot.findFirst({
+      where: { activityId, ...companyWhere(cid) },
       include: {
         client: true,
         branch: true,
@@ -227,7 +258,7 @@ export class InventoriesService {
 
     if (!snapshot) {
       const branch = await this.findBranchForActivity(activity);
-      const previous = await this.findPreviousSnapshot(activity.clientId as number, branch.id);
+      const previous = await this.findPreviousSnapshot(activity.clientId as number, branch.id, cid);
       const previousItems = this.cloneSnapshotItems(previous?.items || []);
 
       snapshot = await this.prisma.inventorySnapshot.create({
@@ -235,6 +266,7 @@ export class InventoriesService {
           clientId: activity.clientId as number,
           branchId: branch.id,
           activityId: activity.id,
+          companyId: cid,
           title: `Mantenimiento e inventario ${activity.anNumber || `ACT-${activity.id}`}`,
           status: 'PENDING',
           previousCount: previous?.currentCount ?? previous?.items?.length ?? 0,
@@ -258,6 +290,7 @@ export class InventoriesService {
       const previous = await this.findPreviousSnapshot(
         snapshot.clientId,
         snapshot.branchId,
+        cid,
         snapshot.id,
       );
       const previousItems = this.cloneSnapshotItems(previous?.items || []);
@@ -267,25 +300,30 @@ export class InventoriesService {
           data: previousItems.map((item) => ({ ...item, snapshotId: snapshot!.id })),
         });
 
-        return this.detail(snapshot.id);
+        return this.detail(snapshot.id, cid);
       }
     }
 
     return snapshot;
   }
 
-  async syncByActivity(activityId: number, payload: SyncInventoryInput, userId?: number) {
-    const activity = await this.prisma.activity.findUnique({ where: { id: activityId } });
-    if (!activity) throw new NotFoundException('Actividad no encontrada');
+  async syncByActivity(
+    activityId: number,
+    payload: SyncInventoryInput,
+    userId?: number,
+    companyId?: number | null,
+  ) {
+    const cid = await resolveRequiredCompanyId(this.prisma, companyId);
+    const activity = await this.assertActivityInTenant(activityId, cid);
     if (!activity.clientId) throw new BadRequestException('La actividad no está ligada a cliente');
 
     const branch = await this.findBranchForActivity(activity);
-    const current = await this.prisma.inventorySnapshot.findUnique({
-      where: { activityId },
+    const current = await this.prisma.inventorySnapshot.findFirst({
+      where: { activityId, ...companyWhere(cid) },
       include: { items: true },
     });
 
-    const previous = await this.findPreviousSnapshot(activity.clientId, branch.id, current?.id);
+    const previous = await this.findPreviousSnapshot(activity.clientId, branch.id, cid, current?.id);
 
     const rawItems = Array.isArray(payload.items) ? payload.items : current?.items || [];
     const sanitizedItems = this.sanitizeItems(rawItems);
@@ -301,36 +339,37 @@ export class InventoriesService {
       );
     }
 
-    const upserted = await this.prisma.inventorySnapshot.upsert({
-      where: { activityId },
-      update: {
-        title: payload.title?.trim() || current?.title || `Inventario ${activity.anNumber || activity.id}`,
-        notes: payload.notes?.trim() || null,
-        status: payload.completed ? 'COMPLETED' : current?.status || 'PENDING',
-        previousCount,
-        currentCount,
-        deltaCount,
-        completedAt: payload.completed ? new Date() : null,
-      },
-      create: {
-        clientId: activity.clientId,
-        branchId: branch.id,
-        activityId: activity.id,
-        title: payload.title?.trim() || `Inventario ${activity.anNumber || activity.id}`,
-        notes: payload.notes?.trim() || null,
-        status: payload.completed ? 'COMPLETED' : 'PENDING',
-        previousCount,
-        currentCount,
-        deltaCount,
-        completedAt: payload.completed ? new Date() : null,
-        createdByType: 'CONSOLE',
-        createdById: userId || activity.responsableId || activity.creadoPorId,
-      },
-      include: {
-        client: true,
-        branch: true,
-      },
-    });
+    const snapshotData = {
+      title: payload.title?.trim() || current?.title || `Inventario ${activity.anNumber || activity.id}`,
+      notes: payload.notes?.trim() || null,
+      status: payload.completed ? 'COMPLETED' : current?.status || 'PENDING',
+      previousCount,
+      currentCount,
+      deltaCount,
+      completedAt: payload.completed ? new Date() : null,
+    };
+
+    const upserted = current
+      ? await this.prisma.inventorySnapshot.update({
+          where: { id: current.id },
+          data: snapshotData,
+          include: { client: true, branch: true },
+        })
+      : await this.prisma.inventorySnapshot.create({
+          data: {
+            clientId: activity.clientId,
+            branchId: branch.id,
+            activityId: activity.id,
+            companyId: cid,
+            ...snapshotData,
+            status: payload.completed ? 'COMPLETED' : 'PENDING',
+            createdByType: 'CONSOLE',
+            createdById: userId || activity.responsableId || activity.creadoPorId,
+          },
+          include: { client: true, branch: true },
+        });
+
+    assertCompanyAccess(upserted, cid, 'Inventario');
 
     await this.prisma.inventoryItem.deleteMany({ where: { snapshotId: upserted.id } });
 
@@ -340,14 +379,18 @@ export class InventoriesService {
       });
     }
 
-    return this.detail(upserted.id);
+    return this.detail(upserted.id, cid);
   }
 
   async syncManualSnapshot(
     context: { clientId: number; branchId: number; createdByType: 'CLIENT' | 'BRANCH' | 'CONSOLE' },
     payload: SyncInventoryInput,
     userId?: number,
+    companyId?: number | null,
   ) {
+    const cid = await resolveRequiredCompanyId(this.prisma, companyId);
+    await this.assertClientInTenant(context.clientId, cid);
+
     const branch = await this.prisma.serviceClientBranch.findFirst({
       where: { id: context.branchId, clientId: context.clientId },
     });
@@ -360,6 +403,7 @@ export class InventoriesService {
             clientId: context.clientId,
             branchId: context.branchId,
             activityId: null,
+            ...companyWhere(cid),
           },
           include: { items: true },
         })
@@ -369,14 +413,18 @@ export class InventoriesService {
             branchId: context.branchId,
             activityId: null,
             status: { in: ['PENDING', 'COMPLETED'] },
+            ...companyWhere(cid),
           },
           orderBy: { updatedAt: 'desc' },
           include: { items: true },
         });
 
+    if (current) assertCompanyAccess(current, cid, 'Inventario');
+
     const previous = await this.findPreviousSnapshot(
       context.clientId,
       context.branchId,
+      cid,
       current?.id,
     );
 
@@ -414,6 +462,7 @@ export class InventoriesService {
         data: {
           clientId: context.clientId,
           branchId: context.branchId,
+          companyId: cid,
           title: payload.title?.trim() || `Inventario sucursal ${branch.name}`,
           notes: payload.notes?.trim() || null,
           status: payload.completed ? 'COMPLETED' : 'PENDING',
@@ -435,10 +484,17 @@ export class InventoriesService {
       });
     }
 
-    return this.detail(snapshotId);
+    return this.detail(snapshotId, cid);
   }
 
-  async updateStatus(id: number, status: string) {
+  async updateStatus(id: number, status: string, companyId?: number | null) {
+    const cid = await resolveRequiredCompanyId(this.prisma, companyId);
+    const existing = await this.prisma.inventorySnapshot.findFirst({
+      where: { id, ...companyWhere(cid) },
+      select: { id: true, companyId: true },
+    });
+    assertCompanyAccess(existing, cid, 'Inventario');
+
     const normalized = String(status || '').toUpperCase();
     if (!['PENDING', 'COMPLETED', 'APPROVED', 'REJECTED'].includes(normalized)) {
       throw new BadRequestException('Estado de inventario inválido');
@@ -453,9 +509,10 @@ export class InventoriesService {
     });
   }
 
-  async generateReport(snapshotId: number) {
-    const snapshot = await this.prisma.inventorySnapshot.findUnique({
-      where: { id: snapshotId },
+  async generateReport(snapshotId: number, companyId?: number | null) {
+    const cid = await resolveRequiredCompanyId(this.prisma, companyId);
+    const snapshot = await this.prisma.inventorySnapshot.findFirst({
+      where: { id: snapshotId, ...companyWhere(cid) },
       include: {
         client: true,
         branch: true,
@@ -464,6 +521,7 @@ export class InventoriesService {
     });
 
     if (!snapshot) return null;
+    assertCompanyAccess(snapshot, cid, 'Inventario');
 
     const pdf = await generateInventoryReportPdf({ snapshot, items: snapshot.items || [] });
     const dir = path.resolve(process.cwd(), 'uploads', 'inventory-reports');

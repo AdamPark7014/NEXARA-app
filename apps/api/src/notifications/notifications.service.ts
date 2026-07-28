@@ -1,9 +1,10 @@
-import { Injectable, Logger, Inject, Optional, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, Inject, Optional, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationType } from '@prisma/client';
 import { Cron } from '@nestjs/schedule';
 import { PERMISSIONS } from '../common/permissions.js';
 import { PushDispatchService } from '../devices/push-dispatch.service.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 export interface INotificationPayload {
   userId: number;
@@ -17,6 +18,7 @@ export interface INotificationPayload {
   entityType?: string;
   relatedUrl?: string;
   priority?: 'high' | 'normal' | 'low';
+  companyId?: number | null;
 }
 
 @Injectable()
@@ -30,9 +32,14 @@ export class NotificationsService {
     @Optional() @Inject('NOTIFICATIONS_GATEWAY') private readonly gateway?: any,
   ) {}
 
-  async getUserNotifications(userId: number, limit: number = 50, offset: number = 0) {
+  async getUserNotifications(
+    userId: number,
+    limit: number = 50,
+    offset: number = 0,
+    companyId?: number | null,
+  ) {
     return this.prisma.notification.findMany({
-      where: { userId },
+      where: { userId, ...companyWhere(companyId ?? null) },
       include: {
         triggerUser: {
           select: {
@@ -54,23 +61,30 @@ export class NotificationsService {
     return Boolean(user?.isSuperAdmin) || permissions.includes(PERMISSIONS.CONSOLE_ADMIN);
   }
 
-  private async getSellerUserIds() {
+  private async getSellerUserIds(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const sellers = await this.prisma.user.findMany({
       where: {
         role: { accesoPanelVentas: true },
         NOT: { role: { accesoConsoleAdmin: true } },
         email: { notIn: this.protectedSalesEmails },
+        companyMemberships: { some: { companyId: tenantId } },
       },
       select: { id: true },
     });
     return sellers.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
   }
 
-  async getSalesPanelNotifications(user: any, limit: number = 50, offset: number = 0) {
+  async getSalesPanelNotifications(
+    user: any,
+    limit: number = 50,
+    offset: number = 0,
+    companyId?: number | null,
+  ) {
     const userId = Number(user?.id || 0);
     if (!userId) return [];
 
-    const sellerIds = await this.getSellerUserIds();
+    const sellerIds = await this.getSellerUserIds(companyId);
     if (!sellerIds.length) return [];
 
     const isSalesAdmin = this.isSalesAdminUser(user);
@@ -82,6 +96,7 @@ export class NotificationsService {
       where: {
         ...(isSalesAdmin ? { userId: { in: sellerIds } } : { userId }),
         NOT: { category: 'security' },
+        ...companyWhere(companyId),
       },
       include: {
         triggerUser: {
@@ -99,17 +114,18 @@ export class NotificationsService {
     });
   }
 
-  private async assertSalesNotificationAccess(user: any, notificationId: number) {
-    const notification = await this.prisma.notification.findUnique({
-      where: { id: notificationId },
+  private async assertSalesNotificationAccess(
+    user: any,
+    notificationId: number,
+    companyId?: number | null,
+  ) {
+    const notification = await this.prisma.notification.findFirst({
+      where: { id: notificationId, ...companyWhere(companyId) },
     });
-
-    if (!notification) {
-      throw new NotFoundException('Notificación no encontrada');
-    }
+    assertCompanyAccess(notification, companyId, 'Notificación');
 
     const userId = Number(user?.id || 0);
-    const sellerIds = await this.getSellerUserIds();
+    const sellerIds = await this.getSellerUserIds(companyId);
     const isSalesAdmin = this.isSalesAdminUser(user);
 
     if (isSalesAdmin) {
@@ -126,8 +142,8 @@ export class NotificationsService {
     return notification;
   }
 
-  async markSalesNotificationAsRead(user: any, notificationId: number) {
-    await this.assertSalesNotificationAccess(user, notificationId);
+  async markSalesNotificationAsRead(user: any, notificationId: number, companyId?: number | null) {
+    await this.assertSalesNotificationAccess(user, notificationId, companyId);
 
     const notification = await this.prisma.notification.update({
       where: { id: notificationId },
@@ -143,11 +159,11 @@ export class NotificationsService {
     return notification;
   }
 
-  async markAllSalesNotificationsAsRead(user: any) {
+  async markAllSalesNotificationsAsRead(user: any, companyId?: number | null) {
     const userId = Number(user?.id || 0);
     if (!userId) return { updatedCount: 0 };
 
-    const sellerIds = await this.getSellerUserIds();
+    const sellerIds = await this.getSellerUserIds(companyId);
     if (!sellerIds.length) return { updatedCount: 0 };
 
     const isSalesAdmin = this.isSalesAdminUser(user);
@@ -161,6 +177,7 @@ export class NotificationsService {
       where: {
         userId: { in: targetUserIds },
         isRead: false,
+        ...companyWhere(companyId),
       },
       data: { isRead: true, readAt: new Date() },
     });
@@ -174,18 +191,23 @@ export class NotificationsService {
     return { updatedCount: result.count };
   }
 
-  async deleteSalesNotification(user: any, notificationId: number) {
-    await this.assertSalesNotificationAccess(user, notificationId);
+  async deleteSalesNotification(user: any, notificationId: number, companyId?: number | null) {
+    await this.assertSalesNotificationAccess(user, notificationId, companyId);
     return this.prisma.notification.delete({ where: { id: notificationId } });
   }
 
-  async getUnreadCount(userId: number) {
+  async getUnreadCount(userId: number, companyId?: number | null) {
     return this.prisma.notification.count({
-      where: { userId, isRead: false },
+      where: { userId, isRead: false, ...companyWhere(companyId ?? null) },
     });
   }
 
-  async markAsRead(notificationId: number) {
+  async markAsRead(notificationId: number, userId: number, companyId?: number | null) {
+    const existing = await this.prisma.notification.findFirst({
+      where: { id: notificationId, userId, ...companyWhere(companyId ?? null) },
+    });
+    assertCompanyAccess(existing, companyId, 'Notificación');
+
     const notification = await this.prisma.notification.update({
       where: { id: notificationId },
       data: { isRead: true, readAt: new Date() },
@@ -200,9 +222,9 @@ export class NotificationsService {
     return notification;
   }
 
-  async markAllAsRead(userId: number) {
+  async markAllAsRead(userId: number, companyId?: number | null) {
     await this.prisma.notification.updateMany({
-      where: { userId, isRead: false },
+      where: { userId, isRead: false, ...companyWhere(companyId ?? null) },
       data: { isRead: true, readAt: new Date() },
     });
 
@@ -211,7 +233,11 @@ export class NotificationsService {
     });
   }
 
-  async deleteNotification(notificationId: number) {
+  async deleteNotification(notificationId: number, userId: number, companyId?: number | null) {
+    const existing = await this.prisma.notification.findFirst({
+      where: { id: notificationId, userId, ...companyWhere(companyId ?? null) },
+    });
+    assertCompanyAccess(existing, companyId, 'Notificación');
     return this.prisma.notification.delete({ where: { id: notificationId } });
   }
 
@@ -232,6 +258,7 @@ export class NotificationsService {
           entityType: payload.entityType,
           relatedUrl: payload.relatedUrl,
           priority: payload.priority || 'normal',
+          companyId: payload.companyId ?? undefined,
         },
         include: {
           triggerUser: {
@@ -284,9 +311,14 @@ export class NotificationsService {
   /**
    * Obtener notificaciones por categoría
    */
-  async getByCategory(userId: number, category: string, limit: number = 20) {
+  async getByCategory(
+    userId: number,
+    category: string,
+    limit: number = 20,
+    companyId?: number | null,
+  ) {
     return this.prisma.notification.findMany({
-      where: { userId, category },
+      where: { userId, category, ...companyWhere(companyId ?? null) },
       include: {
         triggerUser: {
           select: {
@@ -304,18 +336,19 @@ export class NotificationsService {
   /**
    * Obtener estadísticas de notificaciones
    */
-  async getStats(userId: number) {
+  async getStats(userId: number, companyId?: number | null) {
+    const scope = companyWhere(companyId ?? null);
     const total = await this.prisma.notification.count({
-      where: { userId },
+      where: { userId, ...scope },
     });
 
     const unread = await this.prisma.notification.count({
-      where: { userId, isRead: false },
+      where: { userId, isRead: false, ...scope },
     });
 
     const byCategory = await this.prisma.notification.groupBy({
       by: ['category'],
-      where: { userId },
+      where: { userId, ...scope },
       _count: { id: true },
     });
 

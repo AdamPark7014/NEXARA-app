@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
@@ -8,7 +8,12 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { generateEmployeePaymentsReportPdf } from './employee-payments-report-pdf.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
-import { resolveRequiredCompanyId, companyWhere } from '../common/tenant/tenant-scope.js';
+import {
+  assertCompanyAccess,
+  companyWhere,
+  requireCompanyId,
+  resolveRequiredCompanyId,
+} from '../common/tenant/tenant-scope.js';
 
 const STATUS = {
   BORRADOR: 'Borrador',
@@ -36,6 +41,39 @@ export class EmployeePaymentsService {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return null;
     return date;
+  }
+
+  /**
+   * Suma los minutos de asistencia reales (`AttendanceDay`) de un empleado en
+   * un rango de fechas — insumo para calcular `totalMinutes`/`amount` del pago
+   * en vez de capturarlo a mano. No fuerza el monto: solo sugiere.
+   */
+  async calculateFromAttendance(userId: number, from: string, to: string, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const fromDate = this.toDate(from);
+    const toDate = this.toDate(to);
+    if (!fromDate || !toDate) throw new BadRequestException('Rango de fechas inválido');
+    if (fromDate > toDate) throw new BadRequestException('La fecha "desde" no puede ser posterior a "hasta"');
+
+    const days = await this.prisma.attendanceDay.findMany({
+      where: { userId, date: { gte: fromDate, lte: toDate }, ...companyWhere(tenantId) },
+      orderBy: { date: 'asc' },
+      select: { date: true, totalMinutes: true, isOpen: true },
+    });
+
+    const totalMinutes = days.reduce((sum, d) => sum + d.totalMinutes, 0);
+    const openDays = days.filter((d) => d.isOpen).map((d) => d.date);
+
+    return {
+      userId,
+      from: fromDate.toISOString().slice(0, 10),
+      to: toDate.toISOString().slice(0, 10),
+      daysWithAttendance: days.length,
+      totalMinutes,
+      totalHours: Math.round((totalMinutes / 60) * 100) / 100,
+      openDays: openDays.map((d) => d.toISOString().slice(0, 10)),
+      byDay: days.map((d) => ({ date: d.date.toISOString().slice(0, 10), minutes: d.totalMinutes, isOpen: d.isOpen })),
+    };
   }
 
   private canViewAll(user: { isSuperAdmin?: boolean; permissions?: string[] }) {
@@ -104,6 +142,7 @@ export class EmployeePaymentsService {
     currentUser: { id: number },
     dto: CreateEmployeePaymentDto & { concepto?: string; status?: string },
     evidenceUrls: string[] = [],
+    companyId?: number | null,
   ) {
     const userId = Number(dto.userId);
     if (!userId || Number.isNaN(userId)) {
@@ -126,7 +165,7 @@ export class EmployeePaymentsService {
       dto.note?.trim() ||
       'Pago a empleado';
     const wantsPaid = status === STATUS.PAGADO;
-    const companyId = await resolveRequiredCompanyId(this.prisma);
+    const tenantId = await resolveRequiredCompanyId(this.prisma, companyId);
 
     const created = await this.prisma.employeePayment.create({
       data: {
@@ -140,7 +179,7 @@ export class EmployeePaymentsService {
         status: wantsPaid ? STATUS.BORRADOR : status,
         paidAt: null,
         contabilidadRef: null,
-        companyId,
+        companyId: tenantId,
         evidenceUrls,
         createdById: currentUser.id || null,
       },
@@ -148,7 +187,7 @@ export class EmployeePaymentsService {
     });
 
     if (wantsPaid && currentUser.id) {
-      return this.markPagado(created.id, currentUser.id);
+      return this.markPagado(created.id, currentUser.id, tenantId);
     }
 
     await this.audit
@@ -162,11 +201,13 @@ export class EmployeePaymentsService {
     dto: UpdateEmployeePaymentDto,
     evidenceUrls?: string[],
     actorId?: number,
+    companyId?: number | null,
   ) {
+    const tenantId = requireCompanyId(companyId);
     const existing = await this.prisma.employeePayment.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...companyWhere(tenantId) },
     });
-    if (!existing) throw new NotFoundException('Pago no encontrado');
+    assertCompanyAccess(existing, tenantId, 'Pago');
     if (existing.status === STATUS.ANULADO) {
       throw new BadRequestException('No se puede editar un pago anulado');
     }
@@ -217,7 +258,7 @@ export class EmployeePaymentsService {
     });
 
     if (dto.status !== undefined && this.normalizeStatus(dto.status) === STATUS.PAGADO && !existing.journalEntryId) {
-      return this.markPagado(id, actorId);
+      return this.markPagado(id, actorId, tenantId);
     }
 
     await this.audit
@@ -226,9 +267,12 @@ export class EmployeePaymentsService {
     return updated;
   }
 
-  async markPagado(id: number, actorId?: number) {
-    const existing = await this.prisma.employeePayment.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) throw new NotFoundException('Pago no encontrado');
+  async markPagado(id: number, actorId?: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const existing = await this.prisma.employeePayment.findFirst({
+      where: { id, deletedAt: null, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(existing, tenantId, 'Pago');
     if (existing.status === STATUS.ANULADO) {
       throw new BadRequestException('No se puede pagar un registro anulado');
     }
@@ -272,9 +316,12 @@ export class EmployeePaymentsService {
     return updated;
   }
 
-  async remove(id: number, actorId?: number) {
-    const existing = await this.prisma.employeePayment.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) throw new NotFoundException('Pago no encontrado');
+  async remove(id: number, actorId?: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const existing = await this.prisma.employeePayment.findFirst({
+      where: { id, deletedAt: null, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(existing, tenantId, 'Pago');
     const updated = await this.prisma.employeePayment.update({
       where: { id },
       data: { deletedAt: new Date(), status: STATUS.ANULADO },
@@ -289,8 +336,9 @@ export class EmployeePaymentsService {
   async analytics(
     user: { id: number; departmentId: number; isSuperAdmin?: boolean; permissions?: string[] },
     filters: { from?: string; to?: string; userId?: number },
+    companyId?: number | null,
   ) {
-    const rows = (await this.findAll(user, filters)) as Array<{
+    const rows = (await this.findAll(user, filters, undefined, companyId)) as Array<{
       id: number;
       amount: any;
       status: string;
@@ -339,8 +387,9 @@ export class EmployeePaymentsService {
     user: { id: number; departmentId: number; isSuperAdmin?: boolean; permissions?: string[] },
     filters: { from?: string; to?: string; userId?: number },
     preparedBy?: string | null,
+    companyId?: number | null,
   ) {
-    const analytics = await this.analytics(user, filters);
+    const analytics = await this.analytics(user, filters, companyId);
     return generateEmployeePaymentsReportPdf({
       title: 'Pagos a empleados',
       periodLabel: analytics.periodLabel,

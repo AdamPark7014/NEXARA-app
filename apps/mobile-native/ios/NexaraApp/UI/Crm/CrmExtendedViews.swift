@@ -3,8 +3,8 @@ import SwiftUI
 // MARK: - Pipeline (oportunidades por etapa)
 
 struct CrmPipelineView: View {
-    @State private var stages: [(String, [[String: Any]])] = []
-    @State private var flat: [[String: Any]] = []
+    @State private var stages: [(String, [CrmOpportunity])] = []
+    @State private var flat: [CrmOpportunity] = []
     @State private var isLoading = true
 
     private let stageOrder: [(String, String)] = [
@@ -16,24 +16,9 @@ struct CrmPipelineView: View {
         ("LOST", "Perdida"),
     ]
 
-    private var totalValue: Double {
-        flat.reduce(0) { $0 + ConsoleHelpers.mapDouble($1, "value", "amount") }
-    }
-    private var weighted: Double {
-        flat.reduce(0) {
-            let v = ConsoleHelpers.mapDouble($1, "value", "amount")
-            let p = (ConsoleHelpers.mapDouble($1, "probability") > 0
-                ? ConsoleHelpers.mapDouble($1, "probability")
-                : 20) / 100
-            return $0 + v * p
-        }
-    }
-    private var wonCount: Int {
-        flat.filter {
-            let s = ConsoleHelpers.mapStr($0, "stage", "etapa").lowercased()
-            return s == "won" || s.contains("ganad")
-        }.count
-    }
+    private var totalValue: Double { flat.reduce(0) { $0 + $1.value } }
+    private var weighted: Double { flat.reduce(0) { $0 + $1.weightedValue } }
+    private var wonCount: Int { flat.filter(\.isWon).count }
 
     var body: some View {
         ScrollView {
@@ -62,9 +47,7 @@ struct CrmPipelineView: View {
                 } else {
                     LazyVStack(alignment: .leading, spacing: 16) {
                         ForEach(stages, id: \.0) { stage, items in
-                            let stageValue = items.reduce(0.0) {
-                                $0 + ConsoleHelpers.mapDouble($1, "value", "amount")
-                            }
+                            let stageValue = items.reduce(0.0) { $0 + $1.value }
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack {
                                     Text(stage).font(.headline)
@@ -73,22 +56,19 @@ struct CrmPipelineView: View {
                                         .font(.caption.bold())
                                         .foregroundColor(.green)
                                 }
-                                ForEach(items.indices, id: \.self) { i in
-                                    let o = items[i]
+                                ForEach(items) { o in
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text(ConsoleHelpers.mapStr(o, "title", "name")).font(.subheadline.bold())
+                                        Text(o.displayTitle).font(.subheadline.bold())
                                         HStack {
-                                            Text(fmtMxn(ConsoleHelpers.mapDouble(o, "value", "amount")))
+                                            Text(fmtMxn(o.value))
                                                 .font(.caption).foregroundColor(.green).bold()
                                             Spacer()
-                                            if o["probability"] != nil {
-                                                let prob = ConsoleHelpers.mapDouble(o, "probability")
-                                                Text("\(Int(prob))% prob.").font(.caption2).foregroundColor(.secondary)
+                                            if o.probability > 0 {
+                                                Text("\(Int(o.probability))% prob.").font(.caption2).foregroundColor(.secondary)
                                             }
                                         }
-                                        let client = ConsoleHelpers.mapStr(o, "clientName", "accountName")
-                                        if !client.isEmpty {
-                                            Text(client).font(.caption2).foregroundColor(.secondary)
+                                        if !o.clientName.isEmpty {
+                                            Text(o.clientName).font(.caption2).foregroundColor(.secondary)
                                         }
                                     }
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -112,15 +92,10 @@ struct CrmPipelineView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        let list = (try? await CrmRepository.shared.oportunidades()) ?? []
+        let list = (try? await CrmRepository.shared.opportunityItems()) ?? []
         flat = list
-        let grouped = Dictionary(grouping: list) { item -> String in
-            let s = ConsoleHelpers.mapStr(item, "stage")
-            if !s.isEmpty { return s }
-            let e = ConsoleHelpers.mapStr(item, "etapa")
-            return e.isEmpty ? "Sin etapa" : e
-        }
-        var ordered: [(String, [[String: Any]])] = []
+        let grouped = Dictionary(grouping: list) { $0.stageKey }
+        var ordered: [(String, [CrmOpportunity])] = []
         for (key, label) in stageOrder {
             if let items = grouped[key] ?? grouped[label], !items.isEmpty {
                 ordered.append((label, items))
@@ -138,17 +113,17 @@ struct CrmPipelineView: View {
 // MARK: - Agenda
 
 struct CrmAgendaView: View {
-    @State private var events: [[String: Any]] = []
+    @State private var events: [CalendarEvent] = []
     @State private var isLoading = true
     @State private var query = ""
-    @State private var selected: [String: Any]?
+    @State private var selected: CalendarEvent?
 
-    private var filtered: [[String: Any]] {
+    private var filtered: [CalendarEvent] {
         guard !query.isEmpty else { return events }
         let q = query.lowercased()
         return events.filter {
-            ConsoleHelpers.mapStr($0, "title", "subject").lowercased().contains(q) ||
-            ConsoleHelpers.mapStr($0, "ownerName").lowercased().contains(q)
+            $0.displayTitle.lowercased().contains(q) ||
+            $0.ownerName.lowercased().contains(q)
         }
     }
 
@@ -176,20 +151,17 @@ struct CrmAgendaView: View {
             if isLoading { Spacer(); ProgressView(); Spacer() }
             else if filtered.isEmpty { Spacer(); Text("Sin eventos en agenda").foregroundColor(.secondary); Spacer() }
             else {
-                List(filtered, id: \.agKey) { ev in
+                List(filtered) { ev in
                     Button { selected = ev } label: {
                         HStack(alignment: .top) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(ConsoleHelpers.mapStr(ev, "title", "subject")).font(.headline).foregroundColor(.primary)
-                                let date = ConsoleHelpers.mapStr(ev, "startAt", "start", "fecha")
-                                if !date.isEmpty { Text(String(date.prefix(16))).font(.caption).foregroundColor(.secondary) }
-                                let owner = ConsoleHelpers.mapStr(ev, "ownerName", "attendeeName")
-                                if !owner.isEmpty { Text(owner).font(.caption2).foregroundColor(.secondary) }
+                                Text(ev.displayTitle).font(.headline).foregroundColor(.primary)
+                                if !ev.start.isEmpty { Text(String(ev.start.prefix(16))).font(.caption).foregroundColor(.secondary) }
+                                if !ev.ownerName.isEmpty { Text(ev.ownerName).font(.caption2).foregroundColor(.secondary) }
                             }
                             Spacer()
-                            let evType = ConsoleHelpers.mapStr(ev, "type", "tipo")
-                            if !evType.isEmpty {
-                                Text(evType).font(.caption2).padding(.horizontal, 6).padding(.vertical, 2)
+                            if !ev.type.isEmpty {
+                                Text(ev.type).font(.caption2).padding(.horizontal, 6).padding(.vertical, 2)
                                     .background(Color.blue.opacity(0.12)).foregroundColor(.blue).clipShape(Capsule())
                             }
                         }
@@ -202,20 +174,20 @@ struct CrmAgendaView: View {
     }
 
     @ViewBuilder
-    private func agendaDetail(_ ev: [String: Any]) -> some View {
+    private func agendaDetail(_ ev: CalendarEvent) -> some View {
         List {
             Section {
                 Button("← Agenda") { selected = nil }
             }
             Section("Evento") {
-                agRow("Título", ConsoleHelpers.mapStr(ev, "title", "subject"))
-                agRow("Tipo", ConsoleHelpers.mapStr(ev, "type", "tipo"))
-                agRow("Inicio", String(ConsoleHelpers.mapStr(ev, "startAt", "start", "fecha").prefix(16)))
-                agRow("Fin", String(ConsoleHelpers.mapStr(ev, "endAt", "end", "fin").prefix(16)))
-                agRow("Responsable", ConsoleHelpers.mapStr(ev, "ownerName", "attendeeName"))
-                agRow("Descripción", ConsoleHelpers.mapStr(ev, "description", "notes", "descripcion"))
-                agRow("Ubicación", ConsoleHelpers.mapStr(ev, "location", "ubicacion"))
-                agRow("Resultado", ConsoleHelpers.mapStr(ev, "result", "resultado"))
+                agRow("Título", ev.displayTitle)
+                agRow("Tipo", ev.type)
+                agRow("Inicio", String(ev.start.prefix(16)))
+                agRow("Fin", String(ev.end.prefix(16)))
+                agRow("Responsable", ev.ownerName)
+                agRow("Descripción", ev.description)
+                agRow("Ubicación", ev.location)
+                agRow("Resultado", ev.result)
             }
         }
         .listStyle(.insetGrouped)
@@ -228,32 +200,33 @@ struct CrmAgendaView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        events = (try? await CrmRepository.shared.calendarEvents()) ?? []
+        events = (try? await CrmRepository.shared.calendarEventItems()) ?? []
     }
 }
 
 // MARK: - Licitaciones
 
 struct CrmTendersView: View {
-    @State private var items: [[String: Any]] = []
+    @State private var items: [Tender] = []
     @State private var isLoading = true
     @State private var query = ""
     @State private var statusFilter = "todos"
-    @State private var selected: [String: Any]?
+    @State private var selected: Tender?
 
     private var statuses: [String] {
-        ["todos"] + Array(Set(items.map { ConsoleHelpers.mapStr($0, "status", "estado").lowercased() }.filter { !$0.isEmpty })).sorted()
+        ["todos"] + Array(Set(items.map(\.statusLower).filter { !$0.isEmpty })).sorted()
     }
 
-    private var filtered: [[String: Any]] {
+    private var filtered: [Tender] {
         var list = items
         if statusFilter != "todos" {
-            list = list.filter { ConsoleHelpers.mapStr($0, "status", "estado").lowercased() == statusFilter }
+            list = list.filter { $0.statusLower == statusFilter }
         }
         if !query.isEmpty {
             let q = query.lowercased()
-            list = list.filter { ConsoleHelpers.mapStr($0, "title", "name").lowercased().contains(q) ||
-                ConsoleHelpers.mapStr($0, "clientName", "cliente").lowercased().contains(q) }
+            list = list.filter {
+                $0.displayTitle.lowercased().contains(q) || $0.clientName.lowercased().contains(q)
+            }
         }
         return list
     }
@@ -273,9 +246,9 @@ struct CrmTendersView: View {
                 HStack(spacing: 0) {
                     tdKpi("Total", "\(items.count)", .primary)
                     Divider().frame(height: 36)
-                    tdKpi("Activas", "\(items.filter { ["activo","abierto","open"].contains(ConsoleHelpers.mapStr($0,"status","estado").lowercased()) }.count)", .green)
+                    tdKpi("Activas", "\(items.filter(\.isActive).count)", .green)
                     Divider().frame(height: 36)
-                    tdKpi("Cerradas", "\(items.filter { ["cerrado","closed","ganado","perdido"].contains(ConsoleHelpers.mapStr($0,"status","estado").lowercased()) }.count)", .secondary)
+                    tdKpi("Cerradas", "\(items.filter(\.isClosed).count)", .secondary)
                 }
                 .padding(.horizontal).padding(.vertical, 6)
                 .background(Color(.secondarySystemGroupedBackground))
@@ -312,17 +285,16 @@ struct CrmTendersView: View {
             if isLoading { Spacer(); ProgressView(); Spacer() }
             else if filtered.isEmpty { Spacer(); Text("Sin licitaciones").foregroundColor(.secondary); Spacer() }
             else {
-                List(filtered, id: \.tdKey) { t in
+                List(filtered) { t in
                     Button { selected = t } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(ConsoleHelpers.mapStr(t, "title", "name")).font(.headline).foregroundColor(.primary)
+                                Text(t.displayTitle).font(.headline).foregroundColor(.primary)
                                 Spacer()
-                                OpsStatusChip(text: ConsoleHelpers.mapStr(t, "status", "estado"))
+                                OpsStatusChip(text: t.status)
                             }
-                            let client = ConsoleHelpers.mapStr(t, "clientName", "cliente")
-                            if !client.isEmpty { Text(client).font(.caption).foregroundColor(.secondary) }
-                            let deadline = String(ConsoleHelpers.mapStr(t, "deadline", "dueDate", "fechaLimite").prefix(10))
+                            if !t.clientName.isEmpty { Text(t.clientName).font(.caption).foregroundColor(.secondary) }
+                            let deadline = String(t.deadline.prefix(10))
                             if !deadline.isEmpty { Text("Vence: \(deadline)").font(.caption2).foregroundColor(.orange) }
                         }
                         .padding(.vertical, 2)
@@ -334,18 +306,18 @@ struct CrmTendersView: View {
     }
 
     @ViewBuilder
-    private func tenderDetail(_ t: [String: Any]) -> some View {
+    private func tenderDetail(_ t: Tender) -> some View {
         List {
             Section { Button("← Licitaciones") { selected = nil } }
             Section("Licitación") {
-                tdRow("Título", ConsoleHelpers.mapStr(t, "title", "name"))
-                tdRow("Cliente", ConsoleHelpers.mapStr(t, "clientName", "cliente"))
-                tdRow("Estado", ConsoleHelpers.mapStr(t, "status", "estado"))
-                tdRow("Monto", fmtMxn(ConsoleHelpers.mapDouble(t, "amount", "value", "monto")))
-                tdRow("Fecha límite", String(ConsoleHelpers.mapStr(t, "deadline", "dueDate").prefix(10)))
-                tdRow("Descripción", ConsoleHelpers.mapStr(t, "description", "notes"))
-                tdRow("Resultado", ConsoleHelpers.mapStr(t, "result", "resultado"))
-                tdRow("Responsable", ConsoleHelpers.mapStr(t, "ownerName", "responsable"))
+                tdRow("Título", t.displayTitle)
+                tdRow("Cliente", t.clientName)
+                tdRow("Estado", t.status)
+                tdRow("Monto", fmtMxn(t.amount))
+                tdRow("Fecha límite", String(t.deadline.prefix(10)))
+                tdRow("Descripción", t.description)
+                tdRow("Resultado", t.result)
+                tdRow("Responsable", t.ownerName)
             }
         }
         .listStyle(.insetGrouped)
@@ -363,25 +335,25 @@ struct CrmTendersView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await CrmRepository.shared.tenders()) ?? []
+        items = (try? await CrmRepository.shared.tenderItems()) ?? []
     }
 }
 
 // MARK: - Metas comerciales
 
 struct CrmTargetsView: View {
-    @State private var items: [[String: Any]] = []
+    @State private var items: [SalesTarget] = []
     @State private var isLoading = true
     @State private var query = ""
 
-    private var filtered: [[String: Any]] {
+    private var filtered: [SalesTarget] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
-        return items.filter { ConsoleHelpers.mapStr($0, "ownerName", "userName").lowercased().contains(q) }
+        return items.filter { $0.ownerName.lowercased().contains(q) }
     }
 
-    private var totalTarget: Double { items.reduce(0.0) { $0 + ConsoleHelpers.mapDouble($1, "targetAmount", "amount") } }
-    private var totalActual: Double { items.reduce(0.0) { $0 + ConsoleHelpers.mapDouble($1, "actualAmount", "actual", "currentAmount") } }
+    private var totalTarget: Double { items.reduce(0.0) { $0 + $1.targetAmount } }
+    private var totalActual: Double { items.reduce(0.0) { $0 + $1.actualAmount } }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -410,17 +382,15 @@ struct CrmTargetsView: View {
             if isLoading { Spacer(); ProgressView(); Spacer() }
             else if filtered.isEmpty { Spacer(); Text("Sin metas definidas").foregroundColor(.secondary); Spacer() }
             else {
-                List(filtered, id: \.tgKey) { t in
-                    let target = ConsoleHelpers.mapDouble(t, "targetAmount", "amount")
-                    let actual = ConsoleHelpers.mapDouble(t, "actualAmount", "actual", "currentAmount")
-                    let pct    = target > 0 ? min(actual / target, 1.0) : 0
+                List(filtered) { t in
+                    let pct = t.progress
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Text(ConsoleHelpers.mapStr(t, "ownerName", "userName")).font(.headline)
+                            Text(t.ownerName).font(.headline)
                             Spacer()
-                            Text(fmtMxn(actual)).font(.subheadline.bold()).foregroundColor(pct >= 1 ? .green : .orange)
+                            Text(fmtMxn(t.actualAmount)).font(.subheadline.bold()).foregroundColor(pct >= 1 ? .green : .orange)
                         }
-                        Text("\(ConsoleHelpers.mapStr(t, "year")) / \(ConsoleHelpers.mapStr(t, "month"))").font(.caption).foregroundColor(.secondary)
+                        Text("\(t.year) / \(t.month)").font(.caption).foregroundColor(.secondary)
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.2)).frame(height: 6)
@@ -429,7 +399,7 @@ struct CrmTargetsView: View {
                             }
                         }
                         .frame(height: 6)
-                        Text("Meta: \(fmtMxn(target)) · \(Int(pct * 100))%").font(.caption2).foregroundColor(.secondary)
+                        Text("Meta: \(fmtMxn(t.targetAmount)) · \(Int(pct * 100))%").font(.caption2).foregroundColor(.secondary)
                     }
                     .padding(.vertical, 4)
                 }
@@ -448,24 +418,24 @@ struct CrmTargetsView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await CrmRepository.shared.salesTargets()) ?? []
+        items = (try? await CrmRepository.shared.salesTargetItems()) ?? []
     }
 }
 
 // MARK: - Equipo comercial
 
 struct CrmSalesTeamView: View {
-    @State private var items: [[String: Any]] = []
+    @State private var items: [SalesTeamMember] = []
     @State private var isLoading = true
     @State private var query = ""
 
-    private var filtered: [[String: Any]] {
+    private var filtered: [SalesTeamMember] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
-        return items.filter { ConsoleHelpers.mapStr($0, "nombre", "name", "userName").lowercased().contains(q) }
+        return items.filter { $0.name.lowercased().contains(q) }
     }
 
-    private var totalSales: Double { items.reduce(0.0) { $0 + ConsoleHelpers.mapDouble($1, "totalVentas", "salesTotal", "amount") } }
+    private var totalSales: Double { items.reduce(0.0) { $0 + $1.totalSales } }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -494,32 +464,28 @@ struct CrmSalesTeamView: View {
             if isLoading { Spacer(); ProgressView(); Spacer() }
             else if filtered.isEmpty { Spacer(); Text("Sin datos de equipo").foregroundColor(.secondary); Spacer() }
             else {
-                List(filtered, id: \.stKey) { v in
-                    let sales = ConsoleHelpers.mapDouble(v, "totalVentas", "salesTotal", "amount")
-                    let maxSales = items.map { ConsoleHelpers.mapDouble($0, "totalVentas", "salesTotal", "amount") }.max() ?? 1
+                List(filtered) { v in
+                    let maxSales = items.map(\.totalSales).max() ?? 1
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(ConsoleHelpers.mapStr(v, "nombre", "name", "userName")).font(.headline)
-                                let role = ConsoleHelpers.mapStr(v, "role", "puesto", "cargo")
-                                if !role.isEmpty { Text(role).font(.caption).foregroundColor(.secondary) }
+                                Text(v.name).font(.headline)
+                                if !v.role.isEmpty { Text(v.role).font(.caption).foregroundColor(.secondary) }
                             }
                             Spacer()
-                            Text(fmtMxn(sales)).font(.subheadline.bold()).foregroundColor(.green)
+                            Text(fmtMxn(v.totalSales)).font(.subheadline.bold()).foregroundColor(.green)
                         }
-                        let leads = ConsoleHelpers.mapStr(v, "totalLeads", "leads")
-                        let opps  = ConsoleHelpers.mapStr(v, "totalOportunidades", "oportunidades")
-                        if !leads.isEmpty || !opps.isEmpty {
+                        if !v.totalLeads.isEmpty || !v.totalOpps.isEmpty {
                             HStack(spacing: 12) {
-                                if !leads.isEmpty { Label(leads + " leads", systemImage: "person.badge.plus").font(.caption).foregroundColor(.secondary) }
-                                if !opps.isEmpty { Label(opps + " opps", systemImage: "target").font(.caption).foregroundColor(.secondary) }
+                                if !v.totalLeads.isEmpty { Label(v.totalLeads + " leads", systemImage: "person.badge.plus").font(.caption).foregroundColor(.secondary) }
+                                if !v.totalOpps.isEmpty { Label(v.totalOpps + " opps", systemImage: "target").font(.caption).foregroundColor(.secondary) }
                             }
                         }
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.2)).frame(height: 5)
                                 RoundedRectangle(cornerRadius: 4).fill(Color.green)
-                                    .frame(width: geo.size.width * CGFloat(maxSales > 0 ? sales / maxSales : 0), height: 5)
+                                    .frame(width: geo.size.width * CGFloat(maxSales > 0 ? v.totalSales / maxSales : 0), height: 5)
                             }
                         }
                         .frame(height: 5)
@@ -541,15 +507,8 @@ struct CrmSalesTeamView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await CrmRepository.shared.salesTeam()) ?? []
+        items = (try? await CrmRepository.shared.salesTeamMemberItems()) ?? []
     }
-}
-
-private extension [String: Any] {
-    var agKey: String { "ag-\(self["id"] ?? UUID().uuidString)" }
-    var tdKey: String { "td-\(self["id"] ?? UUID().uuidString)" }
-    var tgKey: String { "tg-\(self["id"] ?? UUID().uuidString)" }
-    var stKey: String { "st-\(self["id"] ?? UUID().uuidString)" }
 }
 
 private extension ConsoleHelpers {
@@ -583,8 +542,8 @@ struct CrmClientDetailView: View {
     let onBack: () -> Void
 
     @State private var tab = 0
-    @State private var cotizaciones: [[String: Any]] = []
-    @State private var oportunidades: [[String: Any]] = []
+    @State private var cotizaciones: [Cotizacion] = []
+    @State private var oportunidades: [CrmOpportunity] = []
     @State private var tickets: [[String: Any]] = []
     @State private var sucursales: [[String: Any]] = []
     @State private var servicios: [[String: Any]] = []
@@ -663,21 +622,18 @@ struct CrmClientDetailView: View {
     }
 
     private var cotizacionesTab: some View {
+        let prefix = clientName.lowercased().prefix(6)
         let cots = cotizaciones.filter { cot in
-            let cn = (cot["cliente"] as? String ?? "").lowercased()
-            return clientName.isEmpty || cn.contains(clientName.lowercased().prefix(6))
+            clientName.isEmpty || cot.cliente.lowercased().contains(prefix)
         }
         return Group {
             if cots.isEmpty {
                 VStack { Spacer(); Text("Sin cotizaciones").foregroundColor(.secondary); Spacer() }
             } else {
-                List(cots, id: \.crmKey) { cot in
-                    let folio = ConsoleHelpers.mapStr(cot, "folio").ifBlankExt("Cot. #\(ConsoleHelpers.mapStr(cot, "id"))")
-                    let total = ConsoleHelpers.mapDouble(cot, "total")
-                    let status = ConsoleHelpers.mapStr(cot, "estatus")
+                List(cots) { cot in
                     VStack(alignment: .leading, spacing: 4) {
-                        HStack { Text(folio).font(.subheadline.bold()); Spacer(); Text(fmtMxn(total)).bold() }
-                        Text(status).font(.caption).foregroundColor(.orange)
+                        HStack { Text(cot.displayFolio).font(.subheadline.bold()); Spacer(); Text(fmtMxn(cot.total)).bold() }
+                        Text(cot.estatus).font(.caption).foregroundColor(.orange)
                     }
                 }.listStyle(.plain)
             }
@@ -685,21 +641,21 @@ struct CrmClientDetailView: View {
     }
 
     private var oportunidadesTab: some View {
+        let prefix = clientName.lowercased().prefix(6)
         let opps = oportunidades.filter { o in
-            let cn = (o["clientName"] as? String ?? o["cliente"] as? String ?? "").lowercased()
-            return clientName.isEmpty || cn.contains(clientName.lowercased().prefix(6))
+            clientName.isEmpty || o.clientName.lowercased().contains(prefix)
         }
         return Group {
             if opps.isEmpty {
                 VStack { Spacer(); Text("Sin oportunidades").foregroundColor(.secondary); Spacer() }
             } else {
-                List(opps, id: \.crmKey) { o in
+                List(opps) { o in
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(ConsoleHelpers.mapStr(o, "title", "name")).font(.subheadline.bold())
+                        Text(o.displayTitle).font(.subheadline.bold())
                         HStack {
-                            Text(ConsoleHelpers.mapStr(o, "stage", "etapa")).font(.caption).foregroundColor(.blue)
+                            Text(o.stageKey).font(.caption).foregroundColor(.blue)
                             Spacer()
-                            Text(fmtMxn(ConsoleHelpers.mapDouble(o, "value"))).font(.caption).bold()
+                            if o.value > 0 { Text(fmtMxn(o.value)).font(.caption).bold() }
                         }
                     }
                 }.listStyle(.plain)
@@ -782,8 +738,8 @@ struct CrmClientDetailView: View {
     }
 
     private func load() async {
-        async let cots = ExtraRepository.shared.cotizaciones()
-        async let opps = (try? await CrmRepository.shared.oportunidades()) ?? []
+        async let cots = ExtraRepository.shared.cotizacionItems()
+        async let opps = (try? await CrmRepository.shared.opportunityItems()) ?? []
         async let tks  = ExtraRepository.shared.clientTickets()
         async let suc  = ExtraRepository.shared.serviceClientBranches(serviceClientId: serviceClientId)
         async let srv  = ExtraRepository.shared.maintenanceContracts(clientId: clientId)

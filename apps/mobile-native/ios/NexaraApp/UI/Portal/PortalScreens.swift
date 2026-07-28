@@ -5,7 +5,6 @@ import UIKit
 // MARK: - Profile
 
 struct PortalProfileView: View {
-    @State private var profile: [String: Any]?
     @State private var contactName = ""
     @State private var contactEmail = ""
     @State private var contactPhone = ""
@@ -35,13 +34,12 @@ struct PortalProfileView: View {
     }
 
     private func load() async {
-        guard let p = try? await TicketsRepository.shared.profile() else { return }
-        profile = p
-        contactName = ConsoleHelpers.mapStr(p, "contactName")
-        contactEmail = ConsoleHelpers.mapStr(p, "contactEmail")
-        contactPhone = ConsoleHelpers.mapStr(p, "contactPhone")
-        address = ConsoleHelpers.mapStr(p, "address")
-        city = ConsoleHelpers.mapStr(p, "city")
+        guard let p = try? await TicketsRepository.shared.portalProfile() else { return }
+        contactName = p.contactName
+        contactEmail = p.contactEmail
+        contactPhone = p.contactPhone
+        address = p.address
+        city = p.city
     }
 
     private func save() async {
@@ -61,18 +59,18 @@ struct PortalProfileView: View {
 struct PortalBranchesView: View {
     let onNew: () -> Void
     let onEdit: (Int64) -> Void
-    @State private var branches: [[String: Any]] = []
+    @State private var branches: [PortalBranch] = []
     @State private var isLoading = true
 
     var body: some View {
         List {
             if isLoading { ProgressView() }
-            ForEach(branches, id: \.brKey) { b in
+            ForEach(branches) { b in
                 Button {
-                    if let id = ConsoleHelpers.mapInt64(b, "id") { onEdit(id) }
+                    onEdit(b.id)
                 } label: {
                     HStack(spacing: 12) {
-                        if let url = ConsoleHelpers.mapStr(b, "logoUrl").nilIfEmpty,
+                        if let url = b.logoUrl.nilIfEmpty,
                            let imgUrl = URL(string: url) {
                             AsyncImage(url: imgUrl) { img in
                                 img.resizable().scaledToFill()
@@ -83,8 +81,8 @@ struct PortalBranchesView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(ConsoleHelpers.mapStr(b, "name")).font(.headline)
-                            Text(ConsoleHelpers.mapStr(b, "branchNumber", "city"))
+                            Text(b.name).font(.headline)
+                            Text(b.subtitle)
                                 .font(.caption).foregroundColor(.secondary)
                         }
                     }
@@ -100,7 +98,7 @@ struct PortalBranchesView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        branches = (try? await TicketsRepository.shared.branches()) ?? []
+        branches = (try? await TicketsRepository.shared.portalBranches()) ?? []
     }
 }
 
@@ -182,19 +180,19 @@ struct PortalBranchEditView: View {
         isLoading = true
         defer { isLoading = false }
         guard let branchId else { return }
-        let list = (try? await TicketsRepository.shared.branches()) ?? []
-        guard let b = list.first(where: { ConsoleHelpers.mapInt64($0, "id") == branchId }) else { return }
-        name = ConsoleHelpers.mapStr(b, "name")
-        branchNumber = ConsoleHelpers.mapStr(b, "branchNumber")
-        portalEmail = ConsoleHelpers.mapStr(b, "portalEmail", "email")
-        address = ConsoleHelpers.mapStr(b, "address")
-        city = ConsoleHelpers.mapStr(b, "city")
-        state = ConsoleHelpers.mapStr(b, "state")
-        country = ConsoleHelpers.mapStr(b, "country")
-        if let lat = b["latitud"] as? Double { latitud = String(lat) }
-        if let lng = b["longitud"] as? Double { longitud = String(lng) }
-        isActive = (b["isActive"] as? Bool) ?? true
-        existingLogoUrl = ConsoleHelpers.mapStr(b, "logoUrl").nilIfEmpty
+        let list = (try? await TicketsRepository.shared.portalBranches()) ?? []
+        guard let b = list.first(where: { $0.id == branchId }) else { return }
+        name = b.name
+        branchNumber = b.branchNumber
+        portalEmail = b.portalEmail
+        address = b.address
+        city = b.city
+        state = b.state
+        country = b.country
+        if let lat = b.latitud { latitud = String(lat) }
+        if let lng = b.longitud { longitud = String(lng) }
+        isActive = b.isActive
+        existingLogoUrl = b.logoUrl.nilIfEmpty
     }
 
     private func save() async {
@@ -235,9 +233,9 @@ private extension String {
 
 struct PortalRequestsView: View {
     let onNew: () -> Void
-    @State private var items: [[String: Any]] = []
+    @State private var items: [ClientTicketRequest] = []
     @State private var isLoading = true
-    @State private var selected: [String: Any]?
+    @State private var selected: ClientTicketRequest?
 
     var body: some View {
         Group {
@@ -256,15 +254,15 @@ struct PortalRequestsView: View {
     private var listBody: some View {
         List {
             if isLoading { ProgressView() }
-            ForEach(items, id: \.reqKey) { r in
+            ForEach(items) { r in
                 Button { selected = r } label: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(ConsoleHelpers.mapStr(r, "description").prefix(80).description)
+                        Text(String(r.displayTitle.prefix(80)))
                             .font(.subheadline).bold().foregroundColor(.primary)
                         HStack {
-                            OpsStatusChip(text: ConsoleHelpers.mapStr(r, "status", "urgency"))
+                            OpsStatusChip(text: r.status.isEmpty ? r.urgency : r.status)
                             Spacer()
-                            Text(String(ConsoleHelpers.mapStr(r, "createdAt").prefix(10)))
+                            Text(String(r.createdAt.prefix(10)))
                                 .font(.caption2).foregroundColor(.secondary)
                         }
                     }
@@ -275,27 +273,25 @@ struct PortalRequestsView: View {
     }
 
     @ViewBuilder
-    private func reqDetail(_ r: [String: Any]) -> some View {
-        let status = ConsoleHelpers.mapStr(r, "status").uppercased()
-        let reqId  = ConsoleHelpers.mapInt64(r, "id")
+    private func reqDetail(_ r: ClientTicketRequest) -> some View {
+        let status = r.status.uppercased()
         List {
             Section {
                 Button("← Solicitudes") { selected = nil }
             }
             Section("Solicitud") {
-                let desc = ConsoleHelpers.mapStr(r, "description")
-                if !desc.isEmpty { Text(desc).font(.subheadline) }
-                rRow("Estado",    ConsoleHelpers.mapStr(r, "status"))
-                rRow("Urgencia",  ConsoleHelpers.mapStr(r, "urgency"))
-                rRow("Tipo",      ConsoleHelpers.mapStr(r, "requestType", "type"))
-                rRow("Sucursal",  ConsoleHelpers.mapStr(r, "branchName", "branch"))
-                rRow("Creada",    String(ConsoleHelpers.mapStr(r, "createdAt").prefix(10)))
-                rRow("Actualizada", String(ConsoleHelpers.mapStr(r, "updatedAt").prefix(10)))
+                if !r.displayTitle.isEmpty { Text(r.displayTitle).font(.subheadline) }
+                rRow("Estado", r.status)
+                rRow("Urgencia", r.urgency)
+                rRow("Tipo", r.requestType)
+                rRow("Sucursal", r.branchName)
+                rRow("Creada", String(r.createdAt.prefix(10)))
+                rRow("Vence", String(r.dueAt.prefix(10)))
             }
-            if status != "CLOSED", status != "CERRADA", let id = reqId {
+            if status != "CLOSED", status != "CERRADA", r.id > 0 {
                 Section {
                     Button("Cerrar solicitud", role: .destructive) {
-                        Task { await close(id); selected = nil }
+                        Task { await close(r.id); selected = nil }
                     }
                 }
             }
@@ -310,7 +306,7 @@ struct PortalRequestsView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await TicketsRepository.shared.requests()) ?? []
+        items = (try? await TicketsRepository.shared.portalRequests()) ?? []
     }
 
     private func close(_ id: Int64) async {
@@ -363,33 +359,30 @@ struct PortalRequestNewView: View {
 
 struct PortalTicketsView: View {
     let onOpen: (Int64) -> Void
-    @State private var tickets: [[String: Any]] = []
+    @State private var tickets: [PortalTicket] = []
     @State private var query = ""
     @State private var filter = "todos" // todos | abiertos | alta | aging
     @State private var isLoading = true
 
-    private var openCount: Int { tickets.filter { ticketIsOpen($0) }.count }
-    private var highCount: Int { tickets.filter { ticketIsOpen($0) && ticketIsHigh($0) }.count }
-    private var agingCount: Int { tickets.filter { ticketIsOpen($0) && ticketAgeHours($0) >= 48 }.count }
+    private var openCount: Int { tickets.filter(\.isOpen).count }
+    private var highCount: Int { tickets.filter { $0.isOpen && $0.isHighPriority }.count }
+    private var agingCount: Int { tickets.filter { $0.isOpen && $0.ageHours >= 48 }.count }
 
-    private var filtered: [[String: Any]] {
+    private var filtered: [PortalTicket] {
         let q = query.lowercased()
         return tickets.filter { t in
             let matchFilter: Bool = {
                 switch filter {
-                case "abiertos": return ticketIsOpen(t)
-                case "alta": return ticketIsOpen(t) && ticketIsHigh(t)
-                case "aging": return ticketIsOpen(t) && ticketAgeHours(t) >= 48
+                case "abiertos": return t.isOpen
+                case "alta": return t.isOpen && t.isHighPriority
+                case "aging": return t.isOpen && t.ageHours >= 48
                 default: return true
                 }
             }()
             guard matchFilter else { return false }
             guard !q.isEmpty else { return true }
-            let hay = [
-                ConsoleHelpers.mapStr(t, "titulo", "anNumber"),
-                ConsoleHelpers.mapStr(t, "branchName"),
-                ConsoleHelpers.mapStr(t, "estatus"),
-            ].joined(separator: " ").lowercased()
+            let hay = [t.title, t.anNumber, t.branchName, t.status]
+                .joined(separator: " ").lowercased()
             return hay.contains(q)
         }
     }
@@ -434,36 +427,33 @@ struct PortalTicketsView: View {
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(filtered, id: \.ptkKey) { t in
+                List(filtered) { t in
                     Button {
-                        if let id = ConsoleHelpers.mapInt64(t, "id") { onOpen(id) }
+                        onOpen(t.id)
                     } label: {
-                        let ageH = ticketAgeHours(t)
-                        let open = ticketIsOpen(t)
+                        let ageH = t.ageHours
+                        let open = t.isOpen
                         let tone: NxTone = {
                             if !open { return .success }
-                            if ticketIsHigh(t) || ageH >= 72 { return .danger }
+                            if t.isHighPriority || ageH >= 72 { return .danger }
                             if ageH >= 48 { return .warning }
                             return .info
                         }()
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
-                                Text(ConsoleHelpers.mapStr(t, "titulo").ifBlank {
-                                    ConsoleHelpers.mapStr(t, "anNumber").ifBlank { "Ticket" }
-                                })
+                                Text(t.displayTitle)
                                 .font(.headline)
                                 .lineLimit(2)
                                 Spacer()
                                 NxStatusChip(
-                                    text: ConsoleHelpers.mapStr(t, "estatus").ifBlank { "—" },
+                                    text: t.status.isEmpty ? "—" : t.status,
                                     tone: tone
                                 )
                             }
-                            let priority = ConsoleHelpers.mapStr(t, "prioridad", "urgency")
                             let meta = [
-                                ConsoleHelpers.mapStr(t, "anNumber"),
-                                priority.isEmpty ? "" : "Prioridad \(priority)",
-                                ConsoleHelpers.mapStr(t, "branchName"),
+                                t.anNumber,
+                                t.priority.isEmpty ? "" : "Prioridad \(t.priority)",
+                                t.branchName,
                                 open ? "\(ageH)h abiertos" : "",
                             ].filter { !$0.isEmpty }.joined(separator: " · ")
                             if !meta.isEmpty {
@@ -489,26 +479,26 @@ struct PortalTicketsView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        tickets = (try? await TicketsRepository.shared.tickets()) ?? []
+        tickets = (try? await TicketsRepository.shared.portalTickets()) ?? []
     }
 }
 
 struct PortalTicketDetailView: View {
     let ticketId: Int64
-    @State private var ticket: [String: Any]?
+    @State private var ticket: PortalTicket?
     @State private var reportData: Data?
 
     var body: some View {
         ScrollView {
             if let t = ticket {
-                let ageH = ticketAgeHours(t)
-                let open = ticketIsOpen(t)
+                let ageH = t.ageHours
+                let open = t.isOpen
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(ConsoleHelpers.mapStr(t, "titulo", "anNumber")).font(.title3).bold()
-                    detailRow("Estado", ConsoleHelpers.mapStr(t, "estatus"))
-                    detailRow("Prioridad", ConsoleHelpers.mapStr(t, "prioridad", "urgency"))
-                    detailRow("Sucursal", ConsoleHelpers.mapStr(t, "branchName"))
-                    detailRow("Asignación", String(ConsoleHelpers.mapStr(t, "fechaAsignacion").prefix(16)))
+                    Text(t.displayTitle).font(.title3).bold()
+                    detailRow("Estado", t.status)
+                    detailRow("Prioridad", t.displayPriority)
+                    detailRow("Sucursal", t.branchName)
+                    detailRow("Asignación", String(t.assignedAt.prefix(16)))
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Operación / SLA").font(.subheadline.weight(.semibold))
                         if open {
@@ -523,9 +513,9 @@ struct PortalTicketDetailView: View {
                                     .foregroundColor(.secondary)
                             }
                         } else {
-                            detailRow("Cierre", String(ConsoleHelpers.mapStr(t, "fechaFinalizacion").prefix(16)))
+                            detailRow("Cierre", String(t.completedAt.prefix(16)))
                         }
-                        let sla = ConsoleHelpers.mapStr(t, "slaDueAt", "dueAt")
+                        let sla = t.slaDueAt.isEmpty ? t.dueAt : t.slaDueAt
                         if !sla.isEmpty { detailRow("SLA / vencimiento", String(sla.prefix(16))) }
                     }
                     .padding(12)
@@ -539,7 +529,7 @@ struct PortalTicketDetailView: View {
             } else { ProgressView().padding(.top, 40) }
         }
         .navigationTitle("Detalle ticket")
-        .task { ticket = try? await TicketsRepository.shared.ticket(id: ticketId) }
+        .task { ticket = try? await TicketsRepository.shared.portalTicket(id: ticketId) }
         .sheet(item: Binding(
             get: { reportData.map { PDFSheetItem(data: $0) } },
             set: { reportData = $0?.data }
@@ -557,43 +547,10 @@ struct PortalTicketDetailView: View {
     }
 }
 
-private func ticketIsOpen(_ t: [String: Any]) -> Bool {
-    let s = ConsoleHelpers.mapStr(t, "estatus").lowercased()
-    return !(s.contains("finaliz") || s.contains("cerrad") || s.contains("complet") || s.contains("cancel"))
-}
-
-private func ticketIsHigh(_ t: [String: Any]) -> Bool {
-    let p = ConsoleHelpers.mapStr(t, "prioridad", "urgency").lowercased()
-    return p.contains("alta") || p.contains("high") || p.contains("urgent") || p == "high"
-}
-
-private func ticketAgeHours(_ t: [String: Any]) -> Int {
-    let raw = ConsoleHelpers.mapStr(t, "fechaAsignacion", "fechaInicio")
-    guard !raw.isEmpty else { return 0 }
-    let normalized: String = {
-        if raw.count >= 19, raw[raw.index(raw.startIndex, offsetBy: 10)] == " " {
-            let head = String(raw.prefix(19)).replacingOccurrences(of: " ", with: "T")
-            return head + "Z"
-        }
-        if raw.hasSuffix("Z") || raw.contains("+") { return raw }
-        if raw.count >= 19 { return String(raw.prefix(19)) + "Z" }
-        return raw
-    }()
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    var date = formatter.date(from: normalized)
-    if date == nil {
-        formatter.formatOptions = [.withInternetDateTime]
-        date = formatter.date(from: normalized)
-    }
-    guard let start = date else { return 0 }
-    return max(0, Int(Date().timeIntervalSince(start) / 3600))
-}
-
 // MARK: - Feedback
 
 struct PortalFeedbackView: View {
-    @State private var items: [[String: Any]] = []
+    @State private var items: [PendingFeedbackItem] = []
     @State private var isLoading = true
     @State private var drafts: [Int64: FeedbackDraft] = [:]
     @State private var savingId: Int64?
@@ -605,14 +562,13 @@ struct PortalFeedbackView: View {
             if let message { Text(message).foregroundColor(.green).font(.footnote) }
             if let error { Text(error).foregroundColor(.red).font(.footnote) }
             if isLoading { ProgressView() }
-            ForEach(items, id: \.fbKey) { f in
-                let id = ConsoleHelpers.mapInt64(f, "id")
+            ForEach(items) { f in
                 Section {
-                    Text(ConsoleHelpers.mapStr(f, "titulo", "anNumber")).font(.headline)
-                    Text(String(ConsoleHelpers.mapStr(f, "fechaFinalizacion").prefix(10)))
+                    Text(f.displayTitle).font(.headline)
+                    Text(String(f.completedAt.prefix(10)))
                         .font(.caption).foregroundColor(.secondary)
-                    if let id {
-                        let draft = drafts[id] ?? FeedbackDraft()
+                    if f.id > 0 {
+                        let id = f.id
                         Picker("Calificación", selection: binding(for: id).rating) {
                             ForEach(1...5, id: \.self) { Text("\($0)").tag(String($0)) }
                         }
@@ -676,11 +632,9 @@ struct PortalFeedbackView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await TicketsRepository.shared.pendingFeedback()) ?? []
-        for f in items {
-            if let id = ConsoleHelpers.mapInt64(f, "id"), drafts[id] == nil {
-                drafts[id] = FeedbackDraft()
-            }
+        items = (try? await TicketsRepository.shared.pendingFeedbackItems()) ?? []
+        for f in items where drafts[f.id] == nil {
+            drafts[f.id] = FeedbackDraft()
         }
     }
 
@@ -721,7 +675,7 @@ private struct FeedbackDraftBinding {
 
 struct PortalInventoriesView: View {
     let onOpen: (Int64) -> Void
-    @State private var items: [[String: Any]] = []
+    @State private var items: [PortalInventorySnapshot] = []
     @State private var search = ""
     @State private var isLoading = true
 
@@ -730,13 +684,22 @@ struct PortalInventoriesView: View {
             TextField("Buscar inventario…", text: $search)
                 .textFieldStyle(.roundedBorder).padding()
                 .onSubmit { Task { await reload() } }
-            List(items, id: \.invKey) { inv in
-                Button {
-                    if let id = ConsoleHelpers.mapInt64(inv, "id") { onOpen(id) }
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(ConsoleHelpers.mapStr(inv, "title")).font(.headline)
-                        OpsStatusChip(text: ConsoleHelpers.mapStr(inv, "status"))
+            if isLoading {
+                Spacer(); ProgressView(); Spacer()
+            } else {
+                List(items) { inv in
+                    Button {
+                        onOpen(inv.id)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(inv.displayTitle).font(.headline)
+                            HStack {
+                                OpsStatusChip(text: inv.status.isEmpty ? "—" : inv.status)
+                                if !inv.branchName.isEmpty {
+                                    Text(inv.branchName).font(.caption).foregroundColor(.secondary)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -750,13 +713,13 @@ struct PortalInventoriesView: View {
         isLoading = true
         defer { isLoading = false }
         let q = search.isEmpty ? nil : search
-        items = (try? await TicketsRepository.shared.inventories(search: q)) ?? []
+        items = (try? await TicketsRepository.shared.portalInventories(search: q)) ?? []
     }
 }
 
 struct PortalInventoryDetailView: View {
     let inventoryId: Int64
-    @State private var detail: [String: Any]?
+    @State private var detail: PortalInventorySnapshot?
     @State private var reportData: Data?
     @State private var notes = ""
     @State private var markCompleted = false
@@ -771,14 +734,12 @@ struct PortalInventoryDetailView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     if let message { Text(message).foregroundColor(.green).font(.footnote) }
                     if let error { Text(error).foregroundColor(.red).font(.footnote) }
-                    Text(ConsoleHelpers.mapStr(d, "title")).font(.title3).bold()
-                    Text("Estado: \(ConsoleHelpers.mapStr(d, "status"))").font(.caption)
-                    if let items = d["items"] as? [[String: Any]], !items.isEmpty {
-                        Text("Ítems (\(items.count))").font(.headline).padding(.top, 8)
-                        ForEach(items.indices, id: \.self) { i in
-                            let it = items[i]
-                            Text(ConsoleHelpers.mapStr(it, "itemName", "groupName"))
-                                .font(.subheadline)
+                    Text(d.displayTitle).font(.title3).bold()
+                    Text("Estado: \(d.status)").font(.caption)
+                    if !d.items.isEmpty {
+                        Text("Ítems (\(d.items.count))").font(.headline).padding(.top, 8)
+                        ForEach(d.items) { it in
+                            Text(it.displayName).font(.subheadline)
                         }
                     }
                     TextField("Notas", text: $notes, axis: .vertical).lineLimit(2...5)
@@ -807,26 +768,24 @@ struct PortalInventoryDetailView: View {
     }
 
     private func load() async {
-        guard let d = try? await TicketsRepository.shared.inventoryDetail(id: inventoryId) else { return }
+        guard let d = try? await TicketsRepository.shared.portalInventoryDetail(id: inventoryId) else { return }
         detail = d
-        notes = ConsoleHelpers.mapStr(d, "notes")
-        markCompleted = ConsoleHelpers.mapStr(d, "status").uppercased() == "COMPLETED"
+        notes = d.notes
+        markCompleted = d.status.uppercased() == "COMPLETED"
     }
 
     private func sync() async {
         guard let d = detail else { return }
-        let branchId = ConsoleHelpers.mapInt64(d, "branchId")
-            ?? (d["branch"] as? [String: Any]).flatMap { ConsoleHelpers.mapInt64($0, "id") }
-        guard let branchId else { error = "Sucursal no disponible"; return }
+        guard let branchId = d.branchId else { error = "Sucursal no disponible"; return }
         saving = true; error = nil; message = nil
         defer { saving = false }
         do {
             let updated = try await TicketsRepository.shared.syncInventory(
                 branchId: branchId, snapshotId: inventoryId,
-                title: ConsoleHelpers.mapStr(d, "title").nilIfEmpty,
+                title: d.title.nilIfEmpty,
                 notes: notes.nilIfEmpty, completed: markCompleted, confirmDifference: confirmDifference
             )
-            detail = updated
+            detail = PortalInventorySnapshot(raw: updated)
             message = "Inventario sincronizado"
         } catch { self.error = error.localizedDescription }
     }
@@ -835,7 +794,8 @@ struct PortalInventoryDetailView: View {
         saving = true; error = nil; message = nil
         defer { saving = false }
         do {
-            detail = try await TicketsRepository.shared.decideInventory(id: inventoryId, decision: decision)
+            let updated = try await TicketsRepository.shared.decideInventory(id: inventoryId, decision: decision)
+            detail = PortalInventorySnapshot(raw: updated)
             message = "Inventario actualizado"
         } catch { self.error = error.localizedDescription }
     }
@@ -865,12 +825,4 @@ struct PortalBranchesModuleView: View {
             }
         }
     }
-}
-
-extension [String: Any] {
-    fileprivate var brKey: String { "br-\(self["id"] ?? UUID().uuidString)" }
-    fileprivate var reqKey: String { "rq-\(self["id"] ?? UUID().uuidString)" }
-    fileprivate var ptkKey: String { "pt-\(self["id"] ?? UUID().uuidString)" }
-    fileprivate var fbKey: String { "fb-\(self["id"] ?? UUID().uuidString)" }
-    fileprivate var invKey: String { "iv-\(self["id"] ?? UUID().uuidString)" }
 }

@@ -270,7 +270,23 @@ export default function SupportInboxPage() {
           <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
         )}
         {!loading && !error && (
-          <DataTable columns={columns} rows={visibleItems} rowKey={(t) => t.id} emptyTitle="Sin tickets" emptyDescription="No hay solicitudes de soporte registradas." />
+          <DataTable
+            columns={columns}
+            rows={visibleItems}
+            rowKey={(t) => t.id}
+            emptyTitle="Sin tickets"
+            emptyDescription="Cuando un cliente con contrato abra una solicitud, aparecerá aquí. Mientras tanto puedes revisar SLA o crear una OT."
+            emptyAction={
+              <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                <Link href="/ops/support/sla" style={{ textDecoration: "none" }}>
+                  <Button size="sm" variant="secondary">Ver SLA</Button>
+                </Link>
+                <Link href="/ops/activities" style={{ textDecoration: "none" }}>
+                  <Button size="sm" variant="primary">Ir a actividades</Button>
+                </Link>
+              </div>
+            }
+          />
         )}
       </Section>
     </>

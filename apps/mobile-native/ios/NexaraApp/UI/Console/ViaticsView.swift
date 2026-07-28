@@ -4,50 +4,60 @@ import SwiftUI
 
 @MainActor
 final class ViaticsVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
-    @Published var query        = ""
+    @Published var items: [ViaticItem] = []
+    @Published var query = ""
     @Published var statusFilter = "todos"
-    @Published var isLoading    = false
+    @Published var isLoading = false
+    @Published var loadError: String?
 
     let statuses = ["todos", "pendiente", "aprobado", "rechazado", "pagado"]
 
-    var filtered: [[String: Any]] {
+    var filtered: [ViaticItem] {
         var list = items
         if statusFilter != "todos" {
-            list = list.filter { vStr($0, "estatusPago", "status", "estatus", "estado").lowercased() == statusFilter }
+            list = list.filter { $0.displayStatus.lowercased() == statusFilter }
         }
         if !query.isEmpty {
             let q = query.lowercased()
-            list = list.filter { row in
-                vStr(row, "razonGasto", "concepto", "descripcion", "motivo").lowercased().contains(q) ||
-                (row["usuario"] as? [String: Any]).map { vStr($0, "nombre", "name") }?.lowercased().contains(q) == true ||
-                vStr(row, "usuarioNombre", "userName", "nombre").lowercased().contains(q)
+            list = list.filter {
+                $0.razonGasto.lowercased().contains(q) ||
+                $0.userName.lowercased().contains(q) ||
+                $0.categoria.lowercased().contains(q)
             }
         }
         return list
     }
 
     var totalAmount: Double {
-        items.reduce(0.0) { $0 + (vDouble($1, "montoSolicitado", "amount", "monto", "total") ?? 0) }
+        items.reduce(0) { $0 + $1.montoSolicitado }
     }
 
     var pendingCount: Int {
-        items.filter { vStr($0, "estatusPago", "status", "estatus").lowercased() == "pendiente" }.count
+        items.filter { $0.displayStatus.lowercased() == "pendiente" }.count
     }
 
     func load(personalOnly: Bool = false) {
         isLoading = true
+        loadError = nil
         Task {
-            let all = (try? await ConsoleRepository.shared.viatics()) ?? await ExtraRepository.shared.viatics()
-            if personalOnly, let uid = SessionStore.shared.currentUser?.id {
-                items = all.filter { row in
-                    if let usuario = row["usuario"] as? [String: Any], let id = usuario["id"] {
-                        return String(describing: id) == uid
-                    }
-                    return vStr(row, "usuarioId", "userId", "usuario") == uid
+            do {
+                var all = try await ConsoleRepository.shared.viaticItems()
+                if all.isEmpty {
+                    all = await ExtraRepository.shared.viaticItems()
                 }
-            } else {
-                items = all
+                if personalOnly, let uid = SessionStore.shared.currentUser?.id, let uidNum = Int64(uid) {
+                    items = all.filter { $0.usuarioId == uidNum }
+                } else if personalOnly, let uid = SessionStore.shared.currentUser?.id {
+                    items = all.filter { String($0.usuarioId ?? -1) == uid }
+                } else {
+                    items = all
+                }
+            } catch {
+                let fallback = await ExtraRepository.shared.viaticItems()
+                items = fallback
+                if fallback.isEmpty {
+                    loadError = error.localizedDescription
+                }
             }
             isLoading = false
         }
@@ -60,7 +70,7 @@ struct ViaticsView: View {
     var personalOnly: Bool = false
     @StateObject private var vm = ViaticsVM()
     @EnvironmentObject var session: SessionStore
-    @State private var selected: [String: Any]?
+    @State private var selected: ViaticItem?
     @State private var showCreate = false
     @State private var amountText = ""
     @State private var motivo = ""
@@ -167,6 +177,14 @@ struct ViaticsView: View {
     private var listBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                if let err = vm.loadError {
+                    NxAlertBanner(alert: NxAlert(id: "viat-err", title: "No se pudo cargar", subtitle: err, tone: .danger))
+                        .padding(.horizontal)
+                    Button("Reintentar") { vm.load(personalOnly: personalOnly) }
+                        .buttonStyle(.bordered)
+                        .padding(.horizontal)
+                }
+
                 if !vm.items.isEmpty {
                     HStack(spacing: 0) {
                         ViatKpi(label: "Total",     value: "\(vm.items.count)",  color: .primary)
@@ -212,11 +230,17 @@ struct ViaticsView: View {
                 if vm.isLoading {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                 } else if vm.filtered.isEmpty {
-                    Text("Sin viáticos").foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity).padding(.top, 40)
+                    NxEmptyState(
+                        title: "Sin viáticos",
+                        subtitle: personalOnly
+                            ? "Aún no tienes solicitudes. Crea una con el botón +."
+                            : "No hay viáticos con este filtro.",
+                        actionLabel: "Nueva solicitud",
+                        onAction: { showCreate = true }
+                    )
                 } else {
                     VStack(spacing: 6) {
-                        ForEach(vm.filtered.prefix(50), id: \.viatId) { viat in
+                        ForEach(vm.filtered.prefix(50)) { viat in
                             Button { selected = viat } label: {
                                 ViaticCard(item: viat)
                             }
@@ -232,19 +256,17 @@ struct ViaticsView: View {
     }
 
     @ViewBuilder
-    private func viatDetail(_ v: [String: Any]) -> some View {
-        let status = vStr(v, "estatusPago", "status", "estatus", "estado")
-        let color  = viatStatusColor(status)
-        let ticketUrl = vStr(v, "ticketEvidenciaUrl", "ticketUrl", "evidenciaUrl", "comprobante")
+    private func viatDetail(_ v: ViaticItem) -> some View {
+        let status = v.displayStatus
+        let color = viatStatusColor(status)
         let pending = status.lowercased() == "pendiente"
-        let id = ConsoleHelpers.mapInt64(v, "id")
 
         List {
             Section {
                 HStack {
                     Button("← Volver") { selected = nil; rejectNote = ""; actionMessage = nil }
                     Spacer()
-                    Text(status.isEmpty ? "—" : status.capitalized)
+                    Text(status.capitalized)
                         .font(.caption).bold().foregroundColor(color)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(color.opacity(0.12)).clipShape(Capsule())
@@ -252,38 +274,32 @@ struct ViaticsView: View {
             }
 
             Section("Viático") {
-                viatRow("ID", vStr(v, "id"))
-                if let activ = v["actividad"] as? [String: Any] {
-                    viatRow("Actividad (AN)", vStr(activ, "anNumber", "titulo"))
-                }
-                if let usuario = v["usuario"] as? [String: Any] {
-                    viatRow("Empleado", vStr(usuario, "nombre", "name"))
-                } else {
-                    viatRow("Empleado", vStr(v, "usuarioNombre", "userName", "nombre"))
-                }
-                viatRow("Razón de gasto", vStr(v, "razonGasto", "concepto", "descripcion", "motivo"))
-                viatRow("Categoría", vStr(v, "categoria"))
-                viatRow("Monto", fmtMxnV(vDouble(v, "montoSolicitado", "amount", "monto", "total") ?? 0))
+                viatRow("ID", "\(v.id)")
+                viatRow("Actividad (AN)", v.activityLabel)
+                viatRow("Empleado", v.userName)
+                viatRow("Razón de gasto", v.razonGasto)
+                viatRow("Categoría", v.categoria)
+                viatRow("Monto", fmtMxnV(v.montoSolicitado))
                 viatRow("Estado de pago", status)
-                viatRow("Fecha", String(vStr(v, "createdAt", "fecha").prefix(10)))
+                viatRow("Fecha", v.dateLabel)
             }
 
-            if !ticketUrl.isEmpty {
+            if !v.ticketEvidenciaUrl.isEmpty {
                 Section("Comprobante") {
-                    Link(destination: URL(string: ticketUrl) ?? URL(string: "https://nexara.com.mx")!) {
+                    Link(destination: URL(string: v.ticketEvidenciaUrl) ?? URL(string: "https://nexara.com.mx")!) {
                         Label("Ver ticket / comprobante", systemImage: "link")
                     }
                 }
             }
 
-            if canApprove && pending, let id {
+            if canApprove && pending, v.id > 0 {
                 Section("Decisión") {
                     TextField("Nota / motivo de rechazo", text: $rejectNote, axis: .vertical)
                         .lineLimit(2...4)
                     NxDecisionActions(
                         acting: acting,
-                        onApprove: { Task { await decide(id: id, approve: true) } },
-                        onReject: { Task { await decide(id: id, approve: false) } }
+                        onApprove: { Task { await decide(id: v.id, approve: true) } },
+                        onReject: { Task { await decide(id: v.id, approve: false) } }
                     )
                 }
             }
@@ -330,38 +346,32 @@ struct ViaticsView: View {
 // MARK: – Card
 
 private struct ViaticCard: View {
-    let item: [String: Any]
+    let item: ViaticItem
     var body: some View {
-        let concept = vStr(item, "razonGasto", "concepto", "descripcion", "motivo")
-        let user: String = {
-            if let u = item["usuario"] as? [String: Any] { return vStr(u, "nombre", "name") }
-            return vStr(item, "usuarioNombre", "userName", "nombre")
-        }()
-        let status  = vStr(item, "estatusPago", "status", "estatus", "estado")
-        let amount  = vDouble(item, "montoSolicitado", "amount", "monto", "total")
-        let date    = String(vStr(item, "createdAt", "fecha").prefix(10))
-        let color   = viatStatusColor(status)
+        let color = viatStatusColor(item.displayStatus)
 
         HStack(spacing: 0) {
             Rectangle().fill(color).frame(width: 4)
                 .clipShape(RoundedRectangle(cornerRadius: 2))
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(concept.isEmpty ? "Sin concepto" : concept)
+                    Text(item.displayConcept)
                         .font(.subheadline).bold().lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
-                    if let a = amount {
-                        Text(fmtMxnV(a)).font(.subheadline).bold().foregroundColor(color)
+                    if item.montoSolicitado != 0 {
+                        Text(fmtMxnV(item.montoSolicitado)).font(.subheadline).bold().foregroundColor(color)
                     }
                 }
-                if !user.isEmpty {
-                    Label(user, systemImage: "person").font(.caption).foregroundColor(.secondary)
+                if !item.userName.isEmpty {
+                    Label(item.userName, systemImage: "person").font(.caption).foregroundColor(.secondary)
                 }
                 HStack {
-                    Text(status.capitalized).font(.caption2).bold().foregroundColor(color)
+                    Text(item.displayStatus.capitalized).font(.caption2).bold().foregroundColor(color)
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(color.opacity(0.13)).clipShape(Capsule())
                     Spacer()
-                    if !date.isEmpty { Text(date).font(.caption2).foregroundColor(.secondary) }
+                    if !item.dateLabel.isEmpty {
+                        Text(item.dateLabel).font(.caption2).foregroundColor(.secondary)
+                    }
                 }
             }
             .padding(.horizontal, 10).padding(.vertical, 8)

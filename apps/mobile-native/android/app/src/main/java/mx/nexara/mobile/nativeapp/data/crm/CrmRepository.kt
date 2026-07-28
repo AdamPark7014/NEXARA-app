@@ -7,9 +7,20 @@ import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
+import mx.nexara.mobile.nativeapp.data.api.CalendarEventDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDto
 import mx.nexara.mobile.nativeapp.data.api.CrmApi
+import mx.nexara.mobile.nativeapp.data.api.CrmClientDto
+import mx.nexara.mobile.nativeapp.data.api.CrmLeadDto
+import mx.nexara.mobile.nativeapp.data.api.CrmOpportunityDetailDto
+import mx.nexara.mobile.nativeapp.data.api.CrmOpportunityDto
+import mx.nexara.mobile.nativeapp.data.api.CrmProductDto
+import mx.nexara.mobile.nativeapp.data.api.CrmSalesProjectDto
 import mx.nexara.mobile.nativeapp.data.api.ExtraApi
+import mx.nexara.mobile.nativeapp.data.api.OrderTemplateDto
+import mx.nexara.mobile.nativeapp.data.api.SalesTargetDto
+import mx.nexara.mobile.nativeapp.data.api.SalesTeamMemberDto
+import mx.nexara.mobile.nativeapp.data.api.TenderDto
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -59,10 +70,15 @@ class CrmRepository(private val context: Context) {
         }
     }
 
-    suspend fun oportunidades(): List<Map<String, Any?>> = parseMaps(crmApi.listOportunidadesRaw().string())
+    suspend fun oportunidades(): List<Map<String, Any?>> = opportunityDtos().map { it.toFlatMap() }
+    suspend fun opportunityDtos(): List<CrmOpportunityDto> =
+        parseMaps(crmApi.listOportunidadesRaw().string()).map { CrmOpportunityDto.fromRaw(it) }
 
     suspend fun getOpportunity(id: Long): Map<String, Any?> =
-        parseObject(crmApi.getOpportunityRaw(id).string())
+        opportunityDetail(id).raw
+
+    suspend fun opportunityDetail(id: Long): CrmOpportunityDetailDto =
+        CrmOpportunityDetailDto.fromRaw(parseObject(crmApi.getOpportunityRaw(id).string()))
 
     suspend fun addOpportunityNote(id: Long, message: String): Map<String, Any?> =
         parseObject(crmApi.addOpportunityNoteRaw(id, mapOf("message" to message)).string())
@@ -108,26 +124,41 @@ class CrmRepository(private val context: Context) {
         return MultipartBody.Part.createFormData("files", name, body)
     }
 
-    suspend fun clientes(): List<Map<String, Any?>> = parseMaps(crmApi.listClientesRaw().string())
+    suspend fun clientes(): List<Map<String, Any?>> = clientDtos().map { it.toFlatMap() }
+    suspend fun clientDtos(): List<CrmClientDto> =
+        parseMaps(crmApi.listClientesRaw().string()).map { CrmClientDto.fromRaw(it) }
 
-    suspend fun leads(): List<Map<String, Any?>> = parseMaps(crmApi.listLeadsRaw().string())
+    suspend fun leads(): List<Map<String, Any?>> = leadDtos().map { it.raw }
+    suspend fun leadDtos(): List<CrmLeadDto> =
+        parseMaps(crmApi.listLeadsRaw().string()).map { CrmLeadDto.fromRaw(it) }
 
-    suspend fun proyectos(): List<Map<String, Any?>> = parseMaps(crmApi.listProyectosRaw().string())
+    suspend fun proyectos(): List<Map<String, Any?>> = projectDtos().map { it.toFlatMap() }
+    suspend fun projectDtos(): List<CrmSalesProjectDto> =
+        parseMaps(crmApi.listProyectosRaw().string()).map { CrmSalesProjectDto.fromRaw(it) }
 
     suspend fun products(search: String? = null): List<Map<String, Any?>> =
-        parseMaps(crmApi.listProductsRaw(search).string())
+        productDtos(search).map { it.toFlatMap() }
+    suspend fun productDtos(search: String? = null): List<CrmProductDto> =
+        parseMaps(crmApi.listProductsRaw(search).string()).map { CrmProductDto.fromRaw(it) }
 
     suspend fun calendarEvents(): List<Map<String, Any?>> =
-        parseMaps(crmApi.listCalendarEventsRaw().string())
+        calendarEventDtos().map { it.raw }
 
-    suspend fun tenders(): List<Map<String, Any?>> =
-        parseMaps(crmApi.listTendersRaw().string())
+    suspend fun calendarEventDtos(): List<CalendarEventDto> =
+        parseMaps(crmApi.listCalendarEventsRaw().string()).map { CalendarEventDto.fromRaw(it) }
 
-    suspend fun salesTargets(): List<Map<String, Any?>> =
-        parseMaps(crmApi.listSalesTargetsRaw().string())
+    suspend fun tenders(): List<Map<String, Any?>> = tenderDtos().map { it.raw }
+    suspend fun tenderDtos(): List<TenderDto> =
+        parseMaps(crmApi.listTendersRaw().string()).map { TenderDto.fromRaw(it) }
+
+    suspend fun salesTargets(): List<Map<String, Any?>> = salesTargetDtos().map { it.raw }
+    suspend fun salesTargetDtos(): List<SalesTargetDto> =
+        parseMaps(crmApi.listSalesTargetsRaw().string()).map { SalesTargetDto.fromRaw(it) }
 
     suspend fun salesTeam(period: String = "month"): List<Map<String, Any?>> =
-        parseMaps(crmApi.listSalesTeamRaw(period).string())
+        salesTeamMemberDtos(period).map { it.raw }
+    suspend fun salesTeamMemberDtos(period: String = "month"): List<SalesTeamMemberDto> =
+        parseMaps(crmApi.listSalesTeamRaw(period).string()).map { SalesTeamMemberDto.fromRaw(it) }
 
     suspend fun salesMetrics(period: String = "month"): Map<String, Any?> =
         parseObject(crmApi.getSalesMetricsRaw(period).string())
@@ -136,7 +167,10 @@ class CrmRepository(private val context: Context) {
         parseMaps(crmApi.listSalesTeamRaw(period).string())
 
     suspend fun orderTemplates(): List<Map<String, Any?>> =
-        parseMaps(crmApi.listOrderTemplatesRaw().string())
+        orderTemplateDtos().map { it.raw }
+
+    suspend fun orderTemplateDtos(): List<OrderTemplateDto> =
+        parseMaps(crmApi.listOrderTemplatesRaw().string()).map { OrderTemplateDto.fromRaw(it) }
 
     suspend fun createOrderTemplate(fields: Map<String, String>): Map<String, Any?> =
         parseObject(crmApi.createOrderTemplateRaw(fields).string())

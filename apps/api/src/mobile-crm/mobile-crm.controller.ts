@@ -3,6 +3,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CrmActivitiesService } from '../crm-activities/crm-activities.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 /**
  * Endpoints compactos para la app móvil (iOS/Android Native).
@@ -18,7 +20,12 @@ export class MobileCrmController {
 
   /** Resumen del vendedor para pantalla principal de la app. */
   @Get('home')
-  async home(@CurrentUser() user: any) {
+  async home(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const tw = companyWhere(tenantId);
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
@@ -26,24 +33,30 @@ export class MobileCrmController {
     const [agenda, hotLeads, openOpps, monthClosed, target] = await Promise.all([
       this.crmActivities.getMyAgenda(user.id),
       this.prisma.salesLead.findMany({
-        where: { ownerId: user.id, status: { in: ['NEW' as any, 'CONTACTED' as any, 'QUALIFIED' as any] } },
+        where: { ...tw, ownerId: user.id, status: { in: ['NEW' as any, 'CONTACTED' as any, 'QUALIFIED' as any] } },
         select: { id: true, name: true, company: true, score: true, status: true, createdAt: true },
         orderBy: { score: 'desc' },
         take: 10,
       }),
       this.prisma.salesOpportunity.findMany({
-        where: { ownerId: user.id, stage: { notIn: ['WON' as any, 'LOST' as any] } },
+        where: { ...tw, ownerId: user.id, stage: { notIn: ['WON' as any, 'LOST' as any] } },
         select: { id: true, title: true, stage: true, value: true, probability: true, expectedCloseDate: true },
         orderBy: { expectedCloseDate: 'asc' },
         take: 10,
       }),
       this.prisma.salesOpportunity.aggregate({
-        where: { ownerId: user.id, stage: 'WON' as any, closedAt: { gte: startOfMonth, lte: endOfMonth } },
+        where: { ...tw, ownerId: user.id, stage: 'WON' as any, closedAt: { gte: startOfMonth, lte: endOfMonth } },
         _sum: { value: true },
         _count: { _all: true },
       }),
-      (this.prisma as any).salesTarget.findFirst({
-        where: { ownerId: user.id, period: 'MONTHLY', year: now.getFullYear(), month: now.getMonth() + 1 },
+      this.prisma.salesTarget.findFirst({
+        where: {
+          ...tw,
+          ownerId: user.id,
+          period: 'MONTHLY',
+          year: now.getFullYear(),
+          month: now.getMonth() + 1,
+        },
       }),
     ]);
 
@@ -71,22 +84,42 @@ export class MobileCrmController {
 
   /** Búsqueda global del CRM móvil. */
   @Get('search')
-  async search(@Query('q') q: string, @CurrentUser() user: any) {
+  async search(
+    @Query('q') q: string,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
     if (!q || q.trim().length < 2) return { leads: [], opportunities: [], clients: [] };
+    const tenantId = requireCompanyId(companyId);
+    const tw = companyWhere(tenantId);
     const term = q.trim();
     const [leads, opportunities, clients] = await Promise.all([
       this.prisma.salesLead.findMany({
-        where: { ownerId: user.id, OR: [{ name: { contains: term, mode: 'insensitive' } }, { company: { contains: term, mode: 'insensitive' } }, { email: { contains: term, mode: 'insensitive' } }] },
+        where: {
+          ...tw,
+          ownerId: user.id,
+          OR: [
+            { name: { contains: term, mode: 'insensitive' } },
+            { company: { contains: term, mode: 'insensitive' } },
+            { email: { contains: term, mode: 'insensitive' } },
+          ],
+        },
         select: { id: true, name: true, company: true, email: true, phone: true, score: true },
         take: 10,
       }),
       this.prisma.salesOpportunity.findMany({
-        where: { ownerId: user.id, title: { contains: term, mode: 'insensitive' } },
+        where: { ...tw, ownerId: user.id, title: { contains: term, mode: 'insensitive' } },
         select: { id: true, title: true, stage: true, value: true },
         take: 10,
       }),
       this.prisma.salesClient.findMany({
-        where: { OR: [{ name: { contains: term, mode: 'insensitive' } }, { taxId: { contains: term, mode: 'insensitive' } }] },
+        where: {
+          ...tw,
+          OR: [
+            { name: { contains: term, mode: 'insensitive' } },
+            { taxId: { contains: term, mode: 'insensitive' } },
+          ],
+        },
         select: { id: true, name: true, taxId: true, billingEmail: true, billingPhone: true },
         take: 10,
       }),

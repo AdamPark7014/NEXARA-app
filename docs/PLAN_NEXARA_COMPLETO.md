@@ -23,8 +23,26 @@ Documento vivo. El resumen ejecutivo corto sigue en `docs/ROADMAP_ODOO_PARITY.md
 | 10 | Hard SaaS | Stripe Checkout+Portal+webhooks, SCIM v2 Users, companyId NOT NULL, AuditLog SoT |
 | 11 | Tenant OPS/CRM | Activity/ServiceClient/OpsProject/Product/SalesClient/Lead/Cotizacion NOT NULL; SCIM Groups; audit tenant+actor |
 | 12 | Tenant harden | Webhooks companyId + emit scoped; companyWhere lists (ops/viáticos/pagos/stock); SCIM per-tenant via ApiKey scope=scim + seats |
+| 13 | Chat/GL + packaging UI | ChatChannel + MaintenanceContract + Account/FiscalPeriod/BankAccount tenant; plan feature gates; Settings control center |
+| 14 | Reliability | Idempotency-Key store + interceptor; webhook DLQ list + replay API/UI |
+| 15 | Compliance + OPS | CostCenter + VehicleAsset tenant; GDPR/LFPDPPP `POST /audit/privacy/erase/:userId` |
+| 16 | UI polish | Lab hub enterprise links; Companies → control center |
+| 17 | Catalog masters | Brand + Supplier `companyId` + unique per tenant; procurement suppliers scoped |
+| 19 | Evidence tenant + UI | Evidence.companyId + list/create/update IDOR; empty states con CTA (agenda/viáticos/webhooks/DataTable) |
+| 20 | Privacy UI | IAM drawer → «Borrar PII» → `POST /audit/privacy/erase/:userId` |
+| 21 | Empty CTAs | Warehouse/WMS, soporte/SLA, mantenimiento, clientes OPS, procurement |
+| 22 | Cierre de brechas verificadas (auditoría 2026-07-24) | Almacén: Cycle Counts + Stock Reservations (`CycleCount`, `StockReservation`, ajuste de stock automático al cerrar conteo) · Compras: RFQ multi-proveedor (`PurchaseRFQ`/`PurchaseRFQLine`, comparación lado a lado, adjudicación → OC existente) · Studio: versionado `PageContentRevision` + rollback (snapshot en cada publish) · Contabilidad: DIOT (reporte + CSV por proveedor) y base de Contabilidad Electrónica (`Account.satAgrupador`, `Supplier.rfc`, Balanza XML condicionada a mapeo completo) · MRP/Quality/HSE: decisión de producto — confirmado sin UI/rutas activas, se mantiene fuera de alcance (ver §11) |
+| 23 | Portal: facturas CFDI | `GET client-portal/invoices` (AR vía `SalesClient.serviceClientId`) + descarga PDF/XML con validación de propiedad; sección "Facturas" en `mis-servicios` |
+| 24 | Portal: SLA en vivo por ticket | Badge de countdown/incumplimiento por ticket en `/tickets` — mismos umbrales de `sla-tracker.service.ts` por prioridad (Alta/Media/Baja), cálculo 100% client-side sobre datos ya expuestos |
+| 25 | Portal: KB huérfana → enlazada | `/tickets/ayuda` y `kb-public/*` ya estaban completos (búsqueda, categorías, "fue útil") pero sin link desde el portal; agregado "🆘 Centro de ayuda" al sidebar |
+| 26 | Compras: Landed cost | `GoodsReceipt.{freightCost,insuranceCost,customsCost,otherLandedCost}` + prorrateo por valor en `GoodsReceiptItem.landedCostAllocated`; WAC (`StockMovement.unitCost`) y asiento de recepción (`postPurchaseReceiptAccrual`) incluyen el landed cost |
+| 27 | Studio: RBAC granular | `STUDIO_CONTENT_VIEW/MANAGE` otorgado a `lider_diseno`/`disenador`; agregado de forma aditiva a page-content/news/case-studies (PANEL_WEB y CONSOLE_ADMIN se mantienen) |
+| 28 | Contabilidad: XML Catálogo de cuentas | `exportCatalogoCuentasXml` (misma condición de mapeo que Balanza); jerarquía Nivel/SubCtaDe/Natur derivada del catálogo existente; botón en Cumplimiento SAT |
+| 29 | CRM: Cotización siempre con FK cliente + limpieza checklist §6 | `cotizaciones.service.ts` busca/crea `SalesClient` si falta FK; verificado y corregido checklist §6.3/6.7 (multi-company base y audit global ya estaban hechos, solo desactualizado el doc) |
+| 30 | Portal: cotizaciones | `GET client-portal/quotes` + `/pdf` (reutiliza `CotizacionesService.getPdfBuffer`); sección "Cotizaciones" en `mis-servicios` |
+| 31 | HR: Pagos calculados desde asistencia real | `calculateFromAttendance` suma `AttendanceDay.totalMinutes` del periodo; botón "Calcular" en el formulario de pagos a empleados |
 
-Pendiente inmediato: configurar env prod (STRIPE_*, OIDC_*, SCIM_*). Opcional: Chat/MaintenanceContract tenant, GL/Bank/Period, plan gates.
+Pendiente ops: keys prod (`STRIPE_*`, `OIDC_*`, `SCIM_*`) — cuando las tengas las cableamos. Pendiente contable: validar el XML de Balanza (Iter 22) contra el XSD vigente del SAT con un contador/PAC antes del primer envío real — la estructura general es correcta pero no ha sido validada contra el esquema oficial.
 
 ---
 
@@ -234,51 +252,52 @@ NEXARA debe quedar como **ERP vertical de servicios tecnológicos MX** con:
 - [x] Auto-póliza recepción compra
 - [x] Auto-póliza pago a proveedor (CXP → bancos)
 - [x] Auto-póliza COGS al despacho
-- [ ] XML SAT + DIOT
+- [x] DIOT (reporte + CSV por proveedor) — Iter 22
+- [x] XML Catálogo de cuentas — Iter 28: `exportCatalogoCuentasXml`, misma condición de mapeo que Balanza; jerarquía (Nivel/SubCtaDe) derivada de `Account.parentId`
 - [x] Periodo fiscal con bloqueo de posteo
 
 ### 6.2 Compras / almacén
 - [x] GR → stock + AP draft + póliza
 - [x] 3-way match (MVP: evaluate + gate pago + waive)
-- [ ] RFQ multi-proveedor
-- [ ] Conteos / reservas
-- [ ] Landéd cost
+- [x] RFQ multi-proveedor — Iter 22 (`PurchaseRFQ`, comparación, adjudicación → OC)
+- [x] Conteos / reservas — Iter 22 (`CycleCount`, `StockReservation`)
+- [x] Landed cost — Iter 26: flete/seguro/aranceles/otros en `GoodsReceipt`, prorrateo por valor en `GoodsReceiptItem.landedCostAllocated`, incluido en el WAC (`StockMovement.unitCost`) y en el asiento de recepción
 
 ### 6.3 Multi-company
-- [ ] `UserCompany` + interceptor + switcher wired
-- [ ] `companyId` fiscal
-- [ ] `companyId` ops/CRM
-- [ ] Catálogos por empresa vs compartidos (decisión explícita)
+- [x] `UserCompany` + interceptor + switcher wired — verificado 2026-07-25: `tenant.interceptor.ts`, `CompanySwitcher.tsx`, `CurrentCompanyId` decorator en uso
+- [x] `companyId` fiscal — verificado: `Invoice`/`JournalEntry`/`Expense` con `companyId Int` obligatorio
+- [x] `companyId` ops/CRM — verificado: `Activity`/`ServiceClient`/`SalesClient`/`SalesLead` con `companyId Int` obligatorio
+- [x] Catálogos por empresa vs compartidos — decisión ya implementada en código: **siloed por empresa**, no compartidos (`Product`/`Brand`/`Supplier` con `companyId` obligatorio + `@@unique([companyId, ...])`); documentado aquí como decisión consciente, no pendiente
 
 ### 6.4 CRM / clientes
-- [ ] Flujo único Sales→Service
-- [ ] Deprecar `Client`
-- [ ] Cotización siempre con FK cliente
-- [ ] Portal ve cotizaciones (opcional P1)
+- [x] Flujo único Sales→Service — verificado: `ventas.service.ts` invoca `provisionServiceClient` automáticamente al crear `SalesClient`
+- [x] Deprecar `Client` — verificado: escrituras a `Client` legacy bloqueadas con `BadRequestException`, solo lectura de compatibilidad
+- [x] Cotización siempre con FK cliente — Iter 29: si no viene `salesClientId`/oportunidad, `cotizaciones.service.ts` busca o crea el `SalesClient` a partir del nombre capturado (sin FK ni nombre → 400)
+- [x] Portal ve cotizaciones — Iter 30: `GET client-portal/quotes` + `/pdf` (vía `SalesClient.serviceClientId`), sección "Cotizaciones" en `mis-servicios`
 
 ### 6.5 Studio NEXARA
-- [ ] Draft/publish PageContent
-- [ ] Casos públicos
-- [ ] RBAC studio.content
-- [ ] Versionado
-- [ ] SEO suite
+- [x] Draft/publish PageContent — verificado: `PageContent.draftContent` + `publish()` en `page-content.service.ts`
+- [x] Casos públicos — verificado: `GET case-studies/public` + `/proyectos` en el sitio público ya lo consume
+- [x] RBAC studio.content — Iter 27: `PERMISSIONS.STUDIO_CONTENT_VIEW/MANAGE`, otorgado a `lider_diseno`/`disenador`, aditivo en page-content/news/case-studies controllers (no rompe PANEL_WEB/CONSOLE_ADMIN existentes)
+- [x] Versionado — Iter 22 (`PageContentRevision`, rollback en Studio)
+- [x] SEO suite — verificado: tab SEO completo en Studio (`PAGE_SEO_KEYS`, title/description/OG/keywords/noindex por página)
 
 ### 6.6 Portal
 - [x] Auth unificada
-- [ ] SLA en vivo
-- [ ] Facturas/contratos
-- [ ] KB integrada
+- [x] SLA en vivo — Iter 24: badge de countdown/vencido por ticket en `/tickets` (portal), mismos umbrales que `sla-tracker.service.ts` por prioridad
+- [x] Facturas/contratos — Iter 23: `GET client-portal/invoices` + descarga PDF/XML (contratos ya se mostraban en services-summary)
+- [x] KB integrada — Iter 25: ya existía `/tickets/ayuda` + `kb-public/*` completos pero huérfanos (sin link); agregado a sidebar del portal
 
 ### 6.7 RBAC / audit
 - [x] Fin de flags `acceso*` (ignorados con roleKey; columnas legacy pendientes de drop)
-- [ ] Audit en todas mutaciones $ / stock / CFDI
+- [x] Audit en todas mutaciones $ / stock / CFDI — verificado 2026-07-25: `MutationAuditInterceptor` registrado como `APP_INTERCEPTOR` global en `audit.module.ts` (cubre toda mutación, no solo estas)
 - [x] Audit login staff + portal
-- [ ] MFA
+- [x] MFA — TOTP + UI de setup en /erp/users (Iter 1)
 
 ### 6.8 Pagos / nómina
 - [x] Etiqueta “Pagos a empleados”
 - [x] Póliza al pagar
-- [ ] Cálculo desde asistencia
+- [x] Cálculo desde asistencia — Iter 31: `GET employee-payments/calculate-from-attendance` suma `AttendanceDay.totalMinutes` reales del periodo; botón "Calcular" en el formulario de pago (sugiere, no fuerza el monto)
 - [ ] CFDI N (P2)
 
 ---
@@ -334,3 +353,25 @@ NEXARA debe quedar como **ERP vertical de servicios tecnológicos MX** con:
 | P0-G CMMS | ✅ base | Visita→Activity canónica; workType PREVENTIVE_INVENTORY |
 | P1 AP pay + 3-way | ✅ código | Póliza PAY CXP→bancos; matchStatus + gate pago; migración `20260721160000_*` |
 | P1 COGS + periodo | ✅ código | `SM-COGS-*` Dr 501.01 Cr 115.01; bloqueo periodo cerrado + reopen |
+| Iter 22 Cycle Counts/Reservations | ✅ código | Migración `20260724120000_iter20_cyclecount_reservation_rfq_pagerevision_satagrupador`; ajuste de stock vía `createStockMovement` existente al cerrar conteo |
+| Iter 22 RFQ multi-proveedor | ✅ código | `PurchaseRFQ`/`PurchaseRFQLine`; comparación + adjudicación → `createPurchaseOrder` existente |
+| Iter 22 Studio versionado | ✅ código | `PageContentRevision`; snapshot en cada `publish()`; rollback = restaurar + republicar |
+| Iter 22 DIOT + Contabilidad Electrónica | ✅ código | `Account.satAgrupador` (migración `20260724130000_iter20_supplier_rfc` incluye `Supplier.rfc`); Balanza XML **estructura general Anexo 24, sin validar contra XSD oficial** — validar con contador/PAC antes de envío real |
+| Iter 22 MRP/Quality/HSE | ✅ decisión | Confirmado sin controllers/UI activos; permanece fuera de alcance hasta demanda comercial real de ensamble/kits |
+| Iter 23 Portal facturas | ✅ código | `client-portal/invoices` + `/pdf` + `/xml`; scoping por `SalesClient.serviceClientId = user.clientId`, IDOR validado antes de delegar a `AccountingService.getInvoicePdf/Xml` |
+| Iter 24 Portal SLA en vivo | ✅ código | Sin cambios de backend; badge calculado en `apps/web/app/(subdomains)/tickets/page.tsx` reutilizando umbrales de `sla-tracker.service.ts` |
+| Iter 25 Portal KB link | ✅ código | Backend y página ya existían; solo faltaba el link de navegación — un solo `<Link>` en el sidebar |
+| Iter 26 Landed cost | ✅ código | Migración `20260724140000_iter26_landed_cost`; prorrateo por valor (no por cantidad); UI en "Registrar recepción" con total estimado en vivo |
+| Iter 27 Studio RBAC | ✅ código | Sin migración; permisos nuevos en `common/permissions.ts` + `auth.service.ts` resolveUserPermissions |
+| Iter 28 Catálogo cuentas XML | ✅ código | Reutiliza `getSatAgrupadorStatus`; **sin validar contra XSD oficial** — mismo pendiente contable que Balanza (Iter 22) |
+| Iter 29 Cotización FK + doc | ✅ código | Auto-provisión de `SalesClient` por nombre (find-or-create, scoped por companyId); sin migración |
+| Iter 30 Portal cotizaciones | ✅ código | Sin migración; scoping por `salesClient.serviceClientId = user.clientId` |
+| Iter 31 Pagos desde asistencia | ✅ código | Sin migración; usa `AttendanceDay` ya existente, es sugerencia no automatización forzada |
+
+---
+
+## 11. Decisiones de producto (no construir / diferir)
+
+| Área | Decisión | Motivo | Revisar cuando |
+|------|----------|--------|-----------------|
+| MRP / Quality / HSE | **No construir** — modelos Prisma (`BillOfMaterials`, `ProductionOrder`, `QualityInspection`, `NonConformanceReport`, etc.) se mantienen en schema sin controllers ni UI. Verificado 2026-07-24: cero referencias en `apps/web` a estos modelos. | NEXARA vende servicios tecnológicos de campo (CCTV, redes, cómputo, soporte), no manufactura. Construir MRP/Calidad completo sin un cliente que ensamble kits sería trabajo especulativo sin retorno medible. | Si aparece una oportunidad comercial real de ensamble/kits o manufactura ligera. Hasta entonces, no es deuda técnica pendiente — es una decisión tomada. |

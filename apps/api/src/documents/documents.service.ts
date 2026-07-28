@@ -1,14 +1,24 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import {
+  assertCompanyAccess,
+  companyWhere,
+  requireCompanyId,
+} from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class DocumentsService {
   constructor(private readonly prisma: PrismaService) {}
 
   // ── Document Categories ───────────────────────────────────────────
-  async createCategory(dto: { name: string; description?: string; parentId?: number }) {
+  async createCategory(
+    dto: { name: string; description?: string; parentId?: number },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.documentCategory.create({
       data: {
+        companyId: tenantId,
         name: dto.name.trim(),
         description: dto.description?.trim() || null,
         parentId: dto.parentId ?? null,
@@ -16,29 +26,38 @@ export class DocumentsService {
     });
   }
 
-  async listCategories() {
+  async listCategories(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.documentCategory.findMany({
       include: { children: true, _count: { select: { documents: true } } },
-      where: { parentId: null },
+      where: { parentId: null, ...companyWhere(tenantId) },
       orderBy: { name: 'asc' },
     });
   }
 
   // ── Managed Documents ─────────────────────────────────────────────
-  async createDocument(dto: {
-    title: string;
-    documentNumber?: string;
-    categoryId?: number;
-    description?: string;
-    fileUrl?: string;
-    mimeType?: string;
-    fileSizeBytes?: number;
-    retentionDays?: number;
-  }, userId: number) {
-    const count = await this.prisma.managedDocument.count();
+  async createDocument(
+    dto: {
+      title: string;
+      documentNumber?: string;
+      categoryId?: number;
+      description?: string;
+      fileUrl?: string;
+      mimeType?: string;
+      fileSizeBytes?: number;
+      retentionDays?: number;
+    },
+    userId: number,
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const count = await this.prisma.managedDocument.count({
+      where: companyWhere(tenantId),
+    });
     const docNumber = dto.documentNumber?.trim() || 'DOC-' + String(count + 1).padStart(6, '0');
     return this.prisma.managedDocument.create({
       data: {
+        companyId: tenantId,
         documentNumber: docNumber,
         title: dto.title.trim(),
         categoryId: dto.categoryId ?? null,
@@ -62,8 +81,12 @@ export class DocumentsService {
     });
   }
 
-  async listDocuments(filters?: { categoryId?: number; status?: string; search?: string }) {
-    const where: any = {};
+  async listDocuments(
+    filters?: { categoryId?: number; status?: string; search?: string },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { ...companyWhere(tenantId) };
     if (filters?.categoryId) where.categoryId = filters.categoryId;
     if (filters?.status) where.status = filters.status;
     if (filters?.search) {
@@ -79,9 +102,10 @@ export class DocumentsService {
     });
   }
 
-  async getDocument(id: number) {
-    const doc = await this.prisma.managedDocument.findUnique({
-      where: { id },
+  async getDocument(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const doc = await this.prisma.managedDocument.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: {
         category: true,
         versions: { orderBy: { versionNumber: 'desc' } },
@@ -89,14 +113,23 @@ export class DocumentsService {
         approvedBy: { select: { id: true, nombre: true } },
       },
     });
-    if (!doc) throw new NotFoundException('Documento no encontrado');
+    assertCompanyAccess(doc, tenantId, 'Documento');
     return doc;
   }
 
-  async uploadNewVersion(docId: number, dto: { fileUrl: string; changelog?: string }, userId: number) {
-    const doc = await this.prisma.managedDocument.findUnique({ where: { id: docId }, include: { versions: { orderBy: { versionNumber: 'desc' }, take: 1 } } });
-    if (!doc) throw new NotFoundException('Documento no encontrado');
-    const nextVersion = (doc.versions[0]?.versionNumber || 0) + 1;
+  async uploadNewVersion(
+    docId: number,
+    dto: { fileUrl: string; changelog?: string },
+    userId: number,
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const doc = await this.prisma.managedDocument.findFirst({
+      where: { id: docId, ...companyWhere(tenantId) },
+      include: { versions: { orderBy: { versionNumber: 'desc' }, take: 1 } },
+    });
+    assertCompanyAccess(doc, tenantId, 'Documento');
+    const nextVersion = (doc!.versions[0]?.versionNumber || 0) + 1;
 
     await this.prisma.documentVersion.create({
       data: {
@@ -119,14 +152,26 @@ export class DocumentsService {
     });
   }
 
-  async approveDocument(id: number, userId: number) {
+  async approveDocument(id: number, userId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const doc = await this.prisma.managedDocument.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+      select: { id: true, companyId: true },
+    });
+    assertCompanyAccess(doc, tenantId, 'Documento');
     return this.prisma.managedDocument.update({
       where: { id },
       data: { status: 'APPROVED', approvedById: userId, approvedAt: new Date() },
     });
   }
 
-  async archiveDocument(id: number) {
+  async archiveDocument(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const doc = await this.prisma.managedDocument.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+      select: { id: true, companyId: true },
+    });
+    assertCompanyAccess(doc, tenantId, 'Documento');
     return this.prisma.managedDocument.update({
       where: { id },
       data: { status: 'OBSOLETE' },
@@ -136,10 +181,14 @@ export class DocumentsService {
   async updateDocument(
     id: number,
     dto: { title?: string; description?: string; categoryId?: number | null; fileUrl?: string },
+    companyId?: number | null,
   ) {
-    const doc = await this.prisma.managedDocument.findUnique({ where: { id } });
-    if (!doc) throw new NotFoundException('Documento no encontrado');
-    if (doc.status === 'APPROVED' || doc.status === 'OBSOLETE') {
+    const tenantId = requireCompanyId(companyId);
+    const doc = await this.prisma.managedDocument.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(doc, tenantId, 'Documento');
+    if (doc!.status === 'APPROVED' || doc!.status === 'OBSOLETE') {
       throw new NotFoundException('Solo se pueden editar documentos en borrador o pendientes de aprobación');
     }
     return this.prisma.managedDocument.update({

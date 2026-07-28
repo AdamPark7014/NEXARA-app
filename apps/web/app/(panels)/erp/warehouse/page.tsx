@@ -22,10 +22,20 @@ import {
   createLot,
   getStockValuation,
   getInventoryInsights,
+  listCycleCounts,
+  scheduleCycleCount,
+  recordCycleCountItems,
+  closeCycleCount,
+  cancelCycleCount,
+  listReservations,
+  createReservation,
+  releaseReservation,
   type StockMovementRow,
   type LotRow,
   type ValuationRow,
   type InventoryInsights,
+  type CycleCountRow,
+  type StockReservationRow,
 } from "@/lib/stock-api";
 import { formatApiError } from "@/lib/erp-api";
 import { toast } from "@/components/Toast";
@@ -41,7 +51,15 @@ const TABS = [
   { key: "movimientos", label: "Movimientos" },
   { key: "lotes", label: "Lotes y caducidad" },
   { key: "valuacion", label: "Valuación" },
+  { key: "conteos", label: "Conteos y reservas" },
 ] as const;
+
+const CYCLE_COUNT_STATUS_LABEL: Record<string, string> = {
+  SCHEDULED: "Programado",
+  IN_PROGRESS: "En captura",
+  CLOSED: "Cerrado",
+  CANCELLED: "Cancelado",
+};
 type TabKey = (typeof TABS)[number]["key"];
 
 const MOVEMENT_TYPE_LABEL: Record<string, string> = {
@@ -99,6 +117,22 @@ export default function WarehousePage() {
   const [valuation, setValuation] = useState<ValuationRow[]>([]);
   const [valuationLoading, setValuationLoading] = useState(false);
   const [valuationWarehouseFilter, setValuationWarehouseFilter] = useState("");
+
+  const [cycleCounts, setCycleCounts] = useState<CycleCountRow[]>([]);
+  const [cycleCountsLoading, setCycleCountsLoading] = useState(false);
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({ warehouseId: "", scheduledFor: "", notes: "" });
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [activeCount, setActiveCount] = useState<CycleCountRow | null>(null);
+  const [captureQty, setCaptureQty] = useState<Record<number, string>>({});
+  const [savingCapture, setSavingCapture] = useState(false);
+  const [closingCount, setClosingCount] = useState(false);
+
+  const [reservations, setReservations] = useState<StockReservationRow[]>([]);
+  const [reservationsLoading, setReservationsLoading] = useState(false);
+  const [showReservationForm, setShowReservationForm] = useState(false);
+  const [reservationForm, setReservationForm] = useState({ productId: "", warehouseId: "", quantity: 1, reason: "", expiresAt: "" });
+  const [savingReservation, setSavingReservation] = useState(false);
 
   const loadWarehouses = useCallback(() => {
     if (!token) return;
@@ -279,6 +313,136 @@ export default function WarehousePage() {
     }
   }, [token]);
 
+  const loadCycleCounts = useCallback(async () => {
+    if (!token) return;
+    setCycleCountsLoading(true);
+    try {
+      setCycleCounts(await listCycleCounts(token));
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudieron cargar los conteos cíclicos"));
+      setCycleCounts([]);
+    } finally {
+      setCycleCountsLoading(false);
+    }
+  }, [token]);
+
+  const loadReservations = useCallback(async () => {
+    if (!token) return;
+    setReservationsLoading(true);
+    try {
+      setReservations(await listReservations(token));
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudieron cargar las reservas"));
+      setReservations([]);
+    } finally {
+      setReservationsLoading(false);
+    }
+  }, [token]);
+
+  const submitSchedule = async () => {
+    if (!token || !scheduleForm.warehouseId || !scheduleForm.scheduledFor) return;
+    setSavingSchedule(true);
+    try {
+      await scheduleCycleCount(token, {
+        warehouseId: Number(scheduleForm.warehouseId),
+        scheduledFor: scheduleForm.scheduledFor,
+        notes: scheduleForm.notes.trim() || undefined,
+      });
+      setShowScheduleForm(false);
+      setScheduleForm({ warehouseId: "", scheduledFor: "", notes: "" });
+      void loadCycleCounts();
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo programar el conteo"));
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
+
+  const openCapture = (count: CycleCountRow) => {
+    setActiveCount(count);
+    const initial: Record<number, string> = {};
+    for (const item of count.items ?? []) {
+      initial[item.productId] = item.countedQty != null ? String(item.countedQty) : "";
+    }
+    setCaptureQty(initial);
+  };
+
+  const submitCapture = async () => {
+    if (!token || !activeCount) return;
+    const items = Object.entries(captureQty)
+      .filter(([, v]) => v.trim() !== "")
+      .map(([productId, v]) => ({ productId: Number(productId), countedQty: Number(v) }));
+    if (!items.length) return;
+    setSavingCapture(true);
+    try {
+      const updated = await recordCycleCountItems(token, activeCount.id, items);
+      setActiveCount(updated);
+      void loadCycleCounts();
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo capturar el conteo"));
+    } finally {
+      setSavingCapture(false);
+    }
+  };
+
+  const submitCloseCount = async () => {
+    if (!token || !activeCount) return;
+    setClosingCount(true);
+    try {
+      await closeCycleCount(token, activeCount.id);
+      toast.success("Conteo cerrado — varianzas ajustadas en stock");
+      setActiveCount(null);
+      void loadCycleCounts();
+      if (tab === "dashboard") void loadInsights();
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo cerrar el conteo"));
+    } finally {
+      setClosingCount(false);
+    }
+  };
+
+  const submitCancelCount = async (id: number) => {
+    if (!token) return;
+    try {
+      await cancelCycleCount(token, id);
+      void loadCycleCounts();
+      if (activeCount?.id === id) setActiveCount(null);
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo cancelar el conteo"));
+    }
+  };
+
+  const submitReservation = async () => {
+    if (!token || !reservationForm.productId || !reservationForm.warehouseId || !reservationForm.reason.trim()) return;
+    setSavingReservation(true);
+    try {
+      await createReservation(token, {
+        productId: Number(reservationForm.productId),
+        warehouseId: Number(reservationForm.warehouseId),
+        quantity: reservationForm.quantity,
+        reason: reservationForm.reason.trim(),
+        expiresAt: reservationForm.expiresAt || undefined,
+      });
+      setShowReservationForm(false);
+      setReservationForm({ productId: "", warehouseId: "", quantity: 1, reason: "", expiresAt: "" });
+      void loadReservations();
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo crear la reserva"));
+    } finally {
+      setSavingReservation(false);
+    }
+  };
+
+  const submitReleaseReservation = async (id: number) => {
+    if (!token) return;
+    try {
+      await releaseReservation(token, id);
+      void loadReservations();
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo liberar la reserva"));
+    }
+  };
+
   useEffect(() => {
     if (tab === "dashboard") void loadInsights();
   }, [tab, loadInsights]);
@@ -294,6 +458,13 @@ export default function WarehousePage() {
   useEffect(() => {
     if (tab === "valuacion") void loadValuation();
   }, [tab, loadValuation]);
+
+  useEffect(() => {
+    if (tab === "conteos") {
+      void loadCycleCounts();
+      void loadReservations();
+    }
+  }, [tab, loadCycleCounts, loadReservations]);
 
   const sinStock = items.filter((s) => s.existencia === 0).length;
   const bajoMinimo = items.filter((s) => s.existencia > 0 && s.existencia < s.minimo).length;
@@ -440,6 +611,68 @@ export default function WarehousePage() {
     { key: "unitCost", label: "Costo unit.", render: (v) => <Money value={Number(v.unitCost ?? 0)} compact />, width: 110, numeric: true },
     { key: "totalValue", label: "Valor total", render: (v) => <Money value={v.totalValue} compact />, width: 130, numeric: true },
   ];
+
+  const cycleCountColumns: Column<CycleCountRow>[] = [
+    { key: "countNumber", label: "Folio", render: (c) => <code style={{ fontSize: 11.5 }}>{c.countNumber}</code>, width: 110 },
+    { key: "warehouse", label: "Almacén", accessor: (c) => c.warehouse?.name ?? "—", width: 150 },
+    {
+      key: "status", label: "Estado", width: 130,
+      render: (c) => (
+        <Tag variant={c.status === "CLOSED" ? "positive" : c.status === "CANCELLED" ? "default" : c.status === "IN_PROGRESS" ? "warning" : "neutral"}>
+          {CYCLE_COUNT_STATUS_LABEL[c.status] ?? c.status}
+        </Tag>
+      ),
+    },
+    { key: "scheduledFor", label: "Programado", render: (c) => <span style={{ fontSize: 12 }}>{new Date(c.scheduledFor).toLocaleDateString("es-MX")}</span>, width: 110 },
+    {
+      key: "progress", label: "Captura", width: 110,
+      render: (c) => {
+        const total = c._count?.items ?? c.items?.length ?? 0;
+        const done = (c.items ?? []).filter((i) => i.countedQty != null).length;
+        return <span style={{ fontSize: 12 }}>{done}/{total}</span>;
+      },
+    },
+    {
+      key: "actions", label: "", width: 190,
+      render: (c) => (
+        <div style={{ display: "flex", gap: 6 }}>
+          {(c.status === "SCHEDULED" || c.status === "IN_PROGRESS") && (
+            <>
+              <Button size="sm" variant="secondary" onClick={() => openCapture(c)}>Capturar</Button>
+              <Button size="sm" variant="ghost" onClick={() => void submitCancelCount(c.id)}>Cancelar</Button>
+            </>
+          )}
+          {c.status === "CLOSED" && (
+            <Button size="sm" variant="ghost" onClick={() => openCapture(c)}>Ver detalle</Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  const reservationColumns: Column<StockReservationRow>[] = [
+    { key: "product", label: "Producto", render: (r) => (
+      <div>
+        <div style={{ fontSize: 13 }}>{r.product?.name ?? "—"}</div>
+        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{r.product?.sku}</div>
+      </div>
+    ) },
+    { key: "warehouse", label: "Almacén", accessor: (r) => r.warehouse?.name ?? "—", width: 140 },
+    { key: "quantity", label: "Cantidad", render: (r) => <strong style={{ fontSize: 13 }}>{Number(r.quantity)}</strong>, width: 90, numeric: true },
+    { key: "reason", label: "Motivo", accessor: (r) => r.reason },
+    {
+      key: "status", label: "Estado", width: 110,
+      render: (r) => <Tag variant={r.status === "ACTIVE" ? "warning" : r.status === "CONSUMED" ? "positive" : "default"}>{r.status === "ACTIVE" ? "Activa" : r.status === "CONSUMED" ? "Consumida" : "Liberada"}</Tag>,
+    },
+    { key: "expiresAt", label: "Expira", render: (r) => r.expiresAt ? <span style={{ fontSize: 12 }}>{new Date(r.expiresAt).toLocaleDateString("es-MX")}</span> : <span style={{ color: "var(--text-tertiary)" }}>—</span>, width: 110 },
+    {
+      key: "actions", label: "", width: 90,
+      render: (r) => r.status === "ACTIVE" ? <Button size="sm" variant="ghost" onClick={() => void submitReleaseReservation(r.id)}>Liberar</Button> : null,
+    },
+  ];
+
+  const activeCountItems = activeCount?.items ?? [];
+  const activeCountClosed = activeCount?.status === "CLOSED" || activeCount?.status === "CANCELLED";
 
   const totalValuation = useMemo(() => valuation.reduce((s, v) => s + v.totalValue, 0), [valuation]);
   const expiringLotsCount = useMemo(() => lots.filter((l) => {
@@ -807,7 +1040,19 @@ export default function WarehousePage() {
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
         ) : !loadError ? (
-          <DataTable columns={columns} rows={visibleItems} rowKey={(s) => s.id} emptyTitle="Sin stock registrado" emptyDescription="Configura almacenes y niveles de inventario en el backend." />
+          <DataTable
+            columns={columns}
+            rows={visibleItems}
+            rowKey={(s) => s.id}
+            emptyTitle="Sin stock registrado"
+            emptyDescription="Crea un almacén y registra la primera entrada para empezar el inventario."
+            emptyAction={
+              <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                <Button size="sm" variant="secondary" onClick={() => setShowWarehouseForm(true)}>Nuevo almacén</Button>
+                <Button size="sm" variant="primary" onClick={() => setShowMovementForm(true)}>Entrada de stock</Button>
+              </div>
+            }
+          />
         ) : null}
       </Section>
       </>
@@ -836,7 +1081,14 @@ export default function WarehousePage() {
           {movementsLoading ? (
             <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
           ) : (
-            <DataTable columns={movementColumns} rows={movements} rowKey={(m) => m.id} emptyTitle="Sin movimientos" emptyDescription="Registra una entrada o salida de inventario para ver el historial aquí." />
+            <DataTable
+              columns={movementColumns}
+              rows={movements}
+              rowKey={(m) => m.id}
+              emptyTitle="Sin movimientos"
+              emptyDescription="Registra una entrada o salida para ver el historial aquí."
+              emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={() => setShowMovementForm(true)}>Registrar movimiento</Button> : undefined}
+            />
           )}
         </Section>
       )}
@@ -898,7 +1150,27 @@ export default function WarehousePage() {
           {lotsLoading ? (
             <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
           ) : (
-            <DataTable columns={lotColumns} rows={lots} rowKey={(l) => l.id} emptyTitle="Sin lotes" emptyDescription="Registra el primer lote para trazabilidad y control de caducidad." />
+            <DataTable
+              columns={lotColumns}
+              rows={lots}
+              rowKey={(l) => l.id}
+              emptyTitle="Sin lotes"
+              emptyDescription="Registra el primer lote para trazabilidad y control de caducidad."
+              emptyAction={
+                cfg.canCreate ? (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => {
+                      setLotForm({ lotNumber: "", productId: "", expirationDate: "", manufacturingDate: "", notes: "" });
+                      setShowLotForm(true);
+                    }}
+                  >
+                    Nuevo lote
+                  </Button>
+                ) : undefined
+              }
+            />
           )}
         </Section>
       )}
@@ -921,9 +1193,171 @@ export default function WarehousePage() {
           {valuationLoading ? (
             <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
           ) : (
-            <DataTable columns={valuationColumns} rows={valuation} rowKey={(v) => v.id} emptyTitle="Sin datos de valuación" emptyDescription="No hay niveles de stock configurados para este almacén." />
+            <DataTable
+              columns={valuationColumns}
+              rows={valuation}
+              rowKey={(v) => v.id}
+              emptyTitle="Sin datos de valuación"
+              emptyDescription="Registra stock en un almacén para calcular valor de inventario."
+              emptyAction={
+                <Button size="sm" variant="secondary" onClick={() => { setTab("inventario"); setShowMovementForm(true); }}>
+                  Entrada de stock
+                </Button>
+              }
+            />
           )}
         </Section>
+      )}
+
+      {tab === "conteos" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          <Section
+            title="Conteos cíclicos"
+            subtitle="Programa un conteo físico, captura lo encontrado y cierra: la varianza ajusta el stock automáticamente."
+            actions={cfg.canCreate ? (
+              <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowScheduleForm(true)}>Programar conteo</Button>
+            ) : undefined}
+          >
+            {showScheduleForm && (
+              <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Almacén *</span>
+                  <select value={scheduleForm.warehouseId} onChange={(e) => setScheduleForm((f) => ({ ...f, warehouseId: e.target.value }))} style={inp}>
+                    <option value="">Seleccionar…</option>
+                    {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                  </select>
+                </label>
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Fecha programada *</span>
+                  <input type="date" value={scheduleForm.scheduledFor} onChange={(e) => setScheduleForm((f) => ({ ...f, scheduledFor: e.target.value }))} style={inp} />
+                </label>
+                <label style={{ display: "grid", gap: 4, gridColumn: "1 / -1" }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Notas</span>
+                  <input value={scheduleForm.notes} onChange={(e) => setScheduleForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Conteo trimestral, auditoría sorpresa…" style={inp} />
+                </label>
+                <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <Button variant="ghost" onClick={() => setShowScheduleForm(false)}>Cancelar</Button>
+                  <Button variant="primary" onClick={() => void submitSchedule()} disabled={savingSchedule || !scheduleForm.warehouseId || !scheduleForm.scheduledFor}>
+                    {savingSchedule ? "Programando…" : "Programar (snapshot de stock actual)"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {activeCount && (
+              <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>
+                    Conteo {activeCount.countNumber} · {activeCount.warehouse?.name} · <Tag variant={activeCount.status === "CLOSED" ? "positive" : "warning"}>{CYCLE_COUNT_STATUS_LABEL[activeCount.status]}</Tag>
+                  </p>
+                  <Button variant="ghost" size="sm" onClick={() => setActiveCount(null)}>Cerrar panel</Button>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto" }}>
+                  {activeCountItems.map((it) => {
+                    const counted = captureQty[it.productId] ?? "";
+                    const variance = counted !== "" ? Number(counted) - Number(it.expectedQty) : (it.varianceQty != null ? Number(it.varianceQty) : null);
+                    return (
+                      <div key={it.id} style={{ display: "grid", gridTemplateColumns: "1fr 90px 110px 90px", gap: 10, alignItems: "center", fontSize: 12.5, borderBottom: "1px solid var(--border)", paddingBottom: 6 }}>
+                        <div>
+                          <strong>{it.product?.name ?? `Producto #${it.productId}`}</strong>
+                          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{it.product?.sku}</div>
+                        </div>
+                        <span style={{ color: "var(--text-tertiary)" }}>Esp. {Number(it.expectedQty)}</span>
+                        <input
+                          type="number"
+                          disabled={activeCountClosed}
+                          value={counted}
+                          onChange={(e) => setCaptureQty((q) => ({ ...q, [it.productId]: e.target.value }))}
+                          placeholder="Contado"
+                          style={{ ...inp, padding: "6px 8px" }}
+                        />
+                        <span style={{ fontWeight: 700, color: variance == null ? "var(--text-tertiary)" : variance === 0 ? "var(--success)" : variance > 0 ? "var(--primary)" : "var(--danger)" }}>
+                          {variance == null ? "—" : variance > 0 ? `+${variance}` : variance}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {!activeCountClosed && (
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
+                    <Button variant="secondary" onClick={() => void submitCapture()} disabled={savingCapture}>{savingCapture ? "Guardando…" : "Guardar captura"}</Button>
+                    <Button variant="primary" onClick={() => void submitCloseCount()} disabled={closingCount}>{closingCount ? "Cerrando…" : "Cerrar conteo y ajustar stock"}</Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {cycleCountsLoading ? (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+            ) : (
+              <DataTable
+                columns={cycleCountColumns}
+                rows={cycleCounts}
+                rowKey={(c) => c.id}
+                emptyTitle="Sin conteos programados"
+                emptyDescription="Programa un conteo cíclico para validar el stock físico contra el sistema."
+                emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={() => setShowScheduleForm(true)}>Programar conteo</Button> : undefined}
+              />
+            )}
+          </Section>
+
+          <Section
+            title="Reservas de stock"
+            subtitle="Reduce el disponible sin mover físico — útil para apartar stock a una cotización u orden antes de despachar."
+            actions={cfg.canCreate ? (
+              <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowReservationForm(true)}>Nueva reserva</Button>
+            ) : undefined}
+          >
+            {showReservationForm && (
+              <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Producto *</span>
+                  <select value={reservationForm.productId} onChange={(e) => setReservationForm((f) => ({ ...f, productId: e.target.value }))} style={inp}>
+                    <option value="">Seleccionar…</option>
+                    {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
+                  </select>
+                </label>
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Almacén *</span>
+                  <select value={reservationForm.warehouseId} onChange={(e) => setReservationForm((f) => ({ ...f, warehouseId: e.target.value }))} style={inp}>
+                    <option value="">Seleccionar…</option>
+                    {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                  </select>
+                </label>
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Cantidad *</span>
+                  <input type="number" min={1} value={reservationForm.quantity} onChange={(e) => setReservationForm((f) => ({ ...f, quantity: +e.target.value }))} style={inp} />
+                </label>
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Expira (opcional)</span>
+                  <input type="date" value={reservationForm.expiresAt} onChange={(e) => setReservationForm((f) => ({ ...f, expiresAt: e.target.value }))} style={inp} />
+                </label>
+                <label style={{ display: "grid", gap: 4, gridColumn: "1 / -1" }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo *</span>
+                  <input value={reservationForm.reason} onChange={(e) => setReservationForm((f) => ({ ...f, reason: e.target.value }))} placeholder="Cotización COT-000123, orden de cliente…" style={inp} />
+                </label>
+                <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <Button variant="ghost" onClick={() => setShowReservationForm(false)}>Cancelar</Button>
+                  <Button variant="primary" onClick={() => void submitReservation()} disabled={savingReservation || !reservationForm.productId || !reservationForm.warehouseId || !reservationForm.reason.trim()}>
+                    {savingReservation ? "Reservando…" : "Crear reserva"}
+                  </Button>
+                </div>
+              </div>
+            )}
+            {reservationsLoading ? (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+            ) : (
+              <DataTable
+                columns={reservationColumns}
+                rows={reservations}
+                rowKey={(r) => r.id}
+                emptyTitle="Sin reservas activas"
+                emptyDescription="Reserva stock para apartarlo de una cotización u orden sin despacharlo todavía."
+                emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={() => setShowReservationForm(true)}>Nueva reserva</Button> : undefined}
+              />
+            )}
+          </Section>
+        </div>
       )}
     </>
   );

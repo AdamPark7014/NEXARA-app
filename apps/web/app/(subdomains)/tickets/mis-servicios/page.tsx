@@ -55,6 +55,67 @@ type ServicesSummary = {
   }>;
 };
 
+type Invoice = {
+  id: number;
+  invoiceNumber: string;
+  status: string;
+  issueDate: string;
+  dueDate: string;
+  totalAmount: number;
+  paidAmount: number;
+  currency: string;
+  cfdiUuid?: string | null;
+  pdfUrl?: string | null;
+  cfdiXml?: string | null;
+};
+
+const INVOICE_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Borrador",
+  STAMPING: "Timbrando",
+  SENT: "Enviada",
+  PARTIALLY_PAID: "Pago parcial",
+  PAID: "Pagada",
+  OVERDUE: "Vencida",
+  CANCELLED: "Cancelada",
+  CREDITED: "Con nota de crédito",
+};
+
+type Quote = {
+  id: number;
+  quoteNumber: string;
+  status: string;
+  issueDate: string;
+  validUntil?: string | null;
+  projectName?: string | null;
+  currency: string;
+  total: number;
+  sentAt?: string | null;
+  signedAt?: string | null;
+};
+
+const QUOTE_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Borrador",
+  SENT: "Enviada",
+  APPROVED: "Aprobada",
+};
+
+const QUOTE_STATUS_COLOR: Record<string, string> = {
+  DRAFT: "#6b7280",
+  SENT: "#3b82f6",
+  APPROVED: "#16a34a",
+};
+
+const INVOICE_STATUS_COLOR: Record<string, string> = {
+  DRAFT: "#6b7280",
+  STAMPING: "#6b7280",
+  SENT: "#3b82f6",
+  PARTIALLY_PAID: "#f59e0b",
+  PAID: "#16a34a",
+  OVERDUE: "#dc2626",
+  CANCELLED: "#6b7280",
+  CREDITED: "#8b5cf6",
+};
+
 const FREQ_LABEL: Record<string, string> = {
   WEEKLY: "Semanal",
   BIWEEKLY: "Quincenal",
@@ -79,6 +140,10 @@ export default function MisServiciosPage() {
   const [data, setData] = useState<ServicesSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[] | null>(null);
+  const [downloadingInvoice, setDownloadingInvoice] = useState<string | null>(null);
+  const [quotes, setQuotes] = useState<Quote[] | null>(null);
+  const [downloadingQuoteId, setDownloadingQuoteId] = useState<number | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -103,7 +168,82 @@ export default function MisServiciosPage() {
     }
   }, [token]);
 
+  const downloadInvoiceFile = async (invoiceId: number, kind: "pdf" | "xml", filename: string) => {
+    if (!token) return;
+    const key = `${invoiceId}-${kind}`;
+    setDownloadingInvoice(key);
+    try {
+      const res = await fetch(buildApiUrl(`client-portal/invoices/${invoiceId}/${kind}`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(await res.text().catch(() => "Error al descargar"));
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert((err as Error).message || "No se pudo descargar el archivo");
+    } finally {
+      setDownloadingInvoice(null);
+    }
+  };
+
   useEffect(() => { refresh(); }, [refresh]);
+
+  useEffect(() => {
+    if (!token) return;
+    void (async () => {
+      try {
+        const res = await fetch(buildApiUrl("client-portal/invoices"), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        setInvoices(await res.json());
+      } catch {
+        setInvoices(null);
+      }
+    })();
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    void (async () => {
+      try {
+        const res = await fetch(buildApiUrl("client-portal/quotes"), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        setQuotes(await res.json());
+      } catch {
+        setQuotes(null);
+      }
+    })();
+  }, [token]);
+
+  const downloadQuotePdf = async (quoteId: number, quoteNumber: string) => {
+    if (!token) return;
+    setDownloadingQuoteId(quoteId);
+    try {
+      const res = await fetch(buildApiUrl(`client-portal/quotes/${quoteId}/pdf`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(await res.text().catch(() => "Error al descargar"));
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${quoteNumber}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert((err as Error).message || "No se pudo descargar la cotización");
+    } finally {
+      setDownloadingQuoteId(null);
+    }
+  };
 
   if (!token) {
     return (
@@ -208,6 +348,100 @@ export default function MisServiciosPage() {
           </div>
         )}
       </Section>
+
+      {quotes && quotes.length > 0 && (
+        <Section title="📋 Cotizaciones">
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <Th>Folio</Th>
+                <Th>Proyecto</Th>
+                <Th>Emisión</Th>
+                <Th>Vigencia</Th>
+                <Th>Total</Th>
+                <Th>Estado</Th>
+                <Th>PDF</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {quotes.map((q) => (
+                <tr key={q.id} style={trStyle}>
+                  <Td><strong>{q.quoteNumber}</strong></Td>
+                  <Td>{q.projectName || "-"}</Td>
+                  <Td>{new Date(q.issueDate).toLocaleDateString("es-MX")}</Td>
+                  <Td>{q.validUntil ? new Date(q.validUntil).toLocaleDateString("es-MX") : "-"}</Td>
+                  <Td>{q.total.toLocaleString("es-MX", { style: "currency", currency: q.currency || "MXN" })}</Td>
+                  <Td><Badge color={QUOTE_STATUS_COLOR[q.status] || "#6b7280"}>{QUOTE_STATUS_LABEL[q.status] || q.status}</Badge></Td>
+                  <Td>
+                    <button
+                      type="button"
+                      disabled={downloadingQuoteId === q.id}
+                      onClick={() => void downloadQuotePdf(q.id, q.quoteNumber)}
+                      style={{ background: "none", border: "none", color: "var(--primary)", cursor: "pointer", padding: 0, fontSize: 13 }}
+                    >
+                      {downloadingQuoteId === q.id ? "…" : "Descargar"}
+                    </button>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Section>
+      )}
+
+      {invoices && invoices.length > 0 && (
+        <Section title="🧾 Facturas">
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <Th>Folio</Th>
+                <Th>Emisión</Th>
+                <Th>Vencimiento</Th>
+                <Th>Total</Th>
+                <Th>Pagado</Th>
+                <Th>Estado</Th>
+                <Th>Descargar</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((inv) => (
+                <tr key={inv.id} style={trStyle}>
+                  <Td><strong>{inv.invoiceNumber}</strong></Td>
+                  <Td>{new Date(inv.issueDate).toLocaleDateString("es-MX")}</Td>
+                  <Td>{new Date(inv.dueDate).toLocaleDateString("es-MX")}</Td>
+                  <Td>{inv.totalAmount.toLocaleString("es-MX", { style: "currency", currency: inv.currency || "MXN" })}</Td>
+                  <Td>{inv.paidAmount.toLocaleString("es-MX", { style: "currency", currency: inv.currency || "MXN" })}</Td>
+                  <Td><Badge color={INVOICE_STATUS_COLOR[inv.status] || "#6b7280"}>{INVOICE_STATUS_LABEL[inv.status] || inv.status}</Badge></Td>
+                  <Td>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {inv.pdfUrl && (
+                        <button
+                          type="button"
+                          disabled={downloadingInvoice === `${inv.id}-pdf`}
+                          onClick={() => void downloadInvoiceFile(inv.id, "pdf", `${inv.invoiceNumber}.pdf`)}
+                          style={{ background: "none", border: "none", color: "var(--primary)", cursor: "pointer", padding: 0, fontSize: 13 }}
+                        >
+                          {downloadingInvoice === `${inv.id}-pdf` ? "…" : "PDF"}
+                        </button>
+                      )}
+                      {inv.cfdiXml && (
+                        <button
+                          type="button"
+                          disabled={downloadingInvoice === `${inv.id}-xml`}
+                          onClick={() => void downloadInvoiceFile(inv.id, "xml", `${inv.invoiceNumber}.xml`)}
+                          style={{ background: "none", border: "none", color: "var(--primary)", cursor: "pointer", padding: 0, fontSize: 13 }}
+                        >
+                          {downloadingInvoice === `${inv.id}-xml` ? "…" : "XML"}
+                        </button>
+                      )}
+                    </div>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Section>
+      )}
 
       <Section title="⏰ Próximas visitas (30 días)">
         {data.upcomingVisits.length === 0 ? (

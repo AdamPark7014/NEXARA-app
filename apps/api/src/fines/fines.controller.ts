@@ -16,6 +16,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { FinesService, CreateFineDto, UpdateFineDto } from './fines.service';
 import { PERMISSIONS } from '../common/permissions.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 @Controller('fines')
 @UseGuards(RbacGuard)
@@ -34,20 +35,28 @@ export class FinesController {
 
   @Post()
   @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.ACTIVITIES_MANAGE] })
-  async create(@Body() data: CreateFineDto, @CurrentUser() user: any) {
+  async create(
+    @Body() data: CreateFineDto,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
     if (!this.isOpsManager(user)) {
       throw new ForbiddenException('No autorizado para crear multas');
     }
-    return this.finesService.create(data);
+    return this.finesService.create(data, companyId);
   }
 
   @Get()
   @UseGuards(AuthGuard('jwt'))
-  async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
+  async findAll(
+    @CurrentUser() user: any,
+    @Query() query: PaginationQueryDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
     if (!this.isOpsManager(user)) {
-      return this.finesService.findByUser(user?.id || 0);
+      return this.finesService.findByUser(user?.id || 0, companyId);
     }
-    return this.finesService.findAll(user, query);
+    return this.finesService.findAll(user, query, companyId);
   }
 
   @Get('user/:usuarioId')
@@ -55,12 +64,13 @@ export class FinesController {
   async findByUser(
     @Param('usuarioId') usuarioId: string,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     const id = parseInt(usuarioId, 10);
     if (id !== user?.id && !this.isOpsManager(user)) {
       throw new ForbiddenException('No autorizado');
     }
-    return this.finesService.findByUser(id);
+    return this.finesService.findByUser(id, companyId);
   }
 
   @Get('user/:usuarioId/type/:tipo')
@@ -69,12 +79,13 @@ export class FinesController {
     @Param('usuarioId') usuarioId: string,
     @Param('tipo') tipo: string,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     const id = parseInt(usuarioId, 10);
     if (id !== user?.id && !this.isOpsManager(user)) {
       throw new ForbiddenException('No autorizado');
     }
-    return this.finesService.findByUserAndType(id, tipo);
+    return this.finesService.findByUserAndType(id, tipo, companyId);
   }
 
   @Get('type/:tipo')
@@ -82,11 +93,12 @@ export class FinesController {
   async findByType(
     @Param('tipo') tipo: string,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     if (!this.isOpsManager(user)) {
       throw new ForbiddenException('No autorizado');
     }
-    return this.finesService.findByType(tipo);
+    return this.finesService.findByType(tipo, companyId);
   }
 
   @Get('stats/user/:usuarioId')
@@ -94,6 +106,7 @@ export class FinesController {
   async getStats(
     @Param('usuarioId') usuarioId: string,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     const id = parseInt(usuarioId, 10);
     if (id !== user?.id && !this.isOpsManager(user)) {
@@ -103,8 +116,8 @@ export class FinesController {
     const types = ['actividad', 'vehiculo', 'asistencia', 'herramienta'];
     const stats: Record<string, { count: number; total: number }> = {};
     for (const type of types) {
-      const count = await this.finesService.getCountByUser(id, type);
-      const total = await this.finesService.getTotalByUser(id, type);
+      const count = await this.finesService.getCountByUser(id, type, companyId);
+      const total = await this.finesService.getTotalByUser(id, type, companyId);
       stats[type] = { count, total };
     }
     return stats;
@@ -116,12 +129,13 @@ export class FinesController {
     @Param('id') id: string,
     @Body() body: { action?: 'approve' | 'reject'; note?: string },
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     if (!this.isOpsManager(user)) {
       throw new ForbiddenException('No autorizado');
     }
     const action = body.action === 'reject' ? 'reject' : 'approve';
-    return this.finesService.approveOrReject(parseInt(id, 10), user, action, body.note);
+    return this.finesService.approveOrReject(parseInt(id, 10), user, action, body.note, companyId);
   }
 
   @Patch(':id')
@@ -130,19 +144,24 @@ export class FinesController {
     @Param('id') id: string,
     @Body() data: UpdateFineDto,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     if (!this.isOpsManager(user)) {
       throw new ForbiddenException('No autorizado');
     }
-    return this.finesService.update(parseInt(id, 10), data);
+    return this.finesService.update(parseInt(id, 10), data, companyId);
   }
 
   @Delete(':id')
   @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.ACTIVITIES_MANAGE] })
-  async delete(@Param('id') id: string, @CurrentUser() user: any) {
+  async delete(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
     if (!this.isOpsManager(user)) {
       throw new ForbiddenException('No autorizado');
     }
-    return this.finesService.delete(parseInt(id, 10));
+    return this.finesService.delete(parseInt(id, 10), companyId);
   }
 }

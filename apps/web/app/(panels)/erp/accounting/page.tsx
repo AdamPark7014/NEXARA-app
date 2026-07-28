@@ -45,7 +45,32 @@ interface Account {
   isActive: boolean;
   currency: string;
   balance: number;
+  satAgrupador?: string | null;
   parent?: { id: number; code: string; name: string } | null;
+}
+
+interface DiotRow {
+  supplierId: number;
+  supplierName: string;
+  rfc: string | null;
+  baseAmount: number;
+  ivaAmount: number;
+  totalAmount: number;
+  invoiceCount: number;
+}
+
+interface DiotReport {
+  period: { month: number; year: number };
+  rows: DiotRow[];
+  totals: { baseAmount: number; ivaAmount: number; totalAmount: number };
+  missingRfcSuppliers: string[];
+}
+
+interface SatAgrupadorStatus {
+  totalAccounts: number;
+  mappedAccounts: number;
+  missingAccounts: { id: number; code: string; name: string }[];
+  readyForBalanzaExport: boolean;
 }
 
 interface FiscalPeriod {
@@ -124,6 +149,7 @@ const TABS = [
   { key: "resultados", label: "Estado de resultados" },
   { key: "balance", label: "Balance general" },
   { key: "presupuestos", label: "Presupuestos" },
+  { key: "cumplimiento_sat", label: "Cumplimiento SAT" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -217,6 +243,18 @@ export default function AccountingPage() {
   const [balanceErr, setBalanceErr] = useState<string | null>(null);
 
   const [pdfDownloading, setPdfDownloading] = useState(false);
+
+  // ── Cumplimiento SAT: DIOT + Balanza electrónica ────────────────────
+  const now = new Date();
+  const [diotMonth, setDiotMonth] = useState(now.getMonth() === 0 ? 12 : now.getMonth());
+  const [diotYear, setDiotYear] = useState(now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear());
+  const [diotReport, setDiotReport] = useState<DiotReport | null>(null);
+  const [diotLoading, setDiotLoading] = useState(false);
+  const [diotCsvDownloading, setDiotCsvDownloading] = useState(false);
+  const [agrupadorStatus, setAgrupadorStatus] = useState<SatAgrupadorStatus | null>(null);
+  const [agrupadorStatusLoading, setAgrupadorStatusLoading] = useState(false);
+  const [balanzaDownloading, setBalanzaDownloading] = useState(false);
+  const [catalogoDownloading, setCatalogoDownloading] = useState(false);
 
   // ── Presupuestos / centros de costo ─────────────────────────────────
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
@@ -393,6 +431,100 @@ export default function AccountingPage() {
     }
   }, [token, budgetVsActualCostCenter, budgetVsActualYear]);
 
+  const loadAgrupadorStatus = useCallback(async () => {
+    if (!token) return;
+    setAgrupadorStatusLoading(true);
+    try {
+      setAgrupadorStatus(await apiFetch("accounting/accounts/compliance/sat-agrupador-status", token));
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo cargar el estado de mapeo SAT"));
+      setAgrupadorStatus(null);
+    } finally {
+      setAgrupadorStatusLoading(false);
+    }
+  }, [token]);
+
+  const loadDiotReport = useCallback(async () => {
+    if (!token) return;
+    setDiotLoading(true);
+    try {
+      setDiotReport(await apiFetch(`accounting/accounts/compliance/diot?month=${diotMonth}&year=${diotYear}`, token));
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo generar el reporte DIOT"));
+      setDiotReport(null);
+    } finally {
+      setDiotLoading(false);
+    }
+  }, [token, diotMonth, diotYear]);
+
+  const downloadDiotCsv = async () => {
+    if (!token) return;
+    setDiotCsvDownloading(true);
+    try {
+      const res = await fetch(buildApiUrl(`accounting/accounts/compliance/diot/csv?month=${diotMonth}&year=${diotYear}`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(await res.text().catch(() => "Error al generar el CSV"));
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `diot-${diotYear}-${String(diotMonth).padStart(2, "0")}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo descargar el DIOT"));
+    } finally {
+      setDiotCsvDownloading(false);
+    }
+  };
+
+  const downloadBalanzaXml = async () => {
+    if (!token) return;
+    setBalanzaDownloading(true);
+    try {
+      const res = await fetch(buildApiUrl(`accounting/accounts/compliance/balanza-xml?month=${diotMonth}&year=${diotYear}`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(await res.text().catch(() => "Error al generar la Balanza"));
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `balanza-${diotYear}-${String(diotMonth).padStart(2, "0")}.xml`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Balanza XML generada.");
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo generar la Balanza XML"));
+    } finally {
+      setBalanzaDownloading(false);
+    }
+  };
+
+  const downloadCatalogoCuentasXml = async () => {
+    if (!token) return;
+    setCatalogoDownloading(true);
+    try {
+      const res = await fetch(buildApiUrl("accounting/accounts/compliance/catalogo-cuentas-xml"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(await res.text().catch(() => "Error al generar el Catálogo de cuentas"));
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `catalogo-cuentas-${new Date().toISOString().slice(0, 10)}.xml`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Catálogo de cuentas XML generado.");
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo generar el Catálogo de cuentas"));
+    } finally {
+      setCatalogoDownloading(false);
+    }
+  };
+
   useEffect(() => {
     if (tab === "inteligencia" && token) {
       setFinanceInsightsLoading(true);
@@ -430,6 +562,18 @@ export default function AccountingPage() {
       void loadPeriods();
     }
   }, [tab, loadCostCenters, loadBudgets, loadPeriods]);
+
+  useEffect(() => {
+    if (tab === "cumplimiento_sat") {
+      void loadAgrupadorStatus();
+      void loadAccounts();
+      void loadDiotReport();
+    }
+  }, [tab, loadAgrupadorStatus, loadAccounts, loadDiotReport]);
+
+  useEffect(() => {
+    if (tab === "cumplimiento_sat") void loadDiotReport();
+  }, [diotMonth, diotYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (tab === "presupuestos") void loadBudgetVsActual();
@@ -659,6 +803,21 @@ export default function AccountingPage() {
     }
   };
 
+  const saveAccountAgrupador = async (account: Account, value: string) => {
+    if (!token) return;
+    const trimmed = value.trim();
+    if ((account.satAgrupador ?? "") === trimmed) return;
+    try {
+      await apiFetch(`accounting/accounts/${account.id}`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ satAgrupador: trimmed || null }),
+      });
+      setAccounts(prev => prev.map(a => a.id === account.id ? { ...a, satAgrupador: trimmed || null } : a));
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo guardar el agrupador SAT"));
+    }
+  };
+
   // ── Presupuestos actions ─────────────────────────────────────────────
   const saveCostCenter = async () => {
     if (!token || !costCenterForm.code.trim() || !costCenterForm.name.trim()) {
@@ -791,6 +950,18 @@ export default function AccountingPage() {
     ) },
     { key: "type", label: "Tipo", render: a => <Tag variant="default">{ACCOUNT_TYPE_LABEL[a.type] ?? a.type}</Tag>, width: 110 },
     { key: "balance", label: "Saldo", render: a => <Money value={a.balance} compact />, width: 130, numeric: true },
+    { key: "satAgrupador", label: "Agrupador SAT", width: 130, render: a => (
+      cfg.canEdit ? (
+        <input
+          defaultValue={a.satAgrupador ?? ""}
+          placeholder="Ej. 101.01"
+          onBlur={e => void saveAccountAgrupador(a, e.target.value)}
+          style={{ width: "100%", padding: "4px 6px", fontSize: 12, border: `1px solid ${a.satAgrupador ? "var(--border)" : "var(--warning)"}`, borderRadius: 6, background: "var(--surface)", color: "var(--foreground)" }}
+        />
+      ) : (
+        a.satAgrupador ? <span style={{ fontSize: 12 }}>{a.satAgrupador}</span> : <Tag variant="warning">Sin mapear</Tag>
+      )
+    ) },
     { key: "isActive", label: "Estado", width: 140, render: a => (
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <Tag variant={a.isActive ? "positive" : "default"}>{a.isActive ? "Activa" : "Inactiva"}</Tag>
@@ -1556,6 +1727,124 @@ export default function AccountingPage() {
               <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
             ) : (
               <DataTable columns={budgetColumns} rows={budgets} rowKey={b => b.id} emptyTitle="Sin presupuestos" emptyDescription="Crea el primer presupuesto por centro de costo." />
+            )}
+          </Section>
+        </>
+      )}
+
+      {tab === "cumplimiento_sat" && (
+        <>
+          <Section
+            title="Mapeo de agrupador SAT"
+            subtitle="Contabilidad Electrónica (Balanza) requiere que cada cuenta con movimiento tenga su código de agrupador del catálogo SAT. Edítalo en la columna de Catálogo de cuentas."
+          >
+            {agrupadorStatusLoading ? (
+              <div style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+            ) : agrupadorStatus ? (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 16 }}>
+                  <KpiCard label="Cuentas totales" value={agrupadorStatus.totalAccounts} icon="📚" />
+                  <KpiCard label="Mapeadas" value={agrupadorStatus.mappedAccounts} variant="positive" icon="✅" />
+                  <KpiCard
+                    label="Sin mapear"
+                    value={agrupadorStatus.missingAccounts.length}
+                    variant={agrupadorStatus.missingAccounts.length ? "warning" : "positive"}
+                    icon="⚠️"
+                  />
+                </div>
+                {agrupadorStatus.missingAccounts.length > 0 && (
+                  <div style={{ padding: "10px 14px", borderRadius: 8, background: "var(--state-warning-bg)", border: "1px solid var(--state-warning-border)", fontSize: 12.5, marginBottom: 8 }}>
+                    Faltan mapear: {agrupadorStatus.missingAccounts.map(a => `${a.code} ${a.name}`).join(", ")}.{" "}
+                    <button onClick={() => setTab("cuentas" as TabKey)} style={{ background: "none", border: "none", color: "var(--primary)", cursor: "pointer", fontSize: 12.5, textDecoration: "underline", padding: 0 }}>
+                      Ir al catálogo de cuentas
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : null}
+          </Section>
+
+          <div style={{ height: 24 }} />
+
+          <Section
+            title="DIOT — Declaración Informativa de Operaciones con Terceros"
+            subtitle="Base e IVA trasladado por proveedor (facturas AP del periodo). Insumo directo para el aplicativo DIOT del SAT."
+            actions={
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <select value={diotMonth} onChange={e => setDiotMonth(+e.target.value)} style={{ ...inp, width: 130 }}>
+                  {["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m, i) => (
+                    <option key={m} value={i + 1}>{m}</option>
+                  ))}
+                </select>
+                <input type="number" value={diotYear} onChange={e => setDiotYear(+e.target.value)} style={{ ...inp, width: 90 }} />
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => void downloadDiotCsv()} disabled={diotCsvDownloading || !diotReport?.rows.length}>
+                  {diotCsvDownloading ? "Generando…" : "Descargar CSV"}
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => void downloadBalanzaXml()}
+                  disabled={balanzaDownloading || !agrupadorStatus?.readyForBalanzaExport}
+                  title={agrupadorStatus && !agrupadorStatus.readyForBalanzaExport ? "Completa el mapeo de agrupador SAT primero" : undefined}
+                >
+                  {balanzaDownloading ? "Generando…" : "Exportar Balanza XML"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void downloadCatalogoCuentasXml()}
+                  disabled={catalogoDownloading || !agrupadorStatus?.readyForBalanzaExport}
+                  title={agrupadorStatus && !agrupadorStatus.readyForBalanzaExport ? "Completa el mapeo de agrupador SAT primero" : undefined}
+                >
+                  {catalogoDownloading ? "Generando…" : "Exportar Catálogo de cuentas XML"}
+                </Button>
+              </div>
+            }
+          >
+            {diotLoading ? (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Calculando…</div>
+            ) : diotReport && diotReport.rows.length > 0 ? (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 16 }}>
+                  <KpiCard label="Base 16%" value={<Money value={diotReport.totals.baseAmount} compact />} icon="💵" />
+                  <KpiCard label="IVA trasladado" value={<Money value={diotReport.totals.ivaAmount} compact />} icon="🧾" variant="accent" />
+                  <KpiCard label="Total pagado" value={<Money value={diotReport.totals.totalAmount} compact />} icon="💰" />
+                  <KpiCard label="Proveedores" value={diotReport.rows.length} icon="🏭" />
+                </div>
+                {diotReport.missingRfcSuppliers.length > 0 && (
+                  <div style={{ padding: "10px 14px", borderRadius: 8, background: "var(--state-warning-bg)", border: "1px solid var(--state-warning-border)", fontSize: 12.5, marginBottom: 12 }}>
+                    Sin RFC capturado: {diotReport.missingRfcSuppliers.join(", ")}. Complétalo en Compras → Proveedores.
+                  </div>
+                )}
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+                      <th style={{ textAlign: "left", padding: "6px 8px" }}>Proveedor</th>
+                      <th style={{ textAlign: "left", padding: "6px 8px" }}>RFC</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Base 16%</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>IVA</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Total</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Facturas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {diotReport.rows.map(r => (
+                      <tr key={r.supplierId} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={{ padding: "8px" }}>{r.supplierName}</td>
+                        <td style={{ padding: "8px" }}>{r.rfc ?? <Tag variant="warning">Sin RFC</Tag>}</td>
+                        <td style={{ padding: "8px", textAlign: "right" }}><Money value={r.baseAmount} compact /></td>
+                        <td style={{ padding: "8px", textAlign: "right" }}><Money value={r.ivaAmount} compact /></td>
+                        <td style={{ padding: "8px", textAlign: "right" }}><Money value={r.totalAmount} compact /></td>
+                        <td style={{ padding: "8px", textAlign: "right" }}>{r.invoiceCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            ) : (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>
+                Sin facturas de proveedor (AP) en {diotMonth}/{diotYear}.
+              </div>
             )}
           </Section>
         </>

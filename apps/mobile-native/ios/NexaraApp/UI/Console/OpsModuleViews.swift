@@ -400,25 +400,26 @@ private func woIsDone(_ status: String) -> Bool {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @MainActor final class ServiceSheetsVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [ServiceSheetItem] = []
     @Published var query = ""; @Published var isLoading = false
-    var filtered: [[String: Any]] {
+    var filtered: [ServiceSheetItem] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter {
-            oStr($0,"folio","number").lowercased().contains(q) ||
-            oStr($0,"clientName","anNumber").lowercased().contains(q)
+            $0.displayTitle.lowercased().contains(q) ||
+            $0.clientName.lowercased().contains(q) ||
+            $0.serviceType.lowercased().contains(q)
         }
     }
     func load() {
         isLoading = true
-        Task { items = await ExtraRepository.shared.serviceSheets(); isLoading = false }
+        Task { items = await ExtraRepository.shared.serviceSheetItems(); isLoading = false }
     }
 }
 
 struct ServiceSheetsView: View {
     @StateObject private var vm = ServiceSheetsVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: ServiceSheetItem?
     var body: some View {
         Group {
             if let s = selected { ssDetail(s) } else { listBody }
@@ -436,7 +437,7 @@ struct ServiceSheetsView: View {
             if !vm.items.isEmpty {
                 HStack(spacing: 0) {
                     OpsKpi(label: "Hojas", value: "\(vm.items.count)", color: .primary)
-                    let signed = vm.items.filter { oStr($0,"status","estado").lowercased().contains("firmada") || oStr($0,"signed") == "true" }.count
+                    let signed = vm.items.filter { $0.status.lowercased().contains("firmada") || !$0.signedName.isEmpty }.count
                     Divider().frame(height:32)
                     OpsKpi(label: "Firmadas", value: "\(signed)", color: .green)
                 }
@@ -449,7 +450,7 @@ struct ServiceSheetsView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin hojas de servicio").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"ss") }) { item in
+                List(vm.filtered.prefix(60)) { item in
                     Button { selected = item } label: { ServiceSheetRow(item: item) }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
@@ -461,8 +462,8 @@ struct ServiceSheetsView: View {
     }
 
     @ViewBuilder
-    private func ssDetail(_ s: [String: Any]) -> some View {
-        let status = oStr(s,"status","estado")
+    private func ssDetail(_ s: ServiceSheetItem) -> some View {
+        let status = s.status
         let color: Color = status.lowercased().contains("firmada") ? .green : (status.lowercased().contains("pendiente") ? .orange : .secondary)
         List {
             Section {
@@ -477,26 +478,38 @@ struct ServiceSheetsView: View {
                 }
             }
             Section("Hoja de servicio") {
-                ssRow("Folio",       oStr(s,"folio","number"))
-                ssRow("Cliente",     oStr(s,"clientName","cliente","anNumber"))
-                ssRow("Técnico",     oStr(s,"technicianName","tecnico","assignedTo"))
-                ssRow("Fecha",       String(oStr(s,"createdAt","fecha").prefix(10)))
-                ssRow("Inicio",      String(oStr(s,"startDate","fechaInicio").prefix(10)))
-                ssRow("Fin",         String(oStr(s,"endDate","fechaFin").prefix(10)))
-                ssRow("Ubicación",   oStr(s,"location","ubicacion","address"))
-                ssRow("Tipo",        oStr(s,"type","tipo"))
+                ssRow("Folio",       s.displayTitle)
+                ssRow("Cliente",     s.clientName)
+                ssRow("Técnico",     s.technicianName)
+                ssRow("Fecha",       String(s.createdAt.prefix(10)))
+                ssRow("Tipo",        s.serviceType)
+                if s.activityId > 0 { ssRow("Actividad", "\(s.activityId)") }
             }
-            let desc = oStr(s,"description","descripcion","notes","notas")
-            if !desc.isEmpty { Section("Descripción") { Text(desc).font(.subheadline) } }
-            let tasks = (s["tasks"] as? [[String: Any]]) ?? []
-            if !tasks.isEmpty {
-                Section("Tareas (\(tasks.count))") {
-                    ForEach(Array(tasks.enumerated()), id: \.offset) { _, t in
+            if !s.workSummary.isEmpty { Section("Resumen") { Text(s.workSummary).font(.subheadline) } }
+            if !s.equipmentList.isEmpty {
+                Section("Materiales (\(s.equipmentList.count))") {
+                    ForEach(Array(s.equipmentList.enumerated()), id: \.offset) { _, m in
                         HStack {
-                            Image(systemName: (t["completed"] as? Bool == true) ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor((t["completed"] as? Bool == true) ? .green : .secondary)
-                            Text(oStr(t,"description","name","tarea")).font(.caption)
+                            Text(oStr(m, "name", "nombre", "description")).font(.caption)
+                            Spacer()
+                            let qty = oStr(m, "quantity", "cantidad")
+                            if !qty.isEmpty { Text("x\(qty)").font(.caption2).foregroundColor(.secondary) }
                         }
+                    }
+                }
+            }
+            if !s.observations.isEmpty { Section("Observaciones") { Text(s.observations).font(.subheadline) } }
+            Section("Firma del cliente") {
+                if s.signedName.isEmpty {
+                    Text("Sin firma del cliente").foregroundColor(.secondary)
+                } else {
+                    ssRow("Firmado por", s.signedName)
+                }
+            }
+            if !s.pdfUrl.isEmpty {
+                Section {
+                    Link(destination: URL(string: s.pdfUrl) ?? URL(string:"https://nexara.com.mx")!) {
+                        Label("Abrir PDF", systemImage: "arrow.up.right.square")
                     }
                 }
             }
@@ -510,13 +523,13 @@ struct ServiceSheetsView: View {
 }
 
 private struct ServiceSheetRow: View {
-    let item: [String: Any]
+    let item: ServiceSheetItem
     var body: some View {
-        let folio  = oStr(item,"folio","number")
-        let client = oStr(item,"clientName","cliente","anNumber")
-        let status = oStr(item,"status","estado")
-        let date   = String(oStr(item,"createdAt","fecha").prefix(10))
-        let tech   = oStr(item,"technicianName","tecnico","assignedTo")
+        let folio  = item.displayTitle
+        let client = item.clientName
+        let status = item.status
+        let date   = String(item.createdAt.prefix(10))
+        let tech   = item.technicianName
         let color: Color = status.lowercased().contains("firmada") ? .green : (status.lowercased().contains("pendiente") ? .orange : .secondary)
         HStack(spacing:0) {
             Rectangle().fill(color).frame(width:4).clipShape(RoundedRectangle(cornerRadius:2))
@@ -752,26 +765,27 @@ private struct WarehouseRow: View {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @MainActor final class EmployeePaymentsVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
-    @Published var query = ""; @Published var isLoading = false
-    var filtered: [[String: Any]] {
+    @Published var items: [EmployeePaymentItem] = []
+    @Published var query = ""
+    @Published var isLoading = false
+
+    var filtered: [EmployeePaymentItem] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter {
-            oStr($0,"concept","concepto").lowercased().contains(q) ||
-            oStr($0,"userName","empleado","nombre").lowercased().contains(q)
+            $0.concepto.lowercased().contains(q) || $0.userName.lowercased().contains(q)
         }
     }
-    var totalPaid: Double { items.reduce(0) { $0 + (oDouble($1,"amount","total","monto") ?? 0) } }
+    var totalPaid: Double { items.reduce(0) { $0 + $1.monto } }
     func load() {
         isLoading = true
-        Task { items = await ExtraRepository.shared.employeePayments(); isLoading = false }
+        Task { items = await ExtraRepository.shared.employeePaymentItems(); isLoading = false }
     }
 }
 
 struct EmployeePaymentsView: View {
     @StateObject private var vm = EmployeePaymentsVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: EmployeePaymentItem?
     var body: some View {
         Group {
             if let s = selected { epDetail(s) } else { epList }
@@ -799,9 +813,15 @@ struct EmployeePaymentsView: View {
             }
             searchBar("Buscar pago…", text: $vm.query)
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
-            else if vm.filtered.isEmpty { Spacer(); Text("Sin pagos").foregroundColor(.secondary); Spacer() }
-            else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"ep") }) { item in
+            else if vm.filtered.isEmpty {
+                NxEmptyState(
+                    title: "Sin pagos",
+                    subtitle: "No hay pagos a empleados con este filtro.",
+                    actionLabel: "Actualizar",
+                    onAction: { vm.load() }
+                )
+            } else {
+                List(vm.filtered.prefix(60)) { item in
                     Button { selected = item } label: { PaymentRow(item: item) }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
@@ -812,34 +832,24 @@ struct EmployeePaymentsView: View {
         }
     }
 
-    @ViewBuilder private func epDetail(_ p: [String: Any]) -> some View {
-        let concept = oStr(p,"concept","concepto","descripcion")
-        let user    = oStr(p,"userName","empleado","nombre")
-        let amount  = oDouble(p,"amount","total","monto")
-        let date    = String(oStr(p,"paidAt","createdAt","fecha").prefix(10))
-        let method  = oStr(p,"method","metodoPago","paymentMethod")
-        let ref     = oStr(p,"reference","referencia")
-        let notes   = oStr(p,"notes","notas","comentarios")
+    @ViewBuilder private func epDetail(_ p: EmployeePaymentItem) -> some View {
         List {
             Section { Button("← Pagos") { selected = nil } }
-            if let a = amount {
+            if p.monto != 0 {
                 Section {
                     VStack(spacing: 4) {
                         Text("Monto").font(.caption).foregroundColor(.secondary)
-                        Text(fmtOps(a)).font(.system(size: 28, weight: .bold, design: .rounded)).foregroundColor(.green)
+                        Text(fmtOps(p.monto)).font(.system(size: 28, weight: .bold, design: .rounded)).foregroundColor(.green)
                     }
                     .frame(maxWidth: .infinity).padding(.vertical, 8)
                 }
             }
             Section("Detalle") {
-                oRow("Concepto",  concept)
-                oRow("Empleado",  user)
-                oRow("Fecha",     date)
-                oRow("Método",    method)
-                oRow("Referencia",ref)
-            }
-            if !notes.isEmpty {
-                Section("Notas") { Text(notes).font(.body) }
+                oRow("Concepto",  p.concepto)
+                oRow("Empleado",  p.userName)
+                oRow("Estatus",   p.estatus)
+                oRow("Fecha",     p.dateLabel)
+                oRow("Periodo",   [p.periodoInicio, p.periodoFin].filter { !$0.isEmpty }.joined(separator: " → "))
             }
         }
         .listStyle(.insetGrouped)
@@ -847,25 +857,21 @@ struct EmployeePaymentsView: View {
 }
 
 private struct PaymentRow: View {
-    let item: [String: Any]
+    let item: EmployeePaymentItem
     var body: some View {
-        let concept = oStr(item,"concept","concepto","descripcion")
-        let user    = oStr(item,"userName","empleado","nombre")
-        let amount  = oDouble(item,"amount","total","monto")
-        let date    = String(oStr(item,"paidAt","createdAt","fecha").prefix(10))
         HStack(spacing:12) {
             ZStack {
                 Circle().fill(Color.green.opacity(0.12)).frame(width:38,height:38)
                 Image(systemName:"dollarsign.circle.fill").foregroundColor(.green).font(.system(size:18))
             }
             VStack(alignment:.leading, spacing:2) {
-                Text(concept.isEmpty ? "Pago" : concept).font(.subheadline).bold().lineLimit(1)
-                if !user.isEmpty { Text(user).font(.caption).foregroundColor(.secondary) }
+                Text(item.displayConcepto).font(.subheadline).bold().lineLimit(1)
+                if !item.userName.isEmpty { Text(item.userName).font(.caption).foregroundColor(.secondary) }
             }
             Spacer()
             VStack(alignment:.trailing, spacing:2) {
-                if let a = amount { Text(fmtOps(a)).font(.subheadline).bold().foregroundColor(.green) }
-                if !date.isEmpty { Text(date).font(.caption2).foregroundColor(.secondary) }
+                if item.monto != 0 { Text(fmtOps(item.monto)).font(.subheadline).bold().foregroundColor(.green) }
+                if !item.dateLabel.isEmpty { Text(item.dateLabel).font(.caption2).foregroundColor(.secondary) }
             }
         }
         .padding(10)
@@ -879,26 +885,32 @@ private struct PaymentRow: View {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @MainActor final class FinesVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
-    @Published var query = ""; @Published var isLoading = false
-    var filtered: [[String: Any]] {
+    @Published var items: [FineItem] = []
+    @Published var query = ""
+    @Published var isLoading = false
+    @Published var loadError: String?
+
+    var filtered: [FineItem] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter {
-            oStr($0,"reason","motivo","concepto").lowercased().contains(q) ||
-            oStr($0,"userName","empleado").lowercased().contains(q)
+            $0.motivo.lowercased().contains(q) || $0.userName.lowercased().contains(q)
         }
     }
-    var totalAmount: Double { items.reduce(0) { $0 + (oDouble($1,"amount","total","monto") ?? 0) } }
+    var totalAmount: Double { items.reduce(0) { $0 + $1.monto } }
     func load() {
         isLoading = true
-        Task { items = await ExtraRepository.shared.fines(); isLoading = false }
+        loadError = nil
+        Task {
+            items = await ExtraRepository.shared.fineItems()
+            isLoading = false
+        }
     }
 }
 
 struct FinesView: View {
     @StateObject private var vm = FinesVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: FineItem?
     var body: some View {
         Group {
             if let s = selected { fineDetail(s) } else { fineList }
@@ -926,9 +938,15 @@ struct FinesView: View {
             }
             searchBar("Buscar multa…", text: $vm.query)
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
-            else if vm.filtered.isEmpty { Spacer(); Text("Sin multas").foregroundColor(.secondary); Spacer() }
-            else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"fn") }) { item in
+            else if vm.filtered.isEmpty {
+                NxEmptyState(
+                    title: "Sin multas",
+                    subtitle: "No hay multas registradas con este filtro.",
+                    actionLabel: "Actualizar",
+                    onAction: { vm.load() }
+                )
+            } else {
+                List(vm.filtered.prefix(60)) { item in
                     Button { selected = item } label: { FineRow(item: item) }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
@@ -938,32 +956,26 @@ struct FinesView: View {
         }
     }
 
-    @ViewBuilder private func fineDetail(_ f: [String: Any]) -> some View {
-        let reason  = oStr(f,"reason","motivo","concepto")
-        let user    = oStr(f,"userName","empleado","nombre")
-        let amount  = oDouble(f,"amount","total","monto")
-        let date    = String(oStr(f,"createdAt","fecha").prefix(10))
-        let status  = oStr(f,"status","estado")
-        let notes   = oStr(f,"notes","notas","descripcion")
+    @ViewBuilder private func fineDetail(_ f: FineItem) -> some View {
         List {
             Section { Button("← Multas") { selected = nil } }
-            if let a = amount {
+            if f.monto != 0 {
                 Section {
                     VStack(spacing: 4) {
                         Text("Monto").font(.caption).foregroundColor(.secondary)
-                        Text(fmtOps(a)).font(.system(size: 28, weight: .bold, design: .rounded)).foregroundColor(.red)
+                        Text(fmtOps(f.monto)).font(.system(size: 28, weight: .bold, design: .rounded)).foregroundColor(.red)
                     }
                     .frame(maxWidth: .infinity).padding(.vertical, 8)
                 }
             }
             Section("Detalle") {
-                oRow("Motivo",   reason)
-                oRow("Empleado", user)
-                oRow("Estatus",  status)
-                oRow("Fecha",    date)
+                oRow("Motivo",   f.motivo)
+                oRow("Empleado", f.userName)
+                oRow("Estatus",  f.estatus)
+                oRow("Fecha",    f.dateLabel)
             }
-            if !notes.isEmpty {
-                Section("Descripción") { Text(notes).font(.body) }
+            if !f.notes.isEmpty {
+                Section("Descripción") { Text(f.notes).font(.body) }
             }
         }
         .listStyle(.insetGrouped)
@@ -971,25 +983,21 @@ struct FinesView: View {
 }
 
 private struct FineRow: View {
-    let item: [String: Any]
+    let item: FineItem
     var body: some View {
-        let reason = oStr(item,"reason","motivo","concepto")
-        let user   = oStr(item,"userName","empleado","nombre")
-        let amount = oDouble(item,"amount","total","monto")
-        let date   = String(oStr(item,"createdAt","fecha").prefix(10))
         HStack(spacing:12) {
             ZStack {
                 Circle().fill(Color.red.opacity(0.12)).frame(width:38,height:38)
                 Image(systemName:"exclamationmark.triangle.fill").foregroundColor(.red).font(.system(size:16))
             }
             VStack(alignment:.leading, spacing:2) {
-                Text(reason.isEmpty ? "Multa" : reason).font(.subheadline).bold().lineLimit(1)
-                if !user.isEmpty { Text(user).font(.caption).foregroundColor(.secondary) }
+                Text(item.displayMotivo).font(.subheadline).bold().lineLimit(1)
+                if !item.userName.isEmpty { Text(item.userName).font(.caption).foregroundColor(.secondary) }
             }
             Spacer()
             VStack(alignment:.trailing, spacing:2) {
-                if let a = amount { Text(fmtOps(a)).font(.subheadline).bold().foregroundColor(.red) }
-                if !date.isEmpty { Text(date).font(.caption2).foregroundColor(.secondary) }
+                if item.monto != 0 { Text(fmtOps(item.monto)).font(.subheadline).bold().foregroundColor(.red) }
+                if !item.dateLabel.isEmpty { Text(item.dateLabel).font(.caption2).foregroundColor(.secondary) }
             }
         }
         .padding(10)
@@ -1003,25 +1011,24 @@ private struct FineRow: View {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @MainActor final class AuditVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [AuditEntry] = []
     @Published var query = ""; @Published var isLoading = false
-    var filtered: [[String: Any]] {
+    var filtered: [AuditEntry] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter {
-            oStr($0,"action","accion","description").lowercased().contains(q) ||
-            oStr($0,"userName","usuario").lowercased().contains(q)
+            $0.action.lowercased().contains(q) || $0.userName.lowercased().contains(q)
         }
     }
     func load() {
         isLoading = true
-        Task { items = await ExtraRepository.shared.audit(); isLoading = false }
+        Task { items = await ExtraRepository.shared.auditItems(); isLoading = false }
     }
 }
 
 struct AuditView: View {
     @StateObject private var vm = AuditVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: AuditEntry?
     var body: some View {
         Group {
             if let s = selected { auditDetail(s) } else { auditList }
@@ -1039,9 +1046,10 @@ struct AuditView: View {
             if !vm.items.isEmpty {
                 HStack(spacing: 0) {
                     OpsKpi(label: "Registros", value: "\(vm.items.count)", color: .primary)
-                    let today = vm.items.filter { oStr($0,"createdAt","fecha").prefix(10) == {
+                    let todayStr: String = {
                         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: Date())
-                    }() }.count
+                    }()
+                    let today = vm.items.filter { $0.createdAt.prefix(10) == todayStr }.count
                     Divider().frame(height:32)
                     OpsKpi(label: "Hoy", value: "\(today)", color: .teal)
                 }
@@ -1054,7 +1062,7 @@ struct AuditView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin registros").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(80), id: { opsIdKey($0,"au") }) { item in
+                List(vm.filtered.prefix(80)) { item in
                     Button { selected = item } label: { AuditRow(item: item) }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
@@ -1064,13 +1072,13 @@ struct AuditView: View {
         }
     }
 
-    @ViewBuilder private func auditDetail(_ a: [String: Any]) -> some View {
-        let action   = oStr(a,"action","accion","description")
-        let user     = oStr(a,"userName","usuario")
-        let entity   = oStr(a,"entityType","modelo","entity")
-        let entityId = oStr(a,"entityId","recordId")
-        let date     = oStr(a,"createdAt","timestamp")
-        let details  = oStr(a,"details","metadata","changes")
+    @ViewBuilder private func auditDetail(_ a: AuditEntry) -> some View {
+        let action   = a.action
+        let user     = a.userName
+        let entity   = a.entityType
+        let entityId = a.entityId
+        let date     = a.createdAt
+        let details  = a.details
         List {
             Section { Button("← Auditoría") { selected = nil } }
             Section("Acción") {
@@ -1089,11 +1097,11 @@ struct AuditView: View {
 }
 
 private struct AuditRow: View {
-    let item: [String: Any]
+    let item: AuditEntry
     var body: some View {
-        let action = oStr(item,"action","accion","description")
-        let user   = oStr(item,"userName","usuario","userId")
-        let date   = String(oStr(item,"createdAt","timestamp").prefix(16))
+        let action = item.action
+        let user   = item.userName
+        let date   = String(item.createdAt.prefix(16))
         HStack(spacing:10) {
             Image(systemName:"doc.text.magnifyingglass").foregroundColor(.secondary).font(.system(size:18))
             VStack(alignment:.leading, spacing:2) {
@@ -1114,25 +1122,25 @@ private struct AuditRow: View {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @MainActor final class DocumentsVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [DocumentItem] = []
     @Published var query = ""; @Published var isLoading = false
-    var filtered: [[String: Any]] {
+    var filtered: [DocumentItem] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter {
-            oStr($0,"name","title","fileName").lowercased().contains(q) ||
-            oStr($0,"category","tipo").lowercased().contains(q)
+            $0.displayTitle.lowercased().contains(q) ||
+            $0.type.lowercased().contains(q)
         }
     }
     func load() {
         isLoading = true
-        Task { items = await ExtraRepository.shared.documents(); isLoading = false }
+        Task { items = await ExtraRepository.shared.documentItems(); isLoading = false }
     }
 }
 
 struct DocumentsView: View {
     @StateObject private var vm = DocumentsVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: DocumentItem?
     var body: some View {
         Group {
             if let s = selected { docDetail(s) } else { docList }
@@ -1151,7 +1159,7 @@ struct DocumentsView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin documentos").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"doc") }) { item in
+                List(vm.filtered.prefix(60)) { item in
                     Button { selected = item } label: { DocumentRow(item: item) }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
@@ -1161,13 +1169,13 @@ struct DocumentsView: View {
         }
     }
 
-    @ViewBuilder private func docDetail(_ d: [String: Any]) -> some View {
-        let name     = oStr(d,"name","title","fileName")
-        let category = oStr(d,"category","tipo","type")
-        let date     = String(oStr(d,"createdAt","updatedAt").prefix(10))
-        let url      = oStr(d,"url","fileUrl","path")
-        let size     = oStr(d,"size","fileSize")
-        let author   = oStr(d,"authorName","uploadedBy","createdBy")
+    @ViewBuilder private func docDetail(_ d: DocumentItem) -> some View {
+        let name     = d.displayTitle
+        let category = d.type
+        let date     = String(d.createdAt.prefix(10))
+        let url      = d.fileUrl
+        let size     = StockParse.str(d.raw["size"], d.raw["fileSize"])
+        let author   = StockParse.str(d.raw["authorName"], d.raw["uploadedBy"], d.raw["createdBy"])
         List {
             Section { Button("← Documentos") { selected = nil } }
             Section("Documento") {
@@ -1190,12 +1198,12 @@ struct DocumentsView: View {
 }
 
 private struct DocumentRow: View {
-    let item: [String: Any]
+    let item: DocumentItem
     var body: some View {
-        let name     = oStr(item,"name","title","fileName")
-        let category = oStr(item,"category","tipo","type")
-        let date     = String(oStr(item,"createdAt","updatedAt").prefix(10))
-        let url      = oStr(item,"url","fileUrl","path")
+        let name     = item.displayTitle
+        let category = item.type
+        let date     = String(item.createdAt.prefix(10))
+        let url      = item.fileUrl
         HStack(spacing:12) {
             Image(systemName: docIcon(url)).foregroundColor(.blue).font(.title3)
             VStack(alignment:.leading, spacing:2) {
@@ -1226,25 +1234,27 @@ private struct DocumentRow: View {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @MainActor final class CvsVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [CandidateItem] = []
     @Published var query = ""; @Published var isLoading = false
-    var filtered: [[String: Any]] {
+    var filtered: [CandidateItem] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter {
-            oStr($0,"fullName","name","fileName").lowercased().contains(q) ||
-            oStr($0,"position","role","puesto").lowercased().contains(q)
+            $0.displayName.lowercased().contains(q) ||
+            $0.position.lowercased().contains(q) ||
+            $0.email.lowercased().contains(q) ||
+            $0.category.lowercased().contains(q)
         }
     }
     func load() {
         isLoading = true
-        Task { items = await ExtraRepository.shared.cvs(); isLoading = false }
+        Task { items = await ExtraRepository.shared.candidateItems(); isLoading = false }
     }
 }
 
 struct CvsView: View {
     @StateObject private var vm = CvsVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: CandidateItem?
     var body: some View {
         Group {
             if let s = selected { cvDetail(s) } else { cvList }
@@ -1270,7 +1280,7 @@ struct CvsView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin CVs").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"cv") }) { item in
+                List(vm.filtered.prefix(60)) { item in
                     Button { selected = item } label: { CvRow(item: item) }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
@@ -1280,16 +1290,16 @@ struct CvsView: View {
         }
     }
 
-    @ViewBuilder private func cvDetail(_ cv: [String: Any]) -> some View {
-        let name     = oStr(cv,"fullName","name","fileName")
-        let position = oStr(cv,"position","role","puesto","cargo")
-        let email    = oStr(cv,"email","correo")
-        let phone    = oStr(cv,"phone","telefono","whatsapp")
-        let date     = String(oStr(cv,"createdAt","receivedAt").prefix(10))
-        let url      = oStr(cv,"cvUrl","fileUrl","url")
-        let exp      = oStr(cv,"experience","experiencia")
-        let skills   = oStr(cv,"skills","habilidades","stack")
-        let notes    = oStr(cv,"notes","notas","comentarios")
+    @ViewBuilder private func cvDetail(_ cv: CandidateItem) -> some View {
+        let name     = cv.displayName
+        let position = cv.position.isEmpty ? cv.category : cv.position
+        let email    = cv.email
+        let phone    = cv.whatsapp
+        let date     = String(cv.createdAt.prefix(10))
+        let url      = cv.cvUrl
+        let exp      = cv.experience
+        let skills   = StockParse.str(cv.raw["skills"], cv.raw["habilidades"], cv.raw["stack"])
+        let notes    = cv.notes
         List {
             Section { Button("← CVs") { selected = nil } }
             Section("Candidato") {
@@ -1317,12 +1327,12 @@ struct CvsView: View {
 }
 
 private struct CvRow: View {
-    let item: [String: Any]
+    let item: CandidateItem
     var body: some View {
-        let name     = oStr(item,"fullName","name","fileName")
-        let position = oStr(item,"position","role","puesto","cargo")
-        let date     = String(oStr(item,"createdAt","receivedAt").prefix(10))
-        let email    = oStr(item,"email","correo")
+        let name     = item.displayName
+        let position = item.position.isEmpty ? item.category : item.position
+        let date     = String(item.createdAt.prefix(10))
+        let email    = item.email
         HStack(spacing:12) {
             ZStack {
                 Circle().fill(Color.purple.opacity(0.12)).frame(width:40,height:40)
@@ -1347,25 +1357,26 @@ private struct CvRow: View {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @MainActor final class ContactMessagesVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [ConsoleContactMessage] = []
     @Published var query = ""; @Published var isLoading = false
-    var filtered: [[String: Any]] {
+    var filtered: [ConsoleContactMessage] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter {
-            oStr($0,"name","nombre").lowercased().contains(q) ||
-            oStr($0,"subject","asunto","email").lowercased().contains(q)
+            $0.name.lowercased().contains(q) ||
+            $0.subject.lowercased().contains(q) ||
+            $0.email.lowercased().contains(q)
         }
     }
     func load() {
         isLoading = true
-        Task { items = await ExtraRepository.shared.contactMessages(); isLoading = false }
+        Task { items = await ExtraRepository.shared.contactMessageItems(); isLoading = false }
     }
 }
 
 struct ContactMessagesView: View {
     @StateObject private var vm = ContactMessagesVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: ConsoleContactMessage?
     var body: some View {
         Group {
             if let s = selected { msgDetail(s) } else { listBody }
@@ -1391,7 +1402,7 @@ struct ContactMessagesView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin mensajes").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"cm") }) { item in
+                List(vm.filtered.prefix(60)) { item in
                     Button { selected = item } label: { ContactMsgRow(item: item) }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
@@ -1402,13 +1413,13 @@ struct ContactMessagesView: View {
     }
 
     @ViewBuilder
-    private func msgDetail(_ m: [String: Any]) -> some View {
-        let name    = oStr(m,"name","nombre")
-        let email   = oStr(m,"email","correo")
-        let phone   = oStr(m,"phone","telefono")
-        let subject = oStr(m,"subject","asunto")
-        let message = oStr(m,"message","mensaje","body")
-        let date    = String(oStr(m,"createdAt","fecha").prefix(10))
+    private func msgDetail(_ m: ConsoleContactMessage) -> some View {
+        let name    = m.name
+        let email   = m.email
+        let phone   = m.phone
+        let subject = m.subject
+        let message = m.message
+        let date    = String(m.createdAt.prefix(10))
         List {
             Section {
                 Button("← Mensajes") { selected = nil }
@@ -1432,6 +1443,7 @@ struct ContactMessagesView: View {
                     }
                 }
                 cmRow("Fecha", date)
+                cmRow("Estado", m.status)
             }
             if !subject.isEmpty { Section("Asunto") { Text(subject).font(.subheadline) } }
             if !message.isEmpty { Section("Mensaje") { Text(message).font(.subheadline) } }
@@ -1445,14 +1457,14 @@ struct ContactMessagesView: View {
 }
 
 private struct ContactMsgRow: View {
-    let item: [String: Any]
+    let item: ConsoleContactMessage
     var body: some View {
-        let name    = oStr(item,"name","nombre")
-        let subject = oStr(item,"subject","asunto","message").prefix(60).description
-        let email   = oStr(item,"email","correo")
-        let phone   = oStr(item,"phone","telefono")
-        let date    = String(oStr(item,"createdAt","fecha").prefix(10))
-        let read    = item["read"] as? Bool ?? item["leido"] as? Bool ?? false
+        let name    = item.displayName
+        let subject = item.subject.prefix(60).description
+        let email   = item.email
+        let phone   = item.phone
+        let date    = String(item.createdAt.prefix(10))
+        let read    = (item.raw["read"] as? Bool) ?? (item.raw["leido"] as? Bool) ?? false
         HStack(spacing:12) {
             ZStack {
                 Circle().fill(read ? Color.secondary.opacity(0.08) : Color.blue.opacity(0.12)).frame(width:40,height:40)
@@ -1484,27 +1496,28 @@ private struct ContactMsgRow: View {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @MainActor final class NewsVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [ConsoleNewsItem] = []
     @Published var query = ""; @Published var isLoading = false
-    var filtered: [[String: Any]] {
+    var filtered: [ConsoleNewsItem] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter {
-            oStr($0,"title","titulo").lowercased().contains(q) ||
-            oStr($0,"excerpt","summary","slug").lowercased().contains(q)
+            $0.title.lowercased().contains(q) ||
+            $0.excerpt.lowercased().contains(q) ||
+            $0.slug.lowercased().contains(q)
         }
     }
-    var published: Int { items.filter { !(($0["draft"] as? Bool) ?? false) }.count }
-    var drafts:    Int { items.filter {   ($0["draft"] as? Bool) ?? false  }.count }
+    var published: Int { items.filter { !$0.isDraft }.count }
+    var drafts:    Int { items.filter { $0.isDraft }.count }
     func load() {
         isLoading = true
-        Task { items = await ExtraRepository.shared.news(); isLoading = false }
+        Task { items = await ExtraRepository.shared.newsItems(); isLoading = false }
     }
 }
 
 struct NewsView: View {
     @StateObject private var vm = NewsVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: ConsoleNewsItem?
     var body: some View {
         Group {
             if let s = selected { newsDetail(s) } else { listBody }
@@ -1536,7 +1549,7 @@ struct NewsView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin noticias").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"nw") }) { item in
+                List(vm.filtered.prefix(60)) { item in
                     Button { selected = item } label: { NewsRow(item: item) }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
@@ -1547,8 +1560,8 @@ struct NewsView: View {
     }
 
     @ViewBuilder
-    private func newsDetail(_ n: [String: Any]) -> some View {
-        let isDraft = (n["draft"] as? Bool) ?? false
+    private func newsDetail(_ n: ConsoleNewsItem) -> some View {
+        let isDraft = n.isDraft
         List {
             Section {
                 HStack {
@@ -1561,17 +1574,14 @@ struct NewsView: View {
                 }
             }
             Section("Noticia") {
-                let title = oStr(n,"title","titulo")
-                if !title.isEmpty { Text(title).font(.headline).bold() }
-                nwRow("Fecha", String(oStr(n,"publishedAt","createdAt").prefix(10)))
-                nwRow("Autor", oStr(n,"author","autor","authorName"))
-                nwRow("Slug",  oStr(n,"slug"))
-                nwRow("Tags",  oStr(n,"tags","categorias"))
+                if !n.title.isEmpty { Text(n.title).font(.headline).bold() }
+                nwRow("Fecha", String(n.publishedAt.prefix(10)))
+                nwRow("Autor", StockParse.str(n.raw["author"], n.raw["autor"], n.raw["authorName"]))
+                nwRow("Slug",  n.slug)
+                nwRow("Tags",  StockParse.str(n.raw["tags"], n.raw["categorias"]))
             }
-            let excerpt = oStr(n,"excerpt","summary","extracto")
-            if !excerpt.isEmpty { Section("Resumen") { Text(excerpt).font(.subheadline) } }
-            let content = oStr(n,"content","body","contenido")
-            if !content.isEmpty { Section("Contenido") { Text(content).font(.subheadline) } }
+            if !n.excerpt.isEmpty { Section("Resumen") { Text(n.excerpt).font(.subheadline) } }
+            if !n.content.isEmpty { Section("Contenido") { Text(n.content).font(.subheadline) } }
         }
         .listStyle(.insetGrouped)
     }
@@ -1582,12 +1592,12 @@ struct NewsView: View {
 }
 
 private struct NewsRow: View {
-    let item: [String: Any]
+    let item: ConsoleNewsItem
     var body: some View {
-        let title   = oStr(item,"title","titulo")
-        let excerpt = oStr(item,"excerpt","summary").prefix(80).description
-        let date    = String(oStr(item,"publishedAt","createdAt").prefix(10))
-        let isDraft = (item["draft"] as? Bool) ?? false
+        let title   = item.title
+        let excerpt = String(item.excerpt.prefix(80))
+        let date    = String(item.publishedAt.prefix(10))
+        let isDraft = item.isDraft
         HStack(spacing:12) {
             ZStack {
                 RoundedRectangle(cornerRadius:8).fill(isDraft ? Color.orange.opacity(0.10) : Color.blue.opacity(0.10)).frame(width:38,height:38)
@@ -1615,27 +1625,28 @@ private struct NewsRow: View {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @MainActor final class AccountingVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
-    @Published var query = ""; @Published var isLoading = false
-    var filtered: [[String: Any]] {
+    @Published var items: [JournalEntryItem] = []
+    @Published var query = ""
+    @Published var isLoading = false
+
+    var filtered: [JournalEntryItem] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter {
-            oStr($0,"description","descripcion","concepto").lowercased().contains(q) ||
-            oStr($0,"account","cuenta").lowercased().contains(q)
+            $0.description.lowercased().contains(q) || $0.account.lowercased().contains(q) || $0.reference.lowercased().contains(q)
         }
     }
-    var totalDebit:  Double { items.reduce(0) { $0 + (oDouble($1,"debit","debe","totalDebit") ?? 0) } }
-    var totalCredit: Double { items.reduce(0) { $0 + (oDouble($1,"credit","haber","totalCredit") ?? 0) } }
+    var totalDebit: Double { items.reduce(0) { $0 + $1.totalDebit } }
+    var totalCredit: Double { items.reduce(0) { $0 + $1.totalCredit } }
     func load() {
         isLoading = true
-        Task { items = await ExtraRepository.shared.journalEntries(); isLoading = false }
+        Task { items = await ExtraRepository.shared.journalEntryItems(); isLoading = false }
     }
 }
 
 struct AccountingView: View {
     @StateObject private var vm = AccountingVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: JournalEntryItem?
     var body: some View {
         Group {
             if let s = selected { acDetail(s) } else { acList }
@@ -1665,9 +1676,15 @@ struct AccountingView: View {
             }
             searchBar("Buscar asiento…", text: $vm.query)
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
-            else if vm.filtered.isEmpty { Spacer(); Text("Sin asientos").foregroundColor(.secondary); Spacer() }
-            else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"ac") }) { item in
+            else if vm.filtered.isEmpty {
+                NxEmptyState(
+                    title: "Sin asientos",
+                    subtitle: "No hay asientos contables con este filtro.",
+                    actionLabel: "Actualizar",
+                    onAction: { vm.load() }
+                )
+            } else {
+                List(vm.filtered.prefix(60)) { item in
                     Button { selected = item } label: { AccountingRow(item: item) }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
@@ -1677,36 +1694,29 @@ struct AccountingView: View {
         }
     }
 
-    @ViewBuilder private func acDetail(_ e: [String: Any]) -> some View {
-        let desc    = oStr(e,"description","descripcion","concepto")
-        let account = oStr(e,"account","cuenta")
-        let debit   = oDouble(e,"debit","debe","totalDebit")
-        let credit  = oDouble(e,"credit","haber","totalCredit")
-        let date    = String(oStr(e,"date","createdAt").prefix(10))
-        let ref     = oStr(e,"reference","referencia","folio")
-        let status  = oStr(e,"status","estado")
+    @ViewBuilder private func acDetail(_ e: JournalEntryItem) -> some View {
         List {
             Section { Button("← Contabilidad") { selected = nil } }
             Section {
                 HStack {
                     VStack {
                         Text("Debe").font(.caption).foregroundColor(.secondary)
-                        Text(debit.map { fmtOps($0) } ?? "—").font(.title3).bold().foregroundColor(.red)
+                        Text(fmtOps(e.totalDebit)).font(.title3).bold().foregroundColor(.red)
                     }
                     Spacer()
                     VStack {
                         Text("Haber").font(.caption).foregroundColor(.secondary)
-                        Text(credit.map { fmtOps($0) } ?? "—").font(.title3).bold().foregroundColor(.green)
+                        Text(fmtOps(e.totalCredit)).font(.title3).bold().foregroundColor(.green)
                     }
                 }
                 .frame(maxWidth: .infinity).padding(.vertical, 6)
             }
             Section("Asiento") {
-                oRow("Descripción", desc)
-                oRow("Cuenta",      account)
-                oRow("Fecha",       date)
-                oRow("Referencia",  ref)
-                oRow("Estatus",     status)
+                oRow("Descripción", e.description)
+                oRow("Cuenta",      e.account)
+                oRow("Fecha",       e.dateLabel)
+                oRow("Referencia",  e.reference)
+                oRow("Estatus",     e.status)
             }
         }
         .listStyle(.insetGrouped)
@@ -1714,24 +1724,19 @@ struct AccountingView: View {
 }
 
 private struct AccountingRow: View {
-    let item: [String: Any]
+    let item: JournalEntryItem
     var body: some View {
-        let desc   = oStr(item,"description","descripcion","concepto")
-        let account = oStr(item,"account","cuenta")
-        let debit  = oDouble(item,"debit","debe","totalDebit")
-        let credit = oDouble(item,"credit","haber","totalCredit")
-        let date   = String(oStr(item,"date","createdAt").prefix(10))
         HStack(spacing:10) {
             Image(systemName:"book.closed").foregroundColor(.secondary).font(.title3)
             VStack(alignment:.leading, spacing:2) {
-                Text(desc.isEmpty ? "Asiento" : desc).font(.subheadline).lineLimit(1)
-                if !account.isEmpty { Text(account).font(.caption).foregroundColor(.secondary) }
+                Text(item.displayDescription).font(.subheadline).lineLimit(1)
+                if !item.account.isEmpty { Text(item.account).font(.caption).foregroundColor(.secondary) }
             }
             Spacer()
             VStack(alignment:.trailing, spacing:2) {
-                if let d = debit, d > 0  { Text("D: \(fmtOps(d))").font(.caption2).foregroundColor(.red) }
-                if let c = credit, c > 0 { Text("H: \(fmtOps(c))").font(.caption2).foregroundColor(.green) }
-                if !date.isEmpty { Text(date).font(.caption2).foregroundColor(.secondary) }
+                if item.totalDebit > 0  { Text("D: \(fmtOps(item.totalDebit))").font(.caption2).foregroundColor(.red) }
+                if item.totalCredit > 0 { Text("H: \(fmtOps(item.totalCredit))").font(.caption2).foregroundColor(.green) }
+                if !item.dateLabel.isEmpty { Text(item.dateLabel).font(.caption2).foregroundColor(.secondary) }
             }
         }
         .padding(10)
@@ -1745,26 +1750,28 @@ private struct AccountingRow: View {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @MainActor final class WorkProjectsVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [PortfolioProject] = []
     @Published var query = ""; @Published var isLoading = false
-    var filtered: [[String: Any]] {
+    var filtered: [PortfolioProject] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter {
-            oStr($0,"name","nombre","title").lowercased().contains(q) ||
-            oStr($0,"clientName","cliente").lowercased().contains(q)
+            $0.title.lowercased().contains(q) ||
+            $0.sector.lowercased().contains(q) ||
+            $0.summary.lowercased().contains(q) ||
+            $0.impact.lowercased().contains(q)
         }
     }
-    var active: Int { items.filter { oStr($0,"status","estado").lowercased().contains("activo") || oStr($0,"status").lowercased() == "active" }.count }
+    var withImpact: Int { items.filter { !$0.impact.isEmpty }.count }
     func load() {
         isLoading = true
-        Task { items = await ExtraRepository.shared.projects(); isLoading = false }
+        Task { items = await ExtraRepository.shared.portfolioProjects(); isLoading = false }
     }
 }
 
 struct WorkProjectsView: View {
     @StateObject private var vm = WorkProjectsVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: PortfolioProject?
     var body: some View {
         Group {
             if let s = selected { wpDetail(s) } else { listBody }
@@ -1783,7 +1790,7 @@ struct WorkProjectsView: View {
                 HStack(spacing: 0) {
                     OpsKpi(label: "Proyectos", value: "\(vm.items.count)", color: .primary)
                     Divider().frame(height:32)
-                    OpsKpi(label: "Activos",   value: "\(vm.active)",      color: .green)
+                    OpsKpi(label: "Con impacto", value: "\(vm.withImpact)", color: .green)
                 }
                 .padding(.horizontal).padding(.vertical,6)
                 .background(Color(.secondarySystemGroupedBackground))
@@ -1794,7 +1801,7 @@ struct WorkProjectsView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin proyectos").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"wp") }) { item in
+                List(vm.filtered.prefix(60)) { item in
                     Button { selected = item } label: { WorkProjectRow(item: item) }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
@@ -1805,45 +1812,21 @@ struct WorkProjectsView: View {
     }
 
     @ViewBuilder
-    private func wpDetail(_ p: [String: Any]) -> some View {
-        let status = oStr(p,"status","estado")
-        let color: Color = status.lowercased().contains("activo") || status.lowercased() == "active" ? .green
-                         : status.lowercased().contains("terminado") || status.lowercased() == "done" ? .secondary
-                         : .orange
+    private func wpDetail(_ p: PortfolioProject) -> some View {
         List {
             Section {
-                HStack {
-                    Button("← Proyectos") { selected = nil }
-                    Spacer()
-                    if !status.isEmpty {
-                        Text(status.capitalized).font(.caption).bold().foregroundColor(color)
-                            .padding(.horizontal,8).padding(.vertical,3)
-                            .background(color.opacity(0.12)).clipShape(Capsule())
-                    }
-                }
+                Button("← Proyectos") { selected = nil }
             }
             Section("Proyecto") {
-                wpRow("Nombre",       oStr(p,"name","nombre","title"))
-                wpRow("Cliente",      oStr(p,"clientName","cliente"))
-                wpRow("Responsable",  oStr(p,"ownerName","responsable","manager"))
-                wpRow("Inicio",       String(oStr(p,"startDate","fechaInicio").prefix(10)))
-                wpRow("Fin esperado", String(oStr(p,"endDate","fechaFin").prefix(10)))
-                wpRow("Presupuesto",  oStr(p,"budget","presupuesto"))
-                wpRow("Ubicación",    oStr(p,"location","ubicacion"))
-            }
-            let desc = oStr(p,"description","descripcion","notes","notas")
-            if !desc.isEmpty { Section("Descripción") { Text(desc).font(.subheadline) } }
-            let tasks = (p["tasks"] as? [[String: Any]]) ?? []
-            if !tasks.isEmpty {
-                Section("Tareas (\(tasks.count))") {
-                    ForEach(Array(tasks.enumerated()), id: \.offset) { _, t in
-                        HStack {
-                            Image(systemName: (t["completed"] as? Bool == true) ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor((t["completed"] as? Bool == true) ? .green : .secondary)
-                            Text(oStr(t,"name","title","description")).font(.caption)
-                        }
-                    }
-                }
+                wpRow("Título",    p.title)
+                wpRow("Sector",    p.sector)
+                wpRow("Resumen",   p.summary)
+                wpRow("Impacto",   p.impact)
+                wpRow("Servicios", p.services.joined(separator: ", "))
+                wpRow("Tags",      p.tags.joined(separator: ", "))
+                wpRow("Highlights", p.highlights.joined(separator: ", "))
+                wpRow("Slug",      p.slug)
+                wpRow("Fecha",     String(p.createdAt.prefix(10)))
             }
         }
         .listStyle(.insetGrouped)
@@ -1855,24 +1838,23 @@ struct WorkProjectsView: View {
 }
 
 private struct WorkProjectRow: View {
-    let item: [String: Any]
+    let item: PortfolioProject
     var body: some View {
-        let name    = oStr(item,"name","nombre","title")
-        let client  = oStr(item,"clientName","cliente")
-        let status  = oStr(item,"status","estado")
-        let date    = String(oStr(item,"startDate","createdAt").prefix(10))
-        let color: Color = status.lowercased().contains("activo") || status.lowercased() == "active" ? .green
-                         : status.lowercased().contains("terminado") || status.lowercased() == "done" ? .secondary
-                         : .orange
+        let name    = item.displayTitle
+        let sub     = item.subtitle
+        let date    = String(item.createdAt.prefix(10))
+        let color: Color = item.impact.isEmpty ? .orange : .green
         HStack(spacing:0) {
             Rectangle().fill(color).frame(width:4).clipShape(RoundedRectangle(cornerRadius:2))
             VStack(alignment:.leading, spacing:4) {
                 Text(name.isEmpty ? "Proyecto" : name).font(.subheadline).bold().lineLimit(1)
-                if !client.isEmpty { Text(client).font(.caption).foregroundColor(.secondary) }
+                if !sub.isEmpty { Text(sub).font(.caption).foregroundColor(.secondary) }
                 HStack {
-                    Text(status.capitalized).font(.caption2).bold().foregroundColor(color)
-                        .padding(.horizontal,6).padding(.vertical,2)
-                        .background(color.opacity(0.12)).clipShape(Capsule())
+                    if !item.sector.isEmpty {
+                        Text(item.sector.capitalized).font(.caption2).bold().foregroundColor(color)
+                            .padding(.horizontal,6).padding(.vertical,2)
+                            .background(color.opacity(0.12)).clipShape(Capsule())
+                    }
                     Spacer()
                     if !date.isEmpty { Text(date).font(.caption2).foregroundColor(.secondary) }
                 }
@@ -1889,26 +1871,26 @@ private struct WorkProjectRow: View {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @MainActor final class NewsletterVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [ConsoleNewsletterSubscriber] = []
     @Published var query = ""; @Published var isLoading = false
-    var filtered: [[String: Any]] {
+    var filtered: [ConsoleNewsletterSubscriber] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter {
-            oStr($0,"email","correo").lowercased().contains(q) ||
-            oStr($0,"name","nombre").lowercased().contains(q)
+            $0.email.lowercased().contains(q) ||
+            $0.name.lowercased().contains(q)
         }
     }
-    var active: Int { items.filter { !(($0["unsubscribed"] as? Bool) ?? false) && oStr($0,"status").lowercased() != "unsubscribed" }.count }
+    var active: Int { items.filter { !$0.isUnsubscribed }.count }
     func load() {
         isLoading = true
-        Task { items = await ExtraRepository.shared.newsletter(); isLoading = false }
+        Task { items = await ExtraRepository.shared.newsletterItems(); isLoading = false }
     }
 }
 
 struct NewsletterView: View {
     @StateObject private var vm = NewsletterVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: ConsoleNewsletterSubscriber?
     var body: some View {
         Group {
             if let s = selected { nlDetail(s) } else { nlList }
@@ -1938,7 +1920,7 @@ struct NewsletterView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin suscriptores").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"nl") }) { item in
+                List(vm.filtered.prefix(60)) { item in
                     Button { selected = item } label: { NewsletterRow(item: item) }
                         .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
@@ -1948,13 +1930,12 @@ struct NewsletterView: View {
         }
     }
 
-    @ViewBuilder private func nlDetail(_ s: [String: Any]) -> some View {
-        let email   = oStr(s,"email","correo")
-        let name    = oStr(s,"name","nombre")
-        let status  = oStr(s,"status","estado")
-        let unsub   = (s["unsubscribed"] as? Bool) ?? false || status.lowercased() == "unsubscribed"
-        let date    = String(oStr(s,"createdAt","subscribedAt").prefix(10))
-        let source  = oStr(s,"source","fuente","origen")
+    @ViewBuilder private func nlDetail(_ s: ConsoleNewsletterSubscriber) -> some View {
+        let email   = s.email
+        let name    = s.name
+        let unsub   = s.isUnsubscribed
+        let date    = String(s.createdAt.prefix(10))
+        let source  = StockParse.str(s.raw["source"], s.raw["fuente"], s.raw["origen"])
         List {
             Section { Button("← Newsletter") { selected = nil } }
             Section("Suscriptor") {
@@ -1977,12 +1958,11 @@ struct NewsletterView: View {
 }
 
 private struct NewsletterRow: View {
-    let item: [String: Any]
+    let item: ConsoleNewsletterSubscriber
     var body: some View {
-        let email  = oStr(item,"email","correo")
-        let name   = oStr(item,"name","nombre")
-        let status = oStr(item,"status","estado")
-        let unsub  = (item["unsubscribed"] as? Bool) ?? false || status.lowercased() == "unsubscribed"
+        let email  = item.email
+        let name   = item.name
+        let unsub  = item.isUnsubscribed
         HStack(spacing:12) {
             ZStack {
                 Circle().fill((unsub ? Color.secondary : Color.teal).opacity(0.12)).frame(width:38,height:38)

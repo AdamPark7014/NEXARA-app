@@ -18,7 +18,7 @@ import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { VentasService } from '../ventas/ventas.service.js';
-import { resolveRequiredCompanyId, companyWhere } from '../common/tenant/tenant-scope.js';
+import { resolveRequiredCompanyId, companyWhere, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
 import { randomBytes } from 'crypto';
 import nodemailer from 'nodemailer';
 import fs from 'fs/promises';
@@ -137,10 +137,14 @@ export class CotizacionesService {
     });
   }
 
-  private async ensureUniqueQuoteNumber(base: string) {
+  private async ensureUniqueQuoteNumber(base: string, companyId: number) {
     let candidate = base;
     let counter = 1;
-    while (await this.db.cotizacion.findUnique({ where: { quoteNumber: candidate } })) {
+    while (
+      await this.db.cotizacion.findFirst({
+        where: { quoteNumber: candidate, ...companyWhere(companyId) },
+      })
+    ) {
       candidate = `${base}-${String(counter).padStart(3, '0')}`;
       counter += 1;
       if (counter > 999) {
@@ -150,12 +154,11 @@ export class CotizacionesService {
     return candidate;
   }
 
-  async create(dto: CreateCotizacionDto, createdById?: number) {
+  async create(dto: CreateCotizacionDto, createdById?: number, companyId?: number | null) {
     const items = this.normalizeItems(dto.items);
     const totals = this.calculateTotals(items);
     const status = normalizeStatus(dto.status) || CotizacionStatus.DRAFT;
     const baseQuoteNumber = dto.quoteNumber.trim();
-    const quoteNumber = await this.ensureUniqueQuoteNumber(baseQuoteNumber);
 
     let salesClientId = dto.salesClientId ? Number(dto.salesClientId) : null;
     let opportunityId = dto.opportunityId ? Number(dto.opportunityId) : null;
@@ -165,12 +168,14 @@ export class CotizacionesService {
     let clientPhone = dto.clientPhone?.trim() || null;
     let clientAddress = dto.clientAddress?.trim() || null;
 
+    const resolvedCompanyId = await resolveRequiredCompanyId(this.db, companyId);
+
     if (opportunityId) {
-      const opportunity = await this.db.salesOpportunity.findUnique({
-        where: { id: opportunityId },
+      const opportunity = await this.db.salesOpportunity.findFirst({
+        where: { id: opportunityId, ...companyWhere(resolvedCompanyId) },
         include: { client: true },
       });
-      if (!opportunity) throw new BadRequestException('Oportunidad no encontrada');
+      assertCompanyAccess(opportunity, resolvedCompanyId, 'Oportunidad');
       if (!salesClientId && opportunity.clientId) salesClientId = opportunity.clientId;
       if (!clientName && opportunity.client) {
         clientName = opportunity.client.name;
@@ -182,8 +187,10 @@ export class CotizacionesService {
     }
 
     if (salesClientId) {
-      const salesClient = await this.db.salesClient.findUnique({ where: { id: salesClientId } });
-      if (!salesClient) throw new BadRequestException('Cliente comercial no encontrado');
+      const salesClient = await this.db.salesClient.findFirst({
+        where: { id: salesClientId, ...companyWhere(resolvedCompanyId) },
+      });
+      assertCompanyAccess(salesClient, resolvedCompanyId, 'Cliente comercial');
       clientName = clientName || salesClient.name;
       clientCompany = clientCompany || salesClient.legalName || salesClient.name;
       clientEmail = clientEmail || salesClient.billingEmail;
@@ -191,17 +198,32 @@ export class CotizacionesService {
       clientAddress = clientAddress || salesClient.fiscalAddress;
     }
 
-    const companyId = await resolveRequiredCompanyId(
-      this.db,
-      (opportunityId
-        ? (await this.db.salesOpportunity.findUnique({ where: { id: opportunityId }, select: { companyId: true } }))
-            ?.companyId
-        : null) ??
-        (salesClientId
-          ? (await this.db.salesClient.findUnique({ where: { id: salesClientId }, select: { companyId: true } }))
-              ?.companyId
-          : null),
-    );
+    const quoteNumber = await this.ensureUniqueQuoteNumber(baseQuoteNumber, resolvedCompanyId);
+
+    // Toda cotización debe quedar ligada a un cliente comercial (maestro CRM),
+    // no solo a texto libre: si no vino salesClientId ni oportunidad, se
+    // busca o crea el SalesClient a partir del nombre capturado.
+    if (!salesClientId) {
+      if (!clientName) {
+        throw new BadRequestException('La cotización requiere un cliente: selecciona uno existente o captura al menos el nombre.');
+      }
+      const existingByName = await this.db.salesClient.findFirst({
+        where: { companyId: resolvedCompanyId, name: clientName },
+      });
+      const salesClient =
+        existingByName ??
+        (await this.db.salesClient.create({
+          data: {
+            name: clientName,
+            legalName: clientCompany || clientName,
+            billingEmail: clientEmail,
+            billingPhone: clientPhone,
+            fiscalAddress: clientAddress,
+            companyId: resolvedCompanyId,
+          },
+        }));
+      salesClientId = salesClient.id;
+    }
 
     const data: Prisma.CotizacionUncheckedCreateInput = {
       quoteNumber,
@@ -231,7 +253,7 @@ export class CotizacionesService {
       retentionTotal: round2(totals.retentionTotal),
       total: round2(totals.total),
       createdById: createdById || null,
-      companyId,
+      companyId: resolvedCompanyId,
       items: { create: this.buildItemData(items) },
     };
 
@@ -243,7 +265,10 @@ export class CotizacionesService {
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        const fallback = await this.ensureUniqueQuoteNumber(`${baseQuoteNumber}-${String(Date.now()).slice(-4)}`);
+        const fallback = await this.ensureUniqueQuoteNumber(
+          `${baseQuoteNumber}-${String(Date.now()).slice(-4)}`,
+          resolvedCompanyId,
+        );
         created = await this.db.cotizacion.create({
           data: { ...data, quoteNumber: fallback },
           include: { items: true, salesClient: true, opportunity: true },
@@ -271,6 +296,7 @@ export class CotizacionesService {
           entityType: 'COTIZACION',
           entityId: created.id,
           userId: createdById,
+          companyId: created.companyId,
           payload: { maxDiscountPercent: maxDiscount, total: created.total },
         })
         .catch(() => undefined);
@@ -307,21 +333,35 @@ export class CotizacionesService {
     });
   }
 
-  async findOne(id: number) {
-    const quote = await this.db.cotizacion.findUnique({
-      where: { id },
+  async findOne(id: number, companyId?: number | null) {
+    const quote = await this.db.cotizacion.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
       include: { items: true, createdBy: true },
     });
-    if (!quote) throw new NotFoundException('Cotizacion no encontrada');
+    assertCompanyAccess(quote, companyId, 'Cotizacion');
     return quote;
   }
 
-  async update(id: number, dto: UpdateCotizacionDto, updatedById?: number) {
-    const existing = await this.db.cotizacion.findUnique({
-      where: { id },
+  async update(id: number, dto: UpdateCotizacionDto, updatedById?: number, companyId?: number | null) {
+    const existing = await this.db.cotizacion.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
       include: { items: true },
     });
-    if (!existing) throw new NotFoundException('Cotizacion no encontrada');
+    assertCompanyAccess(existing, companyId, 'Cotizacion');
+    const tenantId = existing.companyId ?? companyId ?? null;
+
+    if (dto.opportunityId) {
+      const opportunity = await this.db.salesOpportunity.findFirst({
+        where: { id: Number(dto.opportunityId), ...companyWhere(tenantId) },
+      });
+      assertCompanyAccess(opportunity, tenantId, 'Oportunidad');
+    }
+    if (dto.salesClientId) {
+      const salesClient = await this.db.salesClient.findFirst({
+        where: { id: Number(dto.salesClientId), ...companyWhere(tenantId) },
+      });
+      assertCompanyAccess(salesClient, tenantId, 'Cliente comercial');
+    }
 
     const updateData: Record<string, any> = {
       quoteNumber: dto.quoteNumber?.trim(),
@@ -398,6 +438,7 @@ export class CotizacionesService {
           entityType: 'COTIZACION',
           entityId: id,
           userId: requesterId,
+          companyId: result.companyId ?? existing.companyId,
           payload: { maxDiscountPercent: maxDiscount, total: result.total },
         })
         .catch(() => undefined);
@@ -405,13 +446,13 @@ export class CotizacionesService {
     return result;
   }
 
-  async getPdfBuffer(id: number) {
-    const quote = await this.findOne(id);
+  async getPdfBuffer(id: number, companyId?: number | null) {
+    const quote = await this.findOne(id, companyId);
     return this.buildPdf(quote);
   }
 
-  async generatePdfFile(id: number) {
-    const quote = await this.findOne(id);
+  async generatePdfFile(id: number, companyId?: number | null) {
+    const quote = await this.findOne(id, companyId);
     const pdf = await this.buildPdf(quote);
     const dir = path.resolve(process.cwd(), 'uploads', 'cotizaciones');
     await fs.mkdir(dir, { recursive: true });
@@ -571,12 +612,12 @@ export class CotizacionesService {
     }
   }
 
-  async send(id: number, dto: SendCotizacionDto, senderId?: number) {
-    const quote = await this.db.cotizacion.findUnique({
-      where: { id },
+  async send(id: number, dto: SendCotizacionDto, senderId?: number, companyId?: number | null) {
+    const quote = await this.db.cotizacion.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
       include: { items: true },
     });
-    if (!quote) throw new NotFoundException('Cotizacion no encontrada');
+    assertCompanyAccess(quote, companyId, 'Cotizacion');
 
     const email = dto.email?.trim() || quote.clientEmail?.trim();
     if (!email) throw new BadRequestException('Email de cliente requerido');

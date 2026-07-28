@@ -4,6 +4,7 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { InventoriesService } from './inventories.service.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { getUploadSubdir } from '../common/upload-paths.js';
@@ -23,6 +24,7 @@ export class InventoriesController {
     ],
   })
   findAll(
+    @CurrentCompanyId() companyId: number | null,
     @Query('clientId') clientId?: string,
     @Query('branchId') branchId?: string,
     @Query('status') status?: string,
@@ -46,13 +48,16 @@ export class InventoriesController {
       from: parsedFrom && !Number.isNaN(parsedFrom.getTime()) ? parsedFrom : undefined,
       to: parsedTo && !Number.isNaN(parsedTo.getTime()) ? parsedTo : undefined,
       search: search?.trim() || undefined,
-    }, query);
+    }, query, companyId);
   }
 
   @Get('activity/:activityId')
   @RBAC({ permissions: [PERMISSIONS.EVIDENCES_CREATE] })
-  getByActivity(@Param('activityId', ParseIntPipe) activityId: number) {
-    return this.inventoriesService.getByActivity(activityId);
+  getByActivity(
+    @Param('activityId', ParseIntPipe) activityId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.inventoriesService.getByActivity(activityId, companyId);
   }
 
   @Post('upload')
@@ -70,9 +75,10 @@ export class InventoriesController {
   syncByActivity(
     @Param('activityId', ParseIntPipe) activityId: number,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Body() body: any,
   ) {
-    return this.inventoriesService.syncByActivity(activityId, body, user?.id);
+    return this.inventoriesService.syncByActivity(activityId, body, user?.id, companyId);
   }
 
   @Post('sync')
@@ -84,6 +90,7 @@ export class InventoriesController {
   })
   syncManual(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Body() body: { clientId?: number; branchId?: number; title?: string; notes?: string; items?: any[]; completed?: boolean },
   ) {
     const clientId = Number(body?.clientId);
@@ -95,6 +102,7 @@ export class InventoriesController {
       { clientId, branchId, createdByType: 'CONSOLE' },
       body || {},
       user?.id,
+      companyId,
     );
   }
 
@@ -107,20 +115,28 @@ export class InventoriesController {
       PERMISSIONS.SUPPORT_VIEW,
     ],
   })
-  detail(@Param('id', ParseIntPipe) id: number) {
-    return this.inventoriesService.detail(id);
+  detail(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.inventoriesService.detail(id, companyId);
   }
 
   @Patch(':id/status')
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
-  updateStatus(@Param('id', ParseIntPipe) id: number, @Body() body: { status?: string }) {
-    return this.inventoriesService.updateStatus(id, body.status || 'PENDING');
+  updateStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: { status?: string },
+  ) {
+    return this.inventoriesService.updateStatus(id, body.status || 'PENDING', companyId);
   }
 
   @Get(':id/report')
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
-  async report(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
-    const result = await this.inventoriesService.generateReport(id);
+  async report(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+    @Res() res: Response,
+  ) {
+    const result = await this.inventoriesService.generateReport(id, companyId);
     if (!result) return res.status(404).send('Inventario no encontrado');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=inventario-${id}.pdf`);

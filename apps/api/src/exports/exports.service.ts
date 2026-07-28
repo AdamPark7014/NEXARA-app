@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 type ExportEntity =
   | 'clients'
@@ -56,8 +57,15 @@ export class ExportsService {
   async exportEntity(
     entity: ExportEntity,
     filters?: { from?: string; to?: string },
+    companyId?: number | null,
   ): Promise<{ rows: any[]; filename: string; rowCount: number }> {
-    const where: any = buildDateWhere(entity, filters);
+    const tenantId = requireCompanyId(companyId);
+    const dateWhere = buildDateWhere(entity, filters);
+    // User is not companyId-stamped — scope via UserCompany membership.
+    const where: any =
+      entity === 'users'
+        ? { ...dateWhere, companyMemberships: { some: { companyId: tenantId } } }
+        : { ...dateWhere, ...companyWhere(tenantId) };
     const stamp = new Date().toISOString().slice(0, 10);
     let rows: any[] = [];
 

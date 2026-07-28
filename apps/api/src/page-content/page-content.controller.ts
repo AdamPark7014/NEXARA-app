@@ -24,6 +24,7 @@ import { UpsertPageContentDto } from './dto/upsert-page-content.dto.js';
 import { resolveUploadsDir } from '../common/uploads-path.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 interface MulterFile {
   fieldname: string;
@@ -40,24 +41,21 @@ const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 export class PageContentController {
   constructor(private readonly svc: PageContentService) {}
 
-  /** GET /api/studio/page-content — lista todas las secciones guardadas */
   @Get()
   @UseGuards(AuthGuard('jwt'))
-  findAll() {
-    return this.svc.findAll();
+  findAll(@CurrentCompanyId() companyId: number | null) {
+    return this.svc.findAll(companyId);
   }
 
-  /** GET /api/studio/page-content/sections — lista las secciones válidas */
   @Get('sections')
   @UseGuards(AuthGuard('jwt'))
   listSections() {
     return { sections: VALID_SECTIONS };
   }
 
-  /** POST /api/studio/page-content/media — sube imagen para slots de página */
   @Post('media')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   @UseInterceptors(FileInterceptor('image'))
   async uploadMedia(@UploadedFile() file?: MulterFile) {
     if (!file) {
@@ -85,7 +83,6 @@ export class PageContentController {
     }
   }
 
-  /** GET /api/studio/page-content/media/:filename — sirve imagen de página */
   @Get('media/:filename')
   async getMedia(@Param('filename') filename: string, @Res() res: Response) {
     try {
@@ -133,46 +130,57 @@ export class PageContentController {
     }
   }
 
-  /**
-   * GET /api/studio/page-content/:section/draft — Studio (borrador)
-   */
   @Get(':section/draft')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
-  findDraft(@Param('section') section: string) {
-    return this.svc.findDraft(section);
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  findDraft(@Param('section') section: string, @CurrentCompanyId() companyId: number | null) {
+    return this.svc.findDraft(section, companyId);
   }
 
-  /**
-   * POST /api/studio/page-content/:section/publish — publica borrador al sitio
-   */
   @Post(':section/publish')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
-  publish(@Param('section') section: string, @Body() body: { updatedBy?: string }) {
-    return this.svc.publish(section, body?.updatedBy);
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  publish(
+    @Param('section') section: string,
+    @Body() body: { updatedBy?: string },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.svc.publish(section, body?.updatedBy, companyId);
   }
 
-  /**
-   * GET /api/studio/page-content/:section
-   * Uso público (landing) — solo publicado.
-   */
+  @Get(':section/revisions')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  listRevisions(@Param('section') section: string, @CurrentCompanyId() companyId: number | null) {
+    return this.svc.listRevisions(section, companyId);
+  }
+
+  @Post(':section/revisions/:version/rollback')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  rollback(
+    @Param('section') section: string,
+    @Param('version') version: string,
+    @Body() body: { updatedBy?: string },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.svc.rollback(section, +version, body?.updatedBy, companyId);
+  }
+
   @Get(':section')
   findOne(@Param('section') section: string) {
     return this.svc.findPublished(section);
   }
 
-  /**
-   * PUT /api/studio/page-content/:section
-   * Guarda borrador (no publica).
-   */
   @Put(':section')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   upsert(
     @Param('section') section: string,
     @Body() dto: UpsertPageContentDto,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.svc.upsert(section, dto);
+    return this.svc.upsert(section, dto, companyId);
   }
 }
+

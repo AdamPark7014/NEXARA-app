@@ -13,7 +13,7 @@ import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { getBiSectionConfig } from "@/lib/section-views";
-import { buildApiUrl } from "@/lib/api-base";
+import { apiRequest } from "@/lib/api-base";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES, type RoleKey } from "@/lib/rbac";
 
@@ -25,11 +25,20 @@ const ERP_BI_ROLES = new Set<RoleKey>([
 interface MarginRow { projectType: string; count: number; budget: number; cost: number; margin: number; marginPercent: number }
 interface EngineerRow { engineerId: number; engineerName: string; totalActivities: number; completed: number; completionRate: number; avgEfficiency: number | null; avgDurationMin: number | null }
 interface ClientRoiRow { clientId: number; clientName: string; projects: number; revenue: number; cost: number; roi: number }
+interface IntelligencePayload {
+  what?: { revenue?: number; marginPercent?: number; dangerCount?: number; warningCount?: number; lowStockAlerts?: number };
+  why?: { drivers?: string[] };
+  willHappen?: { forecastSalesNextMonth?: number; riskIfNoAction?: string };
+  recommendations?: Array<{ action: string; impact: string; priority: string }>;
+  risk?: string;
+  cost?: { monthlyExpenses?: number; opportunityCostOverdueSla?: number };
+  optimize?: string[];
+}
 
 type Period = "month" | "quarter" | "year";
 
 async function apiFetch(path: string, token: string) {
-  const res = await fetch(buildApiUrl(path), { headers: { Authorization: `Bearer ${token}` } });
+  const res = await apiRequest(path, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
   return res.json();
 }
@@ -51,6 +60,7 @@ export default function BiPage() {
   const [margin, setMargin] = useState<MarginRow[]>([]);
   const [engineers, setEngineers] = useState<EngineerRow[]>([]);
   const [clientsRoi, setClientsRoi] = useState<ClientRoiRow[]>([]);
+  const [intel, setIntel] = useState<IntelligencePayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [engSearch, setEngSearch] = useState("");
@@ -60,14 +70,16 @@ export default function BiPage() {
     if (!token) return;
     setLoading(true); setError(null);
     try {
-      const [m, e, c] = await Promise.all([
+      const [m, e, c, i] = await Promise.all([
         apiFetch(`analytics/bi/margin-by-type?period=${period}`, token),
         apiFetch(`analytics/bi/engineers?limit=20&period=${period}`, token),
         apiFetch(`analytics/bi/clients-roi?limit=20&period=${period}`, token),
+        apiFetch(`analytics/intelligence`, token).catch(() => null),
       ]);
       setMargin(Array.isArray(m) ? m : []);
       setEngineers(Array.isArray(e) ? e : []);
       setClientsRoi(Array.isArray(c) ? c : []);
+      setIntel(i && typeof i === "object" ? i : null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar Business Intelligence");
     } finally { setLoading(false); }
@@ -180,6 +192,62 @@ export default function BiPage() {
 
       {!loading && !error && (
         <>
+          {intel && (
+            <Section
+              eyebrow="Inteligencia"
+              title="Qué está pasando · Qué hacer"
+              subtitle={`Riesgo: ${intel.risk || "low"} · Forecast ventas próximo mes: ${intel.willHappen?.forecastSalesNextMonth != null ? new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", notation: "compact" }).format(Number(intel.willHappen.forecastSalesNextMonth)) : "—"}`}
+            >
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 16 }}>
+                <div style={{ padding: 14, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                  <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-tertiary)", marginBottom: 6 }}>Por qué</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.45 }}>
+                    {(intel.why?.drivers || ["Sin drivers críticos"]).map((d) => (
+                      <li key={d}>{d}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div style={{ padding: 14, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                  <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-tertiary)", marginBottom: 6 }}>Qué ocurrirá</div>
+                  <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45 }}>{intel.willHappen?.riskIfNoAction || "Estabilidad esperada"}</p>
+                </div>
+                <div style={{ padding: 14, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                  <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--text-tertiary)", marginBottom: 6 }}>Costo de inacción</div>
+                  <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45 }}>
+                    SLA vencido est.:{" "}
+                    <strong>
+                      {new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(
+                        Number(intel.cost?.opportunityCostOverdueSla || 0),
+                      )}
+                    </strong>
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {(intel.recommendations || []).slice(0, 4).map((r) => (
+                  <div
+                    key={r.action}
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "flex-start",
+                      padding: "10px 12px",
+                      borderRadius: 8,
+                      border: "1px solid var(--border)",
+                      background: "var(--surface)",
+                    }}
+                  >
+                    <Tag variant={r.priority === "P0" ? "danger" : r.priority === "P1" ? "warning" : "neutral"}>{r.priority}</Tag>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{r.action}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{r.impact}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
+
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(175px, 1fr))", gap: 12, marginBottom: 20 }}>
             <KpiCard label="Presupuesto total" value={<Money value={totalBudget} compact />} icon="💰" hint={periodLabel} />
             <KpiCard label="Margen total" value={<Money value={totalMargin} compact />} variant={totalMargin >= 0 ? "positive" : "danger"} icon="📊" hint={periodLabel} />

@@ -257,11 +257,20 @@ enum StockParse {
         return nil
     }
 
-    static func int64(_ value: Any?) -> Int64? {
-        if let n = value as? Int64 { return n }
-        if let n = value as? Int { return Int64(n) }
-        if let n = value as? NSNumber { return n.int64Value }
-        if let s = value as? String, let n = Int64(s) { return n }
+    static func int64(_ values: Any?...) -> Int64? {
+        for value in values {
+            if let n = value as? Int64 { return n }
+            if let n = value as? Int { return Int64(n) }
+            if let n = value as? NSNumber { return n.int64Value }
+            if let s = value as? String, let n = Int64(s) { return n }
+        }
+        return nil
+    }
+
+    static func int(_ values: Any?...) -> Int? {
+        for v in values {
+            if let n = int64(v) { return Int(n) }
+        }
         return nil
     }
 }

@@ -3,6 +3,7 @@ import PDFDocument from 'pdfkit';
 import { PrismaService } from '../prisma/prisma.service.js';
 import fs from 'fs';
 import path from 'path';
+import { companyWhere, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
 
 function resolveNexaraLogoPath(): string | null {
   const candidates = [
@@ -120,12 +121,26 @@ export class PdfGeneratorService {
       where: { id: opportunityQuoteId },
       include: { opportunity: { include: { client: true } }, cotizacion: { include: { items: true } }, createdBy: true },
     });
-    const client = await this.prisma.salesClient.findUnique({ where: { id: clientId } });
-    if (!quote || !client) throw new BadRequestException('Quote or client not found');
+    if (!quote) throw new BadRequestException('Quote or client not found');
+
+    const tenantId = (quote.opportunity as any)?.companyId ?? null;
+    const client = await this.prisma.salesClient.findFirst({
+      where: { id: clientId, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(client, tenantId, 'Cliente');
+    if (!client) throw new BadRequestException('Quote or client not found');
 
     const template = templateId
-      ? await this.prisma.orderTemplate.findUnique({ where: { id: templateId } })
-      : await this.prisma.orderTemplate.findFirst({ where: { isDefault: true } });
+      ? await this.prisma.orderTemplate.findFirst({
+          where: { id: templateId, ...companyWhere(tenantId) },
+        })
+      : await this.prisma.orderTemplate.findFirst({
+          where: {
+            isDefault: true,
+            ...companyWhere(tenantId),
+          },
+        });
+    if (templateId) assertCompanyAccess(template, tenantId, 'Template');
 
     const cot = quote.cotizacion as any;
     const data: QuotePdfData = {
@@ -178,7 +193,16 @@ export class PdfGeneratorService {
     if (!client) throw new BadRequestException('Client not found');
     const template = templateId
       ? await this.prisma.orderTemplate.findUnique({ where: { id: templateId } })
-      : await this.prisma.orderTemplate.findFirst({ where: { isDefault: true } });
+      : await this.prisma.orderTemplate.findFirst({
+          where: {
+            isDefault: true,
+            ...((project as any).companyId
+              ? companyWhere((project as any).companyId)
+              : (project.opportunity as any)?.companyId
+                ? companyWhere((project.opportunity as any).companyId)
+                : {}),
+          },
+        });
     const quote = (project.opportunity as any)?.quotes?.[0];
     const cot = quote?.cotizacion as any;
     const data: QuotePdfData = {

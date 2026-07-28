@@ -145,7 +145,7 @@ export default function AuditPage() {
       <PageHeader
         eyebrow="ERP · Auditoría"
         title="Audit log"
-        subtitle="Trazabilidad inmutable de cambios sensibles en todo NEXARA. Solo lectura. Si necesitas explicar legalmente una acción, está aquí."
+        subtitle="Trazabilidad inmutable de cambios sensibles. El borrado GDPR/LFPDPPP de sujetos se hace desde Usuarios → IAM → Borrar PII."
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 

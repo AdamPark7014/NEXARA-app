@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 type CurrentUser = {
   id: number;
@@ -86,16 +87,19 @@ export class CvsService {
       recruiterNotes?: string;
       cvFileUrl: string;
     },
+    companyId?: number | null,
   ) {
     this.ensureRecruiterAccess(user);
+    const tenantId = requireCompanyId(companyId);
 
     const lastOrder = await this.cv.aggregate({
       _max: { sortOrder: true },
-      where: { stage: 'INBOX' },
+      where: { stage: 'INBOX', ...companyWhere(tenantId) },
     });
 
     return this.cv.create({
       data: {
+        companyId: tenantId,
         fullName: payload.fullName,
         email: payload.email || null,
         whatsapp: payload.whatsapp || null,
@@ -120,10 +124,12 @@ export class CvsService {
       onlyMine?: string;
     },
     pagination?: PaginationQueryDto,
+    companyId?: number | null,
   ) {
     this.ensureRecruiterAccess(user);
+    const tenantId = requireCompanyId(companyId);
 
-    const where: any = {};
+    const where: any = { ...companyWhere(tenantId) };
     if (query.search) {
       where.OR = [
         { fullName: { contains: query.search, mode: 'insensitive' } },
@@ -164,8 +170,9 @@ export class CvsService {
     return rows;
   }
 
-  async summary(user: CurrentUser) {
+  async summary(user: CurrentUser, companyId?: number | null) {
     this.ensureRecruiterAccess(user);
+    const tenantId = requireCompanyId(companyId);
     const rows: Array<{
       stage: string;
       category: string | null;
@@ -174,6 +181,7 @@ export class CvsService {
       adminDecision: string;
       superadminDecision: string;
     }> = await this.cv.findMany({
+      where: companyWhere(tenantId),
       select: {
         stage: true,
         category: true,
@@ -214,8 +222,12 @@ export class CvsService {
     user: CurrentUser,
     id: number,
     body: { decision: 'APPROVED' | 'REJECTED' | 'PENDING'; notes?: string; category?: string; tags?: string[]; employmentStatus?: string },
+    companyId?: number | null,
   ) {
     this.ensureRecruiterAccess(user);
+    const tenantId = requireCompanyId(companyId);
+    const current = await this.cv.findFirst({ where: { id, ...companyWhere(tenantId) } });
+    assertCompanyAccess(current, tenantId, 'CV');
 
     const stage = body.decision === 'APPROVED' ? 'RECRUITER_SHORTLIST' : body.decision === 'REJECTED' ? 'RECRUITER_REJECTED' : 'INBOX';
 
@@ -234,11 +246,17 @@ export class CvsService {
     });
   }
 
-  async adminReview(user: CurrentUser, id: number, body: { decision: 'APPROVED' | 'REJECTED' | 'PENDING'; notes?: string }) {
+  async adminReview(
+    user: CurrentUser,
+    id: number,
+    body: { decision: 'APPROVED' | 'REJECTED' | 'PENDING'; notes?: string },
+    companyId?: number | null,
+  ) {
     this.ensureAdminAccess(user);
+    const tenantId = requireCompanyId(companyId);
 
-    const current = await this.cv.findUnique({ where: { id } });
-    if (!current) throw new NotFoundException('CV no encontrado');
+    const current = await this.cv.findFirst({ where: { id, ...companyWhere(tenantId) } });
+    assertCompanyAccess(current, tenantId, 'CV');
     if (current.recruiterDecision !== 'APPROVED' && !user.isSuperAdmin) {
       throw new BadRequestException('Este CV aún no fue aprobado por reclutamiento');
     }
@@ -257,11 +275,17 @@ export class CvsService {
     });
   }
 
-  async superadminReview(user: CurrentUser, id: number, body: { decision: 'APPROVED' | 'REJECTED' | 'PENDING'; notes?: string }) {
+  async superadminReview(
+    user: CurrentUser,
+    id: number,
+    body: { decision: 'APPROVED' | 'REJECTED' | 'PENDING'; notes?: string },
+    companyId?: number | null,
+  ) {
     this.ensureSuperadminAccess(user);
+    const tenantId = requireCompanyId(companyId);
 
-    const current = await this.cv.findUnique({ where: { id } });
-    if (!current) throw new NotFoundException('CV no encontrado');
+    const current = await this.cv.findFirst({ where: { id, ...companyWhere(tenantId) } });
+    assertCompanyAccess(current, tenantId, 'CV');
 
     const stage = body.decision === 'APPROVED' ? 'APPROVED' : body.decision === 'REJECTED' ? 'SUPERADMIN_REJECTED' : 'SUPERADMIN_SHORTLIST';
 
@@ -277,8 +301,9 @@ export class CvsService {
     });
   }
 
-  async move(user: CurrentUser, id: number, stage: CvStageValue, sortOrder?: number) {
+  async move(user: CurrentUser, id: number, stage: CvStageValue, sortOrder?: number, companyId?: number | null) {
     this.ensureRecruiterAccess(user);
+    const tenantId = requireCompanyId(companyId);
 
     const tier = this.resolveTier(user);
     const allowedStages = this.getAllowedStagesByTier(tier);
@@ -286,8 +311,8 @@ export class CvsService {
       throw new ForbiddenException('No tienes permisos para mover CVs a esa etapa');
     }
 
-    const target = await this.cv.findUnique({ where: { id } });
-    if (!target) throw new NotFoundException('CV no encontrado');
+    const target = await this.cv.findFirst({ where: { id, ...companyWhere(tenantId) } });
+    assertCompanyAccess(target, tenantId, 'CV');
 
     return this.cv.update({
       where: { id },
@@ -298,13 +323,22 @@ export class CvsService {
     });
   }
 
-  async reorder(user: CurrentUser, stage: CvStageValue, orderedIds: number[]) {
+  async reorder(user: CurrentUser, stage: CvStageValue, orderedIds: number[], companyId?: number | null) {
     this.ensureRecruiterAccess(user);
+    const tenantId = requireCompanyId(companyId);
 
     const tier = this.resolveTier(user);
     const allowedStages = this.getAllowedStagesByTier(tier);
     if (!allowedStages.includes(stage)) {
       throw new ForbiddenException('No tienes permisos para ordenar esa etapa');
+    }
+
+    const scoped = await this.cv.findMany({
+      where: { id: { in: orderedIds }, ...companyWhere(tenantId) },
+      select: { id: true },
+    });
+    if (scoped.length !== orderedIds.length) {
+      throw new NotFoundException('CV no encontrado');
     }
 
     await this.prisma.$transaction(
@@ -319,10 +353,11 @@ export class CvsService {
     return { ok: true };
   }
 
-  async getById(user: CurrentUser, id: number) {
+  async getById(user: CurrentUser, id: number, companyId?: number | null) {
     this.ensureRecruiterAccess(user);
-    const row = await this.cv.findUnique({
-      where: { id },
+    const tenantId = requireCompanyId(companyId);
+    const row = await this.cv.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: {
         createdBy: { select: { id: true, nombre: true, email: true } },
         recruiterReviewedBy: { select: { id: true, nombre: true, email: true } },
@@ -330,14 +365,15 @@ export class CvsService {
         superadminReviewedBy: { select: { id: true, nombre: true, email: true } },
       },
     });
-    if (!row) throw new NotFoundException('CV no encontrado');
-    return row;
+    assertCompanyAccess(row, tenantId, 'CV');
+    return row!;
   }
 
-  async getUserPrefill(user: CurrentUser, id: number) {
+  async getUserPrefill(user: CurrentUser, id: number, companyId?: number | null) {
     this.ensureAdminAccess(user);
-    const row = await this.cv.findUnique({ where: { id } });
-    if (!row) throw new NotFoundException('CV no encontrado');
+    const tenantId = requireCompanyId(companyId);
+    const row = await this.cv.findFirst({ where: { id, ...companyWhere(tenantId) } });
+    assertCompanyAccess(row, tenantId, 'CV');
 
     const canCreate = row.superadminDecision === 'APPROVED' || user.isSuperAdmin;
     if (!canCreate) {

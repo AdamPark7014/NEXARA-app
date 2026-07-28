@@ -13,10 +13,14 @@ final class TicketsRepository {
     // MARK: Profile
 
     func profile() async throws -> [String: Any]? {
+        try await portalProfile()?.raw
+    }
+
+    func portalProfile() async throws -> PortalClientProfile? {
         let path = isBranchUser ? "branch-portal/profile" : "client-portal/profile"
         let data = try await api.get(path)
         let map = ConsoleHelpers.decodeMap(data)
-        return map.isEmpty ? nil : map
+        return map.isEmpty ? nil : PortalClientProfile(raw: map)
     }
 
     func updateProfile(
@@ -37,7 +41,11 @@ final class TicketsRepository {
     // MARK: Branches (client only)
 
     func branches() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("client-portal/branches"))
+        try await portalBranches().map(\.raw)
+    }
+
+    func portalBranches() async throws -> [PortalBranch] {
+        ApiClient.decodeMapList(try await api.get("client-portal/branches")).map { PortalBranch(raw: $0) }
     }
 
     func createBranch(
@@ -104,8 +112,12 @@ final class TicketsRepository {
     // MARK: Requests
 
     func requests() async throws -> [[String: Any]] {
+        try await portalRequests().map { $0.toFlatMap() }
+    }
+
+    func portalRequests() async throws -> [ClientTicketRequest] {
         let path = isBranchUser ? "branch-portal/requests" : "client-portal/requests"
-        return ApiClient.decodeMapList(try await api.get(path))
+        return ApiClient.decodeMapList(try await api.get(path)).map { ClientTicketRequest(raw: $0) }
     }
 
     func createRequest(
@@ -143,16 +155,24 @@ final class TicketsRepository {
     // MARK: Tickets
 
     func tickets(branchId: Int64? = nil) async throws -> [[String: Any]] {
+        try await portalTickets(branchId: branchId).map { $0.toFlatMap() }
+    }
+
+    func portalTickets(branchId: Int64? = nil) async throws -> [PortalTicket] {
         let path = isBranchUser ? "branch-portal/tickets" : "client-portal/tickets"
         var q: [String: String] = [:]
         if let b = branchId { q["branchId"] = String(b) }
-        return ApiClient.decodeMapList(try await api.get(path, query: q))
+        return ApiClient.decodeMapList(try await api.get(path, query: q)).map { PortalTicket(raw: $0) }
     }
 
     func ticket(id: Int64) async throws -> [String: Any]? {
+        try await portalTicket(id: id)?.toFlatMap()
+    }
+
+    func portalTicket(id: Int64) async throws -> PortalTicket? {
         let path = isBranchUser ? "branch-portal/tickets/\(id)" : "client-portal/tickets/\(id)"
         let map = ConsoleHelpers.decodeMap(try await api.get(path))
-        return map.isEmpty ? nil : map
+        return map.isEmpty ? nil : PortalTicket(raw: map)
     }
 
     func ticketReportPdf(id: Int64) async throws -> Data {
@@ -163,7 +183,12 @@ final class TicketsRepository {
     // MARK: Feedback
 
     func pendingFeedback() async throws -> [[String: Any]] {
+        try await pendingFeedbackItems().map { $0.toFlatMap() }
+    }
+
+    func pendingFeedbackItems() async throws -> [PendingFeedbackItem] {
         ApiClient.decodeMapList(try await api.get("client-portal/feedback/pending"))
+            .map { PendingFeedbackItem(raw: $0) }
     }
 
     func submitFeedback(
@@ -191,15 +216,23 @@ final class TicketsRepository {
     // MARK: Inventories
 
     func inventories(search: String? = nil) async throws -> [[String: Any]] {
+        try await portalInventories(search: search).map { $0.toFlatMap() }
+    }
+
+    func portalInventories(search: String? = nil) async throws -> [PortalInventorySnapshot] {
         let path = isBranchUser ? "branch-portal/inventories" : "client-portal/inventories"
         var q: [String: String] = [:]
         if let s = search, !s.isEmpty { q["search"] = s }
-        return ApiClient.decodeMapList(try await api.get(path, query: q))
+        return ApiClient.decodeMapList(try await api.get(path, query: q)).map { PortalInventorySnapshot(raw: $0) }
     }
 
     func inventoryDetail(id: Int64) async throws -> [String: Any] {
+        try await portalInventoryDetail(id: id).toFlatMap()
+    }
+
+    func portalInventoryDetail(id: Int64) async throws -> PortalInventorySnapshot {
         let path = isBranchUser ? "branch-portal/inventories/\(id)" : "client-portal/inventories/\(id)"
-        return ConsoleHelpers.decodeMap(try await api.get(path))
+        return PortalInventorySnapshot(raw: ConsoleHelpers.decodeMap(try await api.get(path)))
     }
 
     func inventoryReportPdf(id: Int64) async throws -> Data {

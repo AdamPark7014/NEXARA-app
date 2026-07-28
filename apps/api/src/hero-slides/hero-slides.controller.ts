@@ -26,6 +26,7 @@ import { CreateHeroSlideDto } from './dto/create-hero-slide.dto.js';
 import { UpdateHeroSlideDto } from './dto/update-hero-slide.dto.js';
 import { ReorderHeroSlidesDto } from './dto/reorder-hero-slides.dto.js';
 import { resolveLegacyUploadsDir, resolveUploadsDir } from '../common/uploads-path.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 interface MulterFile {
   fieldname: string;
@@ -99,14 +100,14 @@ export class HeroSlidesController {
 
   @Get()
   @UseGuards(AuthGuard('jwt'))
-  adminList() {
-    return this.heroSlidesService.adminList();
+  adminList(@CurrentCompanyId() companyId: number | null) {
+    return this.heroSlidesService.adminList(companyId);
   }
 
   @Get(':id')
   @UseGuards(AuthGuard('jwt'))
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.heroSlidesService.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.heroSlidesService.findOne(id, companyId);
   }
 
   @Post()
@@ -121,12 +122,13 @@ export class HeroSlidesController {
     @Body() payload: CreateHeroSlideDto,
     @UploadedFiles()
     files?: { image?: MulterFile[]; imageMobile?: MulterFile[] },
+    @CurrentCompanyId() companyId?: number | null,
   ) {
     const image = files?.image?.[0];
     const imageMobile = files?.imageMobile?.[0];
     this.assertValidImage(image, false);
     this.assertValidImage(imageMobile, false);
-    return this.heroSlidesService.create(payload, { image, imageMobile });
+    return this.heroSlidesService.create(payload, { image, imageMobile }, companyId);
   }
 
   @Put(':id')
@@ -142,6 +144,7 @@ export class HeroSlidesController {
     @Body() payload: UpdateHeroSlideDto & { clearMobile?: string },
     @UploadedFiles()
     files?: { image?: MulterFile[]; imageMobile?: MulterFile[] },
+    @CurrentCompanyId() companyId?: number | null,
   ) {
     const image = files?.image?.[0];
     const imageMobile = files?.imageMobile?.[0];
@@ -153,20 +156,20 @@ export class HeroSlidesController {
       id,
       payload,
       { image, imageMobile },
-      { clearMobile },
+      { clearMobile, companyId },
     );
   }
 
   @Patch('reorder')
   @UseGuards(AuthGuard('jwt'))
-  reorder(@Body() payload: ReorderHeroSlidesDto) {
-    return this.heroSlidesService.reorder(payload.ids);
+  reorder(@Body() payload: ReorderHeroSlidesDto, @CurrentCompanyId() companyId: number | null) {
+    return this.heroSlidesService.reorder(payload.ids, companyId);
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'))
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.heroSlidesService.remove(id);
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.heroSlidesService.remove(id, companyId);
   }
 
   // ── Validación común ───────────────────────────────────────────────

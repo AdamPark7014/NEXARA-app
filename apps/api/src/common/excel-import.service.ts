@@ -2,6 +2,10 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { requireCompanyId } from './tenant/tenant-scope.js';
+
+/** Import models whose Prisma target carries companyId (tenant-scoped). */
+const TENANT_IMPORT_MODELS = new Set(['activity', 'evidence', 'vehicle', 'viatic']);
 
 const MODEL_SCHEMAS = {
   viatic: z.object({
@@ -295,8 +299,17 @@ export class ExcelImportService {
     return out;
   }
 
-  async importExcel(model: string, fileBuffer: Buffer | Uint8Array | ArrayBuffer) {
+  async importExcel(
+    model: string,
+    fileBuffer: Buffer | Uint8Array | ArrayBuffer,
+    companyId?: number | null,
+  ) {
     if (!(model in MODEL_SCHEMAS)) throw new BadRequestException('Modelo no permitido');
+
+    let tenantId: number | null = null;
+    if (TENANT_IMPORT_MODELS.has(model)) {
+      tenantId = requireCompanyId(companyId);
+    }
 
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(fileBuffer as any);
@@ -337,7 +350,11 @@ export class ExcelImportService {
     for (const [i, row] of rawData.entries()) {
       try {
         const parsed = schema.parse(this.coerceRowByModel(model, row));
-        validData.push(parsed);
+        if (tenantId != null) {
+          validData.push({ ...parsed, companyId: tenantId });
+        } else {
+          validData.push(parsed);
+        }
       } catch (err) {
         if (err instanceof z.ZodError) {
           errors.push({ row: i + headerRowIndex + 1, error: err.issues });

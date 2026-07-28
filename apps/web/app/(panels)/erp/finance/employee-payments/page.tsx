@@ -41,6 +41,7 @@ interface Payment {
   periodFrom: string;
   periodTo: string;
   amount: number;
+  totalMinutes?: number;
   note?: string | null;
   status?: PaymentStatus | string;
   evidenceUrls?: string[];
@@ -61,6 +62,7 @@ const emptyForm = {
   periodFrom: "",
   periodTo: "",
   amount: 0,
+  totalMinutes: 0,
   note: "",
   status: "Borrador" as PaymentStatus,
 };
@@ -80,6 +82,7 @@ function mapPaymentRow(raw: Record<string, unknown>): Payment {
     periodFrom: String(raw.periodFrom ?? "").slice(0, 10),
     periodTo: String(raw.periodTo ?? "").slice(0, 10),
     amount: Number(raw.amount ?? 0),
+    totalMinutes: Number(raw.totalMinutes ?? 0),
     note: (raw.note as string | null | undefined) ?? null,
     status: String(raw.status ?? "Borrador"),
     evidenceUrls: Array.isArray(raw.evidenceUrls) ? (raw.evidenceUrls as string[]) : [],
@@ -207,12 +210,34 @@ export default function EmployeePaymentsPage() {
       periodFrom: p.periodFrom.slice(0, 10),
       periodTo: p.periodTo.slice(0, 10),
       amount: p.amount,
+      totalMinutes: p.totalMinutes ?? 0,
       note: p.note ?? "",
       status: (p.status as PaymentStatus) || "Borrador",
     });
     setEvidenceFiles([]);
     setSaveErr(null);
     setShowForm(true);
+  };
+
+  const [calculatingAttendance, setCalculatingAttendance] = useState(false);
+
+  const calcularDesdeAsistencia = async () => {
+    if (!token || !form.userId || !form.periodFrom || !form.periodTo) return;
+    setCalculatingAttendance(true);
+    try {
+      const result = await financeFetch(
+        `employee-payments/calculate-from-attendance?userId=${form.userId}&from=${form.periodFrom}&to=${form.periodTo}`,
+        token,
+      );
+      const totalMinutes = Number((result as { totalMinutes?: number })?.totalMinutes ?? 0);
+      setForm((f) => ({ ...f, totalMinutes }));
+      const hrs = Math.round((totalMinutes / 60) * 100) / 100;
+      toast.success(`Asistencia: ${hrs}h en el periodo (${(result as { daysWithAttendance?: number })?.daysWithAttendance ?? 0} día(s) con registro).`);
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo calcular desde asistencia"));
+    } finally {
+      setCalculatingAttendance(false);
+    }
   };
 
   const submit = async () => {
@@ -229,6 +254,7 @@ export default function EmployeePaymentsPage() {
             periodFrom: form.periodFrom,
             periodTo: form.periodTo,
             amount: form.amount,
+            totalMinutes: form.totalMinutes || undefined,
             note: form.note.trim() || undefined,
             status: form.status,
           },
@@ -247,6 +273,7 @@ export default function EmployeePaymentsPage() {
             periodFrom: form.periodFrom,
             periodTo: form.periodTo,
             amount: form.amount,
+            totalMinutes: form.totalMinutes || undefined,
             note: form.note.trim() || undefined,
             status: form.status,
           },
@@ -699,6 +726,27 @@ export default function EmployeePaymentsPage() {
               onChange={(e) => setForm((f) => ({ ...f, amount: Number(e.target.value) }))}
               style={financeInputStyle}
             />
+          </FinanceField>
+          <FinanceField label="Horas trabajadas (asistencia)">
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={Math.round((form.totalMinutes / 60) * 100) / 100}
+                onChange={(e) => setForm((f) => ({ ...f, totalMinutes: Math.round(Number(e.target.value) * 60) }))}
+                style={financeInputStyle}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => void calcularDesdeAsistencia()}
+                disabled={calculatingAttendance || !form.userId || !form.periodFrom || !form.periodTo}
+              >
+                {calculatingAttendance ? "Calculando…" : "Calcular"}
+              </Button>
+            </div>
           </FinanceField>
           {!editing && (
             <FinanceField label="Estado">

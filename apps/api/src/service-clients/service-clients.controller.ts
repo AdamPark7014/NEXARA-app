@@ -26,6 +26,7 @@ import { UpdateServiceClientDto } from './dto/update-service-client.dto.js';
 import { ServiceClientsService } from './service-clients.service.js';
 import { Request } from 'express';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 // Resuelve la ruta absoluta a /uploads/clients en la raíz del proyecto y asegura su existencia
 const ensureUploadsDir = () => {
@@ -78,7 +79,12 @@ export class ServiceClientsController {
       },
     }),
   }))
-  async create(@UploadedFile() file: any, @Body() body: CreateServiceClientDto, @Req() req: Request) {
+  async create(
+    @UploadedFile() file: any,
+    @Body() body: CreateServiceClientDto,
+    @Req() req: Request,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
     console.error(`[uploads] create request content-type: ${req.headers['content-type'] || ''}`);
     if (!body?.name) throw new BadRequestException('Nombre requerido');
     const isActive = this.normalizeBoolean(body.isActive);
@@ -89,7 +95,7 @@ export class ServiceClientsController {
       console.error('[uploads] create without file');
     }
     const logoUrl = file ? `/uploads/clients/${file.filename}` : undefined;
-    return this.serviceClientsService.create(body, logoUrl);
+    return this.serviceClientsService.create(body, logoUrl, companyId);
   }
 
   @UseGuards(RbacGuard)
@@ -102,8 +108,11 @@ export class ServiceClientsController {
     ],
   })
   @Get()
-  findAll(@Query() query: PaginationQueryDto) {
-    return this.serviceClientsService.findAll(query);
+  findAll(
+    @Query() query: PaginationQueryDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.serviceClientsService.findAll(query, companyId);
   }
 
   @UseGuards(RbacGuard)
@@ -116,23 +125,33 @@ export class ServiceClientsController {
     ],
   })
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.serviceClientsService.findOne(id);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.serviceClientsService.findOne(id, companyId);
   }
 
   /** Vista 360° del cliente: agregaciones cross-módulo + timeline. */
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @Get(':id/snapshot')
-  snapshot(@Param('id', ParseIntPipe) id: number) {
-    return this.serviceClientsService.clientSnapshot(id);
+  snapshot(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.serviceClientsService.clientSnapshot(id, companyId);
   }
 
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @Get(':id/report')
-  async report(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
-    const { pdf } = await this.serviceClientsService.generateReport(id);
+  async report(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const { pdf } = await this.serviceClientsService.generateReport(id, undefined, companyId);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=reporte-cliente-${id}.pdf`);
     res.send(pdf);
@@ -141,8 +160,11 @@ export class ServiceClientsController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @Get(':id/branches')
-  listBranches(@Param('id', ParseIntPipe) id: number) {
-    return this.serviceClientsService.listBranches(id);
+  listBranches(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.serviceClientsService.listBranches(id, companyId);
   }
 
   @UseGuards(RbacGuard)
@@ -151,9 +173,10 @@ export class ServiceClientsController {
   createBranch(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { name: string; branchNumber?: string; address?: string; city?: string; state?: string; country?: string },
+    @CurrentCompanyId() companyId: number | null,
   ) {
     if (!body?.name) throw new BadRequestException('Nombre de sucursal requerido');
-    return this.serviceClientsService.createBranch(id, body);
+    return this.serviceClientsService.createBranch(id, body, companyId);
   }
 
   @UseGuards(RbacGuard)
@@ -168,6 +191,7 @@ export class ServiceClientsController {
   createTicketRequest(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { description?: string; branchId?: number; urgency?: string; requestType?: string },
+    @CurrentCompanyId() companyId: number | null,
   ) {
     if (!body?.description?.trim()) throw new BadRequestException('Descripción requerida');
     return this.serviceClientsService.createTicketRequest(id, {
@@ -175,7 +199,7 @@ export class ServiceClientsController {
       branchId: body.branchId ? Number(body.branchId) : undefined,
       urgency: body.urgency,
       requestType: body.requestType,
-    });
+    }, companyId);
   }
 
   @UseGuards(RbacGuard)
@@ -203,6 +227,7 @@ export class ServiceClientsController {
     @UploadedFile() file: any,
     @Body() body: UpdateServiceClientDto,
     @Req() req: Request,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     console.error(`[uploads] update request content-type: ${req.headers['content-type'] || ''}`);
     const isActive = this.normalizeBoolean(body.isActive);
@@ -213,6 +238,6 @@ export class ServiceClientsController {
       console.error('[uploads] update without file');
     }
     const logoUrl = file ? `/uploads/clients/${file.filename}` : undefined;
-    return this.serviceClientsService.update(id, body, logoUrl);
+    return this.serviceClientsService.update(id, body, logoUrl, companyId);
   }
 }

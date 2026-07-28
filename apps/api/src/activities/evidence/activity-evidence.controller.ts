@@ -14,6 +14,7 @@ import { ActivityEvidenceService } from './activity-evidence.service';
 import { RbacGuard } from '../../common/rbac.guard.js';
 import { UrlAccessGuard } from '../../common/rbac/url-access.guard.js';
 import { saveBase64Photo, saveBase64Pdf } from '../../common/file-upload.util';
+import { CurrentCompanyId } from '../../common/tenant/current-company.decorator.js';
 import { Response } from 'express';
 
 @Controller('activity-evidence')
@@ -63,14 +64,19 @@ export class ActivityEvidenceController {
   }
 
   @Get(':activityId')
-  async getActivityEvidence(@Param('activityId') activityId: string, @Req() req: any) {
-    return this.service.getActivityEvidence(parseInt(activityId, 10), req.user);
+  async getActivityEvidence(
+    @Param('activityId') activityId: string,
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.getActivityEvidence(parseInt(activityId, 10), req.user, companyId);
   }
 
   @Post(':activityId/entry-photo')
   async saveEntryPhoto(
     @Param('activityId') activityId: string,
     @Body() body: { photoUrl: string; latitude: number; longitude: number },
+    @CurrentCompanyId() companyId: number | null,
   ) {
     // Check if photoUrl contains base64 data and convert it
     let fileUrl = body.photoUrl;
@@ -84,6 +90,7 @@ export class ActivityEvidenceController {
       fileUrl,
       body.latitude,
       body.longitude,
+      companyId,
     );
   }
 
@@ -91,6 +98,7 @@ export class ActivityEvidenceController {
   async saveEvidencePhotos(
     @Param('activityId') activityId: string,
     @Body() body: { photoUrls: string[] },
+    @CurrentCompanyId() companyId: number | null,
   ) {
     // Convert any base64 data URLs to file URLs
     const processedUrls = body.photoUrls.map((photoUrl) => {
@@ -100,13 +108,14 @@ export class ActivityEvidenceController {
       return photoUrl;
     });
 
-    return this.service.saveEvidencePhotos(parseInt(activityId, 10), processedUrls);
+    return this.service.saveEvidencePhotos(parseInt(activityId, 10), processedUrls, companyId);
   }
 
   @Post(':activityId/service-sheet-pdf')
   async saveServiceSheetPdf(
     @Param('activityId') activityId: string,
     @Body() body: { pdfUrl: string },
+    @CurrentCompanyId() companyId: number | null,
   ) {
     let fileUrl = body.pdfUrl;
     // Detect base64 PDF data: data URI prefix OR raw base64 (longer than a URL would be)
@@ -118,21 +127,23 @@ export class ActivityEvidenceController {
     ) {
       fileUrl = saveBase64Pdf(body.pdfUrl, __dirname, 'activities');
     }
-    return this.service.saveServiceSheetPdf(parseInt(activityId, 10), fileUrl);
+    return this.service.saveServiceSheetPdf(parseInt(activityId, 10), fileUrl, companyId);
   }
 
   @Post(':activityId/service-sheet-data')
   async completeServiceSheetForm(
     @Param('activityId') activityId: string,
     @Body() body: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.completeServiceSheetForm(parseInt(activityId, 10), body);
+    return this.service.completeServiceSheetForm(parseInt(activityId, 10), body, companyId);
   }
 
   @Post(':activityId/exit-photo')
   async saveExitPhoto(
     @Param('activityId') activityId: string,
     @Body() body: { photoUrl: string; latitude: number; longitude: number },
+    @CurrentCompanyId() companyId: number | null,
   ) {
     // Check if photoUrl contains base64 data and convert it
     let fileUrl = body.photoUrl;
@@ -146,6 +157,7 @@ export class ActivityEvidenceController {
       fileUrl,
       body.latitude,
       body.longitude,
+      companyId,
     );
   }
 
@@ -154,6 +166,7 @@ export class ActivityEvidenceController {
     @Param('activityId') activityId: string,
     @Param('index') index: string,
     @Body() body: { photoUrl: string },
+    @CurrentCompanyId() companyId: number | null,
   ) {
     // Check if photoUrl contains base64 data and convert it
     let fileUrl = body.photoUrl;
@@ -166,6 +179,7 @@ export class ActivityEvidenceController {
       parseInt(activityId, 10),
       parseInt(index, 10),
       fileUrl,
+      companyId,
     );
   }
 
@@ -173,19 +187,22 @@ export class ActivityEvidenceController {
   async removeEvidencePhoto(
     @Param('activityId') activityId: string,
     @Param('index') index: string,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.removeEvidencePhoto(parseInt(activityId, 10), parseInt(index, 10));
+    return this.service.removeEvidencePhoto(parseInt(activityId, 10), parseInt(index, 10), companyId);
   }
 
   @Post(':activityId/approve')
   async approveEvidence(
     @Param('activityId') activityId: string,
     @Body() body: { reviewerId: number; notes?: string },
+    @CurrentCompanyId() companyId: number | null,
   ) {
     return this.service.approveEvidence(
       parseInt(activityId, 10),
       body.reviewerId,
       body.notes,
+      companyId,
     );
   }
 
@@ -200,6 +217,7 @@ export class ActivityEvidenceController {
       rejectedSteps?: string[];
       resetFullFlow?: boolean;
     },
+    @CurrentCompanyId() companyId: number | null,
   ) {
     return this.service.rejectEvidence(
       parseInt(activityId, 10),
@@ -210,6 +228,7 @@ export class ActivityEvidenceController {
         rejectedSteps: body.rejectedSteps,
         resetFullFlow: body.resetFullFlow,
       },
+      companyId,
     );
   }
 
@@ -217,7 +236,8 @@ export class ActivityEvidenceController {
   async resubmitStep(
     @Param('activityId') activityId: string,
     @Body() body: { step: string; data: any },
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.service.resubmitStep(parseInt(activityId, 10), body.step, body.data);
+    return this.service.resubmitStep(parseInt(activityId, 10), body.step, body.data, companyId);
   }
 }

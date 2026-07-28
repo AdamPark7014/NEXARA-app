@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class MaintenanceService {
@@ -11,21 +12,25 @@ export class MaintenanceService {
   ) {}
 
   // ── Assets ────────────────────────────────────────────────────────
-  async createAsset(dto: {
-    name: string;
-    code: string;
-    description?: string;
-    category?: string;
-    location?: string;
-    serialNumber?: string;
-    manufacturer?: string;
-    model?: string;
-    purchaseDate?: string;
-    purchaseCost?: number;
-    warrantyExpiry?: string;
-    responsibleId?: number;
-    parentAssetId?: number;
-  }) {
+  async createAsset(
+    dto: {
+      name: string;
+      code: string;
+      description?: string;
+      category?: string;
+      location?: string;
+      serialNumber?: string;
+      manufacturer?: string;
+      model?: string;
+      purchaseDate?: string;
+      purchaseCost?: number;
+      warrantyExpiry?: string;
+      responsibleId?: number;
+      parentAssetId?: number;
+    },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.asset.create({
       data: {
         name: dto.name.trim(),
@@ -41,12 +46,14 @@ export class MaintenanceService {
         warrantyExpiry: dto.warrantyExpiry ? new Date(dto.warrantyExpiry) : null,
         responsibleId: dto.responsibleId ?? null,
         parentAssetId: dto.parentAssetId ?? null,
+        companyId: tenantId,
       },
     });
   }
 
-  async listAssets(filters?: { status?: string; category?: string }) {
-    const where: any = {};
+  async listAssets(companyId?: number | null, filters?: { status?: string; category?: string }) {
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { ...companyWhere(tenantId) };
     if (filters?.status) where.status = filters.status;
     if (filters?.category) where.category = filters.category;
     return this.prisma.asset.findMany({
@@ -56,29 +63,35 @@ export class MaintenanceService {
     });
   }
 
-  async getAsset(id: number) {
-    const asset = await this.prisma.asset.findUnique({
-      where: { id },
+  async getAsset(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const asset = await this.prisma.asset.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: { parentAsset: true, childAssets: true, maintenanceSchedules: true, maintenanceOrders: { take: 10, orderBy: { createdAt: 'desc' } } },
     });
-    if (!asset) throw new NotFoundException('Activo no encontrado');
+    assertCompanyAccess(asset, tenantId, 'Activo');
     return asset;
   }
 
-  async updateAsset(id: number, dto: any) {
+  async updateAsset(id: number, dto: any, companyId?: number | null) {
+    await this.getAsset(id, companyId);
     return this.prisma.asset.update({ where: { id }, data: dto });
   }
 
   // ── Maintenance Schedules ─────────────────────────────────────────
-  async createSchedule(dto: {
-    assetId: number;
-    title: string;
-    type?: 'PREVENTIVE' | 'CORRECTIVE' | 'PREDICTIVE';
-    frequencyDays: number;
-    description?: string;
-    lastExecutedAt?: string;
-    nextDueDate: string;
-  }) {
+  async createSchedule(
+    dto: {
+      assetId: number;
+      title: string;
+      type?: 'PREVENTIVE' | 'CORRECTIVE' | 'PREDICTIVE';
+      frequencyDays: number;
+      description?: string;
+      lastExecutedAt?: string;
+      nextDueDate: string;
+    },
+    companyId?: number | null,
+  ) {
+    const asset = await this.getAsset(dto.assetId, companyId);
     return this.prisma.maintenanceSchedule.create({
       data: {
         assetId: dto.assetId,
@@ -88,12 +101,14 @@ export class MaintenanceService {
         description: dto.description?.trim() || null,
         lastExecutedAt: dto.lastExecutedAt ? new Date(dto.lastExecutedAt) : null,
         nextDueDate: new Date(dto.nextDueDate),
+        companyId: asset.companyId,
       },
     });
   }
 
-  async listSchedules(assetId?: number) {
-    const where: any = {};
+  async listSchedules(companyId?: number | null, assetId?: number) {
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { ...companyWhere(tenantId) };
     if (assetId) where.assetId = assetId;
     return this.prisma.maintenanceSchedule.findMany({
       where,
@@ -102,31 +117,53 @@ export class MaintenanceService {
     });
   }
 
-  async getOverdueSchedules() {
+  async getOverdueSchedules(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.maintenanceSchedule.findMany({
-      where: { isActive: true, nextDueDate: { lt: new Date() } },
+      where: {
+        ...companyWhere(tenantId),
+        isActive: true,
+        nextDueDate: { lt: new Date() },
+      },
       include: { asset: true },
       orderBy: { nextDueDate: 'asc' },
     });
   }
 
   // ── Maintenance Work Orders ───────────────────────────────────────
-  private async generateWONumber(): Promise<string> {
-    const count = await this.prisma.maintenanceOrder.count();
+  private async generateWONumber(companyId: number): Promise<string> {
+    const count = await this.prisma.maintenanceOrder.count({
+      where: companyWhere(companyId),
+    });
     return `MO-${String(count + 1).padStart(6, '0')}`;
   }
 
-  async createWorkOrder(dto: {
-    assetId: number;
-    scheduleId?: number;
-    title: string;
-    description?: string;
-    type: 'PREVENTIVE' | 'CORRECTIVE' | 'PREDICTIVE';
-    priority?: string;
-    assignedToId?: number;
-    plannedDate: string;
-  }, userId: number) {
-    const orderNumber = await this.generateWONumber();
+  async createWorkOrder(
+    dto: {
+      assetId: number;
+      scheduleId?: number;
+      title: string;
+      description?: string;
+      type: 'PREVENTIVE' | 'CORRECTIVE' | 'PREDICTIVE';
+      priority?: string;
+      assignedToId?: number;
+      plannedDate: string;
+    },
+    userId: number,
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    await this.getAsset(dto.assetId, tenantId);
+    if (dto.scheduleId) {
+      const schedule = await this.prisma.maintenanceSchedule.findFirst({
+        where: { id: dto.scheduleId, ...companyWhere(tenantId) },
+      });
+      assertCompanyAccess(schedule, tenantId, 'Programa de mantenimiento');
+      if (schedule.assetId !== dto.assetId) {
+        throw new NotFoundException('Programa de mantenimiento no encontrado');
+      }
+    }
+    const orderNumber = await this.generateWONumber(tenantId);
     const wo = await this.prisma.maintenanceOrder.create({
       data: {
         orderNumber,
@@ -139,6 +176,7 @@ export class MaintenanceService {
         assignedToId: dto.assignedToId ?? null,
         plannedDate: new Date(dto.plannedDate),
         createdById: userId,
+        companyId: tenantId,
       },
       include: { asset: true, assignedTo: { select: { id: true, nombre: true } } },
     });
@@ -148,8 +186,12 @@ export class MaintenanceService {
     return wo;
   }
 
-  async listWorkOrders(filters?: { status?: string; assetId?: number; assignedToId?: number }) {
-    const where: any = {};
+  async listWorkOrders(
+    companyId?: number | null,
+    filters?: { status?: string; assetId?: number; assignedToId?: number },
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { ...companyWhere(tenantId) };
     if (filters?.status) where.status = filters.status;
     if (filters?.assetId) where.assetId = filters.assetId;
     if (filters?.assignedToId) where.assignedToId = filters.assignedToId;
@@ -160,23 +202,31 @@ export class MaintenanceService {
     });
   }
 
-  async getWorkOrder(id: number) {
-    const wo = await this.prisma.maintenanceOrder.findUnique({
-      where: { id },
+  async getWorkOrder(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const wo = await this.prisma.maintenanceOrder.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: { asset: true, assignedTo: { select: { id: true, nombre: true } }, createdBy: { select: { id: true, nombre: true } }, parts: { include: { product: true } }, schedule: true },
     });
-    if (!wo) throw new NotFoundException('Orden de mantenimiento no encontrada');
+    assertCompanyAccess(wo, tenantId, 'Orden de mantenimiento');
     return wo;
   }
 
-  async startWorkOrder(id: number) {
+  async startWorkOrder(id: number, companyId?: number | null) {
+    await this.getWorkOrder(id, companyId);
     return this.prisma.maintenanceOrder.update({
       where: { id },
       data: { status: 'IN_PROGRESS' },
     });
   }
 
-  async completeWorkOrder(id: number, dto: { laborCost?: number; partsCost?: number; notes?: string }) {
+  async completeWorkOrder(
+    id: number,
+    dto: { laborCost?: number; partsCost?: number; notes?: string },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    await this.getWorkOrder(id, tenantId);
     const order = await this.prisma.maintenanceOrder.update({
       where: { id },
       data: {
@@ -188,9 +238,10 @@ export class MaintenanceService {
       },
     });
 
-    // Update schedule nextDue if linked
     if (order.scheduleId) {
-      const schedule = await this.prisma.maintenanceSchedule.findUnique({ where: { id: order.scheduleId } });
+      const schedule = await this.prisma.maintenanceSchedule.findFirst({
+        where: { id: order.scheduleId, ...companyWhere(tenantId) },
+      });
       if (schedule && schedule.frequencyDays) {
         const next = new Date();
         next.setDate(next.getDate() + schedule.frequencyDays);
@@ -204,7 +255,12 @@ export class MaintenanceService {
     return order;
   }
 
-  async addPartToWorkOrder(workOrderId: number, dto: { productId?: number; partName: string; quantity: number; unitCost?: number }) {
+  async addPartToWorkOrder(
+    workOrderId: number,
+    dto: { productId?: number; partName: string; quantity: number; unitCost?: number },
+    companyId?: number | null,
+  ) {
+    await this.getWorkOrder(workOrderId, companyId);
     return this.prisma.maintenanceOrderPart.create({
       data: {
         maintenanceOrderId: workOrderId,
@@ -217,11 +273,8 @@ export class MaintenanceService {
     });
   }
 
-  // ── Asset Depreciation ────────────────────────────────────────────
-
-  async getAssetDepreciation(assetId: number) {
-    const asset = await this.prisma.asset.findUnique({ where: { id: assetId } });
-    if (!asset) throw new NotFoundException('Activo no encontrado');
+  async getAssetDepreciation(assetId: number, companyId?: number | null) {
+    const asset = await this.getAsset(assetId, companyId);
     if (!asset.purchaseCost || !asset.purchaseDate || !asset.expectedLifeYears) {
       return { assetId, code: asset.code, name: asset.name, message: 'Datos insuficientes para calcular depreciación' };
     }
@@ -266,9 +319,11 @@ export class MaintenanceService {
     };
   }
 
-  async getDepreciationSummary() {
+  async getDepreciationSummary(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const assets = await this.prisma.asset.findMany({
       where: {
+        ...companyWhere(tenantId),
         purchaseCost: { not: null },
         purchaseDate: { not: null },
         expectedLifeYears: { not: null },
@@ -310,6 +365,55 @@ export class MaintenanceService {
       totalBookValue: Math.round(totalBookValue * 100) / 100,
       totalDepreciated: Math.round(totalDepreciated * 100) / 100,
       items,
+    };
+  }
+
+  /** CMMS intelligence: risk, cost, recommendations. */
+  async getCmmsIntelligence(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const [overdue, openWo, assetsDown, dep] = await Promise.all([
+      this.getOverdueSchedules(tenantId),
+      this.prisma.maintenanceOrder.count({
+        where: { ...companyWhere(tenantId), status: { in: ['PLANNED', 'IN_PROGRESS'] } },
+      }),
+      this.prisma.asset.count({
+        where: { ...companyWhere(tenantId), status: { in: ['DOWN', 'MAINTENANCE'] } },
+      }),
+      this.getDepreciationSummary(tenantId),
+    ]);
+
+    const overdueCount = overdue.length;
+    const estimatedRiskCost = overdueCount * 8500 + assetsDown * 15000;
+
+    return {
+      what: {
+        overdueSchedules: overdueCount,
+        openWorkOrders: openWo,
+        assetsDownOrMaintenance: assetsDown,
+        bookValue: dep.totalBookValue,
+      },
+      why:
+        overdueCount > 0
+          ? 'Hay planes preventivos vencidos sin ejecutar'
+          : assetsDown > 0
+            ? 'Hay activos fuera de servicio'
+            : 'CMMS dentro de umbrales',
+      willHappen:
+        overdueCount > 3
+          ? 'Alta probabilidad de fallas correctivas costosas en 30 días'
+          : 'Riesgo controlado si se mantiene el plan preventivo',
+      recommendations: [
+        ...(overdueCount > 0
+          ? [{ action: `Generar OT para ${overdueCount} preventivos vencidos`, priority: 'P0' as const }]
+          : []),
+        ...(assetsDown > 0
+          ? [{ action: `Priorizar reparación de ${assetsDown} activos DOWN`, priority: 'P0' as const }]
+          : []),
+        { action: 'Revisar backlog de OT abiertas semanalmente', priority: 'P2' as const },
+      ],
+      risk: overdueCount > 3 || assetsDown > 0 ? 'high' : overdueCount > 0 ? 'medium' : 'low',
+      cost: { estimatedExposureMxn: estimatedRiskCost, currency: 'MXN' },
+      owners: { cmms: 'Jefe de Mantenimiento', finance: 'Controller' },
     };
   }
 }

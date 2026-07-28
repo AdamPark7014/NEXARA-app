@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -42,6 +41,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.api.HrLeaveDto
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 
 data class HrLeavesUiState(
@@ -49,7 +49,7 @@ data class HrLeavesUiState(
     val error: String? = null,
     val query: String = "",
     val typeFilter: String = "todos",
-    val items: List<Map<String, Any?>> = emptyList(),
+    val items: List<HrLeaveDto> = emptyList(),
 )
 
 class HrLeavesViewModel(app: Application) : AndroidViewModel(app) {
@@ -66,7 +66,7 @@ class HrLeavesViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             try {
-                val list = withContext(Dispatchers.IO) { repo.hrLeaves() }
+                val list = withContext(Dispatchers.IO) { repo.hrLeaveDtos() }
                 _state.update { it.copy(loading = false, items = list) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message) }
@@ -74,30 +74,21 @@ class HrLeavesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun filtered(): List<Map<String, Any?>> {
+    fun filtered(): List<HrLeaveDto> {
         val s = _state.value
         var list = s.items
         if (s.typeFilter != "todos") {
-            list = list.filter { str(it, "type", "tipo").equals(s.typeFilter, ignoreCase = true) }
+            list = list.filter { it.type.equals(s.typeFilter, ignoreCase = true) }
         }
         val q = s.query.trim().lowercase()
         if (q.isNotBlank()) {
             list = list.filter { row ->
-                buildString {
-                    append(str(row, "reason", "motivo", "type"))
-                    append(str(row, "userName", "employeeName", "nombre"))
-                }.lowercase().contains(q)
+                row.displayReason.lowercase().contains(q) ||
+                    row.userName.lowercase().contains(q) ||
+                    row.type.lowercase().contains(q)
             }
         }
         return list
-    }
-
-    private fun str(m: Map<String, Any?>, vararg keys: String): String {
-        for (k in keys) {
-            val v = m[k]?.toString()?.trim().orEmpty()
-            if (v.isNotBlank() && v != "null") return v
-        }
-        return ""
     }
 }
 
@@ -106,11 +97,9 @@ fun HrLeavesScreen(onBack: () -> Unit = {}, contentPadding: PaddingValues = Padd
     val vm: HrLeavesViewModel = viewModel()
     val state by vm.state.collectAsState()
     val filtered = vm.filtered()
-    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
-    val types = listOf("todos") + state.items.mapNotNull { row ->
-        row["type"]?.toString()?.takeIf { it.isNotBlank() } ?: row["tipo"]?.toString()
-    }.distinct().sorted()
-    val pending = state.items.count { strMap(it, "status", "estado").equals("pendiente", true) }
+    var selected by remember { mutableStateOf<HrLeaveDto?>(null) }
+    val types = listOf("todos") + state.items.map { it.type }.filter { it.isNotBlank() }.distinct().sorted()
+    val pending = state.items.count { it.status.equals("pendiente", true) }
 
     val sel = selected
     if (sel != null) {
@@ -139,7 +128,7 @@ fun HrLeavesScreen(onBack: () -> Unit = {}, contentPadding: PaddingValues = Padd
             state.error != null -> Text(state.error!!, color = MaterialTheme.colorScheme.error)
             filtered.isEmpty() -> Text("Sin solicitudes", color = Color(0xFF64748B))
             else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(filtered.take(80), key = { strMap(it, "id") }) { row ->
+                items(filtered.take(80), key = { it.rowKey }) { row ->
                     HrLeaveCard(row, onClick = { selected = row })
                 }
             }
@@ -150,54 +139,42 @@ fun HrLeavesScreen(onBack: () -> Unit = {}, contentPadding: PaddingValues = Padd
 }
 
 @Composable
-private fun HrLeaveCard(row: Map<String, Any?>, onClick: () -> Unit = {}) {
-    val reason = strMap(row, "reason", "motivo", "type")
-    val user = strMap(row, "userName", "employeeName", "nombre")
-    val status = strMap(row, "status", "estado")
+private fun HrLeaveCard(row: HrLeaveDto, onClick: () -> Unit = {}) {
     Card(modifier = Modifier.fillMaxWidth().clickable { onClick() }, colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Column(Modifier.padding(12.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(reason.ifBlank { "Permiso" }, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                Text(status, style = MaterialTheme.typography.labelSmall, color = Color(0xFF0D9488))
+                Text(row.displayReason, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text(row.status, style = MaterialTheme.typography.labelSmall, color = Color(0xFF0D9488))
             }
-            if (user.isNotBlank()) Text(user, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+            if (row.userName.isNotBlank()) Text(row.userName, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
         }
     }
 }
 
 @Composable
-private fun LeaveDetail(row: Map<String, Any?>, onBack: () -> Unit) {
-    val reason   = strMap(row, "reason", "motivo", "type")
-    val user     = strMap(row, "userName", "employeeName", "nombre")
-    val status   = strMap(row, "status", "estado")
-    val start    = strMap(row, "startDate", "fechaInicio", "inicio")
-    val end      = strMap(row, "endDate", "fechaFin", "fin")
-    val approver = strMap(row, "approverName", "aprobadoPor")
-    val notes    = strMap(row, "notes", "notas", "motivo", "comments")
-    val days     = strMap(row, "days", "diasSolicitados")
-
+private fun LeaveDetail(row: HrLeaveDto, onBack: () -> Unit) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { OutlinedButton(onClick = onBack) { Text("← Permisos") } }
         item {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(reason.ifBlank { "Permiso" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    LRow("Empleado", user)
-                    LRow("Estatus", status)
-                    LRow("Inicio", start)
-                    LRow("Fin", end)
-                    LRow("Días solicitados", days)
-                    LRow("Aprobado por", approver)
+                    Text(row.displayReason, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    LRow("Empleado", row.userName)
+                    LRow("Estatus", row.status)
+                    LRow("Inicio", row.startDate.take(10))
+                    LRow("Fin", row.endDate.take(10))
+                    LRow("Días solicitados", row.days)
+                    LRow("Aprobado por", row.approverName)
                 }
             }
         }
-        if (notes.isNotBlank()) {
+        if (row.notes.isNotBlank()) {
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
                         Text("Notas / Motivo", fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(6.dp))
-                        Text(notes, style = MaterialTheme.typography.bodyMedium)
+                        Text(row.notes, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
@@ -213,12 +190,4 @@ private fun LRow(label: String, value: String) {
             Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1.2f))
         }
     }
-}
-
-private fun strMap(m: Map<String, Any?>, vararg keys: String): String {
-    for (k in keys) {
-        val v = m[k]?.toString()?.trim().orEmpty()
-        if (v.isNotBlank() && v != "null") return v
-    }
-    return ""
 }

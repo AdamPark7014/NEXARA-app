@@ -227,3 +227,101 @@ export type InventoryInsights = {
 export async function getInventoryInsights(token: string) {
   return stockRequest<InventoryInsights>("stock/insights", token, {}, "No se pudo cargar inteligencia de inventario");
 }
+
+// ── Cycle Counts ────────────────────────────────────────────────────
+export type CycleCountItemRow = {
+  id: number;
+  productId: number;
+  expectedQty: number | string;
+  countedQty: number | string | null;
+  varianceQty: number | string | null;
+  countedAt?: string | null;
+  product?: { id: number; name: string; sku: string } | null;
+};
+
+export type CycleCountRow = {
+  id: number;
+  countNumber: string;
+  status: "SCHEDULED" | "IN_PROGRESS" | "CLOSED" | "CANCELLED";
+  scheduledFor: string;
+  closedAt?: string | null;
+  notes?: string | null;
+  warehouse?: { id: number; name: string; code?: string } | null;
+  items?: CycleCountItemRow[];
+  _count?: { items: number };
+  createdBy?: { id: number; nombre: string } | null;
+  closedBy?: { id: number; nombre: string } | null;
+};
+
+export async function listCycleCounts(token: string, filters?: { warehouseId?: number; status?: string }) {
+  const qs = new URLSearchParams();
+  if (filters?.warehouseId) qs.set("warehouseId", String(filters.warehouseId));
+  if (filters?.status) qs.set("status", filters.status);
+  const raw = await stockRequest<CycleCountRow[] | { data: CycleCountRow[] }>(
+    `stock/cycle-counts?${qs}`, token, {}, "No se pudieron cargar los conteos cíclicos",
+  );
+  return unwrapArray(raw);
+}
+
+export async function getCycleCount(token: string, id: number) {
+  return stockRequest<CycleCountRow>(`stock/cycle-counts/${id}`, token, {}, "No se pudo cargar el conteo");
+}
+
+export async function scheduleCycleCount(
+  token: string,
+  payload: { warehouseId: number; scheduledFor: string; productIds?: number[]; notes?: string },
+) {
+  return stockRequest<CycleCountRow>("stock/cycle-counts", token, { method: "POST", body: JSON.stringify(payload) }, "No se pudo programar el conteo");
+}
+
+export async function recordCycleCountItems(
+  token: string,
+  id: number,
+  items: { productId: number; countedQty: number }[],
+) {
+  return stockRequest<CycleCountRow>(`stock/cycle-counts/${id}/items`, token, { method: "POST", body: JSON.stringify({ items }) }, "No se pudo capturar el conteo");
+}
+
+export async function closeCycleCount(token: string, id: number) {
+  return stockRequest<CycleCountRow>(`stock/cycle-counts/${id}/close`, token, { method: "POST" }, "No se pudo cerrar el conteo");
+}
+
+export async function cancelCycleCount(token: string, id: number) {
+  return stockRequest<CycleCountRow>(`stock/cycle-counts/${id}/cancel`, token, { method: "POST" }, "No se pudo cancelar el conteo");
+}
+
+// ── Stock Reservations ──────────────────────────────────────────────
+export type StockReservationRow = {
+  id: number;
+  quantity: number | string;
+  status: "ACTIVE" | "RELEASED" | "CONSUMED";
+  reason: string;
+  referenceType?: string | null;
+  referenceId?: number | null;
+  expiresAt?: string | null;
+  createdAt: string;
+  product?: { id: number; name: string; sku: string } | null;
+  warehouse?: { id: number; name: string; code?: string } | null;
+  createdBy?: { id: number; nombre: string } | null;
+};
+
+export async function listReservations(token: string, filters?: { warehouseId?: number; status?: string }) {
+  const qs = new URLSearchParams();
+  if (filters?.warehouseId) qs.set("warehouseId", String(filters.warehouseId));
+  if (filters?.status) qs.set("status", filters.status);
+  const raw = await stockRequest<StockReservationRow[] | { data: StockReservationRow[] }>(
+    `stock/reservations?${qs}`, token, {}, "No se pudieron cargar las reservas",
+  );
+  return unwrapArray(raw);
+}
+
+export async function createReservation(
+  token: string,
+  payload: { productId: number; warehouseId: number; quantity: number; reason: string; expiresAt?: string },
+) {
+  return stockRequest<StockReservationRow>("stock/reservations", token, { method: "POST", body: JSON.stringify(payload) }, "No se pudo crear la reserva");
+}
+
+export async function releaseReservation(token: string, id: number) {
+  return stockRequest<StockReservationRow>(`stock/reservations/${id}/release`, token, { method: "PATCH" }, "No se pudo liberar la reserva");
+}

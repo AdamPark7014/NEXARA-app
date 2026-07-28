@@ -12,6 +12,7 @@ import { createReadStream, existsSync, unlinkSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { Response } from 'express';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { diskStorage } from 'multer';
 import * as fs from 'node:fs';
 
@@ -63,6 +64,7 @@ export class UsersController {
   async create(
     @CurrentUser() user: any,
     @Body() createUserDto: CreateUserDto,
+    @CurrentCompanyId() companyId: number | null,
     @UploadedFile() file?: any
   ) {
     const u: any = user;
@@ -98,63 +100,86 @@ export class UsersController {
     if (file) {
       createUserDto.avatarUrl = `/uploads/users/${file.filename}`;
     }
-    return this.usersService.create(createUserDto);
+    return this.usersService.create(createUserDto, companyId);
   }
 
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_VIEW] })
-  async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
-    return this.usersService.findAllVisible(user, query);
+  async findAll(
+    @CurrentUser() user: any,
+    @Query() query: PaginationQueryDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.usersService.findAllVisible(user, query, companyId);
   }
 
   @Get('iam/insights')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_VIEW] })
-  async iamInsights(@CurrentUser() user: any) {
-    return this.usersService.getIamInsights(user);
+  async iamInsights(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    return this.usersService.getIamInsights(user, companyId);
   }
 
   @Post('bulk/active')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
-  async bulkActive(@Body() body: { ids: number[]; isActive: boolean }) {
-    return this.usersService.bulkSetActive(body?.ids ?? [], Boolean(body?.isActive));
+  async bulkActive(
+    @Body() body: { ids: number[]; isActive: boolean },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.usersService.bulkSetActive(body?.ids ?? [], Boolean(body?.isActive), companyId);
   }
 
   @Get(':id/sessions')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
-  async listSessions(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.listUserSessions(id);
+  async listSessions(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.usersService.listUserSessions(id, companyId);
   }
 
   @Get(':id/auth-activity')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
-  async authActivity(@Param('id', ParseIntPipe) id: number, @Query('limit') limit?: string) {
-    return this.usersService.getUserAuthActivity(id, limit ? Number(limit) : 40);
+  async authActivity(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('limit') limit?: string,
+  ) {
+    return this.usersService.getUserAuthActivity(id, companyId, limit ? Number(limit) : 40);
   }
 
   @Post(':id/sessions/revoke-all')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
-  async revokeAllSessions(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.revokeAllUserSessions(id);
+  async revokeAllSessions(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.usersService.revokeAllUserSessions(id, companyId);
   }
 
   @Post('sessions/:sessionId/revoke')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
-  async revokeSession(@Param('sessionId', ParseIntPipe) sessionId: number) {
-    return this.usersService.revokeSession(sessionId);
+  async revokeSession(
+    @Param('sessionId', ParseIntPipe) sessionId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.usersService.revokeSession(sessionId, companyId);
   }
 
   @Post(':id/unlock')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
-  async unlock(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.unlockUser(id);
+  async unlock(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.usersService.unlockUser(id, companyId);
   }
 
   @Get('mfa/status')
@@ -210,27 +235,27 @@ export class UsersController {
       PERMISSIONS.HR_MANAGE,
     ],
   })
-  async listDepartments() {
-    return this.usersService.listDepartments();
+  async listDepartments(@CurrentCompanyId() companyId: number | null) {
+    return this.usersService.listDepartments(companyId);
   }
 
   @Get('assignable')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.ACTIVITIES_MANAGE] })
-  async findAssignable(@CurrentUser() user: any) {
+  async findAssignable(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
     // Cargar rol completo del usuario actual
-    const userWithRole = await this.usersService.findOne(user.id);
+    const userWithRole = await this.usersService.findOne(user.id, companyId);
     const userFull = {
       ...user,
       role: userWithRole?.role,
     };
-    return this.usersService.findAssignableUsers(userFull);
+    return this.usersService.findAssignableUsers(userFull, companyId);
   }
 
   @Get('orgchart')
   @UseGuards(AuthGuard('jwt'))
-  async getOrgchart() {
-    return this.usersService.getOrgchart();
+  async getOrgchart(@CurrentCompanyId() companyId: number | null) {
+    return this.usersService.getOrgchart(companyId);
   }
 
   @Patch(':id/manager')
@@ -239,22 +264,30 @@ export class UsersController {
   async setManager(
     @Param('id', ParseIntPipe) id: number,
     @Body('managerId') managerId: number | null,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.usersService.setManager(id, managerId);
+    return this.usersService.setManager(id, managerId, companyId);
   }
 
   @Get('public-team')
-  async findPublicTeam(@Query('limit') limit?: string) {
+  async findPublicTeam(
+    @Query('limit') limit?: string,
+    @CurrentCompanyId() companyId?: number | null,
+  ) {
     const parsed = Number(limit);
-    return this.usersService.findPublicTeam(Number.isFinite(parsed) ? parsed : 12);
+    return this.usersService.findPublicTeam(Number.isFinite(parsed) ? parsed : 12, companyId);
   }
 
   /** Plantilla RRHH — devuelve todos los usuarios con campos de RRHH */
   @Get('hr-staff')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
-  async findHrStaff(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
-    return this.usersService.findHrStaff(user, query);
+  async findHrStaff(
+    @CurrentUser() user: any,
+    @Query() query: PaginationQueryDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.usersService.findHrStaff(user, query, companyId);
   }
 
   /** PATCH usuarios/:id/hr — actualiza campos RRHH de un empleado */
@@ -264,15 +297,16 @@ export class UsersController {
   async updateHrFields(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { puesto?: string; tipoContrato?: string; estadoRRHH?: string; isActive?: boolean; fechaIngreso?: string },
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.usersService.updateHrFields(id, body);
+    return this.usersService.updateHrFields(id, body, companyId);
   }
 
   @Get('next-employee-number')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
-  async nextEmployeeNumber() {
-    return { employeeNumber: await this.usersService.getNextEmployeeNumber() };
+  async nextEmployeeNumber(@CurrentCompanyId() companyId: number | null) {
+    return { employeeNumber: await this.usersService.getNextEmployeeNumber(companyId) };
   }
 
   @Get('profile/me')
@@ -335,8 +369,8 @@ export class UsersController {
   @Get(':id/profile')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_REVIEW] })
-  getProfile(@Param('id') id: string) {
-    return this.usersService.getProfile(+id);
+  getProfile(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
+    return this.usersService.getProfile(+id, companyId);
   }
 
   @Patch(':id/profile/review')
@@ -346,13 +380,14 @@ export class UsersController {
     @CurrentUser() user: any,
     @Param('id') id: string,
     @Body() body: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
     return this.usersService.updateProfileReview(+id, {
       estatus: body.estatus || 'Pendiente',
       observaciones: body.observaciones || null,
       aprobadoPorId: user.id,
       revisadoEn: new Date(),
-    });
+    }, companyId);
   }
 
   @Patch('documents/:id/review')
@@ -396,8 +431,8 @@ export class UsersController {
   @Get(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(+id);
+  findOne(@Param('id') id: string, @CurrentCompanyId() companyId: number | null) {
+    return this.usersService.findOne(+id, companyId);
   }
 
   @Patch(':id')
@@ -407,17 +442,18 @@ export class UsersController {
   update(
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
+    @CurrentCompanyId() companyId: number | null,
     @UploadedFile() file?: any,
   ) {
     const userId = +id;
-    return this.usersService.findOne(userId).then(async (existingUser) => {
+    return this.usersService.findOne(userId, companyId).then(async (existingUser) => {
       const previousAvatar = String(existingUser?.avatarUrl || '').trim();
 
       if (file) {
         updateUserDto.avatarUrl = `/uploads/users/${file.filename}`;
       }
 
-      const updated = await this.usersService.update(userId, updateUserDto);
+      const updated = await this.usersService.update(userId, updateUserDto, companyId);
       const nextAvatar = String(updated?.avatarUrl || '').trim();
 
       if (previousAvatar && previousAvatar !== nextAvatar && previousAvatar.startsWith('/uploads/users/')) {
@@ -439,8 +475,12 @@ export class UsersController {
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
-  async remove(@CurrentUser() user: any, @Param('id') id: string) {
-    const target = await this.usersService.findOne(+id);
+  async remove(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const target = await this.usersService.findOne(+id, companyId);
     if (!target) throw new ForbiddenException('Usuario no encontrado');
     const protectedEmails = ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'];
     if (protectedEmails.includes(target.email.toLowerCase())) {
@@ -449,6 +489,6 @@ export class UsersController {
     if (!user.isSuperAdmin && target.departmentId !== user.departmentId) {
       throw new ForbiddenException('Solo puedes eliminar usuarios de tu departamento');
     }
-    return this.usersService.remove(+id);
+    return this.usersService.remove(+id, companyId);
   }
 }

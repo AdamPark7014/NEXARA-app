@@ -5,6 +5,7 @@ import { ExportsService } from './exports.service.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 const ALLOWED = new Set([
   'clients',
@@ -40,6 +41,7 @@ export class ExportsController {
     @Query('from') from: string | undefined,
     @Query('to') to: string | undefined,
     @Query('format') format: string | undefined,
+    @CurrentCompanyId() companyId: number | null,
     @Res() res: Response,
   ) {
     if (!ALLOWED.has(entity)) {
@@ -50,7 +52,7 @@ export class ExportsController {
       throw new BadRequestException('Solo se permite format=xlsx. CSV está deshabilitado.');
     }
 
-    const result = await this.service.exportEntity(entity as any, { from, to });
+    const result = await this.service.exportEntity(entity as any, { from, to }, companyId);
     const buffer = await this.excelExport.exportToExcel(result.rows, entity);
     res.setHeader(
       'Content-Type',

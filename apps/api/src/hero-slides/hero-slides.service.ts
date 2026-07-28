@@ -10,6 +10,13 @@ import { UpdateHeroSlideDto } from './dto/update-hero-slide.dto.js';
 import { resolveLegacyUploadsDir, resolveUploadsDir } from '../common/uploads-path.js';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import {
+  assertCompanyAccess,
+  companyWhere,
+  requireCompanyId,
+  resolvePublicCompanyId,
+} from '../common/tenant/tenant-scope.js';
+import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 
 interface MulterFile {
   fieldname: string;
@@ -24,35 +31,45 @@ interface MulterFile {
 export class HeroSlidesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ── Lectura ────────────────────────────────────────────────────────
+  private async publicCompanyId() {
+    return withTenantBypassAsync(() => resolvePublicCompanyId(this.prisma));
+  }
 
   /** Slides activos para el sitio público (orden ascendente). */
-  publicList() {
-    return this.prisma.heroSlide.findMany({
-      where: { isActive: true },
-      orderBy: [{ position: 'asc' }, { id: 'asc' }],
-    });
+  async publicList() {
+    const companyId = await this.publicCompanyId();
+    return withTenantBypassAsync(() =>
+      this.prisma.heroSlide.findMany({
+        where: { isActive: true, companyId },
+        orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      }),
+    );
   }
 
   /** Listado completo (admin) — incluye inactivos. */
-  adminList() {
+  adminList(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.heroSlide.findMany({
+      where: companyWhere(tenantId),
       orderBy: [{ position: 'asc' }, { id: 'asc' }],
     });
   }
 
-  async findOne(id: number) {
-    const slide = await this.prisma.heroSlide.findUnique({ where: { id } });
-    if (!slide) throw new NotFoundException(`Hero slide ${id} no encontrado`);
+  async findOne(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const slide = await this.prisma.heroSlide.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(slide, tenantId, 'Hero slide');
     return slide;
   }
-
-  // ── Escritura ──────────────────────────────────────────────────────
 
   async create(
     payload: CreateHeroSlideDto,
     files?: { image?: MulterFile; imageMobile?: MulterFile },
+    companyId?: number | null,
   ) {
+    const tenantId = requireCompanyId(companyId);
     const imageUrl = files?.image
       ? await this.saveImage(files.image)
       : payload.imageUrl?.trim() || null;
@@ -67,7 +84,7 @@ export class HeroSlidesService {
       ? await this.saveImage(files.imageMobile)
       : null;
 
-    const position = payload.position ?? (await this.nextPosition());
+    const position = payload.position ?? (await this.nextPosition(tenantId));
 
     return this.prisma.heroSlide.create({
       data: {
@@ -78,6 +95,7 @@ export class HeroSlidesService {
         href: payload.href?.trim() || null,
         position,
         isActive: payload.isActive ?? true,
+        companyId: tenantId,
       },
     });
   }
@@ -86,9 +104,9 @@ export class HeroSlidesService {
     id: number,
     payload: UpdateHeroSlideDto,
     files?: { image?: MulterFile; imageMobile?: MulterFile },
-    options?: { clearMobile?: boolean },
+    options?: { clearMobile?: boolean; companyId?: number | null },
   ) {
-    const existing = await this.findOne(id);
+    const existing = await this.findOne(id, options?.companyId);
 
     let imageUrl: string | undefined;
     if (files?.image) {
@@ -129,17 +147,17 @@ export class HeroSlidesService {
     });
   }
 
-  async remove(id: number) {
-    const existing = await this.findOne(id);
+  async remove(id: number, companyId?: number | null) {
+    const existing = await this.findOne(id, companyId);
     await this.prisma.heroSlide.delete({ where: { id } });
     await this.deleteImageFile(existing.imageUrl);
     await this.deleteImageFile(existing.imageUrlMobile);
   }
 
-  /** Reordena en lote: el primer ID queda en posición 1, etc. */
-  async reorder(ids: number[]) {
+  async reorder(ids: number[], companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const existing = await this.prisma.heroSlide.findMany({
-      where: { id: { in: ids } },
+      where: { id: { in: ids }, ...companyWhere(tenantId) },
       select: { id: true },
     });
     const existingSet = new Set(existing.map((s) => s.id));
@@ -158,13 +176,12 @@ export class HeroSlidesService {
       ),
     );
 
-    return this.adminList();
+    return this.adminList(tenantId);
   }
 
-  // ── Utilidades ─────────────────────────────────────────────────────
-
-  private async nextPosition(): Promise<number> {
+  private async nextPosition(companyId: number): Promise<number> {
     const last = await this.prisma.heroSlide.findFirst({
+      where: companyWhere(companyId),
       orderBy: { position: 'desc' },
       select: { position: true },
     });

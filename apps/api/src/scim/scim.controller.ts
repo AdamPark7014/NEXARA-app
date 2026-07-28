@@ -48,10 +48,12 @@ export class ScimBearerGuard implements CanActivate {
         data: { lastUsedAt: new Date() },
       });
       req.scimCompanyId = apiKey.companyId;
+      req.companyId = apiKey.companyId;
       return true;
     }
 
     // 2) Fallback legacy: SCIM_BEARER_TOKEN → empresa primaria
+    //    (X-Company-Id may override primary in companyIdFrom)
     const expected = process.env.SCIM_BEARER_TOKEN?.trim();
     if (expected && token === expected) {
       const primary = await this.prisma.companyProfile.findFirst({
@@ -60,7 +62,9 @@ export class ScimBearerGuard implements CanActivate {
         orderBy: { id: 'asc' },
       });
       if (!primary) throw new UnauthorizedException('No hay empresa primaria para SCIM');
+      req.scimLegacyAuth = true;
       req.scimCompanyId = primary.id;
+      req.companyId = primary.id;
       return true;
     }
 
@@ -99,10 +103,72 @@ export class ScimController {
     private readonly billing: BillingService,
   ) {}
 
+  /**
+   * Active company for SCIM:
+   * 1) CompanyApiKey → locked to key's companyId (`req.scimCompanyId`)
+   * 2) Legacy SCIM_BEARER_TOKEN → `X-Company-Id` header if set, else primary
+   * 3) Fallback: TenantInterceptor `req.companyId` / CurrentCompanyId
+   */
   private companyIdFrom(req: any): number {
-    const id = Number(req?.scimCompanyId);
-    if (!Number.isFinite(id)) throw new UnauthorizedException('SCIM company no resuelta');
-    return id;
+    if (req?.scimLegacyAuth) {
+      const raw = req?.headers?.['x-company-id'] ?? req?.headers?.['X-Company-Id'];
+      const fromHeader = raw != null && String(raw).trim() !== '' ? Number(raw) : NaN;
+      if (Number.isFinite(fromHeader) && fromHeader > 0) return fromHeader;
+    }
+
+    const fromScim = Number(req?.scimCompanyId);
+    if (Number.isFinite(fromScim) && fromScim > 0) return fromScim;
+
+    const fromReq = Number(req?.companyId);
+    if (Number.isFinite(fromReq) && fromReq > 0) return fromReq;
+
+    const raw = req?.headers?.['x-company-id'] ?? req?.headers?.['X-Company-Id'];
+    const fromHeader = raw != null && String(raw).trim() !== '' ? Number(raw) : NaN;
+    if (Number.isFinite(fromHeader) && fromHeader > 0) return fromHeader;
+
+    throw new UnauthorizedException('SCIM company no resuelta (token tenant o X-Company-Id)');
+  }
+
+  private companyMemberWhere(companyId: number) {
+    return { companyMemberships: { some: { companyId } } };
+  }
+
+  /** Assign roleId only to users who already belong to the active company. */
+  private async assignRoleToCompanyMembers(
+    companyId: number,
+    roleId: number,
+    memberIds: number[],
+  ): Promise<{ ok: true } | { error: Record<string, unknown> }> {
+    const unique = [...new Set(memberIds.filter((n) => Number.isFinite(n) && n > 0))];
+    if (!unique.length) return { ok: true };
+
+    const inCompany = await this.prisma.user.findMany({
+      where: { id: { in: unique }, ...this.companyMemberWhere(companyId) },
+      select: { id: true },
+    });
+    if (inCompany.length !== unique.length) {
+      return {
+        error: {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'],
+          status: '403',
+          detail: 'One or more users are not members of the active company',
+        },
+      };
+    }
+
+    await this.prisma.user.updateMany({
+      where: { id: { in: unique } },
+      data: { roleId },
+    });
+    return { ok: true };
+  }
+
+  private async upsertUserCompany(userId: number, companyId: number) {
+    await this.prisma.userCompany.upsert({
+      where: { userId_companyId: { userId, companyId } },
+      update: {},
+      create: { userId, companyId, isDefault: true },
+    });
   }
 
   @Get('ServiceProviderConfig')
@@ -119,7 +185,8 @@ export class ScimController {
         {
           type: 'oauthbearertoken',
           name: 'OAuth Bearer Token',
-          description: 'Bearer token: CompanyApiKey scope=scim (preferido) o SCIM_BEARER_TOKEN → primary',
+          description:
+            'Bearer token: CompanyApiKey scope=scim (preferido) o SCIM_BEARER_TOKEN → primary; opcional X-Company-Id',
           specUri: 'http://www.rfc-editor.org/info/rfc6750',
           primary: true,
         },
@@ -140,7 +207,7 @@ export class ScimController {
     const take = Math.min(200, Math.max(1, Number(count) || 50));
     const skip = Math.max(0, (Number(startIndex) || 1) - 1);
     let where: any = {
-      companyMemberships: { some: { companyId } },
+      ...this.companyMemberWhere(companyId),
     };
     // filter: userName eq "email@x.com"
     const m = filter?.match(/userName\s+eq\s+"([^"]+)"/i);
@@ -172,7 +239,7 @@ export class ScimController {
     const user = await this.prisma.user.findFirst({
       where: {
         id: Number(id),
-        companyMemberships: { some: { companyId } },
+        ...this.companyMemberWhere(companyId),
       },
       select: { id: true, nombre: true, email: true, isActive: true, fechaCreacion: true },
     });
@@ -212,7 +279,10 @@ export class ScimController {
     }
 
     const role = await this.prisma.role.findFirst({ orderBy: { id: 'asc' } });
-    const dept = await this.prisma.department.findFirst({ orderBy: { id: 'asc' } });
+    const dept = await this.prisma.department.findFirst({
+      where: { companyId },
+      orderBy: { id: 'asc' },
+    });
     if (!role || !dept) {
       return {
         schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'],
@@ -235,18 +305,20 @@ export class ScimController {
       select: { id: true, nombre: true, email: true, isActive: true, fechaCreacion: true },
     });
 
-    await this.prisma.userCompany.upsert({
-      where: { userId_companyId: { userId: created.id, companyId } },
-      update: {},
-      create: { userId: created.id, companyId, isDefault: true },
-    });
+    await this.upsertUserCompany(created.id, companyId);
 
     return toScimUser(created);
   }
 
   @Put('Users/:id')
   @Patch('Users/:id')
-  async updateUser(@Param('id') id: string, @Body() body: any, @Headers('content-type') ct?: string) {
+  async updateUser(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: any,
+    @Headers('content-type') ct?: string,
+  ) {
+    const companyId = this.companyIdFrom(req);
     const userId = Number(id);
     const existing = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!existing) {
@@ -290,12 +362,27 @@ export class ScimController {
       data: { nombre, email, isActive },
       select: { id: true, nombre: true, email: true, isActive: true, fechaCreacion: true },
     });
+
+    await this.upsertUserCompany(userId, companyId);
+
     return toScimUser(updated);
   }
 
   @Delete('Users/:id')
-  async deleteUser(@Param('id') id: string) {
+  async deleteUser(@Req() req: any, @Param('id') id: string) {
+    const companyId = this.companyIdFrom(req);
     const userId = Number(id);
+    const existing = await this.prisma.user.findFirst({
+      where: { id: userId, ...this.companyMemberWhere(companyId) },
+      select: { id: true },
+    });
+    if (!existing) {
+      return {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'],
+        status: '404',
+        detail: 'User not found',
+      };
+    }
     await this.prisma.user.update({
       where: { id: userId },
       data: { isActive: false },
@@ -315,12 +402,15 @@ export class ScimController {
 
   @Get('Groups')
   async listGroups(
+    @Req() req: any,
     @Query('filter') filter?: string,
     @Query('startIndex') startIndex = '1',
     @Query('count') count = '50',
   ) {
+    const companyId = this.companyIdFrom(req);
     const take = Math.min(200, Math.max(1, Number(count) || 50));
     const skip = Math.max(0, (Number(startIndex) || 1) - 1);
+    // Role catalog stays global; only members are company-scoped.
     let where: any = {};
     const m = filter?.match(/displayName\s+eq\s+"([^"]+)"/i);
     if (m) where = { nombre: { equals: m[1], mode: 'insensitive' } };
@@ -333,7 +423,11 @@ export class ScimController {
     const resources = await Promise.all(
       roles.map(async (role) => {
         const users = await this.prisma.user.findMany({
-          where: { roleId: role.id, isActive: true },
+          where: {
+            roleId: role.id,
+            isActive: true,
+            ...this.companyMemberWhere(companyId),
+          },
           select: { id: true, nombre: true },
           take: 200,
         });
@@ -354,7 +448,8 @@ export class ScimController {
   }
 
   @Get('Groups/:id')
-  async getGroup(@Param('id') id: string) {
+  async getGroup(@Req() req: any, @Param('id') id: string) {
+    const companyId = this.companyIdFrom(req);
     const role = await this.prisma.role.findUnique({ where: { id: Number(id) } });
     if (!role) {
       return {
@@ -364,7 +459,11 @@ export class ScimController {
       };
     }
     const users = await this.prisma.user.findMany({
-      where: { roleId: role.id, isActive: true },
+      where: {
+        roleId: role.id,
+        isActive: true,
+        ...this.companyMemberWhere(companyId),
+      },
       select: { id: true, nombre: true },
       take: 500,
     });
@@ -375,7 +474,8 @@ export class ScimController {
   }
 
   @Post('Groups')
-  async createGroup(@Body() body: any) {
+  async createGroup(@Req() req: any, @Body() body: any) {
+    const companyId = this.companyIdFrom(req);
     const displayName = String(body?.displayName || '').trim();
     if (!displayName) {
       return {
@@ -401,13 +501,11 @@ export class ScimController {
       ? body.members.map((m: any) => Number(m.value || m)).filter((n: number) => Number.isFinite(n))
       : [];
     if (memberIds.length) {
-      await this.prisma.user.updateMany({
-        where: { id: { in: memberIds } },
-        data: { roleId: role.id },
-      });
+      const assigned = await this.assignRoleToCompanyMembers(companyId, role.id, memberIds);
+      if ('error' in assigned) return assigned.error;
     }
     const users = await this.prisma.user.findMany({
-      where: { roleId: role.id },
+      where: { roleId: role.id, ...this.companyMemberWhere(companyId) },
       select: { id: true, nombre: true },
     });
     return this.toScimGroup(
@@ -418,7 +516,8 @@ export class ScimController {
 
   @Put('Groups/:id')
   @Patch('Groups/:id')
-  async updateGroup(@Param('id') id: string, @Body() body: any) {
+  async updateGroup(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    const companyId = this.companyIdFrom(req);
     const roleId = Number(id);
     const role = await this.prisma.role.findUnique({ where: { id: roleId } });
     if (!role) {
@@ -439,17 +538,10 @@ export class ScimController {
           const memberIds = op.value
             .map((m: any) => Number(m.value || m))
             .filter((n: number) => Number.isFinite(n));
-          if (String(op.op || '').toLowerCase() === 'replace' || !op.op) {
-            // Replace membership: move listed users into this role
-            await this.prisma.user.updateMany({
-              where: { id: { in: memberIds } },
-              data: { roleId },
-            });
-          } else if (String(op.op).toLowerCase() === 'add') {
-            await this.prisma.user.updateMany({
-              where: { id: { in: memberIds } },
-              data: { roleId },
-            });
+          const opName = String(op.op || '').toLowerCase();
+          if (opName === 'replace' || !op.op || opName === 'add') {
+            const assigned = await this.assignRoleToCompanyMembers(companyId, roleId, memberIds);
+            if ('error' in assigned) return assigned.error;
           }
         }
       }
@@ -457,10 +549,8 @@ export class ScimController {
       const memberIds = body.members
         .map((m: any) => Number(m.value || m))
         .filter((n: number) => Number.isFinite(n));
-      await this.prisma.user.updateMany({
-        where: { id: { in: memberIds } },
-        data: { roleId },
-      });
+      const assigned = await this.assignRoleToCompanyMembers(companyId, roleId, memberIds);
+      if ('error' in assigned) return assigned.error;
     }
 
     const updated = await this.prisma.role.update({
@@ -468,7 +558,11 @@ export class ScimController {
       data: { nombre: displayName },
     });
     const users = await this.prisma.user.findMany({
-      where: { roleId, isActive: true },
+      where: {
+        roleId,
+        isActive: true,
+        ...this.companyMemberWhere(companyId),
+      },
       select: { id: true, nombre: true },
     });
     return this.toScimGroup(

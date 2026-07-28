@@ -9,18 +9,30 @@ final class ConsoleRepository {
     // MARK: Attendance
 
     func attendanceCurrent() async throws -> [String: Any]? {
+        try await attendanceCurrentItem()?.raw
+    }
+
+    func attendanceCurrentItem() async throws -> AttendanceCurrent? {
         let data = try await api.get("attendance/current")
         let map = ConsoleHelpers.decodeMap(data)
-        return map.isEmpty ? nil : map
+        return map.isEmpty ? nil : AttendanceCurrent(raw: map)
     }
 
     func attendanceRange(from: String, to: String, hierarchy: Bool = true) async throws -> [String: Any] {
+        try await attendanceRangeItem(from: from, to: to, hierarchy: hierarchy).raw
+    }
+
+    func attendanceRangeItem(from: String, to: String, hierarchy: Bool = true) async throws -> AttendanceRange {
         let path = hierarchy ? "attendance/hierarchy/range" : "attendance/range"
         let data = try await api.get(path, query: ["from": from, "to": to])
-        return ConsoleHelpers.decodeMap(data)
+        return AttendanceRange(raw: ConsoleHelpers.decodeMap(data))
     }
 
     func attendanceCheckIn(type: String, lat: Double? = nil, lng: Double? = nil) async throws -> [String: Any] {
+        try await attendanceCheckInResult(type: type, lat: lat, lng: lng).raw
+    }
+
+    func attendanceCheckInResult(type: String, lat: Double? = nil, lng: Double? = nil) async throws -> AttendanceCheckInResult {
         struct Body: Encodable {
             let type: String
             let timestamp: String
@@ -30,7 +42,7 @@ final class ConsoleRepository {
         let data = try await api.postJSON("attendance", body: Body(
             type: type, timestamp: ConsoleHelpers.isoNow(), latitude: lat, longitude: lng
         ))
-        return ConsoleHelpers.decodeMap(data)
+        return AttendanceCheckInResult(raw: ConsoleHelpers.decodeMap(data))
     }
 
     // MARK: Activities
@@ -48,15 +60,29 @@ final class ConsoleRepository {
     // MARK: Evidences
 
     func myEvidenceHistory() async throws -> [[String: Any]] {
+        try await myEvidenceRows().map { $0.toFlatMap() }
+    }
+
+    func myEvidenceRows() async throws -> [EvidenceRow] {
         ApiClient.decodeMapList(try await api.get("activity-evidence/history"))
+            .map { EvidenceRow(raw: $0) }
     }
 
     func evidenceReviewHistory() async throws -> [[String: Any]] {
+        try await evidenceReviewRows().map { $0.toFlatMap() }
+    }
+
+    func evidenceReviewRows() async throws -> [EvidenceRow] {
         ApiClient.decodeMapList(try await api.get("activity-evidence/review-history"))
+            .map { EvidenceRow(raw: $0) }
     }
 
     func evidenceDetail(activityId: Int64) async throws -> [String: Any] {
-        ConsoleHelpers.decodeMap(try await api.get("activity-evidence/\(activityId)"))
+        try await evidenceDetailItem(activityId: activityId).toFlatMap()
+    }
+
+    func evidenceDetailItem(activityId: Int64) async throws -> EvidenceDetail {
+        EvidenceDetail(raw: ConsoleHelpers.decodeMap(try await api.get("activity-evidence/\(activityId)")))
     }
 
     func evidenceEntryPhoto(activityId: Int64, photoUrl: String, lat: Double = 0, lng: Double = 0) async throws -> [String: Any] {
@@ -120,31 +146,55 @@ final class ConsoleRepository {
     // MARK: Tools
 
     func myToolRequests() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("tool-requests/my-requests"))
+        try await myToolRequestItems().map(\.raw)
+    }
+
+    func myToolRequestItems() async throws -> [ToolItem] {
+        ApiClient.decodeMapList(try await api.get("tool-requests/my-requests")).map { ToolItem(raw: $0) }
     }
 
     func toolRequests(status: String? = nil) async throws -> [[String: Any]] {
+        try await toolRequestItems(status: status).map(\.raw)
+    }
+
+    func toolRequestItems(status: String? = nil) async throws -> [ToolItem] {
         var q: [String: String] = [:]
         if let s = status { q["status"] = s }
-        return ApiClient.decodeMapList(try await api.get("tool-requests", query: q))
+        return ApiClient.decodeMapList(try await api.get("tool-requests", query: q)).map { ToolItem(raw: $0) }
     }
 
     func toolInventory(search: String? = nil) async throws -> [[String: Any]] {
+        try await toolInventoryItems(search: search).map(\.raw)
+    }
+
+    func toolInventoryItems(search: String? = nil) async throws -> [ToolItem] {
         var q: [String: String] = [:]
         if let s = search, !s.isEmpty { q["q"] = s }
-        return ApiClient.decodeMapList(try await api.get("tool-requests/inventory", query: q))
+        return ApiClient.decodeMapList(try await api.get("tool-requests/inventory", query: q)).map { ToolItem(raw: $0) }
     }
 
     func myToolKit() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("tool-requests/kits/my"))
+        try await myToolKitItems().map(\.raw)
+    }
+
+    func myToolKitItems() async throws -> [ToolItem] {
+        ApiClient.decodeMapList(try await api.get("tool-requests/kits/my")).map { ToolItem(raw: $0) }
     }
 
     func toolKitsUsers() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("tool-requests/kits/users"))
+        try await toolKitsUserItems().map(\.raw)
+    }
+
+    func toolKitsUserItems() async throws -> [ToolItem] {
+        ApiClient.decodeMapList(try await api.get("tool-requests/kits/users")).map { ToolItem(raw: $0) }
     }
 
     func toolRenewalsPending() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("tool-requests/renewals/pending"))
+        try await toolRenewalItems().map(\.raw)
+    }
+
+    func toolRenewalItems() async throws -> [ToolRenewal] {
+        ApiClient.decodeMapList(try await api.get("tool-requests/renewals/pending")).map { ToolRenewal(raw: $0) }
     }
 
     func approveToolRenewal(id: Int64) async throws {
@@ -252,7 +302,11 @@ final class ConsoleRepository {
     }
 
     func operationalProjects() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("operational-projects"))
+        try await operationalProjectItems().map(\.raw)
+    }
+
+    func operationalProjectItems() async throws -> [OperationalProjectItem] {
+        ApiClient.decodeMapList(try await api.get("operational-projects")).map { OperationalProjectItem(raw: $0) }
     }
 
     func patchProjectStatus(id: Int64, status: String) async throws -> [String: Any] {
@@ -275,7 +329,11 @@ final class ConsoleRepository {
     }
 
     func viatics() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("viatics"))
+        try await viaticItems().map(\.raw)
+    }
+
+    func viaticItems() async throws -> [ViaticItem] {
+        ApiClient.decodeMapList(try await api.get("viatics")).map { ViaticItem(raw: $0) }
     }
 
     func createViatic(

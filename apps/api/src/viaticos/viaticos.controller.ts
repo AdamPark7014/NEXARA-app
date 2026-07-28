@@ -93,7 +93,12 @@ export class ViaticosController {
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_MANAGE, PERMISSIONS.VIATICS_CREATE] })
   @UseInterceptors(FileInterceptor('ticketEvidencia', { dest: getUploadSubdir(__dirname, 'viatics') }))
-  create(@CurrentUser() user: any, @Body() body: CreateViaticoDto, @UploadedFile() file?: any) {
+  create(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: CreateViaticoDto,
+    @UploadedFile() file?: any,
+  ) {
     const ticketEvidenciaUrl = file
       ? `/uploads/viatics/${file.filename}`
       : body.ticketEvidenciaUrl ?? body.comprobante ?? null;
@@ -119,6 +124,7 @@ export class ViaticosController {
         estatus: 'Pendiente',
       },
       user,
+      companyId,
     );
   }
 
@@ -126,7 +132,11 @@ export class ViaticosController {
   @Post('assign')
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
-  assign(@CurrentUser() user: any, @Body() body: AssignViaticoDto) {
+  assign(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: AssignViaticoDto,
+  ) {
     if (!body.usuarioId) {
       throw new BadRequestException('Debes indicar el usuario beneficiario');
     }
@@ -141,6 +151,7 @@ export class ViaticosController {
         motivo: body.motivo ?? body.concepto,
       },
       user,
+      companyId,
     );
   }
 
@@ -163,7 +174,22 @@ export class ViaticosController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_IMPORT] })
   @UseInterceptors(FileInterceptor('file'))
-  async import(@UploadedFile() _file: any, @Res() res: Response) {
+  async import(
+    @UploadedFile() _file: any,
+    @Res() res: Response,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    try {
+      this.viaticosService.importMany([{ _disabled: true }], companyId);
+    } catch (err) {
+      if (err instanceof BadRequestException) {
+        return res.status(HttpStatus.BAD_REQUEST).json({
+          message:
+            'Importación masiva de viáticos deshabilitada — usa el flujo de solicitud con evidencia.',
+        });
+      }
+      throw err;
+    }
     return res.status(HttpStatus.BAD_REQUEST).json({
       message:
         'Importación masiva de viáticos deshabilitada — usa el flujo de solicitud con evidencia.',
@@ -173,8 +199,12 @@ export class ViaticosController {
   @Get(':id')
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_VIEW, PERMISSIONS.VIATICS_MANAGE] })
-  findOne(@CurrentUser() user: any, @Param('id') id: string) {
-    return this.viaticosService.findOne(+id, user);
+  findOne(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.viaticosService.findOne(+id, user, companyId);
   }
 
   @Patch(':id/approve')
@@ -183,24 +213,34 @@ export class ViaticosController {
   approve(
     @Param('id') id: string,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Body() body: { action?: 'approve' | 'reject'; note?: string },
   ) {
     const action = body.action === 'reject' ? 'reject' : 'approve';
-    return this.viaticosService.approveOrReject(+id, user, action, body.note);
+    return this.viaticosService.approveOrReject(+id, user, action, body.note, companyId);
   }
 
   @Patch(':id/pagado')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_MANAGE] })
-  markPagado(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.viaticosService.markPagado(+id, user?.id);
+  markPagado(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.viaticosService.markPagado(+id, user?.id, companyId);
   }
 
   @Patch(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_MANAGE] })
   @UseInterceptors(FileInterceptor('ticketEvidencia', { dest: getUploadSubdir(__dirname, 'viatics') }))
-  update(@Param('id') id: string, @Body() body: UpdateViaticoDto, @UploadedFile() file?: any) {
+  update(
+    @Param('id') id: string,
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: UpdateViaticoDto,
+    @UploadedFile() file?: any,
+  ) {
     const data: Record<string, unknown> = {};
     if (file) data.ticketEvidenciaUrl = `/uploads/viatics/${file.filename}`;
     if (body.ticketEvidenciaUrl !== undefined) data.ticketEvidenciaUrl = body.ticketEvidenciaUrl;
@@ -221,6 +261,6 @@ export class ViaticosController {
     if (body.vehicleId !== undefined) {
       data.vehicleId = body.vehicleId ? Number(body.vehicleId) : null;
     }
-    return this.viaticosService.update(+id, data);
+    return this.viaticosService.update(+id, data, companyId);
   }
 }

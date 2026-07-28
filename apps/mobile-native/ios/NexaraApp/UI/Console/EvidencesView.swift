@@ -6,14 +6,14 @@ struct EvidencesView: View {
     var reviewMode: Bool = false
     var initialActivityId: Int64? = nil
 
-    @State private var rows: [[String: Any]] = []
-    @State private var myActivities: [[String: Any]] = []
+    @State private var rows: [EvidenceRow] = []
+    @State private var myActivities: [ActivityItem] = []
     @State private var query = ""
     @State private var statusFilter = "Todos"
     @State private var isLoading = true
     @State private var error: String?
     @State private var selectedActivityId: Int64?
-    @State private var evidence: [String: Any]?
+    @State private var evidence: EvidenceDetail?
     @State private var uploadMessage: String?
     @State private var uploading = false
     @State private var reportData: Data?
@@ -22,20 +22,21 @@ struct EvidencesView: View {
     @State private var reviewMessage: String?
 
     private var statuses: [String] {
-        var s = Set(rows.compactMap { ConsoleHelpers.mapStr($0, "status", "estado").ifEmptyNil })
+        var s = Set(rows.map(\.status).filter { !$0.isEmpty })
         return ["Todos"] + s.sorted()
     }
 
-    private var filtered: [[String: Any]] {
+    private var filtered: [EvidenceRow] {
         var list = rows
         if statusFilter != "Todos" {
-            list = list.filter { ConsoleHelpers.mapStr($0, "status", "estado") == statusFilter }
+            list = list.filter { $0.status == statusFilter }
         }
         if !query.isEmpty {
             let q = query.lowercased()
             list = list.filter {
-                ConsoleHelpers.mapStr($0, "activityAn", "anNumber", "titulo").lowercased().contains(q) ||
-                ConsoleHelpers.mapStr($0, "clientName", "cliente").lowercased().contains(q)
+                $0.displayTitle.lowercased().contains(q) ||
+                $0.clientName.lowercased().contains(q) ||
+                $0.title.lowercased().contains(q)
             }
         }
         return list
@@ -81,13 +82,11 @@ struct EvidencesView: View {
                     Text("Actividades asignadas").font(.headline)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(myActivities.prefix(12), id: \.actKey) { act in
+                            ForEach(myActivities.prefix(12)) { act in
                                 Button {
-                                    if let id = ConsoleHelpers.mapInt64(act, "id") {
-                                        Task { await openActivity(id) }
-                                    }
+                                    Task { await openActivity(act.id) }
                                 } label: {
-                                    Text(ConsoleHelpers.mapStr(act, "titulo", "anNumber") )
+                                    Text(act.title.isEmpty ? "Actividad" : act.title)
                                         .font(.caption).padding(.horizontal, 10).padding(.vertical, 6)
                                         .background(Color.teal.opacity(0.12)).foregroundColor(.teal)
                                         .clipShape(Capsule())
@@ -108,11 +107,23 @@ struct EvidencesView: View {
 
                 if isLoading { ProgressView().frame(maxWidth: .infinity).padding(.top, 40) }
                 else if let error, rows.isEmpty {
-                    Text(error).foregroundColor(.red).frame(maxWidth: .infinity).padding()
+                    NxEmptyState(
+                        title: "No se pudo cargar",
+                        subtitle: error,
+                        actionLabel: "Reintentar",
+                        onAction: { Task { await reload() } }
+                    )
                 } else if filtered.isEmpty {
-                    Text("Sin evidencias").foregroundColor(.secondary).frame(maxWidth: .infinity).padding(.top, 40)
+                    NxEmptyState(
+                        title: "Sin evidencias",
+                        subtitle: reviewMode
+                            ? "No hay evidencias pendientes de revisión."
+                            : "Selecciona una actividad o espera asignaciones.",
+                        actionLabel: "Actualizar",
+                        onAction: { Task { await reload() } }
+                    )
                 } else {
-                    ForEach(filtered.prefix(60), id: \.evKey) { row in
+                    ForEach(filtered.prefix(60)) { row in
                         evidenceRow(row)
                     }
                 }
@@ -147,33 +158,21 @@ struct EvidencesView: View {
         }
     }
 
-    private func evidenceNeedsReview(_ status: String) -> Bool {
-        let s = status.lowercased()
-        if s.contains("aprobad") || s.contains("rechazad") { return false }
-        return s.contains("pendiente") || s.contains("revis") || s.contains("complet")
-            || s.contains("enviad") || s.contains("entregad") || s.isEmpty
-    }
-
-    private func evidenceRow(_ row: [String: Any]) -> some View {
-        let an = ConsoleHelpers.mapStr(row, "activityAn", "anNumber", "titulo")
-        let client = ConsoleHelpers.mapStr(row, "clientName", "cliente")
-        let status = ConsoleHelpers.mapStr(row, "status", "estado", "estatus")
-        let activityId = ConsoleHelpers.mapInt64(row, "activityId")
-            ?? ConsoleHelpers.mapInt64(row, "id")
-        let canReview = reviewMode && activityId != nil && evidenceNeedsReview(status)
-        let acting = reviewingId == activityId
+    private func evidenceRow(_ row: EvidenceRow) -> some View {
+        let canReview = reviewMode && row.activityId > 0 && row.needsReview
+        let acting = reviewingId == row.activityId
 
         return VStack(alignment: .leading, spacing: 10) {
             Button {
-                if !reviewMode, let id = activityId {
-                    Task { await openActivity(id) }
+                if !reviewMode, row.activityId > 0 {
+                    Task { await openActivity(row.activityId) }
                 }
             } label: {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(an.isEmpty ? "Actividad" : an).font(.subheadline).bold()
-                        if !client.isEmpty { Text(client).font(.caption).foregroundColor(.secondary) }
-                        OpsStatusChip(text: status.isEmpty ? "—" : status)
+                        Text(row.displayTitle).font(.subheadline).bold()
+                        if !row.clientName.isEmpty { Text(row.clientName).font(.caption).foregroundColor(.secondary) }
+                        OpsStatusChip(text: row.status.isEmpty ? "—" : row.status)
                     }
                     Spacer()
                     if !reviewMode {
@@ -184,15 +183,15 @@ struct EvidencesView: View {
             .buttonStyle(.plain)
             .disabled(reviewMode)
 
-            if canReview, let id = activityId {
+            if canReview {
                 TextField("Motivo de rechazo (requerido para rechazar)", text: $rejectNotes, axis: .vertical)
                     .lineLimit(2...4)
                     .textFieldStyle(.roundedBorder)
                     .disabled(acting == true)
                 NxDecisionActions(
                     acting: acting == true,
-                    onApprove: { Task { await approve(id) } },
-                    onReject: { Task { await reject(id) } }
+                    onApprove: { Task { await approve(row.activityId) } },
+                    onReject: { Task { await reject(row.activityId) } }
                 )
             }
         }
@@ -296,14 +295,13 @@ struct EvidencesView: View {
         let done: Bool
     }
 
-    private func workflowSteps(_ ev: [String: Any]?) -> [WorkflowStep] {
-        let e = ev ?? [:]
-        return [
-            WorkflowStep(key: "entry", title: "1. Foto de entrada", done: e["entryPhotoUrl"] != nil),
-            WorkflowStep(key: "photos", title: "2. Fotos de evidencia", done: (e["evidencePhotoUrls"] as? [Any])?.isEmpty == false),
-            WorkflowStep(key: "pdf", title: "3. Hoja de servicio (PDF)", done: e["serviceSheetPdfUrl"] != nil),
-            WorkflowStep(key: "data", title: "4. Completar plantilla", done: e["serviceSheetCompleted"] as? Bool == true),
-            WorkflowStep(key: "exit", title: "5. Foto de salida", done: e["exitPhotoUrl"] != nil),
+    private func workflowSteps(_ ev: EvidenceDetail?) -> [WorkflowStep] {
+        [
+            WorkflowStep(key: "entry", title: "1. Foto de entrada", done: ev?.hasEntry == true),
+            WorkflowStep(key: "photos", title: "2. Fotos de evidencia", done: ev?.hasPhotos == true),
+            WorkflowStep(key: "pdf", title: "3. Hoja de servicio (PDF)", done: ev?.hasPdf == true),
+            WorkflowStep(key: "data", title: "4. Completar plantilla", done: ev?.serviceSheetCompleted == true),
+            WorkflowStep(key: "exit", title: "5. Foto de salida", done: ev?.hasExit == true),
         ]
     }
 
@@ -312,10 +310,10 @@ struct EvidencesView: View {
         defer { isLoading = false }
         do {
             if reviewMode {
-                rows = try await ConsoleRepository.shared.evidenceReviewHistory()
+                rows = try await ConsoleRepository.shared.evidenceReviewRows()
             } else {
-                async let hist = ConsoleRepository.shared.myEvidenceHistory()
-                async let acts = ConsoleRepository.shared.activities(scope: "mine")
+                async let hist = ConsoleRepository.shared.myEvidenceRows()
+                async let acts = ConsoleRepository.shared.activityItems(scope: "mine")
                 rows = try await hist
                 myActivities = (try? await acts) ?? []
             }
@@ -325,7 +323,7 @@ struct EvidencesView: View {
     private func openActivity(_ id: Int64) async {
         selectedActivityId = id
         uploadMessage = nil
-        do { evidence = try await ConsoleRepository.shared.evidenceDetail(activityId: id) }
+        do { evidence = try await ConsoleRepository.shared.evidenceDetailItem(activityId: id) }
         catch { uploadMessage = "❌ \(error.localizedDescription)" }
     }
 
@@ -367,7 +365,7 @@ struct EvidencesView: View {
                 uploadMessage = coord == nil ? "✅ Flujo completado (sin GPS)." : "✅ Flujo completado · GPS ok."
             default: break
             }
-            evidence = try await ConsoleRepository.shared.evidenceDetail(activityId: activityId)
+            evidence = try await ConsoleRepository.shared.evidenceDetailItem(activityId: activityId)
             await reload()
         } catch { uploadMessage = "❌ \(error.localizedDescription)" }
     }
@@ -391,20 +389,5 @@ struct OpsStatusChip: View {
             .padding(.horizontal, 8).padding(.vertical, 3)
             .background(Color.orange.opacity(0.15)).foregroundColor(.orange)
             .clipShape(Capsule())
-    }
-}
-
-extension String {
-    fileprivate var ifEmptyNil: String? { isEmpty ? nil : self }
-}
-
-extension [String: Any] {
-    fileprivate var evKey: String {
-        if let id = self["activityId"] ?? self["id"] { return "ev-\(id)" }
-        return UUID().uuidString
-    }
-    fileprivate var actKey: String {
-        if let id = self["id"] { return "act-\(id)" }
-        return UUID().uuidString
     }
 }

@@ -13,6 +13,7 @@ import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CaseStudiesService, CreateCaseStudyDto, UpdateCaseStudyDto } from './case-studies.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 interface MulterFile {
   fieldname: string;
@@ -52,10 +53,9 @@ export class CaseStudiesController {
     }
   }
 
-  /** Sitio público nexara.com.mx/proyectos */
   @Get('public')
   findAllPublic(@Query() query: PaginationQueryDto) {
-    return this.svc.findAll(query, true);
+    return this.svc.findAll(query, true, { publicSite: true });
   }
 
   @Get('public/by-slug/:slug')
@@ -65,53 +65,55 @@ export class CaseStudiesController {
 
   @Post()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   @UseInterceptors(FileInterceptor('coverImage'))
   create(
     @Body() body: CreateCaseStudyDto,
     @UploadedFile() coverImage: MulterFile | undefined,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.svc.create(body, user.id, coverImage);
+    return this.svc.create(body, user.id, coverImage, companyId);
   }
 
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
-  findAll(@Query() query: PaginationQueryDto) {
-    return this.svc.findAll(query);
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  findAll(@Query() query: PaginationQueryDto, @CurrentCompanyId() companyId: number | null) {
+    return this.svc.findAll(query, false, { companyId });
   }
 
   @Get(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.svc.findOne(id);
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  findOne(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.svc.findOne(id, companyId);
   }
 
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
   @UseInterceptors(FileInterceptor('coverImage'))
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateCaseStudyDto,
     @UploadedFile() coverImage: MulterFile | undefined,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.svc.update(id, body, coverImage);
+    return this.svc.update(id, body, coverImage, companyId);
   }
 
   @Patch(':id/toggle-publicado')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
-  togglePublicado(@Param('id', ParseIntPipe) id: number) {
-    return this.svc.togglePublicado(id);
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  togglePublicado(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.svc.togglePublicado(id, companyId);
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.svc.remove(id);
+  @RBAC({ anyPermissions: [PERMISSIONS.STUDIO_CONTENT_MANAGE, PERMISSIONS.PANEL_WEB, PERMISSIONS.CONSOLE_ADMIN] })
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.svc.remove(id, companyId);
   }
 }

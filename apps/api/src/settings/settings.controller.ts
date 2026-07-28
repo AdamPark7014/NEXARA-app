@@ -1,9 +1,10 @@
 import { Controller, Get, Put, Delete, Param, Body, UseGuards, HttpCode } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { SettingsService } from './settings.service';
-import { UpsertSettingDto } from './dto/upsert-setting.dto';
-import { RBAC, RbacGuard } from '../common/rbac.guard';
-import { PERMISSIONS } from '../common/permissions';
+import { SettingsService } from './settings.service.js';
+import { UpsertSettingDto } from './dto/upsert-setting.dto.js';
+import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { PERMISSIONS } from '../common/permissions.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 @ApiTags('system')
 @ApiBearerAuth('JWT')
@@ -15,16 +16,19 @@ export class SettingsController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @ApiOperation({ summary: 'Obtener todas las configuraciones del sistema' })
-  findAll() {
-    return this.settingsService.findAll();
+  findAll(@CurrentCompanyId() companyId: number | null) {
+    return this.settingsService.findAll(companyId);
   }
 
   @Get(':category')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @ApiOperation({ summary: 'Obtener configuraciones por categoría' })
-  findByCategory(@Param('category') category: string) {
-    return this.settingsService.findByCategory(category);
+  findByCategory(
+    @Param('category') category: string,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.settingsService.findByCategory(category, companyId);
   }
 
   @Put()
@@ -32,8 +36,8 @@ export class SettingsController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @ApiOperation({ summary: 'Crear o actualizar una configuración' })
-  upsert(@Body() dto: UpsertSettingDto) {
-    return this.settingsService.upsert(dto.key, dto.value, dto.category, dto.label);
+  upsert(@Body() dto: UpsertSettingDto, @CurrentCompanyId() companyId: number | null) {
+    return this.settingsService.upsert(dto.key, dto.value, dto.category, dto.label, companyId);
   }
 
   @Put('batch')
@@ -41,15 +45,15 @@ export class SettingsController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @ApiOperation({ summary: 'Crear o actualizar múltiples configuraciones' })
-  upsertMany(@Body() dtos: UpsertSettingDto[]) {
-    return this.settingsService.upsertMany(dtos);
+  upsertMany(@Body() dtos: UpsertSettingDto[], @CurrentCompanyId() companyId: number | null) {
+    return this.settingsService.upsertMany(dtos, companyId);
   }
 
   @Delete(':key')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @ApiOperation({ summary: 'Eliminar una configuración' })
-  remove(@Param('key') key: string) {
-    return this.settingsService.remove(key);
+  remove(@Param('key') key: string, @CurrentCompanyId() companyId: number | null) {
+    return this.settingsService.remove(key, companyId);
   }
 }

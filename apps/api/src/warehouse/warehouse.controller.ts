@@ -35,15 +35,23 @@ export class WarehouseController {
   @Patch(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.WAREHOUSE_MANAGE] })
-  update(@Param('id') id: string, @Body() dto: any) {
-    return this.service.updateWarehouse(+id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.updateWarehouse(+id, dto, companyId);
   }
 
   @Post(':id/locations')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.WAREHOUSE_MANAGE] })
-  createLocation(@Param('id') id: string, @Body() dto: any) {
-    return this.service.createLocation(+id, dto);
+  createLocation(
+    @Param('id') id: string,
+    @Body() dto: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.createLocation(+id, dto, companyId);
   }
 
   @Get(':id/locations')

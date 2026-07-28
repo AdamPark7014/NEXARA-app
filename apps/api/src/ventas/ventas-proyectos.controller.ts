@@ -19,6 +19,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { Response } from 'express';
 import { SalesPaginationQueryDto } from './dto/sales-pagination-query.dto.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 const SALES_VIEW_ACCESS = [PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
 const SALES_MANAGE_ACCESS = [PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
@@ -30,8 +31,12 @@ export class VentasProyectosController {
   @Post()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async create(@Body() dto: CreateSalesProjectDto, @CurrentUser() user: any) {
-    const created = await this.ventasService.createProject(dto, user);
+  async create(
+    @Body() dto: CreateSalesProjectDto,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const created = await this.ventasService.createProject(dto, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'project.create',
       entityType: 'project',
@@ -45,15 +50,24 @@ export class VentasProyectosController {
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  findAll(@CurrentUser() user: any, @Query() query: SalesPaginationQueryDto) {
-    return this.ventasService.listProjects(user, query.ownerId, query);
+  findAll(
+    @CurrentUser() user: any,
+    @Query() query: SalesPaginationQueryDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.listProjects(user, query.ownerId, query, companyId);
   }
 
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateSalesProjectDto, @CurrentUser() user: any) {
-    const updated = await this.ventasService.updateProject(id, dto, user);
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateSalesProjectDto,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const updated = await this.ventasService.updateProject(id, dto, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'project.update',
       entityType: 'project',
@@ -67,8 +81,12 @@ export class VentasProyectosController {
   @Post(':id/provision-operacion')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async provisionOperational(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    const result = await this.ventasService.provisionOperationalProject(id, user);
+  async provisionOperational(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const result = await this.ventasService.provisionOperationalProject(id, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'project.provision_operacion',
       entityType: 'project',
@@ -85,8 +103,12 @@ export class VentasProyectosController {
   @Post(':id/close')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async closeProject(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    const order = await this.ventasService.closeProject(id, user);
+  async closeProject(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const order = await this.ventasService.closeProject(id, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'project.close',
       entityType: 'project',
@@ -100,22 +122,34 @@ export class VentasProyectosController {
   @Get(':id/orden')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  getOrder(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.ventasService.getProjectOrder(id, user);
+  getOrder(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.getProjectOrder(id, user, companyId);
   }
 
   @Get(':id/resumen')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  getSummary(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.ventasService.getProjectSummary(id, user);
+  getSummary(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.getProjectSummary(id, user, companyId);
   }
 
   @Get(':id/viaticos')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  getProjectViaticos(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.ventasService.getProjectViaticos(id, user);
+  getProjectViaticos(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.getProjectViaticos(id, user, companyId);
   }
 
   @Post(':id/viaticos/assign')
@@ -125,8 +159,9 @@ export class VentasProyectosController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { viaticIds: number[] },
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.ventasService.assignViaticosToProject(id, body.viaticIds, user).then(async (result) => {
+    return this.ventasService.assignViaticosToProject(id, body.viaticIds, user, companyId).then(async (result) => {
       await this.ventasService.createAuditEvent({
         action: 'project.viatic.assign',
         entityType: 'project',
@@ -141,8 +176,15 @@ export class VentasProyectosController {
   @Post('viaticos/:id/unassign')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async unassignViaticFromProject(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    const result = await this.ventasService.unassignViaticFromProject(id, user);
+  async unassignViaticFromProject(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const result = await this.ventasService.unassignViaticFromProject(id, {
+      ...user,
+      companyId: companyId ?? user?.companyId,
+    });
     await this.ventasService.createAuditEvent({
       action: 'project.viatic.unassign',
       entityType: 'viatic',
@@ -155,15 +197,23 @@ export class VentasProyectosController {
   @Get(':id/expenses')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  getProjectExpensesSummary(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.ventasService.getProjectExpensesSummary(id, user);
+  getProjectExpensesSummary(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.getProjectExpensesSummary(id, user, companyId);
   }
 
   @Get(':id/costos')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  calculateProjectCosts(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.ventasService.calculateProjectCosts(id, user);
+  calculateProjectCosts(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.calculateProjectCosts(id, user, companyId);
   }
 
   @Patch(':id/costos')
@@ -173,8 +223,9 @@ export class VentasProyectosController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { costProducts?: number; costViaticos?: number; costOperativo?: number },
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.ventasService.updateProjectCosts(id, body, user).then(async () => {
+    return this.ventasService.updateProjectCosts(id, body, user, companyId).then(async () => {
       await this.ventasService.createAuditEvent({
         action: 'project.costs.update',
         entityType: 'project',
@@ -182,22 +233,30 @@ export class VentasProyectosController {
         actorId: user?.id,
         metadata: body,
       });
-      return this.ventasService.calculateProjectCosts(id, user);
+      return this.ventasService.calculateProjectCosts(id, user, companyId);
     });
   }
 
   @Get(':id/validar-presupuesto')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  validateProjectBudget(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.ventasService.validateProjectBudget(id, user);
+  validateProjectBudget(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.validateProjectBudget(id, user, companyId);
   }
 
   @Post(':id/sync-viaticos')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async syncViaticosToProject(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    const result = await this.ventasService.syncViaticosToProject(id, user);
+  async syncViaticosToProject(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const result = await this.ventasService.syncViaticosToProject(id, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'project.viatic.sync',
       entityType: 'project',
@@ -210,8 +269,12 @@ export class VentasProyectosController {
   @Post(':id/sync-actual-costs')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  async syncActualCosts(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    const result = await this.ventasService.syncActualCostsFromField(id, user);
+  async syncActualCosts(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    const result = await this.ventasService.syncActualCostsFromField(id, user, companyId);
     await this.ventasService.createAuditEvent({
       action: 'project.costs.sync_actual',
       entityType: 'project',
@@ -221,5 +284,3 @@ export class VentasProyectosController {
     return result;
   }
 }
-
-

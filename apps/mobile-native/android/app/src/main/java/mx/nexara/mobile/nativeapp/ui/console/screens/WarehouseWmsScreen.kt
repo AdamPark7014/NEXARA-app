@@ -46,6 +46,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.api.CatalogProductDto
+import mx.nexara.mobile.nativeapp.data.api.StockLevelDto
+import mx.nexara.mobile.nativeapp.data.api.StockMovementDto
+import mx.nexara.mobile.nativeapp.data.api.WarehouseDto
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.ui.common.BarcodeScannerScreen
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlert
@@ -62,6 +66,20 @@ private val WhAmber = Color(0xFFF59E0B)
 private val WhGreen = Color(0xFF10B981)
 
 private enum class WhAction { RECEIVE, ISSUE, COUNT, TRANSFER }
+
+private fun skuMatchScore(sku: String, name: String, q: String): Int {
+    val skuLower = sku.lowercase()
+    val nameLower = name.lowercase()
+    val exactSku = q.isNotBlank() && skuLower == q
+    val startsSku = q.isNotBlank() && skuLower.startsWith(q)
+    return when {
+        exactSku -> 0
+        startsSku -> 1
+        q.isBlank() -> 3
+        skuLower.contains(q) || nameLower.contains(q) -> 2
+        else -> 9
+    }
+}
 
 /**
  * WMS móvil enterprise: inventario, alertas, recepción, despacho y conteo físico.
@@ -82,16 +100,16 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
     var message by remember { mutableStateOf<String?>(null) }
     var acting by remember { mutableStateOf(false) }
 
-    var warehouses by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
-    var stock by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
-    var alerts by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
-    var products by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
-    var movements by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var warehouses by remember { mutableStateOf<List<WarehouseDto>>(emptyList()) }
+    var stock by remember { mutableStateOf<List<StockLevelDto>>(emptyList()) }
+    var alerts by remember { mutableStateOf<List<StockLevelDto>>(emptyList()) }
+    var products by remember { mutableStateOf<List<CatalogProductDto>>(emptyList()) }
+    var movements by remember { mutableStateOf<List<StockMovementDto>>(emptyList()) }
     var query by remember { mutableStateOf("") }
     var skuQuery by remember { mutableStateOf("") }
 
     var action by remember { mutableStateOf<WhAction?>(null) }
-    var selectedLevel by remember { mutableStateOf<Map<String, Any?>?>(null) }
+    var selectedLevel by remember { mutableStateOf<StockLevelDto?>(null) }
 
     var formProductId by remember { mutableStateOf<Long?>(null) }
     var formProductLabel by remember { mutableStateOf("") }
@@ -122,11 +140,11 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
         val catalog = if (canManage) {
             withContext(Dispatchers.IO) { runCatching { repo.catalogProductDtos() }.getOrDefault(emptyList()) }
         } else emptyList()
-        warehouses = wh.map { it.toFlatMap() }
-        stock = levels.map { it.toFlatMap() }
-        alerts = low.map { it.toFlatMap() }
-        movements = moves.map { it.toFlatMap() }
-        products = catalog.map { it.toFlatMap() }
+        warehouses = wh
+        stock = levels
+        alerts = low
+        movements = moves
+        products = catalog
         loading = false
     }
 
@@ -150,17 +168,17 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
         skuQuery = ""
     }
 
-    fun openAction(a: WhAction, level: Map<String, Any?>? = null) {
+    fun openAction(a: WhAction, level: StockLevelDto? = null) {
         resetForm()
         action = a
         selectedLevel = level
         if (level != null) {
-            formProductId = longOf(level, "productId", "id")
-            formProductLabel = strOf(level, "name", "productName", "sku").ifBlank { "Producto" }
-            formWarehouseId = longOf(level, "warehouseId")
-            formWarehouseLabel = strOf(level, "warehouseName", "bodega", "ubicacion")
+            formProductId = level.productId
+            formProductLabel = level.name.ifBlank { level.sku.ifBlank { "Producto" } }
+            formWarehouseId = level.warehouseId
+            formWarehouseLabel = level.warehouseName.orEmpty()
             if (a == WhAction.COUNT) {
-                formCounted = numOf(level, "quantity", "cantidad")?.toInt()?.toString() ?: ""
+                formCounted = level.quantity.toInt().toString()
             }
         }
     }
@@ -180,25 +198,6 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
 
     if (pickProduct) {
         val q = (skuQuery.ifBlank { query }).trim().lowercase()
-        val source = if (products.isNotEmpty()) products else stock
-        val list = source
-            .map { p ->
-                val sku = strOf(p, "sku", "code").lowercase()
-                val name = strOf(p, "name", "productName", "nombre").lowercase()
-                val exactSku = q.isNotBlank() && sku == q
-                val startsSku = q.isNotBlank() && sku.startsWith(q)
-                val score = when {
-                    exactSku -> 0
-                    startsSku -> 1
-                    q.isBlank() -> 3
-                    sku.contains(q) || name.contains(q) -> 2
-                    else -> 9
-                }
-                score to p
-            }
-            .filter { it.first < 9 || q.isBlank() }
-            .sortedBy { it.first }
-            .map { it.second }
         LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
@@ -227,31 +226,67 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                     color = Color(0xFF64748B),
                 )
             }
-            items(list.take(80), key = { "${longOf(it, "id", "productId")}-${strOf(it, "sku")}" }) { p ->
-                val sku = strOf(p, "sku", "code")
-                val exact = q.isNotBlank() && sku.lowercase() == q
-                Card(
-                    modifier = Modifier.fillMaxWidth().clickable {
-                        formProductId = longOf(p, "productId", "id")
-                        formProductLabel = buildString {
-                            append(strOf(p, "name", "productName", "sku").ifBlank { "Producto" })
-                            if (sku.isNotBlank()) append(" ($sku)")
+            if (products.isNotEmpty()) {
+                val list = products
+                    .map { p -> skuMatchScore(p.sku, p.name, q) to p }
+                    .filter { it.first < 9 || q.isBlank() }
+                    .sortedBy { it.first }
+                    .map { it.second }
+                items(list.take(80), key = { "${it.id}-${it.sku}" }) { p ->
+                    val exact = q.isNotBlank() && p.sku.lowercase() == q
+                    Card(
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            formProductId = p.id
+                            formProductLabel = p.label
+                            pickProduct = false
+                            query = ""
+                            skuQuery = ""
+                        },
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (exact) Color(0xFFCCFBF1) else Color.White,
+                        ),
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(p.name, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (exact) "✓ SKU ${p.sku}" else p.sku,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (exact) WhTeal else Color(0xFF64748B),
+                            )
                         }
-                        pickProduct = false
-                        query = ""
-                        skuQuery = ""
-                    },
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (exact) Color(0xFFCCFBF1) else Color.White,
-                    ),
-                ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(strOf(p, "name", "productName", "nombre"), fontWeight = FontWeight.SemiBold)
-                        Text(
-                            if (exact) "✓ SKU $sku" else sku,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (exact) WhTeal else Color(0xFF64748B),
-                        )
+                    }
+                }
+            } else {
+                val list = stock
+                    .map { p -> skuMatchScore(p.sku, p.name, q) to p }
+                    .filter { it.first < 9 || q.isBlank() }
+                    .sortedBy { it.first }
+                    .map { it.second }
+                items(list.take(80), key = { "${it.productId}-${it.sku}" }) { p ->
+                    val exact = q.isNotBlank() && p.sku.lowercase() == q
+                    Card(
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            formProductId = p.productId
+                            formProductLabel = buildString {
+                                append(p.name.ifBlank { "Producto" })
+                                if (p.sku.isNotBlank()) append(" (${p.sku})")
+                            }
+                            pickProduct = false
+                            query = ""
+                            skuQuery = ""
+                        },
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (exact) Color(0xFFCCFBF1) else Color.White,
+                        ),
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(p.name, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (exact) "✓ SKU ${p.sku}" else p.sku,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (exact) WhTeal else Color(0xFF64748B),
+                            )
+                        }
                     }
                 }
             }
@@ -268,11 +303,11 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                     Text(if (choosingTo) "Bodega destino" else "Bodega origen", fontWeight = FontWeight.Bold)
                 }
             }
-            items(warehouses, key = { "${longOf(it, "id")}-$choosingTo" }) { w ->
+            items(warehouses, key = { "${it.id}-$choosingTo" }) { w ->
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable {
-                        val id = longOf(w, "id")
-                        val label = strOf(w, "name", "nombre", "code")
+                        val id = w.id
+                        val label = w.label
                         if (choosingTo) {
                             formToWarehouseId = id
                             formToWarehouseLabel = label
@@ -285,8 +320,11 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                     },
                 ) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(strOf(w, "name", "nombre"), fontWeight = FontWeight.SemiBold)
-                        Text(strOf(w, "code", "codigo", "city"), style = MaterialTheme.typography.bodySmall)
+                        Text(w.name, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            w.code.ifBlank { w.city.orEmpty() },
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                 }
             }
@@ -347,7 +385,7 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                 }
             }
             if (currentAction == WhAction.COUNT) {
-                val onHand = selectedLevel?.let { numOf(it, "quantity", "cantidad") } ?: 0.0
+                val onHand = selectedLevel?.quantity ?: 0.0
                 item { Text("Existencia sistema: ${onHand.toInt()} uds", fontWeight = FontWeight.SemiBold) }
                 item {
                     OutlinedTextField(
@@ -492,7 +530,7 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                                             message = "❌ Conteo inválido"
                                             return@launch
                                         }
-                                        val onHand = selectedLevel?.let { numOf(it, "quantity", "cantidad") } ?: 0.0
+                                        val onHand = selectedLevel?.quantity ?: 0.0
                                         val delta = counted - onHand
                                         if (delta == 0.0) {
                                             message = "✅ Sin diferencia — no hay ajuste"
@@ -546,8 +584,8 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
 
     val level = selectedLevel
     if (level != null) {
-        val qty = numOf(level, "quantity", "cantidad") ?: 0.0
-        val low = isLowStock(level)
+        val qty = level.quantity
+        val low = level.isLow
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
@@ -556,7 +594,7 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
             item { OutlinedButton(onClick = { selectedLevel = null }) { Text("← Inventario") } }
             item {
                 Text(
-                    strOf(level, "name", "productName").ifBlank { "Producto" },
+                    level.name.ifBlank { "Producto" },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                 )
@@ -568,12 +606,19 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                     colors = CardDefaults.cardColors(containerColor = if (low) Color(0xFFFEE2E2) else Color.White),
                 ) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        DetailLine("SKU", strOf(level, "sku", "code"))
+                        DetailLine("SKU", level.sku)
                         DetailLine("Existencia", "${qty.toInt()} uds")
-                        DetailLine("Mínimo / reorder", strOf(level, "minStock", "reorderPoint").ifBlank { "—" })
-                        DetailLine("Bodega", strOf(level, "warehouseName", "bodega", "ubicacion"))
-                        DetailLine("Ubicación", strOf(level, "location", "ubicacion"))
-                        DetailLine("Categoría", strOf(level, "category", "categoria"))
+                        DetailLine(
+                            "Mínimo / reorder",
+                            when {
+                                level.minStock != null -> level.minStock.toInt().toString()
+                                level.reorderPoint != null -> level.reorderPoint.toInt().toString()
+                                else -> "—"
+                            },
+                        )
+                        DetailLine("Bodega", level.warehouseName.orEmpty())
+                        DetailLine("Ubicación", level.location.orEmpty())
+                        DetailLine("Categoría", level.category.orEmpty())
                     }
                 }
             }
@@ -613,17 +658,19 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
         val q = query.trim().lowercase()
         if (q.isBlank()) stock
         else stock.filter {
-            strOf(it, "name", "productName", "sku").lowercase().contains(q) ||
-                strOf(it, "warehouseName", "bodega").lowercase().contains(q)
+            (it.name + it.sku).lowercase().contains(q) ||
+                (it.warehouseName ?: "").lowercase().contains(q)
         }
     }
     val filteredWh = remember(warehouses, query) {
         val q = query.trim().lowercase()
         if (q.isBlank()) warehouses
-        else warehouses.filter { strOf(it, "name", "nombre", "code").lowercase().contains(q) }
+        else warehouses.filter {
+            (it.name + it.code + (it.city ?: "")).lowercase().contains(q)
+        }
     }
-    val lowCount = alerts.size.coerceAtLeast(stock.count { isLowStock(it) })
-    val totalUnits = stock.sumOf { numOf(it, "quantity", "cantidad") ?: 0.0 }
+    val lowCount = alerts.size.coerceAtLeast(stock.count { it.isLow })
+    val totalUnits = stock.sumOf { it.quantity }
 
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -699,9 +746,9 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                     if (filteredStock.isEmpty()) {
                         item { Text("Sin niveles de stock", color = Color(0xFF64748B), modifier = Modifier.padding(24.dp)) }
                     }
-                    items(filteredStock.take(120), key = { "${longOf(it, "id")}-${longOf(it, "productId")}" }) { row ->
-                        val qty = numOf(row, "quantity", "cantidad") ?: 0.0
-                        val low = isLowStock(row)
+                    items(filteredStock.take(120), key = { "${it.id}-${it.productId}" }) { row ->
+                        val qty = row.quantity
+                        val low = row.isLow
                         Card(
                             onClick = { selectedLevel = row },
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -714,11 +761,11 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                                 Alignment.CenterVertically,
                             ) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(strOf(row, "name", "productName").ifBlank { "Producto" }, fontWeight = FontWeight.Bold)
+                                    Text(row.name.ifBlank { "Producto" }, fontWeight = FontWeight.Bold)
                                     Text(
                                         buildString {
-                                            append(strOf(row, "sku"))
-                                            val wh = strOf(row, "warehouseName", "bodega")
+                                            append(row.sku)
+                                            val wh = row.warehouseName.orEmpty()
                                             if (wh.isNotBlank()) {
                                                 if (isNotEmpty()) append(" · ")
                                                 append(wh)
@@ -737,12 +784,12 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                     }
                 }
                 1 -> LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
-                    items(filteredWh.take(80), key = { "${longOf(it, "id")}" }) { w ->
+                    items(filteredWh.take(80), key = { "${it.id}" }) { w ->
                         Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(12.dp)) {
                             Column(Modifier.padding(12.dp)) {
-                                Text(strOf(w, "name", "nombre").ifBlank { "Bodega" }, fontWeight = FontWeight.Bold)
+                                Text(w.name.ifBlank { "Bodega" }, fontWeight = FontWeight.Bold)
                                 Text(
-                                    strOf(w, "code", "codigo", "city", "address"),
+                                    w.code.ifBlank { w.city ?: w.address.orEmpty() },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color(0xFF64748B),
                                 )
@@ -760,7 +807,7 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                             )
                         }
                     }
-                    items(alerts.take(100), key = { "a-${longOf(it, "id")}-${longOf(it, "productId")}" }) { row ->
+                    items(alerts.take(100), key = { "a-${it.id}-${it.productId}" }) { row ->
                         Card(
                             onClick = { selectedLevel = row; tab = 0 },
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -768,9 +815,9 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                             shape = RoundedCornerShape(12.dp),
                         ) {
                             Column(Modifier.padding(12.dp)) {
-                                Text(strOf(row, "name", "productName"), fontWeight = FontWeight.Bold, color = WhRed)
+                                Text(row.name, fontWeight = FontWeight.Bold, color = WhRed)
                                 Text(
-                                    "Existencia ${numOf(row, "quantity")?.toInt() ?: 0} · reorder ${strOf(row, "reorderPoint", "minStock")}",
+                                    "Existencia ${row.quantity.toInt()} · reorder ${row.reorderPoint?.toInt() ?: row.minStock?.toInt() ?: 0}",
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                                 if (canManage) {
@@ -791,8 +838,8 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                             )
                         }
                     }
-                    items(movements.take(80), key = { "m-${longOf(it, "id")}" }) { row ->
-                        val type = strOf(row, "type", "tipo").ifBlank { "MOV" }
+                    items(movements.take(80), key = { "m-${it.id}" }) { row ->
+                        val type = row.type.ifBlank { "MOV" }
                         Card(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                             shape = RoundedCornerShape(12.dp),
@@ -801,28 +848,28 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
                                     Text(type, fontWeight = FontWeight.Bold, color = WhTeal)
                                     Text(
-                                        "${(numOf(row, "quantity", "cantidad") ?: 0.0).toInt()} uds",
+                                        "${row.quantity.toInt()} uds",
                                         fontWeight = FontWeight.SemiBold,
                                     )
                                 }
                                 Text(
-                                    strOf(row, "productName", "name", "sku").ifBlank { "Producto" },
+                                    row.productName.ifBlank { row.sku.ifBlank { "Producto" } },
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
-                                val from = strOf(row, "fromWarehouseName", "fromWarehouse")
-                                val to = strOf(row, "toWarehouseName", "toWarehouse")
+                                val from = row.fromWarehouseName.orEmpty()
+                                val to = row.toWarehouseName.orEmpty()
                                 val route = when {
                                     from.isNotBlank() && to.isNotBlank() -> "$from → $to"
                                     to.isNotBlank() -> "→ $to"
                                     from.isNotBlank() -> "← $from"
-                                    else -> strOf(row, "warehouseName", "bodega")
+                                    else -> ""
                                 }
                                 if (route.isNotBlank()) {
                                     Text(route, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
                                 }
                                 val meta = buildList {
-                                    strOf(row, "reference", "referencia").takeIf { it.isNotBlank() }?.let { add(it) }
-                                    strOf(row, "createdAt", "fecha", "date").takeIf { it.isNotBlank() }?.let {
+                                    row.reference?.takeIf { it.isNotBlank() }?.let { add(it) }
+                                    row.createdAt?.takeIf { it.isNotBlank() }?.let {
                                         add(it.take(16).replace('T', ' '))
                                     }
                                 }.joinToString(" · ")
@@ -836,45 +883,4 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
             }
         }
     }
-}
-
-private fun isLowStock(row: Map<String, Any?>): Boolean {
-    val qty = numOf(row, "quantity", "cantidad") ?: return false
-    val reorder = numOf(row, "reorderPoint", "minStock") ?: 0.0
-    return reorder > 0 && qty <= reorder
-}
-
-private fun strOf(m: Map<String, Any?>, vararg keys: String): String {
-    for (k in keys) {
-        val v = m[k] ?: continue
-        when (v) {
-            is String -> if (v.isNotBlank() && v != "null") return v
-            is Number -> return v.toString()
-            is Map<*, *> -> {
-                val nested = v["name"] ?: v["nombre"] ?: v["code"]
-                if (nested != null) return nested.toString()
-            }
-        }
-    }
-    return ""
-}
-
-private fun numOf(m: Map<String, Any?>, vararg keys: String): Double? {
-    for (k in keys) {
-        when (val v = m[k]) {
-            is Number -> return v.toDouble()
-            is String -> v.toDoubleOrNull()?.let { return it }
-        }
-    }
-    return null
-}
-
-private fun longOf(m: Map<String, Any?>, vararg keys: String): Long? {
-    for (k in keys) {
-        when (val v = m[k]) {
-            is Number -> return v.toLong()
-            is String -> v.toLongOrNull()?.let { return it }
-        }
-    }
-    return null
 }

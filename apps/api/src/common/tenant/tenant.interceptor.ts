@@ -5,22 +5,28 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
+import { Observable, from, lastValueFrom } from 'rxjs';
 import { CompanyService } from '../../company/company.service.js';
+import { runWithTenantAsync } from './tenant-context.js';
 
 /**
  * Resuelve la empresa activa desde `X-Company-Id` (o primaria) y la adjunta a `req.companyId`.
  * Valida membresía UserCompany excepto super_admin.
+ * Propaga el contexto vía AsyncLocalStorage para middleware Prisma fail-closed.
  */
 @Injectable()
 export class TenantInterceptor implements NestInterceptor {
   constructor(private readonly companyService: CompanyService) {}
 
-  async intercept(context: ExecutionContext, next: CallHandler) {
+  async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<unknown>> {
     const req = context.switchToHttp().getRequest();
 
-    // Si ApiKeyAuthGuard ya resolvió empresa, no sobrescribir.
+    // Si ApiKeyAuthGuard ya resolvió empresa, no sobrescribir — sí propagar ALS.
     if (req.apiKeyId && req.companyId != null) {
-      return next.handle();
+      const companyId = Number(req.companyId);
+      return from(
+        runWithTenantAsync({ companyId, bypass: false }, () => lastValueFrom(next.handle())),
+      );
     }
 
     const raw = req.headers?.['x-company-id'] ?? req.headers?.['X-Company-Id'];
@@ -42,6 +48,14 @@ export class TenantInterceptor implements NestInterceptor {
       req.company = null;
     }
 
-    return next.handle();
+    const companyId =
+      req.companyId != null && Number.isFinite(Number(req.companyId))
+        ? Number(req.companyId)
+        : null;
+
+    // Super-admin without explicit company still must not auto-leak; they pick a tenant.
+    return from(
+      runWithTenantAsync({ companyId, bypass: false }, () => lastValueFrom(next.handle())),
+    );
   }
 }

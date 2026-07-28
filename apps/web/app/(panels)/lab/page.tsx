@@ -31,11 +31,25 @@ const TOOLS = [
     chips: ["API", "DB", "Redis", "PAC SAT"],
   },
   {
+    href: "/erp/settings/webhooks",
+    title: "Webhooks DLQ",
+    desc: "Cola de entregas fallidas con replay — mismo control que Stripe Dashboard / Atlassian webhooks.",
+    accent: "#f59e0b",
+    chips: ["HMAC", "Replay", "DLQ"],
+  },
+  {
     href: "/erp/audit",
-    title: "Audit log",
-    desc: "Timeline inmutable de cambios sensibles en todo NEXARA — filtrable por panel, severidad y actor.",
+    title: "Audit & privacy",
+    desc: "Timeline inmutable + borrado GDPR/LFPDPPP de sujetos (anonymize PII, retiene histórico fiscal).",
     accent: "#0ea5e9",
-    chips: ["Trazabilidad", "Cumplimiento"],
+    chips: ["Trazabilidad", "Erase", "Cumplimiento"],
+  },
+  {
+    href: "/erp/settings",
+    title: "Control center",
+    desc: "Billing, API keys, SCIM, empresas y packaging SaaS del tenant.",
+    accent: "#6366f1",
+    chips: ["Billing", "API keys", "SCIM"],
   },
 ];
 

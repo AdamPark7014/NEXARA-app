@@ -3,7 +3,6 @@ package mx.nexara.mobile.nativeapp.ui.ventas
 import android.app.Application
 import android.net.Uri
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,11 +25,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.api.CrmOppAttachmentDto
+import mx.nexara.mobile.nativeapp.data.api.CrmOppHistoryEventDto
+import mx.nexara.mobile.nativeapp.data.api.CrmOppNoteDto
+import mx.nexara.mobile.nativeapp.data.api.CrmOppQuoteDto
+import mx.nexara.mobile.nativeapp.data.api.CrmOpportunityDetailDto
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.data.crm.CrmRepository
 import mx.nexara.mobile.nativeapp.ui.common.CapturedMedia
 import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
 import mx.nexara.mobile.nativeapp.ui.common.PdfViewerScreen
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import java.io.File
 
 private val tabs = listOf("Resumen", "Notas", "Adjuntos", "Cotizaciones", "Historial")
@@ -38,7 +43,7 @@ private val tabs = listOf("Resumen", "Notas", "Adjuntos", "Cotizaciones", "Histo
 data class OppDetailUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
-    val data: Map<String, Any?> = emptyMap(),
+    val detail: CrmOpportunityDetailDto = CrmOpportunityDetailDto(),
     val tab: Int = 0,
     val noteText: String = "",
     val savingNote: Boolean = false,
@@ -62,8 +67,8 @@ class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidVie
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
-                val data = withContext(Dispatchers.IO) { repo.getOpportunity(oppId) }
-                _state.update { it.copy(isLoading = false, data = data) }
+                val detail = withContext(Dispatchers.IO) { repo.opportunityDetail(oppId) }
+                _state.update { it.copy(isLoading = false, detail = detail) }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.message) }
             }
@@ -103,7 +108,7 @@ class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidVie
     }
 
     fun openEdit() = _state.update {
-        it.copy(showEditForm = true, form = it.data.toOpportunityFormState(), actionError = null)
+        it.copy(showEditForm = true, form = it.detail.raw.toOpportunityFormState(), actionError = null)
     }
 
     fun closeEdit() = _state.update { it.copy(showEditForm = false) }
@@ -156,15 +161,6 @@ class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidVie
     fun closePdf() = _state.update { it.copy(pdfFile = null, pdfTitle = "") }
 }
 
-@Suppress("UNCHECKED_CAST")
-private fun nestedMaps(data: Map<String, Any?>, key: String): List<Map<String, Any?>> {
-    val v = data[key] ?: return emptyList()
-    if (v is List<*>) {
-        return v.mapNotNull { it as? Map<String, Any?> }
-    }
-    return emptyList()
-}
-
 private val OppGreen = Color(0xFF10B981)
 
 @Composable
@@ -194,7 +190,7 @@ fun VentasOpportunityDetailScreen(oppId: Long, onBack: () -> Unit) {
         },
     )
     val state by vm.state.collectAsState()
-    val data = state.data
+    val detail = state.detail
     var confirmDelete by remember { mutableStateOf(false) }
 
     if (state.pdfFile != null) {
@@ -213,7 +209,7 @@ fun VentasOpportunityDetailScreen(oppId: Long, onBack: () -> Unit) {
         ) {
             TextButton(onClick = onBack) { Text("← Volver") }
             Text(
-                oppStr(data, "title", "name", "titulo").ifBlank { "Oportunidad" },
+                detail.displayTitle,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
@@ -228,16 +224,18 @@ fun VentasOpportunityDetailScreen(oppId: Long, onBack: () -> Unit) {
         }
         when {
             state.isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-            !state.error.isNullOrBlank() && data.isEmpty() -> Column(Modifier.padding(20.dp)) {
-                Text(state.error ?: "", color = MaterialTheme.colorScheme.error)
-                Button(onClick = vm::refresh) { Text("Reintentar") }
-            }
+            !state.error.isNullOrBlank() && detail.isEmpty -> NxEmptyState(
+                title = "No se pudo cargar",
+                subtitle = state.error ?: "",
+                actionLabel = "Reintentar",
+                onAction = vm::refresh,
+            )
             else -> when (state.tab) {
-                0 -> OppSummaryTab(data)
-                1 -> OppNotesTab(data, state, vm)
-                2 -> OppAttachmentsTab(data, state, vm)
-                3 -> OppQuotesTab(data, onOpen = { url, title -> vm.openQuotePdf(url, title) })
-                else -> OppHistorialTab(data)
+                0 -> OppSummaryTab(detail)
+                1 -> OppNotesTab(detail.notes, state, vm)
+                2 -> OppAttachmentsTab(detail.attachments, state, vm)
+                3 -> OppQuotesTab(detail.quotes, onOpen = { url, title -> vm.openQuotePdf(url, title) })
+                else -> OppHistorialTab(detail.history)
             }
         }
     }
@@ -270,29 +268,24 @@ fun VentasOpportunityDetailScreen(oppId: Long, onBack: () -> Unit) {
 }
 
 @Composable
-private fun OppSummaryTab(data: Map<String, Any?>) {
+private fun OppSummaryTab(detail: CrmOpportunityDetailDto) {
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            OppStageChip(oppStr(data, "stage", "etapa", "status"))
+            OppStageChip(detail.stageKey)
             Spacer(Modifier.height(8.dp))
-            detailRow("Valor", oppFmtMxn(oppDouble(data, "value", "amount") ?: 0.0))
-            detailRow("Probabilidad", "${oppStr(data, "probability", "probabilidad")}%")
-            detailRow("Cliente", oppStr(data, "clientName") + nestedClientName(data))
-            detailRow("Cierre estimado", oppStr(data, "expectedCloseDate", "closeDate").take(10))
-            detailRow("Descripción", oppStr(data, "description", "descripcion"))
+            detailRow("Valor", oppFmtMxn(detail.value))
+            if (detail.probability > 0) {
+                detailRow("Probabilidad", "${detail.probability.toInt()}%")
+            }
+            detailRow("Cliente", detail.clientName)
+            detailRow("Cierre estimado", detail.expectedCloseDate.take(10))
+            detailRow("Descripción", detail.description)
         }
     }
 }
 
-private fun nestedClientName(data: Map<String, Any?>): String {
-    val client = data["client"] as? Map<*, *> ?: return ""
-    val name = client["name"]?.toString() ?: client["nombre"]?.toString() ?: return ""
-    return if (name.isBlank()) "" else " ($name)"
-}
-
 @Composable
-private fun OppNotesTab(data: Map<String, Any?>, state: OppDetailUiState, vm: OppDetailViewModel) {
-    val notes = nestedMaps(data, "notes").ifEmpty { nestedMaps(data, "notas") }
+private fun OppNotesTab(notes: List<CrmOppNoteDto>, state: OppDetailUiState, vm: OppDetailViewModel) {
     Column(Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.weight(1f),
@@ -303,14 +296,19 @@ private fun OppNotesTab(data: Map<String, Any?>, state: OppDetailUiState, vm: Op
                 item { Text(state.actionError ?: "", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
             if (notes.isEmpty()) {
-                item { Text("Sin notas de seguimiento", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                item {
+                    NxEmptyState(
+                        title = "Sin notas",
+                        subtitle = "Agrega notas de seguimiento para el equipo comercial.",
+                    )
+                }
             } else {
-                items(notes, key = { oppStr(it, "id") }) { note ->
+                items(notes, key = { it.rowKey }) { note ->
                     Card(shape = RoundedCornerShape(10.dp)) {
                         Column(Modifier.padding(12.dp)) {
-                            Text(oppStr(note, "message", "mensaje", "content"), style = MaterialTheme.typography.bodyMedium)
+                            Text(note.message, style = MaterialTheme.typography.bodyMedium)
                             Text(
-                                oppStr(note, "createdAt", "fecha").take(16),
+                                note.createdAt.take(16),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -340,8 +338,7 @@ private fun OppNotesTab(data: Map<String, Any?>, state: OppDetailUiState, vm: Op
 }
 
 @Composable
-private fun OppAttachmentsTab(data: Map<String, Any?>, state: OppDetailUiState, vm: OppDetailViewModel) {
-    val evidences = nestedMaps(data, "evidences").ifEmpty { nestedMaps(data, "evidencias") }
+private fun OppAttachmentsTab(attachments: List<CrmOppAttachmentDto>, state: OppDetailUiState, vm: OppDetailViewModel) {
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (!state.actionError.isNullOrBlank()) {
             Text(state.actionError ?: "", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -357,17 +354,18 @@ private fun OppAttachmentsTab(data: Map<String, Any?>, state: OppDetailUiState, 
             allowGallery = true,
             allowDocuments = true,
         )
-        if (evidences.isEmpty()) {
-            Text("Sin archivos adjuntos", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (attachments.isEmpty()) {
+            NxEmptyState(
+                title = "Sin adjuntos",
+                subtitle = "Sube fotos o documentos vinculados a esta oportunidad.",
+            )
         } else {
-            evidences.forEach { ev ->
-                val url = oppStr(ev, "url", "fileUrl")
-                val name = oppStr(ev, "name", "nombre", "fileName").ifBlank { "Archivo" }
+            attachments.forEach { ev ->
                 Card(shape = RoundedCornerShape(10.dp)) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(name, fontWeight = FontWeight.SemiBold)
+                        Text(ev.displayName, fontWeight = FontWeight.SemiBold)
                         Text(
-                            if (url.isNotBlank()) toAbsoluteAssetUrl(url) else "—",
+                            if (ev.url.isNotBlank()) toAbsoluteAssetUrl(ev.url) else "—",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -379,27 +377,29 @@ private fun OppAttachmentsTab(data: Map<String, Any?>, state: OppDetailUiState, 
 }
 
 @Composable
-private fun OppQuotesTab(data: Map<String, Any?>, onOpen: (String, String) -> Unit) {
-    val quotes = nestedMaps(data, "quotes").ifEmpty { nestedMaps(data, "cotizaciones") }
+private fun OppQuotesTab(quotes: List<CrmOppQuoteDto>, onOpen: (String, String) -> Unit) {
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (quotes.isEmpty()) {
-            item { Text("Sin cotizaciones vinculadas", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            item {
+                NxEmptyState(
+                    title = "Sin cotizaciones",
+                    subtitle = "Las cotizaciones vinculadas a esta oportunidad aparecerán aquí.",
+                )
+            }
         } else {
-            items(quotes, key = { oppStr(it, "id") }) { q ->
-                val pdfUrl = oppStr(q, "pdfUrl", "url")
-                val label = oppStr(q, "versionLabel", "folio", "name").ifBlank { "Cotización" }
+            items(quotes, key = { it.rowKey }) { q ->
                 Card(
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.then(
-                        if (pdfUrl.isNotBlank()) Modifier.clickable { onOpen(pdfUrl, label) } else Modifier,
+                        if (q.pdfUrl.isNotBlank()) Modifier.clickable { onOpen(q.pdfUrl, q.displayLabel) } else Modifier,
                     ),
                 ) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(label, fontWeight = FontWeight.SemiBold)
-                        if (pdfUrl.isNotBlank()) {
+                        Text(q.displayLabel, fontWeight = FontWeight.SemiBold)
+                        if (q.pdfUrl.isNotBlank()) {
                             Text("Toca para ver PDF", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                         }
-                        Text(oppStr(q, "createdAt", "fecha").take(16), style = MaterialTheme.typography.labelSmall)
+                        Text(q.createdAt.take(16), style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -408,29 +408,31 @@ private fun OppQuotesTab(data: Map<String, Any?>, onOpen: (String, String) -> Un
 }
 
 @Composable
-private fun OppHistorialTab(data: Map<String, Any?>) {
-    val history = nestedMaps(data, "history").ifEmpty {
-        nestedMaps(data, "historial").ifEmpty {
-            nestedMaps(data, "activityLog").ifEmpty { nestedMaps(data, "changelog") }
-        }
-    }
+private fun OppHistorialTab(history: List<CrmOppHistoryEventDto>) {
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (history.isEmpty()) {
-            item { Text("Sin historial de cambios disponible", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            item {
+                NxEmptyState(
+                    title = "Sin historial",
+                    subtitle = "Los cambios de etapa y actividad se registrarán aquí.",
+                )
+            }
         } else {
-            items(history.take(50), key = { System.identityHashCode(it).toString() }) { h ->
-                val action = oppStr(h, "action", "accion", "event", "type")
-                val by     = oppStr(h, "userName", "createdByName", "usuario")
-                val date   = oppStr(h, "createdAt", "timestamp", "fecha").take(16)
-                val detail = oppStr(h, "detail", "description", "changes", "mensaje")
+            items(history.take(50), key = { it.rowKey }) { h ->
                 Card(shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(action.ifBlank { "Cambio" }, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            if (date.isNotBlank()) Text(date, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(h.displayAction, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            if (h.createdAt.isNotBlank()) {
+                                Text(h.createdAt.take(16), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
-                        if (by.isNotBlank()) Text("Por: $by", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (detail.isNotBlank()) Text(detail, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
+                        if (h.userName.isNotBlank()) {
+                            Text("Por: ${h.userName}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (h.detail.isNotBlank()) {
+                            Text(h.detail, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
+                        }
                     }
                 }
             }
@@ -445,23 +447,4 @@ private fun detailRow(label: String, value: String) {
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, fontWeight = FontWeight.Medium)
     }
-}
-
-private fun oppStr(m: Map<String, Any?>, vararg keys: String): String {
-    for (k in keys) {
-        val v = m[k] ?: continue
-        val s = v.toString()
-        if (s.isNotBlank() && s != "null") return s
-    }
-    return ""
-}
-
-private fun oppDouble(m: Map<String, Any?>, vararg keys: String): Double? {
-    for (k in keys) {
-        when (val v = m[k]) {
-            is Number -> return v.toDouble()
-            is String -> v.toDoubleOrNull()?.let { return it }
-        }
-    }
-    return null
 }

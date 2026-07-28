@@ -17,11 +17,25 @@ final class ExtraRepository {
     }
 
     // MARK: Endpoints (idéntico a Android ExtraRepository + ConsoleRepository)
-    func news() async               -> [[String: Any]] { await load("news") }
-    func contactMessages() async    -> [[String: Any]] { await load("contact-messages") }
-    func newsletter() async         -> [[String: Any]] { await load("newsletter") }
-    func audit() async              -> [[String: Any]] { await load("audit") }
-    func expenses() async           -> [[String: Any]] { await load("expenses") }
+    func news() async -> [[String: Any]] { await newsItems().map(\.raw) }
+    func newsItems() async -> [ConsoleNewsItem] { await load("news").map { ConsoleNewsItem(raw: $0) } }
+    func contactMessages() async -> [[String: Any]] { await contactMessageItems().map(\.raw) }
+    func contactMessageItems() async -> [ConsoleContactMessage] {
+        await load("contact-messages").map { ConsoleContactMessage(raw: $0) }
+    }
+    func newsletter() async -> [[String: Any]] { await newsletterItems().map(\.raw) }
+    func newsletterItems() async -> [ConsoleNewsletterSubscriber] {
+        await load("newsletter").map { ConsoleNewsletterSubscriber(raw: $0) }
+    }
+    func audit() async -> [[String: Any]] { await auditItems().map(\.raw) }
+    func auditItems() async -> [AuditEntry] { await load("audit").map { AuditEntry(raw: $0) } }
+    func expenses() async -> [[String: Any]] {
+        await expenseItems().map { $0.toFlatMap() }
+    }
+
+    func expenseItems() async -> [ExpenseItem] {
+        await load("expenses").map { ExpenseItem(raw: $0) }
+    }
 
     func createExpense(
         concepto: String,
@@ -57,13 +71,29 @@ final class ExtraRepository {
         )
     }
 
-    func fines() async              -> [[String: Any]] { await load("fines") }
-    func employeePayments() async   -> [[String: Any]] { await load("employee-payments") }
-    func cotizaciones() async       -> [[String: Any]] { await load("cotizaciones") }
-    func lunchBreaks() async        -> [[String: Any]] { await load("lunch-breaks") }
-    func documents() async          -> [[String: Any]] { await load("documents") }
-    func journalEntries() async     -> [[String: Any]] { await load("accounting/journal-entries") }
-    func invoices() async           -> [[String: Any]] { await load("accounting/invoices") }
+    func fines() async -> [[String: Any]] { await fineItems().map(\.raw) }
+    func fineItems() async -> [FineItem] { await load("fines").map { FineItem(raw: $0) } }
+    func employeePayments() async -> [[String: Any]] { await employeePaymentItems().map(\.raw) }
+    func employeePaymentItems() async -> [EmployeePaymentItem] {
+        await load("employee-payments").map { EmployeePaymentItem(raw: $0) }
+    }
+    func cotizaciones() async -> [[String: Any]] { await cotizacionItems().map(\.raw) }
+    func cotizacionItems() async -> [Cotizacion] { await load("cotizaciones").map { Cotizacion(raw: $0) } }
+    func lunchBreaks() async -> [[String: Any]] { await lunchBreakItems().map(\.raw) }
+    func lunchBreakItems() async -> [LunchBreak] { await load("lunch-breaks").map { LunchBreak(raw: $0) } }
+    func documents() async -> [[String: Any]] { await documentItems().map(\.raw) }
+    func documentItems() async -> [DocumentItem] { await load("documents").map { DocumentItem(raw: $0) } }
+    func journalEntries() async -> [[String: Any]] { await journalEntryItems().map(\.raw) }
+    func journalEntryItems() async -> [JournalEntryItem] {
+        await load("accounting/journal-entries").map { JournalEntryItem(raw: $0) }
+    }
+    func invoices() async -> [[String: Any]] {
+        await invoiceItems().map { $0.toFlatMap() }
+    }
+
+    func invoiceItems() async -> [InvoiceItem] {
+        await load("accounting/invoices").map { InvoiceItem(raw: $0) }
+    }
 
     func invoiceDetail(id: Int64) async -> [String: Any] {
         do {
@@ -101,8 +131,12 @@ final class ExtraRepository {
         return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }
 
-    func bankAccounts() async       -> [[String: Any]] { await load("accounting/banking/accounts") }
-    func hrLeaves() async           -> [[String: Any]] { await load("hr/leaves") }
+    func bankAccounts() async -> [[String: Any]] { await bankAccountItems().map(\.raw) }
+    func bankAccountItems() async -> [BankAccountItem] {
+        await load("accounting/banking/accounts").map { BankAccountItem(raw: $0) }
+    }
+    func hrLeaves() async           -> [[String: Any]] { await hrLeaveItems().map(\.raw) }
+    func hrLeaveItems() async -> [HrLeave] { await load("hr/leaves").map { HrLeave(raw: $0) } }
     func warehouse() async -> [[String: Any]] {
         await warehouseItems().map { $0.toFlatMap() }
     }
@@ -225,10 +259,17 @@ final class ExtraRepository {
     func workOrderItems() async -> [WorkOrder] {
         await load("maintenance/work-orders").map { WorkOrder(raw: $0) }
     }
-    func serviceSheets() async      -> [[String: Any]] { await load("service-sheets") }
-    func cvs() async                -> [[String: Any]] { await load("cvs") }
+    func serviceSheets() async -> [[String: Any]] { await serviceSheetItems().map(\.raw) }
+    func serviceSheetItems() async -> [ServiceSheetItem] {
+        await load("service-sheets").map { ServiceSheetItem(raw: $0) }
+    }
+    func cvs() async -> [[String: Any]] { await candidateItems().map(\.raw) }
+    func candidateItems() async -> [CandidateItem] { await load("cvs").map { CandidateItem(raw: $0) } }
     func clientTicketRequests() async -> [[String: Any]] { await load("client-ticket-requests") }
-    func projects() async           -> [[String: Any]] { await load("projects") }
+    func projects() async -> [[String: Any]] { await portfolioProjects().map(\.raw) }
+    func portfolioProjects() async -> [PortfolioProject] {
+        await load("projects").map { PortfolioProject(raw: $0) }
+    }
 
     // Console-specific
     func activities() async -> [[String: Any]] { await load("activities") }
@@ -237,19 +278,25 @@ final class ExtraRepository {
         await load("activities").map { ActivityItem(raw: $0) }
     }
     func evidences() async          -> [[String: Any]] { await load("activity-evidence") }
-    func viatics() async            -> [[String: Any]] { await load("viatics") }
+    func viatics() async -> [[String: Any]] { await viaticItems().map(\.raw) }
+    func viaticItems() async -> [ViaticItem] { await load("viatics").map { ViaticItem(raw: $0) } }
     func vehicles() async           -> [[String: Any]] { await load("vehicles") }
     func clients() async            -> [[String: Any]] { await load("clients") }
     func serviceClients() async     -> [[String: Any]] { await load("service-clients") }
     func users() async              -> [[String: Any]] { await load("users") }
-    func attendance() async         -> [[String: Any]] { await load("attendance") }
+    func attendance() async -> [[String: Any]] { await attendanceEventItems().map(\.raw) }
+    func attendanceEventItems() async -> [AttendanceEvent] {
+        await load("attendance").map { AttendanceEvent(raw: $0) }
+    }
     func tools() async              -> [[String: Any]] { await load("tools") }
     func operationalProjects() async -> [[String: Any]] { await load("operational-projects") }
     func gpsLocations() async       -> [[String: Any]] { await load("gps") }
 
     // Lunch break actions
-    func myLunchBreaks() async -> [[String: Any]] { await load("lunch-breaks/my-breaks") }
-    func teamLunchBreaks() async -> [[String: Any]] { await load("lunch-breaks/users") }
+    func myLunchBreaks() async -> [[String: Any]] { await myLunchBreakItems().map(\.raw) }
+    func myLunchBreakItems() async -> [LunchBreak] { await load("lunch-breaks/my-breaks").map { LunchBreak(raw: $0) } }
+    func teamLunchBreaks() async -> [[String: Any]] { await teamLunchBreakItems().map(\.raw) }
+    func teamLunchBreakItems() async -> [LunchBreak] { await load("lunch-breaks/users").map { LunchBreak(raw: $0) } }
 
     func lunchCheckin(checkinTime: String, photoDataUrl: String?) async throws {
         struct Body: Encodable { let checkinTime: String; let checkinPhotoUrl: String? }
@@ -277,45 +324,80 @@ final class ExtraRepository {
     }
 
     func analyticsDashboardMap() async -> [String: Any] {
+        await analyticsDashboardItem().raw
+    }
+
+    func analyticsDashboardItem() async -> AnalyticsDashboard {
         guard let data = try? await ApiClient.shared.get("analytics/dashboard"),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
-        return obj
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return AnalyticsDashboard(raw: [:])
+        }
+        return AnalyticsDashboard(raw: obj)
     }
 
     func analyticsComputedKpis() async -> [[String: Any]] {
+        await analyticsComputedKpiItems().map(\.raw)
+    }
+
+    func analyticsComputedKpiItems() async -> [ComputedKpi] {
         guard let data = try? await ApiClient.shared.get("analytics/kpi/computed") else { return [] }
-        return ApiClient.decodeMapList(data)
+        return ApiClient.decodeMapList(data).map { ComputedKpi(raw: $0) }
     }
 
     func biMarginByType() async -> [[String: Any]] {
+        await biMarginRows().map(\.raw)
+    }
+
+    func biMarginRows() async -> [BiMarginRow] {
         guard let data = try? await ApiClient.shared.get("analytics/bi/margin-by-type") else { return [] }
-        return ApiClient.decodeMapList(data)
+        return ApiClient.decodeMapList(data).map { BiMarginRow(raw: $0) }
     }
 
     func biEngineers(limit: Int = 10) async -> [[String: Any]] {
+        await biEngineerRows(limit: limit).map(\.raw)
+    }
+
+    func biEngineerRows(limit: Int = 10) async -> [BiEngineerRow] {
         guard let data = try? await ApiClient.shared.get("analytics/bi/engineers", query: ["limit": String(limit)]) else { return [] }
-        return ApiClient.decodeMapList(data)
+        return ApiClient.decodeMapList(data).map { BiEngineerRow(raw: $0) }
     }
 
     func biClientsRoi(limit: Int = 10) async -> [[String: Any]] {
+        await biClientRoiRows(limit: limit).map(\.raw)
+    }
+
+    func biClientRoiRows(limit: Int = 10) async -> [BiClientRoi] {
         guard let data = try? await ApiClient.shared.get("analytics/bi/clients-roi", query: ["limit": String(limit)]) else { return [] }
-        return ApiClient.decodeMapList(data)
+        return ApiClient.decodeMapList(data).map { BiClientRoi(raw: $0) }
     }
 
     func executiveCLevel() async -> [String: Any] {
+        await executiveCLevelItem().raw
+    }
+
+    func executiveCLevelItem() async -> ExecutiveCLevel {
         guard let data = try? await ApiClient.shared.get("executive/c-level"),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
-        return obj
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return ExecutiveCLevel(raw: [:])
+        }
+        return ExecutiveCLevel(raw: obj)
     }
 
     func workflowPending() async -> [[String: Any]] {
-        guard let data = try? await ApiClient.shared.get("workflow/my-pending") else { return [] }
-        return ApiClient.decodeMapList(data)
+        await workflowApprovals().map { $0.toFlatMap() }
     }
 
-    func workflowDecide(id: Int, decision: String, comments: String? = nil) async throws {
+    func workflowApprovals() async -> [WorkflowApproval] {
+        guard let data = try? await ApiClient.shared.get("workflow/my-pending") else { return [] }
+        return ApiClient.decodeMapList(data).map { WorkflowApproval(raw: $0) }
+    }
+
+    func workflowDecide(id: Int64, decision: String, comments: String? = nil) async throws {
         struct Body: Encodable { let decision: String; let comments: String? }
-        _ = try await ApiClient.shared.postJSON("workflow/approvals/\(id)/decide", body: Body(decision: decision, comments: comments))
+        _ = try await ApiClient.shared.postJSON(
+            "workflow/approvals/\(id)/decide",
+            body: Body(decision: decision, comments: comments)
+        )
     }
 
     func nocSummary() async -> [String: Any] {
@@ -325,26 +407,44 @@ final class ExtraRepository {
     }
 
     func nocAlerts() async -> [[String: Any]] {
+        await nocAlertItems().map { $0.toFlatMap() }
+    }
+
+    func nocAlertItems() async -> [NocAlert] {
         guard let data = try? await ApiClient.shared.get("noc/alerts") else { return [] }
-        return ApiClient.decodeMapList(data)
+        return ApiClient.decodeMapList(data).map { NocAlert(raw: $0) }
     }
 
     func nocDevices() async -> [[String: Any]] {
+        await nocDeviceItems().map { $0.toFlatMap() }
+    }
+
+    func nocDeviceItems() async -> [NocDevice] {
         guard let data = try? await ApiClient.shared.get("noc/devices") else { return [] }
-        return ApiClient.decodeMapList(data)
+        return ApiClient.decodeMapList(data).map { NocDevice(raw: $0) }
     }
 
     func slaStats() async -> [String: Any] {
+        await slaStatsItem().raw
+    }
+
+    func slaStatsItem() async -> SlaStats {
         guard let data = try? await ApiClient.shared.get("sla/stats"),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
-        return obj
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return SlaStats(raw: [:])
+        }
+        return SlaStats(raw: obj)
     }
 
     func maintenanceContracts(clientId: String? = nil) async -> [[String: Any]] {
+        await maintenanceContractItems(clientId: clientId).map { $0.toFlatMap() }
+    }
+
+    func maintenanceContractItems(clientId: String? = nil) async -> [MaintenanceContract] {
         var query: [String: String] = [:]
         if let id = clientId, !id.isEmpty { query["clientId"] = id }
         guard let data = try? await ApiClient.shared.get("maintenance-contracts", query: query) else { return [] }
-        return ApiClient.decodeMapList(data)
+        return ApiClient.decodeMapList(data).map { MaintenanceContract(raw: $0) }
     }
 
     func serviceClientBranches(serviceClientId: String) async -> [[String: Any]] {
@@ -353,8 +453,12 @@ final class ExtraRepository {
     }
 
     func companies() async -> [[String: Any]] {
+        await companyItems().map(\.raw)
+    }
+
+    func companyItems() async -> [Company] {
         guard let data = try? await ApiClient.shared.get("company/list") else { return [] }
-        return ApiClient.decodeMapList(data)
+        return ApiClient.decodeMapList(data).map { Company(raw: $0) }
     }
 
     func clientTickets() async -> [[String: Any]] {
@@ -363,31 +467,53 @@ final class ExtraRepository {
     }
 
     func kbArticles(q: String? = nil) async -> [[String: Any]] {
+        await kbArticleItems(q: q).map(\.raw)
+    }
+
+    func kbArticleItems(q: String? = nil) async -> [KbArticle] {
         var query: [String: String] = [:]
         if let q, !q.isEmpty { query["q"] = q }
         guard let data = try? await ApiClient.shared.get("kb/articles", query: query) else { return [] }
-        return ApiClient.decodeMapList(data)
+        return ApiClient.decodeMapList(data).map { KbArticle(raw: $0) }
     }
 
     func kbArticle(_ slugOrId: String) async -> [String: Any] {
+        await kbArticleItem(slugOrId).raw
+    }
+
+    func kbArticleItem(_ slugOrId: String) async -> KbArticle {
         guard let data = try? await ApiClient.shared.get("kb/articles/\(slugOrId)"),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
-        return obj
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return KbArticle(raw: [:])
+        }
+        return KbArticle(raw: obj)
     }
 
     func orgchart() async -> [[String: Any]] {
+        await orgNodeItems().map(\.raw)
+    }
+
+    func orgNodeItems() async -> [OrgNode] {
         guard let data = try? await ApiClient.shared.get("users/orgchart") else { return [] }
-        return ApiClient.decodeMapList(data)
+        return ApiClient.decodeMapList(data).map { OrgNode(raw: $0) }
     }
 
     func hrStaff(page: Int = 1, limit: Int = 100) async -> [[String: Any]] {
+        await hrStaffItems(page: page, limit: limit).map(\.raw)
+    }
+
+    func hrStaffItems(page: Int = 1, limit: Int = 100) async -> [HrStaffMember] {
         guard let data = try? await ApiClient.shared.get("users/hr-staff", query: ["page": String(page), "limit": String(limit)]) else { return [] }
-        return ApiClient.decodeMapList(data)
+        return ApiClient.decodeMapList(data).map { HrStaffMember(raw: $0) }
     }
 
     func calendarEvents(from: String, to: String) async -> [[String: Any]] {
+        await calendarEventItems(from: from, to: to).map(\.raw)
+    }
+
+    func calendarEventItems(from: String, to: String) async -> [CalendarEvent] {
         guard let data = try? await ApiClient.shared.get("calendar/events", query: ["from": from, "to": to]) else { return [] }
-        return ApiClient.decodeMapList(data)
+        return ApiClient.decodeMapList(data).map { CalendarEvent(raw: $0) }
     }
 
     func exportCsv(entity: String, from: String, to: String) async throws -> Data {

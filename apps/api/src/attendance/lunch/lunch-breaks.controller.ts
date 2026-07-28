@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Body, UseGuards, UnauthorizedException, Query } from '@nestjs/common';
 import { RbacGuard, RBAC } from '../../common/rbac.guard.js';
 import { CurrentUser } from '../../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../../common/tenant/current-company.decorator.js';
 import { PERMISSIONS } from '../../common/permissions.js';
 import { LunchBreaksService } from './lunch-breaks.service.js';
 import { CreateLunchBreakDto, UpdateLunchBreakDto } from './dto/lunch-break.dto.js';
@@ -15,35 +16,44 @@ export class LunchBreaksController {
   @RBAC({ permissions: [PERMISSIONS.ATTENDANCE_VIEW] })
   async getLunchBreaks(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
     if (user.isSuperAdmin || user.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE)) {
-      return this.lunchBreaksService.getAllLunchBreaks(start, end);
+      return this.lunchBreaksService.getAllLunchBreaks(start, end, companyId);
     }
-    return this.lunchBreaksService.getUserLunchBreaks(user.id, start, end);
+    return this.lunchBreaksService.getUserLunchBreaks(user.id, start, end, companyId);
   }
 
   // Registrar entrada a comida (solo usuarios no admin, todos excepto superadmin)
   @Post('checkin')
   @RBAC({ permissions: [PERMISSIONS.ATTENDANCE_VIEW] })
-  async checkin(@CurrentUser() user: any, @Body() data: CreateLunchBreakDto) {
+  async checkin(
+    @CurrentUser() user: any,
+    @Body() data: CreateLunchBreakDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
     if (user.isSuperAdmin) {
       throw new UnauthorizedException('Super admins no pueden registrar hora de comida');
     }
-    return this.lunchBreaksService.createCheckin(user.id, data);
+    return this.lunchBreaksService.createCheckin(user.id, data, companyId);
   }
 
   // Registrar salida de comida (solo usuarios no admin)
   @Put('checkout')
   @RBAC({ permissions: [PERMISSIONS.ATTENDANCE_VIEW] })
-  async checkout(@CurrentUser() user: any, @Body() data: UpdateLunchBreakDto) {
+  async checkout(
+    @CurrentUser() user: any,
+    @Body() data: UpdateLunchBreakDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
     if (user.isSuperAdmin) {
       throw new UnauthorizedException('Super admins no pueden registrar hora de comida');
     }
-    return this.lunchBreaksService.createCheckout(user.id, data);
+    return this.lunchBreaksService.createCheckout(user.id, data, companyId);
   }
 
   // Obtener horas de comida del usuario (solo usuarios)
@@ -51,6 +61,7 @@ export class LunchBreaksController {
   @RBAC({ permissions: [PERMISSIONS.ATTENDANCE_VIEW] })
   async getMyLunchBreaks(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
@@ -58,6 +69,7 @@ export class LunchBreaksController {
       user.id,
       startDate ? new Date(startDate) : undefined,
       endDate ? new Date(endDate) : undefined,
+      companyId,
     );
   }
 
@@ -66,6 +78,7 @@ export class LunchBreaksController {
   @RBAC({ permissions: [PERMISSIONS.ATTENDANCE_MANAGE] })
   async getUsersLunchBreaks(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
@@ -73,13 +86,14 @@ export class LunchBreaksController {
     return this.lunchBreaksService.getAllLunchBreaks(
       startDate ? new Date(startDate) : undefined,
       endDate ? new Date(endDate) : undefined,
+      companyId,
     );
   }
 
   // Obtener horas de comida de hoy (para notificaciones en tiempo real)
   @Get('today')
   @RBAC({ permissions: [PERMISSIONS.ATTENDANCE_MANAGE] })
-  async getTodayLunchBreaks() {
-    return this.lunchBreaksService.getTodayLunchBreaks();
+  async getTodayLunchBreaks(@CurrentCompanyId() companyId: number | null) {
+    return this.lunchBreaksService.getTodayLunchBreaks(companyId);
   }
 }

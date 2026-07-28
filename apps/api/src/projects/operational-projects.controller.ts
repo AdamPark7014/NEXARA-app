@@ -62,26 +62,38 @@ export class OperationalProjectsController {
 
   @Post(':id/link-crm')
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
-  linkCrm(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.operationalProjectsService.ensureCommercialMirror(id, user.id);
+  linkCrm(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.operationalProjectsService.ensureCommercialMirror(id, user.id, companyId);
   }
 
   @Get(':id')
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
-  findById(@Param('id', ParseIntPipe) id: number) {
-    return this.operationalProjectsService.findById(id);
+  findById(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.operationalProjectsService.findById(id, companyId);
   }
 
   @Patch(':id')
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
-  update(@Param('id', ParseIntPipe) id: number, @Body() updateDto: UpdateOperationalProjectDto) {
-    return this.operationalProjectsService.update(id, updateDto);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateDto: UpdateOperationalProjectDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.operationalProjectsService.update(id, updateDto, companyId);
   }
 
   @Patch(':id/status')
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
-  changeStatus(@Param('id', ParseIntPipe) id: number, @Body() statusDto: ProjectStatusChangeDto) {
-    return this.operationalProjectsService.changeStatus(id, statusDto);
+  changeStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() statusDto: ProjectStatusChangeDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.operationalProjectsService.changeStatus(id, statusDto, companyId);
   }
 
   @Post(':id/engineers')
@@ -89,8 +101,9 @@ export class OperationalProjectsController {
   assignEngineer(
     @Param('id', ParseIntPipe) projectId: number,
     @Body() assignDto: AssignProjectEngineerDto,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.operationalProjectsService.assignEngineer(projectId, assignDto);
+    return this.operationalProjectsService.assignEngineer(projectId, assignDto, companyId);
   }
 
   @Delete(':projectId/engineers/:engineerId')
@@ -98,14 +111,18 @@ export class OperationalProjectsController {
   removeEngineer(
     @Param('projectId', ParseIntPipe) projectId: number,
     @Param('engineerId', ParseIntPipe) engineerId: number,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.operationalProjectsService.removeEngineer(projectId, engineerId);
+    return this.operationalProjectsService.removeEngineer(projectId, engineerId, companyId);
   }
 
   @Get(':id/activities')
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
-  getActivities(@Param('id', ParseIntPipe) projectId: number) {
-    return this.operationalProjectsService.getProjectActivities(projectId);
+  getActivities(
+    @Param('id', ParseIntPipe) projectId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.operationalProjectsService.getProjectActivities(projectId, companyId);
   }
 
   @Post(':id/activities')
@@ -114,8 +131,9 @@ export class OperationalProjectsController {
     @Param('id', ParseIntPipe) projectId: number,
     @Body() dto: CreateProjectActivityDto,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.operationalProjectsService.createProjectActivity(projectId, dto, user.id);
+    return this.operationalProjectsService.createProjectActivity(projectId, dto, user.id, companyId);
   }
 
   @Post(':id/activities/from-sites')
@@ -124,19 +142,26 @@ export class OperationalProjectsController {
     @Param('id', ParseIntPipe) projectId: number,
     @Body() body: { responsableId?: number },
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.operationalProjectsService.createSiteActivities(projectId, user.id, body.responsableId);
+    return this.operationalProjectsService.createSiteActivities(projectId, user.id, body.responsableId, companyId);
   }
 
   @Get(':id/engineers-activity-count')
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
-  getEngineersActivityCount(@Param('id', ParseIntPipe) projectId: number) {
-    return this.operationalProjectsService.getProjectEngineersActivityCount(projectId);
+  getEngineersActivityCount(
+    @Param('id', ParseIntPipe) projectId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.operationalProjectsService.getProjectEngineersActivityCount(projectId, companyId);
   }
 
   @Get(':id/duration')
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
-  getProjectDuration(@Param('id', ParseIntPipe) projectId: number) {
-    return this.operationalProjectsService.getProjectDuration(projectId);
+  getProjectDuration(
+    @Param('id', ParseIntPipe) projectId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.operationalProjectsService.getProjectDuration(projectId, companyId);
   }
 }

@@ -215,7 +215,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
   if (!user) {
     return (
       <div
-        className={styles.shell}
+        className={`${styles.shell} nx-app-shell`}
         style={{ "--panel-accent": panelMeta.accent } as React.CSSProperties}
         data-auth-state={isContextReady ? "redirecting" : "loading"}
       >
@@ -252,7 +252,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
   if (!hasAnyAccess) {
     return (
       <div
-        className={styles.shell}
+        className={`${styles.shell} nx-app-shell`}
         style={{ "--panel-accent": panelMeta.accent } as React.CSSProperties}
         data-auth-state="no-access"
       >
@@ -336,7 +336,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
 
   return (
     <div
-      className={styles.shell}
+      className={`${styles.shell} nx-app-shell`}
       data-mobile-open={mobileOpen ? "true" : "false"}
       data-collapsed={collapsed ? "true" : "false"}
       data-chat={isChatRoute ? "true" : "false"}
@@ -670,7 +670,7 @@ function PanelAccessDenied({
 
   return (
     <div
-      className={styles.shell}
+      className={`${styles.shell} nx-app-shell`}
       style={{ "--panel-accent": panelMeta.accent } as React.CSSProperties}
       data-auth-state="panel-denied"
     >

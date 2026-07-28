@@ -25,12 +25,13 @@ export class VentasReportesController {
   @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
   async salesNotifications(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
     const limitNum = limit ? parseInt(limit, 10) : 50;
     const offsetNum = offset ? parseInt(offset, 10) : 0;
-    return this.notificationsService.getSalesPanelNotifications(user, limitNum, offsetNum);
+    return this.notificationsService.getSalesPanelNotifications(user, limitNum, offsetNum, companyId);
   }
 
   @Patch('notificaciones/:id/read')
@@ -38,16 +39,20 @@ export class VentasReportesController {
   @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
   async markSalesNotificationAsRead(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Param('id', ParseIntPipe) notificationId: number,
   ) {
-    return this.notificationsService.markSalesNotificationAsRead(user, notificationId);
+    return this.notificationsService.markSalesNotificationAsRead(user, notificationId, companyId);
   }
 
   @Patch('notificaciones/read/all')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
-  async markAllSalesNotificationsAsRead(@CurrentUser() user: any) {
-    return this.notificationsService.markAllSalesNotificationsAsRead(user);
+  async markAllSalesNotificationsAsRead(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.notificationsService.markAllSalesNotificationsAsRead(user, companyId);
   }
 
   @Delete('notificaciones/:id')
@@ -55,9 +60,10 @@ export class VentasReportesController {
   @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
   async deleteSalesNotification(
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Param('id', ParseIntPipe) notificationId: number,
   ) {
-    return this.notificationsService.deleteSalesNotification(user, notificationId);
+    return this.notificationsService.deleteSalesNotification(user, notificationId, companyId);
   }
 
   @Get('resumen')
@@ -77,15 +83,23 @@ export class VentasReportesController {
   @Get('vendedores')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
-  async vendorStats(@Query('period') period: 'week' | 'month' | 'year' = 'month', @CurrentUser() user: any) {
-    return this.ventasService.getVendorStatsByPeriod(period, user);
+  async vendorStats(
+    @Query('period') period: 'week' | 'month' | 'year' = 'month',
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.getVendorStatsByPeriod(period, user, companyId);
   }
 
   @Get('cuotas')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
-  async quotas(@Query('period') period: 'week' | 'month' | 'year' = 'month', @CurrentUser() user: any) {
-    return this.ventasService.getSalesQuotaProgress(period, user);
+  async quotas(
+    @Query('period') period: 'week' | 'month' | 'year' = 'month',
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.getSalesQuotaProgress(period, user, companyId);
   }
 
   @Post('cuotas')
@@ -121,15 +135,23 @@ export class VentasReportesController {
   @Get('insights')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
-  async insights(@Query('period') period: 'week' | 'month' | 'year' = 'month', @CurrentUser() user: any) {
-    return this.ventasService.getExecutiveInsights(period, user);
+  async insights(
+    @Query('period') period: 'week' | 'month' | 'year' = 'month',
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.getExecutiveInsights(period, user, companyId);
   }
 
   @Get('cockpit')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
-  async cockpit(@Query('period') period: 'week' | 'month' | 'year' = 'month', @CurrentUser() user: any) {
-    return this.ventasService.getManagerCockpit(period, user);
+  async cockpit(
+    @Query('period') period: 'week' | 'month' | 'year' = 'month',
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.getManagerCockpit(period, user, companyId);
   }
 
   @Get('auditoria')

@@ -1,25 +1,30 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class SalesTargetsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async upsert(dto: {
-    ownerId: number;
-    period?: string;
-    year: number;
-    month?: number;
-    quarter?: number;
-    revenueTarget?: number;
-    newClientsTarget?: number;
-    opportunitiesTarget?: number;
-    baseCommissionPct?: number;
-    bonusCommissionPct?: number;
-    bonusThresholdPct?: number;
-    notes?: string;
-  }) {
+  async upsert(
+    dto: {
+      ownerId: number;
+      period?: string;
+      year: number;
+      month?: number;
+      quarter?: number;
+      revenueTarget?: number;
+      newClientsTarget?: number;
+      opportunitiesTarget?: number;
+      baseCommissionPct?: number;
+      bonusCommissionPct?: number;
+      bonusThresholdPct?: number;
+      notes?: string;
+    },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
     const period = (dto.period as any) || 'MONTHLY';
     const data = {
       ownerId: dto.ownerId,
@@ -34,11 +39,13 @@ export class SalesTargetsService {
       bonusCommissionPct: new Prisma.Decimal(dto.bonusCommissionPct || 0),
       bonusThresholdPct: new Prisma.Decimal(dto.bonusThresholdPct ?? 100),
       notes: dto.notes?.trim() || null,
+      companyId: tenantId,
     };
 
-    return (this.prisma as any).salesTarget.upsert({
+    return this.prisma.salesTarget.upsert({
       where: {
-        ownerId_period_year_month_quarter: {
+        companyId_ownerId_period_year_month_quarter: {
+          companyId: tenantId,
           ownerId: dto.ownerId,
           period,
           year: dto.year,
@@ -51,44 +58,49 @@ export class SalesTargetsService {
     });
   }
 
-  async list(filters?: { ownerId?: number; year?: number; month?: number }) {
-    const where: any = {};
+  async list(filters?: { ownerId?: number; year?: number; month?: number }, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const where: any = { ...companyWhere(tenantId) };
     if (filters?.ownerId) where.ownerId = filters.ownerId;
     if (filters?.year) where.year = filters.year;
     if (filters?.month) where.month = filters.month;
-    return (this.prisma as any).salesTarget.findMany({
+    return this.prisma.salesTarget.findMany({
       where,
       include: { owner: { select: { id: true, nombre: true, email: true } } },
       orderBy: [{ year: 'desc' }, { month: 'desc' }],
     });
   }
 
-  async remove(id: number) {
-    return (this.prisma as any).salesTarget.delete({ where: { id } });
+  async remove(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const existing = await this.prisma.salesTarget.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(existing, tenantId, 'Meta de ventas');
+    return this.prisma.salesTarget.delete({ where: { id } });
   }
 
   /** Calcula desempeño actual de cada vendedor vs su meta del mes. */
-  async getPerformance(year?: number, month?: number) {
+  async getPerformance(year?: number, month?: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const now = new Date();
     const y = year ?? now.getFullYear();
-    const m = month ?? (now.getMonth() + 1);
+    const m = month ?? now.getMonth() + 1;
     const startOfMonth = new Date(y, m - 1, 1);
     const endOfMonth = new Date(y, m, 0, 23, 59, 59);
 
     const salesOrgKeys = ['sales_rep', 'sales_manager', 'vendedor', 'coord_ventas', 'director_commercial'];
     const [targets, salesUsers] = await Promise.all([
-      (this.prisma as any).salesTarget.findMany({
-        where: { period: 'MONTHLY', year: y, month: m },
+      this.prisma.salesTarget.findMany({
+        where: { ...companyWhere(tenantId), period: 'MONTHLY', year: y, month: m },
         include: { owner: { select: { id: true, nombre: true } } },
       }),
       this.prisma.user.findMany({
         where: {
           isActive: true,
+          companyMemberships: { some: { companyId: tenantId } },
           role: {
-            OR: [
-              { accesoPanelVentas: true },
-              { orgRoleKey: { in: salesOrgKeys } },
-            ],
+            OR: [{ accesoPanelVentas: true }, { orgRoleKey: { in: salesOrgKeys } }],
           },
         },
         select: { id: true, nombre: true, email: true },
@@ -108,14 +120,28 @@ export class SalesTargetsService {
         const salesUser = salesUsers.find((u) => u.id === ownerId);
         const [revenueRow, opportunitiesCount, newClients] = await Promise.all([
           this.prisma.salesOpportunity.aggregate({
-            where: { ownerId, stage: 'WON' as any, closedAt: { gte: startOfMonth, lte: endOfMonth } },
+            where: {
+              ...companyWhere(tenantId),
+              ownerId,
+              stage: 'WON' as any,
+              closedAt: { gte: startOfMonth, lte: endOfMonth },
+            },
             _sum: { value: true },
           }),
           this.prisma.salesOpportunity.count({
-            where: { ownerId, createdAt: { gte: startOfMonth, lte: endOfMonth } },
+            where: {
+              ...companyWhere(tenantId),
+              ownerId,
+              createdAt: { gte: startOfMonth, lte: endOfMonth },
+            },
           }),
           this.prisma.salesLead.count({
-            where: { ownerId, createdAt: { gte: startOfMonth, lte: endOfMonth }, status: 'WON' as any },
+            where: {
+              ...companyWhere(tenantId),
+              ownerId,
+              createdAt: { gte: startOfMonth, lte: endOfMonth },
+              status: 'WON' as any,
+            },
           }),
         ]);
 
@@ -127,9 +153,8 @@ export class SalesTargetsService {
         let commission = 0;
         if (t && revenueAchieved > 0) {
           const baseCommission = revenueAchieved * (Number(t.baseCommissionPct) / 100);
-          const bonusCommission = attainmentPct >= thresholdPct
-            ? revenueAchieved * (Number(t.bonusCommissionPct) / 100)
-            : 0;
+          const bonusCommission =
+            attainmentPct >= thresholdPct ? revenueAchieved * (Number(t.bonusCommissionPct) / 100) : 0;
           commission = baseCommission + bonusCommission;
         }
 
@@ -170,9 +195,10 @@ export class SalesTargetsService {
       performance: results.sort((a, b) => b.attainmentPct - a.attainmentPct),
       totals: {
         ...totals,
-        avgAttainmentPct: results.length > 0
-          ? +(results.reduce((acc, r) => acc + r.attainmentPct, 0) / results.length).toFixed(1)
-          : 0,
+        avgAttainmentPct:
+          results.length > 0
+            ? +(results.reduce((acc, r) => acc + r.attainmentPct, 0) / results.length).toFixed(1)
+            : 0,
       },
     };
   }

@@ -239,6 +239,8 @@ struct PlaceholderView: View {
 
 struct MyProfileView: View {
     @EnvironmentObject var session: SessionStore
+    @State private var appLockEnabled = AppLock.isEnabled
+
     var body: some View {
         List {
             if let u = session.currentUser {
@@ -247,6 +249,24 @@ struct MyProfileView: View {
                     row("Email", u.email)
                     if let r = u.role { row("Rol", r) }
                     if let d = u.department { row("Departamento", d) }
+                }
+                Section("Seguridad") {
+                    Toggle(isOn: $appLockEnabled) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Bloqueo de app")
+                            Text(
+                                AppLock.isAvailable
+                                    ? "Biometría o código al volver"
+                                    : "No disponible en este dispositivo"
+                            )
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        }
+                    }
+                    .disabled(!AppLock.isAvailable)
+                    .onChange(of: appLockEnabled) { newValue in
+                        AppLock.isEnabled = newValue
+                    }
                 }
                 Section("Dispositivo") {
                     NavigationLink {

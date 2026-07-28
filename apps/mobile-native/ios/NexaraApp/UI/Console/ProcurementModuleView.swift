@@ -1,32 +1,43 @@
 import SwiftUI
 
-/// Compras — requisiciones, órdenes y recepciones.
+/// Compras — requisiciones, órdenes y recepciones (tipadas).
 struct ProcurementModuleView: View {
   @State private var tab = 0
-  @State private var requisitions: [[String: Any]] = []
-  @State private var orders: [[String: Any]] = []
-  @State private var goodsReceipts: [[String: Any]] = []
+  @State private var requisitions: [RequisitionItem] = []
+  @State private var orders: [PurchaseOrderItem] = []
+  @State private var goodsReceipts: [GoodsReceiptItem] = []
   @State private var query = ""
   @State private var isLoading = true
   @State private var message: String?
   @State private var rejectReason = ""
   @State private var actingId: Int64?
-  @State private var selected: [String: Any]?
+  @State private var selected: RequisitionItem?
 
-  private var items: [[String: Any]] {
-    switch tab {
-    case 1: return orders
-    case 2: return goodsReceipts
-    default: return requisitions
+  private var filteredRequisitions: [RequisitionItem] {
+    guard !query.isEmpty else { return requisitions }
+    let q = query.lowercased()
+    return requisitions.filter {
+      $0.displayTitle.lowercased().contains(q) ||
+      $0.requestedByName.lowercased().contains(q) ||
+      $0.reqNumber.lowercased().contains(q)
     }
   }
 
-  private var filtered: [[String: Any]] {
-    guard !query.isEmpty else { return items }
+  private var filteredOrders: [PurchaseOrderItem] {
+    guard !query.isEmpty else { return orders }
     let q = query.lowercased()
-    return items.filter {
-      opsStr($0, "title", "description", "descripcion", "folio", "number", "poNumber").lowercased().contains(q) ||
-      opsStr($0, "requestedBy", "solicitante", "vendorName", "supplierName").lowercased().contains(q)
+    return orders.filter {
+      $0.displayTitle.lowercased().contains(q) || $0.supplierName.lowercased().contains(q)
+    }
+  }
+
+  private var filteredReceipts: [GoodsReceiptItem] {
+    guard !query.isEmpty else { return goodsReceipts }
+    let q = query.lowercased()
+    return goodsReceipts.filter {
+      $0.displayTitle.lowercased().contains(q) ||
+      $0.warehouseName.lowercased().contains(q) ||
+      $0.poNumber.lowercased().contains(q)
     }
   }
 
@@ -48,6 +59,7 @@ struct ProcurementModuleView: View {
       }
       .pickerStyle(.segmented)
       .padding()
+      .onChange(of: tab) { _ in selected = nil }
 
       if let message {
         Text(message).font(.footnote).foregroundColor(.green).padding(.horizontal)
@@ -64,48 +76,89 @@ struct ProcurementModuleView: View {
 
       if isLoading {
         Spacer(); ProgressView(); Spacer()
-      } else if filtered.isEmpty {
-        Spacer()
-        Text(tab == 2 ? "Sin recepciones de mercancía" : "Sin registros").foregroundColor(.secondary)
-        Spacer()
       } else {
-        List(filtered.prefix(80), id: \.procId) { row in
-          if tab == 0 {
-            Button { selected = row } label: { procRow(row) }
+        switch tab {
+        case 1:
+          if filteredOrders.isEmpty {
+            emptyLabel("Sin registros")
           } else {
-            procRow(row)
+            List(filteredOrders.prefix(80), id: \.rowKey) { r in
+              VStack(alignment: .leading, spacing: 4) {
+                Text(r.displayTitle).font(.headline)
+                Text(r.supplierName).font(.caption).foregroundColor(.secondary)
+                HStack {
+                  Text(r.status).font(.caption2).bold()
+                  Spacer()
+                  Text(String(r.createdAt.prefix(10))).font(.caption2).foregroundColor(.secondary)
+                }
+              }
+              .padding(.vertical, 4)
+            }
+            .listStyle(.plain)
+          }
+        case 2:
+          if filteredReceipts.isEmpty {
+            emptyLabel("Sin recepciones de mercancía")
+          } else {
+            List(filteredReceipts.prefix(80), id: \.rowKey) { r in
+              VStack(alignment: .leading, spacing: 4) {
+                Text(r.displayTitle).font(.headline)
+                Text(r.warehouseName).font(.caption).foregroundColor(.secondary)
+                HStack {
+                  Text(r.status).font(.caption2).bold()
+                  Spacer()
+                  if let qty = r.quantity {
+                    Text("Cantidad: \(qty)").font(.caption2).foregroundColor(.teal)
+                  }
+                }
+              }
+              .padding(.vertical, 4)
+            }
+            .listStyle(.plain)
+          }
+        default:
+          if filteredRequisitions.isEmpty {
+            emptyLabel("Sin registros")
+          } else {
+            List(filteredRequisitions.prefix(80), id: \.rowKey) { r in
+              Button { selected = r } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                  Text(r.displayTitle).font(.headline)
+                  Text(r.requestedByName).font(.caption).foregroundColor(.secondary)
+                  HStack {
+                    Text(r.status).font(.caption2).bold()
+                    Spacer()
+                    Text(String(r.createdAt.prefix(10))).font(.caption2).foregroundColor(.secondary)
+                  }
+                }
+                .padding(.vertical, 4)
+              }
+            }
+            .listStyle(.plain)
           }
         }
-        .listStyle(.plain)
       }
     }
   }
 
-  private func procRow(_ r: [String: Any]) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-      let title = opsStr(r, "title", "description", "descripcion", "folio", "number", "poNumber")
-      Text(title.isEmpty ? "Registro" : title).font(.headline)
-      Text(opsStr(r, "requestedBy", "solicitante", "vendorName", "supplierName", "warehouseName")).font(.caption).foregroundColor(.secondary)
-      HStack {
-        Text(opsStr(r, "status", "estado")).font(.caption2).bold()
-        Spacer()
-        Text(String(opsStr(r, "createdAt").prefix(10))).font(.caption2).foregroundColor(.secondary)
-      }
-    }
-    .padding(.vertical, 4)
+  @ViewBuilder
+  private func emptyLabel(_ text: String) -> some View {
+    Spacer()
+    Text(text).foregroundColor(.secondary)
+    Spacer()
   }
 
-  private func reqDetail(_ r: [String: Any]) -> some View {
-    let id = ConsoleHelpers.mapInt64(r, "id")
-    let status = opsStr(r, "status", "estado").uppercased()
-    return List {
+  private func reqDetail(_ r: RequisitionItem) -> some View {
+    List {
       Section("Requisición") {
-        detailRow("Título", opsStr(r, "title", "description"))
-        detailRow("Solicitante", opsStr(r, "requestedBy", "solicitante"))
-        detailRow("Estado", opsStr(r, "status", "estado"))
-        detailRow("Departamento", opsStr(r, "departmentName"))
+        detailRow("Título", r.displayTitle)
+        detailRow("Número", r.reqNumber)
+        detailRow("Solicitante", r.requestedByName)
+        detailRow("Estado", r.status)
+        detailRow("Departamento", r.departmentName)
+        detailRow("Prioridad", r.priority)
       }
-      if let id, status == "PENDING" || status == "SUBMITTED" {
+      if let id = r.id, r.canDecide {
         Section("Aprobación") {
           TextField("Motivo rechazo", text: $rejectReason)
           Button("Aprobar") { Task { await approve(id) } }.disabled(actingId != nil)
@@ -123,9 +176,9 @@ struct ProcurementModuleView: View {
   private func reload() async {
     isLoading = true
     defer { isLoading = false }
-    async let r = ExtraRepository.shared.requisitions()
-    async let o = ExtraRepository.shared.purchaseOrders()
-    async let g = ExtraRepository.shared.goodsReceipts()
+    async let r = ExtraRepository.shared.requisitionItems()
+    async let o = ExtraRepository.shared.purchaseOrderItems()
+    async let g = ExtraRepository.shared.goodsReceiptItems()
     requisitions = await r
     orders = await o
     goodsReceipts = await g
@@ -155,21 +208,4 @@ struct ProcurementModuleView: View {
       await reload()
     } catch { message = error.localizedDescription }
   }
-}
-
-private func opsStr(_ m: [String: Any], _ keys: String...) -> String {
-  for k in keys {
-    if let v = m[k] {
-      let s: String
-      if let ss = v as? String { s = ss }
-      else if let n = v as? NSNumber { s = n.stringValue }
-      else { s = String(describing: v) }
-      if !s.isEmpty && s != "null" { return s }
-    }
-  }
-  return ""
-}
-
-extension [String: Any] {
-  fileprivate var procId: String { "pr-\(self["id"] ?? UUID().uuidString)" }
 }

@@ -5,7 +5,7 @@ struct CrmOpportunityDetailView: View {
     let oppId: Int
     let onBack: () -> Void
 
-    @State private var data: [String: Any] = [:]
+    @State private var detail = CrmOpportunityDetail()
     @State private var isLoading = true
     @State private var error: String?
     @State private var tab = 0
@@ -66,12 +66,12 @@ struct CrmOpportunityDetailView: View {
         VStack(spacing: 0) {
             HStack {
                 Button("← Volver", action: onBack)
-                Text(oppStr(data, "title", "name", "titulo").isEmpty ? "Oportunidad" : oppStr(data, "title", "name", "titulo"))
+                Text(detail.displayTitle)
                     .font(.headline)
                     .lineLimit(1)
                 Spacer()
                 Button("Editar") {
-                    editForm = OpportunityFormState.from(data)
+                    editForm = OpportunityFormState.from(detail.raw)
                     actionError = nil
                     showEdit = true
                 }
@@ -91,12 +91,13 @@ struct CrmOpportunityDetailView: View {
             Group {
                 if isLoading {
                     Spacer(); ProgressView(); Spacer()
-                } else if let error, data.isEmpty {
-                    VStack(spacing: 12) {
-                        Text(error).foregroundColor(.red)
-                        Button("Reintentar") { Task { await reload() } }
-                    }
-                    .padding()
+                } else if let error, detail.isEmpty {
+                    NxEmptyState(
+                        title: "No se pudo cargar",
+                        subtitle: error,
+                        actionLabel: "Reintentar",
+                        onAction: { Task { await reload() } }
+                    )
                 } else {
                     switch tab {
                     case 0: summaryTab
@@ -113,14 +114,16 @@ struct CrmOpportunityDetailView: View {
     private var summaryTab: some View {
         List {
             Section {
-                CrmStageChip(text: oppStr(data, "stage", "etapa", "status"))
+                CrmStageChip(text: detail.stageKey)
             }
             Section("Datos") {
-                oppRow("Valor", crmMxn(oppDouble(data, "value", "amount") ?? 0))
-                oppRow("Probabilidad", "\(oppStr(data, "probability", "probabilidad"))%")
-                oppRow("Cliente", oppStr(data, "clientName") + nestedClient(data))
-                oppRow("Cierre", String(oppStr(data, "expectedCloseDate", "closeDate").prefix(10)))
-                oppRow("Descripción", oppStr(data, "description", "descripcion"))
+                oppRow("Valor", crmMxn(detail.value))
+                if detail.probability > 0 {
+                    oppRow("Probabilidad", "\(Int(detail.probability))%")
+                }
+                oppRow("Cliente", detail.clientName)
+                oppRow("Cierre", String(detail.expectedCloseDate.prefix(10)))
+                oppRow("Descripción", detail.description)
             }
         }
         .listStyle(.insetGrouped)
@@ -132,14 +135,16 @@ struct CrmOpportunityDetailView: View {
                 if let actionError {
                     Text(actionError).foregroundColor(.red).font(.footnote)
                 }
-                let notes = nestedMaps(data, "notes") + nestedMaps(data, "notas")
-                if notes.isEmpty {
-                    Text("Sin notas de seguimiento").foregroundColor(.secondary)
+                if detail.notes.isEmpty {
+                    NxEmptyState(
+                        title: "Sin notas",
+                        subtitle: "Agrega notas de seguimiento para el equipo comercial."
+                    )
                 } else {
-                    ForEach(Array(notes.enumerated()), id: \.offset) { _, note in
+                    ForEach(detail.notes) { note in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(oppStr(note, "message", "mensaje", "content"))
-                            Text(String(oppStr(note, "createdAt", "fecha").prefix(16)))
+                            Text(note.message)
+                            Text(String(note.createdAt.prefix(16)))
                                 .font(.caption2).foregroundColor(.secondary)
                         }
                     }
@@ -178,15 +183,16 @@ struct CrmOpportunityDetailView: View {
                     }
                 }
             }
-            let evidences = nestedMaps(data, "evidences") + nestedMaps(data, "evidencias")
-            if evidences.isEmpty {
-                Text("Sin archivos adjuntos").foregroundColor(.secondary)
+            if detail.attachments.isEmpty {
+                NxEmptyState(
+                    title: "Sin adjuntos",
+                    subtitle: "Sube fotos o documentos vinculados a esta oportunidad."
+                )
             } else {
-                ForEach(Array(evidences.enumerated()), id: \.offset) { _, ev in
+                ForEach(detail.attachments) { ev in
                     VStack(alignment: .leading) {
-                        Text(oppStr(ev, "name", "nombre", "fileName").isEmpty ? "Archivo" : oppStr(ev, "name", "nombre", "fileName"))
-                            .font(.headline)
-                        Text(ApiUrls.absoluteAsset(oppStr(ev, "url", "fileUrl")))
+                        Text(ev.displayName).font(.headline)
+                        Text(ApiUrls.absoluteAsset(ev.url))
                             .font(.caption).foregroundColor(.secondary)
                     }
                 }
@@ -197,26 +203,28 @@ struct CrmOpportunityDetailView: View {
 
     private var quotesTab: some View {
         List {
-            let quotes = nestedMaps(data, "quotes") + nestedMaps(data, "cotizaciones")
-            if quotes.isEmpty {
-                Text("Sin cotizaciones vinculadas").foregroundColor(.secondary)
+            if detail.quotes.isEmpty {
+                NxEmptyState(
+                    title: "Sin cotizaciones",
+                    subtitle: "Las cotizaciones vinculadas a esta oportunidad aparecerán aquí."
+                )
             } else {
-                ForEach(Array(quotes.enumerated()), id: \.offset) { _, q in
-                    let pdfUrl = oppStr(q, "pdfUrl", "url")
-                    let label = oppStr(q, "versionLabel", "folio", "name").isEmpty ? "Cotización" : oppStr(q, "versionLabel", "folio", "name")
+                ForEach(detail.quotes) { q in
                     Button {
-                        if !pdfUrl.isEmpty { Task { await openQuotePdf(url: pdfUrl, title: label) } }
+                        if !q.pdfUrl.isEmpty {
+                            Task { await openQuotePdf(url: q.pdfUrl, title: q.displayLabel) }
+                        }
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(label).font(.headline)
-                            if !pdfUrl.isEmpty {
+                            Text(q.displayLabel).font(.headline)
+                            if !q.pdfUrl.isEmpty {
                                 Text("Toca para ver PDF").font(.caption).foregroundColor(.accentColor)
                             }
-                            Text(String(oppStr(q, "createdAt", "fecha").prefix(16)))
+                            Text(String(q.createdAt.prefix(16)))
                                 .font(.caption).foregroundColor(.secondary)
                         }
                     }
-                    .disabled(pdfUrl.isEmpty)
+                    .disabled(q.pdfUrl.isEmpty)
                 }
             }
         }
@@ -224,27 +232,29 @@ struct CrmOpportunityDetailView: View {
     }
 
     private var historialTab: some View {
-        let history = nestedMaps(data, "history")
-            + nestedMaps(data, "historial")
-            + nestedMaps(data, "activityLog")
-            + nestedMaps(data, "changelog")
-        return Group {
-            if history.isEmpty {
-                VStack { Spacer(); Text("Sin historial de cambios").foregroundColor(.secondary); Spacer() }
+        Group {
+            if detail.history.isEmpty {
+                NxEmptyState(
+                    title: "Sin historial",
+                    subtitle: "Los cambios de etapa y actividad se registrarán aquí."
+                )
             } else {
-                List(Array(history.prefix(50).enumerated()), id: \.offset) { _, h in
-                    let action  = oppStr(h, "action", "accion", "event", "type")
-                    let by      = oppStr(h, "userName", "createdByName", "usuario")
-                    let date    = String(oppStr(h, "createdAt", "timestamp", "fecha").prefix(16))
-                    let detail  = oppStr(h, "detail", "description", "changes", "mensaje")
+                List(Array(detail.history.prefix(50))) { h in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text(action.isEmpty ? "Cambio" : action).font(.subheadline).bold()
+                            Text(h.displayAction).font(.subheadline).bold()
                             Spacer()
-                            if !date.isEmpty { Text(date).font(.caption2).foregroundColor(.secondary) }
+                            if !h.createdAt.isEmpty {
+                                Text(String(h.createdAt.prefix(16)))
+                                    .font(.caption2).foregroundColor(.secondary)
+                            }
                         }
-                        if !by.isEmpty { Text("Por: \(by)").font(.caption).foregroundColor(.secondary) }
-                        if !detail.isEmpty { Text(detail).font(.caption).foregroundColor(.secondary).lineLimit(3) }
+                        if !h.userName.isEmpty {
+                            Text("Por: \(h.userName)").font(.caption).foregroundColor(.secondary)
+                        }
+                        if !h.detail.isEmpty {
+                            Text(h.detail).font(.caption).foregroundColor(.secondary).lineLimit(3)
+                        }
                     }
                 }
                 .listStyle(.plain)
@@ -254,7 +264,7 @@ struct CrmOpportunityDetailView: View {
 
     private func oppRow(_ label: String, _ value: String) -> some View {
         Group {
-            if !value.isEmpty && value != "—" && value != "0%" {
+            if !value.isEmpty && value != "—" {
                 HStack {
                     Text(label).foregroundColor(.secondary)
                     Spacer()
@@ -268,7 +278,7 @@ struct CrmOpportunityDetailView: View {
         isLoading = true
         defer { isLoading = false }
         do {
-            data = try await CrmRepository.shared.getOpportunity(id: oppId)
+            detail = try await CrmRepository.shared.opportunityDetail(id: oppId)
             error = nil
         } catch {
             self.error = error.localizedDescription
@@ -328,33 +338,5 @@ struct CrmOpportunityDetailView: View {
         } catch {
             actionError = error.localizedDescription
         }
-    }
-
-    private func oppStr(_ m: [String: Any], _ keys: String...) -> String {
-        for k in keys {
-            if let s = m[k] as? String, !s.isEmpty { return s }
-            if let n = m[k] { let s = "\(n)"; if s != "nil" && !s.isEmpty { return s } }
-        }
-        return ""
-    }
-
-    private func oppDouble(_ m: [String: Any], _ keys: String...) -> Double? {
-        for k in keys {
-            if let n = m[k] as? Double { return n }
-            if let n = m[k] as? Int { return Double(n) }
-            if let s = m[k] as? String { return Double(s) }
-        }
-        return nil
-    }
-
-    private func nestedMaps(_ m: [String: Any], _ key: String) -> [[String: Any]] {
-        guard let arr = m[key] as? [[String: Any]] else { return [] }
-        return arr
-    }
-
-    private func nestedClient(_ m: [String: Any]) -> String {
-        guard let c = m["client"] as? [String: Any] else { return "" }
-        let n = oppStr(c, "name", "nombre")
-        return n.isEmpty ? "" : " (\(n))"
     }
 }

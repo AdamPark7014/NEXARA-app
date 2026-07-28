@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma, WorkProjectStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { CreateWorkProjectDto } from './dto/create-work-project.dto.js';
 import { UpdateWorkProjectDto } from './dto/update-work-project.dto.js';
 import { CreateWorkProjectExpenseDto } from './dto/create-work-project-expense.dto.js';
@@ -32,13 +33,15 @@ export class WorkProjectsService {
     return Math.min(100, Math.max(0, value));
   }
 
-  async create(dto: CreateWorkProjectDto) {
+  async create(dto: CreateWorkProjectDto, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     if (!dto.title?.trim()) {
       throw new BadRequestException('Titulo requerido');
     }
 
     return this.prisma.workProject.create({
       data: {
+        companyId: tenantId,
         title: dto.title.trim(),
         clientName: dto.clientName?.trim() || null,
         managerName: dto.managerName?.trim() || null,
@@ -58,10 +61,15 @@ export class WorkProjectsService {
     });
   }
 
-  async findAll(query?: PaginationQueryDto) {
+  async findAll(query?: PaginationQueryDto, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const include = { expenses: { orderBy: { incurredAt: 'desc' } as const }, payroll: { orderBy: { paidAt: 'desc' } as const }, logs: { orderBy: { createdAt: 'desc' } as const } };
+    const scope = companyWhere(tenantId);
     if (query?.limit) {
-      const where = query.search ? { title: { contains: query.search, mode: 'insensitive' as const } } : undefined;
+      const where = {
+        ...scope,
+        ...(query.search ? { title: { contains: query.search, mode: 'insensitive' as const } } : {}),
+      };
       const [data, total] = await Promise.all([
         this.prisma.workProject.findMany({ where, orderBy: { createdAt: 'desc' }, include, skip: query.skip, take: query.take }),
         this.prisma.workProject.count({ where }),
@@ -69,28 +77,28 @@ export class WorkProjectsService {
       return buildPaginatedResponse(data, total, query);
     }
     return this.prisma.workProject.findMany({
+      where: scope,
       orderBy: { createdAt: 'desc' },
       include,
     });
   }
 
-  async findOne(id: number) {
-    const project = await this.prisma.workProject.findUnique({
-      where: { id },
+  async findOne(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const project = await this.prisma.workProject.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: {
         expenses: { orderBy: { incurredAt: 'desc' } },
         payroll: { orderBy: { paidAt: 'desc' } },
         logs: { orderBy: { createdAt: 'desc' } },
       },
     });
-    if (!project) {
-      throw new NotFoundException('Proyecto en curso no encontrado');
-    }
-    return project;
+    assertCompanyAccess(project, tenantId, 'Proyecto en curso');
+    return project!;
   }
 
-  async update(id: number, dto: UpdateWorkProjectDto) {
-    await this.findOne(id);
+  async update(id: number, dto: UpdateWorkProjectDto, companyId?: number | null) {
+    await this.findOne(id, companyId);
 
     return this.prisma.workProject.update({
       where: { id },
@@ -114,13 +122,13 @@ export class WorkProjectsService {
     });
   }
 
-  async remove(id: number) {
-    await this.findOne(id);
+  async remove(id: number, companyId?: number | null) {
+    await this.findOne(id, companyId);
     return this.prisma.workProject.delete({ where: { id } });
   }
 
-  async addExpense(projectId: number, dto: CreateWorkProjectExpenseDto) {
-    const project = await this.findOne(projectId);
+  async addExpense(projectId: number, dto: CreateWorkProjectExpenseDto, companyId?: number | null) {
+    const project = await this.findOne(projectId, companyId);
     const amount = this.toDecimal(dto.amount);
     if (!amount) {
       throw new BadRequestException('Monto invalido');
@@ -133,6 +141,7 @@ export class WorkProjectsService {
         amount,
         incurredAt: this.toDate(dto.incurredAt) || new Date(),
         note: dto.note?.trim() || null,
+        companyId: project.companyId,
       },
     });
 
@@ -140,8 +149,8 @@ export class WorkProjectsService {
     return expense;
   }
 
-  async addPayroll(projectId: number, dto: CreateWorkProjectPayrollDto) {
-    const project = await this.findOne(projectId);
+  async addPayroll(projectId: number, dto: CreateWorkProjectPayrollDto, companyId?: number | null) {
+    const project = await this.findOne(projectId, companyId);
     const amount = this.toDecimal(dto.amount);
     if (!amount) {
       throw new BadRequestException('Monto invalido');
@@ -154,6 +163,7 @@ export class WorkProjectsService {
         amount,
         paidAt: this.toDate(dto.paidAt) || new Date(),
         note: dto.note?.trim() || null,
+        companyId: project.companyId,
       },
     });
 
@@ -161,8 +171,8 @@ export class WorkProjectsService {
     return payroll;
   }
 
-  async addLog(projectId: number, dto: CreateWorkProjectLogDto) {
-    await this.findOne(projectId);
+  async addLog(projectId: number, dto: CreateWorkProjectLogDto, companyId?: number | null) {
+    const project = await this.findOne(projectId, companyId);
     const progress = this.clampProgress(dto.progress);
 
     const log = await this.prisma.workProjectLog.create({
@@ -171,6 +181,7 @@ export class WorkProjectsService {
         label: dto.label.trim(),
         progress: progress ?? 0,
         note: dto.note?.trim() || null,
+        companyId: project.companyId,
       },
     });
 

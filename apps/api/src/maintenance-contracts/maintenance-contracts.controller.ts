@@ -4,6 +4,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { MaintenanceContractsService } from './maintenance-contracts.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { generateContractPdf } from './maintenance-contract-pdf.js';
 
 const MAINT_VIEW = [PERMISSIONS.MAINTENANCE_VIEW, PERMISSIONS.MAINTENANCE_MANAGE, PERMISSIONS.CONSOLE_ADMIN];
@@ -16,13 +17,14 @@ export class MaintenanceContractsController {
 
   @Post()
   @RBAC({ anyPermissions: MAINT_MANAGE })
-  create(@Body() dto: any) {
-    return this.service.createContract(dto);
+  create(@Body() dto: any, @CurrentCompanyId() companyId: number | null) {
+    return this.service.createContract({ ...dto, companyId });
   }
 
   @Get()
   @RBAC({ anyPermissions: MAINT_VIEW })
   list(
+    @CurrentCompanyId() companyId: number | null,
     @Query('status') status?: string,
     @Query('clientId') clientId?: string,
     @Query('ownerId') ownerId?: string,
@@ -31,12 +33,14 @@ export class MaintenanceContractsController {
       status,
       clientId: clientId ? +clientId : undefined,
       ownerId: ownerId ? +ownerId : undefined,
+      companyId,
     });
   }
 
   @Get('visits')
   @RBAC({ anyPermissions: MAINT_VIEW })
   visits(
+    @CurrentCompanyId() companyId: number | null,
     @Query('contractId') contractId?: string,
     @Query('status') status?: string,
     @Query('from') from?: string,
@@ -47,37 +51,53 @@ export class MaintenanceContractsController {
       status,
       from,
       to,
+      companyId,
     });
   }
 
   @Post('visits/:id/generate-ot')
   @RBAC({ anyPermissions: MAINT_MANAGE })
-  generateOt(@Param('id', ParseIntPipe) id: number, @Body() body: { assignedToId?: number }) {
-    return this.service.materializeVisitAsActivity(id, body);
+  generateOt(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { assignedToId?: number },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.materializeVisitAsActivity(id, body, companyId);
   }
 
   @Post('visits/:id/complete')
   @RBAC({ anyPermissions: MAINT_MANAGE })
-  completeVisit(@Param('id', ParseIntPipe) id: number) {
-    return this.service.markVisitCompleted(id);
+  completeVisit(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.markVisitCompleted(id, companyId);
   }
 
   @Get(':id')
   @RBAC({ anyPermissions: MAINT_VIEW })
-  get(@Param('id', ParseIntPipe) id: number) {
-    return this.service.getContract(id);
+  get(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
+    return this.service.getContract(id, companyId);
   }
 
   @Patch(':id')
   @RBAC({ anyPermissions: MAINT_MANAGE })
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: any) {
-    return this.service.updateContract(id, dto);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.updateContract(id, dto, companyId);
   }
 
   @Patch(':id/status')
   @RBAC({ anyPermissions: MAINT_MANAGE })
-  setStatus(@Param('id', ParseIntPipe) id: number, @Body() body: { status: any }) {
-    return this.service.setStatus(id, body.status);
+  setStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: any },
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.setStatus(id, body.status, companyId);
   }
 
   @Post('run-cron')
@@ -88,13 +108,17 @@ export class MaintenanceContractsController {
 
   @Get(':id/pdf')
   @RBAC({ anyPermissions: MAINT_VIEW })
-  async pdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
-    const contract = await this.service.getContract(id);
+  async pdf(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+    @Res() res: Response,
+  ) {
+    const contract = await this.service.getContract(id, companyId);
     if (!contract) {
       res.status(404).send('Contrato no encontrado');
       return;
     }
-    const visits = await this.service.listVisits({ contractId: id });
+    const visits = await this.service.listVisits({ contractId: id, companyId });
     const buffer = await generateContractPdf({
       contractNumber: contract.contractNumber,
       title: contract.title,

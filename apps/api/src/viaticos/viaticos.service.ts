@@ -15,7 +15,7 @@ import { ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
 import { generateViaticsReportPdf } from './viatics-report-pdf.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
-import { resolveRequiredCompanyId, companyWhere } from '../common/tenant/tenant-scope.js';
+import { assertCompanyAccess, resolveRequiredCompanyId, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 export const VIATIC_CATEGORIES = [
   'COMBUSTIBLE',
@@ -135,7 +135,8 @@ export class ViaticosService {
     return csvRows.join('\n');
   }
 
-  importMany(rows: any[]) {
+  importMany(rows: any[], companyId?: number | null) {
+    requireCompanyId(companyId);
     if (!Array.isArray(rows) || !rows.length) {
       throw new BadRequestException('No hay filas para importar');
     }
@@ -144,7 +145,7 @@ export class ViaticosService {
     );
   }
 
-  async create(dto: any, actor?: any) {
+  async create(dto: any, actor?: any, companyId?: number | null) {
     if (actor) this.assertCanRequest(actor);
     if (!dto.ticketEvidenciaUrl) {
       throw new BadRequestException('Debes adjuntar el ticket o comprobante de gasto');
@@ -159,9 +160,9 @@ export class ViaticosService {
     }
     const vehicleId = dto.vehicleId ? Number(dto.vehicleId) : null;
     const categoria = this.normalizeCategory(dto.categoria);
-    const companyId = await resolveRequiredCompanyId(
+    const resolvedCompanyId = await resolveRequiredCompanyId(
       this.prisma,
-      dto.companyId ? Number(dto.companyId) : null,
+      companyId ?? (dto.companyId ? Number(dto.companyId) : null),
     );
 
     const viatico = await this.prisma['viatico'].create({
@@ -170,7 +171,7 @@ export class ViaticosService {
         actividadId,
         projectId,
         vehicleId,
-        companyId,
+        companyId: resolvedCompanyId,
         categoria,
         origen: 'SOLICITUD',
         montoSolicitado: dto.montoSolicitado,
@@ -200,6 +201,7 @@ export class ViaticosService {
           entityType: 'VIATIC',
           entityId: viatico.id,
           userId: viatico.usuarioId,
+          companyId: viatico.companyId ?? resolvedCompanyId,
           payload: { amount, outOfPolicy: Boolean(dto?.outOfPolicy) },
         })
         .catch(() => undefined);
@@ -211,7 +213,7 @@ export class ViaticosService {
    * Asigna un viático a un usuario para una actividad/proyecto.
    * No requiere evidencia (presupuesto anticipado); entra al mismo flujo de aprobación.
    */
-  async assign(dto: any, actor: any) {
+  async assign(dto: any, actor: any, companyId?: number | null) {
     if (!actor?.id) {
       throw new ForbiddenException('Se requiere autenticación para asignar viáticos');
     }
@@ -238,9 +240,9 @@ export class ViaticosService {
 
     const vehicleId = dto.vehicleId ? Number(dto.vehicleId) : null;
     const categoria = this.normalizeCategory(dto.categoria);
-    const companyId = await resolveRequiredCompanyId(
+    const resolvedCompanyId = await resolveRequiredCompanyId(
       this.prisma,
-      dto.companyId ? Number(dto.companyId) : null,
+      companyId ?? (dto.companyId ? Number(dto.companyId) : null),
     );
     const motivo =
       dto.motivo ??
@@ -253,7 +255,7 @@ export class ViaticosService {
         actividadId,
         projectId,
         vehicleId,
-        companyId,
+        companyId: resolvedCompanyId,
         categoria,
         origen: 'ASIGNACION',
         asignadoPorId: Number(actor.id),
@@ -292,6 +294,7 @@ export class ViaticosService {
         entityType: 'VIATIC',
         entityId: viatico.id,
         userId: usuarioId,
+        companyId: viatico.companyId ?? resolvedCompanyId,
         payload: { amount, outOfPolicy: false, origen: 'ASIGNACION' },
       })
       .catch(() => undefined);
@@ -354,8 +357,8 @@ export class ViaticosService {
     return data.map((row: any) => ({ ...row, actividad: row.Activity, usuario: row.User }));
   }
 
-  async findOne(id: number, currentUser?: any) {
-    const where = { id, ...this.buildListWhere(currentUser) };
+  async findOne(id: number, currentUser?: any, companyId?: number | null) {
+    const where = { id, ...this.buildListWhere(currentUser, companyId) };
     const row = await this.prisma['viatico'].findFirst({
       where,
       include: {
@@ -369,11 +372,18 @@ export class ViaticosService {
       const exists = await this.prisma['viatico'].findUnique({ where: { id }, select: { id: true } });
       if (exists) throw new ForbiddenException('No tienes acceso a este viático');
     }
+    if (row) assertCompanyAccess(row, companyId, 'Viático');
     return row;
   }
 
-  async approveOrReject(id: number, actor: any, action: 'approve' | 'reject', note?: string) {
-    const viatico = await this.findOne(id);
+  async approveOrReject(
+    id: number,
+    actor: any,
+    action: 'approve' | 'reject',
+    note?: string,
+    companyId?: number | null,
+  ) {
+    const viatico = await this.findOne(id, undefined, companyId);
     if (!viatico) throw new BadRequestException('Viático no encontrado');
     if (['Rechazado', 'Aprobado', 'Pagado'].includes(viatico.estatus)) {
       throw new BadRequestException('Este viático ya fue cerrado');
@@ -470,8 +480,8 @@ export class ViaticosService {
     });
   }
 
-  async markPagado(id: number, actorId?: number) {
-    const viatico = await this.findOne(id);
+  async markPagado(id: number, actorId?: number, companyId?: number | null) {
+    const viatico = await this.findOne(id, undefined, companyId);
     if (!viatico || viatico.estatus !== 'Aprobado') {
       throw new BadRequestException('Solo viáticos aprobados por CEO pueden marcarse como pagados');
     }
@@ -514,9 +524,12 @@ export class ViaticosService {
     return updated;
   }
 
-  async update(id: number, dto: any) {
-    const currentViatico = await this.findOne(id);
-    if (!currentViatico) throw new BadRequestException('Viático no encontrado');
+  async update(id: number, dto: any, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const currentViatico = await this.prisma['viatico'].findFirst({
+      where: { id, deletedAt: null, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(currentViatico, tenantId, 'Viático');
 
     // Solo campos editables — estatus/approval/usuarioId solo vía approve/pagado.
     const allowed = [
@@ -569,7 +582,12 @@ export class ViaticosService {
     });
   }
 
-  remove(id: number) {
+  async remove(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const existing = await this.prisma['viatico'].findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(existing, tenantId, 'Viático');
     return this.prisma['viatico'].delete({ where: { id } });
   }
 

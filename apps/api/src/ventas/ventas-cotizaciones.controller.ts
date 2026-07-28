@@ -15,6 +15,7 @@ import { VentasService } from './ventas.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 
 const SALES_VIEW_ACCESS = [PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
 const SALES_MANAGE_ACCESS = [PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
@@ -49,14 +50,22 @@ export class VentasCotizacionesController {
     @Param('cotizacionId', ParseIntPipe) cotizacionId: number,
     @Param('opportunityId', ParseIntPipe) opportunityId: number,
     @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
     @Body() dto?: { versionLabel?: string },
   ) {
-    const linked = await this.ventasService.linkCotizacionToOpportunity(cotizacionId, opportunityId, user, dto?.versionLabel);
+    const linked = await this.ventasService.linkCotizacionToOpportunity(
+      cotizacionId,
+      opportunityId,
+      user,
+      dto?.versionLabel,
+      companyId,
+    );
     await this.ventasService.createAuditEvent({
       action: 'quote.link.opportunity',
       entityType: 'quote',
       entityId: cotizacionId,
       actorId: user?.id,
+      companyId,
       metadata: { opportunityId, salesQuoteId: linked?.id || null },
     });
     return linked;

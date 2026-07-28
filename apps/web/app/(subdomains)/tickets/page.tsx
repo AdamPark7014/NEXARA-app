@@ -1,6 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { io, Socket } from "socket.io-client";
 import PanelLogin from "@/components/PanelLogin";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
@@ -319,6 +320,35 @@ export default function ClientTicketsPage() {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const SLA_RESOLUTION_HOURS_BY_PRIORITY: Record<string, number> = { Alta: 8, Media: 24, Baja: 72 };
+
+  const getSlaStatus = (ticket: Ticket): { label: string; color: string; detail: string } | null => {
+    if (!ticket.fechaAsignacion) return null;
+    const start = new Date(ticket.fechaAsignacion).getTime();
+    if (Number.isNaN(start)) return null;
+    const slaHours = SLA_RESOLUTION_HOURS_BY_PRIORITY[ticket.prioridad || "Media"] ?? 24;
+    const deadline = start + slaHours * 3600000;
+
+    if (ticket.fechaFinalizacion) {
+      const closedAt = new Date(ticket.fechaFinalizacion).getTime();
+      if (Number.isNaN(closedAt)) return null;
+      const tookHours = (closedAt - start) / 3600000;
+      const onTime = closedAt <= deadline;
+      return onTime
+        ? { label: "SLA cumplido", color: "#16a34a", detail: `Resuelto en ${tookHours.toFixed(1)}h · meta ${slaHours}h` }
+        : { label: "SLA excedido", color: "#dc2626", detail: `Resuelto en ${tookHours.toFixed(1)}h · meta ${slaHours}h` };
+    }
+
+    const remainingH = (deadline - Date.now()) / 3600000;
+    if (remainingH < 0) {
+      return { label: `Vencido hace ${Math.abs(remainingH).toFixed(1)}h`, color: "#dc2626", detail: `Meta de resolución: ${slaHours}h (prioridad ${ticket.prioridad || "Media"})` };
+    }
+    if (remainingH <= 4) {
+      return { label: `Vence en ${remainingH.toFixed(1)}h`, color: "#f59e0b", detail: `Meta de resolución: ${slaHours}h (prioridad ${ticket.prioridad || "Media"})` };
+    }
+    return { label: `${remainingH.toFixed(0)}h para SLA`, color: "#3b82f6", detail: `Meta de resolución: ${slaHours}h (prioridad ${ticket.prioridad || "Media"})` };
   };
 
   const getArrivalTime = (ticket: Ticket) => ticket.activityEvidence?.entryPhotoUploadedAt || ticket.activityEvidence?.createdAt || undefined;
@@ -1142,6 +1172,15 @@ export default function ClientTicketsPage() {
               🧰 Inventarios
             </button>
           </li>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <Link
+              href="/tickets/ayuda"
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              🆘 Centro de ayuda
+            </Link>
+          </li>
         </ul>
 
         <div className={consoleStyles.menuTitle}>Sesión</div>
@@ -1374,7 +1413,20 @@ export default function ClientTicketsPage() {
                       <div style={{ fontWeight: 700 }}>{ticket.anNumber}</div>
                       <div style={{ color: "var(--text-secondary)", fontSize: 12 }}>{ticket.titulo}</div>
                     </div>
-                    <span className="badge">{ticket.estatus}</span>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <span className="badge">{ticket.estatus}</span>
+                      {(() => {
+                        const sla = getSlaStatus(ticket);
+                        return sla ? (
+                          <span
+                            title={sla.detail}
+                            style={{ display: "inline-block", padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 700, background: `${sla.color}22`, color: sla.color }}
+                          >
+                            {sla.label}
+                          </span>
+                        ) : null;
+                      })()}
+                    </div>
                   </div>
                   <div className={styles.metaGrid}>
                     {ticket.project?.title && (

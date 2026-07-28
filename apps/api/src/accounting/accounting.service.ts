@@ -6,7 +6,10 @@ import { NotificationHierarchyService } from '../notifications/notification-hier
 import { PacService } from '../pac/pac.service.js';
 import { SatService } from '../pac/sat.service.js';
 import { WebhooksService } from '../webhooks/webhooks.service.js';
-import { assertCompanyAccess, companyWhere } from '../common/tenant/tenant-scope.js';
+import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
+
+const escapeXml = (value: string): string =>
+  value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 @Injectable()
 export class AccountingService {
@@ -168,7 +171,9 @@ export class AccountingService {
     parentId?: number;
     description?: string;
     currency?: string;
+    companyId?: number | null;
   }) {
+    const companyId = await this.resolveCompanyId(dto.companyId);
     return this.prisma.account.create({
       data: {
         code: dto.code.trim(),
@@ -177,13 +182,14 @@ export class AccountingService {
         parentId: dto.parentId ?? null,
         description: dto.description?.trim() || null,
         currency: dto.currency || 'MXN',
+        companyId,
       },
       include: { parent: true },
     });
   }
 
-  async listAccounts(filters?: { type?: string; isActive?: boolean }) {
-    const where: any = {};
+  async listAccounts(filters?: { type?: string; isActive?: boolean; companyId?: number | null }) {
+    const where: any = { ...companyWhere(filters?.companyId ?? null) };
     if (filters?.type) where.type = filters.type;
     if (filters?.isActive !== undefined) where.isActive = filters.isActive;
     return this.prisma.account.findMany({
@@ -193,42 +199,252 @@ export class AccountingService {
     });
   }
 
-  async getAccount(id: number) {
-    const account = await this.prisma.account.findUnique({
-      where: { id },
+  async getAccount(id: number, companyId?: number | null) {
+    const account = await this.prisma.account.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
       include: { parent: true, children: true },
     });
-    if (!account) throw new NotFoundException('Cuenta no encontrada');
+    assertCompanyAccess(account, companyId, 'Cuenta');
     return account;
   }
 
-  async updateAccount(id: number, dto: Partial<{ code: string; name: string; type: string; parentId: number; description: string; isActive: boolean; currency: string }>) {
+  async updateAccount(
+    id: number,
+    dto: Partial<{ code: string; name: string; type: string; parentId: number; description: string; isActive: boolean; currency: string; satAgrupador: string }>,
+    companyId?: number | null,
+  ) {
+    const account = await this.prisma.account.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
+      select: { id: true, companyId: true },
+    });
+    assertCompanyAccess(account, companyId, 'Cuenta');
     return this.prisma.account.update({ where: { id }, data: dto as any });
   }
 
+  // ── Cumplimiento SAT: Contabilidad Electrónica (DIOT + Balanza) ────
+  /** Cuentas con movimiento en el periodo que aún no tienen agrupador SAT asignado. */
+  async getSatAgrupadorStatus(companyId?: number | null) {
+    const accounts = await this.prisma.account.findMany({
+      where: { ...companyWhere(companyId ?? null), isActive: true },
+      select: { id: true, code: true, name: true, type: true, satAgrupador: true },
+      orderBy: { code: 'asc' },
+    });
+    const missing = accounts.filter((a) => !a.satAgrupador);
+    return {
+      totalAccounts: accounts.length,
+      mappedAccounts: accounts.length - missing.length,
+      missingAccounts: missing,
+      readyForBalanzaExport: missing.length === 0 && accounts.length > 0,
+    };
+  }
+
+  /**
+   * Reporte DIOT: agrega facturas de proveedor (AP) del periodo por proveedor,
+   * con base e IVA trasladado — insumo directo para el llenado de la declaración
+   * en el aplicativo del SAT (no reemplaza la clasificación fiscal fina por RFC).
+   */
+  async getDiotReport(month: number, year: number, companyId?: number | null) {
+    const from = new Date(Date.UTC(year, month - 1, 1));
+    const to = new Date(Date.UTC(year, month, 1));
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        type: 'ACCOUNTS_PAYABLE',
+        isCancelled: false,
+        issueDate: { gte: from, lt: to },
+        ...companyWhere(companyId ?? null),
+      },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        subtotal: true,
+        taxAmount: true,
+        totalAmount: true,
+        supplierId: true,
+        supplier: { select: { id: true, name: true, rfc: true } },
+      },
+    });
+
+    const bySupplier = new Map<
+      number,
+      { supplierId: number; supplierName: string; rfc: string | null; baseAmount: number; ivaAmount: number; totalAmount: number; invoiceCount: number }
+    >();
+    for (const inv of invoices) {
+      if (!inv.supplierId) continue;
+      const key = inv.supplierId;
+      if (!bySupplier.has(key)) {
+        bySupplier.set(key, {
+          supplierId: key,
+          supplierName: inv.supplier?.name ?? `Proveedor #${key}`,
+          rfc: inv.supplier?.rfc ?? null,
+          baseAmount: 0,
+          ivaAmount: 0,
+          totalAmount: 0,
+          invoiceCount: 0,
+        });
+      }
+      const entry = bySupplier.get(key)!;
+      entry.baseAmount += Number(inv.subtotal);
+      entry.ivaAmount += Number(inv.taxAmount);
+      entry.totalAmount += Number(inv.totalAmount);
+      entry.invoiceCount += 1;
+    }
+
+    const rows = [...bySupplier.values()].sort((a, b) => b.totalAmount - a.totalAmount);
+    const missingRfc = rows.filter((r) => !r.rfc);
+
+    return {
+      period: { month, year },
+      rows: rows.map((r) => ({
+        ...r,
+        baseAmount: Math.round(r.baseAmount * 100) / 100,
+        ivaAmount: Math.round(r.ivaAmount * 100) / 100,
+        totalAmount: Math.round(r.totalAmount * 100) / 100,
+      })),
+      totals: {
+        baseAmount: Math.round(rows.reduce((s, r) => s + r.baseAmount, 0) * 100) / 100,
+        ivaAmount: Math.round(rows.reduce((s, r) => s + r.ivaAmount, 0) * 100) / 100,
+        totalAmount: Math.round(rows.reduce((s, r) => s + r.totalAmount, 0) * 100) / 100,
+      },
+      missingRfcSuppliers: missingRfc.map((r) => r.supplierName),
+    };
+  }
+
+  getDiotReportCsv(report: Awaited<ReturnType<AccountingService['getDiotReport']>>): string {
+    const header = 'RFC,Proveedor,Base 16% IVA,IVA Trasladado,Total,Facturas';
+    const lines = report.rows.map((r) =>
+      [
+        r.rfc ?? 'SIN RFC',
+        `"${r.supplierName.replace(/"/g, '""')}"`,
+        r.baseAmount.toFixed(2),
+        r.ivaAmount.toFixed(2),
+        r.totalAmount.toFixed(2),
+        r.invoiceCount,
+      ].join(','),
+    );
+    const totalLine = ['TOTAL', '', report.totals.baseAmount.toFixed(2), report.totals.ivaAmount.toFixed(2), report.totals.totalAmount.toFixed(2), ''].join(',');
+    return [header, ...lines, totalLine].join('\n');
+  }
+
+  /**
+   * Catálogo de cuentas en XML (estructura general Anexo 24 SAT).
+   * Misma condición que la Balanza: requiere agrupador SAT completo.
+   */
+  async exportCatalogoCuentasXml(companyId?: number | null) {
+    const status = await this.getSatAgrupadorStatus(companyId);
+    if (!status.readyForBalanzaExport) {
+      throw new BadRequestException(
+        `Faltan ${status.missingAccounts.length} cuenta(s) sin agrupador SAT asignado. Complétalas antes de exportar el Catálogo de cuentas.`,
+      );
+    }
+    const company = companyId ? await this.prisma.companyProfile.findUnique({ where: { id: companyId }, select: { rfc: true } }) : null;
+    const accounts = await this.prisma.account.findMany({
+      where: { ...companyWhere(companyId ?? null), isActive: true },
+      orderBy: { code: 'asc' },
+    });
+
+    const levelByAccountId = new Map<number, number>();
+    const byId = new Map(accounts.map((a) => [a.id, a]));
+    const levelOf = (accountId: number, guard = 0): number => {
+      if (levelByAccountId.has(accountId)) return levelByAccountId.get(accountId)!;
+      if (guard > 20) return 1; // corta ciclos accidentales en la jerarquía
+      const acc = byId.get(accountId);
+      const level = acc?.parentId && byId.has(acc.parentId) ? levelOf(acc.parentId, guard + 1) + 1 : 1;
+      levelByAccountId.set(accountId, level);
+      return level;
+    };
+
+    const naturOf = (type: string): 'D' | 'A' => (type === 'ASSET' || type === 'EXPENSE' ? 'D' : 'A');
+
+    const now = new Date();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const rows = accounts
+      .map((a) => {
+        const parent = a.parentId ? byId.get(a.parentId) : null;
+        return `    <Ctas CodAgrup="${escapeXml(a.satAgrupador ?? '')}" NumCta="${escapeXml(a.code)}" Desc="${escapeXml(a.name)}" Nivel="${levelOf(a.id)}" Natur="${naturOf(a.type)}"${parent ? ` SubCtaDe="${escapeXml(parent.code)}"` : ''}/>`;
+      })
+      .join('\n');
+
+    return [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      `<catalogocuentas:Catalogo xmlns:catalogocuentas="http://www.sat.gob.mx/esquemas/ContabilidadE/1_3/CatalogoCuentas" Version="1.3" RFC="${escapeXml(company?.rfc ?? '')}" Mes="${mm}" Anio="${now.getFullYear()}">`,
+      rows,
+      '</catalogocuentas:Catalogo>',
+    ].join('\n');
+  }
+
+  /**
+   * Balanza de comprobación en XML (estructura general Anexo 24 SAT).
+   * Requiere que toda cuenta con movimiento en el periodo tenga `satAgrupador`
+   * asignado — si falta alguna, no genera un XML potencialmente inválido y en
+   * su lugar informa qué cuentas faltan mapear.
+   */
+  async exportBalanzaXml(month: number, year: number, companyId?: number | null) {
+    const status = await this.getSatAgrupadorStatus(companyId);
+    if (!status.readyForBalanzaExport) {
+      throw new BadRequestException(
+        `Faltan ${status.missingAccounts.length} cuenta(s) sin agrupador SAT asignado. Complétalas antes de exportar la Balanza.`,
+      );
+    }
+    const company = companyId ? await this.prisma.companyProfile.findUnique({ where: { id: companyId }, select: { rfc: true } }) : null;
+    const accounts = await this.prisma.account.findMany({
+      where: { ...companyWhere(companyId ?? null), isActive: true },
+      orderBy: { code: 'asc' },
+    });
+
+    const mm = String(month).padStart(2, '0');
+    const ctas = accounts
+      .map(
+        (a) =>
+          `    <Ctas NumCta="${escapeXml(a.code)}" SaldoIni="0.00" Debe="0.00" Haber="0.00" SaldoFin="${Number(a.balance).toFixed(2)}"/>`,
+      )
+      .join('\n');
+
+    return [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      `<BCE:Balanza xmlns:BCE="http://www.sat.gob.mx/esquemas/ContabilidadE/1_3/BalanzaComprobacion" Version="1.3" RFC="${escapeXml(company?.rfc ?? '')}" Mes="${mm}" Anio="${year}" TipoEnvio="N">`,
+      ctas,
+      '</BCE:Balanza>',
+    ].join('\n');
+  }
+
   // ── Fiscal Periods ────────────────────────────────────────────────
-  async createFiscalPeriod(dto: { name: string; startDate: string; endDate: string }) {
+  async createFiscalPeriod(dto: { name: string; startDate: string; endDate: string; companyId?: number | null }) {
+    const companyId = await this.resolveCompanyId(dto.companyId);
     return this.prisma.fiscalPeriod.create({
       data: {
         name: dto.name.trim(),
         startDate: new Date(dto.startDate),
         endDate: new Date(dto.endDate),
+        companyId,
       },
     });
   }
 
-  async listFiscalPeriods() {
-    return this.prisma.fiscalPeriod.findMany({ orderBy: { startDate: 'desc' } });
+  async listFiscalPeriods(companyId?: number | null) {
+    return this.prisma.fiscalPeriod.findMany({
+      where: { ...companyWhere(companyId ?? null) },
+      orderBy: { startDate: 'desc' },
+    });
   }
 
-  async closeFiscalPeriod(id: number, userId: number) {
+  async closeFiscalPeriod(id: number, userId: number, companyId?: number | null) {
+    const period = await this.prisma.fiscalPeriod.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
+      select: { id: true, companyId: true },
+    });
+    assertCompanyAccess(period, companyId, 'Periodo fiscal');
     return this.prisma.fiscalPeriod.update({
       where: { id },
       data: { isClosed: true, closedAt: new Date(), closedById: userId },
     });
   }
 
-  async reopenFiscalPeriod(id: number) {
+  async reopenFiscalPeriod(id: number, companyId?: number | null) {
+    const period = await this.prisma.fiscalPeriod.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
+      select: { id: true, companyId: true },
+    });
+    assertCompanyAccess(period, companyId, 'Periodo fiscal');
     return this.prisma.fiscalPeriod.update({
       where: { id },
       data: { isClosed: false, closedAt: null, closedById: null },
@@ -239,10 +455,16 @@ export class AccountingService {
    * Resuelve periodo abierto que cubre la fecha.
    * Si hay periodo cerrado → bloquea. Si no hay periodo → null (compat).
    */
-  private async resolveOpenFiscalPeriodId(date: Date, explicit?: number | null): Promise<number | null> {
+  private async resolveOpenFiscalPeriodId(
+    date: Date,
+    explicit?: number | null,
+    companyId?: number | null,
+  ): Promise<number | null> {
     if (explicit != null && Number.isFinite(Number(explicit))) {
-      const period = await this.prisma.fiscalPeriod.findUnique({ where: { id: Number(explicit) } });
-      if (!period) throw new BadRequestException('Periodo fiscal no encontrado');
+      const period = await this.prisma.fiscalPeriod.findFirst({
+        where: { id: Number(explicit), ...companyWhere(companyId ?? null) },
+      });
+      assertCompanyAccess(period, companyId, 'Periodo fiscal');
       if (period.isClosed) {
         throw new BadRequestException(`Periodo fiscal cerrado (${period.name})`);
       }
@@ -253,6 +475,7 @@ export class AccountingService {
     day.setHours(12, 0, 0, 0);
     const covering = await this.prisma.fiscalPeriod.findFirst({
       where: {
+        ...companyWhere(companyId ?? null),
         startDate: { lte: day },
         endDate: { gte: day },
       },
@@ -267,13 +490,15 @@ export class AccountingService {
     return covering.id;
   }
 
-  private async assertDateNotInClosedPeriod(date: Date) {
-    await this.resolveOpenFiscalPeriodId(date, null);
+  private async assertDateNotInClosedPeriod(date: Date, companyId?: number | null) {
+    await this.resolveOpenFiscalPeriodId(date, null, companyId);
   }
 
   // ── Journal Entries ───────────────────────────────────────────────
-  private async generateEntryNumber(): Promise<string> {
-    const count = await this.prisma.journalEntry.count();
+  private async generateEntryNumber(companyId: number): Promise<string> {
+    const count = await this.prisma.journalEntry.count({
+      where: companyWhere(companyId),
+    });
     return `JE-${String(count + 1).padStart(6, '0')}`;
   }
 
@@ -292,10 +517,13 @@ export class AccountingService {
     }
 
     const entryDate = new Date(dto.date);
-    const fiscalPeriodId = await this.resolveOpenFiscalPeriodId(entryDate, dto.fiscalPeriodId ?? null);
-
     const companyId = await this.resolveCompanyId(dto.companyId);
-    const entryNumber = await this.generateEntryNumber();
+    const fiscalPeriodId = await this.resolveOpenFiscalPeriodId(
+      entryDate,
+      dto.fiscalPeriodId ?? null,
+      companyId,
+    );
+    const entryNumber = await this.generateEntryNumber(companyId);
     return this.prisma.journalEntry.create({
       data: {
         entryNumber,
@@ -323,19 +551,7 @@ export class AccountingService {
   }
 
   private async resolveCompanyId(explicit?: number | null): Promise<number> {
-    if (explicit != null && Number.isFinite(Number(explicit))) return Number(explicit);
-    const primary = await this.prisma.companyProfile.findFirst({
-      where: { isPrimary: true, isActive: true },
-      select: { id: true },
-      orderBy: { id: 'asc' },
-    });
-    if (primary?.id) return primary.id;
-    const any = await this.prisma.companyProfile.findFirst({
-      select: { id: true },
-      orderBy: { id: 'asc' },
-    });
-    if (!any?.id) throw new BadRequestException('No hay empresa configurada');
-    return any.id;
+    return resolveRequiredCompanyId(this.prisma, explicit);
   }
 
   async listJournalEntries(
@@ -365,21 +581,27 @@ export class AccountingService {
   }
 
   async getJournalEntry(id: number, companyId?: number | null) {
-    const entry = await this.prisma.journalEntry.findUnique({
-      where: { id },
+    const tenantId = requireCompanyId(companyId);
+    const entry = await this.prisma.journalEntry.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: { lines: { include: { debitAccount: true, creditAccount: true, costCenter: true } }, createdBy: { select: { id: true, nombre: true } } },
     });
-    assertCompanyAccess(entry, companyId, 'Asiento');
-    return entry!;
+    assertCompanyAccess(entry, tenantId, 'Asiento');
+    return entry;
   }
 
-  async postJournalEntry(id: number, postedByUserId: number) {
-    const entry = await this.prisma.journalEntry.findUnique({ where: { id }, include: { lines: true, fiscalPeriod: true } });
-    if (!entry) throw new NotFoundException('Asiento no encontrado');
+  async postJournalEntry(id: number, postedByUserId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const entry = await this.prisma.journalEntry.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+      include: { lines: true, fiscalPeriod: true },
+    });
+    assertCompanyAccess(entry, tenantId, 'Asiento');
     if (entry.status === 'POSTED') throw new BadRequestException('Ya está contabilizado');
     if (entry.fiscalPeriod?.isClosed) throw new BadRequestException('Periodo fiscal cerrado');
     // Cubre asientos legacy sin fiscalPeriodId: bloquea por fecha si el periodo está cerrado
-    const resolvedPeriodId = entry.fiscalPeriodId ?? (await this.resolveOpenFiscalPeriodId(entry.date, null));
+    const resolvedPeriodId =
+      entry.fiscalPeriodId ?? (await this.resolveOpenFiscalPeriodId(entry.date, null, tenantId));
 
     // Todo corre en una sola transacción: la "reclamación" del asiento vía
     // updateMany con status distinto de POSTED en el WHERE hace que dos
@@ -484,21 +706,26 @@ export class AccountingService {
     ];
 
     for (const account of defaults) {
+      const companyId = await this.resolveCompanyId();
       await this.prisma.account.upsert({
-        where: { code: account.code },
+        where: { companyId_code: { companyId, code: account.code } },
         create: {
           code: account.code,
           name: account.name,
           type: account.type,
+          companyId,
         },
         update: {},
       });
     }
   }
 
-  private async getAccountByCode(code: string) {
+  private async getAccountByCode(code: string, companyId?: number | null) {
+    const cid = await this.resolveCompanyId(companyId);
     await this.ensureDefaultAccounts();
-    const account = await this.prisma.account.findUnique({ where: { code } });
+    const account = await this.prisma.account.findUnique({
+      where: { companyId_code: { companyId: cid, code } },
+    });
     if (!account) {
       throw new BadRequestException(`Cuenta contable ${code} no configurada`);
     }
@@ -511,6 +738,7 @@ export class AccountingService {
     date: string,
     lines: Array<{ debitAccountId: number; creditAccountId: number; debit: number; credit: number; label: string }>,
     userId: number,
+    companyId?: number | null,
   ) {
     const existing = await this.prisma.journalEntry.findFirst({ where: { reference } });
     if (existing) return existing;
@@ -521,6 +749,7 @@ export class AccountingService {
           date,
           description,
           reference,
+          companyId,
           lines: lines.map((line) => ({
             debitAccountId: line.debitAccountId,
             creditAccountId: line.creditAccountId,
@@ -658,13 +887,19 @@ export class AccountingService {
   async postPurchaseReceiptAccrual(input: {
     goodsReceiptId: number;
     userId: number;
+    companyId?: number | null;
   }) {
     const reference = `GR-ACCRUAL-${input.goodsReceiptId}`;
     const existing = await this.prisma.journalEntry.findFirst({ where: { reference } });
     if (existing) return existing;
 
-    const receipt = await this.prisma.goodsReceipt.findUnique({
-      where: { id: input.goodsReceiptId },
+    const receipt = await this.prisma.goodsReceipt.findFirst({
+      where: {
+        id: input.goodsReceiptId,
+        ...(input.companyId != null && Number(input.companyId) > 0
+          ? companyWhere(Number(input.companyId))
+          : {}),
+      },
       include: {
         items: {
           include: {
@@ -677,6 +912,8 @@ export class AccountingService {
       },
     });
     if (!receipt) throw new BadRequestException('Recepción no encontrada');
+    const tenantId = requireCompanyId(input.companyId ?? receipt.companyId);
+    assertCompanyAccess(receipt, tenantId, 'Recepción');
 
     let inventoryBase = 0;
     let expenseBase = 0;
@@ -694,6 +931,17 @@ export class AccountingService {
       const itemType = poItem.product?.itemType || (poItem.productId ? 'PRODUCT' : 'SERVICE');
       if (itemType === 'PRODUCT') inventoryBase += base;
       else expenseBase += base;
+    }
+
+    // Landed cost (flete/seguro/aranceles/otros): ya prorrateado en el WAC de cada
+    // StockMovement; aquí solo se refleja como mayor valor de inventario y CXP.
+    const landedCostTotal =
+      Number(receipt.freightCost || 0) +
+      Number(receipt.insuranceCost || 0) +
+      Number(receipt.customsCost || 0) +
+      Number(receipt.otherLandedCost || 0);
+    if (landedCostTotal > 0 && inventoryBase > 0) {
+      inventoryBase += landedCostTotal;
     }
 
     const total = inventoryBase + expenseBase + taxAmount;
@@ -758,6 +1006,7 @@ export class AccountingService {
       date,
       lines,
       input.userId,
+      tenantId,
     );
 
     await this.prisma.goodsReceipt.update({
@@ -771,14 +1020,25 @@ export class AccountingService {
   /**
    * Factura AP en borrador a partir de una recepción (NEXARA compras).
    */
-  async createInvoiceFromGoodsReceipt(goodsReceiptId: number, userId: number) {
+  async createInvoiceFromGoodsReceipt(
+    goodsReceiptId: number,
+    userId: number,
+    companyId?: number | null,
+  ) {
+    const scopedWhere =
+      companyId != null && Number(companyId) > 0
+        ? { goodsReceiptId, deletedAt: null, ...companyWhere(Number(companyId)) }
+        : { goodsReceiptId, deletedAt: null };
     const existing = await this.prisma.invoice.findFirst({
-      where: { goodsReceiptId, deletedAt: null },
+      where: scopedWhere,
     });
     if (existing) return existing;
 
-    const receipt = await this.prisma.goodsReceipt.findUnique({
-      where: { id: goodsReceiptId },
+    const receipt = await this.prisma.goodsReceipt.findFirst({
+      where: {
+        id: goodsReceiptId,
+        ...(companyId != null && Number(companyId) > 0 ? companyWhere(Number(companyId)) : {}),
+      },
       include: {
         items: {
           include: {
@@ -803,6 +1063,8 @@ export class AccountingService {
       },
     });
     if (!receipt) throw new BadRequestException('Recepción no encontrada');
+    const tenantId = requireCompanyId(companyId ?? receipt.companyId);
+    assertCompanyAccess(receipt, tenantId, 'Recepción');
 
     const items = receipt.items
       .filter((i) => Number(i.quantityReceived) > 0)
@@ -844,6 +1106,7 @@ export class AccountingService {
         notes: `Desde ${receipt.receiptNumber} / OC ${receipt.purchaseOrder.poNumber}`,
         receptorName: receipt.purchaseOrder.supplier?.name || undefined,
         items,
+        companyId: tenantId,
       },
       userId,
     );
@@ -963,9 +1226,11 @@ export class AccountingService {
     });
   }
 
-  async waiveThreeWayMatch(invoiceId: number, userId: number, notes?: string) {
-    const invoice = await this.prisma.invoice.findFirst({ where: { id: invoiceId, deletedAt: null } });
-    if (!invoice) throw new NotFoundException('Factura no encontrada');
+  async waiveThreeWayMatch(invoiceId: number, userId: number, notes?: string, companyId?: number | null) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, deletedAt: null, ...companyWhere(companyId ?? null) },
+    });
+    assertCompanyAccess(invoice, companyId, 'Factura');
     if (invoice.type !== 'ACCOUNTS_PAYABLE') {
       throw new BadRequestException('Solo aplica a facturas por pagar');
     }
@@ -1072,15 +1337,19 @@ export class AccountingService {
     return null;
   }
 
-  async reverseJournalEntry(id: number, userId: number) {
-    const original = await this.prisma.journalEntry.findUnique({ where: { id }, include: { lines: true } });
-    if (!original) throw new NotFoundException('Asiento no encontrado');
+  async reverseJournalEntry(id: number, userId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const original = await this.prisma.journalEntry.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+      include: { lines: true },
+    });
+    assertCompanyAccess(original, tenantId, 'Asiento');
     if (original.status !== 'POSTED') throw new BadRequestException('Solo se pueden revertir asientos contabilizados');
-    await this.assertDateNotInClosedPeriod(original.date);
-    await this.assertDateNotInClosedPeriod(new Date());
+    await this.assertDateNotInClosedPeriod(original.date, tenantId);
+    await this.assertDateNotInClosedPeriod(new Date(), tenantId);
 
-    const entryNumber = await this.generateEntryNumber();
-    const reversalPeriodId = await this.resolveOpenFiscalPeriodId(new Date(), null);
+    const entryNumber = await this.generateEntryNumber(original.companyId ?? tenantId);
+    const reversalPeriodId = await this.resolveOpenFiscalPeriodId(new Date(), null, tenantId);
 
     // Transacción: (1) reclama el original atómicamente (evita reversas
     // duplicadas por doble clic / reintento concurrente), (2) crea la
@@ -1132,8 +1401,8 @@ export class AccountingService {
   }
 
   // ── Trial Balance / Reports ───────────────────────────────────────
-  async getTrialBalance(periodId?: number) {
-    const where: any = { status: 'POSTED' };
+  async getTrialBalance(periodId?: number, companyId?: number | null) {
+    const where: any = { status: 'POSTED', ...companyWhere(requireCompanyId(companyId)) };
     if (periodId) where.fiscalPeriodId = periodId;
     const entries = await this.prisma.journalEntry.findMany({
       where,
@@ -1157,8 +1426,8 @@ export class AccountingService {
   }
 
   // ── Income Statement (Estado de Resultados) ──────────────────────
-  async getIncomeStatement(from?: string, to?: string) {
-    const where: any = { status: 'POSTED' };
+  async getIncomeStatement(from?: string, to?: string, companyId?: number | null) {
+    const where: any = { status: 'POSTED', ...companyWhere(requireCompanyId(companyId)) };
     if (from || to) {
       where.date = {};
       if (from) where.date.gte = new Date(from);
@@ -1206,8 +1475,8 @@ export class AccountingService {
   }
 
   // ── Balance Sheet (Balance General) ──────────────────────────────
-  async getBalanceSheet(asOf?: string) {
-    const where: any = { status: 'POSTED' };
+  async getBalanceSheet(asOf?: string, companyId?: number | null) {
+    const where: any = { status: 'POSTED', ...companyWhere(requireCompanyId(companyId)) };
     if (asOf) where.date = { lte: new Date(asOf) };
 
     const entries = await this.prisma.journalEntry.findMany({
@@ -1257,8 +1526,10 @@ export class AccountingService {
   }
 
   // ── Invoicing (AR / AP) ───────────────────────────────────────────
-  private async generateInvoiceNumber(): Promise<string> {
-    const count = await this.prisma.invoice.count();
+  private async generateInvoiceNumber(companyId: number): Promise<string> {
+    const count = await this.prisma.invoice.count({
+      where: companyWhere(companyId),
+    });
     return `INV-${String(count + 1).padStart(6, '0')}`;
   }
 
@@ -1304,8 +1575,8 @@ export class AccountingService {
       goodsReceiptItemId?: number;
     }>;
   }, userId: number) {
-    const invoiceNumber = await this.generateInvoiceNumber();
     const companyId = await this.resolveCompanyId(dto.companyId);
+    const invoiceNumber = await this.generateInvoiceNumber(companyId);
     const issuer = await this.getInvoiceIssuerProfile(companyId ?? undefined);
     const emisorRfc = dto.emisorRfc?.trim() || issuer.emisorRfc || null;
     const emisorName = dto.emisorName?.trim() || issuer.emisorName || null;
@@ -1397,7 +1668,14 @@ export class AccountingService {
     projectId: number,
     userId: number,
     options?: { lineIds?: number[] },
+    companyId?: number | null,
   ) {
+    const tenantId = requireCompanyId(companyId);
+    const project = await this.prisma.salesProject.findFirst({
+      where: { id: projectId, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(project, tenantId, 'Proyecto');
+
     const order = await this.prisma.salesProjectOrder.findUnique({
       where: { projectId },
       include: {
@@ -1453,6 +1731,7 @@ export class AccountingService {
         cfdiUsage: 'G03',
         satPaymentForm: '03',
         satPaymentMethod: 'PUE',
+        companyId: tenantId,
         items: selectedLines.map((line) => {
           const qty = Number(line.qty);
           const unitPrice = Number(line.unitPrice);
@@ -1491,19 +1770,19 @@ export class AccountingService {
       });
     }
 
-    return this.getInvoice(invoice.id);
+    return this.getInvoice(invoice.id, tenantId);
   }
 
   /**
    * Timbra una factura borrador llamando al PAC configurado (Facturama / SW / Finkok / Mock).
    * Pasa a SENT y persiste UUID + XML + sello + número de certificado SAT.
    */
-  async stampInvoice(id: number, userId: number) {
-    const invoice = await this.prisma.invoice.findUnique({
-      where: { id },
+  async stampInvoice(id: number, userId: number, companyId?: number | null) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, deletedAt: null, ...companyWhere(companyId ?? null) },
       include: { items: { include: { product: true } } },
     });
-    if (!invoice || invoice.deletedAt) throw new NotFoundException('Factura no encontrada');
+    assertCompanyAccess(invoice, companyId, 'Factura');
     if (invoice.isCancelled) throw new BadRequestException('La factura está cancelada');
     if (invoice.cfdiUuid) throw new BadRequestException('La factura ya está timbrada');
     if (invoice.status === 'STAMPING') {
@@ -1668,7 +1947,7 @@ export class AccountingService {
 
   async getInvoice(id: number, companyId?: number | null) {
     const invoice = await this.prisma.invoice.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...companyWhere(companyId ?? null) },
       include: { items: { include: { product: true } }, client: true, supplier: true, payments: true },
     });
     assertCompanyAccess(invoice, companyId, 'Factura');
@@ -1699,12 +1978,13 @@ export class AccountingService {
       }>;
     },
     userId?: number,
+    companyId?: number | null,
   ) {
     const invoice = await this.prisma.invoice.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...companyWhere(companyId ?? null) },
       include: { items: true },
     });
-    if (!invoice) throw new NotFoundException('Factura no encontrada');
+    assertCompanyAccess(invoice, companyId, 'Factura');
     if (invoice.status !== 'DRAFT' || invoice.cfdiUuid) {
       throw new BadRequestException('Solo borradores sin timbrar pueden editarse');
     }
@@ -1787,19 +2067,34 @@ export class AccountingService {
     if (invoice.type === 'ACCOUNTS_PAYABLE' && (invoice.purchaseOrderId || invoice.goodsReceiptId)) {
       return this.evaluateThreeWayMatch(id, userId);
     }
-    return this.getInvoice(id);
+    return this.getInvoice(id, companyId);
   }
 
   async getInvoiceIssuerProfile(companyId?: number) {
     const settings = await this.prisma.systemSetting.findMany({
-      where: { category: { in: ['empresa', 'fiscal'] } },
-      select: { key: true, value: true, label: true },
+      where: {
+        category: { in: ['empresa', 'fiscal'] },
+        ...(companyId != null && Number(companyId) > 0
+          ? { OR: [{ companyId: null }, { companyId: Number(companyId) }] }
+          : { companyId: null }),
+      },
+      select: { key: true, value: true, label: true, companyId: true },
     });
+    // Prefer tenant overrides over platform defaults for the same key
+    const byKey = new Map<string, { key: string; value: string; label: string | null }>();
+    for (const row of settings) {
+      if (row.companyId == null) {
+        if (!byKey.has(row.key)) byKey.set(row.key, row);
+      } else {
+        byKey.set(row.key, row);
+      }
+    }
+    const merged = [...byKey.values()];
 
-    const emisorRfc = this.pickSettingValue(settings, ['rfc', 'fiscalrfc', 'empresarfc']);
-    const emisorName = this.pickSettingValue(settings, ['razonsocial', 'nombreempresa', 'empresa', 'socialname']);
-    const emisorRegime = this.pickSettingValue(settings, ['regimenfiscal', 'regimen']);
-    const emisorZipCode = this.pickSettingValue(settings, ['codigopostal', 'cp', 'zip']);
+    const emisorRfc = this.pickSettingValue(merged, ['rfc', 'fiscalrfc', 'empresarfc']);
+    const emisorName = this.pickSettingValue(merged, ['razonsocial', 'nombreempresa', 'empresa', 'socialname']);
+    const emisorRegime = this.pickSettingValue(merged, ['regimenfiscal', 'regimen']);
+    const emisorZipCode = this.pickSettingValue(merged, ['codigopostal', 'cp', 'zip']);
 
     if (emisorRfc || emisorName || emisorRegime || emisorZipCode) {
       return {
@@ -1856,13 +2151,14 @@ export class AccountingService {
     };
   }
 
-  async deleteInvoice(id: number, userId: number) {
-    const invoice = await this.prisma.invoice.findUnique({
-      where: { id },
+  async deleteInvoice(id: number, userId: number, companyId?: number | null) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
       include: { payments: { select: { id: true } } },
     });
 
-    if (!invoice || invoice.deletedAt) {
+    assertCompanyAccess(invoice, companyId, 'Factura');
+    if (invoice.deletedAt) {
       throw new NotFoundException('Factura no encontrada');
     }
 
@@ -1898,20 +2194,26 @@ export class AccountingService {
     exchangeRate?: number;
     operationNumber?: string;
     stampComplement?: boolean;
-  }, userId: number) {
+  }, userId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+
     if (!Number.isFinite(dto.amount) || dto.amount <= 0) {
       throw new BadRequestException('El monto del pago debe ser mayor a cero');
     }
 
     const speiKey = dto.speiTrackingKey?.trim() || null;
     if (speiKey) {
-      const dup = await this.prisma.payment.findFirst({ where: { speiTrackingKey: speiKey } });
+      const dup = await this.prisma.payment.findFirst({
+        where: { speiTrackingKey: speiKey, ...companyWhere(tenantId) },
+      });
       if (dup) throw new BadRequestException('La clave de rastreo SPEI ya está registrada');
     }
 
     const [payment, invoice] = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT id FROM invoices WHERE id = ${dto.invoiceId} FOR UPDATE`;
-      const locked = await tx.invoice.findUnique({ where: { id: dto.invoiceId } });
+      const locked = await tx.invoice.findFirst({
+        where: { id: dto.invoiceId, ...companyWhere(tenantId) },
+      });
       if (!locked) throw new NotFoundException('Factura no encontrada');
       if (locked.isCancelled) throw new BadRequestException('La factura está cancelada');
       if (locked.deletedAt) throw new NotFoundException('Factura no encontrada');
@@ -1929,9 +2231,13 @@ export class AccountingService {
         );
       }
 
+      let paymentBankAccount: { id: number; companyId: number } | null = null;
       if (dto.bankAccountId) {
-        const bankAccount = await tx.bankAccount.findUnique({ where: { id: dto.bankAccountId } });
-        if (!bankAccount) {
+        paymentBankAccount = await tx.bankAccount.findFirst({
+          where: { id: dto.bankAccountId, ...companyWhere(tenantId) },
+          select: { id: true, companyId: true },
+        });
+        if (!paymentBankAccount) {
           throw new NotFoundException('Cuenta bancaria no encontrada');
         }
       }
@@ -1956,6 +2262,7 @@ export class AccountingService {
           bankAccountId: dto.bankAccountId ?? null,
           notes: dto.notes?.trim() || null,
           createdById: userId,
+          companyId: tenantId,
           satPaymentForm: this.normalizeSatPaymentForm(
             dto.satPaymentForm || this.methodToSatPaymentForm(dto.method),
           ) as any,
@@ -1973,10 +2280,10 @@ export class AccountingService {
         throw new BadRequestException('Conflicto al registrar el pago; reintenta');
       }
 
-      if (dto.bankAccountId) {
+      if (paymentBankAccount) {
         await tx.bankTransaction.create({
           data: {
-            bankAccountId: dto.bankAccountId,
+            bankAccountId: paymentBankAccount.id,
             transactionDate: new Date(dto.paymentDate),
             description: `Pago factura ${locked.invoiceNumber}`,
             amount: new Prisma.Decimal(dto.amount),
@@ -1986,11 +2293,12 @@ export class AccountingService {
             concept: dto.notes?.trim() || `Pago ${locked.invoiceNumber}`,
             counterpartyName: locked.receptorName?.trim() || null,
             counterpartyRfc: locked.receptorRfc?.trim() || null,
+            companyId: requireCompanyId(paymentBankAccount.companyId),
           },
         });
 
         await tx.bankAccount.update({
-          where: { id: dto.bankAccountId },
+          where: { id: paymentBankAccount.id },
           data: {
             currentBalance: isDebit
               ? { decrement: new Prisma.Decimal(dto.amount) }
@@ -2051,7 +2359,7 @@ export class AccountingService {
 
     if (shouldStampComplement) {
       try {
-        const complement = await this.stampPaymentComplement(payment.id, userId);
+        const complement = await this.stampPaymentComplement(payment.id, userId, tenantId);
         return { ...payment, journalEntryId, complement };
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Error al timbrar complemento';
@@ -2095,7 +2403,9 @@ export class AccountingService {
     accountType?: string;
     branch?: string;
     speiEnabled?: boolean;
+    companyId?: number | null;
   }) {
+    const companyId = requireCompanyId(dto.companyId);
     return this.prisma.bankAccount.create({
       data: {
         name: dto.name.trim(),
@@ -2108,13 +2418,15 @@ export class AccountingService {
         accountType: dto.accountType?.trim() || null,
         branch: dto.branch?.trim() || null,
         speiEnabled: dto.speiEnabled ?? true,
+        companyId,
       },
     });
   }
 
-  async listBankAccounts() {
+  async listBankAccounts(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.bankAccount.findMany({
-      where: { isActive: true },
+      where: { isActive: true, ...companyWhere(tenantId) },
       orderBy: { name: 'asc' },
     });
   }
@@ -2128,9 +2440,13 @@ export class AccountingService {
       clabe: string;
       isActive: boolean;
     }>,
+    companyId?: number | null,
   ) {
-    const account = await this.prisma.bankAccount.findUnique({ where: { id } });
-    if (!account) throw new NotFoundException('Cuenta bancaria no encontrada');
+    const tenantId = requireCompanyId(companyId);
+    const account = await this.prisma.bankAccount.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(account, tenantId, 'Cuenta bancaria');
     return this.prisma.bankAccount.update({
       where: { id },
       data: {
@@ -2143,20 +2459,30 @@ export class AccountingService {
     });
   }
 
-  async importBankTransactions(bankAccountId: number, transactions: Array<{
-    transactionDate: string;
-    description: string;
-    amount: number;
-    isDebit: boolean;
-    externalRef?: string;
-    speiTrackingKey?: string;
-    counterpartyRfc?: string;
-    counterpartyName?: string;
-    counterpartyClabe?: string;
-    counterpartyBank?: string;
-    concept?: string;
-    beneficiaryRef?: string;
-  }>) {
+  async importBankTransactions(
+    bankAccountId: number,
+    transactions: Array<{
+      transactionDate: string;
+      description: string;
+      amount: number;
+      isDebit: boolean;
+      externalRef?: string;
+      speiTrackingKey?: string;
+      counterpartyRfc?: string;
+      counterpartyName?: string;
+      counterpartyClabe?: string;
+      counterpartyBank?: string;
+      concept?: string;
+      beneficiaryRef?: string;
+    }>,
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const account = await this.prisma.bankAccount.findFirst({
+      where: { id: bankAccountId, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(account, tenantId, 'Cuenta bancaria');
+    const accountCompanyId = requireCompanyId(account.companyId);
     return this.prisma.bankTransaction.createMany({
       data: transactions.map((t) => ({
         bankAccountId,
@@ -2172,6 +2498,7 @@ export class AccountingService {
         counterpartyBank: t.counterpartyBank?.trim() || null,
         concept: t.concept?.trim() || null,
         beneficiaryRef: t.beneficiaryRef?.trim() || null,
+        companyId: accountCompanyId,
       })),
     });
   }
@@ -2180,8 +2507,14 @@ export class AccountingService {
     bankAccountId: number,
     filters?: { from?: string; to?: string },
     query?: PaginationQueryDto,
+    companyId?: number | null,
   ) {
-    const where: any = { bankAccountId };
+    const tenantId = requireCompanyId(companyId);
+    const account = await this.prisma.bankAccount.findFirst({
+      where: { id: bankAccountId, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(account, tenantId, 'Cuenta bancaria');
+    const where: any = { bankAccountId, ...companyWhere(tenantId) };
     if (filters?.from || filters?.to) {
       where.transactionDate = {};
       if (filters.from) where.transactionDate.gte = new Date(filters.from);
@@ -2201,12 +2534,20 @@ export class AccountingService {
     return buildPaginatedResponse(data, total, pageQuery);
   }
 
-  async reconcileTransaction(transactionId: number, dto: { matchedAmount: number; notes?: string }, userId: number) {
-    const tx = await this.prisma.bankTransaction.findUnique({
-      where: { id: transactionId },
-      include: { reconciliation: true },
+  async reconcileTransaction(
+    transactionId: number,
+    dto: { matchedAmount: number; notes?: string },
+    userId: number,
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const tx = await this.prisma.bankTransaction.findFirst({
+      where: { id: transactionId, ...companyWhere(tenantId) },
+      include: { reconciliation: true, bankAccount: true },
     });
     if (!tx) throw new NotFoundException('Transacción no encontrada');
+    assertCompanyAccess(tx, tenantId, 'Transacción bancaria');
+    assertCompanyAccess(tx.bankAccount, tenantId, 'Cuenta bancaria');
     if (tx.reconciliation) {
       throw new BadRequestException('Esta transacción ya está conciliada');
     }
@@ -2226,6 +2567,7 @@ export class AccountingService {
           notes: dto.notes?.trim() || null,
           reconciledAt: new Date(),
           reconciledById: userId,
+          companyId: requireCompanyId(tx.bankAccount.companyId),
         },
       });
     } catch (err) {
@@ -2237,20 +2579,42 @@ export class AccountingService {
   }
 
   // ── Cost Centers ──────────────────────────────────────────────────
-  async createCostCenter(dto: { code: string; name: string; departmentId?: number; defaultAccountId?: number }) {
-    return this.prisma.costCenter.create({ data: dto as any });
+  async createCostCenter(
+    dto: { code: string; name: string; departmentId?: number; defaultAccountId?: number },
+    companyId?: number | null,
+  ) {
+    const cid = await this.resolveCompanyId(companyId);
+    return this.prisma.costCenter.create({
+      data: {
+        code: dto.code,
+        name: dto.name,
+        departmentId: dto.departmentId,
+        defaultAccountId: dto.defaultAccountId,
+        companyId: cid,
+      } as any,
+    });
   }
 
-  async listCostCenters() {
+  async listCostCenters(companyId?: number | null) {
+    const cid = await this.resolveCompanyId(companyId);
     return this.prisma.costCenter.findMany({
-      where: { isActive: true },
+      where: { isActive: true, companyId: cid },
       include: { department: true },
       orderBy: { code: 'asc' },
     });
   }
 
   // ── Budgets ───────────────────────────────────────────────────────
-  async createBudget(dto: { name: string; costCenterId: number; year: number; month?: number; plannedAmount: number; notes?: string }) {
+  async createBudget(
+    dto: { name: string; costCenterId: number; year: number; month?: number; plannedAmount: number; notes?: string },
+    companyId?: number | null,
+  ) {
+    const cid = await this.resolveCompanyId(companyId);
+    const costCenter = await this.prisma.costCenter.findFirst({
+      where: { id: dto.costCenterId, companyId: cid },
+      select: { id: true },
+    });
+    if (!costCenter) throw new NotFoundException('Centro de costo no encontrado');
     return this.prisma.budget.create({
       data: {
         name: dto.name.trim(),
@@ -2259,13 +2623,15 @@ export class AccountingService {
         month: dto.month ?? null,
         plannedAmount: new Prisma.Decimal(dto.plannedAmount),
         notes: dto.notes?.trim() || null,
+        companyId: cid,
       },
       include: { costCenter: true },
     });
   }
 
-  async listBudgets(filters?: { costCenterId?: number; year?: number }) {
-    const where: any = {};
+  async listBudgets(filters?: { costCenterId?: number; year?: number }, companyId?: number | null) {
+    const cid = await this.resolveCompanyId(companyId);
+    const where: any = { companyId: cid };
     if (filters?.costCenterId) where.costCenterId = filters.costCenterId;
     if (filters?.year) where.year = filters.year;
     return this.prisma.budget.findMany({
@@ -2275,9 +2641,10 @@ export class AccountingService {
     });
   }
 
-  async getBudgetVsActual(costCenterId: number, year: number) {
+  async getBudgetVsActual(costCenterId: number, year: number, companyId?: number | null) {
+    const cid = await this.resolveCompanyId(companyId);
     const budgets = await this.prisma.budget.findMany({
-      where: { costCenterId, year },
+      where: { costCenterId, year, companyId: cid },
       orderBy: { month: 'asc' },
     });
     return budgets.map((b) => ({
@@ -2288,9 +2655,16 @@ export class AccountingService {
   }
 
   // ── CFDI Cancel ───────────────────────────────────────────────────
-  async cancelInvoice(id: number, dto: { cancelReason: string; substitutionUuid?: string }, _userId: number) {
-    const invoice = await this.prisma.invoice.findUnique({ where: { id } });
-    if (!invoice) throw new NotFoundException('Factura no encontrada');
+  async cancelInvoice(
+    id: number,
+    dto: { cancelReason: string; substitutionUuid?: string },
+    _userId: number,
+    companyId?: number | null,
+  ) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
+    });
+    assertCompanyAccess(invoice, companyId, 'Factura');
     if (invoice.isCancelled) throw new BadRequestException('La factura ya está cancelada');
     if (!invoice.cfdiUuid) throw new BadRequestException('La factura no tiene UUID CFDI para cancelar');
     if (!invoice.emisorRfc) throw new BadRequestException('La factura no tiene RFC del emisor');
@@ -2364,9 +2738,12 @@ export class AccountingService {
   }
 
   /** Consulta estatus de un CFDI en el SAT (API REST pública). */
-  async queryCfdiStatus(invoiceId: number) {
-    const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
-    if (!invoice?.cfdiUuid) throw new BadRequestException('La factura no tiene UUID CFDI');
+  async queryCfdiStatus(invoiceId: number, companyId?: number | null) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, ...companyWhere(companyId ?? null) },
+    });
+    assertCompanyAccess(invoice, companyId, 'Factura');
+    if (!invoice.cfdiUuid) throw new BadRequestException('La factura no tiene UUID CFDI');
     if (!invoice.emisorRfc || !invoice.receptorRfc) {
       throw new BadRequestException('Faltan RFC emisor/receptor');
     }
@@ -2391,12 +2768,14 @@ export class AccountingService {
     originalInvoiceId: number,
     dto: { reason?: string; amount?: number; items?: Array<{ description: string; quantity: number; unitPrice: number; taxRate?: number }> },
     userId: number,
+    companyId?: number | null,
   ) {
-    const original = await this.prisma.invoice.findUnique({
-      where: { id: originalInvoiceId },
+    const original = await this.prisma.invoice.findFirst({
+      where: { id: originalInvoiceId, ...companyWhere(companyId ?? null) },
       include: { items: true },
     });
-    if (!original?.cfdiUuid) {
+    assertCompanyAccess(original, companyId, 'Factura');
+    if (!original.cfdiUuid) {
       throw new BadRequestException('Solo se pueden emitir notas de crédito contra facturas timbradas');
     }
     if (original.isCancelled) throw new BadRequestException('La factura original está cancelada');
@@ -2494,12 +2873,24 @@ export class AccountingService {
    * Timbra un Complemento de Pago (CFDI tipo P, Pagos 2.0) para un pago registrado
    * contra una factura PPD timbrada.
    */
-  async stampPaymentComplement(paymentId: number, userId: number) {
-    const payment = await this.prisma.payment.findUnique({
-      where: { id: paymentId },
+  async stampPaymentComplement(paymentId: number, userId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        id: paymentId,
+        OR: [
+          { ...companyWhere(tenantId) },
+          { invoice: companyWhere(tenantId) },
+        ],
+      },
       include: { invoice: { include: { items: true, payments: true } } },
     });
     if (!payment) throw new NotFoundException('Pago no encontrado');
+    if (payment.companyId != null) {
+      assertCompanyAccess(payment, tenantId, 'Pago');
+    } else {
+      assertCompanyAccess(payment.invoice, tenantId, 'Pago');
+    }
     if (payment.cfdiPaymentUuid) throw new BadRequestException('Este pago ya tiene complemento timbrado');
     const invoice = payment.invoice;
     if (!invoice?.cfdiUuid) throw new BadRequestException('La factura no está timbrada');
@@ -2510,7 +2901,7 @@ export class AccountingService {
       throw new BadRequestException('Faltan RFC emisor/receptor');
     }
 
-    const issuerProfile = await this.getInvoiceIssuerProfile();
+    const issuerProfile = await this.getInvoiceIssuerProfile(tenantId);
     const previousPayments = invoice.payments.filter((p) => p.id !== payment.id && p.cfdiPaymentUuid);
     const previousPaid = previousPayments.reduce((s, p) => s + Number(p.amount), 0);
     const previousBalance = Number(invoice.totalAmount) - previousPaid;
@@ -2575,13 +2966,15 @@ export class AccountingService {
   }
 
   // ── Overdue invoices ──────────────────────────────────────────────
-  async getOverdueInvoices() {
+  async getOverdueInvoices(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     return this.prisma.invoice.findMany({
       where: {
         deletedAt: null,
         status: { in: ['SENT', 'PARTIALLY_PAID'] },
         dueDate: { lt: new Date() },
         isCancelled: false,
+        ...companyWhere(tenantId),
       },
       include: { client: true, payments: true },
       orderBy: { dueDate: 'asc' },
@@ -2589,7 +2982,8 @@ export class AccountingService {
   }
 
   // ── Dashboard ejecutivo financiero (P&L + cash + AR/AP) ─────────────
-  async getFinancialDashboard() {
+  async getFinancialDashboard(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfYear = new Date(now.getFullYear(), 0, 1);
@@ -2612,15 +3006,15 @@ export class AccountingService {
       ytdInvoiceCount,
     ] = await Promise.all([
       this.prisma.invoice.aggregate({
-        where: { deletedAt: null, type: 'ACCOUNTS_RECEIVABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false },
+        where: { deletedAt: null, type: 'ACCOUNTS_RECEIVABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false, ...companyWhere(tenantId) },
         _sum: { totalAmount: true, paidAmount: true },
       }),
       this.prisma.invoice.aggregate({
-        where: { deletedAt: null, type: 'ACCOUNTS_PAYABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false },
+        where: { deletedAt: null, type: 'ACCOUNTS_PAYABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false, ...companyWhere(tenantId) },
         _sum: { totalAmount: true, paidAmount: true },
       }),
       this.prisma.bankAccount.findMany({
-        where: { isActive: true },
+        where: { isActive: true, ...companyWhere(tenantId) },
         select: { id: true, name: true, bankName: true, currentBalance: true, currency: true },
       }).catch(() => []),
       this.prisma.invoice.aggregate({
@@ -2629,6 +3023,7 @@ export class AccountingService {
           type: 'ACCOUNTS_RECEIVABLE',
           issueDate: { gte: startOfMonth },
           isCancelled: false,
+          ...companyWhere(tenantId),
         },
         _sum: { subtotal: true, totalAmount: true },
       }),
@@ -2638,15 +3033,16 @@ export class AccountingService {
           type: 'ACCOUNTS_PAYABLE',
           issueDate: { gte: startOfMonth },
           isCancelled: false,
+          ...companyWhere(tenantId),
         },
         _sum: { subtotal: true, totalAmount: true },
       }),
       this.prisma.invoice.aggregate({
-        where: { deletedAt: null, type: 'ACCOUNTS_RECEIVABLE', issueDate: { gte: startOfYear }, isCancelled: false },
+        where: { deletedAt: null, type: 'ACCOUNTS_RECEIVABLE', issueDate: { gte: startOfYear }, isCancelled: false, ...companyWhere(tenantId) },
         _sum: { subtotal: true, totalAmount: true },
       }),
       this.prisma.invoice.aggregate({
-        where: { deletedAt: null, type: 'ACCOUNTS_PAYABLE', issueDate: { gte: startOfYear }, isCancelled: false },
+        where: { deletedAt: null, type: 'ACCOUNTS_PAYABLE', issueDate: { gte: startOfYear }, isCancelled: false, ...companyWhere(tenantId) },
         _sum: { subtotal: true, totalAmount: true },
       }),
       this.prisma.invoice.aggregate({
@@ -2655,28 +3051,29 @@ export class AccountingService {
           type: 'ACCOUNTS_RECEIVABLE',
           issueDate: { gte: startOfPrevMonth, lte: endOfPrevMonth },
           isCancelled: false,
+          ...companyWhere(tenantId),
         },
         _sum: { subtotal: true, totalAmount: true },
       }),
       this.prisma.invoice.groupBy({
         by: ['receptorName'],
-        where: { deletedAt: null, type: 'ACCOUNTS_RECEIVABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false },
+        where: { deletedAt: null, type: 'ACCOUNTS_RECEIVABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false, ...companyWhere(tenantId) },
         _sum: { totalAmount: true, paidAmount: true },
         orderBy: { _sum: { totalAmount: 'desc' } },
         take: 5,
       }),
       this.prisma.invoice.groupBy({
         by: ['receptorName'],
-        where: { deletedAt: null, type: 'ACCOUNTS_PAYABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false },
+        where: { deletedAt: null, type: 'ACCOUNTS_PAYABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false, ...companyWhere(tenantId) },
         _sum: { totalAmount: true, paidAmount: true },
         orderBy: { _sum: { totalAmount: 'desc' } },
         take: 5,
       }),
       this.prisma.invoice.count({
-        where: { deletedAt: null, status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: now }, isCancelled: false },
+        where: { deletedAt: null, status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: now }, isCancelled: false, ...companyWhere(tenantId) },
       }),
-      this.prisma.invoice.count({ where: { deletedAt: null, issueDate: { gte: startOfMonth } } }),
-      this.prisma.invoice.count({ where: { deletedAt: null, issueDate: { gte: startOfYear } } }),
+      this.prisma.invoice.count({ where: { deletedAt: null, issueDate: { gte: startOfMonth }, ...companyWhere(tenantId) } }),
+      this.prisma.invoice.count({ where: { deletedAt: null, issueDate: { gte: startOfYear }, ...companyWhere(tenantId) } }),
     ]);
 
     const arTotal = Number(arAggregate._sum.totalAmount || 0);
@@ -2751,8 +3148,9 @@ export class AccountingService {
   /**
    * Inteligencia financiera: aging AR/AP, cashflow 90d, DSO/DPO, runway proxy.
    */
-  async getFinanceInsights() {
-    const base = await this.getFinancialDashboard();
+  async getFinanceInsights(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const base = await this.getFinancialDashboard(tenantId);
     const now = new Date();
     const d90 = new Date(now.getTime() - 90 * 86_400_000);
 
@@ -2761,6 +3159,7 @@ export class AccountingService {
         deletedAt: null,
         isCancelled: false,
         status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] },
+        ...companyWhere(tenantId),
       },
       select: {
         id: true,
@@ -2799,7 +3198,7 @@ export class AccountingService {
     }
 
     const payments = await this.prisma.payment.findMany({
-      where: { paymentDate: { gte: d90 } },
+      where: { paymentDate: { gte: d90 }, invoice: companyWhere(tenantId) },
       select: {
         amount: true,
         paymentDate: true,
@@ -2837,6 +3236,7 @@ export class AccountingService {
         type: 'ACCOUNTS_RECEIVABLE',
         issueDate: { gte: d90 },
         isCancelled: false,
+        ...companyWhere(tenantId),
       },
       _sum: { totalAmount: true },
     });
@@ -2846,6 +3246,7 @@ export class AccountingService {
         type: 'ACCOUNTS_PAYABLE',
         issueDate: { gte: d90 },
         isCancelled: false,
+        ...companyWhere(tenantId),
       },
       _sum: { totalAmount: true },
     });
@@ -2926,29 +3327,31 @@ export class AccountingService {
   }
 
   // ── Invoice Dashboard ─────────────────────────────────────────────
-  async getInvoiceDashboard() {
+  async getInvoiceDashboard(companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
     const [totalAR, totalAP, overdueCount, monthInvoices, recentPayments] = await Promise.all([
       this.prisma.invoice.aggregate({
-        where: { deletedAt: null, type: 'ACCOUNTS_RECEIVABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false },
+        where: { deletedAt: null, type: 'ACCOUNTS_RECEIVABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false, ...companyWhere(tenantId) },
         _sum: { totalAmount: true, paidAmount: true },
         _count: true,
       }),
       this.prisma.invoice.aggregate({
-        where: { deletedAt: null, type: 'ACCOUNTS_PAYABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false },
+        where: { deletedAt: null, type: 'ACCOUNTS_PAYABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false, ...companyWhere(tenantId) },
         _sum: { totalAmount: true, paidAmount: true },
         _count: true,
       }),
       this.prisma.invoice.count({
-        where: { deletedAt: null, status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: now }, isCancelled: false },
+        where: { deletedAt: null, status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: now }, isCancelled: false, ...companyWhere(tenantId) },
       }),
       this.prisma.invoice.count({
-        where: { deletedAt: null, issueDate: { gte: startOfMonth, lte: endOfMonth } },
+        where: { deletedAt: null, issueDate: { gte: startOfMonth, lte: endOfMonth }, ...companyWhere(tenantId) },
       }),
       this.prisma.payment.findMany({
+        where: { invoice: companyWhere(tenantId) },
         take: 10,
         orderBy: { paymentDate: 'desc' },
         include: { invoice: { select: { invoiceNumber: true, type: true, receptorName: true } } },
@@ -2975,9 +3378,12 @@ export class AccountingService {
   }
 
   // ── Bank Account Summary ──────────────────────────────────────────
-  async getBankAccountSummary(bankAccountId: number) {
-    const account = await this.prisma.bankAccount.findUnique({ where: { id: bankAccountId } });
-    if (!account) throw new NotFoundException('Cuenta bancaria no encontrada');
+  async getBankAccountSummary(bankAccountId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const account = await this.prisma.bankAccount.findFirst({
+      where: { id: bankAccountId, ...companyWhere(tenantId) },
+    });
+    assertCompanyAccess(account, tenantId, 'Cuenta bancaria');
 
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -2985,15 +3391,15 @@ export class AccountingService {
     const [monthSummary, unreconciled, lastTransactions] = await Promise.all([
       this.prisma.bankTransaction.groupBy({
         by: ['isDebit'],
-        where: { bankAccountId, transactionDate: { gte: startOfMonth } },
+        where: { bankAccountId, ...companyWhere(tenantId), transactionDate: { gte: startOfMonth } },
         _sum: { amount: true },
         _count: true,
       }),
       this.prisma.bankTransaction.count({
-        where: { bankAccountId, reconciliation: null },
+        where: { bankAccountId, ...companyWhere(tenantId), reconciliation: null },
       }),
       this.prisma.bankTransaction.findMany({
-        where: { bankAccountId },
+        where: { bankAccountId, ...companyWhere(tenantId) },
         take: 20,
         orderBy: { transactionDate: 'desc' },
       }),
@@ -3013,22 +3419,33 @@ export class AccountingService {
   }
 
   // ── SPEI Transaction lookup ───────────────────────────────────────
-  async findTransactionBySpei(trackingKey: string) {
+  async findTransactionBySpei(trackingKey: string, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
     const tx = await this.prisma.bankTransaction.findFirst({
-      where: { speiTrackingKey: trackingKey.trim() },
+      where: {
+        speiTrackingKey: trackingKey.trim(),
+        ...companyWhere(tenantId),
+      },
       include: { bankAccount: true, reconciliation: true },
     });
     if (!tx) throw new NotFoundException('Transacción SPEI no encontrada');
+    assertCompanyAccess(tx, tenantId, 'Transacción bancaria');
+    assertCompanyAccess(tx.bankAccount, tenantId, 'Cuenta bancaria');
     return tx;
   }
 
   // ── Financial Reports PDF ────────────────────────────────────────
-  async getFinancialReportsForPdf(fromDate?: string, toDate?: string, asOfDate?: string) {
+  async getFinancialReportsForPdf(
+    fromDate?: string,
+    toDate?: string,
+    asOfDate?: string,
+    companyId?: number | null,
+  ) {
     // Get all three reports
     const [trialBalance, incomeStatement, balanceSheet] = await Promise.all([
-      this.getTrialBalance(),
-      this.getIncomeStatement(fromDate, toDate),
-      this.getBalanceSheet(asOfDate),
+      this.getTrialBalance(undefined, companyId),
+      this.getIncomeStatement(fromDate, toDate, companyId),
+      this.getBalanceSheet(asOfDate, companyId),
     ]);
 
     return {

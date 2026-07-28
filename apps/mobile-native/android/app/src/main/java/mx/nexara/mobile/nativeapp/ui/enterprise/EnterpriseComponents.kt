@@ -132,7 +132,7 @@ fun NxKpiCard(
         colors = CardDefaults.cardColors(containerColor = NxColors.Card),
         elevation = CardDefaults.cardElevation(2.dp),
     ) {
-        Column(Modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(kpi.label, style = MaterialTheme.typography.labelMedium, color = NxColors.Muted)
             Text(
                 kpi.value,

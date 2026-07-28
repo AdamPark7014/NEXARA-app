@@ -4,10 +4,10 @@ import SwiftUI
 
 @MainActor
 final class InvoicesVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
-    @Published var query        = ""
+    @Published var items: [InvoiceItem] = []
+    @Published var query = ""
     @Published var statusFilter = "todos"
-    @Published var isLoading    = false
+    @Published var isLoading = false
     @Published var acting = false
     @Published var message: String?
     @Published var detail: [String: Any] = [:]
@@ -21,28 +21,31 @@ final class InvoicesVM: ObservableObject {
         return perms.contains { $0.contains("invoicing.manage") || $0.contains("contabilidad.manage") || $0.contains("console.admin") }
     }
 
-    var filtered: [[String: Any]] {
+    var filtered: [InvoiceItem] {
         var list = items
         if statusFilter != "todos" {
-            list = list.filter { invStr($0, "status", "estatus").lowercased() == statusFilter }
+            list = list.filter { $0.status.lowercased() == statusFilter }
         }
         if !query.isEmpty {
             let q = query.lowercased()
-            list = list.filter { row in
-                invStr(row, "folio", "invoiceNumber", "number").lowercased().contains(q) ||
-                invStr(row, "clientName", "cliente").lowercased().contains(q)
+            list = list.filter {
+                $0.folio.lowercased().contains(q) || $0.clientName.lowercased().contains(q)
             }
         }
         return list
     }
 
-    var totalPaid:    Double { items.filter { invStr($0, "status","estatus").lowercased() == "pagada" }.reduce(0) { $0 + (invDouble($1, "total","amount") ?? 0) } }
-    var totalPending: Double { items.filter { invStr($0, "status","estatus").lowercased() == "pendiente" }.reduce(0) { $0 + (invDouble($1, "total","amount") ?? 0) } }
+    var totalPaid: Double {
+        items.filter { $0.status.lowercased() == "pagada" }.reduce(0) { $0 + ($1.total ?? 0) }
+    }
+    var totalPending: Double {
+        items.filter { $0.status.lowercased() == "pendiente" }.reduce(0) { $0 + ($1.total ?? 0) }
+    }
 
     func load() {
         isLoading = true
         Task {
-            items     = await ExtraRepository.shared.invoices()
+            items = await ExtraRepository.shared.invoiceItems()
             isLoading = false
         }
     }
@@ -91,7 +94,7 @@ final class InvoicesVM: ObservableObject {
 
 struct InvoicesView: View {
     @StateObject private var vm = InvoicesVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: InvoiceItem?
     @State private var payAmount = ""
     @State private var payMethod = "TRANSFERENCIA"
     @State private var payRef = ""
@@ -115,11 +118,11 @@ struct InvoicesView: View {
             VStack(alignment: .leading, spacing: 14) {
                 if !vm.items.isEmpty {
                     HStack(spacing: 0) {
-                        InvKpi(label: "Total",    value: "\(vm.items.count)",          color: .primary)
+                        InvKpi(label: "Total", value: "\(vm.items.count)", color: .primary)
                         Divider().frame(height: 36)
-                        InvKpi(label: "Pagadas",  value: fmtInv(vm.totalPaid),         color: .green)
+                        InvKpi(label: "Pagadas", value: fmtInv(vm.totalPaid), color: .green)
                         Divider().frame(height: 36)
-                        InvKpi(label: "Pendiente",value: fmtInv(vm.totalPending),      color: .orange)
+                        InvKpi(label: "Pendiente", value: fmtInv(vm.totalPending), color: .orange)
                     }
                     .padding(.horizontal).padding(.vertical, 6)
                     .background(Color(.secondarySystemGroupedBackground))
@@ -158,7 +161,7 @@ struct InvoicesView: View {
                     Text("Sin facturas").foregroundColor(.secondary).frame(maxWidth: .infinity).padding(.top, 40)
                 } else {
                     VStack(spacing: 6) {
-                        ForEach(vm.filtered.prefix(50), id: \.invId) { inv in
+                        ForEach(vm.filtered.prefix(50)) { inv in
                             Button { selected = inv } label: {
                                 InvoiceCard(item: inv).padding(.horizontal)
                             }
@@ -173,15 +176,13 @@ struct InvoicesView: View {
     }
 
     @ViewBuilder
-    private func invDetail(_ inv: [String: Any]) -> some View {
-        let folio  = invStr(inv, "folio", "invoiceNumber", "number")
-        let status = invStr(inv, "status", "estatus")
-        let color  = invStatusColor(status)
-        let id = ConsoleHelpers.mapInt64(inv, "id")
-        let merged = vm.detail.isEmpty ? inv : vm.detail.merging(inv) { new, _ in new }
-        let pdfUrl = invStr(merged, "pdfUrl")
-        let matchStatus = invStr(merged, "matchStatus", "threeWayMatchStatus")
-        let pending = status.lowercased().contains("pendiente")
+    private func invDetail(_ inv: InvoiceItem) -> some View {
+        let merged = vm.detail.isEmpty ? inv.toFlatMap() : vm.detail.merging(inv.toFlatMap()) { new, _ in new }
+        let status = invStr(merged, "status", "estatus").ifEmpty(inv.status)
+        let color = invStatusColor(status)
+        let pdfUrl = invStr(merged, "pdfUrl").ifEmpty(inv.pdfUrl)
+        let matchStatus = invStr(merged, "matchStatus", "threeWayMatchStatus").ifEmpty(inv.matchStatus)
+        let pending = inv.isPendingPayment || status.lowercased().contains("pendiente")
             || status.lowercased().contains("parcial")
             || status.lowercased().contains("open")
             || status.lowercased().contains("posted")
@@ -198,17 +199,17 @@ struct InvoicesView: View {
                 }
             }
             Section("Factura") {
-                iRow("Folio",    folio)
-                iRow("Cliente",  invStr(merged, "clientName", "cliente"))
-                if let t = invDouble(merged, "total", "amount") {
+                iRow("Folio", inv.displayFolio)
+                iRow("Cliente", invStr(merged, "clientName", "cliente").ifEmpty(inv.clientName))
+                if let t = invDouble(merged, "total", "amount") ?? inv.total {
                     HStack { Text("Total"); Spacer(); Text(fmtInv(t)).foregroundColor(.secondary) }
                 }
-                if let bal = invDouble(merged, "balance", "amountDue") {
+                if let bal = invDouble(merged, "balance", "amountDue") ?? inv.balance {
                     HStack { Text("Saldo"); Spacer(); Text(fmtInv(bal)).foregroundColor(.orange) }
                 }
-                iRow("RFC",      invStr(merged, "rfc", "taxId"))
-                iRow("Fecha",    String(invStr(merged, "createdAt", "issuedAt", "issueDate", "fecha").prefix(10)))
-                iRow("Vence",    String(invStr(merged, "dueDate", "fechaVencimiento").prefix(10)))
+                iRow("RFC", invStr(merged, "rfc", "taxId").ifEmpty(inv.rfc))
+                iRow("Fecha", String((invStr(merged, "createdAt", "issuedAt", "issueDate", "fecha").ifEmpty(inv.issueDate)).prefix(10)))
+                iRow("Vence", String((invStr(merged, "dueDate", "fechaVencimiento").ifEmpty(inv.dueDate)).prefix(10)))
                 iRow("3-way match", matchStatus)
             }
             if !pdfUrl.isEmpty {
@@ -218,10 +219,10 @@ struct InvoicesView: View {
                     }
                 }
             }
-            if vm.canManage, let id {
+            if vm.canManage, inv.id > 0 {
                 Section("Acciones") {
                     Button(vm.acting ? "…" : "Evaluar 3-way match") {
-                        Task { await vm.evaluateMatch(id: id) }
+                        Task { await vm.evaluateMatch(id: inv.id) }
                     }
                     .disabled(vm.acting)
                     if pending {
@@ -234,7 +235,7 @@ struct InvoicesView: View {
                                     vm.message = "❌ Monto inválido"; return
                                 }
                                 let ok = await vm.registerPayment(
-                                    id: id, amount: amt,
+                                    id: inv.id, amount: amt,
                                     method: payMethod.isEmpty ? nil : payMethod,
                                     reference: payRef.isEmpty ? nil : payRef
                                 )
@@ -248,12 +249,12 @@ struct InvoicesView: View {
             if let msg = vm.message {
                 Section { Text(msg).foregroundColor(msg.hasPrefix("✅") ? .green : .red) }
             }
-            let notes = invStr(merged, "notes", "notas", "description")
+            let notes = invStr(merged, "notes", "notas", "description").ifEmpty(inv.notes)
             if !notes.isEmpty { Section("Notas") { Text(notes).font(.subheadline) } }
         }
         .listStyle(.insetGrouped)
         .task {
-            if let id { vm.loadDetail(id: id) }
+            if inv.id > 0 { vm.loadDetail(id: inv.id) }
         }
     }
 
@@ -265,31 +266,26 @@ struct InvoicesView: View {
 // MARK: – Card
 
 private struct InvoiceCard: View {
-    let item: [String: Any]
+    let item: InvoiceItem
     var body: some View {
-        let folio  = invStr(item, "folio", "invoiceNumber", "number")
-        let client = invStr(item, "clientName", "cliente")
-        let status = invStr(item, "status", "estatus")
-        let total  = invDouble(item, "total", "amount")
-        let date   = String(invStr(item, "createdAt", "issuedAt", "fecha").prefix(10))
-        let color  = invStatusColor(status)
-
+        let color = invStatusColor(item.status)
         HStack(spacing: 0) {
             Rectangle().fill(color).frame(width: 4).clipShape(RoundedRectangle(cornerRadius: 2))
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(folio.isEmpty ? "Sin folio" : folio).font(.subheadline).bold()
-                        if !client.isEmpty { Text(client).font(.caption).foregroundColor(.secondary) }
+                        Text(item.displayFolio).font(.subheadline).bold()
+                        if !item.clientName.isEmpty { Text(item.clientName).font(.caption).foregroundColor(.secondary) }
                     }
                     Spacer()
-                    if let t = total { Text(fmtInv(t)).font(.subheadline).bold() }
+                    if let t = item.total { Text(fmtInv(t)).font(.subheadline).bold() }
                 }
                 HStack {
-                    Text(status.capitalized).font(.caption2).bold().foregroundColor(color)
+                    Text(item.status.capitalized).font(.caption2).bold().foregroundColor(color)
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(color.opacity(0.12)).clipShape(Capsule())
                     Spacer()
+                    let date = String(item.issueDate.prefix(10))
                     if !date.isEmpty { Text(date).font(.caption2).foregroundColor(.secondary) }
                 }
             }
@@ -339,7 +335,7 @@ private func invDouble(_ m: [String: Any], _ keys: String...) -> Double? {
 
 private func fmtInv(_ v: Double) -> String {
     if v >= 1_000_000 { return String(format: "$%.1fM", v / 1_000_000) }
-    if v >= 1_000     { return String(format: "$%.0fK", v / 1_000) }
+    if v >= 1_000 { return String(format: "$%.0fK", v / 1_000) }
     let f = NumberFormatter(); f.numberStyle = .currency; f.currencyCode = "MXN"; f.maximumFractionDigits = 0
     return f.string(from: NSNumber(value: v)) ?? "$\(Int(v))"
 }
@@ -354,10 +350,6 @@ private func invStatusColor(_ status: String) -> Color {
     }
 }
 
-extension [String: Any] {
-    fileprivate var invId: String {
-        if let n = self["id"] as? Int { return "inv-\(n)" }
-        if let s = self["id"] as? String { return "inv-\(s)" }
-        return UUID().uuidString
-    }
+private extension String {
+    func ifEmpty(_ fallback: String) -> String { isEmpty ? fallback : self }
 }

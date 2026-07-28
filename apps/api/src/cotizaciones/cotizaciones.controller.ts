@@ -9,6 +9,7 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
 @Controller('cotizaciones')
@@ -19,22 +20,29 @@ export class CotizacionesController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
   @Post()
-  create(@CurrentUser() user: any, @Body() dto: CreateCotizacionDto) {
-    return this.cotizacionesService.create(dto, user?.id);
+  create(
+    @CurrentUser() user: any,
+    @Body() dto: CreateCotizacionDto,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.create(dto, user?.id, companyId);
   }
 
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
   @Get()
-  findAll(@Query() query: PaginationQueryDto) {
-    return this.cotizacionesService.findAll(query);
+  findAll(@Query() query: PaginationQueryDto, @CurrentCompanyId() companyId: number | null) {
+    return this.cotizacionesService.findAll(query, companyId);
   }
 
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.cotizacionesService.findOne(id);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.cotizacionesService.findOne(id, companyId);
   }
 
   @UseGuards(RbacGuard)
@@ -44,8 +52,9 @@ export class CotizacionesController {
     @CurrentUser() user: any,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCotizacionDto,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.cotizacionesService.update(id, dto, user?.id);
+    return this.cotizacionesService.update(id, dto, user?.id, companyId);
   }
 
   @UseGuards(RbacGuard)
@@ -55,16 +64,21 @@ export class CotizacionesController {
     @CurrentUser() user: any,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: SendCotizacionDto,
+    @CurrentCompanyId() companyId: number | null,
   ) {
-    return this.cotizacionesService.send(id, dto, user?.id);
+    return this.cotizacionesService.send(id, dto, user?.id, companyId);
   }
 
   @UseGuards(RbacGuard)
   // Quien puede ver la cotización (SALES_VIEW) también puede descargar su PDF
   @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS] })
   @Get(':id/pdf')
-  async downloadPdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
-    const pdf = await this.cotizacionesService.getPdfBuffer(id);
+  async downloadPdf(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.cotizacionesService.getPdfBuffer(id, companyId);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=cotizacion-${id}.pdf`);
     res.send(pdf);

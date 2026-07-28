@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Oportunidades
 
 struct CrmOpportunitiesView: View {
-    @State private var items: [[String: Any]] = []
+    @State private var items: [CrmOpportunity] = []
     @State private var query = ""
     @State private var isLoading = true
     @State private var selectedId: Int?
@@ -12,12 +12,11 @@ struct CrmOpportunitiesView: View {
     @State private var creating = false
     @State private var createError: String?
 
-    private var filtered: [[String: Any]] {
+    private var filtered: [CrmOpportunity] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter {
-            ConsoleHelpers.mapStr($0, "title", "name", "titulo").lowercased().contains(q) ||
-            ConsoleHelpers.mapStr($0, "stage", "etapa").lowercased().contains(q)
+            $0.title.lowercased().contains(q) || $0.stage.lowercased().contains(q)
         }
     }
 
@@ -33,19 +32,17 @@ struct CrmOpportunitiesView: View {
                         else if filtered.isEmpty {
                             Spacer(); Text("Sin oportunidades").foregroundColor(.secondary); Spacer()
                         } else {
-                            List(filtered, id: \.crmKey) { o in
+                            List(filtered) { o in
                                 Button {
-                                    if let id = ConsoleHelpers.mapInt64(o, "id") {
-                                        selectedId = Int(id)
-                                    }
+                                    if o.id > 0 { selectedId = Int(o.id) }
                                 } label: {
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text(ConsoleHelpers.mapStr(o, "title", "name", "titulo")).font(.headline)
+                                        Text(o.displayTitle).font(.headline)
                                         HStack {
-                                            CrmStageChip(text: ConsoleHelpers.mapStr(o, "stage", "etapa", "status"))
+                                            CrmStageChip(text: o.stageKey)
                                             Spacer()
-                                            if let v = o["value"] as? NSNumber {
-                                                Text(crmMxn(v.doubleValue)).font(.caption).bold()
+                                            if o.value > 0 {
+                                                Text(crmMxn(o.value)).font(.caption).bold()
                                             }
                                         }
                                     }
@@ -105,17 +102,17 @@ struct CrmOpportunitiesView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await CrmRepository.shared.oportunidades()) ?? []
+        items = (try? await CrmRepository.shared.opportunityItems()) ?? []
     }
 }
 
 // MARK: - Clientes comerciales
 
 struct CrmCommercialClientsView: View {
-    @State private var items: [[String: Any]] = []
+    @State private var items: [CrmClient] = []
     @State private var query = ""
     @State private var isLoading = true
-    @State private var selected: [String: Any]?
+    @State private var selected: CrmClient?
 
     var body: some View {
         Group {
@@ -128,41 +125,41 @@ struct CrmCommercialClientsView: View {
     private var listBody: some View {
         VStack(spacing: 0) {
             crmSearchBar("Buscar cliente…", text: $query)
-            List(filtered, id: \.crmKey) { c in
+            List(filtered) { c in
                 Button { selected = c } label: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(ConsoleHelpers.mapStr(c, "name", "nombre", "razonSocial")).font(.headline)
-                        Text(ConsoleHelpers.mapStr(c, "email", "rfc")).font(.caption).foregroundColor(.secondary)
+                        Text(c.displayName).font(.headline)
+                        Text(c.subtitle).font(.caption).foregroundColor(.secondary)
                     }
                 }
             }
         }
     }
 
-    private var filtered: [[String: Any]] {
+    private var filtered: [CrmClient] {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
-        return items.filter { ConsoleHelpers.mapStr($0, "name", "nombre").lowercased().contains(q) }
+        return items.filter { $0.name.lowercased().contains(q) }
     }
 
-    private func clientDetail(_ c: [String: Any]) -> some View {
-        CrmClientDetailView(client: c, onBack: { selected = nil })
+    private func clientDetail(_ c: CrmClient) -> some View {
+        CrmClientDetailView(client: c.raw, onBack: { selected = nil })
     }
 
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await CrmRepository.shared.clientes()) ?? []
+        items = (try? await CrmRepository.shared.clientItems()) ?? []
     }
 }
 
 // MARK: - Productos
 
 struct CrmProductsView: View {
-    @State private var items: [[String: Any]] = []
+    @State private var items: [CrmProduct] = []
     @State private var query = ""
     @State private var isLoading = true
-    @State private var selected: [String: Any]?
+    @State private var selected: CrmProduct?
 
     var body: some View {
         Group {
@@ -179,16 +176,16 @@ struct CrmProductsView: View {
                 .onSubmit { Task { await reload() } }
             if isLoading { Spacer(); ProgressView(); Spacer() }
             else {
-                List(items, id: \.crmKey) { p in
+                List(items) { p in
                     Button { selected = p } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(ConsoleHelpers.mapStr(p, "name", "nombre")).font(.headline)
-                                Text(ConsoleHelpers.mapStr(p, "sku", "code")).font(.caption).foregroundColor(.secondary)
+                                Text(p.displayName).font(.headline)
+                                Text(p.sku).font(.caption).foregroundColor(.secondary)
                             }
                             Spacer()
-                            if let price = p["price"] as? NSNumber {
-                                Text(crmMxn(price.doubleValue)).font(.subheadline).bold()
+                            if p.price > 0 {
+                                Text(crmMxn(p.price)).font(.subheadline).bold()
                             }
                         }
                     }
@@ -200,23 +197,24 @@ struct CrmProductsView: View {
     }
 
     @ViewBuilder
-    private func productDetail(_ p: [String: Any]) -> some View {
+    private func productDetail(_ p: CrmProduct) -> some View {
+        let raw = p.raw
         List {
             Section {
                 Button("← Catálogo") { selected = nil }
             }
             Section("Producto") {
-                prodRow("Nombre", ConsoleHelpers.mapStr(p, "name", "nombre"))
-                prodRow("SKU / Código", ConsoleHelpers.mapStr(p, "sku", "code", "codigo"))
-                if let price = p["price"] as? NSNumber {
-                    HStack { Text("Precio"); Spacer(); Text(crmMxn(price.doubleValue)).foregroundColor(.secondary) }
+                prodRow("Nombre", p.displayName)
+                prodRow("SKU / Código", p.sku)
+                if p.price > 0 {
+                    HStack { Text("Precio"); Spacer(); Text(crmMxn(p.price)).foregroundColor(.secondary) }
                 }
-                prodRow("Categoría", ConsoleHelpers.mapStr(p, "category", "categoria", "tipo"))
-                prodRow("Stock", ConsoleHelpers.mapStr(p, "stock", "quantity", "inventario"))
-                prodRow("Unidad", ConsoleHelpers.mapStr(p, "unit", "unidad"))
-                prodRow("Proveedor", ConsoleHelpers.mapStr(p, "supplier", "proveedor"))
+                prodRow("Categoría", StockParse.str(raw["category"], raw["categoria"], raw["tipo"]))
+                prodRow("Stock", StockParse.str(raw["stock"], raw["quantity"], raw["inventario"]))
+                prodRow("Unidad", StockParse.str(raw["unit"], raw["unidad"]))
+                prodRow("Proveedor", StockParse.str(raw["supplier"], raw["proveedor"]))
             }
-            let desc = ConsoleHelpers.mapStr(p, "description", "descripcion", "notas")
+            let desc = StockParse.str(raw["description"], raw["descripcion"], raw["notas"])
             if !desc.isEmpty {
                 Section("Descripción") { Text(desc).font(.subheadline) }
             }
@@ -232,16 +230,16 @@ struct CrmProductsView: View {
         isLoading = true
         defer { isLoading = false }
         let q = query.isEmpty ? nil : query
-        items = (try? await CrmRepository.shared.products(search: q)) ?? []
+        items = (try? await CrmRepository.shared.productos(search: q)) ?? []
     }
 }
 
 // MARK: - Proyectos ventas
 
 struct CrmProjectsView: View {
-    @State private var items: [[String: Any]] = []
+    @State private var items: [CrmSalesProject] = []
     @State private var isLoading = true
-    @State private var selected: [String: Any]?
+    @State private var selected: CrmSalesProject?
 
     var body: some View {
         Group {
@@ -259,15 +257,15 @@ struct CrmProjectsView: View {
     private var listBody: some View {
         List {
             if isLoading { ProgressView() }
-            ForEach(items, id: \.crmKey) { p in
+            ForEach(items) { p in
                 Button { selected = p } label: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(ConsoleHelpers.mapStr(p, "name", "title", "nombre")).font(.headline)
+                        Text(p.displayName).font(.headline)
                         HStack {
-                            CrmStageChip(text: ConsoleHelpers.mapStr(p, "status", "estado"))
+                            CrmStageChip(text: p.status)
                             Spacer()
-                            if let client = p["client"] as? [String: Any] {
-                                Text(ConsoleHelpers.mapStr(client, "name", "nombre")).font(.caption).foregroundColor(.secondary)
+                            if !p.clientName.isEmpty {
+                                Text(p.clientName).font(.caption).foregroundColor(.secondary)
                             }
                         }
                     }
@@ -280,39 +278,27 @@ struct CrmProjectsView: View {
     private func reload() async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await CrmRepository.shared.proyectos()) ?? []
+        items = (try? await CrmRepository.shared.projectItems()) ?? []
     }
 }
 
 struct CrmProjectDetailView: View {
-    let project: [String: Any]
+    let project: CrmSalesProject
     let onBack: () -> Void
 
     @State private var tab = 0
-    @State private var detail: [String: Any] = [:]
+    @State private var detail: CrmSalesProject?
     @State private var loading = true
 
     private let tabs = ["Info", "Costos", "Orden de cierre"]
 
-    private func pStr(_ keys: String...) -> String {
-        let src = detail.isEmpty ? project : detail
-        for k in keys {
-            let v = ConsoleHelpers.mapStr(src, k)
-            if !v.isEmpty { return v }
-        }
-        return ""
-    }
-
-    private func nestedList(_ key: String) -> [[String: Any]] {
-        let src = detail.isEmpty ? project : detail
-        return (src[key] as? [[String: Any]]) ?? []
-    }
+    private var current: CrmSalesProject { detail ?? project }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 Button("← Volver", action: onBack)
-                Text(pStr("name", "title", "nombre").isEmpty ? "Proyecto" : pStr("name", "title", "nombre"))
+                Text(current.displayName)
                     .font(.headline).lineLimit(1)
                 Spacer()
             }
@@ -338,43 +324,49 @@ struct CrmProjectDetailView: View {
     }
 
     private var infoTab: some View {
-        List {
+        let p = current
+        return List {
             Section {
-                CrmStageChip(text: pStr("status", "estado"))
+                CrmStageChip(text: p.status)
             }
             Section("Datos del proyecto") {
-                crmPRow("Cliente", {
-                    if let c = (detail.isEmpty ? project : detail)["client"] as? [String: Any] {
-                        return ConsoleHelpers.mapStr(c, "name", "nombre")
-                    }
-                    return pStr("clientName")
-                }())
-                crmPRow("Responsable", pStr("ownerName", "assignedName", "vendorName"))
-                crmPRow("Tipo", pStr("type", "tipo", "projectType"))
-                crmPRow("Inicio", String(pStr("startDate", "startAt", "createdAt").prefix(10)))
-                crmPRow("Fin", String(pStr("endDate", "closedAt").prefix(10)))
-                crmPRow("Descripción", pStr("description", "descripcion", "notes"))
+                crmPRow("Cliente", p.clientName)
+                crmPRow("Responsable", p.ownerName)
+                crmPRow("Tipo", p.projectType)
+                if p.budget != 0 { crmPRow("Presupuesto", crmMxn(p.budget)) }
+                if p.margin != 0 { crmPRow("Margen", crmMxn(p.margin)) }
+                crmPRow("Inicio", String(p.startDate.prefix(10)))
+                crmPRow("Fin", String(p.endDate.prefix(10)))
+                crmPRow("Descripción", p.scopeSummary)
             }
         }
         .listStyle(.insetGrouped)
     }
 
     private var costosTab: some View {
-        let costs = nestedList("costs") + nestedList("costos") + nestedList("expenses")
-        return Group {
-            if costs.isEmpty {
-                VStack { Spacer(); Text("Sin costos registrados").foregroundColor(.secondary); Spacer() }
-            } else {
-                List(Array(costs.enumerated()), id: \.offset) { _, c in
+        let raw = current.raw
+        let nested = (raw["costs"] as? [[String: Any]] ?? [])
+            + (raw["costos"] as? [[String: Any]] ?? [])
+            + (raw["expenses"] as? [[String: Any]] ?? [])
+        let rows: [(String, Double)] = {
+            if !nested.isEmpty {
+                return nested.map { c in
                     let concept = ConsoleHelpers.mapStr(c, "concept", "concepto", "description", "name")
                     let amount = ConsoleHelpers.mapDouble(c, "amount", "total", "costo")
+                    return (concept.isEmpty ? "Costo" : concept, amount)
+                }
+            }
+            return current.costRows
+        }()
+        return Group {
+            if rows.isEmpty {
+                VStack { Spacer(); Text("Sin costos registrados").foregroundColor(.secondary); Spacer() }
+            } else {
+                List(Array(rows.enumerated()), id: \.offset) { _, row in
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(concept.isEmpty ? "Costo" : concept).font(.subheadline)
-                            Text(ConsoleHelpers.mapStr(c, "category", "categoria")).font(.caption).foregroundColor(.secondary)
-                        }
+                        Text(row.0).font(.subheadline)
                         Spacer()
-                        Text(crmMxn(amount)).font(.subheadline.bold())
+                        Text(crmMxn(row.1)).font(.subheadline.bold())
                     }
                 }
                 .listStyle(.plain)
@@ -383,9 +375,11 @@ struct CrmProjectDetailView: View {
     }
 
     private var ordenTab: some View {
-        let orden = (detail.isEmpty ? project : detail)["closingOrder"] as? [String: Any]
-            ?? (detail.isEmpty ? project : detail)["workOrder"] as? [String: Any]
-            ?? (detail.isEmpty ? project : detail)["orden"] as? [String: Any]
+        let raw = current.raw
+        let orden = raw["closingOrder"] as? [String: Any]
+            ?? raw["workOrder"] as? [String: Any]
+            ?? raw["orden"] as? [String: Any]
+            ?? raw["closureOrder"] as? [String: Any]
         return Group {
             if let o = orden {
                 List {
@@ -412,11 +406,12 @@ struct CrmProjectDetailView: View {
     private func loadDetail() async {
         loading = true
         defer { loading = false }
-        let id = ConsoleHelpers.mapStr(project, "id")
-        if id.isEmpty { detail = project; return }
-        if let raw = try? await ApiClient.shared.get("projects/\(id)"),
+        guard project.id > 0 else { detail = project; return }
+        if let raw = try? await ApiClient.shared.get("ventas/proyectos/\(project.id)/resumen"),
            let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any] {
-            detail = obj
+            var merged = project.raw
+            for (k, v) in obj { merged[k] = v }
+            detail = CrmSalesProject(raw: merged)
         } else {
             detail = project
         }

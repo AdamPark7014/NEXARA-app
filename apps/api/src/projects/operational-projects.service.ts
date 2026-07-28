@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto, CreateProjectActivityDto } from './dto/create-operational-project.dto.js';
 import { salesPatchFromOps, opsStatusToSales } from '../common/project-handoff.js';
-import { resolveRequiredCompanyId, companyWhere } from '../common/tenant/tenant-scope.js';
+import { resolveRequiredCompanyId, companyWhere, requireCompanyId, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
 
 const salesProjectInclude = {
   id: true,
@@ -31,15 +31,23 @@ export class OperationalProjectsService {
    * crea SalesClient (si falta) + oportunidad WON + SalesProject y enlaza.
    * Así CRM y OPS muestran el mismo negocio.
    */
-  async ensureCommercialMirror(operationalProjectId: number, actorId?: number) {
-    const op = await this.prisma.operationalProject.findUnique({
-      where: { id: operationalProjectId },
+  async ensureCommercialMirror(operationalProjectId: number, actorId?: number, companyId?: number | null) {
+    const tenantId = companyId != null ? requireCompanyId(companyId) : undefined;
+    const op = await this.prisma.operationalProject.findFirst({
+      where: {
+        id: operationalProjectId,
+        ...(tenantId != null ? companyWhere(tenantId) : {}),
+      },
       include: {
         client: true,
         salesProject: { select: { id: true, name: true, status: true } },
       },
     });
-    if (!op) throw new NotFoundException('Project not found');
+    if (tenantId != null) {
+      assertCompanyAccess(op, tenantId, 'Project');
+    } else if (!op) {
+      throw new NotFoundException('Project not found');
+    }
     if (op.salesProjectId && op.salesProject) {
       return { operationalProject: op, salesProject: op.salesProject, created: false };
     }
@@ -72,7 +80,9 @@ export class OperationalProjectsService {
       });
     }
 
-    const companyId =
+    const mirrorCompanyId =
+      tenantId ??
+      (op as any).companyId ??
       (
         await this.prisma.companyProfile.findFirst({
           where: { isPrimary: true, isActive: true },
@@ -80,7 +90,7 @@ export class OperationalProjectsService {
           orderBy: { id: 'asc' },
         })
       )?.id;
-    if (!companyId) throw new BadRequestException('No hay empresa configurada');
+    if (!mirrorCompanyId) throw new BadRequestException('No hay empresa configurada');
 
     const opportunity = await this.prisma.salesOpportunity.create({
       data: {
@@ -92,7 +102,7 @@ export class OperationalProjectsService {
         closedAt: new Date(),
         clientId: salesClient.id,
         ownerId: actorId || op.vendorId,
-        companyId,
+        companyId: mirrorCompanyId,
       },
     });
 
@@ -107,6 +117,7 @@ export class OperationalProjectsService {
         status: salesStatus,
         startDate: op.startDate,
         endDate: op.endDate,
+        companyId: mirrorCompanyId,
       },
     });
 
@@ -253,9 +264,10 @@ export class OperationalProjectsService {
     });
   }
 
-  async findById(id: number) {
-    const project = await this.projectRepo.findUnique({
-      where: { id },
+  async findById(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const project = await this.projectRepo.findFirst({
+      where: { id, ...companyWhere(tenantId) },
       include: {
         vendor: {
           select: { id: true, nombre: true, email: true },
@@ -285,15 +297,12 @@ export class OperationalProjectsService {
       },
     });
 
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
-
+    assertCompanyAccess(project, tenantId, 'Project');
     return project;
   }
 
-  async update(id: number, updateDto: UpdateOperationalProjectDto) {
-    const project = await this.findById(id);
+  async update(id: number, updateDto: UpdateOperationalProjectDto, companyId?: number | null) {
+    await this.findById(id, companyId);
 
     const updated = await this.projectRepo.update({
       where: { id },
@@ -344,8 +353,8 @@ export class OperationalProjectsService {
     return updated;
   }
 
-  async changeStatus(id: number, statusDto: ProjectStatusChangeDto) {
-    await this.findById(id);
+  async changeStatus(id: number, statusDto: ProjectStatusChangeDto, companyId?: number | null) {
+    await this.findById(id, companyId);
     const validStatuses = ['ACTIVE', 'ON_HOLD', 'COMPLETED'];
 
     if (!validStatuses.includes(statusDto.status)) {
@@ -404,8 +413,8 @@ export class OperationalProjectsService {
     return updated;
   }
 
-  async assignEngineer(projectId: number, assignDto: AssignProjectEngineerDto) {
-    const project = await this.findById(projectId);
+  async assignEngineer(projectId: number, assignDto: AssignProjectEngineerDto, companyId?: number | null) {
+    await this.findById(projectId, companyId);
 
     // Check if engineer already assigned
     const existing = await this.projectEngineerRepo.findUnique({
@@ -437,7 +446,9 @@ export class OperationalProjectsService {
     });
   }
 
-  async removeEngineer(projectId: number, engineerId: number) {
+  async removeEngineer(projectId: number, engineerId: number, companyId?: number | null) {
+    await this.findById(projectId, companyId);
+
     const assignment = await this.projectEngineerRepo.findUnique({
       where: {
         projectId_engineerId: {
@@ -461,8 +472,8 @@ export class OperationalProjectsService {
     });
   }
 
-  async getProjectActivities(projectId: number) {
-    const project = await this.findById(projectId);
+  async getProjectActivities(projectId: number, companyId?: number | null) {
+    await this.findById(projectId, companyId);
 
     return this.prisma['activity'].findMany({
       where: { projectId } as any,
@@ -486,8 +497,8 @@ export class OperationalProjectsService {
     });
   }
 
-  async getProjectEngineersActivityCount(projectId: number) {
-    const project = await this.findById(projectId);
+  async getProjectEngineersActivityCount(projectId: number, companyId?: number | null) {
+    await this.findById(projectId, companyId);
 
     const engineers = await this.projectEngineerRepo.findMany({
       where: { projectId },
@@ -522,8 +533,8 @@ export class OperationalProjectsService {
     }));
   }
 
-  async getProjectDuration(projectId: number) {
-    const project = await this.findById(projectId);
+  async getProjectDuration(projectId: number, companyId?: number | null) {
+    const project = await this.findById(projectId, companyId);
 
     const startDate = new Date(project.startDate);
     const endDate = project.actualEndDate ? new Date(project.actualEndDate) : project.endDate ? new Date(project.endDate) : new Date();
@@ -538,8 +549,8 @@ export class OperationalProjectsService {
     };
   }
 
-  async createProjectActivity(projectId: number, dto: CreateProjectActivityDto, userId: number) {
-    const project = await this.findById(projectId);
+  async createProjectActivity(projectId: number, dto: CreateProjectActivityDto, userId: number, companyId?: number | null) {
+    const project = await this.findById(projectId, companyId);
     return this.activitiesService.create(
       {
         titulo: dto.titulo,
@@ -558,8 +569,8 @@ export class OperationalProjectsService {
     );
   }
 
-  async createSiteActivities(projectId: number, userId: number, responsableId?: number) {
-    const project = await this.findById(projectId);
+  async createSiteActivities(projectId: number, userId: number, responsableId?: number, companyId?: number | null) {
+    const project = await this.findById(projectId, companyId);
     const siteCount = project.siteCount ?? 0;
     if (siteCount < 1) {
       throw new BadRequestException('El proyecto no tiene sitios/sucursales definidos');

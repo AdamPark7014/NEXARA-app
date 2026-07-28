@@ -9,6 +9,12 @@ import { CreateClientDto } from './dto/create-client.dto.js';
 import { UpdateClientDto } from './dto/update-client.dto.js';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import {
+  assertCompanyAccess,
+  companyWhere,
+  resolvePublicCompanyId,
+} from '../common/tenant/tenant-scope.js';
+import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 
 interface MulterFile {
   fieldname: string;
@@ -44,28 +50,36 @@ export class ClientsService {
   }
 
   async findAll(query?: PaginationQueryDto) {
+    const companyId = await withTenantBypassAsync(() => resolvePublicCompanyId(this.prisma));
+    const where: any = {
+      ...companyWhere(companyId),
+      ...(query?.search ? { name: { contains: query.search, mode: 'insensitive' as const } } : {}),
+    };
     if (query?.limit) {
-      const where = query.search ? { name: { contains: query.search, mode: 'insensitive' as const } } : undefined;
-      const [data, total] = await Promise.all([
-        this.db['client'].findMany({ where, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
-        this.db['client'].count({ where }),
-      ]);
+      const [data, total] = await withTenantBypassAsync(() =>
+        Promise.all([
+          this.db.client.findMany({ where, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
+          this.db.client.count({ where }),
+        ]),
+      );
       return buildPaginatedResponse(data, total, query);
     }
-    return await this.db['client'].findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    return withTenantBypassAsync(() =>
+      this.db.client.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
   }
 
   async findOne(id: number) {
-    const client = await this.db['client'].findUnique({
-      where: { id },
-    });
-
-    if (!client) {
-      throw new NotFoundException(`Client with ID ${id} not found`);
-    }
-
+    const companyId = await withTenantBypassAsync(() => resolvePublicCompanyId(this.prisma));
+    const client = await withTenantBypassAsync(() =>
+      this.db.client.findFirst({
+        where: { id, ...companyWhere(companyId) },
+      }),
+    );
+    assertCompanyAccess(client, companyId, 'Client');
     return client;
   }
 

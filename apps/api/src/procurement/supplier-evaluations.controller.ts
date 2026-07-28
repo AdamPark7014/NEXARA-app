@@ -2,6 +2,7 @@ import { Controller, Get, Post, Query, Body, UseGuards } from '@nestjs/common';
 import { ProcurementService } from './procurement.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
 @Controller('procurement/supplier-evaluations')
@@ -11,13 +12,13 @@ export class SupplierEvaluationsController {
 
   @Post()
   @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_MANAGE] })
-  create(@Body() dto: any, @CurrentUser() user: any) {
-    return this.svc.createSupplierEvaluation(dto, user.id);
+  create(@Body() dto: any, @CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    return this.svc.createSupplierEvaluation(dto, user.id, companyId);
   }
 
   @Get()
   @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_VIEW] })
-  list(@Query('supplierId') supplierId?: string) {
-    return this.svc.listSupplierEvaluations(supplierId ? +supplierId : undefined);
+  list(@Query('supplierId') supplierId?: string, @CurrentCompanyId() companyId?: number | null) {
+    return this.svc.listSupplierEvaluations(supplierId ? +supplierId : undefined, companyId);
   }
 }

@@ -7,6 +7,7 @@ import {
 import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { featuresForPlan } from '../common/tenant/plan-features.js';
 
 @Injectable()
 export class BillingService {
@@ -58,6 +59,7 @@ export class BillingService {
     return {
       company,
       seats: { used: seatsUsed, limit: company.seatLimit, remaining: Math.max(0, company.seatLimit - seatsUsed) },
+      features: Array.from(featuresForPlan(company.planCode)).sort(),
       usage30d: usage.map((u) => ({
         metric: u.metric,
         quantity: Number(u._sum.quantity || 0),

@@ -3,14 +3,14 @@ import SwiftUI
 // MARK: – Multi-empresa
 
 @MainActor final class CompaniesVM: ObservableObject {
-    @Published var items: [[String: Any]] = []
+    @Published var items: [Company] = []
     @Published var isLoading = false
-    func load() { isLoading = true; Task { items = await ExtraRepository.shared.companies(); isLoading = false } }
+    func load() { isLoading = true; Task { items = await ExtraRepository.shared.companyItems(); isLoading = false } }
 }
 
 struct CompaniesView: View {
     @StateObject private var vm = CompaniesVM()
-    @State private var selected: [String: Any]?
+    @State private var selected: Company?
     var body: some View {
         Group {
             if let s = selected { companyDetail(s) } else { companyList }
@@ -23,12 +23,12 @@ struct CompaniesView: View {
     private var companyList: some View {
         List {
             if vm.isLoading { ProgressView() }
-            ForEach(vm.items, id: \.govId) { c in
+            ForEach(vm.items) { c in
                 Button { selected = c } label: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(govStr(c, "legalName", "tradeName")).font(.headline).foregroundColor(.primary)
-                        Text(govStr(c, "rfc")).font(.caption).foregroundColor(.secondary)
-                        if c["isPrimary"] as? Bool == true {
+                        Text(c.displayName).font(.headline).foregroundColor(.primary)
+                        Text(c.rfc).font(.caption).foregroundColor(.secondary)
+                        if c.isPrimary {
                             Text("Principal").font(.caption2).foregroundColor(.green)
                         }
                     }
@@ -38,20 +38,20 @@ struct CompaniesView: View {
     }
 
     @ViewBuilder
-    private func companyDetail(_ c: [String: Any]) -> some View {
+    private func companyDetail(_ c: Company) -> some View {
         List {
             Section { Button("← Empresas") { selected = nil } }
             Section("Empresa") {
-                govRow("Razón social",  govStr(c, "legalName"))
-                govRow("Nombre comercial", govStr(c, "tradeName", "name"))
-                govRow("RFC",           govStr(c, "rfc"))
-                govRow("Régimen fiscal",govStr(c, "fiscalRegime", "regimenFiscal"))
-                govRow("Email",         govStr(c, "email"))
-                govRow("Teléfono",      govStr(c, "phone", "telefono"))
-                govRow("Dirección",     govStr(c, "address", "direccion"))
-                govRow("Ciudad",        govStr(c, "city", "ciudad"))
-                govRow("Estado",        govStr(c, "state", "estado"))
-                if c["isPrimary"] as? Bool == true {
+                govRow("Razón social",  c.legalName)
+                govRow("Nombre comercial", c.tradeName)
+                govRow("RFC",           c.rfc)
+                govRow("Régimen fiscal",c.fiscalRegime)
+                govRow("Email",         c.email)
+                govRow("Teléfono",      c.phone)
+                govRow("Dirección",     c.address)
+                govRow("Ciudad",        c.city)
+                govRow("Estado",        c.state)
+                if c.isPrimary {
                     HStack { Text("Empresa principal").foregroundColor(.secondary); Spacer(); Image(systemName: "checkmark.circle.fill").foregroundColor(.green) }
                 }
             }
@@ -69,18 +69,18 @@ struct CompaniesView: View {
 // MARK: – KB
 
 @MainActor final class KbVM: ObservableObject {
-    @Published var articles: [[String: Any]] = []
+    @Published var articles: [KbArticle] = []
     @Published var query = ""
-    @Published var selected: [String: Any]?
+    @Published var selected: KbArticle?
     @Published var isLoading = false
     func load() {
         isLoading = true
         Task {
-            articles = await ExtraRepository.shared.kbArticles(q: query.isEmpty ? nil : query)
+            articles = await ExtraRepository.shared.kbArticleItems(q: query.isEmpty ? nil : query)
             isLoading = false
         }
     }
-    func open(_ slug: String) { Task { selected = await ExtraRepository.shared.kbArticle(slug) } }
+    func open(_ slug: String) { Task { selected = await ExtraRepository.shared.kbArticleItem(slug) } }
 }
 
 struct KbView: View {
@@ -88,13 +88,13 @@ struct KbView: View {
     var body: some View {
         List {
             if vm.isLoading { ProgressView() }
-            ForEach(vm.filtered, id: \.govId) { a in
+            ForEach(vm.filtered) { a in
                 Button {
-                    vm.open(govStr(a, "slug", "id"))
+                    vm.open(a.openKey)
                 } label: {
                     VStack(alignment: .leading) {
-                        Text(govStr(a, "title")).font(.subheadline.bold())
-                        Text(govStr(a, "excerpt")).font(.caption).foregroundColor(.secondary).lineLimit(2)
+                        Text(a.title).font(.subheadline.bold())
+                        Text(a.excerpt).font(.caption).foregroundColor(.secondary).lineLimit(2)
                     }
                 }
             }
@@ -103,28 +103,23 @@ struct KbView: View {
         .onChange(of: vm.query) { _, _ in vm.load() }
         .navigationTitle("Knowledge Base")
         .task { vm.load() }
-        .sheet(item: Binding(
-            get: { vm.selected.map { GovSheetItem(map: $0) } },
-            set: { _ in vm.selected = nil }
-        )) { item in
+        .sheet(item: $vm.selected) { article in
             NavigationStack {
                 ScrollView {
-                    Text(govStr(item.map, "content")).padding()
+                    Text(article.content).padding()
                 }
-                .navigationTitle(govStr(item.map, "title"))
+                .navigationTitle(article.title)
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cerrar") { vm.selected = nil } } }
             }
         }
     }
 }
 
-private struct GovSheetItem: Identifiable { let id = UUID(); let map: [String: Any] }
-
 extension KbVM {
-    var filtered: [[String: Any]] {
+    var filtered: [KbArticle] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         guard !q.isEmpty else { return articles }
-        return articles.filter { govStr($0, "title").lowercased().contains(q) }
+        return articles.filter { $0.title.lowercased().contains(q) }
     }
 }
 
@@ -250,7 +245,7 @@ private struct FilterChipView: View {
 // MARK: – Calendario ERP
 
 @MainActor final class ErpCalendarVM: ObservableObject {
-    @Published var events: [[String: Any]] = []
+    @Published var events: [CalendarEvent] = []
     @Published var rangeDays = 30
     @Published var isLoading = false
     func load() {
@@ -258,7 +253,7 @@ private struct FilterChipView: View {
         Task {
             let from = ISO8601DateFormatter().string(from: Date())
             let to = ISO8601DateFormatter().string(from: Date().addingTimeInterval(Double(rangeDays) * 86400))
-            events = await ExtraRepository.shared.calendarEvents(from: from, to: to)
+            events = await ExtraRepository.shared.calendarEventItems(from: from, to: to)
             isLoading = false
         }
     }
@@ -272,10 +267,10 @@ struct ErpCalendarView: View {
                 Text("7 días").tag(7); Text("30 días").tag(30); Text("90 días").tag(90)
             }.onChange(of: vm.rangeDays) { _, _ in vm.load() }
             if vm.isLoading { ProgressView() }
-            ForEach(vm.events, id: \.govId) { ev in
+            ForEach(vm.events) { ev in
                 VStack(alignment: .leading) {
-                    Text(govStr(ev, "title")).font(.subheadline.bold())
-                    Text("\(govStr(ev, "source")) · \(govStr(ev, "start").prefix(16))").font(.caption).foregroundColor(.secondary)
+                    Text(ev.displayTitle).font(.subheadline.bold())
+                    Text("\(ev.source) · \(ev.start.prefix(16))").font(.caption).foregroundColor(.secondary)
                 }
             }
         }
@@ -288,35 +283,34 @@ struct ErpCalendarView: View {
 // MARK: – Organigrama
 
 struct OrgchartView: View {
-    @State private var roots: [[String: Any]] = []
+    @State private var roots: [OrgNode] = []
     @State private var loading = true
 
     var body: some View {
         List {
             if loading { ProgressView() }
-            ForEach(roots, id: \.govId) { node in OrgNodeView(node: node, depth: 0) }
+            ForEach(roots) { node in OrgNodeView(node: node, depth: 0) }
         }
         .navigationTitle("Organigrama")
         .task {
             loading = true
-            roots = await ExtraRepository.shared.orgchart()
+            roots = await ExtraRepository.shared.orgNodeItems()
             loading = false
         }
     }
 }
 
 private struct OrgNodeView: View {
-    let node: [String: Any]; let depth: Int
+    let node: OrgNode; let depth: Int
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text(govStr(node, "nombre")).font(.subheadline.bold())
+                Text(node.name).font(.subheadline.bold())
                 Spacer()
-                Text(govNested(node, "role", "nombre")).font(.caption).foregroundColor(.secondary)
+                Text(node.roleName).font(.caption).foregroundColor(.secondary)
             }
             .padding(.leading, CGFloat(depth * 14))
-            let children = node["children"] as? [[String: Any]] ?? []
-            ForEach(children, id: \.govId) { child in OrgNodeView(node: child, depth: depth + 1) }
+            ForEach(node.children) { child in OrgNodeView(node: child, depth: depth + 1) }
         }
     }
 }
@@ -324,22 +318,22 @@ private struct OrgNodeView: View {
 // MARK: – KPIs RH
 
 @MainActor final class HrKpisVM: ObservableObject {
-    @Published var staff: [[String: Any]] = []
-    @Published var engineers: [[String: Any]] = []
+    @Published var staff: [HrStaffMember] = []
+    @Published var engineers: [BiEngineerRow] = []
     @Published var isLoading = false
     func load() {
         isLoading = true
         Task {
-            var all: [[String: Any]] = []; var page = 1
+            var all: [HrStaffMember] = []; var page = 1
             repeat {
-                let batch = await ExtraRepository.shared.hrStaff(page: page)
+                let batch = await ExtraRepository.shared.hrStaffItems(page: page)
                 if batch.isEmpty { break }
                 all.append(contentsOf: batch)
                 if batch.count < 100 { break }
                 page += 1
             } while page < 10
             staff = all
-            engineers = await ExtraRepository.shared.biEngineers(limit: 15)
+            engineers = await ExtraRepository.shared.biEngineerRows(limit: 15)
             isLoading = false
         }
     }
@@ -349,7 +343,7 @@ struct HrKpisView: View {
     @StateObject private var vm = HrKpisVM()
     var body: some View {
         let total = vm.staff.count
-        let bajas = vm.staff.filter { govStr($0, "estadoRRHH") == "Baja" || ($0["isActive"] as? Bool) == false }.count
+        let bajas = vm.staff.filter(\.isBaja).count
         let rot = total > 0 ? Double(bajas) / Double(total) * 100 : 0
         List {
             if vm.isLoading { ProgressView() }
@@ -359,11 +353,11 @@ struct HrKpisView: View {
             }
             if !vm.engineers.isEmpty {
                 Section("Productividad (90d)") {
-                    ForEach(vm.engineers, id: \.govId) { e in
+                    ForEach(vm.engineers) { e in
                         HStack {
-                            Text(govStr(e, "engineerName"))
+                            Text(e.engineerName)
                             Spacer()
-                            Text("\(Int(govDbl(e, "completionRate"))) %")
+                            Text("\(Int(e.completionRate)) %")
                         }
                     }
                 }

@@ -10,8 +10,17 @@ import { ReactNode } from "react";
 
 type Variant = "default" | "compact";
 
+function DefaultIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M8 12h8M8 15h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function EmptyState({
-  icon = "📭",
+  icon,
   title,
   description,
   action,
@@ -24,6 +33,7 @@ export default function EmptyState({
   variant?: Variant;
 }) {
   const isCompact = variant === "compact";
+  const resolvedIcon = icon ?? <DefaultIcon />;
 
   return (
     <div
@@ -60,7 +70,7 @@ export default function EmptyState({
           boxShadow: "0 8px 18px color-mix(in srgb, var(--primary) 18%, transparent)",
         }}
       >
-        {icon}
+        {resolvedIcon}
       </div>
       <div>
         <h3

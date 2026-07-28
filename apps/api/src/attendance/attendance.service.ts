@@ -5,6 +5,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service';
 import { PERMISSIONS } from '../common/permissions.js';
 import { detectDeviceFromUserAgent } from '../common/device-detector.js';
+import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 
 @Injectable()
 export class AttendanceService {
@@ -44,20 +45,22 @@ export class AttendanceService {
     return new Date(value);
   }
 
-  async getCurrentDay(userId: number) {
+  async getCurrentDay(userId: number, companyId?: number | null) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
+    const tenantId = requireCompanyId(companyId);
     const openDay = await this.prisma.attendanceDay.findFirst({
-      where: { userId, isOpen: true },
+      where: { userId, isOpen: true, ...companyWhere(tenantId) },
       orderBy: { date: 'desc' },
     });
     return openDay ?? null;
   }
 
   /** Reabre jornada si hay entrada sin salida pero attendanceDay quedó inconsistente. */
-  private async reconcileOpenDay(userId: number, referenceDate: Date) {
+  private async reconcileOpenDay(userId: number, referenceDate: Date, companyId: number) {
     const dayStart = this.getDateOnly(referenceDate);
     const dayEnd = new Date(dayStart);
     dayEnd.setHours(23, 59, 59, 999);
+    const tenant = companyWhere(companyId);
 
     const [entry, exit] = await Promise.all([
       this.prisma.attendance.findFirst({
@@ -65,6 +68,7 @@ export class AttendanceService {
           userId,
           type: 'entrada',
           timestamp: { gte: dayStart, lte: dayEnd },
+          ...tenant,
         },
         orderBy: { timestamp: 'desc' },
       }),
@@ -73,6 +77,7 @@ export class AttendanceService {
           userId,
           type: 'salida',
           timestamp: { gte: dayStart, lte: dayEnd },
+          ...tenant,
         },
         orderBy: { timestamp: 'desc' },
       }),
@@ -81,13 +86,14 @@ export class AttendanceService {
     if (!entry || exit) return null;
 
     return this.prisma.attendanceDay.upsert({
-      where: { userId_date: { userId, date: dayStart } },
+      where: { companyId_userId_date: { companyId, userId, date: dayStart } },
       create: {
         userId,
         date: dayStart,
         totalMinutes: 0,
         lastEntryAt: entry.timestamp,
         isOpen: true,
+        companyId,
       },
       update: {
         lastEntryAt: entry.timestamp,
@@ -96,8 +102,9 @@ export class AttendanceService {
     });
   }
 
-  async getHistory(userId: number, date?: string) {
+  async getHistory(userId: number, date?: string, companyId?: number | null) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
+    const tenantId = requireCompanyId(companyId);
     const base = date ? this.parseDateInput(date) : new Date();
     if (Number.isNaN(base.getTime())) {
       throw new BadRequestException('Fecha invalida');
@@ -113,26 +120,30 @@ export class AttendanceService {
           gte: start,
           lte: end,
         },
+        ...companyWhere(tenantId),
       },
       orderBy: { timestamp: 'asc' },
     });
   }
 
-  async getDaySummary(userId: number, date?: string) {
+  async getDaySummary(userId: number, date?: string, companyId?: number | null) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
+    const tenantId = requireCompanyId(companyId);
     const base = date ? this.parseDateInput(date) : new Date();
     if (Number.isNaN(base.getTime())) {
       throw new BadRequestException('Fecha invalida');
     }
     const day = this.getDateOnly(base);
-    return this.prisma.attendanceDay.findUnique({
-      where: { userId_date: { userId, date: day } },
+    return this.prisma.attendanceDay.findFirst({
+      where: { userId, date: day, ...companyWhere(tenantId) },
     });
   }
 
-  async getRangeSummary(userId: number, from?: string, to?: string) {
+  async getRangeSummary(userId: number, from?: string, to?: string, companyId?: number | null) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
     if (!from || !to) throw new BadRequestException('Rango incompleto');
+    const tenantId = requireCompanyId(companyId);
+    const tenant = companyWhere(tenantId);
     const fromDate = this.parseDateInput(from);
     const toDate = this.parseDateInput(to);
     if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
@@ -151,6 +162,7 @@ export class AttendanceService {
           gte: start,
           lte: end,
         },
+        ...tenant,
       },
       orderBy: { date: 'asc' },
     });
@@ -162,6 +174,7 @@ export class AttendanceService {
           gte: start,
           lte: end,
         },
+        ...tenant,
       },
       orderBy: { timestamp: 'asc' },
     });
@@ -241,36 +254,38 @@ export class AttendanceService {
     return { start, end };
   }
 
-  private async findAttendanceOnDate(userId: number, type: string, date: Date) {
+  private async findAttendanceOnDate(userId: number, type: string, date: Date, companyId: number) {
     const { start, end } = this.getDayBounds(date);
     return this.prisma.attendance.findFirst({
       where: {
         userId,
         type,
         timestamp: { gte: start, lt: end },
+        ...companyWhere(companyId),
       },
       orderBy: { timestamp: 'desc' },
     });
   }
 
-  private async resolveOpenDay(userId: number, referenceDate: Date) {
+  private async resolveOpenDay(userId: number, referenceDate: Date, companyId: number) {
     let day = await this.prisma.attendanceDay.findFirst({
-      where: { userId, isOpen: true },
+      where: { userId, isOpen: true, ...companyWhere(companyId) },
       orderBy: { date: 'desc' },
     });
     if (!day?.isOpen || !day.lastEntryAt) {
-      day = await this.reconcileOpenDay(userId, referenceDate);
+      day = await this.reconcileOpenDay(userId, referenceDate, companyId);
     }
     if (!day?.isOpen || !day.lastEntryAt) {
       const yesterday = new Date(referenceDate);
       yesterday.setDate(yesterday.getDate() - 1);
-      day = await this.reconcileOpenDay(userId, yesterday);
+      day = await this.reconcileOpenDay(userId, yesterday, companyId);
     }
     return day;
   }
 
-  async register(dto: CreateAttendanceDto, userId: number, req?: any) {
+  async register(dto: CreateAttendanceDto, userId: number, req?: any, companyId?: number | null) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
+    const tenantId = requireCompanyId(companyId);
     const now = dto.timestamp ? new Date(dto.timestamp) : new Date();
     const today = this.getDateOnly(now);
     const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
@@ -279,13 +294,13 @@ export class AttendanceService {
     const isEntry = dto.type === 'entrada';
 
     if (isEntry) {
-      const existingEntry = await this.findAttendanceOnDate(userId, 'entrada', today);
+      const existingEntry = await this.findAttendanceOnDate(userId, 'entrada', today, tenantId);
       if (existingEntry) {
         throw new BadRequestException('Ya existe una entrada registrada para hoy');
       }
 
       const openDay = await this.prisma.attendanceDay.findFirst({
-        where: { userId, isOpen: true },
+        where: { userId, isOpen: true, ...companyWhere(tenantId) },
       });
       if (openDay) {
         throw new BadRequestException(
@@ -302,18 +317,20 @@ export class AttendanceService {
           photoUrl: dto.photoBase64 || null,
           entryLatitude: dto.latitude || null,
           entryLongitude: dto.longitude || null,
+          companyId: tenantId,
         },
         include: { user: true },
       });
 
       const day = await this.prisma.attendanceDay.upsert({
-        where: { userId_date: { userId, date: today } },
+        where: { companyId_userId_date: { companyId: tenantId, userId, date: today } },
         create: {
           userId,
           date: today,
           totalMinutes: 0,
           lastEntryAt: now,
           isOpen: true,
+          companyId: tenantId,
         },
         update: {
           lastEntryAt: now,
@@ -378,10 +395,10 @@ export class AttendanceService {
     }
 
     // Salida: resolver jornada abierta ANTES de crear el registro (evita salidas huérfanas).
-    const openDay = await this.resolveOpenDay(userId, today);
+    const openDay = await this.resolveOpenDay(userId, today, tenantId);
 
     if (!openDay?.isOpen || !openDay.lastEntryAt) {
-      const existingExit = await this.findAttendanceOnDate(userId, 'salida', today);
+      const existingExit = await this.findAttendanceOnDate(userId, 'salida', today, tenantId);
       if (existingExit) {
         throw new BadRequestException('Ya existe una salida registrada para hoy');
       }
@@ -389,7 +406,7 @@ export class AttendanceService {
     }
 
     // Limpiar salida huérfana de un intento fallido anterior (jornada sigue abierta).
-    const orphanExit = await this.findAttendanceOnDate(userId, 'salida', today);
+    const orphanExit = await this.findAttendanceOnDate(userId, 'salida', today, tenantId);
     if (orphanExit) {
       await this.prisma.attendance.delete({ where: { id: orphanExit.id } });
       this.logger.warn(
@@ -406,6 +423,7 @@ export class AttendanceService {
         photoUrl: dto.photoBase64 || null,
         exitLatitude: dto.latitude || null,
         exitLongitude: dto.longitude || null,
+        companyId: tenantId,
       },
       include: { user: true },
     });
@@ -572,8 +590,8 @@ export class AttendanceService {
 
   /**
   * Obtiene usuarios accesibles según la jerarquía del usuario actual
-   * - Superadmin (gerencia/developer): Ve todos los usuarios
-    * - Console admin (CONSOLE_ADMIN): Ve todos los usuarios
+  * - Superadmin (gerencia/developer): Ve todos los usuarios del tenant
+    * - Console admin (CONSOLE_ADMIN): Ve todos los usuarios del tenant
     * - Usuario con ATTENDANCE_MANAGE sin CONSOLE_ADMIN: Solo su propio usuario
     * - Otros: No tiene acceso a esta funcion
    * 
@@ -581,10 +599,13 @@ export class AttendanceService {
    */
   private async getAccessibleUsers(
     currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean },
+    companyId?: number | null,
   ) {
     if (!currentUser?.id) {
       throw new BadRequestException('Usuario no autenticado');
     }
+    const tenantId = requireCompanyId(companyId);
+    const membership = { companyMemberships: { some: { companyId: tenantId } } };
     const isSuperAdmin = Boolean(currentUser.isSuperAdmin);
     const isConsoleAdmin = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
     const canManageAttendance = Boolean(currentUser.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE));
@@ -597,6 +618,7 @@ export class AttendanceService {
 
     if (isSuperAdmin || isConsoleAdmin) {
       return this.prisma.user.findMany({
+        where: membership,
         include: { role: true, department: true },
         orderBy: { nombre: 'asc' },
       });
@@ -607,6 +629,7 @@ export class AttendanceService {
     if (canManageAttendance) {
       return this.prisma.user.findMany({
         where: {
+          ...membership,
           departmentId: currentUser.departmentId,
           role: { accesoConsoleAdmin: false },
         },
@@ -617,7 +640,7 @@ export class AttendanceService {
 
     // Fallback: solo su propia información.
     return this.prisma.user.findMany({
-      where: { id: currentUser.id },
+      where: { id: currentUser.id, ...membership },
       include: { role: true, department: true },
       orderBy: { nombre: 'asc' },
     });
@@ -633,10 +656,13 @@ export class AttendanceService {
     from?: string,
     to?: string,
     targetDepartmentId?: number,
+    companyId?: number | null,
   ) {
     if (!from || !to) {
       throw new BadRequestException('Rango incompleto');
     }
+    const tenantId = requireCompanyId(companyId);
+    const tenant = companyWhere(tenantId);
 
     const fromDate = this.parseDateInput(from);
     const toDate = this.parseDateInput(to);
@@ -645,8 +671,8 @@ export class AttendanceService {
       throw new BadRequestException('Rango invalido');
     }
 
-    // Obtener usuarios accesibles
-    let accessibleUsers = await this.getAccessibleUsers(currentUser);
+    // Obtener usuarios accesibles (solo miembros del tenant)
+    let accessibleUsers = await this.getAccessibleUsers(currentUser, companyId);
 
     // Filtrar según el tipo de usuario:
     // - Superadmin: Ve todos EXCEPTO otros superadmins
@@ -687,6 +713,7 @@ export class AttendanceService {
       where: {
         userId: { in: accessibleUserIds },
         calificacionEficiencia: { not: null },
+        ...tenant,
         OR: [
           { revisadoEn: { gte: start, lte: end } },
           { revisadoEn: null, subidoEn: { gte: start, lte: end } },
@@ -752,6 +779,7 @@ export class AttendanceService {
               gte: start,
               lte: end,
             },
+            ...tenant,
           },
           orderBy: { date: 'asc' },
         });
@@ -773,6 +801,7 @@ export class AttendanceService {
               gte: start,
               lte: end,
             },
+            ...tenant,
           },
           orderBy: { timestamp: 'asc' },
         });
@@ -780,6 +809,7 @@ export class AttendanceService {
         const activities = await this.prisma.activity.findMany({
           where: {
             responsableId: user.id,
+            ...tenant,
             OR: [
               { fechaAsignacion: { gte: start, lte: end } },
               { fechaInicio: { gte: start, lte: end } },

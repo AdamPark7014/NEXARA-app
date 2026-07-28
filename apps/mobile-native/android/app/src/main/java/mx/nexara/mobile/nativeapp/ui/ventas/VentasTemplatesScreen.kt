@@ -29,14 +29,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.api.OrderTemplateDto
 import mx.nexara.mobile.nativeapp.data.crm.CrmRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 
 private val CrmGreen = Color(0xFF10B981)
 
 data class TemplatesUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
-    val items: List<Map<String, Any?>> = emptyList(),
+    val items: List<OrderTemplateDto> = emptyList(),
     val showForm: Boolean = false,
     val saving: Boolean = false,
     val actionError: String? = null,
@@ -61,7 +63,7 @@ class VentasTemplatesViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null, actionError = null) }
             try {
-                val list = withContext(Dispatchers.IO) { repo.orderTemplates() }
+                val list = withContext(Dispatchers.IO) { repo.orderTemplateDtos() }
                 _state.update { it.copy(isLoading = false, items = list) }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.message) }
@@ -151,29 +153,6 @@ class VentasTemplatesViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
-private fun tplStr(m: Map<String, Any?>, vararg keys: String): String {
-    for (k in keys) {
-        val v = m[k] ?: continue
-        val s = v.toString()
-        if (s.isNotBlank() && s != "null") return s
-    }
-    return ""
-}
-
-private fun tplId(m: Map<String, Any?>): Long? =
-    (m["id"] as? Number)?.toLong() ?: m["id"]?.toString()?.toLongOrNull()
-
-private fun tplBool(m: Map<String, Any?>, vararg keys: String): Boolean {
-    for (k in keys) {
-        when (val v = m[k]) {
-            is Boolean -> return v
-            is Number -> return v.toInt() != 0
-            is String -> if (v.equals("true", true) || v == "1") return true
-        }
-    }
-    return false
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VentasTemplatesScreen() {
@@ -201,13 +180,12 @@ fun VentasTemplatesScreen() {
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
                 state.isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-                !state.error.isNullOrBlank() && state.items.isEmpty() -> Column(
-                    Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(state.error ?: "", color = MaterialTheme.colorScheme.error)
-                    Button(onClick = vm::refresh) { Text("Reintentar") }
-                }
+                !state.error.isNullOrBlank() && state.items.isEmpty() -> NxEmptyState(
+                    title = "No se pudieron cargar",
+                    subtitle = state.error ?: "",
+                    actionLabel = "Reintentar",
+                    onAction = vm::refresh,
+                )
                 else -> LazyColumn(
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -226,19 +204,26 @@ fun VentasTemplatesScreen() {
                     }
                     if (!state.actionError.isNullOrBlank()) {
                         item {
-                            Text(state.actionError ?: "", color = MaterialTheme.colorScheme.error, fontSize = MaterialTheme.typography.bodySmall.fontSize)
+                            Text(
+                                state.actionError ?: "",
+                                color = MaterialTheme.colorScheme.error,
+                                fontSize = MaterialTheme.typography.bodySmall.fontSize,
+                            )
                         }
                     }
                     if (state.items.isEmpty()) {
                         item {
-                            Text("Sin plantillas. Crea la primera con el botón +.", Modifier.padding(vertical = 24.dp))
+                            NxEmptyState(
+                                title = "Sin plantillas",
+                                subtitle = "Crea la primera plantilla corporativa con el botón +.",
+                            )
                         }
                     } else {
-                        items(state.items, key = { tplId(it)?.toString() ?: it.hashCode().toString() }) { tpl ->
+                        items(state.items, key = { it.rowKey }) { tpl ->
                             TemplateCard(
                                 tpl = tpl,
-                                onSetDefault = { tplId(tpl)?.let(vm::setDefault) },
-                                onDelete = { tplId(tpl)?.let { confirmDeleteId = it } },
+                                onSetDefault = { if (tpl.id > 0) vm.setDefault(tpl.id) },
+                                onDelete = { if (tpl.id > 0) confirmDeleteId = tpl.id },
                             )
                         }
                     }
@@ -288,7 +273,9 @@ fun VentasTemplatesScreen() {
             title = { Text("Eliminar plantilla") },
             text = { Text("¿Eliminar esta plantilla de cotización?") },
             confirmButton = {
-                TextButton(onClick = { vm.delete(id); confirmDeleteId = null }) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = { vm.delete(id); confirmDeleteId = null }) {
+                    Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                }
             },
             dismissButton = { TextButton(onClick = { confirmDeleteId = null }) { Text("Cancelar") } },
         )
@@ -297,26 +284,18 @@ fun VentasTemplatesScreen() {
 
 @Composable
 private fun TemplateCard(
-    tpl: Map<String, Any?>,
+    tpl: OrderTemplateDto,
     onSetDefault: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val isDefault = tplBool(tpl, "isDefault", "is_default")
-    val colorHex = tplStr(tpl, "primaryColor", "primary_color").ifBlank { "#0f6ad6" }
-    val swatch = runCatching { Color(android.graphics.Color.parseColor(colorHex)) }.getOrDefault(CrmGreen)
+    val swatch = runCatching { Color(android.graphics.Color.parseColor(tpl.colorHex)) }.getOrDefault(CrmGreen)
 
     Card(shape = RoundedCornerShape(12.dp)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(
-                    Modifier.size(14.dp).clip(CircleShape).background(swatch),
-                )
-                Text(
-                    tplStr(tpl, "name", "nombre").ifBlank { "—" },
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
-                )
-                if (isDefault) {
+                Box(Modifier.size(14.dp).clip(CircleShape).background(swatch))
+                Text(tpl.displayName, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                if (tpl.isDefault) {
                     AssistChip(
                         onClick = {},
                         label = { Text("Predeterminada", style = MaterialTheme.typography.labelSmall) },
@@ -325,16 +304,14 @@ private fun TemplateCard(
                     )
                 }
             }
-            val desc = tplStr(tpl, "description", "descripcion")
-            if (desc.isNotBlank()) {
-                Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (tpl.description.isNotBlank()) {
+                Text(tpl.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            val company = tplStr(tpl, "companyName", "company_name")
-            if (company.isNotBlank()) {
-                Text(company, style = MaterialTheme.typography.labelMedium)
+            if (tpl.companyName.isNotBlank()) {
+                Text(tpl.companyName, style = MaterialTheme.typography.labelMedium)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!isDefault) {
+                if (!tpl.isDefault) {
                     TextButton(onClick = onSetDefault) { Text("Predeterminar") }
                 }
                 TextButton(onClick = onDelete, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
