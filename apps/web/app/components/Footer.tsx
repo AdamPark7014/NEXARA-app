@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import styles from "./Footer.module.css";
 import { openExternalUrl } from "@/lib/open-external-url";
+import { openCookiePreferences } from "@/lib/cookie-consent";
 
 const WA_URL = "https://wa.me/522226960350?text=Hola%2C%20me%20interesa%20informaci%C3%B3n%20de%20Nexara";
 const WA_LABEL = "+52 222 696 0350";
@@ -139,6 +140,13 @@ export default function Footer() {
             <Link href="/legal/privacidad">Privacidad</Link>
             <Link href="/legal/terminos">Términos</Link>
             <Link href="/legal/cookies">Cookies</Link>
+            <button
+              type="button"
+              className={styles.legalButton}
+              onClick={() => openCookiePreferences()}
+            >
+              Gestionar cookies
+            </button>
           </nav>
         </div>
       </div>

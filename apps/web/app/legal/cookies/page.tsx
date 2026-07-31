@@ -18,7 +18,7 @@ export default function CookiesPage() {
     <main className={styles.page}>
       <p className={styles.eyebrow}>Legal</p>
       <h1 className={styles.title}>Política de Cookies</h1>
-      <p className={styles.updated}>Última actualización: 13/07/2026</p>
+      <p className={styles.updated}>Última actualización: 31/07/2026</p>
 
       <p className={styles.lead}>
         Esta política complementa el{" "}
@@ -46,16 +46,17 @@ export default function CookiesPage() {
           <li>
             <strong style={{ color: "#fff" }}>Cookies técnicas o necesarias:</strong> permiten
             el funcionamiento básico del sitio, la autenticación de sesiones y la seguridad de
-            la plataforma.
+            la plataforma. Se activan automáticamente porque son indispensables.
           </li>
           <li>
             <strong style={{ color: "#fff" }}>Cookies de preferencia:</strong> recuerdan
-            configuraciones de navegación o de interfaz cuando aplica.
+            configuraciones de navegación o de interfaz cuando usted las autoriza.
           </li>
           <li>
             <strong style={{ color: "#fff" }}>Cookies de analítica / rendimiento:</strong>{" "}
-            ayudan a entender el uso de nuestros servicios para mejorar la experiencia y
-            detectar fallas.
+            ayudan a entender el uso de nuestros servicios (por ejemplo Google Analytics y
+            métricas propias del sitio público) para mejorar la experiencia y detectar fallas.
+            Solo se activan con su consentimiento.
           </li>
           <li>
             <strong style={{ color: "#fff" }}>Registros y bitácoras de soporte:</strong>{" "}
@@ -70,7 +71,7 @@ export default function CookiesPage() {
         <p className={styles.p}>Utilizamos estas tecnologías para:</p>
         <ul className={styles.list}>
           <li>Mejorar la experiencia del usuario.</li>
-          <li>Analizar el funcionamiento de nuestros servicios.</li>
+          <li>Analizar el funcionamiento de nuestros servicios (con consentimiento).</li>
           <li>Fortalecer la seguridad de la información.</li>
           <li>
             Mantener sesiones y prevenir accesos no autorizados a plataformas de clientes o
@@ -80,16 +81,19 @@ export default function CookiesPage() {
       </section>
 
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Gestión y deshabilitación</h2>
+        <h2 className={styles.sectionTitle}>Consentimiento y gestión</h2>
         <p className={styles.p}>
-          El usuario podrá configurar su navegador para limitar o deshabilitar el uso de cookies
-          y tecnologías similares. Sin embargo, algunas funcionalidades del sitio o de las
-          plataformas de soporte podrían verse afectadas.
+          Al visitar el sitio público de NEXARA verá un aviso de cookies. Puede{" "}
+          <strong style={{ color: "#fff" }}>aceptar todas</strong>, elegir{" "}
+          <strong style={{ color: "#fff" }}>solo las necesarias</strong> o{" "}
+          <strong style={{ color: "#fff" }}>configurar</strong> categorías (analítica y
+          preferencias). Su elección se guarda en su navegador y puede cambiarla en cualquier
+          momento desde el enlace <em>Gestionar cookies</em> del pie de página.
         </p>
         <p className={styles.p}>
-          Si continúa navegando o utilizando nuestros servicios sin modificar la configuración de
-          su navegador, se entenderá que acepta el uso de cookies conforme a esta política y al
-          Aviso de Privacidad Integral.
+          Las cookies no esenciales (analítica y preferencias) no se cargan hasta que usted las
+          autorice. También puede limitar cookies desde la configuración de su navegador; algunas
+          funcionalidades del sitio o de las plataformas de soporte podrían verse afectadas.
         </p>
       </section>
 
@@ -137,7 +141,7 @@ export default function CookiesPage() {
             </a>
           </p>
         </div>
-        <p className={styles.note}>Última actualización: 13/07/2026</p>
+        <p className={styles.note}>Última actualización: 31/07/2026</p>
       </section>
     </main>
   );

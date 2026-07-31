@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import PublicSiteThemeLock from "@/components/PublicSiteThemeLock";
 import Header from "../../components/Header";
 import Footer from "../components/Footer";
+import CookieConsentBanner from "@/components/CookieConsentBanner";
 
 const FloatingContactForm = dynamic(() => import("../components/FloatingContactForm"), { ssr: false });
 const PublicTrafficTracker = dynamic(() => import("../../components/PublicTrafficTracker"), { ssr: false });
@@ -49,6 +50,7 @@ export default function PublicLayout({
       <div className={contentClass}>{children}</div>
       <FloatingContactForm />
       <Footer />
+      <CookieConsentBanner />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import PublicSiteThemeLock from "@/components/PublicSiteThemeLock";
 import Header from "@/components/Header";
 import Footer from "@/app/components/Footer";
+import CookieConsentBanner from "@/components/CookieConsentBanner";
 
 export default function LegalLayout({ children }: { children: ReactNode }) {
   return (
@@ -14,6 +15,7 @@ export default function LegalLayout({ children }: { children: ReactNode }) {
         {children}
       </div>
       <Footer />
+      <CookieConsentBanner />
     </>
   );
 }

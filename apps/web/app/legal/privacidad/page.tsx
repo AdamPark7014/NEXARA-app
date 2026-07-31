@@ -21,7 +21,7 @@ export default function PrivacidadPage() {
     <main className={styles.page}>
       <p className={styles.eyebrow}>Legal</p>
       <h1 className={styles.title}>Aviso de Privacidad Integral</h1>
-      <p className={styles.updated}>Última actualización: 13/07/2026</p>
+      <p className={styles.updated}>Última actualización: 31/07/2026</p>
 
       <p className={styles.lead}>
         <strong style={{ color: "#fff" }}>{COMPANY}</strong>, con domicilio en {ADDRESS}, es
@@ -182,9 +182,12 @@ export default function PrivacidadPage() {
           seguridad de la información.
         </p>
         <p className={styles.p}>
-          El usuario podrá configurar su navegador para limitar o deshabilitar el uso de dichas
-          tecnologías; sin embargo, algunas funcionalidades podrían verse afectadas. Consulta
-          también nuestra{" "}
+          En el sitio público mostramos un aviso de cookies para que usted decida si autoriza
+          cookies no esenciales (analítica y preferencias). Las cookies necesarias para el
+          funcionamiento y la seguridad se mantienen activas. Puede cambiar su elección en
+          cualquier momento desde <em>Gestionar cookies</em> en el pie de página, o limitar
+          cookies desde su navegador (algunas funcionalidades podrían verse afectadas).
+          Consulta también nuestra{" "}
           <Link className={styles.link} href="/legal/cookies">
             Política de Cookies
           </Link>
@@ -239,7 +242,7 @@ export default function PrivacidadPage() {
             </a>
           </p>
         </div>
-        <p className={styles.note}>Última actualización: 13/07/2026</p>
+        <p className={styles.note}>Última actualización: 31/07/2026</p>
       </section>
     </main>
   );
