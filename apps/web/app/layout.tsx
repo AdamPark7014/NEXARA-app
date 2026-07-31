@@ -2,10 +2,10 @@ import "./globals.scss";
 import "./utilities.scss";
 import "./ecosystem.scss";
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
 import { Space_Grotesk, Inter_Tight, Manrope, Fraunces, JetBrains_Mono } from "next/font/google";
 import ClientLayout from "./ClientLayout";
 import Providers from "./providers";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -248,23 +248,8 @@ export default function RootLayout({
           </ClientLayout>
         </Providers>
 
-        {/* Google Analytics 4 — set NEXT_PUBLIC_GA_MEASUREMENT_ID in .env */}
-        {gaId && (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
-              strategy="afterInteractive"
-            />
-            <Script id="ga4-init" strategy="afterInteractive">
-              {`
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', '${gaId}', { page_path: window.location.pathname });
-              `}
-            </Script>
-          </>
-        )}
+        {/* GA4 solo tras consentimiento de analítica (CookieConsentBanner). */}
+        {gaId ? <GoogleAnalytics measurementId={gaId} /> : null}
       </body>
     </html>
   );

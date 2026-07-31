@@ -246,6 +246,23 @@
   color: var(--f-acento);
 }
 
+.legalButton {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--f-niebla);
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+
+.legalButton:hover {
+  color: var(--f-acento);
+}
+
 .backTop {
   position: fixed;
   right: max(16px, env(safe-area-inset-right, 0px));

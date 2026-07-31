@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { buildApiUrl } from "@/lib/api-base";
+import {
+  COOKIE_CONSENT_EVENT,
+  getCookieConsent,
+  hasAnalyticsConsent,
+  type CookieConsentState,
+} from "@/lib/cookie-consent";
 
 const parseLandingKey = (pathname: string) => {
   const clean = pathname.replace(/\/+$/, "");
@@ -37,6 +43,7 @@ const trackEvent = (payload: Record<string, unknown>) => {
 export default function PublicTrafficTracker() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [analyticsAllowed, setAnalyticsAllowed] = useState(false);
 
   const utmSnapshot = useMemo(() => ({
     source: searchParams?.get("utm_source") || null,
@@ -47,7 +54,22 @@ export default function PublicTrafficTracker() {
   }), [searchParams]);
 
   useEffect(() => {
-    if (!pathname) return;
+    const sync = (state?: CookieConsentState | null) => {
+      setAnalyticsAllowed(
+        hasAnalyticsConsent(state === undefined ? getCookieConsent() : state),
+      );
+    };
+    sync();
+    const onConsent = (event: Event) => {
+      const detail = (event as CustomEvent<CookieConsentState>).detail;
+      sync(detail ?? getCookieConsent());
+    };
+    window.addEventListener(COOKIE_CONSENT_EVENT, onConsent);
+    return () => window.removeEventListener(COOKIE_CONSENT_EVENT, onConsent);
+  }, []);
+
+  useEffect(() => {
+    if (!analyticsAllowed || !pathname) return;
 
     const landingKey = parseLandingKey(pathname);
     trackEvent({
@@ -61,9 +83,11 @@ export default function PublicTrafficTracker() {
         userAgent: typeof navigator !== "undefined" ? navigator.userAgent : null,
       },
     });
-  }, [pathname, utmSnapshot]);
+  }, [pathname, utmSnapshot, analyticsAllowed]);
 
   useEffect(() => {
+    if (!analyticsAllowed) return;
+
     const onClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
       if (!target) return;
@@ -91,7 +115,7 @@ export default function PublicTrafficTracker() {
 
     document.addEventListener("click", onClick);
     return () => document.removeEventListener("click", onClick);
-  }, [pathname, utmSnapshot]);
+  }, [pathname, utmSnapshot, analyticsAllowed]);
 
   return null;
 }

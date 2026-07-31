@@ -1,0 +1,190 @@
+.banner {
+  --cc-bg: #07111f;
+  --cc-ink: #eef4ff;
+  --cc-muted: #9bb0cc;
+  --cc-line: rgba(140, 190, 255, 0.16);
+  --cc-cyan: #2dd8f2;
+  --cc-display: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  --cc-body: var(--nx-font-body, "Manrope", system-ui, sans-serif);
+  --cc-ui: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
+
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 100050;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 18px 18px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--cc-line);
+  background:
+    radial-gradient(80% 120% at 0% 0%, rgba(45, 216, 242, 0.12), transparent 55%),
+    var(--cc-bg);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  color: var(--cc-ink);
+  font-family: var(--cc-body);
+}
+
+.title {
+  margin: 0 0 8px;
+  font-family: var(--cc-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.text {
+  margin: 0 0 14px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--cc-muted);
+}
+
+.text a {
+  color: var(--cc-cyan);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btnPrimary,
+.btnSecondary,
+.btnGhost {
+  appearance: none;
+  border-radius: 9px;
+  padding: 9px 14px;
+  font-family: var(--cc-ui);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.btnPrimary {
+  background: var(--cc-cyan);
+  color: #041018;
+}
+
+.btnPrimary:hover {
+  filter: brightness(1.06);
+}
+
+.btnSecondary {
+  background: transparent;
+  border-color: var(--cc-line);
+  color: var(--cc-ink);
+}
+
+.btnSecondary:hover {
+  border-color: rgba(45, 216, 242, 0.45);
+}
+
+.btnGhost {
+  background: transparent;
+  color: var(--cc-muted);
+  border-color: transparent;
+}
+
+.btnGhost:hover {
+  color: var(--cc-ink);
+}
+
+.prefs {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--cc-line);
+  display: grid;
+  gap: 10px;
+}
+
+.prefRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.prefCopy {
+  min-width: 0;
+}
+
+.prefLabel {
+  display: block;
+  font-family: var(--cc-ui);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--cc-ink);
+  margin-bottom: 2px;
+}
+
+.prefDesc {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--cc-muted);
+}
+
+.toggle {
+  flex-shrink: 0;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--cc-line);
+  background: rgba(255, 255, 255, 0.06);
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+}
+
+.toggle[data-on="true"] {
+  background: rgba(45, 216, 242, 0.28);
+  border-color: rgba(45, 216, 242, 0.55);
+}
+
+.toggle[data-disabled="true"] {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.toggleKnob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #d7e6ff;
+  transition: transform 0.15s ease;
+}
+
+.toggle[data-on="true"] .toggleKnob {
+  transform: translateX(18px);
+  background: var(--cc-cyan);
+}
+
+@media (max-width: 560px) {
+  .banner {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    padding: 16px 14px 14px;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .btnPrimary,
+  .btnSecondary,
+  .btnGhost {
+    width: 100%;
+    text-align: center;
+  }
+}
