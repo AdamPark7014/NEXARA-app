@@ -10,18 +10,19 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
+/** Texto alineado al aviso oficial (DOCX) de NEW ENGINEERING EXPERTISE AND RESOURCE ADVANCEMENT S.A. DE C.V. */
 const COMPANY =
   "NEW ENGINEERING EXPERTISE AND RESOURCE ADVANCEMENT S.A. DE C.V.";
 
 const ADDRESS =
-  "Ignacio Allende 512 local 2, Santiago Momoxpan, San Pedro Cholula, Puebla C.P. 72775";
+  "Ignacio Allende 512 local 2, Santiago Momoxpan, San Pedro Cholula Puebla C.P. 72775";
 
 export default function PrivacidadPage() {
   return (
     <main className={styles.page}>
       <p className={styles.eyebrow}>Legal</p>
       <h1 className={styles.title}>Aviso de Privacidad Integral</h1>
-      <p className={styles.updated}>Última actualización: 31/07/2026</p>
+      <p className={styles.updated}>Última actualización: 13/07/2026</p>
 
       <p className={styles.lead}>
         <strong style={{ color: "#fff" }}>{COMPANY}</strong>, con domicilio en {ADDRESS}, es
@@ -69,8 +70,8 @@ export default function PrivacidadPage() {
           </li>
         </ul>
         <p className={styles.p}>
-          La empresa no recaba datos personales sensibles, salvo que por la naturaleza de
-          algún servicio específico resulte estrictamente necesario y exista el consentimiento
+          La empresa no recaba datos personales sensibles, salvo que por la naturaleza de algún
+          servicio específico resulte estrictamente necesario y exista el consentimiento
           correspondiente.
         </p>
       </section>
@@ -88,10 +89,9 @@ export default function PrivacidadPage() {
             tecnológicas.
           </li>
           <li>
-            Prestar servicios de instalación, configuración, mantenimiento, reparación y
-            soporte técnico de equipos de cómputo, servidores, redes, sistemas de
-            videovigilancia (CCTV), control de acceso, telecomunicaciones y demás
-            infraestructura tecnológica.
+            Prestar servicios de instalación, configuración, mantenimiento, reparación y soporte
+            técnico de equipos de cómputo, servidores, redes, sistemas de videovigilancia (CCTV),
+            control de acceso, telecomunicaciones y demás infraestructura tecnológica.
           </li>
           <li>
             Gestionar, atender y dar seguimiento a reportes técnicos, solicitudes de soporte y
@@ -135,7 +135,7 @@ export default function PrivacidadPage() {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Medidas de seguridad</h2>
         <p className={styles.p}>
-          {COMPANY} implementa medidas administrativas, técnicas y físicas razonables para
+          {COMPANY}, implementa medidas administrativas, técnicas y físicas razonables para
           proteger los datos personales contra daño, pérdida, alteración, destrucción, uso,
           acceso o tratamiento no autorizado.
         </p>
@@ -182,12 +182,9 @@ export default function PrivacidadPage() {
           seguridad de la información.
         </p>
         <p className={styles.p}>
-          En el sitio público mostramos un aviso de cookies para que usted decida si autoriza
-          cookies no esenciales (analítica y preferencias). Las cookies necesarias para el
-          funcionamiento y la seguridad se mantienen activas. Puede cambiar su elección en
-          cualquier momento desde <em>Gestionar cookies</em> en el pie de página, o limitar
-          cookies desde su navegador (algunas funcionalidades podrían verse afectadas).
-          Consulta también nuestra{" "}
+          El usuario podrá configurar su navegador para limitar o deshabilitar el uso de dichas
+          tecnologías; sin embargo, algunas funcionalidades podrían verse afectadas. Detalle
+          adicional en nuestra{" "}
           <Link className={styles.link} href="/legal/cookies">
             Política de Cookies
           </Link>
@@ -198,8 +195,8 @@ export default function PrivacidadPage() {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Cambios al aviso de privacidad</h2>
         <p className={styles.p}>
-          {COMPANY} podrá modificar o actualizar el presente Aviso de Privacidad cuando resulte
-          necesario por cambios legales, operativos o de políticas internas.
+          {COMPANY}, podrá modificar o actualizar el presente Aviso de Privacidad cuando
+          resulte necesario por cambios legales, operativos o de políticas internas.
         </p>
         <p className={styles.p}>
           Las modificaciones estarán disponibles en nuestro sitio web{" "}
@@ -232,7 +229,7 @@ export default function PrivacidadPage() {
           <p>
             <strong>Teléfono:</strong>{" "}
             <a className={styles.link} href="tel:+522201791871">
-              220 179 1871
+              2201791871
             </a>
           </p>
           <p>
@@ -242,7 +239,7 @@ export default function PrivacidadPage() {
             </a>
           </p>
         </div>
-        <p className={styles.note}>Última actualización: 31/07/2026</p>
+        <p className={styles.note}>Última actualización: 13/07/2026</p>
       </section>
     </main>
   );
