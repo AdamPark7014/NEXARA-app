@@ -75,8 +75,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
         details = res;
       }
     } else if (exception instanceof Error) {
-      message = exception.message;
-      details = { stack: exception.stack };
+      const mapped = mapPrismaError(exception);
+      if (mapped) {
+        status = mapped.status;
+        message = mapped.message;
+        errorCode = mapped.errorCode;
+      } else {
+        // Nunca se devuelve al cliente el mensaje interno de un error no
+        // controlado: los de Prisma incluyen la forma de la consulta y los
+        // nombres de las columnas. Se registra completo y se responde genérico.
+        message = 'Error interno del servidor';
+      }
+      details = { originalMessage: exception.message, stack: exception.stack };
     }
 
     const payload = {
@@ -112,6 +122,57 @@ export class AllExceptionsFilter implements ExceptionFilter {
       path: request.url,
     });
   }
+}
+
+/**
+ * Traduce errores de Prisma a respuestas HTTP correctas.
+ *
+ * Sin esto, un parámetro de ruta no numérico (`/api/warehouse/abc`) llegaba al
+ * motor como `NaN`, Prisma lanzaba un error de validación y el cliente recibía
+ * un 500 con la forma completa de la consulta: tabla, columnas y tipos. Son 87
+ * los puntos del código que convierten parámetros sin validar, así que se
+ * resuelve aquí una sola vez en lugar de parchear cada uno.
+ */
+export function mapPrismaError(
+  error: Error,
+): { status: number; message: string; errorCode: string } | null {
+  const name = error.constructor?.name ?? error.name;
+
+  if (name === 'PrismaClientValidationError') {
+    return {
+      status: HttpStatus.BAD_REQUEST,
+      message: 'Parámetros de la petición inválidos',
+      errorCode: 'INVALID_REQUEST',
+    };
+  }
+
+  if (name === 'PrismaClientKnownRequestError') {
+    const code = (error as unknown as { code?: string }).code;
+    switch (code) {
+      case 'P2025':
+        return {
+          status: HttpStatus.NOT_FOUND,
+          message: 'Recurso no encontrado',
+          errorCode: 'NOT_FOUND',
+        };
+      case 'P2002':
+        return {
+          status: HttpStatus.CONFLICT,
+          message: 'Ya existe un registro con esos datos',
+          errorCode: 'DUPLICATE',
+        };
+      case 'P2003':
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          message: 'Referencia inválida a otro registro',
+          errorCode: 'INVALID_REFERENCE',
+        };
+      default:
+        return null;
+    }
+  }
+
+  return null;
 }
 
 function suggestErrorSolutions(status: number, _errorCode: string, message: string, details: any): string[] {
