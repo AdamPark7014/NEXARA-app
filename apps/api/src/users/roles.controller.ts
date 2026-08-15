@@ -8,6 +8,7 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
 import { ORG_ROLE_TEMPLATES } from '../common/org-roles.js';
+import { buildRoleData, resolveTemplateOrThrow } from './role-template.js';
 
 @Controller('roles')
 export class RolesController {
@@ -53,11 +54,17 @@ export class RolesController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ROLES_MANAGE] })
   async create(@Body() createRoleDto: CreateRoleDto) {
-    const data = { ...this.sanitizeRolePayload(createRoleDto) };
-    const name = String(data.nombre || '').trim();
+    const sanitized = { ...this.sanitizeRolePayload(createRoleDto) };
+    const name = String(sanitized.nombre || '').trim();
     if (!name) {
       throw new BadRequestException('Nombre de rol requerido');
     }
+    sanitized.nombre = name;
+
+    // Todo rol nace de una plantilla: sin `orgRoleKey` la matriz de permisos no
+    // sabe qué puede hacer y el rol queda sin línea base.
+    const template = resolveTemplateOrThrow(sanitized);
+    const data = buildRoleData(template, sanitized) as Prisma.RoleUncheckedCreateInput;
     data.nombre = name;
 
     const existing = await this.prisma.role.findFirst({
@@ -121,6 +128,21 @@ export class RolesController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ROLES_MANAGE] })
   async remove(@Param('id') id: string) {
-    return this.prisma.role.delete({ where: { id: Number(id) } });
+    const roleId = Number(id);
+    if (!Number.isInteger(roleId) || roleId <= 0) {
+      throw new BadRequestException('Identificador de rol inválido');
+    }
+
+    // Borrar un rol con gente asignada dejaba a esos usuarios sin permisos
+    // (o fallaba con un error de clave foránea sin explicar la causa).
+    const assigned = await this.prisma.user.count({ where: { roleId } });
+    if (assigned > 0) {
+      throw new ConflictException(
+        `No se puede eliminar: ${assigned} usuario(s) tienen este rol asignado. ` +
+          'Reasígnalos a otro rol antes de borrarlo.',
+      );
+    }
+
+    return this.prisma.role.delete({ where: { id: roleId } });
   }
 }

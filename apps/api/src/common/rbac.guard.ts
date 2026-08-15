@@ -66,6 +66,23 @@ export class RbacGuard extends AuthGuard('jwt') {
       // No early-return: keep evaluating decorator permissions below.
     }
 
+    // Fail-closed: si el rol no se puede resolver contra la matriz v2 y el
+    // endpoint tampoco declara @RBAC, no queda ninguna comprobación efectiva.
+    //
+    // Es el caso de un rol creado a mano cuya clave no existe en ROLES: la
+    // matriz se salta entera y el usuario alcanzaba endpoints que para los
+    // roles conocidos están denegados. Los 8 roles reales resuelven bien, así
+    // que esto no afecta a nadie hoy; cierra el agujero para los que se creen.
+    if (!v2Role && !rbac.permissions?.length && !rbac.anyPermissions?.length) {
+      this.logger.warn(
+        `[RBAC_DENY] usuario=${user.id} rol sin clave reconocida (roleKey=${user.roleKey ?? 'ninguna'}, ` +
+          `orgRoleKey=${user.orgRoleKey ?? 'ninguna'}) en ${request.method} ${request.originalUrl || request.url}`,
+      );
+      throw new ForbiddenException(
+        'Tu rol no tiene una plantilla de permisos válida. Pide a un administrador que lo reasigne.',
+      );
+    }
+
     // 3) Permisos del decorator @RBAC — siempre se evalúan si existen.
     const permissions: string[] = user.permissions || [];
     const isConsoleAdmin = Boolean(
