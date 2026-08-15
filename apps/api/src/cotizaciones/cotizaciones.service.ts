@@ -23,6 +23,13 @@ import { randomBytes } from 'crypto';
 import nodemailer from 'nodemailer';
 import fs from 'fs/promises';
 import path from 'path';
+import {
+  calculateTotals,
+  maxDiscountPercent,
+  normalizeItems,
+  type NormalizedCotizacionItem,
+  type RawCotizacionItem,
+} from './cotizacion-totals.js';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
@@ -55,8 +62,7 @@ export class CotizacionesService {
    * workflow "Aprobación de descuento en cotización".
    */
   private maxDiscountPercent(items: Array<{ discount: number }>): number {
-    if (!items.length) return 0;
-    return items.reduce((max, it) => Math.max(max, Number(it.discount) || 0), 0);
+    return maxDiscountPercent(items);
   }
 
   private parseDate(value?: string) {
@@ -67,58 +73,11 @@ export class CotizacionesService {
   }
 
   private normalizeItems(items: CreateCotizacionDto['items']) {
-    if (!items || !items.length) {
-      throw new BadRequestException('Se requiere al menos un concepto');
-    }
-
-    return items.map((item) => ({
-      productId: item.productId ? Number(item.productId) : null,
-      category: item.category?.trim() || 'Otros',
-      name: item.name?.trim() || 'Concepto',
-      description: item.description?.trim() || null,
-      scope: item.scope?.trim() || null,
-      brand: item.brand?.trim() || null,
-      model: item.model?.trim() || null,
-      sku: item.sku?.trim() || null,
-      partNumber: item.partNumber?.trim() || null,
-      batchReference: item.batchReference?.trim() || null,
-      unit: item.unit?.trim() || 'pieza',
-      qty: Math.max(1, Number(item.qty) || 1),
-      unitPrice: Number(item.unitPrice) || 0,
-      discount: Math.max(0, Math.min(100, Number(item.discount) || 0)),
-      tax: Math.max(0, Math.min(100, Number(item.tax) || 0)),
-      ieps: Math.max(0, Math.min(100, Number(item.ieps) || 0)),
-      retention: Math.max(0, Math.min(100, Number(item.retention) || 0)),
-      laborHours: Math.max(0, Number(item.laborHours) || 0),
-      laborRate: Math.max(0, Number(item.laborRate) || 0),
-      warrantyMonths: Math.max(0, Number(item.warrantyMonths) || 0),
-      deliveryTime: item.deliveryTime?.trim() || null,
-      countryOrigin: item.countryOrigin?.trim() || null,
-      notes: item.notes?.trim() || null,
-    }));
+    return normalizeItems(items as RawCotizacionItem[]);
   }
 
-  private calculateTotals(items: ReturnType<CotizacionesService['normalizeItems']>) {
-    return items.reduce(
-      (acc, item) => {
-        const subtotal = item.qty * item.unitPrice;
-        const discount = subtotal * (item.discount / 100);
-        const taxable = subtotal - discount;
-        const taxAmount = taxable * (item.tax / 100);
-        const iepsAmount = taxable * (item.ieps / 100);
-        const retentionAmount = taxable * (item.retention / 100);
-        const total = taxable + taxAmount + iepsAmount - retentionAmount;
-        return {
-          subtotal: acc.subtotal + subtotal,
-          discountTotal: acc.discountTotal + discount,
-          taxTotal: acc.taxTotal + taxAmount,
-          iepsTotal: acc.iepsTotal + iepsAmount,
-          retentionTotal: acc.retentionTotal + retentionAmount,
-          total: acc.total + total,
-        };
-      },
-      { subtotal: 0, discountTotal: 0, taxTotal: 0, iepsTotal: 0, retentionTotal: 0, total: 0 },
-    );
+  private calculateTotals(items: NormalizedCotizacionItem[]) {
+    return calculateTotals(items);
   }
 
   private buildItemData(items: ReturnType<CotizacionesService['normalizeItems']>) {
