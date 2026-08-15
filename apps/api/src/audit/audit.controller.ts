@@ -6,6 +6,7 @@ import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { requirePositiveIntQuery, requireStringQuery } from '../common/dto/query-params.js';
 
 @Controller('audit')
 @UseGuards(UrlAccessGuard, RbacGuard)
@@ -83,6 +84,10 @@ export class AuditController {
   @Get('entity-history')
   @RBAC({ permissions: [PERMISSIONS.AUDIT_VIEW] })
   entityHistory(@Query('entityType') entityType: string, @Query('entityId') entityId: string) {
-    return this.svc.getEntityHistory(entityType, +entityId);
+    // Sin estos parámetros el `undefined`/`NaN` llegaba a Prisma y devolvía 500.
+    return this.svc.getEntityHistory(
+      requireStringQuery(entityType, 'entityType', 100),
+      requirePositiveIntQuery(entityId, 'entityId'),
+    );
   }
 }
