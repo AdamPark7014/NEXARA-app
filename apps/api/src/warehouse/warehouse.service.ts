@@ -319,7 +319,16 @@ export class WarehouseService {
         ...(companyId != null ? companyWhere(companyId) : {}),
       },
     });
-    const available = level ? Number(level.quantity) - Number(level.reservedQty) : 0;
+    // Sin fila de stock no hay nada que descontar. El llamador ya rechaza
+    // cantidades <= 0, pero no dependemos de esa validación remota para evitar
+    // desreferenciar `level` en null si algún día aparece otro llamador.
+    if (!level) {
+      throw new BadRequestException(
+        `Stock insuficiente en el almacén de origen: disponible 0, solicitado ${quantity}`,
+      );
+    }
+
+    const available = Number(level.quantity) - Number(level.reservedQty);
     if (available < quantity) {
       throw new BadRequestException(
         `Stock insuficiente en el almacén de origen: disponible ${available}, solicitado ${quantity}`,
@@ -327,7 +336,7 @@ export class WarehouseService {
     }
 
     const result = await tx.stockLevel.updateMany({
-      where: { id: level!.id, quantity: { gte: quantity } },
+      where: { id: level.id, quantity: { gte: quantity } },
       data: { quantity: { decrement: quantity } },
     });
     if (result.count === 0) {

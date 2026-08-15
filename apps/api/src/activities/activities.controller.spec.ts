@@ -1,36 +1,53 @@
-
 import { Test, TestingModule } from '@nestjs/testing';
 import { ActivitiesController } from './activities.controller.js';
 import { ActivitiesService } from './activities.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { UsersService } from '../users/users.service.js';
+import { ExcelExportService } from '../common/excel-export.service.js';
+import { ExcelImportService } from '../common/excel-import.service.js';
 import { RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
-import { TicketType } from '@prisma/client';
-type UserPrismaMock = {
-  id: number;
-  nombre: string;
-  email: string;
-  password?: string;
-  passwordHash: string;
-  roleId: number;
-  departmentId: number;
-  avatarUrl: string | null;
-  fechaCreacion: Date;
-  locationConsent: boolean;
-};
 
+/**
+ * `GET /activities` enruta a un método distinto del servicio según el alcance
+ * del usuario. Lo que importa verificar es ese enrutado y que la empresa activa
+ * se propague siempre: un fallo aquí devuelve a un usuario actividades que no
+ * le corresponden, o de otra empresa.
+ */
 describe('ActivitiesController', () => {
   let controller: ActivitiesController;
   let service: ActivitiesService;
+  let usersService: { findUsersForConsoleActivityScope: jest.Mock };
+
+  const COMPANY_ID = 7;
+  const activity = (id: number, titulo: string) => ({ id, titulo });
 
   beforeEach(async () => {
+    usersService = {
+      findUsersForConsoleActivityScope: jest.fn().mockResolvedValue([{ id: 3 }, { id: 4 }]),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ActivitiesController],
       providers: [
         ActivitiesService,
-        { provide: PrismaService, useValue: { activity: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn(), } } },
+        {
+          provide: PrismaService,
+          useValue: { activity: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() } },
+        },
+        {
+          provide: NotificationHierarchyService,
+          useValue: {
+            notifyActivityAssigned: jest.fn(),
+            notifyActivityUpdated: jest.fn(),
+            notifyHierarchy: jest.fn(),
+          },
+        },
+        { provide: UsersService, useValue: usersService },
+        { provide: ExcelExportService, useValue: { exportToExcel: jest.fn() } },
+        { provide: ExcelImportService, useValue: { importExcel: jest.fn() } },
       ],
     })
       .overrideGuard(RbacGuard)
@@ -47,219 +64,48 @@ describe('ActivitiesController', () => {
     expect(controller).toBeDefined();
   });
 
-  it('should return activities for CEO', async () => {
-    const user = { isSuperAdmin: true };
-    const responsable: UserPrismaMock = {
-      id: 2,
-      nombre: 'Juan',
-      email: 'juan@mail.com',
-      password: '',
-      passwordHash: '',
-      roleId: 1,
-      departmentId: 1,
-      avatarUrl: null,
-      fechaCreacion: new Date(),
-      locationConsent: false,
-    };
-    const creador: UserPrismaMock = {
-      id: 1,
-      nombre: 'Admin',
-      email: 'admin@mail.com',
-      password: '',
-      passwordHash: '',
-      roleId: 1,
-      departmentId: 1,
-      avatarUrl: null,
-      fechaCreacion: new Date(),
-      locationConsent: false,
-    };
-    const activity = {
-      id: 1,
-      anNumber: 'A-001',
-      titulo: 'Actividad CEO',
-      descripcion: null,
-      indicaciones: null,
-      estatus: 'Pendiente',
-      prioridad: null,
-      ticketType: TicketType.PREVENTIVO,
-      clientId: null,
-      branchName: null,
-      branchNumber: null,
-      branchCity: null,
-      branchState: null,
-      branchAddress: null,
-      slaAlertedAt: null,
-      tiempoEstimadoMin: null,
-      tiempoMaximoMin: null,
-      creadoPorId: creador.id,
-      responsableId: responsable.id,
-      eficienciaScore: null,
-      comentariosFeedback: null,
-      fechaAsignacion: new Date(),
-      fechaInicio: null,
-      fechaMaxima: null,
-      fechaEntregaEsperada: null,
-      fechaFinalizacion: null,
-      clientSurveyRequestedAt: null,
-      clientSurveyCompletedAt: null,
-      ticketReportUrl: null,
-      ticketReportGeneratedAt: null,
-      creador,
-      responsable,
-      client: null,
-      serviceSheet: null,
-      evidencias: [],
-      vehicleControls: [],
-      expenses: [],
-      locations: [],
-    };
-    jest.spyOn(service, 'findAll').mockResolvedValueOnce([activity]);
-    // @ts-ignore
-    const result = await controller.findAll(user);
-    expect(result).toEqual([activity]);
+  it('returns every activity for a super admin', async () => {
+    const expected = [activity(1, 'Actividad CEO')];
+    const spy = jest.spyOn(service, 'findAll').mockResolvedValueOnce(expected as any);
+
+    const query = {} as any;
+    const result = await controller.findAll({ isSuperAdmin: true } as any, COMPANY_ID, query);
+
+    expect(result).toEqual(expected);
+    expect(spy).toHaveBeenCalledWith(query, COMPANY_ID);
   });
 
-  it('should return activities for supervisor', async () => {
+  it('scopes an ops manager to the console activity user set', async () => {
+    const expected = [activity(2, 'Actividad Supervisor')];
+    const spy = jest.spyOn(service, 'findByAllowedUsers').mockResolvedValueOnce(expected as any);
+
     const user = { permissions: [PERMISSIONS.CONSOLE_ADMIN], departmentId: 2 };
-    const responsable: UserPrismaMock = {
-      id: 3,
-      nombre: 'Ana',
-      email: 'ana@mail.com',
-      password: '',
-      passwordHash: '',
-      roleId: 2,
-      departmentId: 2,
-      avatarUrl: null,
-      fechaCreacion: new Date(),
-      locationConsent: false,
-    };
-    const creador: UserPrismaMock = {
-      id: 1,
-      nombre: 'Admin',
-      email: 'admin@mail.com',
-      password: '',
-      passwordHash: '',
-      roleId: 1,
-      departmentId: 1,
-      avatarUrl: null,
-      fechaCreacion: new Date(),
-      locationConsent: false,
-    };
-    const activity = {
-      id: 2,
-      anNumber: 'A-002',
-      titulo: 'Actividad Supervisor',
-      descripcion: null,
-      indicaciones: null,
-      estatus: 'Pendiente',
-      prioridad: null,
-      ticketType: TicketType.PREVENTIVO,
-      clientId: null,
-      branchName: null,
-      branchNumber: null,
-      branchCity: null,
-      branchState: null,
-      branchAddress: null,
-      slaAlertedAt: null,
-      tiempoEstimadoMin: null,
-      tiempoMaximoMin: null,
-      creadoPorId: creador.id,
-      responsableId: responsable.id,
-      eficienciaScore: null,
-      comentariosFeedback: null,
-      fechaAsignacion: new Date(),
-      fechaInicio: null,
-      fechaMaxima: null,
-      fechaEntregaEsperada: null,
-      fechaFinalizacion: null,
-      clientSurveyRequestedAt: null,
-      clientSurveyCompletedAt: null,
-      ticketReportUrl: null,
-      ticketReportGeneratedAt: null,
-      creador,
-      responsable,
-      client: null,
-      serviceSheet: null,
-      evidencias: [],
-      vehicleControls: [],
-      expenses: [],
-      locations: [],
-    };
-    jest.spyOn(service, 'findByDepartment').mockResolvedValueOnce([activity]);
-    // @ts-ignore
-    const result = await controller.findAll(user);
-    expect(result).toEqual([activity]);
+    const result = await controller.findAll(user as any, COMPANY_ID, {} as any);
+
+    expect(result).toEqual(expected);
+    expect(usersService.findUsersForConsoleActivityScope).toHaveBeenCalled();
+    expect(spy).toHaveBeenCalledWith([3, 4], COMPANY_ID);
   });
 
-  it('should return activities for staff', async () => {
+  it('falls back to own activities for regular staff', async () => {
+    const expected = [activity(3, 'Actividad Staff')];
+    const spy = jest.spyOn(service, 'findByResponsible').mockResolvedValueOnce(expected as any);
+
     const user = { permissions: [PERMISSIONS.ACTIVITIES_VIEW], id: 3 };
-    const responsable: UserPrismaMock = {
-      id: 3,
-      nombre: 'Ana',
-      email: 'ana@mail.com',
-      password: '',
-      passwordHash: '',
-      roleId: 2,
-      departmentId: 2,
-      avatarUrl: null,
-      fechaCreacion: new Date(),
-      locationConsent: false,
-    };
-    const creador: UserPrismaMock = {
-      id: 1,
-      nombre: 'Admin',
-      email: 'admin@mail.com',
-      password: '',
-      passwordHash: '',
-      roleId: 1,
-      departmentId: 1,
-      avatarUrl: null,
-      fechaCreacion: new Date(),
-      locationConsent: false,
-    };
-    const activity = {
-      id: 3,
-      anNumber: 'A-003',
-      titulo: 'Actividad Staff',
-      descripcion: null,
-      indicaciones: null,
-      estatus: 'Pendiente',
-      prioridad: null,
-      ticketType: TicketType.PREVENTIVO,
-      clientId: null,
-      branchName: null,
-      branchNumber: null,
-      branchCity: null,
-      branchState: null,
-      branchAddress: null,
-      slaAlertedAt: null,
-      tiempoEstimadoMin: null,
-      tiempoMaximoMin: null,
-      creadoPorId: creador.id,
-      responsableId: responsable.id,
-      eficienciaScore: null,
-      comentariosFeedback: null,
-      fechaAsignacion: new Date(),
-      fechaInicio: null,
-      fechaMaxima: null,
-      fechaEntregaEsperada: null,
-      fechaFinalizacion: null,
-      clientSurveyRequestedAt: null,
-      clientSurveyCompletedAt: null,
-      ticketReportUrl: null,
-      ticketReportGeneratedAt: null,
-      creador,
-      responsable,
-      client: null,
-      serviceSheet: null,
-      evidencias: [],
-      vehicleControls: [],
-      expenses: [],
-      locations: [],
-    };
-    jest.spyOn(service, 'findByResponsible').mockResolvedValueOnce([activity]);
-    // @ts-ignore
-    const result = await controller.findAll(user);
-    expect(result).toEqual([activity]);
+    const result = await controller.findAll(user as any, COMPANY_ID, {} as any);
+
+    expect(result).toEqual(expected);
+    expect(spy).toHaveBeenCalledWith(3, COMPANY_ID);
+  });
+
+  it('honours scope=mine even for a super admin', async () => {
+    const expected = [activity(4, 'Solo mías')];
+    const spy = jest.spyOn(service, 'findByResponsible').mockResolvedValueOnce(expected as any);
+
+    const user = { isSuperAdmin: true, id: 9 };
+    const result = await controller.findAll(user as any, COMPANY_ID, { scope: 'mine' } as any);
+
+    expect(result).toEqual(expected);
+    expect(spy).toHaveBeenCalledWith(9, COMPANY_ID);
   });
 });
