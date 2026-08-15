@@ -1,10 +1,11 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import styles from './GpsMap.module.css';
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 const GOOGLE_MAPS_SCRIPT_ID = 'google-maps-script';
 
@@ -324,7 +325,7 @@ const GpsMap = () => {
   useEffect(() => {
     if (!user?.token) return;
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, {
+    const socket: Socket = createRealtimeSocket(socketUrl, {
       path: '/socket.io',
       transports: ['websocket', 'polling'],
       upgrade: true,

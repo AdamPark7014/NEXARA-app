@@ -4,9 +4,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useUser } from './UserContext';
 import PDFViewer from './PDFViewer';
 import styles from './QuoteGenerator.module.css';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { triggerBlobDownload } from '@/lib/file-download';
 import { getSocketBaseUrl } from '@/lib/api-base';
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 interface Quote {
   id: number;
@@ -102,7 +103,7 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
     if (!token) return;
 
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    const socket: Socket = createRealtimeSocket(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
     const scheduleRefresh = () => {

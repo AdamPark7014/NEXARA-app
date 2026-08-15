@@ -1,10 +1,11 @@
 "use client";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useState, useEffect } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import styles from './AttendanceHierarchyStats.module.css';
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 interface UserAttendanceStats {
   userId: number;
@@ -247,7 +248,7 @@ const AttendanceHierarchyStats: React.FC = () => {
     if (!hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE)) return;
 
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    const socket: Socket = createRealtimeSocket(socketUrl, { transports: ['polling', 'websocket'] });
 
     socket.on('attendance:updated', () => {
       fetchStats();

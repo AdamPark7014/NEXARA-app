@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
 import { getSocketBaseUrl } from '@/lib/api-base';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 function BackupRestorePanel() {
@@ -13,7 +13,7 @@ function BackupRestorePanel() {
     if (!user) return;
 
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, {
+    const socket: Socket = createRealtimeSocket(socketUrl, {
       auth: { token: user.token },
       transports: ['websocket', 'polling'],
     });
@@ -107,6 +107,7 @@ import Image from 'next/image';
 import styles from './Header.module.css';
 
 import { usePathname } from 'next/navigation';
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 const navLinks = [
   { name: 'Inicio', href: '/' },

@@ -11,11 +11,12 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { io, type Socket } from 'socket.io-client';
+import { type Socket } from 'socket.io-client';
 import { buildApiUrl, getSocketBaseUrl } from '@/lib/api-base';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import type { Activity, AttendanceRange, Viatic, WeekRange } from './types';
 import { getWeekRange } from './utils';
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 type Options = {
   user: any;
@@ -130,7 +131,7 @@ export function useDashboardData({ user }: Options) {
 
   useEffect(() => {
     if (!user?.token) return;
-    const socket: Socket = io(getSocketBaseUrl(), {
+    const socket: Socket = createRealtimeSocket(getSocketBaseUrl(), {
       transports: ['polling', 'websocket'],
       auth: { token: user.token },
     });

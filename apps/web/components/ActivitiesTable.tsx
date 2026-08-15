@@ -3,13 +3,14 @@ import { toast } from "@/components/Toast";
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import { getActivitiesSectionConfig } from '@/lib/section-views';
 import ExcelDownloadModal from './ExcelDownloadModal';
 import { openExternalUrl } from '@/lib/open-external-url';
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 const EMPTY_ACTIVITY_FORM = {
   titulo: '',
@@ -517,7 +518,7 @@ const ActivitiesTable: React.FC = () => {
   useEffect(() => {
     if (!user?.token) return;
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    const socket: Socket = createRealtimeSocket(socketUrl, { transports: ['polling', 'websocket'] });
 
     socket.on('entity:updated', (payload: { model?: string }) => {
       if (payload?.model === 'Activity') {

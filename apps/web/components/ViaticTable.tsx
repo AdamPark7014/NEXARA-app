@@ -1,13 +1,14 @@
 "use client";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useState, useEffect, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import ExcelDownloadModal from './ExcelDownloadModal';
 import styles from './ViaticTable.module.css';
 import { openExternalUrl } from '@/lib/open-external-url';
 import ApprovalHistory from './ApprovalHistory';
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 interface Viatic {
   id: number;
@@ -101,7 +102,7 @@ const ViaticTable = () => {
   useEffect(() => {
     if (!user?.token) return;
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    const socket: Socket = createRealtimeSocket(socketUrl, { transports: ['polling', 'websocket'] });
 
     socket.on('entity:updated', (payload: { model?: string }) => {
       if (payload?.model === 'Viatico') {

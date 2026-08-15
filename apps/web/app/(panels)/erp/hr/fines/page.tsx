@@ -16,6 +16,7 @@ import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog"
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import { isPaid, isCancelled, isOutstanding } from '@/lib/operational-status';
 
 interface HrStaff {
   id: number;
@@ -276,7 +277,7 @@ export default function FinesPage() {
       render: (f) => {
         if (!f.fechaCreacion) return <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>—</span>;
         const days = Math.floor((Date.now() - new Date(f.fechaCreacion).getTime()) / 86400000);
-        const isPending = f.estatusPago !== "Pagado" && f.estatusPago !== "Cancelado";
+        const isPending = isOutstanding(f.estatusPago);
         const color = !isPending ? "var(--text-tertiary)" : days >= 30 ? "var(--danger)" : days >= 14 ? "var(--warning)" : "var(--text-secondary)";
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -301,7 +302,7 @@ export default function FinesPage() {
       key: "estatusPago",
       label: "Estado",
       render: (f) => (
-        <Tag variant={f.estatusPago === "Pagado" ? "neutral" : f.estatusPago === "Cancelado" ? "danger" : "warning"}>
+        <Tag variant={isPaid(f.estatusPago) ? "neutral" : isCancelled(f.estatusPago) ? "danger" : "warning"}>
           {f.estatusPago ?? "Pendiente"}
         </Tag>
       ),
@@ -433,7 +434,7 @@ export default function FinesPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 18 }}>
           <KpiCard label="Total sanciones" value={items.length} icon="📋" />
           <KpiCard label="Pendientes aprobación" value={items.filter(f => f.estatusAprobacion === "Pendiente").length} variant={items.filter(f => f.estatusAprobacion === "Pendiente").length > 0 ? "warning" : "positive"} icon="⏳" />
-          <KpiCard label="Pagadas" value={items.filter(f => f.estatusPago === "Pagado").length} variant="positive" icon="✅" />
+          <KpiCard label="Pagadas" value={items.filter(f => isPaid(f.estatusPago)).length} variant="positive" icon="✅" />
           <KpiCard label="Monto total" value={<Money value={items.reduce((s, f) => s + Number(f.monto ?? 0), 0)} compact />} icon="💰" hint="Sanciones registradas" />
         </div>
       )}

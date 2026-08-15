@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { io, Socket } from "socket.io-client";
+import { Socket } from "socket.io-client";
 import Link from "next/link";
 import PanelLogin from "@/components/PanelLogin";
 import BranchesForm, { Branch } from "../../../../components/BranchesForm";
@@ -9,6 +9,7 @@ import { useTheme } from "@/components/ThemeContext";
 import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 import consoleStyles from "../../console/console.module.css";
 import styles from "../tickets.module.css";
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 type ClientSession = {
   token: string;
@@ -150,7 +151,7 @@ export default function MyBranchesPage() {
   useEffect(() => {
     if (!session?.token) return undefined;
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ["polling", "websocket"] });
+    const socket: Socket = createRealtimeSocket(socketUrl, { transports: ["polling", "websocket"] });
     socket.on("entity:updated", (payload: { model?: string }) => {
       if (payload?.model === "ServiceClientBranch" || payload?.model === "ServiceClient") {
         fetchProfile(session.token);

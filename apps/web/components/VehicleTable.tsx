@@ -1,12 +1,13 @@
 "use client";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useState, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import ExcelDownloadModal from './ExcelDownloadModal';
 import styles from './VehicleTable.module.css';
 import { openExternalUrl } from '@/lib/open-external-url';
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 interface Vehicle {
   id: number;
@@ -157,7 +158,7 @@ const VehicleTable = () => {
   useEffect(() => {
     if (!user?.token) return;
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, {
+    const socket: Socket = createRealtimeSocket(socketUrl, {
       transports: ['polling'],
       upgrade: false,
       timeout: 20000,

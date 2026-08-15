@@ -1,10 +1,11 @@
 "use client";
 import React, { useState, useRef, useEffect } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { useLunchBreakNotifications } from '@/lib/notifications';
 import { buildApiUrl, getSocketBaseUrl } from '@/lib/api-base';
 import styles from './LunchBreakForm.module.css';
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 interface LunchBreakFormProps {
   onSuccess?: () => void;
@@ -167,7 +168,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
     if (!user) return;
 
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, {
+    const socket: Socket = createRealtimeSocket(socketUrl, {
       auth: { token: user.token },
       transports: ['websocket', 'polling'],
     });
