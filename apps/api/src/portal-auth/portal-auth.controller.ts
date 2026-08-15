@@ -1,6 +1,7 @@
-import { Body, Controller, Headers, Post, Req } from '@nestjs/common';
-import type { Request } from 'express';
+import { Body, Controller, Headers, HttpCode, Post, Req, Res } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { PortalAuthService, type PortalCompanyHint } from './portal-auth.service.js';
+import { clearSessionCookie, setSessionCookie } from '../common/security/session-cookie.js';
 
 @Controller('portal')
 export class PortalAuthController {
@@ -28,21 +29,37 @@ export class PortalAuthController {
 
   /** Login unificado portal tickets (cliente o sucursal). companySlug/companyId opcionales. */
   @Post('login')
-  login(
+  async login(
     @Body() body: { email?: string; password?: string; companySlug?: string; companyId?: number | string },
     @Headers('x-company-slug') headerSlug: string | undefined,
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const meta = {
       ipAddress: String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0]?.trim(),
       userAgent: String(req.headers['user-agent'] || ''),
     };
     const companyHint = this.resolveCompanyHint(body || {}, headerSlug);
-    return this.portalAuth.login(
+    const result = await this.portalAuth.login(
       String(body.email || ''),
       String(body.password || ''),
       meta,
       companyHint,
     );
+
+    // Misma sesión por cookie `HttpOnly` que el login de staff.
+    if (result?.access_token) {
+      setSessionCookie(res, result.access_token);
+    }
+
+    return result;
+  }
+
+  /** Cierre de sesión del portal: la cookie `HttpOnly` solo la borra el servidor. */
+  @Post('logout')
+  @HttpCode(200)
+  logout(@Res({ passthrough: true }) res: Response) {
+    clearSessionCookie(res);
+    return { ok: true };
   }
 }

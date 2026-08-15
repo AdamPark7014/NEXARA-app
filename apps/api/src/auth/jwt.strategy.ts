@@ -1,9 +1,11 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
+import { Strategy } from 'passport-jwt';
+import type { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from './auth.service.js';
 import { isSuperAdminEmail } from '../common/platform-accounts.js';
+import { sessionTokenFromHeaders } from '../common/security/session-cookie.js';
 
 const jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret) {
@@ -17,7 +19,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly authService: AuthService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      // Cabecera primero (app nativa, integraciones), cookie `HttpOnly` después
+      // (navegador). Ver common/security/session-cookie.ts.
+      jwtFromRequest: (req: Request) => sessionTokenFromHeaders(req?.headers ?? {}),
       ignoreExpiration: false,
       secretOrKey: jwtSecret,
     });
