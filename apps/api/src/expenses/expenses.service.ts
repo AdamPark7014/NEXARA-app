@@ -9,6 +9,7 @@ import { generateExpensesReportPdf } from './expenses-report-pdf.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { ACTIVITY_STATUS } from '../activities/activity-status.js';
 
 const ADMIN_EXPENSE_ACTIVITY_AN = 'SYS-ADMIN-GASTOS';
 
@@ -74,7 +75,7 @@ export class ExpensesService {
         anNumber: ADMIN_EXPENSE_ACTIVITY_AN,
         titulo: 'Gastos administrativos',
         descripcion: 'Contenedor interno para gastos de oficina, renta y servicios (no operación de campo).',
-        estatus: 'Finalizado',
+        estatus: ACTIVITY_STATUS.FINALIZADA,
         activityType: 'INTERNAL',
         creadoPorId: usuarioId,
         responsableId: usuarioId,

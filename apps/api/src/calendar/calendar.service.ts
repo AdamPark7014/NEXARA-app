@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { isFinishedStatus } from '../activities/activity-status.js';
 
 export type CalendarEvent = {
   id: string;
@@ -146,7 +147,7 @@ export class CalendarService {
         start: act.fechaEntregaEsperada?.toISOString() || act.fechaAsignacion?.toISOString() || '',
         ownerId: act.responsable?.id,
         ownerName: act.responsable?.nombre || null,
-        color: act.estatus === 'Finalizado' ? '#16a34a' : act.estatus === 'En Proceso' ? '#3b82f6' : '#f59e0b',
+        color: isFinishedStatus(act.estatus) ? '#16a34a' : act.estatus === 'En Proceso' ? '#3b82f6' : '#f59e0b',
         url: `/activities`,
         metadata: { status: act.estatus, branch: act.branchName },
       });

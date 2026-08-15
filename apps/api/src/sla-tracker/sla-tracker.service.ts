@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { OPEN_ACTIVITY_WHERE, isClosedStatus } from '../activities/activity-status.js';
 
 const SLA_RESPONSE_HOURS_BY_PRIORITY: Record<string, number> = {
   Alta: 2,
@@ -72,7 +73,7 @@ export class SlaTrackerService {
           respondedLate++;
           breaches.push({ id: t.id, anNumber: t.anNumber, titulo: t.titulo, type: 'response', priority: t.prioridad, hoursLate: +(hrs - slaResp).toFixed(1) });
         }
-      } else if (t.estatus !== 'Finalizado') {
+      } else if (!isClosedStatus(t.estatus)) {
         const hrsOpen = (Date.now() - asignado.getTime()) / 3600000;
         if (hrsOpen > slaResp) {
           respondedLate++;
@@ -87,7 +88,7 @@ export class SlaTrackerService {
           resolvedLate++;
           breaches.push({ id: t.id, anNumber: t.anNumber, titulo: t.titulo, type: 'resolution', priority: t.prioridad, hoursLate: +(hrs - slaRes).toFixed(1) });
         }
-      } else if (t.estatus !== 'Finalizado') {
+      } else if (!isClosedStatus(t.estatus)) {
         stillOpen++;
       }
     }
@@ -141,7 +142,7 @@ export class SlaTrackerService {
     const openTickets = await this.prisma.activity.findMany({
       where: {
         ticketType: { not: null },
-        estatus: { not: 'Finalizado' },
+        ...OPEN_ACTIVITY_WHERE,
         ...(filters.clientId ? { clientId: filters.clientId } : {}),
       },
       select: {

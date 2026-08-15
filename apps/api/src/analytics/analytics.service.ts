@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { RecordPublicLandingEventDto } from './dto/record-public-landing-event.dto.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
+import { OPEN_ACTIVITY_WHERE, finishedStatusSqlList } from '../activities/activity-status.js';
 
 @Injectable()
 export class AnalyticsService {
@@ -221,7 +222,7 @@ export class AnalyticsService {
       this.prisma.activity.count({
         where: {
           ...scope,
-          estatus: { not: 'Finalizado' },
+          ...OPEN_ACTIVITY_WHERE,
           fechaMaxima: { lt: now },
         },
       }).catch(() => 0),
@@ -418,7 +419,7 @@ export class AnalyticsService {
         u."id" AS "engineerId",
         u."nombre" AS "engineerName",
         COUNT(a."id")::bigint AS "totalActivities",
-        COUNT(*) FILTER (WHERE a."estatus" = 'Finalizado')::bigint AS "completed",
+        COUNT(*) FILTER (WHERE a."estatus" IN (${Prisma.raw(finishedStatusSqlList())}))::bigint AS "completed",
         AVG(a."eficienciaScore")::float AS "avgEfficiency",
         AVG(EXTRACT(EPOCH FROM (a."fechaFinalizacion" - a."fechaInicio")) / 60)::float AS "avgDurationMin"
       FROM "Activity" a
@@ -529,7 +530,7 @@ export class AnalyticsService {
         sc."name" AS "clientName",
         a."branchName",
         COUNT(*)::bigint AS "total",
-        COUNT(*) FILTER (WHERE a."estatus" = 'Finalizado')::bigint AS "completed",
+        COUNT(*) FILTER (WHERE a."estatus" IN (${Prisma.raw(finishedStatusSqlList())}))::bigint AS "completed",
         AVG(a."eficienciaScore")::float AS "avgEfficiency"
       FROM "Activity" a
       LEFT JOIN "service_clients" sc ON sc."id" = a."clientId"

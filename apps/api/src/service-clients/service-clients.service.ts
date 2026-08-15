@@ -14,6 +14,7 @@ import {
   companyWhere,
   resolveRequiredCompanyId,
 } from '../common/tenant/tenant-scope.js';
+import { isClosedStatus } from '../activities/activity-status.js';
 
 @Injectable()
 export class ServiceClientsService {
@@ -755,7 +756,7 @@ export class ServiceClientsService {
     });
 
     const totalTickets = activities.length;
-    const closed = activities.filter((activity: any) => activity.estatus === 'Finalizada');
+    const closed = activities.filter((activity: any) => isClosedStatus(activity.estatus));
     const durations = closed
       .map((activity: any) => {
         if (!activity.fechaFinalizacion) return null;
@@ -840,7 +841,7 @@ export class ServiceClientsService {
     });
 
     const totalTickets = activities.length;
-    const closed = activities.filter((activity: any) => activity.estatus === 'Finalizada');
+    const closed = activities.filter((activity: any) => isClosedStatus(activity.estatus));
     const durations = closed
       .map((activity: any) => {
         if (!activity.fechaFinalizacion) return null;

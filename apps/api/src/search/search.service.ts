@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { isClosedStatus } from '../activities/activity-status.js';
 
 interface SearchResult {
   type: string;
@@ -135,7 +136,7 @@ export class SearchService {
 
     const now = Date.now();
     const activityResults: SearchResult[] = activities.map((a: any) => {
-      const overdue = a.fechaMaxima && new Date(a.fechaMaxima).getTime() < now && a.estatus !== 'Finalizado';
+      const overdue = a.fechaMaxima && new Date(a.fechaMaxima).getTime() < now && !isClosedStatus(a.estatus);
       return {
         type: 'activity',
         id: a.id,
