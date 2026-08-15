@@ -5,6 +5,7 @@ import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CreateBudgetDto } from './dto/account.dto.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { requirePositiveIntQuery } from '../common/dto/query-params.js';
 
 @Controller('accounting/budgets')
 @UseGuards(UrlAccessGuard)
@@ -43,6 +44,11 @@ export class BudgetsController {
     @Query('costCenterId') costCenterId: string,
     @Query('year') year: string,
   ) {
-    return this.service.getBudgetVsActual(+costCenterId, +year, companyId);
+    // Sin estos parámetros llegaban `NaN`/`undefined` hasta Prisma, que
+    // respondía con un 500 y un stack completo en los logs en vez de decir
+    // simplemente que falta un dato.
+    const centro = requirePositiveIntQuery(costCenterId, 'costCenterId');
+    const ejercicio = requirePositiveIntQuery(year, 'year');
+    return this.service.getBudgetVsActual(centro, ejercicio, companyId);
   }
 }
