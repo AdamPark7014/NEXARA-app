@@ -27,6 +27,7 @@ import { UpdateHeroSlideDto } from './dto/update-hero-slide.dto.js';
 import { ReorderHeroSlidesDto } from './dto/reorder-hero-slides.dto.js';
 import { resolveLegacyUploadsDir, resolveUploadsDir } from '../common/uploads-path.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
 
 interface MulterFile {
   fieldname: string;
@@ -99,19 +100,19 @@ export class HeroSlidesController {
   // ── Admin (Studio) ─────────────────────────────────────────────────
 
   @Get()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
   adminList(@CurrentCompanyId() companyId: number | null) {
     return this.heroSlidesService.adminList(companyId);
   }
 
   @Get(':id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
   findOne(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
     return this.heroSlidesService.findOne(id, companyId);
   }
 
   @Post()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'image', maxCount: 1 },
@@ -132,7 +133,7 @@ export class HeroSlidesController {
   }
 
   @Put(':id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'image', maxCount: 1 },
@@ -161,13 +162,13 @@ export class HeroSlidesController {
   }
 
   @Patch('reorder')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
   reorder(@Body() payload: ReorderHeroSlidesDto, @CurrentCompanyId() companyId: number | null) {
     return this.heroSlidesService.reorder(payload.ids, companyId);
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
   remove(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
     return this.heroSlidesService.remove(id, companyId);
   }

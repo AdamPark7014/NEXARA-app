@@ -7,9 +7,10 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { SocialPostsService, CreateSocialPostDto, UpdateSocialPostDto } from './social-posts.service.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
 
 @Controller('social-posts')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
 export class SocialPostsController {
   constructor(private readonly svc: SocialPostsService) {}
 

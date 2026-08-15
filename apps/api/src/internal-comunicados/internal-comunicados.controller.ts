@@ -11,9 +11,10 @@ import {
   UpdateComunicadoDto,
 } from './internal-comunicados.service.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
 
 @Controller('internal-comunicados')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
 export class InternalComunicadosController {
   constructor(private readonly svc: InternalComunicadosService) {}
 
