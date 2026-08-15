@@ -26,6 +26,7 @@ import {
   isSafeFetchSite,
   resolveCorsOrigin,
 } from './common/security/security.utils';
+import { isPublicUploadPath, readUploadToken } from './common/security/uploads-access';
 
 const toPositiveInt = (rawValue: string | undefined, fallback: number): number => {
   const parsed = Number(rawValue);
@@ -388,19 +389,24 @@ async function bootstrap() {
     console.error(`Error setting up uploads directory: ${errorMsg}`);
   }
   
-  // Proteger /uploads con autenticación JWT
+  // Proteger /uploads con autenticación JWT (lecturas incluidas)
   app.use('/uploads', (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method.toUpperCase())) {
+    if (req.method.toUpperCase() === 'OPTIONS') {
       next();
       return;
     }
 
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const isRead = ['GET', 'HEAD'].includes(req.method.toUpperCase());
+    if (isRead && isPublicUploadPath(req.path || req.url || '')) {
+      next();
+      return;
+    }
+
+    const token = readUploadToken(req.headers);
+    if (!token) {
       res.status(401).json({ statusCode: 401, message: 'Authentication required' });
       return;
     }
-    const token = authHeader.slice(7);
     const secret = process.env['JWT_SECRET'];
     if (!secret) {
       res.status(500).json({ statusCode: 500, message: 'Server configuration error' });
@@ -414,38 +420,29 @@ async function bootstrap() {
     }
   });
 
-  app.use(
-    '/uploads',
-    express.static(uploadsPath, {
-      index: false,
-      dotfiles: 'deny',
-      fallthrough: true,
-      etag: true,
-      maxAge: '1d',
-      setHeaders: (res) => {
-        // Some legacy uploaded avatars were stored without file extension.
-        // Removing nosniff here allows browsers to render those assets.
-        res.removeHeader('X-Content-Type-Options');
-        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-      },
-    }),
-  );
+  // Contenido subido por usuarios: nunca debe interpretarse como HTML/script.
+  // Mantenemos nosniff siempre; los avatares antiguos guardados sin extensión
+  // se fijan como imagen para que sigan renderizando sin permitir sniffing.
+  const setUploadHeaders = (res: express.Response, filePath: string) => {
+    if (!path.extname(filePath)) {
+      res.setHeader('Content-Type', 'image/jpeg');
+    }
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  };
 
-  app.use(
-    '/uploads',
-    express.static(legacyUploadsPath, {
-      index: false,
-      dotfiles: 'deny',
-      fallthrough: true,
-      etag: true,
-      maxAge: '1d',
-      setHeaders: (res) => {
-        // Same behavior for legacy upload directory.
-        res.removeHeader('X-Content-Type-Options');
-        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-      },
-    }),
-  );
+  const uploadStaticOptions: Parameters<typeof express.static>[1] = {
+    index: false,
+    dotfiles: 'deny',
+    fallthrough: true,
+    etag: true,
+    maxAge: '1d',
+    setHeaders: setUploadHeaders,
+  };
+
+  app.use('/uploads', express.static(uploadsPath, uploadStaticOptions));
+
+  app.use('/uploads', express.static(legacyUploadsPath, uploadStaticOptions));
 
   // ── Swagger / OpenAPI (solo fuera de producción, o con ENABLE_SWAGGER=true) ──
   const enableSwagger =
