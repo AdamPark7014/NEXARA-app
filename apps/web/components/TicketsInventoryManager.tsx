@@ -1,8 +1,9 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 type BranchOption = { id: number; name: string; branchNumber?: string | null };
 
@@ -344,7 +345,7 @@ export default function TicketsInventoryManager({ token, mode, fixedBranch, bran
 
   useEffect(() => {
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    const socket: Socket = createRealtimeSocket(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
     const scheduleRefresh = () => {

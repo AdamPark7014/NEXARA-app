@@ -2,9 +2,10 @@
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import { EVIDENCE_STEP_ORDER, evidenceStepLabel } from "@/lib/evidence-lock";
 import React, { useEffect, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import styles from './EvidenceReviewModal.module.css';
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 interface EvidenceReviewModalProps {
   activityId: number;
@@ -36,7 +37,7 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
     if (!user) return;
 
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, {
+    const socket: Socket = createRealtimeSocket(socketUrl, {
       auth: { token: user.token },
       transports: ['websocket', 'polling'],
     });

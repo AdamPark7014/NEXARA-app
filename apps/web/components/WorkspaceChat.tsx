@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
-import { io, type Socket } from "socket.io-client";
+import { type Socket } from "socket.io-client";
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 import styles from "./WorkspaceChat.module.css";
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 type Attachment = { url: string; name: string; mime: string; size: number };
 
@@ -589,7 +590,7 @@ export default function WorkspaceChat({
 
   useEffect(() => {
     if (!token) return;
-    const socket = io(getSocketBaseUrl(), {
+    const socket = createRealtimeSocket(getSocketBaseUrl(), {
       transports: ["polling", "websocket"],
       auth: { token },
     });

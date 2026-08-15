@@ -4,13 +4,14 @@ import { getSocketBaseUrl, buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { io, Socket } from "socket.io-client";
+import { Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "../lib/permissions";
 import { getDeviceIdentityHeaders, getLocalDeviceLabel } from "@/lib/device-identity";
 import { getUserHomeUrl, getUserHomeUrlAbsolute } from "@/lib/panel-home";
 import { isCapacitorNative } from "@/lib/capacitor-env";
 import { setSharedCookie, SHARED_COOKIE_KEYS } from "@/lib/shared-cookies";
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 type PanelLoginProps = {
   redirectTo: string;
@@ -78,6 +79,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           department: data.user.department,
           departmentId: data.user.departmentId,
           token: data.access_token,
+          expiresAt: data.expiresAt ?? null,
           avatarUrl: data.user.avatarUrl || "",
           permissions: data.user.permissions || [],
           isSuperAdmin: data.user.isSuperAdmin || false,
@@ -122,7 +124,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
   useEffect(() => {
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['websocket', 'polling'] });
+    const socket: Socket = createRealtimeSocket(socketUrl, { transports: ['websocket', 'polling'] });
 
     let clearErrorTimeout: ReturnType<typeof setTimeout> | null = null;
     const relevantModels = new Set(['user', 'role', 'department']);
@@ -245,6 +247,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         department: data.user.department,
         departmentId: data.user.departmentId,
         token: data.access_token,
+        expiresAt: data.expiresAt ?? null,
         avatarUrl: data.user.avatarUrl || "",
         permissions: data.user.permissions || [],
         isSuperAdmin: data.user.isSuperAdmin || false,

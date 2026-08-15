@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
 import PDFViewer from './PDFViewer';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import {
   getSalesAuditEvents,
   getSalesExecutiveInsights,
@@ -19,6 +19,7 @@ import {
 import styles from './SalesReportsDashboard.module.css';
 import { triggerBlobDownload, triggerFileDownload } from '@/lib/file-download';
 import { buildApiUrl, getSocketBaseUrl } from '@/lib/api-base';
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 interface SalesReportsDashboardProps {
   period?: 'week' | 'month' | 'year';
@@ -90,7 +91,7 @@ export default function SalesReportsDashboard({
     if (!user?.token) return;
 
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    const socket: Socket = createRealtimeSocket(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
     const scheduleRefresh = () => {

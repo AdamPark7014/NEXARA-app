@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { io, Socket } from "socket.io-client";
+import { Socket } from "socket.io-client";
 import PanelLogin from "@/components/PanelLogin";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
 import BranchesForm from "@/components/BranchesForm";
@@ -15,6 +15,7 @@ import { isCapacitorNative } from "@/lib/capacitor-env";
 import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 import consoleStyles from "../console/console.module.css";
 import styles from "./tickets.module.css";
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
@@ -604,7 +605,7 @@ export default function ClientTicketsPage() {
   useEffect(() => {
     if (!session?.token) return undefined;
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ["polling", "websocket"] });
+    const socket: Socket = createRealtimeSocket(socketUrl, { transports: ["polling", "websocket"] });
     socket.on("entity:updated", (payload: { model?: string }) => {
       if (payload?.model === "Activity" || payload?.model === "Evidence" || payload?.model === "ClientTicketRequest") {
         fetchTickets(session.token);

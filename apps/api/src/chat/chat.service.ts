@@ -171,10 +171,21 @@ export class ChatService {
     return clean.length > 140 ? `${clean.slice(0, 137)}…` : clean;
   }
 
-  /** IDs de reportes directos e indirectos (árbol managerId). */
-  private async listDescendantIds(userId: number): Promise<number[]> {
+  /**
+   * IDs de reportes directos e indirectos (árbol managerId).
+   *
+   * `User` no tiene `companyId` —la pertenencia va por `UserCompany`— y por eso
+   * tampoco entra en el middleware de tenant. Sin acotar por empresa esto
+   * cargaba el directorio completo de **todas** las empresas en cada llamada, y
+   * un `managerId` que cruzara empresas habría arrastrado subordinados ajenos
+   * al alcance del chat.
+   */
+  private async listDescendantIds(userId: number, companyId: number): Promise<number[]> {
     const rows = await this.prisma.user.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        companyMemberships: { some: { companyId } },
+      },
       select: { id: true, managerId: true },
     });
     const byManager = new Map<number, number[]>();
@@ -197,7 +208,7 @@ export class ChatService {
     return out;
   }
 
-  private async resolveChatScope(userId: number): Promise<{
+  private async resolveChatScope(userId: number, companyId?: number | null): Promise<{
     isOmniscient: boolean;
     reportIds: number[];
   }> {
@@ -216,7 +227,9 @@ export class ChatService {
       tier >= ORG_TIER.EXECUTIVE ||
       orgKey === ORG_ROLE_KEYS.CEO ||
       isSuperAdminEmail(user?.email);
-    const reportIds = isOmniscient ? [] : await this.listDescendantIds(userId);
+    const reportIds = isOmniscient
+      ? []
+      : await this.listDescendantIds(userId, await this.resolveUserCompanyId(userId, companyId));
     return { isOmniscient, reportIds };
   }
 
@@ -262,7 +275,7 @@ export class ChatService {
     }
 
     // Supervisión jerárquica: lectura de privadas/DMs del equipo (sin publicar).
-    const scope = await this.resolveChatScope(userId);
+    const scope = await this.resolveChatScope(userId, companyId);
     if (scope.isOmniscient) {
       if (write) throw new ForbiddenException('Solo lectura en supervisión');
       return { channel, supervised: true, readOnly: true };
@@ -287,7 +300,7 @@ export class ChatService {
   async listChannels(userId: number, companyId?: number | null) {
     const cid = await this.resolveUserCompanyId(userId, companyId);
     await this.ensureDefaults(userId, cid);
-    const scope = await this.resolveChatScope(userId);
+    const scope = await this.resolveChatScope(userId, cid);
 
     const where: Prisma.ChatChannelWhereInput = {
       isArchived: false,
@@ -858,7 +871,7 @@ export class ChatService {
   ) {
     const query = (q ?? '').trim().slice(0, 100);
     const tenantId = requireCompanyId(companyId);
-    const scope = await this.resolveChatScope(userId);
+    const scope = await this.resolveChatScope(userId, tenantId);
     const scopedUserIds = [userId, ...scope.reportIds];
     const activityScope: Prisma.ActivityWhereInput = scope.isOmniscient
       ? {}
@@ -1175,7 +1188,7 @@ export class ChatService {
     if (query.length < 2) return { messages: [] };
     if (channelId) await this.assertChannelAccess(channelId, userId, undefined, companyId);
 
-    const scope = await this.resolveChatScope(userId);
+    const scope = await this.resolveChatScope(userId, companyId);
     const where: Prisma.ChatChannelWhereInput = {
       isArchived: false,
       kind: { not: ChatChannelKind.DOCUMENT },

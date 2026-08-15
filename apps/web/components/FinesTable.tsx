@@ -1,10 +1,12 @@
 "use client";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import styles from './FinesTable.module.css';
+import { createRealtimeSocket } from '@/lib/realtime-socket';
+import { isPaid } from '@/lib/operational-status';
 
 interface Fine {
   id: number;
@@ -178,7 +180,7 @@ const FinesTable: React.FC<FinesTableProps> = ({
     if (!user?.token) return;
 
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    const socket: Socket = createRealtimeSocket(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
     const scheduleRefresh = () => {
@@ -271,7 +273,7 @@ const FinesTable: React.FC<FinesTableProps> = ({
               >
                 <option value="">Todos los estatus</option>
                 <option value="Pendiente">Pendiente</option>
-                <option value="Pagada">Pagada</option>
+                <option value="Pagado">Pagado</option>
               </select>
             </div>
           </div>
@@ -352,7 +354,7 @@ const FinesTable: React.FC<FinesTableProps> = ({
                       </td>
                       <td className={styles.td}>
                         <span
-                          className={`${styles.statusBadge} ${fine.estatusPago === 'Pagada' ? styles.statusPaid : styles.statusPending}`}
+                          className={`${styles.statusBadge} ${isPaid(fine.estatusPago) ? styles.statusPaid : styles.statusPending}`}
                         >
                           {fine.estatusPago}
                         </span>
@@ -377,7 +379,7 @@ const FinesTable: React.FC<FinesTableProps> = ({
                       <div className={styles.mobileReason}>{fine.razon}</div>
                     </div>
                     <span
-                      className={`${styles.mobileStatus} ${fine.estatusPago === 'Pagada' ? styles.statusPaid : styles.statusPending}`}
+                      className={`${styles.mobileStatus} ${isPaid(fine.estatusPago) ? styles.statusPaid : styles.statusPending}`}
                     >
                       {fine.estatusPago}
                     </span>

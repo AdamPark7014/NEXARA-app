@@ -47,7 +47,14 @@ export interface User {
 	};
 	department: string;
 	departmentId: number;
+	/**
+	 * Antes el JWT en claro. Tras la migración a cookie `HttpOnly` contiene
+	 * `SESSION_COOKIE_SENTINEL` en el navegador: sigue sirviendo como bandera de
+	 * "hay sesión", pero ya no es un secreto robable por XSS.
+	 */
 	token: string;
+	/** Caducidad de la sesión (ISO). La envía el login; sustituye a decodificar el JWT. */
+	expiresAt?: string | null;
 	avatarUrl?: string;
 	permissions: string[];
 	isSuperAdmin?: boolean;
@@ -70,10 +77,24 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 
 const USER_STORAGE_KEY = 'nexara_user';
 
+/**
+ * Marcador que ocupa el lugar del JWT en el estado persistido.
+ *
+ * La sesión vive ahora en una cookie `HttpOnly` que JavaScript no puede leer,
+ * pero el navegador la envía sola en cada petición. El campo `token` se conserva
+ * porque cientos de sitios lo usan como bandera de "hay sesión"
+ * (`if (!user?.token) return`) y para construir la cabecera `Authorization`.
+ *
+ * El valor no es un JWT a propósito: la API descarta cualquier `Bearer` que no
+ * tenga forma de JWT y cae a la cookie (ver `common/security/session-cookie.ts`).
+ * Así no hubo que tocar ~300 puntos de llamada para completar la migración.
+ */
+export const SESSION_COOKIE_SENTINEL = 'session-cookie';
+
 const normalizeUser = (value: unknown): User | null => {
 	if (!value || typeof value !== 'object') return null;
 	const candidate = value as Partial<User> & { permissions?: unknown };
-	if (!candidate.token || !candidate.id || !candidate.email) return null;
+	if (!candidate.id || !candidate.email) return null;
 
 	return {
 		id: Number(candidate.id),
@@ -87,7 +108,8 @@ const normalizeUser = (value: unknown): User | null => {
 		roleFlags: candidate.roleFlags,
 		department: candidate.department || '',
 		departmentId: Number(candidate.departmentId || 0),
-		token: candidate.token,
+		token: candidate.token || SESSION_COOKIE_SENTINEL,
+		expiresAt: candidate.expiresAt ?? null,
 		avatarUrl: candidate.avatarUrl,
 		permissions: Array.isArray(candidate.permissions)
 			? candidate.permissions.filter((item): item is string => typeof item === 'string')
@@ -99,16 +121,35 @@ const normalizeUser = (value: unknown): User | null => {
 	};
 };
 
-const isTokenExpired = (token: string): boolean => {
+/**
+ * Caducidad de la sesión.
+ *
+ * Con la cookie en `HttpOnly` ya no se puede decodificar el JWT en el cliente,
+ * así que se usa el `expiresAt` que devuelve el login. Si falta (sesión anterior
+ * a la migración, o token aún legible) se recurre al JWT como antes.
+ *
+ * Sin ninguna de las dos referencias se considera **no** caducada: la autoridad
+ * real es la API, que responderá 401 si la sesión ya no vale. Asumir lo
+ * contrario expulsaría a usuarios con sesión válida.
+ */
+const isSessionExpired = (user: Pick<User, 'token' | 'expiresAt'>): boolean => {
+	if (user.expiresAt) {
+		const expiresMs = Date.parse(user.expiresAt);
+		if (Number.isFinite(expiresMs)) {
+			// Se considera caducada con menos de 60 s de margen.
+			return expiresMs < Date.now() + 60_000;
+		}
+	}
+
+	const parts = (user.token || '').split('.');
+	if (parts.length !== 3) return false;
+
 	try {
-		const parts = token.split('.');
-		if (parts.length !== 3) return true;
 		const payload = JSON.parse(atob(parts[1]));
 		if (!payload.exp) return false;
-		// Consider expired if less than 60 seconds remaining
 		return payload.exp * 1000 < Date.now() + 60_000;
 	} catch {
-		return true;
+		return false;
 	}
 };
 
@@ -213,7 +254,17 @@ const safePersistUser = (user: User | null) => {
 	const write = (storage: Storage) => {
 		if (user) {
 			const { offlineDegraded: _omit, ...persistable } = user;
-			storage.setItem(USER_STORAGE_KEY, JSON.stringify(persistable));
+			// En navegador el JWT NO se persiste: `sessionStorage` es tan legible
+			// por XSS como una cookie sin `HttpOnly`, así que guardar el token ahí
+			// anularía la migración. La sesión real viaja en la cookie `HttpOnly`
+			// que emite el servidor; aquí queda solo el marcador.
+			//
+			// La app nativa sí conserva el JWT: no usa cookie de sesión y autentica
+			// con la cabecera `Authorization`.
+			const safeToPersist = isCapacitorNative()
+				? persistable
+				: { ...persistable, token: SESSION_COOKIE_SENTINEL };
+			storage.setItem(USER_STORAGE_KEY, JSON.stringify(safeToPersist));
 			return;
 		}
 		storage.removeItem(USER_STORAGE_KEY);
@@ -313,7 +364,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		if (handoffJson) {
 			try {
 				const handoffUser = normalizeUser(JSON.parse(handoffJson));
-				if (handoffUser && !isTokenExpired(handoffUser.token)) {
+				if (handoffUser && !isSessionExpired(handoffUser)) {
 					safePersistUser(handoffUser);
 					setUser(handoffUser);
 					setIsContextReady(true);
@@ -327,7 +378,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		const storedUser = safeGetStoredUser();
 		const online = typeof navigator !== "undefined" && navigator.onLine;
 		if (storedUser) {
-			if (isTokenExpired(storedUser.token)) {
+			if (isSessionExpired(storedUser)) {
 				if (!online) {
 					setUser({ ...storedUser, offlineDegraded: true });
 				} else {
@@ -351,7 +402,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		const onOnline = () => {
 			setUser((prev) => {
 				if (!prev?.offlineDegraded) return prev;
-				if (isTokenExpired(prev.token)) {
+				if (isSessionExpired(prev)) {
 					safePersistUser(null);
 					return null;
 				}
@@ -375,6 +426,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 			deleteSharedCookie(SHARED_COOKIE_KEYS.USER);
 			deleteSharedCookie(SHARED_COOKIE_KEYS.ACCESS_TOKEN);
 		}
+		// La cookie de sesión es `HttpOnly`: solo el servidor puede borrarla.
+		// Sin esta llamada la sesión seguiría viva pese al logout en la UI.
+		void fetch(buildApiUrl('auth/logout'), {
+			method: 'POST',
+			credentials: 'include',
+		}).catch(() => {
+			/* el logout local no debe fallar por un error de red */
+		});
 	};
 
 	return (

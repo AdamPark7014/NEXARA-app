@@ -9,8 +9,9 @@ import {
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import styles from './ActivityEvidenceFlow.module.css';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 interface ActivityOption {
   id: number;
@@ -305,7 +306,7 @@ const ActivityEvidenceFlow = () => {
     if (!user?.token || !selectedActivityId) return;
 
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    const socket: Socket = createRealtimeSocket(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
     const scheduleRefresh = () => {

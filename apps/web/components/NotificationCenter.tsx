@@ -1,10 +1,11 @@
 "use client";
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { useUser } from './UserContext';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import { getSocketBaseUrl, buildApiUrl } from "@/lib/api-base";
 import { showBrowserHeadsUpNotification } from '@/lib/browser-notifications';
 import styles from './NotificationCenter.module.css';
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 interface Notification {
   id: number;
@@ -184,7 +185,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
     if (!user?.token) return;
 
     const socketUrl = getSocketBaseUrl();
-    socketRef.current = io(socketUrl, {
+    socketRef.current = createRealtimeSocket(socketUrl, {
       transports: ['polling'],
       upgrade: false,
       timeout: 20000,

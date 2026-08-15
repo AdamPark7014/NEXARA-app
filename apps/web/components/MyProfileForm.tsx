@@ -3,7 +3,8 @@ import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import styles from './MyProfileForm.module.css';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
+import { createRealtimeSocket } from '@/lib/realtime-socket';
 
 const requiredDocuments = [
   {
@@ -180,7 +181,7 @@ const MyProfileForm: React.FC = () => {
     if (!user?.token) return;
 
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    const socket: Socket = createRealtimeSocket(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
     const scheduleRefresh = () => {
