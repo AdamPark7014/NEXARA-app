@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ServiceClientsService } from '../service-clients/service-clients.service.js';
@@ -8,12 +8,17 @@ import fs from 'fs/promises';
 import path from 'path';
 import { PERMISSIONS } from '../common/permissions.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { ACTIVITY_STATUS, isFinishedStatus } from '../activities/activity-status.js';
+import { ActivityLifecycleService } from '../activities/activity-lifecycle.service.js';
 
 @Injectable()
 export class ServiceSheetsService {
+  private readonly logger = new Logger(ServiceSheetsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly serviceClientsService: ServiceClientsService,
+    private readonly activityLifecycle: ActivityLifecycleService,
   ) {}
 
   private async loadActivityForTenant(activityId: number, companyId?: number | null) {
@@ -237,14 +242,29 @@ export class ServiceSheetsService {
     const hasAll = requiredTypes.every((type) => present.has(type));
     if (!hasAll) return;
 
-    if (activity.estatus !== 'Finalizada') {
+    if (!isFinishedStatus(activity.estatus)) {
       await this.prisma['activity'].update({
         where: { id: activityId },
         data: {
-          estatus: 'Finalizada',
+          estatus: ACTIVITY_STATUS.FINALIZADA,
           fechaFinalizacion: new Date(),
         },
       });
+
+      // Este es el único punto del ERP donde una actividad pasa a finalizada,
+      // así que es donde cuelgan los efectos en cadena: cerrar la visita de
+      // contrato, cerrar la solicitud del cliente y abrir el flujo de
+      // aprobación si la empresa lo tiene definido.
+      const outcome = await this.activityLifecycle.onActivityFinished({
+        activityId,
+        companyId: tenantId ?? activity.companyId,
+        actorId: activity.responsableId,
+      });
+      if (outcome.errors.length) {
+        this.logger.warn(
+          `Cierre de actividad ${activityId} con efectos incompletos: ${outcome.errors.join('; ')}`,
+        );
+      }
     }
 
     if (!activity.serviceSheet.pdfUrl) {
