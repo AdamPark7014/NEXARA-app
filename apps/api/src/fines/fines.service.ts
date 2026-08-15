@@ -13,6 +13,7 @@ import {
 } from '../common/rbac/hierarchical-approval.js';
 import { ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
 import { assertCompanyAccess, companyWhere, mergeCompanyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { normalizePaymentStatus } from '../common/status/operational-status.js';
 
 export interface CreateFineDto {
   usuarioId: number;
@@ -202,9 +203,23 @@ export class FinesService {
 
   async update(id: number, data: UpdateFineDto, companyId?: number | null) {
     await this.findScopedFine(id, companyId);
+
+    // El panel de RRHH enviaba 'Pagado' y la tabla de multas 'Pagada' para el
+    // mismo estado, así que una multa pagada desde un sitio seguía apareciendo
+    // pendiente en el otro. Se normaliza en la escritura para que la base de
+    // datos deje de acumular variantes.
+    const normalized: UpdateFineDto = { ...data };
+    if (normalized.estatusPago !== undefined) {
+      const canonical = normalizePaymentStatus(normalized.estatusPago);
+      if (!canonical) {
+        throw new BadRequestException(`Estatus de pago no válido: ${normalized.estatusPago}`);
+      }
+      normalized.estatusPago = canonical;
+    }
+
     return this.prisma.fine.update({
       where: { id },
-      data,
+      data: normalized,
       include: {
         usuario: {
           select: {
