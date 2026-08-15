@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { OPEN_ACTIVITY_WHERE } from '../activities/activity-status.js';
 
 export type TriageResult = {
   priority: 'P0' | 'P1' | 'P2' | 'P3';
@@ -115,7 +116,7 @@ export class AiTriageService {
     const overdue = await this.prisma.activity.count({
       where: {
         ...companyWhere(tenantId),
-        estatus: { not: 'Finalizado' },
+        ...OPEN_ACTIVITY_WHERE,
         fechaMaxima: { lt: new Date() },
       },
     });

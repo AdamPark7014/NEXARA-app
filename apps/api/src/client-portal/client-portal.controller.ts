@@ -16,6 +16,7 @@ import { AccountingService } from '../accounting/accounting.service.js';
 import { CotizacionesService } from '../cotizaciones/cotizaciones.service.js';
 import { Request } from 'express';
 import { getUploadSubdir } from '../common/upload-paths.js';
+import { isFinishedStatus, statusVariants, ACTIVITY_STATUS } from '../activities/activity-status.js';
 
 const ensureBranchUploadsDir = () => {
   const segments = __dirname.split(path.sep);
@@ -184,7 +185,7 @@ export class ClientPortalController {
       }).catch(() => 0),
     ]);
 
-    const completedTickets = recentTickets.filter((t: any) => t.estatus === 'Finalizado').length;
+    const completedTickets = recentTickets.filter((t: any) => isFinishedStatus(t.estatus)).length;
     const completionRate = recentTickets.length > 0 ? +((completedTickets / recentTickets.length) * 100).toFixed(1) : 0;
 
     return {
@@ -527,7 +528,7 @@ export class ClientPortalController {
     return this.prisma['activity'].findMany({
       where: {
         clientId: user.clientId,
-        estatus: 'Finalizada',
+        estatus: { in: statusVariants(ACTIVITY_STATUS.FINALIZADA) },
         clientFeedback: null,
       },
       include: { responsable: true },
@@ -543,7 +544,7 @@ export class ClientPortalController {
     }
 
     const activity = await this.prisma['activity'].findFirst({
-      where: { id: activityId, clientId: user.clientId, estatus: 'Finalizada' },
+      where: { id: activityId, clientId: user.clientId, estatus: { in: statusVariants(ACTIVITY_STATUS.FINALIZADA) } },
     });
     if (!activity) throw new BadRequestException('Actividad no encontrada');
 

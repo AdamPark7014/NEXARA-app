@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { closedStatusSqlList } from './activity-status.js';
 
 /**
  * Detecta tickets con SLA a punto de vencer y notifica a los usuarios
@@ -35,7 +37,7 @@ export class TicketAlertsService {
       FROM "Activity" a
       LEFT JOIN service_clients c ON c.id = a."clientId"
       WHERE a."clientId" IS NOT NULL
-        AND a.estatus <> 'Finalizada'
+        AND a.estatus NOT IN (${Prisma.raw(closedStatusSqlList())})
         AND a."fechaEntregaEsperada" >= ${now}
         AND a."fechaEntregaEsperada" <= ${alertAt}
         AND a."slaAlertedAt" IS NULL

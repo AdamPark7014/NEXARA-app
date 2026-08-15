@@ -6,6 +6,7 @@ import { NotificationHierarchyService } from '../../notifications/notification-h
 import { MaintenanceContractsService } from '../../maintenance-contracts/maintenance-contracts.service.js';
 import { VehiclesService } from '../../vehicles/vehicles.service.js';
 import { WebhooksService } from '../../webhooks/webhooks.service.js';
+import { OPEN_ACTIVITY_WHERE } from '../../activities/activity-status.js';
 
 @Injectable()
 export class CronService {
@@ -379,7 +380,7 @@ export class CronService {
   async handleSlaBreachEscalate() {
     const now = Date.now();
     const open = await this.prisma.activity.findMany({
-      where: { ticketType: { not: null }, estatus: { not: 'Finalizado' } },
+      where: { ticketType: { not: null }, ...OPEN_ACTIVITY_WHERE },
       select: {
         id: true,
         anNumber: true,

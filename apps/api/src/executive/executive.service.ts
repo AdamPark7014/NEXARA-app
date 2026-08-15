@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { FINISHED_ACTIVITY_WHERE } from '../activities/activity-status.js';
 
 @Injectable()
 export class ExecutiveService {
@@ -94,7 +95,7 @@ export class ExecutiveService {
         where: { ...tw, estatus: { in: ['Pendiente', 'En Proceso'] }, fechaEntregaEsperada: { lt: now } },
       }).catch(() => 0),
       this.prisma.activity.count({
-        where: { ...tw, estatus: 'Finalizado', fechaFinalizacion: { gte: startOfMonth, lte: endOfMonth } },
+        where: { ...tw, ...FINISHED_ACTIVITY_WHERE, fechaFinalizacion: { gte: startOfMonth, lte: endOfMonth } },
       }).catch(() => 0),
       this.prisma.invoice.aggregate({
         where: { ...tw, issueDate: { gte: startOfMonth, lte: endOfMonth }, status: { not: 'CANCELLED' }, type: 'ACCOUNTS_RECEIVABLE' },
@@ -120,7 +121,7 @@ export class ExecutiveService {
         where: { ...tw, ticketType: { not: null }, estatus: { in: ['Pendiente', 'En Proceso', 'Asignado'] } },
       }).catch(() => 0),
       this.prisma.activity.count({
-        where: { ...tw, ticketType: { not: null }, estatus: 'Finalizado', fechaFinalizacion: { gte: startOfMonth, lte: endOfMonth } },
+        where: { ...tw, ticketType: { not: null }, ...FINISHED_ACTIVITY_WHERE, fechaFinalizacion: { gte: startOfMonth, lte: endOfMonth } },
       }).catch(() => 0),
       this.prisma.salesClient.count({ where: { ...tw } }).catch(() => 0),
       (this.prisma as any).maintenanceContract.count({ where: { ...tw, status: 'ACTIVE' } }).catch(() => 0),

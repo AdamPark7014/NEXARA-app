@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { OPEN_ACTIVITY_WHERE } from '../activities/activity-status.js';
 
 /**
  * Feature flags: `companyId = null` = platform/global.
@@ -177,7 +178,7 @@ export class LabService {
     const [users, projects, openTickets] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.operationalProject.count().catch(() => 0),
-      this.prisma.activity.count({ where: { estatus: { not: 'Finalizado' } } }).catch(() => 0),
+      this.prisma.activity.count({ where: { ...OPEN_ACTIVITY_WHERE } }).catch(() => 0),
     ]);
     return {
       timestamp: new Date().toISOString(),
