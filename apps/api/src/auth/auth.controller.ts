@@ -16,6 +16,7 @@ import { LoginDto } from './dto/login.dto.js';
 import { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { clearSessionCookie, setSessionCookie } from '../common/security/session-cookie.js';
 
 @Controller('auth')
 export class AuthController {
@@ -26,8 +27,34 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
-  login(@Body() loginDto: LoginDto, @Req() req: Request) {
-    return this.authService.login(loginDto, req);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.login(loginDto, req);
+
+    // La sesión del navegador viaja en cookie `HttpOnly`; el `access_token` del
+    // cuerpo se mantiene para la app nativa y las integraciones, que no tienen
+    // cookie jar.
+    if (result?.access_token) {
+      setSessionCookie(res, result.access_token);
+    }
+
+    return result;
+  }
+
+  /**
+   * Cierre de sesión.
+   *
+   * Con la cookie en `HttpOnly` el cliente ya no puede borrarla por su cuenta:
+   * sin este endpoint no habría forma de cerrar sesión.
+   */
+  @Post('logout')
+  @HttpCode(200)
+  logout(@Res({ passthrough: true }) res: Response) {
+    clearSessionCookie(res);
+    return { ok: true };
   }
 
   @Get('oidc/status')
@@ -59,6 +86,10 @@ export class AuthController {
     }
     const user = await this.oidc.exchangeCode(code);
     const session = await this.authService.loginWithOidcUser(user, req);
+    // Misma sesión por cookie que en el login normal.
+    if (session?.access_token) {
+      setSessionCookie(res, session.access_token);
+    }
     const web = process.env.WEB_PUBLIC_URL || 'http://localhost:3000';
     // Entrega token vía fragmento hash (no viaja a logs de servidor web)
     const hash = Buffer.from(JSON.stringify(session), 'utf8').toString('base64url');

@@ -952,6 +952,9 @@ export class AuthService {
 
     return {
       access_token: this.jwtService.sign(payload, { expiresIn: expiresInRaw as any }),
+      // Caducidad explícita: el cliente ya no puede leer el JWT para deducirla
+      // cuando la sesión viaja en una cookie HttpOnly.
+      expiresAt: expiresAt.toISOString(),
       loginDevice: detectedDevice,
       loginGreeting: `Hola, ${firstName}`,
       loginDeviceLabel: detectedDevice,
