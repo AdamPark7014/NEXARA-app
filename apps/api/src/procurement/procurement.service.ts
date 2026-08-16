@@ -9,6 +9,7 @@ import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { FolioService } from '../common/folio/folio.service.js';
+import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
 
 @Injectable()
 export class ProcurementService {
@@ -238,6 +239,20 @@ export class ProcurementService {
       });
       supplierId = supplier.id;
     }
+
+    // Cuando llega `supplierId` en lugar de `supplierName` no pasa por el
+    // upsert de arriba, así que nadie comprobaba que ese proveedor —ni la
+    // requisición, ni los productos de las partidas— fueran de esta empresa.
+    await assertRefsBelongToCompany(companyId, [
+      { modelo: this.prisma.supplier, ids: [supplierId], etiqueta: 'Proveedor' },
+      {
+        modelo: this.prisma.purchaseRequisition,
+        ids: [dto.requisitionId],
+        etiqueta: 'Requisición',
+      },
+      { modelo: this.prisma.product, ids: dto.items.map((i) => i.productId), etiqueta: 'Producto' },
+    ]);
+
     const poNumber = await this.generatePONumber(companyId);
     const items = dto.items.map((i) => ({
       ...i,

@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { resolveRequiredCompanyId, companyWhere, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
 import { FolioService } from '../common/folio/folio.service.js';
+import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
 
 const FREQUENCY_DAYS: Record<string, number> = {
   WEEKLY: 7,
@@ -64,6 +65,13 @@ export class MaintenanceContractsService {
           })
         )?.companyId,
     );
+    // El cliente sólo se usaba para deducir la empresa; la sucursal se escribía
+    // sin comprobar de quién era.
+    await assertRefsBelongToCompany(companyId, [
+      { modelo: this.prisma.serviceClient, ids: [dto.clientId], etiqueta: 'Cliente' },
+      { modelo: this.prisma.serviceClientBranch, ids: [dto.branchId], etiqueta: 'Sucursal' },
+    ]);
+
     const contractNumber = await this.generateContractNumber(companyId);
     const contract = await (this.prisma as any).maintenanceContract.create({
       data: {
