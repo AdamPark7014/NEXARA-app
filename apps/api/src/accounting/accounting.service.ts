@@ -8,6 +8,7 @@ import { SatService } from '../pac/sat.service.js';
 import { WebhooksService } from '../webhooks/webhooks.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { FolioService } from '../common/folio/folio.service.js';
+import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
 
 const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -511,6 +512,24 @@ export class AccountingService {
     companyId?: number | null;
     lines: Array<{ debitAccountId: number; creditAccountId?: number; description?: string; debit: number; credit: number; costCenterId?: number }>;
   }, userId: number) {
+    if (!Array.isArray(dto.lines) || dto.lines.length === 0) {
+      // Sin esto, una póliza sin renglones cuadra por vacío (0 = 0) y se
+      // guardaba: un asiento fantasma en los libros.
+      throw new BadRequestException('La póliza necesita al menos un renglón');
+    }
+    for (const l of dto.lines) {
+      const debe = Number(l.debit || 0);
+      const haber = Number(l.credit || 0);
+      if (!Number.isFinite(debe) || !Number.isFinite(haber) || debe < 0 || haber < 0) {
+        // Un renglón con importes negativos también cuadra (-100 contra -100) y
+        // corrompe la balanza sin que el total lo delate.
+        throw new BadRequestException('Los importes de la póliza no pueden ser negativos');
+      }
+      if (debe === 0 && haber === 0) {
+        throw new BadRequestException('Cada renglón debe mover Debe o Haber');
+      }
+    }
+
     const totalDebit = dto.lines.reduce((s, l) => s + (l.debit || 0), 0);
     const totalCredit = dto.lines.reduce((s, l) => s + (l.credit || 0), 0);
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
@@ -519,6 +538,7 @@ export class AccountingService {
 
     const entryDate = new Date(dto.date);
     const companyId = await this.resolveCompanyId(dto.companyId);
+    await this.assertJournalRefsBelongToCompany(dto.lines, companyId);
     const fiscalPeriodId = await this.resolveOpenFiscalPeriodId(
       entryDate,
       dto.fiscalPeriodId ?? null,
@@ -553,6 +573,42 @@ export class AccountingService {
 
   private async resolveCompanyId(explicit?: number | null): Promise<number> {
     return resolveRequiredCompanyId(this.prisma, explicit);
+  }
+
+  /**
+   * Las cuentas y centros de costo de la póliza tienen que ser de la empresa.
+   *
+   * El aislamiento por empresa se aplica sobre los `where` de las consultas,
+   * pero un `create` escribe las claves foráneas tal cual: `debitAccountId`
+   * llegaba del cuerpo de la petición y nadie comprobaba de quién era. Así,
+   * alguien de una empresa podía asentar contra el catálogo de cuentas de otra
+   * —descuadrando sus libros— y, probando ids, deducir qué cuentas existen.
+   *
+   * Se comprueba en bloque: una consulta por tipo, no una por renglón.
+   */
+  private async assertJournalRefsBelongToCompany(
+    lines: Array<{ debitAccountId: number; creditAccountId?: number | null; costCenterId?: number | null }>,
+    companyId: number,
+  ): Promise<void> {
+    const cuentaIds = new Set<number>();
+    const centroIds = new Set<number>();
+    for (const l of lines) {
+      if (Number.isInteger(l.debitAccountId)) cuentaIds.add(l.debitAccountId);
+      if (l.creditAccountId != null && Number.isInteger(l.creditAccountId)) {
+        cuentaIds.add(l.creditAccountId);
+      }
+      if (l.costCenterId != null && Number.isInteger(l.costCenterId)) {
+        centroIds.add(l.costCenterId);
+      }
+    }
+    if (cuentaIds.size === 0) {
+      throw new BadRequestException('Cada renglón necesita una cuenta de cargo');
+    }
+
+    await assertRefsBelongToCompany(companyId, [
+      { modelo: this.prisma.account, ids: [...cuentaIds], etiqueta: 'Cuenta contable' },
+      { modelo: this.prisma.costCenter, ids: [...centroIds], etiqueta: 'Centro de costo' },
+    ]);
   }
 
   async listJournalEntries(
@@ -1574,6 +1630,18 @@ export class AccountingService {
     }>;
   }, userId: number) {
     const companyId = await this.resolveCompanyId(dto.companyId);
+    // `clientId` y `supplierId` llegan del cuerpo de la petición y se escribían
+    // sin mirar de quién eran: una factura de esta empresa podía apuntar al
+    // cliente de otra.
+    await assertRefsBelongToCompany(companyId, [
+      { modelo: this.prisma.salesClient, ids: [dto.clientId], etiqueta: 'Cliente' },
+      { modelo: this.prisma.supplier, ids: [dto.supplierId], etiqueta: 'Proveedor' },
+      {
+        modelo: this.prisma.product,
+        ids: dto.items.map((i) => i.productId),
+        etiqueta: 'Producto',
+      },
+    ]);
     const invoiceNumber = await this.generateInvoiceNumber(companyId);
     const issuer = await this.getInvoiceIssuerProfile(companyId ?? undefined);
     const emisorRfc = dto.emisorRfc?.trim() || issuer.emisorRfc || null;
@@ -2360,8 +2428,19 @@ export class AccountingService {
     try {
       const journal = await this.autoJournalForPayment(payment, invoice, userId);
       journalEntryId = journal?.id ?? null;
-    } catch {
-      // Pago ya guardado; la póliza se puede reintentar por reference PAY-{id}
+    } catch (error) {
+      // El pago ya está guardado, así que fallar aquí no puede tumbar la
+      // operación. Pero tragarlo en silencio deja dinero cobrado sin asiento y
+      // los libros descuadrados sin que nadie lo sepa: se registra con lo justo
+      // para rehacer la póliza a mano y localizarla por su referencia.
+      this.logger.error(
+        `Pago registrado SIN póliza contable — requiere asiento manual. ` +
+          `pagoId=${payment.id} referencia=PAY-${payment.id} facturaId=${invoice.id} ` +
+          `folio=${invoice.invoiceNumber} importe=${dto.amount} ${invoice.currency} ` +
+          `empresa=${invoice.companyId}: ` +
+          (error instanceof Error ? error.message : String(error)),
+        error instanceof Error ? error.stack : undefined,
+      );
     }
 
     const shouldStampComplement =
