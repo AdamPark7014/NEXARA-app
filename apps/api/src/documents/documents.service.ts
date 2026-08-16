@@ -5,10 +5,14 @@ import {
   companyWhere,
   requireCompanyId,
 } from '../common/tenant/tenant-scope.js';
+import { FolioService } from '../common/folio/folio.service.js';
 
 @Injectable()
 export class DocumentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly folio: FolioService,
+  ) {}
 
   // ── Document Categories ───────────────────────────────────────────
   async createCategory(
@@ -51,10 +55,8 @@ export class DocumentsService {
     companyId?: number | null,
   ) {
     const tenantId = requireCompanyId(companyId);
-    const count = await this.prisma.managedDocument.count({
-      where: companyWhere(tenantId),
-    });
-    const docNumber = dto.documentNumber?.trim() || 'DOC-' + String(count + 1).padStart(6, '0');
+    const docNumber =
+      dto.documentNumber?.trim() || (await this.folio.next('MANAGED_DOCUMENT', tenantId));
     return this.prisma.managedDocument.create({
       data: {
         companyId: tenantId,

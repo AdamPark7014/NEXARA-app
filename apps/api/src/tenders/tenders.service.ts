@@ -3,20 +3,20 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { FolioService } from '../common/folio/folio.service.js';
 
 @Injectable()
 export class TendersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
+    private readonly folio: FolioService,
   ) {}
 
-  private async generateTenderNumber(companyId: number): Promise<string> {
-    const year = new Date().getFullYear();
-    const count = await this.prisma.tender.count({
-      where: { companyId, tenderNumber: { startsWith: `LIC-${year}` } },
-    });
-    return `LIC-${year}-${String(count + 1).padStart(5, '0')}`;
+  private generateTenderNumber(companyId: number): Promise<string> {
+    // La serie incluye el ano, asi que enero arranca de nuevo en 00001 sin
+    // tocar el contador del ano anterior.
+    return this.folio.next('TENDER', companyId);
   }
 
   async create(dto: {

@@ -12,6 +12,7 @@ import { ExcelImportController } from './common/excel-import.controller';
 import { ExcelModule } from './common/excel.module';
 import { ClientsModule } from './clients/clients.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { FolioModule } from './common/folio/folio.module.js';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { ActivitiesModule } from './activities/activities.module';
@@ -163,6 +164,8 @@ import { AiModule } from './ai/ai.module.js';
     PacModule,
     MaintenanceContractsModule,
     MeetingsModule,
+    // Global: once servicios generan folios y todos comparten el contador.
+    FolioModule,
     TendersModule,
     CrmActivitiesModule,
     SalesTargetsModule,

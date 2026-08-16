@@ -3,12 +3,14 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { FolioService } from '../common/folio/folio.service.js';
 
 @Injectable()
 export class MaintenanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
+    private readonly folio: FolioService,
   ) {}
 
   // ── Assets ────────────────────────────────────────────────────────
@@ -131,11 +133,8 @@ export class MaintenanceService {
   }
 
   // ── Maintenance Work Orders ───────────────────────────────────────
-  private async generateWONumber(companyId: number): Promise<string> {
-    const count = await this.prisma.maintenanceOrder.count({
-      where: companyWhere(companyId),
-    });
-    return `MO-${String(count + 1).padStart(6, '0')}`;
+  private generateWONumber(companyId: number): Promise<string> {
+    return this.folio.next('MAINTENANCE_ORDER', companyId);
   }
 
   async createWorkOrder(
