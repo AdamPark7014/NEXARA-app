@@ -7,6 +7,7 @@ import { Tag } from "@/components/ui/DataTable";
 import { buildApiUrl } from "@/lib/api-base";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection, formatDate, formatDateTime } from "@/components/detail/DetailFrame";
 import ActivityEvidenceReviewPanel from "@/components/ops/ActivityEvidenceReviewPanel";
+import ActivityIssuesPanel from "@/components/ops/ActivityIssuesPanel";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
@@ -315,6 +316,10 @@ export default function ActivityDetailPage() {
             para capturar entrada, fotos en sitio y salida.
           </p>
         )}
+      </DetailSection>
+
+      <DetailSection title="Incidencias y recomendaciones">
+        <ActivityIssuesPanel activityId={Number(id)} token={token} canManage={Boolean(canEdit)} />
       </DetailSection>
     </>
   );
