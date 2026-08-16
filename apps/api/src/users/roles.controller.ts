@@ -9,6 +9,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 
 import { ORG_ROLE_TEMPLATES } from '../common/org-roles.js';
 import { buildRoleData, resolveTemplateOrThrow } from './role-template.js';
+import { buildRoleAccessSummary } from './role-access-summary.js';
 
 @Controller('roles')
 export class RolesController {
@@ -106,6 +107,32 @@ export class RolesController {
       nivelAutoridad,
       departmentHint,
       flags,
+    }));
+  }
+
+  /**
+   * Qué alcanza cada rol, resuelto contra la matriz de permisos.
+   *
+   * Hasta ahora el acceso de un rol estaba repartido entre sus banderas, su
+   * plantilla, la matriz de URLs y la lista de permisos, sin ninguna vista que
+   * lo juntara: no se podía saber qué haría un rol hasta que alguien chocaba
+   * con un 403.
+   */
+  @Get('access-matrix')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.ROLES_MANAGE, PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  async accessMatrix() {
+    const roles = await this.prisma.role.findMany({
+      select: { id: true, nombre: true, orgRoleKey: true, nivelAutoridad: true },
+      orderBy: [{ nivelAutoridad: 'desc' }, { nombre: 'asc' }],
+    });
+
+    return roles.map((role) => ({
+      id: role.id,
+      nombre: role.nombre,
+      orgRoleKey: role.orgRoleKey,
+      nivelAutoridad: role.nivelAutoridad,
+      acceso: buildRoleAccessSummary({ orgRoleKey: role.orgRoleKey }),
     }));
   }
 
