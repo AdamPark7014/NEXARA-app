@@ -4825,6 +4825,7 @@ model CompanyProfile {
   activityRecommendations   ActivityRecommendation[]
   operationalMeetings       OperationalMeeting[]
   meetingAgreements         MeetingAgreement[]
+  folioCounters             FolioCounter[]
 
   @@map("company_profile")
 }
@@ -5444,4 +5445,32 @@ model MeetingAgreement {
   @@index([companyId, estado, fechaCompromiso])
   @@index([responsableId, estado])
   @@map("meeting_agreements")
+}
+
+/// Contador de folios por empresa y serie.
+///
+/// Antes cada folio salía de `count() + 1` sobre la tabla destino. Eso rompía
+/// de dos maneras:
+///
+///   1. Dos altas simultáneas leían el mismo `count` y generaban el mismo
+///      folio; la segunda moría contra el índice único.
+///   2. Peor en las tablas con borrado suave (`Invoice`, `PurchaseOrder`): el
+///      middleware excluye lo borrado de las lecturas, así que al borrar un
+///      registro el contador **retrocedía** y el siguiente folio chocaba con
+///      uno que ya existía. No se recuperaba solo: toda alta posterior fallaba.
+///
+/// El contador vive aquí y se incrementa de forma atómica, así que ni la
+/// concurrencia ni los borrados lo mueven hacia atrás.
+model FolioCounter {
+  id        Int      @id @default(autoincrement())
+  /// Prefijo resuelto de la serie: "PO-", "INV-", "LIC-2026-"…
+  serie     String   @db.VarChar(20)
+  valor     Int      @default(0)
+  companyId Int
+  updatedAt DateTime @updatedAt
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, serie])
+  @@map("folio_counters")
 }

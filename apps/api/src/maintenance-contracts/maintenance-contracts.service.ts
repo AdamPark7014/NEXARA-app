@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { resolveRequiredCompanyId, companyWhere, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
+import { FolioService } from '../common/folio/folio.service.js';
 
 const FREQUENCY_DAYS: Record<string, number> = {
   WEEKLY: 7,
@@ -21,14 +22,12 @@ export class MaintenanceContractsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
+    private readonly folio: FolioService,
   ) {}
 
   // ── Contracts ──────────────────────────────────────────────────────
-  private async generateContractNumber(companyId: number): Promise<string> {
-    const count = await (this.prisma as any).maintenanceContract.count({
-      where: companyWhere(companyId),
-    });
-    return `MC-${String(count + 1).padStart(5, '0')}`;
+  private generateContractNumber(companyId: number): Promise<string> {
+    return this.folio.next('MAINTENANCE_CONTRACT', companyId);
   }
 
   async createContract(dto: {

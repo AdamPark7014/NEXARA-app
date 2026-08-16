@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { FolioService } from '../common/folio/folio.service.js';
 
 const COGS_MOVEMENT_TYPES = new Set(['DISPATCH', 'SCRAP', 'PRODUCTION_OUT']);
 
@@ -15,6 +16,7 @@ export class WarehouseService {
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly accounting: AccountingService,
+    private readonly folio: FolioService,
   ) {}
 
   // ── Warehouses ────────────────────────────────────────────────────
@@ -173,11 +175,8 @@ export class WarehouseService {
   }
 
   // ── Stock Movements ───────────────────────────────────────────────
-  private async generateMovementNumber(companyId: number): Promise<string> {
-    const count = await this.prisma.stockMovement.count({
-      where: companyWhere(companyId),
-    });
-    return `SM-${String(count + 1).padStart(6, '0')}`;
+  private generateMovementNumber(companyId: number): Promise<string> {
+    return this.folio.next('STOCK_MOVEMENT', companyId);
   }
 
   async createStockMovement(dto: {
@@ -772,11 +771,8 @@ export class WarehouseService {
   }
 
   // ── Cycle Counts ──────────────────────────────────────────────────
-  private async generateCountNumber(companyId: number): Promise<string> {
-    const count = await this.prisma.cycleCount.count({
-      where: companyWhere(companyId),
-    });
-    return `CC-${String(count + 1).padStart(6, '0')}`;
+  private generateCountNumber(companyId: number): Promise<string> {
+    return this.folio.next('CYCLE_COUNT', companyId);
   }
 
   /**

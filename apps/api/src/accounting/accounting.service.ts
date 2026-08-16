@@ -7,6 +7,7 @@ import { PacService } from '../pac/pac.service.js';
 import { SatService } from '../pac/sat.service.js';
 import { WebhooksService } from '../webhooks/webhooks.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
+import { FolioService } from '../common/folio/folio.service.js';
 
 const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -20,6 +21,7 @@ export class AccountingService {
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly pacService: PacService,
     private readonly satService: SatService,
+    private readonly folio: FolioService,
     @Optional() private readonly webhooks?: WebhooksService,
   ) {}
 
@@ -497,11 +499,8 @@ export class AccountingService {
   }
 
   // ── Journal Entries ───────────────────────────────────────────────
-  private async generateEntryNumber(companyId: number): Promise<string> {
-    const count = await this.prisma.journalEntry.count({
-      where: companyWhere(companyId),
-    });
-    return `JE-${String(count + 1).padStart(6, '0')}`;
+  private generateEntryNumber(companyId: number): Promise<string> {
+    return this.folio.next('JOURNAL_ENTRY', companyId);
   }
 
   async createJournalEntry(dto: {
@@ -1528,11 +1527,8 @@ export class AccountingService {
   }
 
   // ── Invoicing (AR / AP) ───────────────────────────────────────────
-  private async generateInvoiceNumber(companyId: number): Promise<string> {
-    const count = await this.prisma.invoice.count({
-      where: companyWhere(companyId),
-    });
-    return `INV-${String(count + 1).padStart(6, '0')}`;
+  private generateInvoiceNumber(companyId: number): Promise<string> {
+    return this.folio.next('INVOICE', companyId);
   }
 
   async createInvoice(dto: {

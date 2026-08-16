@@ -8,6 +8,7 @@ import { WarehouseService } from '../warehouse/warehouse.service.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
+import { FolioService } from '../common/folio/folio.service.js';
 
 @Injectable()
 export class ProcurementService {
@@ -18,14 +19,12 @@ export class ProcurementService {
     private readonly warehouse: WarehouseService,
     private readonly accounting: AccountingService,
     private readonly audit: AuditService,
+    private readonly folio: FolioService,
   ) {}
 
   // ── Purchase Requisitions ─────────────────────────────────────────
-  private async generateReqNumber(companyId: number): Promise<string> {
-    const count = await this.prisma.purchaseRequisition.count({
-      where: companyWhere(companyId),
-    });
-    return `REQ-${String(count + 1).padStart(6, '0')}`;
+  private generateReqNumber(companyId: number): Promise<string> {
+    return this.folio.next('PURCHASE_REQUISITION', companyId);
   }
 
   async createRequisition(
@@ -169,11 +168,8 @@ export class ProcurementService {
   }
 
   // ── Purchase Orders ───────────────────────────────────────────────
-  private async generatePONumber(companyId: number): Promise<string> {
-    const count = await this.prisma.purchaseOrder.count({
-      where: companyWhere(companyId),
-    });
-    return `PO-${String(count + 1).padStart(6, '0')}`;
+  private generatePONumber(companyId: number): Promise<string> {
+    return this.folio.next('PURCHASE_ORDER', companyId);
   }
 
   async listSuppliers(companyId?: number | null) {
@@ -344,11 +340,8 @@ export class ProcurementService {
   }
 
   // ── Goods Receipts ────────────────────────────────────────────────
-  private async generateReceiptNumber(companyId: number): Promise<string> {
-    const count = await this.prisma.goodsReceipt.count({
-      where: companyWhere(companyId),
-    });
-    return `GR-${String(count + 1).padStart(6, '0')}`;
+  private generateReceiptNumber(companyId: number): Promise<string> {
+    return this.folio.next('GOODS_RECEIPT', companyId);
   }
 
   async createGoodsReceipt(dto: {
@@ -812,11 +805,8 @@ export class ProcurementService {
   }
 
   // ── RFQ multi-proveedor ─────────────────────────────────────────────
-  private async generateRfqNumber(companyId: number): Promise<string> {
-    const count = await this.prisma.purchaseRFQ.count({
-      where: companyWhere(companyId),
-    });
-    return `RFQ-${String(count + 1).padStart(6, '0')}`;
+  private generateRfqNumber(companyId: number): Promise<string> {
+    return this.folio.next('PURCHASE_RFQ', companyId);
   }
 
   /**
