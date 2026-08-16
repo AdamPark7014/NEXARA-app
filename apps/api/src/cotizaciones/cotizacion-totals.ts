@@ -61,12 +61,68 @@ export type NormalizedCotizacionItem = {
 
 export type CotizacionTotals = {
   subtotal: number;
+  laborTotal: number;
   discountTotal: number;
   taxTotal: number;
   iepsTotal: number;
   retentionTotal: number;
   total: number;
 };
+
+/** Desglose de una línea. */
+export type LineAmounts = {
+  /** Producto: cantidad × precio unitario. */
+  productAmount: number;
+  /** Mano de obra: horas × tarifa. */
+  laborAmount: number;
+  /** Base antes de descuento (producto + mano de obra). */
+  subtotal: number;
+  discount: number;
+  /** Base imponible tras descuento. */
+  taxable: number;
+  taxAmount: number;
+  iepsAmount: number;
+  retentionAmount: number;
+  total: number;
+};
+
+/**
+ * Importes de una línea de cotización.
+ *
+ * **La mano de obra se factura.** Antes se imprimía en el PDF como línea
+ * informativa ("MO: 10h × $500") pero no entraba en ningún total, de modo que
+ * el cliente veía el desglose y no se le cobraba: una fuga de ingresos en cada
+ * cotización con mano de obra.
+ *
+ * La mano de obra forma parte de la base de la línea, así que el descuento y
+ * los impuestos se aplican sobre ella igual que sobre el producto —es un
+ * servicio y causa IVA—, y la retención también.
+ *
+ * Única fuente del cálculo: los totales de la cotización y el `lineTotal` que
+ * se guarda por línea salen de aquí, para que no puedan discrepar.
+ */
+export function calculateLine(item: NormalizedCotizacionItem): LineAmounts {
+  const productAmount = item.qty * item.unitPrice;
+  const laborAmount = item.laborHours * item.laborRate;
+  const subtotal = productAmount + laborAmount;
+  const discount = subtotal * (item.discount / 100);
+  const taxable = subtotal - discount;
+  const taxAmount = taxable * (item.tax / 100);
+  const iepsAmount = taxable * (item.ieps / 100);
+  const retentionAmount = taxable * (item.retention / 100);
+
+  return {
+    productAmount,
+    laborAmount,
+    subtotal,
+    discount,
+    taxable,
+    taxAmount,
+    iepsAmount,
+    retentionAmount,
+    total: taxable + taxAmount + iepsAmount - retentionAmount,
+  };
+}
 
 /** Porcentaje a partir del cual se dispara el workflow de aprobación. */
 export function maxDiscountPercent(items: Array<{ discount: number }>): number {
@@ -128,22 +184,25 @@ export function normalizeItems(items: RawCotizacionItem[] | undefined | null): N
 export function calculateTotals(items: NormalizedCotizacionItem[]): CotizacionTotals {
   return items.reduce<CotizacionTotals>(
     (acc, item) => {
-      const subtotal = item.qty * item.unitPrice;
-      const discount = subtotal * (item.discount / 100);
-      const taxable = subtotal - discount;
-      const taxAmount = taxable * (item.tax / 100);
-      const iepsAmount = taxable * (item.ieps / 100);
-      const retentionAmount = taxable * (item.retention / 100);
-      const total = taxable + taxAmount + iepsAmount - retentionAmount;
+      const line = calculateLine(item);
       return {
-        subtotal: acc.subtotal + subtotal,
-        discountTotal: acc.discountTotal + discount,
-        taxTotal: acc.taxTotal + taxAmount,
-        iepsTotal: acc.iepsTotal + iepsAmount,
-        retentionTotal: acc.retentionTotal + retentionAmount,
-        total: acc.total + total,
+        subtotal: acc.subtotal + line.subtotal,
+        laborTotal: acc.laborTotal + line.laborAmount,
+        discountTotal: acc.discountTotal + line.discount,
+        taxTotal: acc.taxTotal + line.taxAmount,
+        iepsTotal: acc.iepsTotal + line.iepsAmount,
+        retentionTotal: acc.retentionTotal + line.retentionAmount,
+        total: acc.total + line.total,
       };
     },
-    { subtotal: 0, discountTotal: 0, taxTotal: 0, iepsTotal: 0, retentionTotal: 0, total: 0 },
+    {
+      subtotal: 0,
+      laborTotal: 0,
+      discountTotal: 0,
+      taxTotal: 0,
+      iepsTotal: 0,
+      retentionTotal: 0,
+      total: 0,
+    },
   );
 }
