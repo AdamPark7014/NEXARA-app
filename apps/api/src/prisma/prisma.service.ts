@@ -4,6 +4,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { AuditBuffer } from './audit-buffer.js';
 import { getTenantStore } from '../common/tenant/tenant-context.js';
 import { TENANT_SCOPED_MODELS } from '../common/tenant/tenant-models.js';
+import { applyCap, probeTake, resolveRowCap, shouldCap } from './row-cap.js';
 
 /** Models that support soft-delete (have deletedAt column) */
 const SOFT_DELETE_MODELS = new Set<string>([
@@ -182,6 +183,8 @@ const AUDIT_BUFFER_HARD_LIMIT = AUDIT_FLUSH_MAX_BUFFER * 20;
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly tenantLogger = new Logger('PrismaTenant');
   private readonly auditLogger = new Logger('PrismaAudit');
+  private readonly capLogger = new Logger('PrismaRowCap');
+  private readonly rowCap = resolveRowCap();
 
   /**
    * Buffer de auditoría. Antes se emitía un INSERT por cada escritura, lo que
@@ -225,6 +228,29 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   constructor(private readonly realtimeGateway: RealtimeGateway) {
     super({
       log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+    });
+
+    // ── Tope de filas para `findMany` sin `take` ──────────────────
+    // Va el primero para que el `take` viaje ya puesto por el resto de la
+    // cadena. Ver `row-cap.ts` para el porqué del tope y del aviso.
+    this.$use(async (params, next) => {
+      if (!shouldCap(params.action, params.args)) return next(params);
+
+      const cap = this.rowCap;
+      params.args = { ...(params.args ?? {}), take: probeTake(cap) };
+      const resultado = await next(params);
+      if (!Array.isArray(resultado)) return resultado;
+
+      const { rows, truncated } = applyCap(resultado, cap);
+      if (truncated) {
+        // Recortar en silencio daría respuestas incompletas que nadie sabría
+        // interpretar. Este modelo es el que necesita paginación de verdad.
+        this.capLogger.warn(
+          `Consulta sin paginar recortada al tope de ${cap} filas: ` +
+            `modelo=${params.model ?? 'desconocido'}. Necesita paginación.`,
+        );
+      }
+      return rows;
     });
 
     // ── Soft-delete middleware: convert delete → update deletedAt ──
