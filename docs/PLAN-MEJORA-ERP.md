@@ -12,13 +12,13 @@ producción). Parchear `main` habría sido trabajo perdido.
 
 Estado de partida medido, no supuesto:
 
-| Métrica | Antes | F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8 |
-|---|---|---|---|---|---|---|---|---|---|
-| Errores TypeScript (API) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Errores TypeScript (web) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Suites que pasan | 32 / 35 | 34 / 37 | 37 / 37 | 38 / 38 | 39 / 39 | 40 / 40 | 41 / 41 | 43 / 43 | **44 / 44** |
-| Tests que pasan | 81 | 102 | 119 | 126 | 143 | 156 | 170 | 187 | **197** |
-| Tests que fallan | 6 | 6 (preexistentes) | 0 | 0 | 0 | 0 | 0 | 0 | **0** |
+| Métrica | Antes | F1 | F5 | F8 | F9 |
+|---|---|---|---|---|---|
+| Errores TypeScript (API) | 0 | 0 | 0 | 0 | 0 |
+| Errores TypeScript (web) | 0 | 0 | 0 | 0 | 0 |
+| Suites que pasan | 32 / 35 | 34 / 37 | 40 / 40 | 44 / 44 | **48 / 48** |
+| Tests que pasan | 81 | 102 | 156 | 197 | **226** |
+| Tests que fallan | 6 | 6 (preexistentes) | 0 | 0 | **0** |
 
 Los 6 tests que estaban en rojo se verificaron primero contra la copia de trabajo
 sin modificar en el mismo commit: fallaban igual, no los introdujo este trabajo.
@@ -441,7 +441,71 @@ sincronizar no revierte el cierre. 10 tests.
 
 ---
 
-## Fase 9 — Pendiente
+## Fase 9 — Ejecutada (verificación en producción y observabilidad)
+
+### 9.1 Verificación con usuarios reales
+
+Se probaron **241 rutas GET con los 8 roles** (1928 peticiones): **ningún 5xx en
+ningún módulo**.
+
+> Aviso metodológico: el primer intento de matriz por rol **fue invalidado y
+> descartado**. Las propias pruebas dispararon el rate limiter y los 429 se
+> contaban como "denegado". Se repitió con ritmo controlado (0 rate-limited).
+> El limitador funciona; la medición inicial no.
+
+Resultado con datos limpios: el mínimo privilegio funciona —nómina, roles,
+auditoría, CVs y multas solo CEO— con dos huecos:
+
+- `hero-slides`, `social-posts` e `internal-comunicados` responden **200 a los 8
+  roles**: un técnico de campo puede modificar el sitio público y los
+  comunicados internos.
+- `coord_operaciones` no alcanza vehículos, viáticos ni gastos, lo que para un
+  coordinador de operaciones parece un olvido de la matriz.
+
+### 9.2 Fuga del esquema en errores — **corregido**
+
+`/api/warehouse/abc` casaba con `/api/warehouse/:id`, el `NaN` llegaba a Prisma y
+el filtro global **devolvía al cliente el mensaje interno**: tabla, columnas y
+tipos. Son 87 los puntos que convierten parámetros sin validar, así que se
+resolvió en el filtro: errores de Prisma traducidos a 400/404/409 y mensaje
+genérico para lo no controlado; el detalle queda en el log.
+
+### 9.3 Camino *fail-open* en los roles — **corregido**
+
+`RbacGuard` solo consultaba la matriz si podía resolver el rol. Si no —un rol con
+clave desconocida— se la saltaba entera. Los 8 roles reales resuelven bien, así
+que era latente. Ahora falla cerrado, y **todo rol nace de una plantilla** que
+aporta el `orgRoleKey` que la matriz necesita. El borrado comprueba usuarios
+asignados.
+
+Incluye un test que verifica que **toda plantilla publicada tenga puente a la
+matriz v2** (`LEGACY_TO_V2`): si alguien añade una plantilla sin mapear, el rol
+nacería sin permisos y el test lo detecta.
+
+### 9.4 Fallos silenciosos — **corregidos los dos que importan**
+
+Barrido: 136 puntos con `.catch` sin log ni comentario.
+
+- **`autoJournalForStampedInvoice`** se ejecutaba con `.catch(() => undefined)`.
+  Si fallaba, la factura quedaba **timbrada ante el SAT sin póliza contable** y
+  los libros descuadraban sin que nadie lo supiera. Ahora deja registro con
+  folio, UUID, total y empresa para rehacer el asiento. No se revierte el
+  timbrado: ya ocurrió.
+- **Los tableros usaban `.catch(() => 0)`**, así que un KPI roto se veía igual
+  que uno sin datos. Es exactamente por eso que dirección estuvo contando cero
+  tickets completados sin que nada lo delatara. `kpiFallback` conserva la
+  resiliencia pero deja advertencia: 38 indicadores instrumentados.
+
+### 9.5 Tareas programadas sin atribución — **corregido**
+
+Más de veinte `@Cron` y, si el cuerpo lanza, `@nestjs/schedule` no lo captura:
+acaba como `unhandledRejection` anónimo. `runScheduledJob` registra el fallo con
+el nombre de la tarea y su duración, sin propagarlo. Aplicado primero a
+`ticket-alerts`, que corre **cada minuto sin ninguna captura**.
+
+---
+
+## Fase 10 — Pendiente
 
 1. **Verificar la Fase 5 contra un entorno levantado** (lista en el diseño).
 2. **Confirmar la regla de negocio de la mano de obra** (4.3).
@@ -481,8 +545,8 @@ cd apps/web && npx tsc --noEmit -p tsconfig.json
 cd apps/api && npx jest --config jest.config.js --runInBand
 ```
 
-Resultado tras la Fase 8: **0 errores de tipos** en ambas apps y **197 tests en
-verde de 197, en las 44 suites**.
+Resultado tras la Fase 9: **0 errores de tipos** en ambas apps y **226 tests en
+verde de 226, en las 48 suites**.
 
 Aviso: la Fase 5 toca el camino de login y **no se ha probado contra un entorno
 levantado**. Ver la lista de comprobación de
