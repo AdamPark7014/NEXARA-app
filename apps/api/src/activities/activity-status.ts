@@ -18,6 +18,16 @@ export const ACTIVITY_STATUS = {
   PENDIENTE: 'Pendiente',
   ASIGNADA: 'Asignada',
   EN_PROCESO: 'En Proceso',
+  /**
+   * Trabajo terminado en campo, a la espera de la validación del Arquitecto.
+   *
+   * El organigrama define esa validación ("Validación final de trabajos" y
+   * "Josué valida y envía a Administración y Dirección"), pero antes no existía:
+   * la actividad se cerraba sola al completar las evidencias. Reutilizar
+   * `Pendiente` tampoco servía, porque no distinguía lo que nadie ha empezado
+   * de lo que espera visto bueno.
+   */
+  POR_VALIDAR: 'Por Validar',
   FINALIZADA: 'Finalizada',
   RECHAZADA: 'Rechazada',
   CANCELADA: 'Cancelada',
@@ -35,6 +45,7 @@ const STATUS_ALIASES: Record<ActivityStatus, string[]> = {
   [ACTIVITY_STATUS.PENDIENTE]: ['pendiente'],
   [ACTIVITY_STATUS.ASIGNADA]: ['asignada', 'asignado'],
   [ACTIVITY_STATUS.EN_PROCESO]: ['enproceso', 'enprogreso'],
+  [ACTIVITY_STATUS.POR_VALIDAR]: ['porvalidar', 'envalidacion', 'pendientevalidacion'],
   [ACTIVITY_STATUS.FINALIZADA]: ['finalizada', 'finalizado', 'completada', 'completado'],
   [ACTIVITY_STATUS.RECHAZADA]: ['rechazada', 'rechazado'],
   [ACTIVITY_STATUS.CANCELADA]: ['cancelada', 'cancelado'],
@@ -79,7 +90,10 @@ export function statusVariants(status: ActivityStatus): string[] {
 
   for (const alias of aliases) {
     // Reconstruye las grafías reales a partir del alias normalizado.
-    if (alias === 'enproceso') out.add('En Proceso');
+    if (alias === 'porvalidar') out.add('Por Validar');
+    else if (alias === 'envalidacion') out.add('En Validacion');
+    else if (alias === 'pendientevalidacion') out.add('Pendiente Validacion');
+    else if (alias === 'enproceso') out.add('En Proceso');
     else if (alias === 'enprogreso') {
       out.add('En Progreso');
       out.add('EN_PROGRESO');

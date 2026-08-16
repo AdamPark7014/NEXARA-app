@@ -5,10 +5,11 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
 import { WorkflowService } from './workflow.service.js';
 import { WorkflowController } from './workflow.controller.js';
 import { AutoApprovalService } from './auto-approval.service.js';
+import { ActivityLifecycleService } from '../activities/activity-lifecycle.service.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, NotificationsModule],
-  providers: [WorkflowService, AutoApprovalService],
+  providers: [ActivityLifecycleService, WorkflowService, AutoApprovalService],
   controllers: [WorkflowController],
   exports: [WorkflowService, AutoApprovalService],
 })

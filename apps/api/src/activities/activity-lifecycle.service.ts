@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { ACTIVITY_STATUS, statusVariants } from './activity-status.js';
 
 /**
  * Efectos en cadena al cerrar una actividad.
@@ -50,10 +51,37 @@ export class ActivityLifecycleService {
    * y qué falló, para que el llamador pueda registrarlo sin arriesgar la
    * operación principal.
    */
+  /**
+   * ¿Tiene la empresa definida la validación del Arquitecto?
+   *
+   * Si la tiene, el trabajo terminado en campo pasa a `Por Validar` y espera su
+   * visto bueno. Si no, se cierra directo como siempre: no dejamos actividades
+   * atascadas en empresas que no han configurado el flujo.
+   */
+  async requiresArchitectValidation(companyId: number | null): Promise<boolean> {
+    if (companyId == null || companyId <= 0) return false;
+    try {
+      const definition = await this.prisma.workflowDefinition.findFirst({
+        where: { entityType: ACTIVITY_CLOSURE_WORKFLOW, status: 'ACTIVE', companyId },
+        select: { id: true, steps: { select: { id: true }, take: 1 } },
+      });
+      return Boolean(definition && definition.steps.length > 0);
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo comprobar el flujo de validación: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return false;
+    }
+  }
+
   async onActivityFinished(input: {
     activityId: number;
     companyId: number | null;
     actorId?: number | null;
+    /** Falso mientras la actividad espera la validación del Arquitecto. */
+    applyClosureEffects?: boolean;
   }): Promise<ActivityClosureOutcome> {
     const outcome: ActivityClosureOutcome = {
       contractVisitCompleted: false,
@@ -62,15 +90,55 @@ export class ActivityLifecycleService {
       errors: [],
     };
 
-    const { activityId, companyId } = input;
+    const { activityId, applyClosureEffects = true } = input;
     if (!Number.isFinite(activityId) || activityId <= 0) {
       outcome.errors.push('activityId inválido');
       return outcome;
     }
 
+    if (applyClosureEffects) {
+      outcome.contractVisitCompleted = await this.completeContractVisit(activityId, outcome);
+      outcome.clientTicketClosed = await this.closeClientTicketRequest(activityId, outcome);
+    }
+    outcome.workflowInstanceId = await this.startClosureWorkflow(input, outcome);
+
+    return outcome;
+  }
+
+  /**
+   * El Arquitecto aprobó: la actividad pasa a finalizada y ahora sí se propagan
+   * los efectos que estaban esperando su visto bueno.
+   */
+  async onActivityValidated(input: {
+    activityId: number;
+    companyId: number | null;
+  }): Promise<ActivityClosureOutcome> {
+    const outcome: ActivityClosureOutcome = {
+      contractVisitCompleted: false,
+      clientTicketClosed: false,
+      workflowInstanceId: null,
+      errors: [],
+    };
+
+    const { activityId } = input;
+    if (!Number.isFinite(activityId) || activityId <= 0) {
+      outcome.errors.push('activityId inválido');
+      return outcome;
+    }
+
+    try {
+      await this.prisma.activity.updateMany({
+        where: { id: activityId, estatus: { in: statusVariants(ACTIVITY_STATUS.POR_VALIDAR) } },
+        data: { estatus: ACTIVITY_STATUS.FINALIZADA },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      outcome.errors.push(`marcar finalizada: ${message}`);
+      this.logger.warn(`No se pudo finalizar la actividad ${activityId}: ${message}`);
+    }
+
     outcome.contractVisitCompleted = await this.completeContractVisit(activityId, outcome);
     outcome.clientTicketClosed = await this.closeClientTicketRequest(activityId, outcome);
-    outcome.workflowInstanceId = await this.startClosureWorkflow(input, outcome);
 
     return outcome;
   }

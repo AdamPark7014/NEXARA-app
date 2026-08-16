@@ -243,22 +243,31 @@ export class ServiceSheetsService {
     if (!hasAll) return;
 
     if (!isFinishedStatus(activity.estatus)) {
+      const companyId = tenantId ?? activity.companyId;
+
+      // El organigrama sitúa una validación del Arquitecto antes de dar por
+      // buena una actividad ("Josué valida y envía a Administración y
+      // Dirección"). Si la empresa tiene ese flujo configurado, el trabajo
+      // terminado en campo queda `Por Validar` y los efectos en cadena esperan
+      // a su visto bueno. Si no lo tiene, se cierra directo como siempre: no
+      // dejamos actividades atascadas donde nadie configuró el flujo.
+      const needsValidation = await this.activityLifecycle.requiresArchitectValidation(companyId);
+
       await this.prisma['activity'].update({
         where: { id: activityId },
         data: {
-          estatus: ACTIVITY_STATUS.FINALIZADA,
+          estatus: needsValidation ? ACTIVITY_STATUS.POR_VALIDAR : ACTIVITY_STATUS.FINALIZADA,
           fechaFinalizacion: new Date(),
         },
       });
 
-      // Este es el único punto del ERP donde una actividad pasa a finalizada,
-      // así que es donde cuelgan los efectos en cadena: cerrar la visita de
-      // contrato, cerrar la solicitud del cliente y abrir el flujo de
-      // aprobación si la empresa lo tiene definido.
       const outcome = await this.activityLifecycle.onActivityFinished({
         activityId,
-        companyId: tenantId ?? activity.companyId,
+        companyId,
         actorId: activity.responsableId,
+        // Con validación pendiente solo se abre el flujo; la visita de contrato
+        // y la solicitud del cliente se cierran cuando el Arquitecto aprueba.
+        applyClosureEffects: !needsValidation,
       });
       if (outcome.errors.length) {
         this.logger.warn(
