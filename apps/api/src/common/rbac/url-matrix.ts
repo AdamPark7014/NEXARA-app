@@ -58,6 +58,9 @@ export const SHARED_SESSION_URL_RULES: UrlRule[] = [
   { path: '/api/users/profile/**', scope: 'write' },
   { path: '/api/devices/**', methods: ['GET', 'POST', 'PATCH', 'DELETE'], scope: 'write' },
   { path: '/api/company/mine', methods: ['GET'], scope: 'read' },
+  // Los comunicados internos son PARA el personal: todos leen, solo
+  // Administracion y Direccion publican.
+  { path: '/api/internal-comunicados/**', methods: ['GET'], scope: 'read' },
 ];
 
 /**
@@ -84,6 +87,11 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/crm/**', scope: 'read' },
     { path: '/ops/**', scope: 'read' },
     { path: '/studio/**', scope: 'read' },
+    // Direccion: gestion de contenido y comunicados internos.
+    { path: '/api/hero-slides/**', scope: 'write' },
+    { path: '/api/hero-video/**', scope: 'write' },
+    { path: '/api/social-posts/**', scope: 'write' },
+    { path: '/api/internal-comunicados/**', scope: 'write' },
     { path: '/api/**', methods: ['GET'], scope: 'read' },
   ],
 
@@ -216,6 +224,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/stock/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/catalog/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/documents/**', scope: 'write' },
+    { path: '/api/internal-comunicados/**', scope: 'write' },
     { path: '/api/chat/**', scope: 'write' },
     { path: '/api/workflow/**', scope: 'approve' },
     { path: '/crm/dashboard', scope: 'read' },
@@ -259,6 +268,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/viaticos/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/viatics/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/documents/**', scope: 'write' },
+    { path: '/api/internal-comunicados/**', scope: 'write' },
     { path: '/api/chat/**', scope: 'write' },
     { path: '/api/clients/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
   ],
