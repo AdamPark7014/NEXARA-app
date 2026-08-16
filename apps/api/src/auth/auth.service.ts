@@ -510,6 +510,12 @@ export class AuthService {
       set.add(PERMISSIONS.EVIDENCES_REVIEW);
       set.add(PERMISSIONS.EVIDENCES_VIEW);
       set.add(PERMISSIONS.EVIDENCES_CREATE);
+      // VEHICLES_VIEW faltaba: los mandos de operaciones podían *revisar* y
+      // gestionar el inventario de vehículos, pero el listado exige
+      // `vehicles.view` y se les negaba. Resultado absurdo: el ingeniero de
+      // campo veía los vehículos y su coordinador —quien asigna personal y
+      // controla materiales— no.
+      set.add(PERMISSIONS.VEHICLES_VIEW);
       set.add(PERMISSIONS.VEHICLES_REVIEW);
       set.add(PERMISSIONS.VEHICLES_INVENTORY);
       set.add(PERMISSIONS.TOOLS_MANAGE);

@@ -1,4 +1,5 @@
 import {
+  calculateLine,
   calculateTotals,
   maxDiscountPercent,
   normalizeItems,
@@ -127,6 +128,7 @@ describe('calculateTotals', () => {
   it('devuelve ceros sin conceptos', () => {
     expect(calculateTotals([])).toEqual({
       subtotal: 0,
+      laborTotal: 0,
       discountTotal: 0,
       taxTotal: 0,
       iepsTotal: 0,
@@ -135,18 +137,62 @@ describe('calculateTotals', () => {
     });
   });
 
-  it('NO factura la mano de obra (comportamiento vigente, pendiente de confirmar)', () => {
-    // `laborHours` x `laborRate` se imprime en el PDF como línea informativa
-    // ("MO: Xh x $Y") pero no entra en ningún total. Si la mano de obra debe
-    // cobrarse aparte del precio unitario, esto es una fuga de ingresos; si va
-    // incluida en `unitPrice`, es correcto.
-    //
-    // Este test fija el comportamiento actual: si algún día se decide facturarla,
-    // fallará y obligará a revisar la decisión de forma consciente.
+  it('factura la mano de obra junto al producto', () => {
+    // Decisión de negocio confirmada: la mano de obra SE COBRA. Antes se
+    // imprimía en el PDF como línea informativa pero no entraba en ningún
+    // total, de modo que el cliente veía el desglose y no se le cobraba.
     const totals = calculateTotals([
       item({ qty: 1, unitPrice: 1000, laborHours: 10, laborRate: 500 }),
     ]);
-    expect(totals.total).toBe(1000);
+    expect(totals.laborTotal).toBe(5000);
+    expect(totals.subtotal).toBe(6000);
+    expect(totals.total).toBe(6000);
+  });
+
+  it('el descuento y el IVA alcanzan también a la mano de obra', () => {
+    // Base 1000 producto + 1000 MO = 2000; -10% = 1800; IVA 16% = 288.
+    const totals = calculateTotals([
+      item({ qty: 1, unitPrice: 1000, laborHours: 4, laborRate: 250, discount: 10, tax: 16 }),
+    ]);
+    expect(totals.subtotal).toBe(2000);
+    expect(totals.laborTotal).toBe(1000);
+    expect(totals.discountTotal).toBe(200);
+    expect(totals.taxTotal).toBe(288);
+    expect(totals.total).toBe(2088);
+  });
+
+  it('cobra una línea que es solo mano de obra', () => {
+    // Servicio puro: sin producto, pero con horas facturables.
+    const totals = calculateTotals([
+      item({ qty: 1, unitPrice: 0, laborHours: 8, laborRate: 400, tax: 16 }),
+    ]);
+    expect(totals.subtotal).toBe(3200);
+    expect(totals.total).toBe(3712);
+  });
+
+  it('acumula la mano de obra de varias líneas', () => {
+    const totals = calculateTotals([
+      item({ qty: 1, unitPrice: 100, laborHours: 2, laborRate: 300 }),
+      item({ qty: 1, unitPrice: 100, laborHours: 3, laborRate: 200 }),
+    ]);
+    expect(totals.laborTotal).toBe(1200);
+    expect(totals.subtotal).toBe(1400);
+  });
+});
+
+describe('calculateLine', () => {
+  it('separa producto y mano de obra en el desglose', () => {
+    const line = calculateLine(item({ qty: 2, unitPrice: 500, laborHours: 3, laborRate: 200 }));
+    expect(line.productAmount).toBe(1000);
+    expect(line.laborAmount).toBe(600);
+    expect(line.subtotal).toBe(1600);
+  });
+
+  it('es la misma fuente que usan los totales', () => {
+    // El lineTotal guardado por linea y los totales de la cotizacion salen de
+    // aqui: antes el calculo estaba duplicado y podian descuadrar.
+    const row = item({ qty: 2, unitPrice: 500, laborHours: 3, laborRate: 200, discount: 5, tax: 16 });
+    expect(calculateLine(row).total).toBeCloseTo(calculateTotals([row]).total, 10);
   });
 });
 

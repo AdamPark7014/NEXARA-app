@@ -24,6 +24,7 @@ import nodemailer from 'nodemailer';
 import fs from 'fs/promises';
 import path from 'path';
 import {
+  calculateLine,
   calculateTotals,
   maxDiscountPercent,
   normalizeItems,
@@ -81,19 +82,12 @@ export class CotizacionesService {
   }
 
   private buildItemData(items: ReturnType<CotizacionesService['normalizeItems']>) {
-    return items.map((item) => {
-      const subtotal = item.qty * item.unitPrice;
-      const discount = subtotal * (item.discount / 100);
-      const taxable = subtotal - discount;
-      const taxAmount = taxable * (item.tax / 100);
-      const iepsAmount = taxable * (item.ieps / 100);
-      const retentionAmount = taxable * (item.retention / 100);
-      const total = taxable + taxAmount + iepsAmount - retentionAmount;
-      return {
-        ...item,
-        lineTotal: round2(total),
-      };
-    });
+    // Mismo cálculo que los totales de la cotización: antes estaba duplicado
+    // aquí y cualquier cambio en uno dejaba al otro descuadrado.
+    return items.map((item) => ({
+      ...item,
+      lineTotal: round2(calculateLine(item).total),
+    }));
   }
 
   private async ensureUniqueQuoteNumber(base: string, companyId: number) {
