@@ -1,49 +1,83 @@
 name: CI
 
+# Ya existía un CI, pero con tres huecos que explican por qué no detectó nada de
+# lo corregido en esta rama:
+#
+#   1. Solo corría en main/master/develop, así que NUNCA se ejecutó en ramas de
+#      trabajo: el código llegaba al servidor sin haber pasado por él.
+#   2. El typecheck de la API llevaba `continue-on-error: true`, de modo que un
+#      error de tipos no rompía la ejecución.
+#   3. La web no se comprobaba: solo se verificaba que existiera su package.json.
 on:
   push:
-    branches: [main, master, develop]
+    branches: ['**']
   pull_request:
 
+# Un push nuevo cancela la ejecución anterior de la misma rama.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  api-quality:
+  verificar:
+    name: Tipos y tests
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/api
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: package-lock.json
-      - name: Install
-        run: npm ci
-        working-directory: .
-      - name: Prisma generate
-        run: npx prisma generate
-      - name: Unit tests (tenant isolation + core)
-        run: npm test -- --coverage=false
-      - name: Typecheck API
-        run: npx tsc --noEmit -p tsconfig.json
-        continue-on-error: true
+    timeout-minutes: 20
 
-  web-build-gate:
-    runs-on: ubuntu-latest
-    needs: api-quality
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: package-lock.json
-      - name: Install
-        run: npm ci
-      - name: Lint web package.json present
-        run: test -f apps/web/package.json
+
+      - name: Instalar dependencias
+        run: npm ci --ignore-scripts
+
+      # El cliente de Prisma se genera desde el esquema; sin esto el typecheck
+      # de la API no tiene los tipos de los modelos.
+      - name: Generar cliente de Prisma
+        run: npx prisma generate --schema apps/api/prisma/schema.prisma
+
+      - name: Tipos · API
+        run: npx tsc --noEmit -p apps/api/tsconfig.json
+
+      - name: Tipos · Web
+        run: npx tsc --noEmit -p apps/web/tsconfig.json
+
+      - name: Tests · API
+        run: npx jest --config apps/api/jest.config.js --rootDir apps/api --runInBand --ci
+
+  fugas:
+    name: Secretos en el código
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # No bloquea TODAVÍA: hoy fallaría siempre porque `seed-demo-users.ts` tiene
+    # 17 contraseñas en claro, y rotarlas exige una decisión de negocio (son
+    # cuentas vivas en producción). El aviso aparece en cada ejecución.
+    #
+    # QUITAR esta línea en cuanto el seeder lea las contraseñas del entorno:
+    # a partir de ahí, cualquier credencial nueva debe romper la construcción.
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # El repositorio es público y hay credenciales en claro dentro del árbol.
+      # Esto las mantiene a la vista y evita que se añadan más sin que nadie
+      # lo note.
+      - name: Buscar credenciales en claro
+        run: |
+          set -o pipefail
+          PATRON="(password|contrasena|secret|api[_-]?key|token)\s*[:=]\s*['\"][^'\"]{8,}['\"]"
+          if grep -rInE "$PATRON" \
+               --include='*.ts' --include='*.tsx' --include='*.js' --include='*.json' \
+               --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=dist \
+               --exclude='*.spec.ts' --exclude='*.test.ts' \
+               . > /tmp/fugas.txt; then
+            echo "::error::Posibles credenciales en claro:"
+            cat /tmp/fugas.txt
+            exit 1
+          fi
+          echo "Sin credenciales en claro."
