@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
@@ -482,7 +482,7 @@ model User {
   // ── Campos RRHH ─────────────────────────────────────────
   puesto                    String?                    @db.VarChar(120)
   tipoContrato              String?                    @db.VarChar(30)
-  estadoRRHH                String?                    @db.VarChar(30)  @default("Activo")
+  estadoRRHH                String?                    @default("Activo") @db.VarChar(30)
   isActive                  Boolean                    @default(true)
   fechaIngreso              DateTime?
   // ── IAM / seguridad de acceso ───────────────────────────
@@ -551,64 +551,68 @@ model User {
   cvsAdminReviewed          CvCandidate[]              @relation("CvAdminReviewedBy")
   cvsSuperadminReviewed     CvCandidate[]              @relation("CvSuperadminReviewedBy")
   companyMemberships        UserCompany[]
+  participacionesActividad  ActivityAssignee[]         @relation("ActivityAssignedUser")
+  reasignacionesDesde       ActivityReassignment[]     @relation("ActivityReassignFrom")
+  reasignacionesHacia       ActivityReassignment[]     @relation("ActivityReassignTo")
+  reasignacionesHechas      ActivityReassignment[]     @relation("ActivityReassignBy")
 
   // === ERP Industrial Relations ===
-  fiscalPeriodsClosed     FiscalPeriod[]         @relation("FiscalPeriodClosedBy")
-  journalEntriesCreated   JournalEntry[]         @relation("JournalEntryCreator")
-  invoicesCreated         Invoice[]              @relation("InvoiceCreator")
-  invoicesMatched         Invoice[]              @relation("InvoiceMatcher")
-  paymentsCreated         Payment[]              @relation("PaymentCreator")
-  reconciliations         BankReconciliation[]   @relation("ReconciliationUser")
-  warehousesManaged       Warehouse[]            @relation("WarehouseManager")
-  stockMovementsCreated   StockMovement[]        @relation("StockMovementCreator")
-  requisitionsRequested   PurchaseRequisition[]  @relation("RequisitionRequester")
-  requisitionsApproved    PurchaseRequisition[]  @relation("RequisitionApprover")
-  purchaseOrdersCreated   PurchaseOrder[]        @relation("PurchaseOrderCreator")
-  purchaseOrdersApproved  PurchaseOrder[]        @relation("PurchaseOrderApprover")
-  goodsReceiptsReceived   GoodsReceipt[]         @relation("GoodsReceiptReceiver")
-  supplierEvaluations     SupplierEvaluation[]   @relation("SupplierEvaluator")
-  bomsApproved            BillOfMaterials[]      @relation("BOMApprover")
-  productionOrdersCreated ProductionOrder[]      @relation("ProductionOrderCreator")
-  productionLogs          ProductionLog[]        @relation("ProductionLogOperator")
-  qualityInspections      QualityInspection[]    @relation("QualityInspector")
-  ncrsReported            NonConformanceReport[] @relation("NCRReportedBy")
-  cycleCountsCreated      CycleCount[]           @relation("CycleCountCreator")
-  cycleCountsClosed       CycleCount[]           @relation("CycleCountCloser")
-  stockReservationsCreated StockReservation[]    @relation("StockReservationCreator")
-  purchaseRfqsCreated     PurchaseRFQ[]          @relation("PurchaseRFQCreator")
-  ncrsAssigned            NonConformanceReport[] @relation("NCRAssignedTo")
-  assetsResponsible       Asset[]                @relation("AssetResponsible")
-  maintenanceAssigned     MaintenanceOrder[]     @relation("MaintenanceAssignee")
-  maintenanceCreated      MaintenanceOrder[]     @relation("MaintenanceCreator")
-  maintenanceContractsOwned MaintenanceContract[] @relation("MaintenanceContractOwner")
+  fiscalPeriodsClosed       FiscalPeriod[]             @relation("FiscalPeriodClosedBy")
+  journalEntriesCreated     JournalEntry[]             @relation("JournalEntryCreator")
+  invoicesCreated           Invoice[]                  @relation("InvoiceCreator")
+  invoicesMatched           Invoice[]                  @relation("InvoiceMatcher")
+  paymentsCreated           Payment[]                  @relation("PaymentCreator")
+  reconciliations           BankReconciliation[]       @relation("ReconciliationUser")
+  warehousesManaged         Warehouse[]                @relation("WarehouseManager")
+  stockMovementsCreated     StockMovement[]            @relation("StockMovementCreator")
+  requisitionsRequested     PurchaseRequisition[]      @relation("RequisitionRequester")
+  requisitionsApproved      PurchaseRequisition[]      @relation("RequisitionApprover")
+  purchaseOrdersCreated     PurchaseOrder[]            @relation("PurchaseOrderCreator")
+  purchaseOrdersApproved    PurchaseOrder[]            @relation("PurchaseOrderApprover")
+  goodsReceiptsReceived     GoodsReceipt[]             @relation("GoodsReceiptReceiver")
+  supplierEvaluations       SupplierEvaluation[]       @relation("SupplierEvaluator")
+  bomsApproved              BillOfMaterials[]          @relation("BOMApprover")
+  productionOrdersCreated   ProductionOrder[]          @relation("ProductionOrderCreator")
+  productionLogs            ProductionLog[]            @relation("ProductionLogOperator")
+  qualityInspections        QualityInspection[]        @relation("QualityInspector")
+  ncrsReported              NonConformanceReport[]     @relation("NCRReportedBy")
+  cycleCountsCreated        CycleCount[]               @relation("CycleCountCreator")
+  cycleCountsClosed         CycleCount[]               @relation("CycleCountCloser")
+  stockReservationsCreated  StockReservation[]         @relation("StockReservationCreator")
+  purchaseRfqsCreated       PurchaseRFQ[]              @relation("PurchaseRFQCreator")
+  ncrsAssigned              NonConformanceReport[]     @relation("NCRAssignedTo")
+  assetsResponsible         Asset[]                    @relation("AssetResponsible")
+  maintenanceAssigned       MaintenanceOrder[]         @relation("MaintenanceAssignee")
+  maintenanceCreated        MaintenanceOrder[]         @relation("MaintenanceCreator")
+  maintenanceContractsOwned MaintenanceContract[]      @relation("MaintenanceContractOwner")
   maintenanceVisitsAssigned MaintenanceContractVisit[] @relation("MaintenanceVisitAssignee")
-  tendersOwned            Tender[]               @relation("TenderOwner")
-  crmActivitiesOwned      CrmActivity[]          @relation("CrmActivityOwner")
-  crmActivitiesCreated    CrmActivity[]          @relation("CrmActivityCreator")
-  salesTargets            SalesTarget[]          @relation("SalesTargetOwner")
-  kbArticlesAuthored      KbArticle[]            @relation("KbArticleAuthor")
-  safetyIncidentsReported SafetyIncident[]       @relation("IncidentReporter")
-  safetyIncidentsAssigned SafetyIncident[]       @relation("IncidentAssignee")
-  workPermitsRequested    WorkPermit[]           @relation("PermitRequester")
-  workPermitsApproved     WorkPermit[]           @relation("PermitApprover")
-  trainingRecords         TrainingRecord[]       @relation("UserTraining")
-  documentsCreated        ManagedDocument[]      @relation("DocumentCreator")
-  documentsApproved       ManagedDocument[]      @relation("DocumentApprover")
-  documentVersionsCreated DocumentVersion[]      @relation("DocumentVersionCreator")
-  chatChannelsCreated     ChatChannel[]          @relation("ChatChannelCreator")
-  chatMemberships         ChatChannelMember[]    @relation("ChatChannelMember")
-  chatMessagesAuthored    ChatMessage[]          @relation("ChatMessageAuthor")
-  chatMessagesPinned      ChatMessage[]          @relation("ChatMessagePinner")
-  chatReactions           ChatMessageReaction[]  @relation("ChatReactionUser")
-  workflowStepsApprover   WorkflowStep[]         @relation("WorkflowStepApprover")
-  workflowsStarted        WorkflowInstance[]     @relation("WorkflowStarter")
-  workflowApprovals       WorkflowApproval[]     @relation("ApprovalDecider")
-  auditLogs               AuditLog[]             @relation("AuditLogUser")
-  preferences             UserPreference[]       @relation("UserPreferences")
-  pushEndpoints           UserPushEndpoint[]
-  sessions                UserSession[]       @relation("UserSessions")
-  webhooksCreated         OutboundWebhook[]   @relation("WebhookCreator")
-  companyApiKeysCreated   CompanyApiKey[]     @relation("CompanyApiKeyCreator")
+  tendersOwned              Tender[]                   @relation("TenderOwner")
+  crmActivitiesOwned        CrmActivity[]              @relation("CrmActivityOwner")
+  crmActivitiesCreated      CrmActivity[]              @relation("CrmActivityCreator")
+  salesTargets              SalesTarget[]              @relation("SalesTargetOwner")
+  kbArticlesAuthored        KbArticle[]                @relation("KbArticleAuthor")
+  safetyIncidentsReported   SafetyIncident[]           @relation("IncidentReporter")
+  safetyIncidentsAssigned   SafetyIncident[]           @relation("IncidentAssignee")
+  workPermitsRequested      WorkPermit[]               @relation("PermitRequester")
+  workPermitsApproved       WorkPermit[]               @relation("PermitApprover")
+  trainingRecords           TrainingRecord[]           @relation("UserTraining")
+  documentsCreated          ManagedDocument[]          @relation("DocumentCreator")
+  documentsApproved         ManagedDocument[]          @relation("DocumentApprover")
+  documentVersionsCreated   DocumentVersion[]          @relation("DocumentVersionCreator")
+  chatChannelsCreated       ChatChannel[]              @relation("ChatChannelCreator")
+  chatMemberships           ChatChannelMember[]        @relation("ChatChannelMember")
+  chatMessagesAuthored      ChatMessage[]              @relation("ChatMessageAuthor")
+  chatMessagesPinned        ChatMessage[]              @relation("ChatMessagePinner")
+  chatReactions             ChatMessageReaction[]      @relation("ChatReactionUser")
+  workflowStepsApprover     WorkflowStep[]             @relation("WorkflowStepApprover")
+  workflowsStarted          WorkflowInstance[]         @relation("WorkflowStarter")
+  workflowApprovals         WorkflowApproval[]         @relation("ApprovalDecider")
+  auditLogs                 AuditLog[]                 @relation("AuditLogUser")
+  preferences               UserPreference[]           @relation("UserPreferences")
+  pushEndpoints             UserPushEndpoint[]
+  sessions                  UserSession[]              @relation("UserSessions")
+  webhooksCreated           OutboundWebhook[]          @relation("WebhookCreator")
+  companyApiKeysCreated     CompanyApiKey[]            @relation("CompanyApiKeyCreator")
 
   // === HR Relations ===
   leaveRequests           LeaveRequest[]      @relation("LeaveRequester")
@@ -617,39 +621,39 @@ model User {
   performanceReviewsGiven PerformanceReview[] @relation("Reviewer")
 
   // === Jerarquía (organigrama) ===
-  managerId        Int?
-  manager          User?   @relation("UserReportsTo", fields: [managerId], references: [id])
-  reportees        User[]  @relation("UserReportsTo")
+  managerId Int?
+  manager   User?  @relation("UserReportsTo", fields: [managerId], references: [id])
+  reportees User[] @relation("UserReportsTo")
 
   // === Contenido autoreado ===
-  caseStudiesAuthored       CaseStudy[]           @relation("CaseStudyAuthor")
-  socialPostsAuthored       SocialPost[]          @relation("SocialPostAuthor")
-  internalComunicadosSent   InternalComunicado[]  @relation("ComunicadoAuthor")
+  caseStudiesAuthored     CaseStudy[]          @relation("CaseStudyAuthor")
+  socialPostsAuthored     SocialPost[]         @relation("SocialPostAuthor")
+  internalComunicadosSent InternalComunicado[] @relation("ComunicadoAuthor")
 
   // === Operational Project Relations ===
   projectsAsVendor OperationalProject[] @relation("ProjectVendor")
   projectEngineers ProjectEngineer[]    @relation("ProjectEngineers")
 
+  @@unique([oidcProvider, oidcSubject])
   @@index([lastLoginAt])
   @@index([isActive, lastLoginAt])
   @@index([lockedUntil])
-  @@unique([oidcProvider, oidcSubject])
 }
 
 /// Sesión JWT activa (jti). Permite force-logout y auditoría de dispositivos.
 model UserSession {
-  id         Int       @id @default(autoincrement())
-  userId     Int
-  jti        String    @unique @db.VarChar(64)
-  device     String?   @db.VarChar(255)
-  ipAddress  String?   @db.VarChar(45)
-  userAgent  String?   @db.VarChar(500)
-  createdAt  DateTime  @default(now())
-  lastSeenAt DateTime  @default(now())
-  expiresAt  DateTime
-  revokedAt  DateTime?
-  revokeReason String? @db.VarChar(120)
-  user       User      @relation("UserSessions", fields: [userId], references: [id], onDelete: Cascade)
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  jti          String    @unique @db.VarChar(64)
+  device       String?   @db.VarChar(255)
+  ipAddress    String?   @db.VarChar(45)
+  userAgent    String?   @db.VarChar(500)
+  createdAt    DateTime  @default(now())
+  lastSeenAt   DateTime  @default(now())
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  revokeReason String?   @db.VarChar(120)
+  user         User      @relation("UserSessions", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, revokedAt])
   @@index([expiresAt])
@@ -808,6 +812,14 @@ model Activity {
   vehicleControls         VehicleControl[]
   Viatico                 Viatico[]
   inventorySnapshot       InventorySnapshot?
+  /// Equipo asignado. `responsableId` sigue siendo el líder.
+  assignees               ActivityAssignee[]
+  /// Historial de reasignaciones (quién la tenía, quién la movió y por qué).
+  reassignments           ActivityReassignment[]
+  /// Material consumido en el servicio.
+  stockMovements          StockMovement[]
+  /// Facturas emitidas por este servicio.
+  invoices                Invoice[]
   deletedAt               DateTime?
   companyId               Int
   company                 CompanyProfile          @relation(fields: [companyId], references: [id], onDelete: Restrict)
@@ -832,33 +844,33 @@ enum TicketType {
 }
 
 model ServiceClient {
-  id                  Int                      @id @default(autoincrement())
-  name                String                   @db.VarChar(200)
-  logoUrl             String?                  @db.VarChar(500)
-  contactName         String?                  @db.VarChar(160)
-  contactEmail        String?                  @db.VarChar(200)
-  contactPhone        String?                  @db.VarChar(60)
-  address             String?                  @db.VarChar(220)
-  city                String?                  @db.VarChar(120)
-  state               String?                  @db.VarChar(120)
-  country             String?                  @db.VarChar(80)
-  accountCode         String?                  @db.VarChar(80)
-  portalEmail         String?                  @db.VarChar(200)
-  portalPasswordHash  String?
-  reportUrl           String?                  @db.VarChar(500)
-  reportGeneratedAt   DateTime?
-  isActive            Boolean                  @default(true)
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
-  companyId           Int
-  company             CompanyProfile           @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  activities          Activity[]
-  branches            ServiceClientBranch[]
-  ticketRequests      ClientTicketRequest[]
-  feedbacks           ClientActivityFeedback[]
-  salesClients        SalesClient[]
-  inventorySnapshots  InventorySnapshot[]
-  operationalProjects OperationalProject[]
+  id                   Int                      @id @default(autoincrement())
+  name                 String                   @db.VarChar(200)
+  logoUrl              String?                  @db.VarChar(500)
+  contactName          String?                  @db.VarChar(160)
+  contactEmail         String?                  @db.VarChar(200)
+  contactPhone         String?                  @db.VarChar(60)
+  address              String?                  @db.VarChar(220)
+  city                 String?                  @db.VarChar(120)
+  state                String?                  @db.VarChar(120)
+  country              String?                  @db.VarChar(80)
+  accountCode          String?                  @db.VarChar(80)
+  portalEmail          String?                  @db.VarChar(200)
+  portalPasswordHash   String?
+  reportUrl            String?                  @db.VarChar(500)
+  reportGeneratedAt    DateTime?
+  isActive             Boolean                  @default(true)
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  companyId            Int
+  company              CompanyProfile           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  activities           Activity[]
+  branches             ServiceClientBranch[]
+  ticketRequests       ClientTicketRequest[]
+  feedbacks            ClientActivityFeedback[]
+  salesClients         SalesClient[]
+  inventorySnapshots   InventorySnapshot[]
+  operationalProjects  OperationalProject[]
   maintenanceContracts MaintenanceContract[]
 
   @@unique([companyId, portalEmail])
@@ -881,29 +893,29 @@ enum ClientTicketStatus {
 }
 
 model ServiceClientBranch {
-  id                 Int                   @id @default(autoincrement())
-  clientId           Int
-  branchNumber       String?               @db.VarChar(60)
-  name               String                @db.VarChar(180)
-  address            String?               @db.VarChar(220)
-  city               String?               @db.VarChar(120)
-  state              String?               @db.VarChar(120)
-  country            String?               @db.VarChar(80)
-  placeId            String?               @db.VarChar(180)
-  latitud            Decimal?              @db.Decimal(10, 8)
-  longitud           Decimal?              @db.Decimal(11, 8)
-  portalEmail        String?               @db.VarChar(200)
-  portalPasswordHash String?
-  logoUrl            String?               @db.VarChar(500)
-  isActive           Boolean               @default(true)
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  client             ServiceClient         @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  ticketRequests     ClientTicketRequest[]
-  inventorySnapshots InventorySnapshot[]
+  id                   Int                   @id @default(autoincrement())
+  clientId             Int
+  branchNumber         String?               @db.VarChar(60)
+  name                 String                @db.VarChar(180)
+  address              String?               @db.VarChar(220)
+  city                 String?               @db.VarChar(120)
+  state                String?               @db.VarChar(120)
+  country              String?               @db.VarChar(80)
+  placeId              String?               @db.VarChar(180)
+  latitud              Decimal?              @db.Decimal(10, 8)
+  longitud             Decimal?              @db.Decimal(11, 8)
+  portalEmail          String?               @db.VarChar(200)
+  portalPasswordHash   String?
+  logoUrl              String?               @db.VarChar(500)
+  isActive             Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  client               ServiceClient         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  ticketRequests       ClientTicketRequest[]
+  inventorySnapshots   InventorySnapshot[]
   maintenanceContracts MaintenanceContract[]
-  companyId          Int
-  company            CompanyProfile        @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  companyId            Int
+  company              CompanyProfile        @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([clientId, branchNumber])
   @@unique([companyId, portalEmail])
@@ -1033,20 +1045,20 @@ model ClientActivityFeedback {
 }
 
 model ServiceSheet {
-  id            Int      @id @default(autoincrement())
-  activityId    Int      @unique
-  managerName   String?  @db.VarChar(160)
-  managerRole   String?  @db.VarChar(160)
+  id            Int            @id @default(autoincrement())
+  activityId    Int            @unique
+  managerName   String?        @db.VarChar(160)
+  managerRole   String?        @db.VarChar(160)
   workSummary   String?
   equipmentList Json?
   observations  String?
-  signedName    String?  @db.VarChar(160)
-  pdfUrl        String?  @db.VarChar(500)
+  signedName    String?        @db.VarChar(160)
+  pdfUrl        String?        @db.VarChar(500)
   survey        Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   companyId     Int
-  activity      Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  activity      Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
   company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([companyId])
@@ -1054,26 +1066,26 @@ model ServiceSheet {
 }
 
 model Evidence {
-  id                     Int             @id @default(autoincrement())
+  id                     Int            @id @default(autoincrement())
   actividadId            Int
-  tipoEvidencia          String          @db.VarChar(50)
+  tipoEvidencia          String         @db.VarChar(50)
   archivoUrl             String
-  aprobada               Boolean         @default(false)
-  estatus                String          @default("Pendiente") @db.VarChar(50)
-  comentarios            String?         @db.Text
-  observacionesRevision  String?         @db.Text
-  calificacionEficiencia String?         @db.VarChar(20)
-  latitud                Decimal?        @db.Decimal(10, 8)
-  longitud               Decimal?        @db.Decimal(11, 8)
+  aprobada               Boolean        @default(false)
+  estatus                String         @default("Pendiente") @db.VarChar(50)
+  comentarios            String?        @db.Text
+  observacionesRevision  String?        @db.Text
+  calificacionEficiencia String?        @db.VarChar(20)
+  latitud                Decimal?       @db.Decimal(10, 8)
+  longitud               Decimal?       @db.Decimal(11, 8)
   aprobadoPorId          Int?
   revisadoEn             DateTime?
-  subidoEn               DateTime        @default(now())
+  subidoEn               DateTime       @default(now())
   userId                 Int?
   companyId              Int
-  actividad              Activity        @relation(fields: [actividadId], references: [id], onDelete: Cascade)
-  user                   User?           @relation(fields: [userId], references: [id])
-  aprobadoPor            User?           @relation("EvidenceApprover", fields: [aprobadoPorId], references: [id])
-  company                CompanyProfile  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  actividad              Activity       @relation(fields: [actividadId], references: [id], onDelete: Cascade)
+  user                   User?          @relation(fields: [userId], references: [id])
+  aprobadoPor            User?          @relation("EvidenceApprover", fields: [aprobadoPorId], references: [id])
+  company                CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([companyId])
   @@index([actividadId])
@@ -1123,8 +1135,8 @@ model ActivityEvidence {
   reviewedById          Int? // Usuario que revisó
   correctionSubmittedAt DateTime? // Fecha de corrección del usuario
 
-  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
-  reviewedBy User?    @relation(fields: [reviewedById], references: [id], onDelete: SetNull)
+  activity   Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  reviewedBy User?          @relation(fields: [reviewedById], references: [id], onDelete: SetNull)
   companyId  Int
   company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
@@ -1133,35 +1145,35 @@ model ActivityEvidence {
 }
 
 model VehicleControl {
-  id                         Int           @id @default(autoincrement())
+  id                         Int            @id @default(autoincrement())
   actividadId                Int
   vehicleId                  Int?
   solicitanteId              Int
-  nombreVehiculo             String?       @db.VarChar(100)
-  placasVehiculo             String?       @db.VarChar(20)
+  nombreVehiculo             String?        @db.VarChar(100)
+  placasVehiculo             String?        @db.VarChar(20)
   motivoUso                  String?
-  estatusAprobacion          String        @default("Pendiente") @db.VarChar(30)
+  estatusAprobacion          String         @default("Pendiente") @db.VarChar(30)
   evidenciaEntregaUrl        String?
   evidenciaDevolucionUrl     String?
   entregaFotos               Json?
-  entregaEstatus             String        @default("Pendiente") @db.VarChar(30)
+  entregaEstatus             String         @default("Pendiente") @db.VarChar(30)
   entregaObservaciones       String?
-  entregaAprobada            Boolean       @default(false)
+  entregaAprobada            Boolean        @default(false)
   entregaRevisadoPorId       Int?
   entregaRevisadoEn          DateTime?
-  fechaSolicitud             DateTime      @default(now())
+  fechaSolicitud             DateTime       @default(now())
   fechaInicioSolicitada      DateTime?
   fechaFinSolicitada         DateTime?
   fechaInicioAprobada        DateTime?
   fechaFinAprobada           DateTime?
   renovacionSolicitadaInicio DateTime?
   renovacionSolicitadaFin    DateTime?
-  renovacionEstatus          String?       @db.VarChar(30)
-  penalizacionMonto          Decimal?      @db.Decimal(10, 2)
+  renovacionEstatus          String?        @db.VarChar(30)
+  penalizacionMonto          Decimal?       @db.Decimal(10, 2)
   penalizacionNotas          String?
   fechaInicio                DateTime?
   fechaFin                   DateTime?
-  approvalStep               Int           @default(0)
+  approvalStep               Int            @default(0)
   approvalTrail              Json?
   odometroInicio             Int?
   odometroFin                Int?
@@ -1169,10 +1181,10 @@ model VehicleControl {
   combustibleFinPct          Int?
   fotosSalida                Json?
   fotosDevolucion            Json?
-  actividad                  Activity      @relation(fields: [actividadId], references: [id])
-  solicitante                User          @relation("SolicitanteVehiculo", fields: [solicitanteId], references: [id])
-  vehiculo                   VehicleAsset? @relation(fields: [vehicleId], references: [id])
-  entregaRevisadoPor         User?         @relation("VehicleDeliveryReviewer", fields: [entregaRevisadoPorId], references: [id])
+  actividad                  Activity       @relation(fields: [actividadId], references: [id])
+  solicitante                User           @relation("SolicitanteVehiculo", fields: [solicitanteId], references: [id])
+  vehiculo                   VehicleAsset?  @relation(fields: [vehicleId], references: [id])
+  entregaRevisadoPor         User?          @relation("VehicleDeliveryReviewer", fields: [entregaRevisadoPorId], references: [id])
   companyId                  Int
   company                    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
@@ -1180,55 +1192,55 @@ model VehicleControl {
 }
 
 model VehicleAsset {
-  id                  Int              @id @default(autoincrement())
-  nombre              String           @db.VarChar(100)
-  placas              String?          @db.VarChar(20)
-  estatus             String           @default("Disponible") @db.VarChar(30)
-  activo              Boolean          @default(true)
-  notas               String?
-  companyId           Int
+  id               Int              @id @default(autoincrement())
+  nombre           String           @db.VarChar(100)
+  placas           String?          @db.VarChar(20)
+  estatus          String           @default("Disponible") @db.VarChar(30)
+  activo           Boolean          @default(true)
+  notas            String?
+  companyId        Int
   // Checkout / return tracking
-  assignedToId        Int?
-  assignedAt          DateTime?
-  salidaFotos         Json?            // before-checkout photos array
-  devolucionFotos     Json?            // after-return photos array
-  tiempoUsoMinutos    Int?             // computed on return
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
-  company             CompanyProfile   @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  controles           VehicleControl[]
-  viaticos            Viatico[]
-  assignedTo          User?            @relation("VehicleAssetAssigned", fields: [assignedToId], references: [id])
+  assignedToId     Int?
+  assignedAt       DateTime?
+  salidaFotos      Json? // before-checkout photos array
+  devolucionFotos  Json? // after-return photos array
+  tiempoUsoMinutos Int? // computed on return
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  company          CompanyProfile   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  controles        VehicleControl[]
+  viaticos         Viatico[]
+  assignedTo       User?            @relation("VehicleAssetAssigned", fields: [assignedToId], references: [id])
 
   @@index([companyId])
 }
 
 model Expense {
-  id                 Int       @id @default(autoincrement())
+  id                 Int            @id @default(autoincrement())
   actividadId        Int
   usuarioId          Int
-  montoSolicitado    Decimal   @db.Decimal(10, 2)
+  montoSolicitado    Decimal        @db.Decimal(10, 2)
   /// Texto libre (OPS campo) o fallback legacy
   razonGasto         String?
   /// Gastos administrativos tipados
-  isAdministrative   Boolean   @default(false)
-  concepto           String?   @db.VarChar(255)
-  categoria          String?   @db.VarChar(40)
-  esRecurrente       Boolean   @default(false)
+  isAdministrative   Boolean        @default(false)
+  concepto           String?        @db.VarChar(255)
+  categoria          String?        @db.VarChar(40)
+  esRecurrente       Boolean        @default(false)
   fechaGasto         DateTime?
-  contabilidadRef    String?   @db.VarChar(120)
+  contabilidadRef    String?        @db.VarChar(120)
   journalEntryId     Int?
   companyId          Int
   createdById        Int?
   ticketEvidenciaUrl String?
   /// Pendiente | Aprobado | Pagado | Rechazado
-  estatusPago        String    @default("Pendiente") @db.VarChar(30)
-  fechaSolicitud     DateTime  @default(now())
+  estatusPago        String         @default("Pendiente") @db.VarChar(30)
+  fechaSolicitud     DateTime       @default(now())
   deletedAt          DateTime?
-  actividad          Activity  @relation(fields: [actividadId], references: [id])
-  usuario            User      @relation(fields: [usuarioId], references: [id])
-  createdBy          User?     @relation("ExpenseCreator", fields: [createdById], references: [id])
-  journalEntry       JournalEntry? @relation(fields: [journalEntryId], references: [id])
+  actividad          Activity       @relation(fields: [actividadId], references: [id])
+  usuario            User           @relation(fields: [usuarioId], references: [id])
+  createdBy          User?          @relation("ExpenseCreator", fields: [createdById], references: [id])
+  journalEntry       JournalEntry?  @relation(fields: [journalEntryId], references: [id])
   company            CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([isAdministrative, estatusPago, fechaSolicitud])
@@ -1237,50 +1249,50 @@ model Expense {
 }
 
 model LocationTracking {
-  id                  Int       @id @default(autoincrement())
+  id                  Int            @id @default(autoincrement())
   usuarioId           Int
   actividadId         Int?
-  latitud             Decimal   @db.Decimal(10, 8)
-  longitud            Decimal   @db.Decimal(11, 8)
-  velocidadKmh        Decimal?  @db.Decimal(5, 2)
-  estaActivo          Boolean   @default(true)
-  ultimaActualizacion DateTime  @default(now())
+  latitud             Decimal        @db.Decimal(10, 8)
+  longitud            Decimal        @db.Decimal(11, 8)
+  velocidadKmh        Decimal?       @db.Decimal(5, 2)
+  estaActivo          Boolean        @default(true)
+  ultimaActualizacion DateTime       @default(now())
   companyId           Int
-  actividad           Activity? @relation(fields: [actividadId], references: [id])
-  usuario             User      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  actividad           Activity?      @relation(fields: [actividadId], references: [id])
+  usuario             User           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   company             CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([companyId])
 }
 
 model Viatico {
-  id                 Int           @id @default(autoincrement())
+  id                 Int            @id @default(autoincrement())
   usuarioId          Int
   actividadId        Int?
   projectId          Int?
   vehicleId          Int?
   /// COMBUSTIBLE | CASETA | HOSPEDAJE | ALIMENTACION | TRANSPORTE | OTROS
-  categoria          String?       @db.VarChar(40)
+  categoria          String?        @db.VarChar(40)
   /// SOLICITUD (usuario pide) | ASIGNACION (manager asigna a usuario/actividad/proyecto)
-  origen             String        @default("SOLICITUD") @db.VarChar(20)
+  origen             String         @default("SOLICITUD") @db.VarChar(20)
   asignadoPorId      Int?
-  montoSolicitado    Decimal       @db.Decimal(10, 2)
-  motivo             String?       @db.VarChar(255)
+  montoSolicitado    Decimal        @db.Decimal(10, 2)
+  motivo             String?        @db.VarChar(255)
   ticketEvidenciaUrl String?
-  estatus            String        @default("Pendiente") @db.VarChar(30)
-  approvalStep       Int           @default(0)
+  estatus            String         @default("Pendiente") @db.VarChar(30)
+  approvalStep       Int            @default(0)
   approvalTrail      Json?
-  contabilidadRef    String?       @db.VarChar(120)
+  contabilidadRef    String?        @db.VarChar(120)
   journalEntryId     Int?
   companyId          Int
-  fechaSolicitud     DateTime      @default(now())
+  fechaSolicitud     DateTime       @default(now())
   deletedAt          DateTime?
-  Activity           Activity?     @relation(fields: [actividadId], references: [id])
-  User               User          @relation(fields: [usuarioId], references: [id])
-  asignadoPor        User?         @relation("ViaticoAsignadoPor", fields: [asignadoPorId], references: [id])
-  project            SalesProject? @relation(fields: [projectId], references: [id])
-  vehicle            VehicleAsset? @relation(fields: [vehicleId], references: [id])
-  journalEntry       JournalEntry? @relation(fields: [journalEntryId], references: [id])
+  Activity           Activity?      @relation(fields: [actividadId], references: [id])
+  User               User           @relation(fields: [usuarioId], references: [id])
+  asignadoPor        User?          @relation("ViaticoAsignadoPor", fields: [asignadoPorId], references: [id])
+  project            SalesProject?  @relation(fields: [projectId], references: [id])
+  vehicle            VehicleAsset?  @relation(fields: [vehicleId], references: [id])
+  journalEntry       JournalEntry?  @relation(fields: [journalEntryId], references: [id])
   company            CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([projectId, fechaSolicitud])
@@ -1356,28 +1368,28 @@ model LunchBreak {
 }
 
 model EmployeePayment {
-  id             Int       @id @default(autoincrement())
-  userId         Int
-  periodFrom     DateTime  @db.Date
-  periodTo       DateTime  @db.Date
-  totalMinutes   Int       @default(0)
-  amount         Decimal   @db.Decimal(12, 2)
-  concepto       String?   @db.VarChar(255)
-  note           String?
+  id              Int            @id @default(autoincrement())
+  userId          Int
+  periodFrom      DateTime       @db.Date
+  periodTo        DateTime       @db.Date
+  totalMinutes    Int            @default(0)
+  amount          Decimal        @db.Decimal(12, 2)
+  concepto        String?        @db.VarChar(255)
+  note            String?
   /// Borrador | Pagado | Anulado
-  status         String    @default("Pagado") @db.VarChar(30)
-  paidAt         DateTime?
-  contabilidadRef String?  @db.VarChar(120)
+  status          String         @default("Pagado") @db.VarChar(30)
+  paidAt          DateTime?
+  contabilidadRef String?        @db.VarChar(120)
   journalEntryId  Int?
   companyId       Int
-  evidenceUrls   String[]  @default([])
-  createdAt      DateTime  @default(now())
-  createdById    Int?
-  deletedAt      DateTime?
-  user           User      @relation(fields: [userId], references: [id])
-  createdBy      User?     @relation("EmployeePaymentCreator", fields: [createdById], references: [id])
-  journalEntry   JournalEntry? @relation(fields: [journalEntryId], references: [id])
-  company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  evidenceUrls    String[]       @default([])
+  createdAt       DateTime       @default(now())
+  createdById     Int?
+  deletedAt       DateTime?
+  user            User           @relation(fields: [userId], references: [id])
+  createdBy       User?          @relation("EmployeePaymentCreator", fields: [createdById], references: [id])
+  journalEntry    JournalEntry?  @relation(fields: [journalEntryId], references: [id])
+  company         CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([status, periodFrom])
   @@index([companyId])
@@ -1629,10 +1641,10 @@ model Cotizacion {
   opportunity    SalesOpportunity?       @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
   salesQuotes    SalesOpportunityQuote[]
 
+  @@unique([companyId, quoteNumber])
   @@index([salesClientId])
   @@index([opportunityId])
   @@index([companyId])
-  @@unique([companyId, quoteNumber])
   @@map("cotizaciones")
 }
 
@@ -1845,52 +1857,52 @@ model SalesOpportunityQuote {
 }
 
 model SalesProject {
-  id             Int                @id @default(autoincrement())
-  opportunityId  Int
-  name           String             @db.VarChar(220)
-  projectType    ServiceProjectType @default(OTRO)
-  scopeSummary   String?
-  siteCount      Int?
-  budget         Decimal            @default(0) @db.Decimal(14, 2)
-  costProducts   Decimal            @default(0) @db.Decimal(14, 2)
-  costViaticos   Decimal            @default(0) @db.Decimal(14, 2)
-  costOperativo  Decimal            @default(0) @db.Decimal(14, 2)
-  margin         Decimal            @default(0) @db.Decimal(14, 2)
-  status         SalesProjectStatus @default(PLANNED)
-  startDate      DateTime?
-  endDate        DateTime?
-  closureOrderId Int?
-  companyId      Int
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  opportunity    SalesOpportunity   @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
-  closureOrder   SalesProjectOrder? @relation("ProjectOrder")
+  id                 Int                 @id @default(autoincrement())
+  opportunityId      Int
+  name               String              @db.VarChar(220)
+  projectType        ServiceProjectType  @default(OTRO)
+  scopeSummary       String?
+  siteCount          Int?
+  budget             Decimal             @default(0) @db.Decimal(14, 2)
+  costProducts       Decimal             @default(0) @db.Decimal(14, 2)
+  costViaticos       Decimal             @default(0) @db.Decimal(14, 2)
+  costOperativo      Decimal             @default(0) @db.Decimal(14, 2)
+  margin             Decimal             @default(0) @db.Decimal(14, 2)
+  status             SalesProjectStatus  @default(PLANNED)
+  startDate          DateTime?
+  endDate            DateTime?
+  closureOrderId     Int?
+  companyId          Int
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  opportunity        SalesOpportunity    @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  closureOrder       SalesProjectOrder?  @relation("ProjectOrder")
   /// Faceta operativa (OPS) del mismo proyecto — 0..1
   operationalProject OperationalProject? @relation("SalesOperationalHandoff")
-  viaticos       Viatico[]
-  company        CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  viaticos           Viatico[]
+  company            CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([companyId])
   @@map("sales_projects")
 }
 
 model SalesProjectOrder {
-  id          Int                    @id @default(autoincrement())
-  projectId   Int                    @unique
-  orderId     String                 @db.VarChar(40)
+  id          Int                     @id @default(autoincrement())
+  projectId   Int                     @unique
+  orderId     String                  @db.VarChar(40)
   quoteId     Int?
-  orderPdfUrl String?                @db.VarChar(500)
-  status      String                 @default("OPEN") @db.VarChar(40)
+  orderPdfUrl String?                 @db.VarChar(500)
+  status      String                  @default("OPEN") @db.VarChar(40)
   templateId  Int?
   createdById Int?
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
   companyId   Int
-  project     SalesProject           @relation("ProjectOrder", fields: [projectId], references: [id], onDelete: Cascade)
-  quote       SalesOpportunityQuote? @relation(fields: [quoteId], references: [id])
-  template    OrderTemplate?         @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  createdBy   User?                  @relation("SalesProjectOrderCreator", fields: [createdById], references: [id])
-  company     CompanyProfile         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  project     SalesProject            @relation("ProjectOrder", fields: [projectId], references: [id], onDelete: Cascade)
+  quote       SalesOpportunityQuote?  @relation(fields: [quoteId], references: [id])
+  template    OrderTemplate?          @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  createdBy   User?                   @relation("SalesProjectOrderCreator", fields: [createdById], references: [id])
+  company     CompanyProfile          @relation(fields: [companyId], references: [id], onDelete: Restrict)
   lines       SalesProjectOrderLine[]
   invoices    Invoice[]
 
@@ -2111,9 +2123,9 @@ model Notification {
   createdAt       DateTime         @default(now())
 
   // Relaciones
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  triggerUser User?            @relation("NotificationTriggeredBy", fields: [triggerUserId], references: [id], onDelete: SetNull)
-  company     CompanyProfile?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  triggerUser User?           @relation("NotificationTriggeredBy", fields: [triggerUserId], references: [id], onDelete: SetNull)
+  company     CompanyProfile? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   @@index([userId, isRead, createdAt])
   @@index([userId, category])
@@ -2123,23 +2135,23 @@ model Notification {
 }
 
 model Fine {
-  id            Int       @id @default(autoincrement())
-  usuarioId     Int
-  tipo          String    @db.VarChar(50) // "actividad", "vehiculo", "asistencia", "herramienta"
-  razon         String    @db.VarChar(100)
-  descripcion   String?   @db.Text
-  monto         Decimal   @db.Decimal(10, 2)
-  referenciaId  Int? // id de la actividad, vehiculo, etc.
-  estatusPago   String    @default("Pendiente") @db.VarChar(30)
-  estatusAprobacion String @default("Pendiente") @db.VarChar(30)
-  approvalStep  Int       @default(0)
-  approvalTrail Json?
-  fechaCreacion DateTime  @default(now())
-  fechaPago     DateTime?
-  notas         String?
-  companyId     Int
-  usuario       User           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  id                Int            @id @default(autoincrement())
+  usuarioId         Int
+  tipo              String         @db.VarChar(50) // "actividad", "vehiculo", "asistencia", "herramienta"
+  razon             String         @db.VarChar(100)
+  descripcion       String?        @db.Text
+  monto             Decimal        @db.Decimal(10, 2)
+  referenciaId      Int? // id de la actividad, vehiculo, etc.
+  estatusPago       String         @default("Pendiente") @db.VarChar(30)
+  estatusAprobacion String         @default("Pendiente") @db.VarChar(30)
+  approvalStep      Int            @default(0)
+  approvalTrail     Json?
+  fechaCreacion     DateTime       @default(now())
+  fechaPago         DateTime?
+  notas             String?
+  companyId         Int
+  usuario           User           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  company           CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([usuarioId, tipo, estatusPago])
   @@index([companyId])
@@ -2307,17 +2319,17 @@ model ToolKitEvent {
 }
 
 model ToolRenewal {
-  id                 Int            @id @default(autoincrement())
+  id                 Int           @id @default(autoincrement())
   toolRequestId      Int
   previousReturnDate DateTime // Fecha de devolución anterior
   newReturnDate      DateTime // Nueva fecha de devolución
-  renewalReason      String?        @db.Text // Razón de la renovación
+  renewalReason      String?       @db.Text // Razón de la renovación
   approvedBy         Int? // Usuario admin que aprobó
-  requestDate        DateTime       @default(now()) // Fecha de solicitud de renovación
+  requestDate        DateTime      @default(now()) // Fecha de solicitud de renovación
   approvalDate       DateTime? // Fecha de aprobación
-  status             RenewalStatus  @default(PENDING)
+  status             RenewalStatus @default(PENDING)
   companyId          Int
-  createdAt          DateTime       @default(now())
+  createdAt          DateTime      @default(now())
 
   toolRequest ToolRequest    @relation("ToolRequestRenewals", fields: [toolRequestId], references: [id], onDelete: Cascade)
   approver    User?          @relation("AdminRenewals", fields: [approvedBy], references: [id])
@@ -2542,31 +2554,31 @@ model FiscalPeriod {
 }
 
 model JournalEntry {
-  id             Int                @id @default(autoincrement())
-  entryNumber    String             @db.VarChar(30)
-  date           DateTime           @db.Date
-  description    String
-  reference      String?            @db.VarChar(100)
-  status         JournalEntryStatus @default(DRAFT)
-  fiscalPeriodId Int?
-  reversalOfId   Int?               @unique
-  totalDebit     Decimal            @default(0) @db.Decimal(16, 2)
-  totalCredit    Decimal            @default(0) @db.Decimal(16, 2)
-  createdById    Int?
-  postedAt       DateTime?
-  companyId      Int
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  fiscalPeriod   FiscalPeriod?      @relation(fields: [fiscalPeriodId], references: [id])
-  reversalOf     JournalEntry?      @relation("JournalReversal", fields: [reversalOfId], references: [id])
-  reversedBy     JournalEntry?      @relation("JournalReversal")
-  createdBy      User?              @relation("JournalEntryCreator", fields: [createdById], references: [id])
-  company        CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  lines          JournalEntryLine[]
-  expenses       Expense[]
-  viaticos       Viatico[]
+  id               Int                @id @default(autoincrement())
+  entryNumber      String             @db.VarChar(30)
+  date             DateTime           @db.Date
+  description      String
+  reference        String?            @db.VarChar(100)
+  status           JournalEntryStatus @default(DRAFT)
+  fiscalPeriodId   Int?
+  reversalOfId     Int?               @unique
+  totalDebit       Decimal            @default(0) @db.Decimal(16, 2)
+  totalCredit      Decimal            @default(0) @db.Decimal(16, 2)
+  createdById      Int?
+  postedAt         DateTime?
+  companyId        Int
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  fiscalPeriod     FiscalPeriod?      @relation(fields: [fiscalPeriodId], references: [id])
+  reversalOf       JournalEntry?      @relation("JournalReversal", fields: [reversalOfId], references: [id])
+  reversedBy       JournalEntry?      @relation("JournalReversal")
+  createdBy        User?              @relation("JournalEntryCreator", fields: [createdById], references: [id])
+  company          CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  lines            JournalEntryLine[]
+  expenses         Expense[]
+  viaticos         Viatico[]
   employeePayments EmployeePayment[]
-  goodsReceipts  GoodsReceipt[]
+  goodsReceipts    GoodsReceipt[]
 
   @@unique([companyId, entryNumber])
   @@unique([companyId, reference])
@@ -2616,58 +2628,62 @@ model CostCenter {
 }
 
 model Invoice {
-  id               Int               @id @default(autoincrement())
-  invoiceNumber    String            @db.VarChar(40)
-  type             InvoiceType
-  status           InvoiceStatus     @default(DRAFT)
-  issueDate        DateTime          @db.Date
-  dueDate          DateTime          @db.Date
-  clientId         Int?
-  supplierId       Int?
-  subtotal         Decimal           @default(0) @db.Decimal(14, 2)
-  taxAmount        Decimal           @default(0) @db.Decimal(14, 2)
-  totalAmount      Decimal           @default(0) @db.Decimal(14, 2)
-  paidAmount       Decimal           @default(0) @db.Decimal(14, 2)
-  currency         String            @default("MXN") @db.VarChar(10)
-  notes            String?
+  id                  Int                @id @default(autoincrement())
+  invoiceNumber       String             @db.VarChar(40)
+  type                InvoiceType
+  status              InvoiceStatus      @default(DRAFT)
+  issueDate           DateTime           @db.Date
+  dueDate             DateTime           @db.Date
+  clientId            Int?
+  supplierId          Int?
+  subtotal            Decimal            @default(0) @db.Decimal(14, 2)
+  taxAmount           Decimal            @default(0) @db.Decimal(14, 2)
+  totalAmount         Decimal            @default(0) @db.Decimal(14, 2)
+  paidAmount          Decimal            @default(0) @db.Decimal(14, 2)
+  currency            String             @default("MXN") @db.VarChar(10)
+  notes               String?
   // ── CFDI 4.0 / SAT fields ──
-  cfdiUuid         String?           @db.VarChar(80)
-  cfdiXml          String?
-  pdfUrl           String?           @db.VarChar(500)
-  cfdiVersion      String?           @default("4.0") @db.VarChar(5)
-  cfdiSerie        String?           @db.VarChar(25)
-  cfdiFolio        String?           @db.VarChar(40)
-  cfdiUsage        CfdiUsage?        @default(G03)
-  satPaymentForm   SatPaymentForm?   @default(FP99)
-  satPaymentMethod SatPaymentMethod? @default(PUE)
-  emisorRfc        String?           @db.VarChar(13)
-  emisorName       String?           @db.VarChar(300)
-  emisorRegime     FiscalRegime?     @default(R601)
-  receptorRfc      String?           @db.VarChar(13)
-  receptorName     String?           @db.VarChar(300)
-  receptorRegime   FiscalRegime?
-  receptorZipCode  String?           @db.VarChar(5)
-  exchangeRate     Decimal?          @db.Decimal(10, 4)
-  cfdiStampDate    DateTime?
-  satCertNumber    String?           @db.VarChar(30)
-  cfdiRelationType String?           @db.VarChar(5)
-  cfdiRelatedUuids String? // Comma-separated UUIDs of related CFDI
-  isCancelled      Boolean           @default(false)
-  cancelledAt      DateTime?
-  cancelReason     String?           @db.VarChar(5)
-  substitutionUuid String?           @db.VarChar(80)
+  cfdiUuid            String?            @db.VarChar(80)
+  cfdiXml             String?
+  pdfUrl              String?            @db.VarChar(500)
+  cfdiVersion         String?            @default("4.0") @db.VarChar(5)
+  cfdiSerie           String?            @db.VarChar(25)
+  cfdiFolio           String?            @db.VarChar(40)
+  cfdiUsage           CfdiUsage?         @default(G03)
+  satPaymentForm      SatPaymentForm?    @default(FP99)
+  satPaymentMethod    SatPaymentMethod?  @default(PUE)
+  emisorRfc           String?            @db.VarChar(13)
+  emisorName          String?            @db.VarChar(300)
+  emisorRegime        FiscalRegime?      @default(R601)
+  receptorRfc         String?            @db.VarChar(13)
+  receptorName        String?            @db.VarChar(300)
+  receptorRegime      FiscalRegime?
+  receptorZipCode     String?            @db.VarChar(5)
+  exchangeRate        Decimal?           @db.Decimal(10, 4)
+  cfdiStampDate       DateTime?
+  satCertNumber       String?            @db.VarChar(30)
+  cfdiRelationType    String?            @db.VarChar(5)
+  cfdiRelatedUuids    String? // Comma-separated UUIDs of related CFDI
+  isCancelled         Boolean            @default(false)
+  cancelledAt         DateTime?
+  cancelReason        String?            @db.VarChar(5)
+  substitutionUuid    String?            @db.VarChar(80)
   // ── end CFDI ──
-  createdById      Int?
-  companyId        Int
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  deletedAt        DateTime?
-  client           SalesClient?      @relation(fields: [clientId], references: [id])
-  supplier         Supplier?         @relation("SupplierInvoices", fields: [supplierId], references: [id])
-  createdBy        User?             @relation("InvoiceCreator", fields: [createdById], references: [id])
-  company          CompanyProfile    @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  items            InvoiceItem[]
-  payments         Payment[]
+  createdById         Int?
+  companyId           Int
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  deletedAt           DateTime?
+  client              SalesClient?       @relation(fields: [clientId], references: [id])
+  supplier            Supplier?          @relation("SupplierInvoices", fields: [supplierId], references: [id])
+  createdBy           User?              @relation("InvoiceCreator", fields: [createdById], references: [id])
+  company             CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  items               InvoiceItem[]
+  payments            Payment[]
+  /// Servicio facturado. Permite responder "¿qué trabajo cerrado sigue sin
+  /// facturar?", que antes no tenía camino de datos.
+  activityId          Int?
+  activity            Activity?          @relation(fields: [activityId], references: [id], onDelete: SetNull)
   salesProjectOrderId Int?
   salesProjectOrder   SalesProjectOrder? @relation(fields: [salesProjectOrderId], references: [id], onDelete: SetNull)
   purchaseOrderId     Int?
@@ -2680,10 +2696,10 @@ model Invoice {
   matchNotes          String?            @db.VarChar(500)
   matchedBy           User?              @relation("InvoiceMatcher", fields: [matchedById], references: [id])
 
-  @@index([type, status])
-  @@index([dueDate])
   @@unique([cfdiUuid])
   @@unique([companyId, invoiceNumber])
+  @@index([type, status])
+  @@index([dueDate])
   @@index([emisorRfc])
   @@index([receptorRfc])
   @@index([companyId])
@@ -2692,37 +2708,37 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id            Int      @id @default(autoincrement())
-  invoiceId     Int
-  description   String   @db.VarChar(300)
-  quantity      Decimal  @db.Decimal(12, 4)
-  unitPrice     Decimal  @db.Decimal(14, 2)
-  taxRate       Decimal  @default(0) @db.Decimal(5, 2)
-  total         Decimal  @db.Decimal(14, 2)
-  productId     Int?
+  id                  Int                    @id @default(autoincrement())
+  invoiceId           Int
+  description         String                 @db.VarChar(300)
+  quantity            Decimal                @db.Decimal(12, 4)
+  unitPrice           Decimal                @db.Decimal(14, 2)
+  taxRate             Decimal                @default(0) @db.Decimal(5, 2)
+  total               Decimal                @db.Decimal(14, 2)
+  productId           Int?
   // ── SAT catalog fields ──
-  satProductKey String?  @db.VarChar(10) // ClaveProdServ (catálogo SAT)
-  satUnitKey    String?  @db.VarChar(5) // ClaveUnidad (catálogo SAT)
-  unitName      String?  @db.VarChar(50) // e.g. "Pieza", "Servicio"
-  discount      Decimal  @default(0) @db.Decimal(14, 2)
-  taxBase       Decimal? @db.Decimal(14, 2)
-  ivaRate       Decimal? @db.Decimal(5, 2) // IVA 16%, 8%, 0%
-  ivaAmount     Decimal? @db.Decimal(14, 2)
-  iepsRate      Decimal? @db.Decimal(5, 2)
-  iepsAmount    Decimal? @db.Decimal(14, 2)
-  isrRetRate    Decimal? @db.Decimal(5, 2)
-  isrRetAmount  Decimal? @db.Decimal(14, 2)
-  ivaRetRate    Decimal? @db.Decimal(5, 4)
-  ivaRetAmount  Decimal? @db.Decimal(14, 2)
+  satProductKey       String?                @db.VarChar(10) // ClaveProdServ (catálogo SAT)
+  satUnitKey          String?                @db.VarChar(5) // ClaveUnidad (catálogo SAT)
+  unitName            String?                @db.VarChar(50) // e.g. "Pieza", "Servicio"
+  discount            Decimal                @default(0) @db.Decimal(14, 2)
+  taxBase             Decimal?               @db.Decimal(14, 2)
+  ivaRate             Decimal?               @db.Decimal(5, 2) // IVA 16%, 8%, 0%
+  ivaAmount           Decimal?               @db.Decimal(14, 2)
+  iepsRate            Decimal?               @db.Decimal(5, 2)
+  iepsAmount          Decimal?               @db.Decimal(14, 2)
+  isrRetRate          Decimal?               @db.Decimal(5, 2)
+  isrRetAmount        Decimal?               @db.Decimal(14, 2)
+  ivaRetRate          Decimal?               @db.Decimal(5, 4)
+  ivaRetAmount        Decimal?               @db.Decimal(14, 2)
   // ── end SAT ──
   purchaseOrderItemId Int?
   goodsReceiptItemId  Int?
-  invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  product       Product? @relation(fields: [productId], references: [id])
-  salesOrderLineId Int?  @unique
-  salesOrderLine   SalesProjectOrderLine? @relation(fields: [salesOrderLineId], references: [id], onDelete: SetNull)
-  purchaseOrderItem PurchaseOrderItem? @relation(fields: [purchaseOrderItemId], references: [id], onDelete: SetNull)
-  goodsReceiptItem  GoodsReceiptItem?  @relation(fields: [goodsReceiptItemId], references: [id], onDelete: SetNull)
+  invoice             Invoice                @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product             Product?               @relation(fields: [productId], references: [id])
+  salesOrderLineId    Int?                   @unique
+  salesOrderLine      SalesProjectOrderLine? @relation(fields: [salesOrderLineId], references: [id], onDelete: SetNull)
+  purchaseOrderItem   PurchaseOrderItem?     @relation(fields: [purchaseOrderItemId], references: [id], onDelete: SetNull)
+  goodsReceiptItem    GoodsReceiptItem?      @relation(fields: [goodsReceiptItemId], references: [id], onDelete: SetNull)
 
   @@index([purchaseOrderItemId])
   @@index([goodsReceiptItemId])
@@ -2814,9 +2830,9 @@ model BankTransaction {
   reconciliation    BankReconciliation?
   company           CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([bankAccountId, speiTrackingKey])
   @@index([bankAccountId, transactionDate])
   @@index([companyId])
-  @@unique([bankAccountId, speiTrackingKey])
   @@map("bank_transactions")
 }
 
@@ -2883,26 +2899,26 @@ enum ValuationMethod {
 }
 
 model Warehouse {
-  id            Int                 @id @default(autoincrement())
-  code          String              @db.VarChar(20)
-  name          String              @db.VarChar(200)
-  address       String?
-  city          String?             @db.VarChar(120)
-  state         String?             @db.VarChar(120)
-  managerId     Int?
-  isActive      Boolean             @default(true)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  manager       User?               @relation("WarehouseManager", fields: [managerId], references: [id])
-  locations     WarehouseLocation[]
-  stockLevels   StockLevel[]
-  movementsFrom StockMovement[]     @relation("MovementFromWarehouse")
-  movementsTo   StockMovement[]     @relation("MovementToWarehouse")
-  goodsReceipts GoodsReceipt[]
-  cycleCounts   CycleCount[]
+  id                Int                 @id @default(autoincrement())
+  code              String              @db.VarChar(20)
+  name              String              @db.VarChar(200)
+  address           String?
+  city              String?             @db.VarChar(120)
+  state             String?             @db.VarChar(120)
+  managerId         Int?
+  isActive          Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  manager           User?               @relation("WarehouseManager", fields: [managerId], references: [id])
+  locations         WarehouseLocation[]
+  stockLevels       StockLevel[]
+  movementsFrom     StockMovement[]     @relation("MovementFromWarehouse")
+  movementsTo       StockMovement[]     @relation("MovementToWarehouse")
+  goodsReceipts     GoodsReceipt[]
+  cycleCounts       CycleCount[]
   stockReservations StockReservation[]
-  companyId     Int
-  company       CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  companyId         Int
+  company           CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -2910,17 +2926,17 @@ model Warehouse {
 }
 
 model WarehouseLocation {
-  id          Int          @id @default(autoincrement())
+  id          Int            @id @default(autoincrement())
   warehouseId Int
-  code        String       @db.VarChar(30)
-  name        String       @db.VarChar(120)
-  aisle       String?      @db.VarChar(20)
-  rack        String?      @db.VarChar(20)
-  shelf       String?      @db.VarChar(20)
-  bin         String?      @db.VarChar(20)
-  createdAt   DateTime     @default(now())
+  code        String         @db.VarChar(30)
+  name        String         @db.VarChar(120)
+  aisle       String?        @db.VarChar(20)
+  rack        String?        @db.VarChar(20)
+  shelf       String?        @db.VarChar(20)
+  bin         String?        @db.VarChar(20)
+  createdAt   DateTime       @default(now())
   companyId   Int
-  warehouse   Warehouse    @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
   stockLevels StockLevel[]
   company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
@@ -2980,6 +2996,11 @@ model StockMovement {
   lot               Lot?              @relation(fields: [lotId], references: [id])
   purchaseOrder     PurchaseOrder?    @relation(fields: [purchaseOrderId], references: [id])
   productionOrder   ProductionOrder?  @relation(fields: [productionOrderId], references: [id])
+  /// Servicio que consumió el material. Sin esto no se podía responder
+  /// "¿qué material usó esta actividad?", que es el control de materiales de
+  /// Operaciones y el "Material utilizado" que reporta Ingeniería.
+  activityId        Int?
+  activity          Activity?         @relation(fields: [activityId], references: [id], onDelete: SetNull)
   createdBy         User?             @relation("StockMovementCreator", fields: [createdById], references: [id])
   company           CompanyProfile    @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
@@ -3054,10 +3075,10 @@ model CycleCount {
   closedBy     User?            @relation("CycleCountCloser", fields: [closedById], references: [id])
   items        CycleCountItem[]
 
+  @@unique([companyId, countNumber])
   @@index([warehouseId])
   @@index([companyId])
   @@index([status])
-  @@unique([companyId, countNumber])
   @@map("cycle_counts")
 }
 
@@ -3088,23 +3109,23 @@ enum StockReservationStatus {
 /// StockLevel) sin mover físico. El agregado de reservas activas de un
 /// producto/almacén se refleja en StockLevel.reservedQty.
 model StockReservation {
-  id            Int                     @id @default(autoincrement())
+  id            Int                    @id @default(autoincrement())
   productId     Int
   warehouseId   Int
-  quantity      Decimal                 @db.Decimal(14, 4)
-  status        StockReservationStatus  @default(ACTIVE)
-  reason        String                  @db.VarChar(200)
-  referenceType String?                 @db.VarChar(60)
+  quantity      Decimal                @db.Decimal(14, 4)
+  status        StockReservationStatus @default(ACTIVE)
+  reason        String                 @db.VarChar(200)
+  referenceType String?                @db.VarChar(60)
   referenceId   Int?
   expiresAt     DateTime?
   releasedAt    DateTime?
   companyId     Int
   createdById   Int?
-  createdAt     DateTime                @default(now())
-  product       Product                 @relation(fields: [productId], references: [id])
-  warehouse     Warehouse               @relation(fields: [warehouseId], references: [id])
-  company       CompanyProfile          @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  createdBy     User?                   @relation("StockReservationCreator", fields: [createdById], references: [id])
+  createdAt     DateTime               @default(now())
+  product       Product                @relation(fields: [productId], references: [id])
+  warehouse     Warehouse              @relation(fields: [warehouseId], references: [id])
+  company       CompanyProfile         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdBy     User?                  @relation("StockReservationCreator", fields: [createdById], references: [id])
 
   @@index([productId, warehouseId])
   @@index([companyId])
@@ -3212,9 +3233,9 @@ model PurchaseOrder {
   invoices        Invoice[]
   awardedRfq      PurchaseRFQ?
 
+  @@unique([companyId, poNumber])
   @@index([supplierId, status])
   @@index([companyId])
-  @@unique([companyId, poNumber])
   @@map("purchase_orders")
 }
 
@@ -3334,9 +3355,9 @@ model PurchaseRFQ {
   awardedPurchaseOrder   PurchaseOrder?      @relation(fields: [awardedPurchaseOrderId], references: [id])
   lines                  PurchaseRFQLine[]
 
+  @@unique([companyId, rfqNumber])
   @@index([requisitionId])
   @@index([companyId])
-  @@unique([companyId, rfqNumber])
   @@map("purchase_rfqs")
 }
 
@@ -3738,9 +3759,9 @@ model MaintenanceOrder {
   company         CompanyProfile         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   parts           MaintenanceOrderPart[]
 
+  @@unique([companyId, orderNumber])
   @@index([assetId, status])
   @@index([companyId])
-  @@unique([companyId, orderNumber])
   @@map("maintenance_orders")
 }
 
@@ -4128,14 +4149,14 @@ model UserPreference {
 
 /// Tokens FCM (APK) y suscripciones Web Push (navegador) para alertas fuera de la app.
 model UserPushEndpoint {
-  id                Int      @id @default(autoincrement())
-  userId            Int
-  fcmToken          String?  @unique @db.VarChar(512)
-  webPushEndpoint   String?  @unique @db.VarChar(2048)
-  webPushKeys       Json?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  fcmToken        String?  @unique @db.VarChar(512)
+  webPushEndpoint String?  @unique @db.VarChar(2048)
+  webPushKeys     Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("UserPushEndpoint")
@@ -4163,20 +4184,20 @@ enum LeaveStatus {
 }
 
 model LeaveRequest {
-  id              Int             @id @default(autoincrement())
+  id              Int         @id @default(autoincrement())
   userId          Int
   type            LeaveType
-  status          LeaveStatus     @default(PENDING)
-  startDate       DateTime        @db.Date
-  endDate         DateTime        @db.Date
+  status          LeaveStatus @default(PENDING)
+  startDate       DateTime    @db.Date
+  endDate         DateTime    @db.Date
   days            Float
-  reason          String?         @db.Text
+  reason          String?     @db.Text
   approvedById    Int?
   approvedAt      DateTime?
-  rejectionReason String?         @db.VarChar(500)
+  rejectionReason String?     @db.VarChar(500)
   companyId       Int
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   user       User           @relation("LeaveRequester", fields: [userId], references: [id])
   approvedBy User?          @relation("LeaveApprover", fields: [approvedById], references: [id])
@@ -4203,20 +4224,20 @@ enum ReviewStatus {
 }
 
 model PerformanceReview {
-  id                 Int            @id @default(autoincrement())
+  id                 Int          @id @default(autoincrement())
   userId             Int
   reviewerId         Int
   period             ReviewPeriod
-  reviewDate         DateTime       @db.Date
+  reviewDate         DateTime     @db.Date
   overallRating      Float
-  strengths          String?        @db.Text
-  areasOfImprovement String?        @db.Text
-  goals              String?        @db.Text
-  status             ReviewStatus   @default(DRAFT)
-  comments           String?        @db.Text
+  strengths          String?      @db.Text
+  areasOfImprovement String?      @db.Text
+  goals              String?      @db.Text
+  status             ReviewStatus @default(DRAFT)
+  comments           String?      @db.Text
   companyId          Int
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   user     User           @relation("ReviewedUser", fields: [userId], references: [id])
   reviewer User           @relation("Reviewer", fields: [reviewerId], references: [id])
@@ -4259,66 +4280,66 @@ enum MaintenanceContractVisitStatus {
 }
 
 model MaintenanceContract {
-  id                  Int                          @id @default(autoincrement())
-  contractNumber      String                       @db.VarChar(40)
-  clientId            Int
-  branchId            Int?
-  ownerId             Int?
-  companyId           Int
-  title               String                       @db.VarChar(200)
-  description         String?
-  serviceScope        String?
-  frequency           MaintenanceFrequency
+  id                   Int                       @id @default(autoincrement())
+  contractNumber       String                    @db.VarChar(40)
+  clientId             Int
+  branchId             Int?
+  ownerId              Int?
+  companyId            Int
+  title                String                    @db.VarChar(200)
+  description          String?
+  serviceScope         String?
+  frequency            MaintenanceFrequency
   // SLA en horas para acudir tras alta del ticket / próxima visita.
-  slaResponseHours    Int                          @default(48)
-  slaResolutionHours  Int                          @default(72)
-  monthlyFee          Decimal                      @default(0) @db.Decimal(12, 2)
-  currency            String                       @default("MXN") @db.VarChar(3)
-  startDate           DateTime                     @db.Date
-  endDate             DateTime?                    @db.Date
-  nextVisitDate       DateTime?                    @db.Date
-  status              MaintenanceContractStatus    @default(ACTIVE)
-  autoGenerateOt      Boolean                      @default(true)
-  notifyHoursBefore   Int                          @default(24)
-  notes               String?
+  slaResponseHours     Int                       @default(48)
+  slaResolutionHours   Int                       @default(72)
+  monthlyFee           Decimal                   @default(0) @db.Decimal(12, 2)
+  currency             String                    @default("MXN") @db.VarChar(3)
+  startDate            DateTime                  @db.Date
+  endDate              DateTime?                 @db.Date
+  nextVisitDate        DateTime?                 @db.Date
+  status               MaintenanceContractStatus @default(ACTIVE)
+  autoGenerateOt       Boolean                   @default(true)
+  notifyHoursBefore    Int                       @default(24)
+  notes                String?
   /// Proyecto OPS dedicado a este contrato (no reutilizar proyectos comerciales del cliente).
-  operationalProjectId Int?                        @unique
-  createdAt           DateTime                     @default(now())
-  updatedAt           DateTime                     @updatedAt
-  deletedAt           DateTime?
+  operationalProjectId Int?                      @unique
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  deletedAt            DateTime?
 
-  client              ServiceClient                @relation(fields: [clientId], references: [id])
-  branch              ServiceClientBranch?         @relation(fields: [branchId], references: [id])
-  owner               User?                        @relation("MaintenanceContractOwner", fields: [ownerId], references: [id])
-  company             CompanyProfile               @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  operationalProject  OperationalProject?          @relation("MaintenanceContractProject", fields: [operationalProjectId], references: [id], onDelete: SetNull)
-  visits              MaintenanceContractVisit[]
+  client             ServiceClient              @relation(fields: [clientId], references: [id])
+  branch             ServiceClientBranch?       @relation(fields: [branchId], references: [id])
+  owner              User?                      @relation("MaintenanceContractOwner", fields: [ownerId], references: [id])
+  company            CompanyProfile             @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  operationalProject OperationalProject?        @relation("MaintenanceContractProject", fields: [operationalProjectId], references: [id], onDelete: SetNull)
+  visits             MaintenanceContractVisit[]
 
+  @@unique([companyId, contractNumber])
   @@index([status, nextVisitDate])
   @@index([clientId, status])
   @@index([companyId])
-  @@unique([companyId, contractNumber])
   @@map("maintenance_contracts")
 }
 
 model MaintenanceContractVisit {
-  id                  Int                              @id @default(autoincrement())
-  contractId          Int
-  scheduledDate       DateTime                         @db.Date
-  status              MaintenanceContractVisitStatus   @default(SCHEDULED)
-  generatedAt         DateTime?
-  completedAt         DateTime?
+  id                   Int                            @id @default(autoincrement())
+  contractId           Int
+  scheduledDate        DateTime                       @db.Date
+  status               MaintenanceContractVisitStatus @default(SCHEDULED)
+  generatedAt          DateTime?
+  completedAt          DateTime?
   operationalProjectId Int?
-  activityId          Int?
-  assignedToId        Int?
-  notes               String?
-  createdAt           DateTime                         @default(now())
-  updatedAt           DateTime                         @updatedAt
+  activityId           Int?
+  assignedToId         Int?
+  notes                String?
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
 
-  contract            MaintenanceContract              @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  assignedTo          User?                            @relation("MaintenanceVisitAssignee", fields: [assignedToId], references: [id])
-  companyId           Int
-  company             CompanyProfile                   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  contract   MaintenanceContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  assignedTo User?               @relation("MaintenanceVisitAssignee", fields: [assignedToId], references: [id])
+  companyId  Int
+  company    CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([contractId, scheduledDate])
   @@index([status, scheduledDate])
@@ -4349,54 +4370,54 @@ enum TenderStatus {
 }
 
 model Tender {
-  id                  Int                @id @default(autoincrement())
-  tenderNumber        String             @db.VarChar(60)
-  title               String             @db.VarChar(220)
-  description         String?
-  tenderType          TenderType         @default(PUBLIC_GOV)
-  status              TenderStatus       @default(PROSPECT)
+  id                    Int          @id @default(autoincrement())
+  tenderNumber          String       @db.VarChar(60)
+  title                 String       @db.VarChar(220)
+  description           String?
+  tenderType            TenderType   @default(PUBLIC_GOV)
+  status                TenderStatus @default(PROSPECT)
   // Datos del convocante (gobierno / empresa)
-  conveningEntity     String             @db.VarChar(220)
-  conveningContact    String?            @db.VarChar(180)
-  conveningEmail      String?            @db.VarChar(180)
-  conveningPhone      String?            @db.VarChar(60)
-  publicationUrl      String?            @db.VarChar(500)
+  conveningEntity       String       @db.VarChar(220)
+  conveningContact      String?      @db.VarChar(180)
+  conveningEmail        String?      @db.VarChar(180)
+  conveningPhone        String?      @db.VarChar(60)
+  publicationUrl        String?      @db.VarChar(500)
   // CompraNet u otro identificador externo
-  externalReference   String?            @db.VarChar(160)
+  externalReference     String?      @db.VarChar(160)
   // Montos
-  budgetCeiling       Decimal            @default(0) @db.Decimal(16, 2)
-  ourBidAmount        Decimal            @default(0) @db.Decimal(16, 2)
-  estimatedCost       Decimal            @default(0) @db.Decimal(16, 2)
-  expectedMargin      Decimal            @default(0) @db.Decimal(16, 2)
-  guaranteeAmount     Decimal            @default(0) @db.Decimal(16, 2)
-  currency            String             @default("MXN") @db.VarChar(3)
+  budgetCeiling         Decimal      @default(0) @db.Decimal(16, 2)
+  ourBidAmount          Decimal      @default(0) @db.Decimal(16, 2)
+  estimatedCost         Decimal      @default(0) @db.Decimal(16, 2)
+  expectedMargin        Decimal      @default(0) @db.Decimal(16, 2)
+  guaranteeAmount       Decimal      @default(0) @db.Decimal(16, 2)
+  currency              String       @default("MXN") @db.VarChar(3)
   // Fechas críticas
-  publishDate         DateTime?          @db.Date
-  questionsDeadline   DateTime?
-  submissionDeadline  DateTime?
-  openingDate         DateTime?
-  awardDate           DateTime?
-  contractStartDate   DateTime?          @db.Date
-  contractEndDate     DateTime?          @db.Date
+  publishDate           DateTime?    @db.Date
+  questionsDeadline     DateTime?
+  submissionDeadline    DateTime?
+  openingDate           DateTime?
+  awardDate             DateTime?
+  contractStartDate     DateTime?    @db.Date
+  contractEndDate       DateTime?    @db.Date
   // Operativo
-  scope               String?
+  scope                 String?
   technicalRequirements String?
-  legalRequirements   String?
-  ownerId             Int?
-  salesOpportunityId  Int?               @unique
-  awardedToCompetitor String?            @db.VarChar(220)
-  awardNotes          String?
-  companyId           Int
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  deletedAt           DateTime?
+  legalRequirements     String?
+  ownerId               Int?
+  salesOpportunityId    Int?         @unique
+  awardedToCompetitor   String?      @db.VarChar(220)
+  awardNotes            String?
+  companyId             Int
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  deletedAt             DateTime?
 
-  owner               User?              @relation("TenderOwner", fields: [ownerId], references: [id])
-  opportunity         SalesOpportunity?  @relation(fields: [salesOpportunityId], references: [id])
-  company             CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  documents           TenderDocument[]
-  events              TenderEvent[]
-  crmActivities       CrmActivity[]
+  owner         User?             @relation("TenderOwner", fields: [ownerId], references: [id])
+  opportunity   SalesOpportunity? @relation(fields: [salesOpportunityId], references: [id])
+  company       CompanyProfile    @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  documents     TenderDocument[]
+  events        TenderEvent[]
+  crmActivities CrmActivity[]
 
   @@unique([companyId, tenderNumber])
   @@index([status, submissionDeadline])
@@ -4419,15 +4440,15 @@ enum TenderDocumentType {
 }
 
 model TenderDocument {
-  id          Int                @id @default(autoincrement())
-  tenderId    Int
+  id           Int                @id @default(autoincrement())
+  tenderId     Int
   documentType TenderDocumentType
-  name        String             @db.VarChar(200)
-  url         String?            @db.VarChar(500)
-  uploadedBy  Int?
-  notes       String?
-  createdAt   DateTime           @default(now())
-  tender      Tender             @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  name         String             @db.VarChar(200)
+  url          String?            @db.VarChar(500)
+  uploadedBy   Int?
+  notes        String?
+  createdAt    DateTime           @default(now())
+  tender       Tender             @relation(fields: [tenderId], references: [id], onDelete: Cascade)
 
   @@index([tenderId, documentType])
   @@map("tender_documents")
@@ -4468,34 +4489,34 @@ enum CrmActivityStatus {
 }
 
 model CrmActivity {
-  id                 Int                @id @default(autoincrement())
-  activityType       CrmActivityType    @default(TASK)
-  status             CrmActivityStatus  @default(PENDING)
-  subject            String             @db.VarChar(220)
-  description        String?
-  dueDate            DateTime
-  completedAt        DateTime?
-  outcome            String?
+  id            Int               @id @default(autoincrement())
+  activityType  CrmActivityType   @default(TASK)
+  status        CrmActivityStatus @default(PENDING)
+  subject       String            @db.VarChar(220)
+  description   String?
+  dueDate       DateTime
+  completedAt   DateTime?
+  outcome       String?
   // Polimórfico — apunta a Lead o Opportunity o Tender
-  leadId             Int?
-  opportunityId      Int?
-  tenderId           Int?
+  leadId        Int?
+  opportunityId Int?
+  tenderId      Int?
   // Asignación
-  ownerId            Int?
-  createdById        Int?
+  ownerId       Int?
+  createdById   Int?
   // Recordatorio
-  remindAt           DateTime?
-  reminderSent       Boolean            @default(false)
-  companyId          Int
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  remindAt      DateTime?
+  reminderSent  Boolean           @default(false)
+  companyId     Int
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
-  lead               SalesLead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  opportunity        SalesOpportunity?  @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
-  tender             Tender?            @relation(fields: [tenderId], references: [id], onDelete: SetNull)
-  owner              User?              @relation("CrmActivityOwner", fields: [ownerId], references: [id])
-  createdBy          User?              @relation("CrmActivityCreator", fields: [createdById], references: [id])
-  company            CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  lead        SalesLead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  opportunity SalesOpportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  tender      Tender?           @relation(fields: [tenderId], references: [id], onDelete: SetNull)
+  owner       User?             @relation("CrmActivityOwner", fields: [ownerId], references: [id])
+  createdBy   User?             @relation("CrmActivityCreator", fields: [createdById], references: [id])
+  company     CompanyProfile    @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([ownerId, status, dueDate])
   @@index([leadId])
@@ -4516,27 +4537,27 @@ enum SalesTargetPeriod {
 }
 
 model SalesTarget {
-  id              Int                @id @default(autoincrement())
-  ownerId         Int
-  period          SalesTargetPeriod  @default(MONTHLY)
-  year            Int
-  month           Int?               // 1-12 si MONTHLY
-  quarter         Int?               // 1-4 si QUARTERLY
+  id                  Int               @id @default(autoincrement())
+  ownerId             Int
+  period              SalesTargetPeriod @default(MONTHLY)
+  year                Int
+  month               Int? // 1-12 si MONTHLY
+  quarter             Int? // 1-4 si QUARTERLY
   // Metas
-  revenueTarget   Decimal            @default(0) @db.Decimal(14, 2)
-  newClientsTarget Int               @default(0)
-  opportunitiesTarget Int            @default(0)
+  revenueTarget       Decimal           @default(0) @db.Decimal(14, 2)
+  newClientsTarget    Int               @default(0)
+  opportunitiesTarget Int               @default(0)
   // Comisiones
-  baseCommissionPct Decimal          @default(0) @db.Decimal(5, 2)
-  bonusCommissionPct Decimal         @default(0) @db.Decimal(5, 2)
-  bonusThresholdPct Decimal          @default(100) @db.Decimal(5, 2) // 100% = al alcanzar la meta
-  notes           String?
-  companyId       Int
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  baseCommissionPct   Decimal           @default(0) @db.Decimal(5, 2)
+  bonusCommissionPct  Decimal           @default(0) @db.Decimal(5, 2)
+  bonusThresholdPct   Decimal           @default(100) @db.Decimal(5, 2) // 100% = al alcanzar la meta
+  notes               String?
+  companyId           Int
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
-  owner           User               @relation("SalesTargetOwner", fields: [ownerId], references: [id])
-  company         CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  owner   User           @relation("SalesTargetOwner", fields: [ownerId], references: [id])
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([companyId, ownerId, period, year, month, quarter])
   @@index([year, month])
@@ -4561,21 +4582,21 @@ enum KbArticleStatus {
 }
 
 model KbCategory {
-  id           Int            @id @default(autoincrement())
-  slug         String         @db.VarChar(120)
-  name         String         @db.VarChar(180)
-  description  String?
-  icon         String?        @db.VarChar(60)
-  visibility   KbVisibility   @default(PUBLIC)
-  sortOrder    Int            @default(0)
-  parentId     Int?
-  companyId    Int
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  parent       KbCategory?    @relation("KbCategoryHierarchy", fields: [parentId], references: [id])
-  children     KbCategory[]   @relation("KbCategoryHierarchy")
-  articles     KbArticle[]
-  company      CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  id          Int            @id @default(autoincrement())
+  slug        String         @db.VarChar(120)
+  name        String         @db.VarChar(180)
+  description String?
+  icon        String?        @db.VarChar(60)
+  visibility  KbVisibility   @default(PUBLIC)
+  sortOrder   Int            @default(0)
+  parentId    Int?
+  companyId   Int
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  parent      KbCategory?    @relation("KbCategoryHierarchy", fields: [parentId], references: [id])
+  children    KbCategory[]   @relation("KbCategoryHierarchy")
+  articles    KbArticle[]
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([companyId, slug])
   @@index([companyId])
@@ -4583,26 +4604,26 @@ model KbCategory {
 }
 
 model KbArticle {
-  id            Int             @id @default(autoincrement())
-  slug          String          @db.VarChar(180)
-  title         String          @db.VarChar(220)
-  excerpt       String?
-  content       String          @db.Text
-  visibility    KbVisibility    @default(PUBLIC)
-  status        KbArticleStatus @default(DRAFT)
-  categoryId    Int?
-  authorId      Int?
-  tags          String?         @db.VarChar(400)  // CSV
-  viewCount     Int             @default(0)
-  helpfulCount  Int             @default(0)
-  publishedAt   DateTime?
-  companyId     Int
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id           Int             @id @default(autoincrement())
+  slug         String          @db.VarChar(180)
+  title        String          @db.VarChar(220)
+  excerpt      String?
+  content      String          @db.Text
+  visibility   KbVisibility    @default(PUBLIC)
+  status       KbArticleStatus @default(DRAFT)
+  categoryId   Int?
+  authorId     Int?
+  tags         String?         @db.VarChar(400) // CSV
+  viewCount    Int             @default(0)
+  helpfulCount Int             @default(0)
+  publishedAt  DateTime?
+  companyId    Int
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
-  category      KbCategory?     @relation(fields: [categoryId], references: [id])
-  author        User?           @relation("KbArticleAuthor", fields: [authorId], references: [id])
-  company       CompanyProfile  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  category KbCategory?    @relation(fields: [categoryId], references: [id])
+  author   User?          @relation("KbArticleAuthor", fields: [authorId], references: [id])
+  company  CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([companyId, slug])
   @@index([status, publishedAt])
@@ -4616,168 +4637,170 @@ model KbArticle {
 // ============================================================================
 
 model CompanyProfile {
-  id              Int      @id @default(autoincrement())
-  slug            String?  @unique @db.VarChar(80)
-  legalName       String   @db.VarChar(220)
-  tradeName       String?  @db.VarChar(220)
-  rfc             String   @db.VarChar(13)
-  fiscalRegime    String?  @db.VarChar(10)
-  fiscalAddress   String?
-  fiscalPostalCode String? @db.VarChar(10)
+  id                   Int       @id @default(autoincrement())
+  slug                 String?   @unique @db.VarChar(80)
+  legalName            String    @db.VarChar(220)
+  tradeName            String?   @db.VarChar(220)
+  rfc                  String    @db.VarChar(13)
+  fiscalRegime         String?   @db.VarChar(10)
+  fiscalAddress        String?
+  fiscalPostalCode     String?   @db.VarChar(10)
   // Contacto
-  contactEmail    String?  @db.VarChar(180)
-  contactPhone    String?  @db.VarChar(60)
-  supportEmail    String?  @db.VarChar(180)
-  websiteUrl      String?  @db.VarChar(300)
+  contactEmail         String?   @db.VarChar(180)
+  contactPhone         String?   @db.VarChar(60)
+  supportEmail         String?   @db.VarChar(180)
+  websiteUrl           String?   @db.VarChar(300)
   // Branding
-  logoUrl         String?  @db.VarChar(500)
-  logoDarkUrl     String?  @db.VarChar(500)
-  faviconUrl      String?  @db.VarChar(500)
-  brandPrimary    String?  @db.VarChar(20)
-  brandSecondary  String?  @db.VarChar(20)
+  logoUrl              String?   @db.VarChar(500)
+  logoDarkUrl          String?   @db.VarChar(500)
+  faviconUrl           String?   @db.VarChar(500)
+  brandPrimary         String?   @db.VarChar(20)
+  brandSecondary       String?   @db.VarChar(20)
   // Banca
-  defaultBankName String?  @db.VarChar(180)
-  defaultClabe    String?  @db.VarChar(20)
+  defaultBankName      String?   @db.VarChar(180)
+  defaultClabe         String?   @db.VarChar(20)
   // Notificación
-  notificationEmail String? @db.VarChar(180)
+  notificationEmail    String?   @db.VarChar(180)
   // Billing / SaaS packaging
-  planCode          String   @default("enterprise") @db.VarChar(40)
-  seatLimit         Int      @default(50)
-  billingStatus     String   @default("active") @db.VarChar(30)
-  stripeCustomerId  String?  @db.VarChar(80)
-  stripeSubscriptionId String? @db.VarChar(80)
-  stripePriceId     String?  @db.VarChar(80)
-  trialEndsAt       DateTime?
-  isPrimary       Boolean  @default(false)
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  planCode             String    @default("enterprise") @db.VarChar(40)
+  seatLimit            Int       @default(50)
+  billingStatus        String    @default("active") @db.VarChar(30)
+  stripeCustomerId     String?   @db.VarChar(80)
+  stripeSubscriptionId String?   @db.VarChar(80)
+  stripePriceId        String?   @db.VarChar(80)
+  trialEndsAt          DateTime?
+  isPrimary            Boolean   @default(false)
+  isActive             Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  memberships     UserCompany[]
-  invoices        Invoice[]
-  journalEntries  JournalEntry[]
-  expenses        Expense[]
-  viaticos        Viatico[]
-  employeePayments EmployeePayment[]
-  purchaseOrders  PurchaseOrder[]
-  apiKeys         CompanyApiKey[]
-  salesOpportunities SalesOpportunity[]
-  warehouses      Warehouse[]
-  ticketRequests  ClientTicketRequest[]
-  auditLogs       AuditLog[]
-  usageEvents     CompanyUsageEvent[]
-  products        Product[]
-  activities      Activity[]
-  serviceClients  ServiceClient[]
-  operationalProjects OperationalProject[]
-  salesClients    SalesClient[]
-  salesLeads      SalesLead[]
-  cotizaciones    Cotizacion[]
-  outboundWebhooks OutboundWebhook[]
-  chatChannels    ChatChannel[]
-  maintenanceContracts MaintenanceContract[]
+  memberships               UserCompany[]
+  invoices                  Invoice[]
+  journalEntries            JournalEntry[]
+  expenses                  Expense[]
+  viaticos                  Viatico[]
+  employeePayments          EmployeePayment[]
+  purchaseOrders            PurchaseOrder[]
+  apiKeys                   CompanyApiKey[]
+  salesOpportunities        SalesOpportunity[]
+  warehouses                Warehouse[]
+  ticketRequests            ClientTicketRequest[]
+  auditLogs                 AuditLog[]
+  usageEvents               CompanyUsageEvent[]
+  products                  Product[]
+  activities                Activity[]
+  serviceClients            ServiceClient[]
+  operationalProjects       OperationalProject[]
+  salesClients              SalesClient[]
+  salesLeads                SalesLead[]
+  cotizaciones              Cotizacion[]
+  outboundWebhooks          OutboundWebhook[]
+  chatChannels              ChatChannel[]
+  maintenanceContracts      MaintenanceContract[]
   maintenanceContractVisits MaintenanceContractVisit[]
-  accounts        Account[]
-  fiscalPeriods   FiscalPeriod[]
-  bankAccounts    BankAccount[]
-  idempotencyKeys IdempotencyKey[]
-  costCenters     CostCenter[]
-  vehicleAssets   VehicleAsset[]
-  vehicleControls VehicleControl[]
-  inventorySnapshots InventorySnapshot[]
-  serviceClientBranches ServiceClientBranch[]
-  bankTransactions BankTransaction[]
-  bankReconciliations BankReconciliation[]
-  chatMessages ChatMessage[]
-  serviceSheets ServiceSheet[]
-  activityEvidences ActivityEvidence[]
-  locationTrackings LocationTracking[]
-  salesProjectOrders SalesProjectOrder[]
-  warehouseLocations WarehouseLocation[]
-  stockLevels StockLevel[]
-  brands          Brand[]
-  suppliers       Supplier[]
-  evidences       Evidence[]
-  cycleCounts     CycleCount[]
-  stockReservations StockReservation[]
-  purchaseRfqs    PurchaseRFQ[]
-  assets          Asset[]
-  maintenanceOrders MaintenanceOrder[]
-  kpiSnapshots    KpiSnapshot[]
-  notifications   Notification[]
-  leaveRequests   LeaveRequest[]
-  attendances     Attendance[]
-  attendanceDays  AttendanceDay[]
-  lunchBreaks     LunchBreak[]
-  newsPosts       NewsPost[]
-  pageContents    PageContent[]
-  heroSlides      HeroSlide[]
-  heroVideos      HeroVideo[]
-  performanceReviews PerformanceReview[]
-  caseStudies     CaseStudy[]
-  featureFlags    FeatureFlag[]
-  socialPosts     SocialPost[]
-  internalComunicados InternalComunicado[]
-  contactMessages ContactMessage[]
-  newsletterSubscribers NewsletterSubscriber[]
-  departments     Department[]
-  clients         Client[]
-  projects        Project[]
-  tenders         Tender[]
-  crmActivities   CrmActivity[]
-  kbCategories    KbCategory[]
-  kbArticles      KbArticle[]
-  workProjects    WorkProject[]
-  cvCandidates    CvCandidate[]
-  pageContentRevisions PageContentRevision[]
-  salesProjects   SalesProject[]
-  orderTemplates  OrderTemplate[]
-  fines           Fine[]
-  toolRequests    ToolRequest[]
-  toolInventoryItems ToolInventoryItem[]
-  documentCategories DocumentCategory[]
-  managedDocuments ManagedDocument[]
-  workflowDefinitions WorkflowDefinition[]
-  workflowInstances WorkflowInstance[]
-  toolKitAssignments ToolKitAssignment[]
-  purchaseRequisitions PurchaseRequisition[]
-  safetyIncidents SafetyIncident[]
-  workPermits WorkPermit[]
-  trainingRecords TrainingRecord[]
-  salesTargets SalesTarget[]
-  workProjectExpenses WorkProjectExpense[]
-  workProjectPayroll WorkProjectPayroll[]
-  workProjectLogs WorkProjectLog[]
-  toolRenewals ToolRenewal[]
-  budgets Budget[]
-  goodsReceipts GoodsReceipt[]
-  stockMovements StockMovement[]
-  lots Lot[]
-  supplierEvaluations SupplierEvaluation[]
-  billsOfMaterials BillOfMaterials[]
-  workCenters WorkCenter[]
-  productionOrders ProductionOrder[]
-  qualityInspections QualityInspection[]
-  nonConformanceReports NonConformanceReport[]
-  systemSettings SystemSetting[]
-  maintenanceSchedules MaintenanceSchedule[]
-  payments Payment[]
+  accounts                  Account[]
+  fiscalPeriods             FiscalPeriod[]
+  bankAccounts              BankAccount[]
+  idempotencyKeys           IdempotencyKey[]
+  costCenters               CostCenter[]
+  vehicleAssets             VehicleAsset[]
+  vehicleControls           VehicleControl[]
+  inventorySnapshots        InventorySnapshot[]
+  serviceClientBranches     ServiceClientBranch[]
+  bankTransactions          BankTransaction[]
+  bankReconciliations       BankReconciliation[]
+  chatMessages              ChatMessage[]
+  serviceSheets             ServiceSheet[]
+  activityEvidences         ActivityEvidence[]
+  locationTrackings         LocationTracking[]
+  salesProjectOrders        SalesProjectOrder[]
+  warehouseLocations        WarehouseLocation[]
+  stockLevels               StockLevel[]
+  brands                    Brand[]
+  suppliers                 Supplier[]
+  evidences                 Evidence[]
+  cycleCounts               CycleCount[]
+  stockReservations         StockReservation[]
+  purchaseRfqs              PurchaseRFQ[]
+  assets                    Asset[]
+  maintenanceOrders         MaintenanceOrder[]
+  kpiSnapshots              KpiSnapshot[]
+  notifications             Notification[]
+  leaveRequests             LeaveRequest[]
+  attendances               Attendance[]
+  attendanceDays            AttendanceDay[]
+  lunchBreaks               LunchBreak[]
+  newsPosts                 NewsPost[]
+  pageContents              PageContent[]
+  heroSlides                HeroSlide[]
+  heroVideos                HeroVideo[]
+  performanceReviews        PerformanceReview[]
+  caseStudies               CaseStudy[]
+  featureFlags              FeatureFlag[]
+  socialPosts               SocialPost[]
+  internalComunicados       InternalComunicado[]
+  contactMessages           ContactMessage[]
+  newsletterSubscribers     NewsletterSubscriber[]
+  departments               Department[]
+  clients                   Client[]
+  projects                  Project[]
+  tenders                   Tender[]
+  crmActivities             CrmActivity[]
+  kbCategories              KbCategory[]
+  kbArticles                KbArticle[]
+  workProjects              WorkProject[]
+  cvCandidates              CvCandidate[]
+  pageContentRevisions      PageContentRevision[]
+  salesProjects             SalesProject[]
+  orderTemplates            OrderTemplate[]
+  fines                     Fine[]
+  toolRequests              ToolRequest[]
+  toolInventoryItems        ToolInventoryItem[]
+  documentCategories        DocumentCategory[]
+  managedDocuments          ManagedDocument[]
+  workflowDefinitions       WorkflowDefinition[]
+  workflowInstances         WorkflowInstance[]
+  toolKitAssignments        ToolKitAssignment[]
+  purchaseRequisitions      PurchaseRequisition[]
+  safetyIncidents           SafetyIncident[]
+  workPermits               WorkPermit[]
+  trainingRecords           TrainingRecord[]
+  salesTargets              SalesTarget[]
+  workProjectExpenses       WorkProjectExpense[]
+  workProjectPayroll        WorkProjectPayroll[]
+  workProjectLogs           WorkProjectLog[]
+  toolRenewals              ToolRenewal[]
+  budgets                   Budget[]
+  goodsReceipts             GoodsReceipt[]
+  stockMovements            StockMovement[]
+  lots                      Lot[]
+  supplierEvaluations       SupplierEvaluation[]
+  billsOfMaterials          BillOfMaterials[]
+  workCenters               WorkCenter[]
+  productionOrders          ProductionOrder[]
+  qualityInspections        QualityInspection[]
+  nonConformanceReports     NonConformanceReport[]
+  systemSettings            SystemSetting[]
+  maintenanceSchedules      MaintenanceSchedule[]
+  payments                  Payment[]
+  ActivityAssignee          ActivityAssignee[]
+  ActivityReassignment      ActivityReassignment[]
 
   @@map("company_profile")
 }
 
 /// Idempotency-Key store (Stripe-style) — evita mutaciones duplicadas.
 model IdempotencyKey {
-  id           Int            @id @default(autoincrement())
-  key          String         @db.VarChar(120)
+  id           Int             @id @default(autoincrement())
+  key          String          @db.VarChar(120)
   companyId    Int?
   userId       Int?
-  method       String         @db.VarChar(10)
-  path         String         @db.VarChar(300)
-  requestHash  String?        @db.VarChar(64)
+  method       String          @db.VarChar(10)
+  path         String          @db.VarChar(300)
+  requestHash  String?         @db.VarChar(64)
   statusCode   Int
   responseBody Json?
-  createdAt    DateTime       @default(now())
+  createdAt    DateTime        @default(now())
   expiresAt    DateTime
   company      CompanyProfile? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -4842,7 +4865,6 @@ model CompanyUsageEvent {
   @@map("company_usage_events")
 }
 
-
 // ============================================================================
 // CASOS DE ÉXITO (studio/cases → sitio público /casos)
 // ============================================================================
@@ -4874,19 +4896,26 @@ model CaseStudy {
 // POSTS DE REDES SOCIALES (studio/social — calendario editorial)
 // ============================================================================
 model SocialPost {
-  id        Int            @id @default(autoincrement())
-  red       String         @db.VarChar(40)
-  titulo    String         @db.VarChar(300)
-  contenido String?        @db.Text
-  mediaUrl  String?        @db.VarChar(500)
-  cuando    DateTime
-  estado    String         @default("Borrador") @db.VarChar(30)
-  autorId   Int
-  companyId Int
-  autor     User           @relation("SocialPostAuthor", fields: [autorId], references: [id])
-  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id            Int            @id @default(autoincrement())
+  red           String         @db.VarChar(40)
+  titulo        String         @db.VarChar(300)
+  contenido     String?        @db.Text
+  mediaUrl      String?        @db.VarChar(500)
+  cuando        DateTime
+  estado        String         @default("Borrador") @db.VarChar(30)
+  autorId       Int
+  companyId     Int
+  /// Resultados de la publicación. El flujo diario pide que Creativa envíe
+  /// métricas a las 17:00 y no había dónde registrarlas.
+  impresiones   Int?
+  alcance       Int?
+  interacciones Int?
+  clics         Int?
+  metricasAt    DateTime?
+  autor         User           @relation("SocialPostAuthor", fields: [autorId], references: [id])
+  company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@index([estado, cuando])
   @@index([companyId])
@@ -4935,26 +4964,26 @@ enum ChatMessageKind {
 }
 
 model ChatChannel {
-  id             Int                 @id @default(autoincrement())
-  kind           ChatChannelKind     @default(PUBLIC)
-  slug           String?             @db.VarChar(80)
-  name           String              @db.VarChar(120)
-  topic          String?             @db.VarChar(500)
-  description    String?             @db.VarChar(1000)
-  isArchived     Boolean             @default(false)
-  documentId     Int?                @unique
-  dmKey          String?             @db.VarChar(64)
-  companyId      Int
-  createdById    Int?
-  lastMessageAt  DateTime?
-  lastMessagePreview String?         @db.VarChar(280)
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  document       ManagedDocument?    @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  company        CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  createdBy      User?               @relation("ChatChannelCreator", fields: [createdById], references: [id])
-  members        ChatChannelMember[]
-  messages       ChatMessage[]
+  id                 Int                 @id @default(autoincrement())
+  kind               ChatChannelKind     @default(PUBLIC)
+  slug               String?             @db.VarChar(80)
+  name               String              @db.VarChar(120)
+  topic              String?             @db.VarChar(500)
+  description        String?             @db.VarChar(1000)
+  isArchived         Boolean             @default(false)
+  documentId         Int?                @unique
+  dmKey              String?             @db.VarChar(64)
+  companyId          Int
+  createdById        Int?
+  lastMessageAt      DateTime?
+  lastMessagePreview String?             @db.VarChar(280)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  document           ManagedDocument?    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  company            CompanyProfile      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdBy          User?               @relation("ChatChannelCreator", fields: [createdById], references: [id])
+  members            ChatChannelMember[]
+  messages           ChatMessage[]
 
   @@unique([companyId, slug])
   @@unique([companyId, dmKey])
@@ -4964,15 +4993,15 @@ model ChatChannel {
 }
 
 model ChatChannelMember {
-  id           Int         @id @default(autoincrement())
-  channelId    Int
-  userId       Int
-  role         String      @default("member") @db.VarChar(20)
-  lastReadAt   DateTime?
-  mutedUntil   DateTime?
-  joinedAt     DateTime    @default(now())
-  channel      ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  user         User        @relation("ChatChannelMember", fields: [userId], references: [id], onDelete: Cascade)
+  id         Int         @id @default(autoincrement())
+  channelId  Int
+  userId     Int
+  role       String      @default("member") @db.VarChar(20)
+  lastReadAt DateTime?
+  mutedUntil DateTime?
+  joinedAt   DateTime    @default(now())
+  channel    ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user       User        @relation("ChatChannelMember", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([channelId, userId])
   @@index([userId, lastReadAt])
@@ -4980,28 +5009,28 @@ model ChatChannelMember {
 }
 
 model ChatMessage {
-  id              Int                   @id @default(autoincrement())
-  channelId       Int
-  authorId        Int
-  parentId        Int?
-  kind            ChatMessageKind       @default(TEXT)
-  body            String                @db.Text
-  attachmentUrl   String?               @db.VarChar(500)
-  attachmentName  String?               @db.VarChar(255)
-  pinnedAt        DateTime?
-  pinnedById      Int?
-  editedAt        DateTime?
-  deletedAt       DateTime?
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
-  channel         ChatChannel           @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  author          User                  @relation("ChatMessageAuthor", fields: [authorId], references: [id])
-  pinnedBy        User?                 @relation("ChatMessagePinner", fields: [pinnedById], references: [id], onDelete: SetNull)
-  parent          ChatMessage?          @relation("ChatThread", fields: [parentId], references: [id], onDelete: Cascade)
-  replies         ChatMessage[]         @relation("ChatThread")
-  reactions       ChatMessageReaction[]
-  companyId       Int
-  company         CompanyProfile        @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  id             Int                   @id @default(autoincrement())
+  channelId      Int
+  authorId       Int
+  parentId       Int?
+  kind           ChatMessageKind       @default(TEXT)
+  body           String                @db.Text
+  attachmentUrl  String?               @db.VarChar(500)
+  attachmentName String?               @db.VarChar(255)
+  pinnedAt       DateTime?
+  pinnedById     Int?
+  editedAt       DateTime?
+  deletedAt      DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  channel        ChatChannel           @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  author         User                  @relation("ChatMessageAuthor", fields: [authorId], references: [id])
+  pinnedBy       User?                 @relation("ChatMessagePinner", fields: [pinnedById], references: [id], onDelete: SetNull)
+  parent         ChatMessage?          @relation("ChatThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies        ChatMessage[]         @relation("ChatThread")
+  reactions      ChatMessageReaction[]
+  companyId      Int
+  company        CompanyProfile        @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@index([channelId, createdAt])
   @@index([parentId, createdAt])
@@ -5066,3 +5095,68 @@ model WebhookDelivery {
   @@map("webhook_deliveries")
 }
 
+/// Rol de una persona dentro de una actividad.
+enum ActivityAssigneeRole {
+  LEAD
+  TECNICO
+  APOYO
+}
+
+/// Equipo asignado a una actividad.
+///
+/// `Activity.responsableId` admite una sola persona, así que una instalación
+/// con tres técnicos registraba a uno y los otros dos no figuraban en ninguna
+/// parte: ni sus horas, ni su presencia en la evidencia. El responsable se
+/// conserva como líder para no romper las consultas existentes.
+///
+/// Los viáticos siguen siendo individuales (`Viatico.usuarioId` +
+/// `actividadId`): cada asignado solicita los suyos, no se prorratean.
+model ActivityAssignee {
+  id          Int                  @id @default(autoincrement())
+  activityId  Int
+  userId      Int
+  rol         ActivityAssigneeRole @default(TECNICO)
+  /// Horas previstas para esta persona en esta actividad.
+  horasPlan   Decimal?             @db.Decimal(6, 2)
+  /// Horas realmente dedicadas, para el costo real del servicio.
+  horasReales Decimal?             @db.Decimal(6, 2)
+  asignadoAt  DateTime             @default(now())
+  /// Fecha de salida del equipo; null mientras sigue asignado.
+  retiradoAt  DateTime?
+  companyId   Int
+
+  activity Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     User           @relation("ActivityAssignedUser", fields: [userId], references: [id])
+  company  CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([activityId, userId])
+  @@index([userId, retiradoAt])
+  @@index([companyId])
+  @@map("activity_assignees")
+}
+
+/// Reasignación de una actividad inconclusa.
+///
+/// Antes cambiar `responsableId` pisaba el valor anterior: se perdía quién la
+/// tenía, quién la movió y por qué. Al reasignar, el nuevo responsable solicita
+/// sus propios viáticos; los del anterior quedan a su nombre.
+model ActivityReassignment {
+  id          Int      @id @default(autoincrement())
+  activityId  Int
+  deUsuarioId Int?
+  aUsuarioId  Int
+  movidaPorId Int
+  motivo      String?  @db.VarChar(400)
+  createdAt   DateTime @default(now())
+  companyId   Int
+
+  activity  Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  deUsuario User?          @relation("ActivityReassignFrom", fields: [deUsuarioId], references: [id])
+  aUsuario  User           @relation("ActivityReassignTo", fields: [aUsuarioId], references: [id])
+  movidaPor User           @relation("ActivityReassignBy", fields: [movidaPorId], references: [id])
+  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([activityId, createdAt])
+  @@index([companyId])
+  @@map("activity_reassignments")
+}
