@@ -26,6 +26,7 @@ import { UpdateHeroVideoDto } from './dto/update-hero-video.dto.js';
 import { resolveLegacyUploadsDir, resolveUploadsDir } from '../common/uploads-path.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
+import { RbacGuard } from '../common/rbac.guard.js';
 
 interface MulterFile {
   fieldname: string;
@@ -124,13 +125,13 @@ export class HeroVideoController {
   // ── Admin (Studio) ─────────────────────────────────────────────────
 
   @Get()
-  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
   adminCurrent(@CurrentCompanyId() companyId: number | null) {
     return this.heroVideoService.adminCurrent(companyId);
   }
 
   @Post()
-  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'video', maxCount: 1 },
@@ -158,7 +159,7 @@ export class HeroVideoController {
   }
 
   @Patch(':id')
-  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() payload: UpdateHeroVideoDto,
@@ -168,7 +169,7 @@ export class HeroVideoController {
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
   remove(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
     return this.heroVideoService.remove(id, companyId);
   }

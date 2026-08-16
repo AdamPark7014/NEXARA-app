@@ -8,9 +8,10 @@ import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { SocialPostsService, CreateSocialPostDto, UpdateSocialPostDto } from './social-posts.service.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
+import { RbacGuard } from '../common/rbac.guard.js';
 
 @Controller('social-posts')
-@UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
+@UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
 export class SocialPostsController {
   constructor(private readonly svc: SocialPostsService) {}
 

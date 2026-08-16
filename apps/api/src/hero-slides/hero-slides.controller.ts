@@ -28,6 +28,7 @@ import { ReorderHeroSlidesDto } from './dto/reorder-hero-slides.dto.js';
 import { resolveLegacyUploadsDir, resolveUploadsDir } from '../common/uploads-path.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
+import { RbacGuard } from '../common/rbac.guard.js';
 
 interface MulterFile {
   fieldname: string;
@@ -100,19 +101,19 @@ export class HeroSlidesController {
   // ── Admin (Studio) ─────────────────────────────────────────────────
 
   @Get()
-  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
   adminList(@CurrentCompanyId() companyId: number | null) {
     return this.heroSlidesService.adminList(companyId);
   }
 
   @Get(':id')
-  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
   findOne(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
     return this.heroSlidesService.findOne(id, companyId);
   }
 
   @Post()
-  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'image', maxCount: 1 },
@@ -133,7 +134,7 @@ export class HeroSlidesController {
   }
 
   @Put(':id')
-  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'image', maxCount: 1 },
@@ -162,13 +163,13 @@ export class HeroSlidesController {
   }
 
   @Patch('reorder')
-  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
   reorder(@Body() payload: ReorderHeroSlidesDto, @CurrentCompanyId() companyId: number | null) {
     return this.heroSlidesService.reorder(payload.ids, companyId);
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
+  @UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
   remove(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {
     return this.heroSlidesService.remove(id, companyId);
   }

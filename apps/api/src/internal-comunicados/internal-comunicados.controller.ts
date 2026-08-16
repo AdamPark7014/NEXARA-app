@@ -12,9 +12,10 @@ import {
 } from './internal-comunicados.service.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { StaffOnlyGuard } from '../common/security/staff-only.guard.js';
+import { RbacGuard } from '../common/rbac.guard.js';
 
 @Controller('internal-comunicados')
-@UseGuards(AuthGuard('jwt'), StaffOnlyGuard)
+@UseGuards(AuthGuard('jwt'), StaffOnlyGuard, RbacGuard)
 export class InternalComunicadosController {
   constructor(private readonly svc: InternalComunicadosService) {}
 
