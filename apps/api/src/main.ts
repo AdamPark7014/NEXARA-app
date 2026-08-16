@@ -27,6 +27,7 @@ import {
   resolveCorsOrigin,
 } from './common/security/security.utils';
 import { isPublicUploadPath, readUploadToken } from './common/security/uploads-access';
+import { uploadHeadersFor } from './common/security/upload-content-type.js';
 
 const toPositiveInt = (rawValue: string | undefined, fallback: number): number => {
   const parsed = Number(rawValue);
@@ -421,12 +422,18 @@ async function bootstrap() {
   });
 
   // Contenido subido por usuarios: nunca debe interpretarse como HTML/script.
-  // Mantenemos nosniff siempre; los avatares antiguos guardados sin extensión
-  // se fijan como imagen para que sigan renderizando sin permitir sniffing.
+  //
+  // El tipo lo decide una lista blanca, no la extensión con la que llegó el
+  // archivo. Varios de los veinte puntos de subida sólo validan `file.mimetype`
+  // —la cabecera que pone el cliente— y toman la extensión del nombre original,
+  // así que un `.svg` o un `.html` pueden acabar en disco habiendo pasado por
+  // un filtro de "sólo imágenes". Servidos con su tipo real ejecutarían
+  // JavaScript en el origen de la API; `nosniff` no lo evita porque el tipo no
+  // se está adivinando, se está declarando. Ver `upload-content-type.ts`.
   const setUploadHeaders = (res: express.Response, filePath: string) => {
-    if (!path.extname(filePath)) {
-      res.setHeader('Content-Type', 'image/jpeg');
-    }
+    const { contentType, contentDisposition } = uploadHeadersFor(filePath);
+    res.setHeader('Content-Type', contentType);
+    if (contentDisposition) res.setHeader('Content-Disposition', contentDisposition);
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   };
