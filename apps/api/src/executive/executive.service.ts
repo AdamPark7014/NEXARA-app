@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { FINISHED_ACTIVITY_WHERE } from '../activities/activity-status.js';
+import { kpiFallback } from '../common/kpi-fallback.js';
 
 @Injectable()
 export class ExecutiveService {
@@ -80,23 +81,23 @@ export class ExecutiveService {
       }),
       this.prisma.salesLead.count({
         where: { ...tw, score: { gte: 70 }, status: { in: ['NEW' as any, 'CONTACTED' as any, 'QUALIFIED' as any] } },
-      }).catch(() => 0),
+      }).catch(kpiFallback('executive.service.ts:83', 0)),
       (this.prisma as any).tender.count({
         where: { ...tw, status: { in: ['PROSPECT', 'INTERESTED', 'IN_PREP', 'SUBMITTED', 'EVALUATION'] } },
-      }).catch(() => 0),
-      (this.prisma as any).tender.count({ where: { ...tw, status: 'AWARDED' } }).catch(() => 0),
+      }).catch(kpiFallback('executive.service.ts:86', 0)),
+      (this.prisma as any).tender.count({ where: { ...tw, status: 'AWARDED' } }).catch(kpiFallback('executive.service.ts:87', 0)),
       this.prisma.operationalProject.count({
         where: { ...tw, status: 'ACTIVE' as any, deletedAt: null },
-      }).catch(() => 0),
+      }).catch(kpiFallback('executive.service.ts:90', 0)),
       this.prisma.activity.count({
         where: { ...tw, estatus: { in: ['Pendiente', 'En Proceso', 'Asignado'] } },
-      }).catch(() => 0),
+      }).catch(kpiFallback('executive.service.ts:93', 0)),
       this.prisma.activity.count({
         where: { ...tw, estatus: { in: ['Pendiente', 'En Proceso'] }, fechaEntregaEsperada: { lt: now } },
-      }).catch(() => 0),
+      }).catch(kpiFallback('executive.service.ts:96', 0)),
       this.prisma.activity.count({
         where: { ...tw, ...FINISHED_ACTIVITY_WHERE, fechaFinalizacion: { gte: startOfMonth, lte: endOfMonth } },
-      }).catch(() => 0),
+      }).catch(kpiFallback('executive.service.ts:99', 0)),
       this.prisma.invoice.aggregate({
         where: { ...tw, issueDate: { gte: startOfMonth, lte: endOfMonth }, status: { not: 'CANCELLED' }, type: 'ACCOUNTS_RECEIVABLE' },
         _sum: { totalAmount: true },
@@ -112,19 +113,19 @@ export class ExecutiveService {
       }).catch(() => ({ _sum: { totalAmount: 0 } } as any)),
       this.prisma.invoice.count({
         where: { ...tw, status: 'OVERDUE' as any },
-      }).catch(() => 0),
+      }).catch(kpiFallback('executive.service.ts:115', 0)),
       this.prisma.bankAccount.aggregate({
         where: { ...tw, isActive: true },
         _sum: { currentBalance: true },
       }).catch(() => ({ _sum: { currentBalance: 0 } } as any)),
       this.prisma.activity.count({
         where: { ...tw, ticketType: { not: null }, estatus: { in: ['Pendiente', 'En Proceso', 'Asignado'] } },
-      }).catch(() => 0),
+      }).catch(kpiFallback('executive.service.ts:122', 0)),
       this.prisma.activity.count({
         where: { ...tw, ticketType: { not: null }, ...FINISHED_ACTIVITY_WHERE, fechaFinalizacion: { gte: startOfMonth, lte: endOfMonth } },
-      }).catch(() => 0),
-      this.prisma.salesClient.count({ where: { ...tw } }).catch(() => 0),
-      (this.prisma as any).maintenanceContract.count({ where: { ...tw, status: 'ACTIVE' } }).catch(() => 0),
+      }).catch(kpiFallback('executive.service.ts:125', 0)),
+      this.prisma.salesClient.count({ where: { ...tw } }).catch(kpiFallback('executive.service.ts:126', 0)),
+      (this.prisma as any).maintenanceContract.count({ where: { ...tw, status: 'ACTIVE' } }).catch(kpiFallback('executive.service.ts:127', 0)),
       // MaintenanceContractVisit has no companyId — scope via contract relation
       (this.prisma as any).maintenanceContractVisit.count({
         where: {
@@ -132,17 +133,17 @@ export class ExecutiveService {
           scheduledDate: { gte: now, lte: new Date(now.getTime() + 30 * 86400000) },
           status: { in: ['SCHEDULED', 'GENERATED'] },
         },
-      }).catch(() => 0),
+      }).catch(kpiFallback('executive.service.ts:135', 0)),
       this.prisma.user.count({
         where: { companyMemberships: { some: { companyId: tenantId } } },
-      }).catch(() => 0),
-      this.prisma.purchaseRequisition.count({ where: { ...tw, status: 'SUBMITTED' } }).catch(() => 0),
-      this.prisma.purchaseOrder.count({ where: { ...tw, status: { in: ['DRAFT', 'SENT'] } } }).catch(() => 0),
+      }).catch(kpiFallback('executive.service.ts:138', 0)),
+      this.prisma.purchaseRequisition.count({ where: { ...tw, status: 'SUBMITTED' } }).catch(kpiFallback('executive.service.ts:139', 0)),
+      this.prisma.purchaseOrder.count({ where: { ...tw, status: { in: ['DRAFT', 'SENT'] } } }).catch(kpiFallback('executive.service.ts:140', 0)),
       // stockItem is optional / may lack companyId — scope defensively if field exists
       (this.prisma as any).stockItem?.findMany({
         where: { ...tw, currentQuantity: { lte: { _ref: 'minQuantity' } as any } },
         take: 5,
-      }).catch(() => []) ?? [],
+      }).catch(kpiFallback('executive.service.ts:145', [])) ?? [],
       this.prisma.salesOpportunity.groupBy({
         by: ['ownerId'],
         where: { ...tw, stage: 'WON' as any, closedAt: { gte: startOfMonth, lte: endOfMonth } },
@@ -150,12 +151,12 @@ export class ExecutiveService {
         _count: { _all: true },
         orderBy: { _sum: { value: 'desc' } },
         take: 5,
-      }).catch(() => []),
+      }).catch(kpiFallback('executive.service.ts:153', [])),
       this.prisma.operationalProject.groupBy({
         by: ['projectType'],
         where: { ...tw, status: 'COMPLETED' as any, actualEndDate: { gte: startOfYear } },
         _count: { _all: true },
-      }).catch(() => []),
+      }).catch(kpiFallback('executive.service.ts:158', [])),
     ]);
 
     const revenueMtdValue = Number(revenueMtd._sum?.value || 0);

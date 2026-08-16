@@ -5,6 +5,7 @@ import { RecordPublicLandingEventDto } from './dto/record-public-landing-event.d
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 import { OPEN_ACTIVITY_WHERE, finishedStatusSqlList } from '../activities/activity-status.js';
+import { kpiFallback } from '../common/kpi-fallback.js';
 
 @Injectable()
 export class AnalyticsService {
@@ -148,14 +149,14 @@ export class AnalyticsService {
     ] = await Promise.all([
       this.prisma.cotizacion.aggregate({ _sum: { total: true }, where: { status: 'APPROVED', ...scope } }).catch(() => ({ _sum: { total: null } })),
       this.prisma.expense.aggregate({ _sum: { montoSolicitado: true }, where: { estatusPago: 'Aprobado', ...scope } }).catch(() => ({ _sum: { montoSolicitado: null } })),
-      this.prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED'] }, ...scope } }).catch(() => 0),
-      this.prisma.maintenanceOrder.count({ where: { status: { in: ['PLANNED', 'IN_PROGRESS'] }, ...scope } }).catch(() => 0),
+      this.prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED'] }, ...scope } }).catch(kpiFallback('analytics.service.ts:151', 0)),
+      this.prisma.maintenanceOrder.count({ where: { status: { in: ['PLANNED', 'IN_PROGRESS'] }, ...scope } }).catch(kpiFallback('analytics.service.ts:152', 0)),
       this.prisma.stockLevel.count({
         where: {
           quantity: { lte: 5 },
           warehouse: { companyId: tenantId },
         },
-      }).catch(() => 0),
+      }).catch(kpiFallback('analytics.service.ts:158', 0)),
     ]);
 
     const revenue = Number(totalSales._sum?.total ?? 0);
@@ -216,28 +217,28 @@ export class AnalyticsService {
           timestamp: { gte: startOfDay },
           user: { companyMemberships: { some: { companyId: tenantId } } },
         },
-      }).catch(() => 0),
-      this.prisma.activity.count({ where: { fechaAsignacion: { gte: startOfMonth }, ...scope } }).catch(() => 0),
-      this.prisma.activity.count({ where: { estatus: { in: ['Pendiente', 'En Proceso'] }, ...scope } }).catch(() => 0),
+      }).catch(kpiFallback('analytics.service.ts:219', 0)),
+      this.prisma.activity.count({ where: { fechaAsignacion: { gte: startOfMonth }, ...scope } }).catch(kpiFallback('analytics.service.ts:220', 0)),
+      this.prisma.activity.count({ where: { estatus: { in: ['Pendiente', 'En Proceso'] }, ...scope } }).catch(kpiFallback('analytics.service.ts:221', 0)),
       this.prisma.activity.count({
         where: {
           ...scope,
           ...OPEN_ACTIVITY_WHERE,
           fechaMaxima: { lt: now },
         },
-      }).catch(() => 0),
-      this.prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED'] }, ...scope } }).catch(() => 0),
-      this.prisma.stockLevel.count({ where: { quantity: { lte: 5 }, warehouse: { companyId: tenantId } } }).catch(() => 0),
-      this.prisma.maintenanceOrder.count({ where: { status: { in: ['PLANNED', 'IN_PROGRESS'] }, ...scope } }).catch(() => 0),
-      this.prisma.maintenanceOrder.count({ where: { status: 'PLANNED', plannedDate: { lt: now }, ...scope } }).catch(() => 0),
-      this.prisma.cotizacion.count({ where: { createdAt: { gte: startOfMonth }, ...scope } }).catch(() => 0),
+      }).catch(kpiFallback('analytics.service.ts:228', 0)),
+      this.prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED'] }, ...scope } }).catch(kpiFallback('analytics.service.ts:229', 0)),
+      this.prisma.stockLevel.count({ where: { quantity: { lte: 5 }, warehouse: { companyId: tenantId } } }).catch(kpiFallback('analytics.service.ts:230', 0)),
+      this.prisma.maintenanceOrder.count({ where: { status: { in: ['PLANNED', 'IN_PROGRESS'] }, ...scope } }).catch(kpiFallback('analytics.service.ts:231', 0)),
+      this.prisma.maintenanceOrder.count({ where: { status: 'PLANNED', plannedDate: { lt: now }, ...scope } }).catch(kpiFallback('analytics.service.ts:232', 0)),
+      this.prisma.cotizacion.count({ where: { createdAt: { gte: startOfMonth }, ...scope } }).catch(kpiFallback('analytics.service.ts:233', 0)),
       this.prisma.cotizacion.aggregate({
         _sum: { total: true },
         where: { status: 'APPROVED', createdAt: { gte: startOfMonth }, ...scope },
       }).catch(() => ({ _sum: { total: null } })),
       this.prisma.user.count({
         where: { companyMemberships: { some: { companyId: tenantId } } },
-      }).catch(() => 0),
+      }).catch(kpiFallback('analytics.service.ts:240', 0)),
     ]);
 
     const approvedSales = Number((approvedSalesMonth as any)?._sum?.total ?? 0);
@@ -560,8 +561,8 @@ export class AnalyticsService {
     const tenantId = requireCompanyId(companyId);
     const scope = companyWhere(tenantId);
     const [active, total, mrrAgg, upcomingVisits, generatedVisits] = await Promise.all([
-      (this.prisma as any).maintenanceContract.count({ where: { status: 'ACTIVE', deletedAt: null, ...scope } }).catch(() => 0),
-      (this.prisma as any).maintenanceContract.count({ where: { deletedAt: null, ...scope } }).catch(() => 0),
+      (this.prisma as any).maintenanceContract.count({ where: { status: 'ACTIVE', deletedAt: null, ...scope } }).catch(kpiFallback('analytics.service.ts:563', 0)),
+      (this.prisma as any).maintenanceContract.count({ where: { deletedAt: null, ...scope } }).catch(kpiFallback('analytics.service.ts:564', 0)),
       (this.prisma as any).maintenanceContract.aggregate({
         _sum: { monthlyFee: true },
         where: { status: 'ACTIVE', deletedAt: null, ...scope },
@@ -572,10 +573,10 @@ export class AnalyticsService {
           scheduledDate: { lte: new Date(Date.now() + 14 * 86400000) },
           contract: { companyId: tenantId },
         },
-      }).catch(() => 0),
+      }).catch(kpiFallback('analytics.service.ts:575', 0)),
       (this.prisma as any).maintenanceContractVisit.count({
         where: { status: 'GENERATED', contract: { companyId: tenantId } },
-      }).catch(() => 0),
+      }).catch(kpiFallback('analytics.service.ts:578', 0)),
     ]);
 
     return {
