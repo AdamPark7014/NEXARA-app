@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, Optional } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Optional, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
@@ -13,6 +13,8 @@ const escapeXml = (value: string): string =>
 
 @Injectable()
 export class AccountingService {
+  private readonly logger = new Logger(AccountingService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
@@ -1913,7 +1915,20 @@ export class AccountingService {
       include: { items: { include: { product: true } }, client: true, supplier: true, payments: true },
     });
 
-    void this.autoJournalForStampedInvoice(updated, userId).catch(() => undefined);
+    // La factura ya está timbrada ante el SAT: un fallo generando la póliza no
+    // debe revertir el timbrado. Pero tampoco puede desaparecer — si se traga,
+    // queda una factura timbrada sin asiento contable y los libros no cuadran
+    // sin que nadie lo sepa. Se registra con los datos necesarios para
+    // regenerarla a mano.
+    void this.autoJournalForStampedInvoice(updated, userId).catch((error) => {
+      this.logger.error(
+        `Factura timbrada SIN póliza contable — requiere asiento manual. ` +
+          `facturaId=${updated.id} folio=${updated.invoiceNumber} uuid=${updated.cfdiUuid ?? 'n/d'} ` +
+          `total=${String(updated.totalAmount)} empresa=${updated.companyId}: ` +
+          (error instanceof Error ? error.message : String(error)),
+        error instanceof Error ? error.stack : undefined,
+      );
+    });
 
     return { ...updated, pacProvider: stamp.provider };
   }
