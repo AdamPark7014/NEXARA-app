@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { closedStatusSqlList } from './activity-status.js';
+import { runScheduledJob } from '../common/cron/run-scheduled-job.js';
 
 /**
  * Detecta tickets con SLA a punto de vencer y notifica a los usuarios
@@ -24,6 +25,14 @@ export class TicketAlertsService {
 
   @Cron('*/1 * * * *')
   async notifyUpcomingDeadlines() {
+    // Corre cada minuto: sin envoltura, un fallo se repetía sesenta veces por
+    // hora como `unhandledRejection` anónimo, sin decir qué tarea era.
+    await runScheduledJob('ticket-alerts:sla-proximo', this.logger, () =>
+      this.scanUpcomingDeadlines(),
+    );
+  }
+
+  private async scanUpcomingDeadlines() {
     const now = new Date();
     const alertAt = new Date(now.getTime() + 30 * 60 * 1000);
 
