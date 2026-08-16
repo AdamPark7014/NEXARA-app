@@ -23,6 +23,7 @@ import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import { DashGrid, DashCol, DashPanel, StatStrip, DashPill } from "@/components/dashboard/DashKit";
+import RoleAccessMatrix from "@/components/RoleAccessMatrix";
 
 /* ─── tipos ─────────────────────────────────────────────────────────── */
 interface ApiUser {
@@ -1013,6 +1014,11 @@ export default function UsersPage() {
           ? <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
           : <DataTable columns={columns} rows={visibleUsers} rowKey={(u) => u.id} emptyTitle="Sin usuarios" emptyDescription="Crea el primer usuario" />
         }
+      </Section>
+
+      {/* Qué alcanza cada rol: lo que el sistema aplica de verdad, no las casillas. */}
+      <Section>
+        <RoleAccessMatrix token={token} />
       </Section>
 
       {/* Drawer IAM */}
