@@ -1024,15 +1024,39 @@ export class WarehouseService {
         },
       });
 
-      await tx.stockLevel.update({
-        where: { id: level!.id },
-        data: { reservedQty: { increment: quantity } },
-      });
+      // Entre la lectura de `available` y esta escritura cabe otra reserva.
+      // Con un `update` simple las dos pasaban y `reservedQty` acababa por
+      // encima de `quantity`: la misma pieza reservada dos veces. Postgres
+      // reevalúa la condición al aplicar la fila, así que sólo una gana.
+      const reservado = await tx.$executeRaw`
+        UPDATE stock_levels
+           SET "reservedQty" = "reservedQty" + ${new Prisma.Decimal(quantity)}
+         WHERE id = ${level!.id}
+           AND ("quantity" - "reservedQty") >= ${new Prisma.Decimal(quantity)}
+      `;
+      if (reservado === 0) {
+        throw new BadRequestException(
+          'Disponible insuficiente para reservar (otra reserva lo tomó al mismo tiempo)',
+        );
+      }
 
       return reservation;
     });
   }
 
+  /**
+   * Libera una reserva y devuelve el disponible.
+   *
+   * El orden importa. Antes se leía el estado, se recalculaba `reservedQty` a
+   * mano y se escribía el valor absoluto; dos liberaciones simultáneas leían el
+   * mismo valor, restaban lo mismo y escribían lo mismo, así que **una de las
+   * dos restas se perdía** y esa cantidad quedaba reservada para siempre,
+   * bloqueando ventas sin que nada lo señalara.
+   *
+   * Ahora se reclama primero la reserva con una condición sobre su estado: sólo
+   * quien consigue pasarla de ACTIVE a RELEASED puede descontar, y el descuento
+   * es relativo, no absoluto.
+   */
   async releaseReservation(id: number, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
     return this.prisma.$transaction(async (tx) => {
@@ -1040,7 +1064,12 @@ export class WarehouseService {
         where: { id, ...companyWhere(tenantId) },
       });
       assertCompanyAccess(reservation, tenantId, 'Reserva');
-      if (reservation.status !== 'ACTIVE') {
+
+      const reclamada = await tx.stockReservation.updateMany({
+        where: { id, status: 'ACTIVE', ...companyWhere(tenantId) },
+        data: { status: 'RELEASED', releasedAt: new Date() },
+      });
+      if (reclamada.count === 0) {
         throw new BadRequestException('La reserva ya fue liberada o consumida');
       }
 
@@ -1053,14 +1082,15 @@ export class WarehouseService {
         },
       });
       if (level) {
-        const nextReserved = Math.max(0, Number(level.reservedQty) - Number(reservation.quantity));
-        await tx.stockLevel.update({ where: { id: level.id }, data: { reservedQty: new Prisma.Decimal(nextReserved) } });
+        // GREATEST evita que un descuadre previo deje `reservedQty` negativo.
+        await tx.$executeRaw`
+          UPDATE stock_levels
+             SET "reservedQty" = GREATEST(0, "reservedQty" - ${reservation.quantity})
+           WHERE id = ${level.id}
+        `;
       }
 
-      return tx.stockReservation.update({
-        where: { id },
-        data: { status: 'RELEASED', releasedAt: new Date() },
-      });
+      return tx.stockReservation.findFirstOrThrow({ where: { id } });
     });
   }
 
