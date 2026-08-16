@@ -43,23 +43,24 @@ model Product {
   sources         ProductSource[]
 
   // === ERP Industrial Relations ===
-  invoiceItems       InvoiceItem[]
-  stockLevels        StockLevel[]
-  stockMovements     StockMovement[]
-  lots               Lot[]
-  purchaseReqItems   PurchaseRequisitionItem[]
-  purchaseOrderItems PurchaseOrderItem[]
-  boms               BillOfMaterials[]         @relation("ProductBOM")
-  cotizacionItems    CotizacionItem[]
-  salesOrderLines    SalesProjectOrderLine[]
-  bomComponents      BOMComponent[]            @relation("BOMComponentProduct")
-  productionOrders   ProductionOrder[]
-  qualityInspections QualityInspection[]
-  ncrs               NonConformanceReport[]
-  maintenanceParts   MaintenanceOrderPart[]
-  cycleCountItems    CycleCountItem[]
-  stockReservations  StockReservation[]
-  rfqLines           PurchaseRFQLine[]
+  invoiceItems        InvoiceItem[]
+  stockLevels         StockLevel[]
+  stockMovements      StockMovement[]
+  lots                Lot[]
+  purchaseReqItems    PurchaseRequisitionItem[]
+  purchaseOrderItems  PurchaseOrderItem[]
+  boms                BillOfMaterials[]         @relation("ProductBOM")
+  cotizacionItems     CotizacionItem[]
+  salesOrderLines     SalesProjectOrderLine[]
+  bomComponents       BOMComponent[]            @relation("BOMComponentProduct")
+  productionOrders    ProductionOrder[]
+  qualityInspections  QualityInspection[]
+  ncrs                NonConformanceReport[]
+  maintenanceParts    MaintenanceOrderPart[]
+  cycleCountItems     CycleCountItem[]
+  stockReservations   StockReservation[]
+  rfqLines            PurchaseRFQLine[]
+  supplierPriceBreaks SupplierPriceBreak[]
 
   @@unique([companyId, sku])
   @@index([companyId])
@@ -334,13 +335,32 @@ model Brand {
 }
 
 model Supplier {
-  id               Int               @id @default(autoincrement())
-  name             String            @db.VarChar(255)
-  apiUrl           String?           @db.VarChar(500)
-  description      String?
-  isActive         Boolean           @default(true)
+  id          Int     @id @default(autoincrement())
+  name        String  @db.VarChar(255)
+  apiUrl      String? @db.VarChar(500)
+  description String?
+  isActive    Boolean @default(true)
   /// RFC del proveedor — requerido para DIOT y Contabilidad Electrónica.
-  rfc              String?           @db.VarChar(13)
+  rfc         String? @db.VarChar(13)
+
+  // === Condiciones de mayorista ===
+  // El organigrama nombra "Compras con Mayorista" como función propia de
+  // Administración, pero el esquema trataba igual al mayorista con el que hay
+  // convenio y al proveedor de una sola compra: sin crédito pactado, sin
+  // escalones de precio y sin tiempo de entrega comprometido.
+  /// Distingue al mayorista con convenio del proveedor puntual.
+  esMayorista   Boolean  @default(false)
+  /// Días de crédito pactados. 0 o null = pago de contado.
+  creditoDias   Int?
+  /// Tope de saldo por pagar. Al superarse, la orden avisa antes de emitirse.
+  limiteCredito Decimal? @db.Decimal(14, 2)
+  /// Descuento de convenio aplicable cuando no hay escalón por volumen.
+  descuentoBase Decimal? @db.Decimal(5, 2)
+  /// Tiempo de entrega comprometido, en días.
+  leadTimeDias  Int?
+  /// Importe mínimo por pedido exigido por el mayorista.
+  pedidoMinimo  Decimal? @db.Decimal(14, 2)
+
   companyId        Int
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
@@ -354,6 +374,7 @@ model Supplier {
   purchaseOrders PurchaseOrder[]      @relation("SupplierPurchaseOrders")
   evaluations    SupplierEvaluation[] @relation("SupplierEvaluations")
   rfqLines       PurchaseRFQLine[]    @relation("SupplierRFQLines")
+  priceBreaks    SupplierPriceBreak[]
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -555,6 +576,12 @@ model User {
   reasignacionesDesde       ActivityReassignment[]     @relation("ActivityReassignFrom")
   reasignacionesHacia       ActivityReassignment[]     @relation("ActivityReassignTo")
   reasignacionesHechas      ActivityReassignment[]     @relation("ActivityReassignBy")
+  incidenciasReportadas     ActivityIncident[]         @relation("IncidentReporter")
+  incidenciasResueltas      ActivityIncident[]         @relation("IncidentResolver")
+  recomendacionesHechas     ActivityRecommendation[]   @relation("RecommendationAuthor")
+  reunionesFacilitadas      OperationalMeeting[]       @relation("MeetingFacilitator")
+  asistenciasReunion        MeetingAttendee[]
+  acuerdosAsignados         MeetingAgreement[]         @relation("AgreementOwner")
 
   // === ERP Industrial Relations ===
   fiscalPeriodsClosed       FiscalPeriod[]             @relation("FiscalPeriodClosedBy")
@@ -764,24 +791,24 @@ model UserDocument {
 }
 
 model Activity {
-  id                      Int                     @id @default(autoincrement())
-  anNumber                String                  @db.VarChar(20)
-  titulo                  String                  @db.VarChar(200)
+  id                      Int                      @id @default(autoincrement())
+  anNumber                String                   @db.VarChar(20)
+  titulo                  String                   @db.VarChar(200)
   descripcion             String?
   indicaciones            String?
-  estatus                 String                  @default("Pendiente") @db.VarChar(50)
-  prioridad               String?                 @db.VarChar(20)
-  activityType            ActivityType?           @default(CLIENT)
-  ticketType              TicketType?             @default(PREVENTIVO)
-  ticketTypeCustom        String?                 @db.VarChar(120)
-  workType                ActivityWorkType        @default(ISSUE)
+  estatus                 String                   @default("Pendiente") @db.VarChar(50)
+  prioridad               String?                  @db.VarChar(20)
+  activityType            ActivityType?            @default(CLIENT)
+  ticketType              TicketType?              @default(PREVENTIVO)
+  ticketTypeCustom        String?                  @db.VarChar(120)
+  workType                ActivityWorkType         @default(ISSUE)
   projectId               Int?
   clientId                Int?
-  branchName              String?                 @db.VarChar(160)
-  branchNumber            String?                 @db.VarChar(60)
-  branchCity              String?                 @db.VarChar(120)
-  branchState             String?                 @db.VarChar(120)
-  branchAddress           String?                 @db.VarChar(220)
+  branchName              String?                  @db.VarChar(160)
+  branchNumber            String?                  @db.VarChar(60)
+  branchCity              String?                  @db.VarChar(120)
+  branchState             String?                  @db.VarChar(120)
+  branchAddress           String?                  @db.VarChar(220)
   slaAlertedAt            DateTime?
   tiempoEstimadoMin       Int?
   tiempoMaximoMin         Int?
@@ -789,19 +816,19 @@ model Activity {
   responsableId           Int
   eficienciaScore         Int?
   comentariosFeedback     String?
-  fechaAsignacion         DateTime                @default(now())
+  fechaAsignacion         DateTime                 @default(now())
   fechaInicio             DateTime?
   fechaMaxima             DateTime?
   fechaEntregaEsperada    DateTime?
   fechaFinalizacion       DateTime?
   clientSurveyRequestedAt DateTime?
   clientSurveyCompletedAt DateTime?
-  ticketReportUrl         String?                 @db.VarChar(500)
+  ticketReportUrl         String?                  @db.VarChar(500)
   ticketReportGeneratedAt DateTime?
-  creador                 User                    @relation("CreadorActividades", fields: [creadoPorId], references: [id])
-  responsable             User                    @relation("ResponsableActividades", fields: [responsableId], references: [id])
-  project                 OperationalProject?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  client                  ServiceClient?          @relation(fields: [clientId], references: [id])
+  creador                 User                     @relation("CreadorActividades", fields: [creadoPorId], references: [id])
+  responsable             User                     @relation("ResponsableActividades", fields: [responsableId], references: [id])
+  project                 OperationalProject?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  client                  ServiceClient?           @relation(fields: [clientId], references: [id])
   serviceSheet            ServiceSheet?
   evidencias              Evidence[]
   activityEvidence        ActivityEvidence?
@@ -820,9 +847,15 @@ model Activity {
   stockMovements          StockMovement[]
   /// Facturas emitidas por este servicio.
   invoices                Invoice[]
+  /// Incidencias del servicio, tipificadas.
+  incidents               ActivityIncident[]
+  /// Recomendaciones al cliente derivadas del servicio.
+  recommendations         ActivityRecommendation[]
+  /// Acuerdos de reunión que apuntan a este servicio.
+  meetingAgreements       MeetingAgreement[]
   deletedAt               DateTime?
   companyId               Int
-  company                 CompanyProfile          @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  company                 CompanyProfile           @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([companyId, anNumber])
   @@index([projectId])
@@ -1595,51 +1628,53 @@ enum CotizacionStatus {
 }
 
 model Cotizacion {
-  id             Int                     @id @default(autoincrement())
-  quoteNumber    String                  @db.VarChar(40)
-  issueDate      DateTime
-  validUntil     DateTime?
-  status         CotizacionStatus        @default(DRAFT)
+  id              Int                      @id @default(autoincrement())
+  quoteNumber     String                   @db.VarChar(40)
+  issueDate       DateTime
+  validUntil      DateTime?
+  status          CotizacionStatus         @default(DRAFT)
   /// FK al cliente comercial ERP (opcional: cotizaciones legacy solo con strings)
-  salesClientId  Int?
-  opportunityId  Int?
-  clientName     String?                 @db.VarChar(180)
-  clientCompany  String?                 @db.VarChar(200)
-  clientEmail    String?                 @db.VarChar(200)
-  clientPhone    String?                 @db.VarChar(60)
-  clientAddress  String?
-  projectName    String?                 @db.VarChar(200)
-  scope          String?                 @db.Text
-  paymentTerms   String?                 @db.VarChar(200)
-  deliveryTime   String?                 @db.VarChar(120)
-  preparedBy     String?                 @db.VarChar(120)
-  preparedRole   String?                 @db.VarChar(120)
-  currency       String                  @default("MXN") @db.VarChar(10)
-  depositPercent Int                     @default(0)
-  note           String?                 @db.Text
-  subtotal       Decimal                 @default(0) @db.Decimal(12, 2)
-  discountTotal  Decimal                 @default(0) @db.Decimal(12, 2)
-  taxTotal       Decimal                 @default(0) @db.Decimal(12, 2)
-  iepsTotal      Decimal                 @default(0) @db.Decimal(12, 2)
-  retentionTotal Decimal                 @default(0) @db.Decimal(12, 2)
-  total          Decimal                 @default(0) @db.Decimal(12, 2)
-  publicToken    String?                 @unique @db.VarChar(80)
-  sentToEmail    String?                 @db.VarChar(200)
-  sentAt         DateTime?
-  signedByName   String?                 @db.VarChar(180)
-  signedByEmail  String?                 @db.VarChar(200)
-  signedAt       DateTime?
-  createdById    Int?
-  companyId      Int
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  deletedAt      DateTime?
-  items          CotizacionItem[]
-  createdBy      User?                   @relation(fields: [createdById], references: [id])
-  company        CompanyProfile          @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  salesClient    SalesClient?            @relation(fields: [salesClientId], references: [id], onDelete: SetNull)
-  opportunity    SalesOpportunity?       @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
-  salesQuotes    SalesOpportunityQuote[]
+  salesClientId   Int?
+  opportunityId   Int?
+  clientName      String?                  @db.VarChar(180)
+  clientCompany   String?                  @db.VarChar(200)
+  clientEmail     String?                  @db.VarChar(200)
+  clientPhone     String?                  @db.VarChar(60)
+  clientAddress   String?
+  projectName     String?                  @db.VarChar(200)
+  scope           String?                  @db.Text
+  paymentTerms    String?                  @db.VarChar(200)
+  deliveryTime    String?                  @db.VarChar(120)
+  preparedBy      String?                  @db.VarChar(120)
+  preparedRole    String?                  @db.VarChar(120)
+  currency        String                   @default("MXN") @db.VarChar(10)
+  depositPercent  Int                      @default(0)
+  note            String?                  @db.Text
+  subtotal        Decimal                  @default(0) @db.Decimal(12, 2)
+  discountTotal   Decimal                  @default(0) @db.Decimal(12, 2)
+  taxTotal        Decimal                  @default(0) @db.Decimal(12, 2)
+  iepsTotal       Decimal                  @default(0) @db.Decimal(12, 2)
+  retentionTotal  Decimal                  @default(0) @db.Decimal(12, 2)
+  total           Decimal                  @default(0) @db.Decimal(12, 2)
+  publicToken     String?                  @unique @db.VarChar(80)
+  sentToEmail     String?                  @db.VarChar(200)
+  sentAt          DateTime?
+  signedByName    String?                  @db.VarChar(180)
+  signedByEmail   String?                  @db.VarChar(200)
+  signedAt        DateTime?
+  createdById     Int?
+  companyId       Int
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  deletedAt       DateTime?
+  items           CotizacionItem[]
+  createdBy       User?                    @relation(fields: [createdById], references: [id])
+  company         CompanyProfile           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  salesClient     SalesClient?             @relation(fields: [salesClientId], references: [id], onDelete: SetNull)
+  opportunity     SalesOpportunity?        @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  salesQuotes     SalesOpportunityQuote[]
+  /// Recomendaciones de Ingeniería que se convirtieron en esta cotización.
+  recommendations ActivityRecommendation[]
 
   @@unique([companyId, quoteNumber])
   @@index([salesClientId])
@@ -4785,6 +4820,11 @@ model CompanyProfile {
   payments                  Payment[]
   ActivityAssignee          ActivityAssignee[]
   ActivityReassignment      ActivityReassignment[]
+  supplierPriceBreaks       SupplierPriceBreak[]
+  activityIncidents         ActivityIncident[]
+  activityRecommendations   ActivityRecommendation[]
+  operationalMeetings       OperationalMeeting[]
+  meetingAgreements         MeetingAgreement[]
 
   @@map("company_profile")
 }
@@ -5159,4 +5199,249 @@ model ActivityReassignment {
   @@index([activityId, createdAt])
   @@index([companyId])
   @@map("activity_reassignments")
+}
+
+/// Escalón de precio por volumen pactado con un mayorista.
+///
+/// Comprar 5 piezas y comprar 500 costaba lo mismo en el sistema: sólo existía
+/// `SupplierProduct.price`, un precio único. El escalón vigente se elige por la
+/// cantidad de la línea, de mayor a menor `cantidadMinima`.
+model SupplierPriceBreak {
+  id             Int       @id @default(autoincrement())
+  supplierId     Int
+  productId      Int
+  /// Cantidad a partir de la cual aplica este precio.
+  cantidadMinima Decimal   @db.Decimal(14, 4)
+  unitPrice      Decimal   @db.Decimal(14, 4)
+  currency       String    @default("MXN") @db.VarChar(10)
+  /// Vigencia. Fuera de ella el escalón no se considera.
+  vigenteDesde   DateTime? @db.Date
+  vigenteHasta   DateTime? @db.Date
+  activo         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  companyId      Int
+
+  supplier Supplier       @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product  Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  company  CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([supplierId, productId, cantidadMinima])
+  @@index([productId, cantidadMinima])
+  @@index([companyId])
+  @@map("supplier_price_breaks")
+}
+
+/// Naturaleza de una incidencia de campo.
+enum ActivityIncidentType {
+  ACCESO_DENEGADO
+  FALTA_MATERIAL
+  FALLA_EQUIPO
+  CONDICION_INSEGURA
+  CLIMA
+  ALCANCE_ADICIONAL
+  RETRASO_CLIENTE
+  DANO_INSTALACION
+  OTRO
+}
+
+/// Gravedad de una incidencia de campo. Distinta de `IncidentSeverity`, que
+/// clasifica accidentes laborales (NEAR_MISS…FATALITY) y no aplica aquí.
+enum ActivityIncidentSeverity {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+/// Incidencia ocurrida durante un servicio.
+///
+/// Antes esto vivía en `ServiceSheet.observations`, texto libre: no se podía
+/// contar cuántas veces se fue por falta de material ni qué cliente niega el
+/// acceso con frecuencia. Tipificarlo convierte el relato en una cifra.
+model ActivityIncident {
+  id             Int                      @id @default(autoincrement())
+  activityId     Int
+  tipo           ActivityIncidentType
+  severidad      ActivityIncidentSeverity @default(MEDIA)
+  descripcion    String                   @db.Text
+  /// Qué se hizo en el momento.
+  accionTomada   String?                  @db.Text
+  /// Horas perdidas por la incidencia, para costo real del servicio.
+  horasPerdidas  Decimal?                 @db.Decimal(6, 2)
+  reportadoPorId Int?
+  resueltoPorId  Int?
+  resueltoAt     DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  companyId      Int
+
+  activity     Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  reportadoPor User?          @relation("IncidentReporter", fields: [reportadoPorId], references: [id])
+  resueltoPor  User?          @relation("IncidentResolver", fields: [resueltoPorId], references: [id])
+  company      CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([activityId])
+  @@index([companyId, tipo])
+  @@index([companyId, severidad, resueltoAt])
+  @@map("activity_incidents")
+}
+
+enum RecommendationType {
+  CORRECTIVO
+  PREVENTIVO
+  MEJORA
+  ACTUALIZACION
+  CAPACITACION
+  AMPLIACION
+}
+
+enum RecommendationPriority {
+  BAJA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+enum RecommendationStatus {
+  ABIERTA
+  COTIZADA
+  ACEPTADA
+  RECHAZADA
+  DESCARTADA
+}
+
+/// Recomendación técnica derivada de un servicio.
+///
+/// El técnico ve en sitio lo que hay que cambiar, pero eso moría en la hoja de
+/// servicio. Con `cotizacionId` la observación de Ingeniería llega a Ventas y
+/// se puede medir cuánta facturación nace del trabajo de campo.
+model ActivityRecommendation {
+  id            Int                    @id @default(autoincrement())
+  activityId    Int
+  tipo          RecommendationType
+  prioridad     RecommendationPriority @default(MEDIA)
+  estado        RecommendationStatus   @default(ABIERTA)
+  descripcion   String                 @db.Text
+  /// Estimación del técnico, antes de que Ventas cotice formalmente.
+  costoEstimado Decimal?               @db.Decimal(14, 2)
+  /// Cotización que nació de esta recomendación.
+  cotizacionId  Int?
+  creadoPorId   Int?
+  cerradoAt     DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  companyId     Int
+
+  activity   Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  cotizacion Cotizacion?    @relation(fields: [cotizacionId], references: [id], onDelete: SetNull)
+  creadoPor  User?          @relation("RecommendationAuthor", fields: [creadoPorId], references: [id])
+  company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([activityId])
+  @@index([companyId, estado])
+  @@index([cotizacionId])
+  @@map("activity_recommendations")
+}
+
+/// Los cuatro ritmos que describe el organigrama.
+enum MeetingType {
+  DIARIA
+  PLANEACION_SEMANAL
+  REVISION_AVANCES
+  CIERRE_SEMANAL
+  EXTRAORDINARIA
+}
+
+enum MeetingStatus {
+  PROGRAMADA
+  REALIZADA
+  CANCELADA
+}
+
+/// Reunión operativa: la diaria de las 10:00, la planeación del lunes, la
+/// revisión del miércoles y la junta de cierre del viernes.
+///
+/// El pulso de la empresa vivía fuera del ERP, así que los acuerdos no quedaban
+/// ligados a las actividades de las que se hablaba.
+model OperationalMeeting {
+  id            Int           @id @default(autoincrement())
+  tipo          MeetingType
+  titulo        String        @db.VarChar(200)
+  fecha         DateTime      @db.Date
+  horaInicio    String?       @db.VarChar(5)
+  estado        MeetingStatus @default(PROGRAMADA)
+  agenda        String?       @db.Text
+  notas         String?       @db.Text
+  facilitadorId Int?
+  realizadaAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  companyId     Int
+
+  facilitador User?              @relation("MeetingFacilitator", fields: [facilitadorId], references: [id])
+  company     CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  asistentes  MeetingAttendee[]
+  acuerdos    MeetingAgreement[]
+
+  @@index([companyId, fecha])
+  @@index([companyId, tipo, fecha])
+  @@map("operational_meetings")
+}
+
+/// Convocado a una reunión y si asistió.
+model MeetingAttendee {
+  id        Int      @id @default(autoincrement())
+  meetingId Int
+  userId    Int
+  asistio   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  meeting OperationalMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([meetingId, userId])
+  @@index([userId])
+  @@map("meeting_attendees")
+}
+
+/// Un acuerdo tiene responsable y fecha; una lección y un riesgo, no.
+enum AgreementKind {
+  ACUERDO
+  LECCION
+  RIESGO
+}
+
+enum AgreementStatus {
+  PENDIENTE
+  EN_PROCESO
+  CUMPLIDO
+  CANCELADO
+}
+
+/// Lo que sale de una reunión: acuerdos con responsable, lecciones aprendidas y
+/// riesgos detectados. `activityId` liga el acuerdo al servicio del que se habló.
+model MeetingAgreement {
+  id              Int             @id @default(autoincrement())
+  meetingId       Int
+  tipo            AgreementKind   @default(ACUERDO)
+  descripcion     String          @db.Text
+  responsableId   Int?
+  fechaCompromiso DateTime?       @db.Date
+  estado          AgreementStatus @default(PENDIENTE)
+  cumplidoAt      DateTime?
+  activityId      Int?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  companyId       Int
+
+  meeting     OperationalMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  responsable User?              @relation("AgreementOwner", fields: [responsableId], references: [id])
+  activity    Activity?          @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  company     CompanyProfile     @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@index([meetingId])
+  @@index([companyId, estado, fechaCompromiso])
+  @@index([responsableId, estado])
+  @@map("meeting_agreements")
 }

@@ -45,6 +45,28 @@ export const SELF_ATTENDANCE_URL_RULES: UrlRule[] = [
   { path: '/api/lunch-breaks/**', methods: ['GET', 'POST', 'PUT'], scope: 'write' },
 ];
 
+/**
+ * Ritmo operativo — reuniones, acuerdos y lecciones aprendidas.
+ *
+ * Todo el personal interno ve las reuniones a las que se le convoca y mueve sus
+ * propios acuerdos; convocar, cerrar la junta y registrar acuerdos ajenos es de
+ * quien la conduce. `cliente` NO recibe ninguna de las dos: son reuniones
+ * internas, y por eso esto no vive en `SHARED_SESSION_URL_RULES`.
+ */
+export const MEETINGS_STAFF_URL_RULES: UrlRule[] = [
+  { path: '/api/reuniones/mis-acuerdos/**', methods: ['GET', 'PATCH'], scope: 'write' },
+  { path: '/api/reuniones/mis-acuerdos', methods: ['GET'], scope: 'read' },
+  { path: '/api/reuniones/lecciones', methods: ['GET'], scope: 'read' },
+  { path: '/api/reuniones/**', methods: ['GET'], scope: 'read' },
+  { path: '/api/reuniones', methods: ['GET'], scope: 'read' },
+];
+
+/** Quien conduce la reunión: convoca, cierra y deja los acuerdos por escrito. */
+export const MEETINGS_LEAD_URL_RULES: UrlRule[] = [
+  { path: '/api/reuniones/**', scope: 'write' },
+  { path: '/api/reuniones', scope: 'write' },
+];
+
 /** Proyectos operativos OPS (`/ops/projects`). Distinto de `/api/projects` (Studio). */
 export const OPS_OPERATIONAL_PROJECTS_URL_RULES: UrlRule[] = [
   { path: '/api/operational-projects/**', scope: 'write' },
@@ -78,6 +100,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CEO — ve TODO (lectura) + aprobaciones de tope
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CEO]: [
+    ...MEETINGS_LEAD_URL_RULES,
     // Rutas específicas primero (first-match-wins)
     { path: '/erp/approvals/**', scope: 'approve' },
     { path: '/api/workflow/**', methods: ['POST'], scope: 'approve' },
@@ -100,6 +123,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // Supervisa OPS, valida trabajos antes de reportar a Admin + Dirección
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ARQUITECTO]: [
+    ...MEETINGS_LEAD_URL_RULES,
     // OPS — lectura total + aprobación de actividades y evidencias
     { path: '/ops/**',                      scope: 'approve' },
     { path: '/api/activities/**',           scope: 'approve' },
@@ -138,6 +162,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR DE OPERACIONES — aprueba viáticos/proyectos nivel alto
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_OPERACIONES]: [
+    ...MEETINGS_LEAD_URL_RULES,
     { path: '/erp', scope: 'read' },
     { path: '/erp/dashboard', scope: 'read' },
     { path: '/erp/executive', scope: 'read' },
@@ -175,6 +200,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DIRECTOR ADMINISTRATIVO — finanzas, compras, RH (alto nivel)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DIR_ADMIN]: [
+    ...MEETINGS_LEAD_URL_RULES,
     { path: '/erp/**', scope: 'admin' },
     { path: '/crm/dashboard', scope: 'read' },
     { path: '/crm/quotes/**', scope: 'approve' },
@@ -191,6 +217,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD ADMINISTRATIVO — segundo nivel de aprobación
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_ADMIN]: [
+    ...MEETINGS_LEAD_URL_RULES,
     { path: '/erp', scope: 'read' },
     { path: '/erp/dashboard', scope: 'read' },
     { path: '/erp/approvals/**', scope: 'approve' },
@@ -247,6 +274,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // ADMINISTRATIVO — primer nivel (operación día a día)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ADMINISTRATIVO]: [
+    ...MEETINGS_STAFF_URL_RULES,
     { path: '/erp', scope: 'read' },
     { path: '/erp/dashboard', scope: 'read' },
     { path: '/erp/approvals', methods: ['GET'], scope: 'read' },
@@ -277,6 +305,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD OPERACIONES — supervisa ing. de campo, project manager
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_OPERACIONES]: [
+    ...MEETINGS_LEAD_URL_RULES,
     { path: '/ops', scope: 'read' },
     { path: '/ops/dashboard', scope: 'read' },
     { path: '/ops/activities/**', scope: 'approve' },
@@ -316,6 +345,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // INGENIERO DE CAMPO — solo lo suyo
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ING_CAMPO]: [
+    ...MEETINGS_STAFF_URL_RULES,
     // Páginas frontend
     { path: '/ops', scope: 'read' },
     { path: '/ops/dashboard', scope: 'read' },
@@ -349,6 +379,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // INGENIERO DE SOPORTE — tickets, NOC, mantenimiento
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ING_SOPORTE]: [
+    ...MEETINGS_STAFF_URL_RULES,
     { path: '/ops', scope: 'read' },
     { path: '/ops/dashboard', scope: 'read' },
     { path: '/ops/chat', scope: 'write' },
@@ -395,6 +426,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // COORD VENTAS — gerente comercial
   // ─────────────────────────────────────────────────────────────────
   [ROLES.COORD_VENTAS]: [
+    ...MEETINGS_LEAD_URL_RULES,
     { path: '/crm/**', scope: 'approve' },
     { path: '/crm/chat', scope: 'write' },
     { path: '/erp/dashboard', scope: 'read' },
@@ -415,6 +447,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // VENDEDOR — CRM (sus leads, clientes, cotizaciones)
   // ─────────────────────────────────────────────────────────────────
   [ROLES.VENDEDOR]: [
+    ...MEETINGS_STAFF_URL_RULES,
     { path: '/crm', scope: 'read' },
     { path: '/crm/dashboard', scope: 'read' },
     { path: '/crm/chat', scope: 'write' },
@@ -443,6 +476,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // LÍDER DISEÑO — Studio completo
   // ─────────────────────────────────────────────────────────────────
   [ROLES.LIDER_DISENO]: [
+    ...MEETINGS_LEAD_URL_RULES,
     { path: '/studio/**', scope: 'admin' },
     { path: '/erp/dashboard', scope: 'read' },
     { path: '/erp/notifications-center', scope: 'read' },
@@ -464,6 +498,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // DISEÑADOR — solo sus tareas en Studio
   // ─────────────────────────────────────────────────────────────────
   [ROLES.DISENADOR]: [
+    ...MEETINGS_STAFF_URL_RULES,
     { path: '/studio', scope: 'read' },
     { path: '/studio/dashboard', scope: 'read' },
     { path: '/studio/pages/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
@@ -488,6 +523,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // RH
   // ─────────────────────────────────────────────────────────────────
   [ROLES.RH]: [
+    ...MEETINGS_LEAD_URL_RULES,
     { path: '/erp', scope: 'read' },
     { path: '/erp/dashboard', scope: 'read' },
     { path: '/erp/hr/**', scope: 'write' },
@@ -513,6 +549,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CONTABILIDAD
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CONTABILIDAD]: [
+    ...MEETINGS_STAFF_URL_RULES,
     { path: '/erp', scope: 'read' },
     { path: '/erp/dashboard', scope: 'read' },
     { path: '/erp/accounting/**', scope: 'write' },

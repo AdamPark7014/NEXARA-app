@@ -46,8 +46,11 @@ jobs:
       - name: Tipos · Web
         run: npx tsc --noEmit -p apps/web/tsconfig.json
 
+      # Sin `--rootDir`: el propio jest.config.js ya fija rootDir a `src`, y
+      # sobrescribirlo desde fuera hace que ts-jest busque `apps/tsconfig.json`
+      # —que no existe— y la suite entera falle al arrancar.
       - name: Tests · API
-        run: npx jest --config apps/api/jest.config.js --rootDir apps/api --runInBand --ci
+        run: npx jest --config apps/api/jest.config.js --runInBand --ci
 
   fugas:
     name: Secretos en el código
