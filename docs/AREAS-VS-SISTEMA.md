@@ -147,21 +147,48 @@ ligados a las actividades y proyectos a los que se refieren.
 
 ---
 
-## Orden sugerido
+## Estado
 
-Por relación valor/esfuerzo, y señalando qué necesita migración de base de datos:
-
-| # | Qué | Área | ¿Migración? |
+| # | Qué | Área | Estado |
 |---|---|---|---|
-| 1 | **Validación del Arquitecto** al cerrar actividad | Arquitecto | **No** — definir flujo `ACTIVITY_CLOSURE` |
-| 2 | **Material por actividad** (`StockMovement.activityId`) | Operaciones | Sí |
-| 3 | **Multi-asignación** de técnicos | Operaciones | Sí |
-| 4 | **Métricas de publicación** | Creativa | Sí |
-| 5 | **Mayorista**: condiciones de crédito y precio por volumen | Administración | Sí |
-| 6 | **Incidencias y recomendaciones** tipificadas | Ingeniería | Sí |
-| 7 | **Ritmo operativo**: reuniones, acuerdos, junta de cierre | Todas | Sí |
+| 1 | **Validación del Arquitecto** al cerrar actividad | Arquitecto | Código listo · **falta activar el flujo** |
+| 2 | **Material por actividad** (`StockMovement.activityId`) | Operaciones | ✅ desplegado |
+| 3 | **Multi-asignación** de técnicos | Operaciones | ✅ desplegado |
+| 4 | **Métricas de publicación** | Creativa | ✅ desplegado |
+| 5 | **Mayorista**: condiciones de crédito y precio por volumen | Administración | ✅ desplegado |
+| 6 | **Incidencias y recomendaciones** tipificadas | Ingeniería | ✅ desplegado |
+| 7 | **Ritmo operativo**: reuniones, acuerdos, junta de cierre | Todas | ✅ desplegado |
 
-El punto 1 se puede hacer **hoy y sin tocar el esquema**: la infraestructura ya
-está puesta. Los demás requieren migración, que debe aplicarse contra tu
-PostgreSQL y con las reglas de negocio decididas antes (sobre todo el 3: si los
-viáticos se prorratean entre asignados y cómo se mide el SLA al reasignar).
+El punto 1 **no depende del código**: la infraestructura está puesta y probada,
+pero encenderla cambia cómo cierran su trabajo los 8 técnicos, así que espera a
+que se decida el momento y se avise al equipo. Basta con crear un
+`WorkflowDefinition` con `entityType = ACTIVITY_CLOSURE` y al Arquitecto como
+aprobador del paso 1.
+
+---
+
+## Decisiones de negocio tomadas al implementar
+
+Se dejan por escrito porque no se deducen del código y condicionan lo demás:
+
+- **La mano de obra se factura.** `calculateLine()` cobra
+  `producto + horas × tarifa`; antes las horas se capturaban y no llegaban al
+  total.
+- **Los viáticos son individuales.** Cada asignado solicita los suyos
+  (`Viatico.usuarioId` + `actividadId`); no se prorratean. Al reasignar, quien
+  entra genera los suyos y los del anterior quedan a su nombre.
+- **Reasignar reinicia `fechaAsignacion`.** Si no, el SLA seguiría midiendo
+  desde una asignación que ya no corresponde a nadie, y ese número alimenta los
+  informes de incumplimiento.
+- **El responsable anterior permanece como APOYO**, salvo que se pida
+  retirarlo: conserva el contexto del trabajo hecho.
+- **El escalón por volumen no se suma al descuento de convenio.** El escalón ya
+  es el precio negociado para ese volumen; encimarle el descuento lo contaría
+  dos veces.
+- **El crédito avisa, no bloquea.** Rebasar el límite del mayorista genera un
+  aviso visible para quien autoriza; la orden sigue siendo posible porque a
+  veces urge, y el flujo de autorización de OC ya existe.
+- **Un acuerdo exige responsable; una lección aprendida y un riesgo, no.** Un
+  acuerdo sin dueño es un deseo, y es lo que vuelve inútil la junta del viernes.
+- **"Vencido" se calcula, no se guarda.** Una bandera almacenada exige un cron
+  que la refresque y queda mintiendo el día que ese cron falla.

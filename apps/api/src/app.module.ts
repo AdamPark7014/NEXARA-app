@@ -67,6 +67,7 @@ import { CatalogModule } from './catalog/catalog.module.js';
 import { AccessControlModule } from './access-control/access-control.module.js';
 import { PacModule } from './pac/pac.module.js';
 import { MaintenanceContractsModule } from './maintenance-contracts/maintenance-contracts.module.js';
+import { MeetingsModule } from './meetings/meetings.module.js';
 import { TendersModule } from './tenders/tenders.module.js';
 import { CrmActivitiesModule } from './crm-activities/crm-activities.module.js';
 import { SalesTargetsModule } from './sales-targets/sales-targets.module.js';
@@ -161,6 +162,7 @@ import { AiModule } from './ai/ai.module.js';
     AccessControlModule,
     PacModule,
     MaintenanceContractsModule,
+    MeetingsModule,
     TendersModule,
     CrmActivitiesModule,
     SalesTargetsModule,

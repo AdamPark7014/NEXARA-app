@@ -8,6 +8,12 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
 import { TicketAlertsService } from './ticket-alerts.service.js';
 import { ActivityTeamService } from './activity-team.service.js';
 import { ActivityTeamController, ActivityReassignController } from './activity-team.controller.js';
+import { ActivityIssuesService } from './activity-issues.service.js';
+import {
+  ActivityIssuesReportController,
+  ActivityIncidentsController,
+  ActivityRecommendationsController,
+} from './activity-issues.controller.js';
 
 @Module({
   imports: [
@@ -16,8 +22,17 @@ import { ActivityTeamController, ActivityReassignController } from './activity-t
     UsersModule,
     NotificationsModule,
   ],
-  controllers: [ActivityTeamController, ActivityReassignController, ActivitiesController],
-  providers: [ActivityTeamService, ActivitiesService, TicketAlertsService],
+  // El orden importa: los controladores con rutas literales van primero para
+  // que `activities/reportes/...` no caiga en `activities/:id`.
+  controllers: [
+    ActivityIssuesReportController,
+    ActivityIncidentsController,
+    ActivityRecommendationsController,
+    ActivityTeamController,
+    ActivityReassignController,
+    ActivitiesController,
+  ],
+  providers: [ActivityTeamService, ActivityIssuesService, ActivitiesService, TicketAlertsService],
   exports: [ActivitiesService],
 })
 export class ActivitiesModule {}
