@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import {
@@ -6,11 +6,15 @@ import {
   companyWhere,
   requireCompanyId,
 } from '../common/tenant/tenant-scope.js';
+import { ACTIVITY_CLOSURE_WORKFLOW, ActivityLifecycleService } from '../activities/activity-lifecycle.service.js';
 
 @Injectable()
 export class WorkflowService {
+  private readonly logger = new Logger(WorkflowService.name);
+
   constructor(
     private readonly prisma: PrismaService,
+    private readonly activityLifecycle: ActivityLifecycleService,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -317,6 +321,22 @@ export class WorkflowService {
       where: { id: approval.instanceId },
       data: { isComplete: true, completedAt: new Date() },
     });
+
+    // Validación del Arquitecto aprobada: la actividad pasa a finalizada y se
+    // propagan los efectos que estaban esperando su visto bueno (cierre de la
+    // visita de contrato y de la solicitud del cliente).
+    if (approval.instance.entityType === ACTIVITY_CLOSURE_WORKFLOW) {
+      const result = await this.activityLifecycle.onActivityValidated({
+        activityId: approval.instance.entityId,
+        companyId: approval.instance.companyId,
+      });
+      if (result.errors.length) {
+        this.logger.warn(
+          `Validación de actividad ${approval.instance.entityId} con efectos incompletos: ` +
+            result.errors.join('; '),
+        );
+      }
+    }
     await this.notifications.createNotification({
       userId: approval.instance.startedById,
       type: 'WORKFLOW_APPROVED',

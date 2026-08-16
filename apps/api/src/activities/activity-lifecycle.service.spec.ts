@@ -143,3 +143,60 @@ describe('ActivityLifecycleService.onActivityFinished', () => {
     expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
   });
 });
+
+describe('validación del Arquitecto', () => {
+  it('sin flujo configurado no exige validación', async () => {
+    // Caso normal: no dejamos actividades atascadas donde nadie lo configuró.
+    const { service } = build();
+    expect(await service.requiresArchitectValidation(7)).toBe(false);
+  });
+
+  it('con flujo activo y pasos, exige validación', async () => {
+    const { service } = build({
+      definitionFindFirst: jest.fn().mockResolvedValue({ id: 2, steps: [{ id: 20 }] }),
+    });
+    expect(await service.requiresArchitectValidation(7)).toBe(true);
+  });
+
+  it('una definición sin pasos no cuenta como validación', async () => {
+    const { service } = build({
+      definitionFindFirst: jest.fn().mockResolvedValue({ id: 2, steps: [] }),
+    });
+    expect(await service.requiresArchitectValidation(7)).toBe(false);
+  });
+
+  it('sin empresa no exige validación', async () => {
+    const { service } = build();
+    expect(await service.requiresArchitectValidation(null)).toBe(false);
+  });
+
+  it('mientras espera validación NO propaga los efectos de cierre', async () => {
+    // La visita de contrato y el ticket del cliente esperan al visto bueno.
+    const { service, mocks } = build();
+    const outcome = await service.onActivityFinished({
+      activityId: 10,
+      companyId: 7,
+      actorId: 3,
+      applyClosureEffects: false,
+    });
+
+    expect(mocks.visitUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
+    expect(outcome.contractVisitCompleted).toBe(false);
+  });
+
+  it('al validar, finaliza la actividad y propaga los efectos', async () => {
+    const activityUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const { service, mocks } = build();
+    (service as any).prisma.activity = { updateMany: activityUpdateMany };
+
+    const outcome = await service.onActivityValidated({ activityId: 10, companyId: 7 });
+
+    const args = activityUpdateMany.mock.calls[0][0];
+    expect(args.where.estatus.in).toContain('Por Validar');
+    expect(args.data.estatus).toBe('Finalizada');
+    expect(mocks.visitUpdateMany).toHaveBeenCalled();
+    expect(mocks.ticketUpdateMany).toHaveBeenCalled();
+    expect(outcome.errors).toEqual([]);
+  });
+});
