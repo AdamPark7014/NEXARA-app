@@ -14,8 +14,9 @@ import { buildApiUrl } from "@/lib/api-base";
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import WholesalePanel from "@/components/WholesalePanel";
 
-type ProcTab = "orders" | "requisitions" | "receipts" | "rfq";
+type ProcTab = "orders" | "requisitions" | "receipts" | "rfq" | "mayoristas";
 
 interface PurchaseOrder {
   id: number;
@@ -1122,8 +1123,17 @@ export default function ProcurementPage() {
         <button type="button" style={tabStyle(tab === "rfq")} onClick={() => setTab("rfq")}>
           RFQ · Comparar proveedores
         </button>
+        <button type="button" style={tabStyle(tab === "mayoristas")} onClick={() => setTab("mayoristas")}>
+          Mayoristas
+        </button>
       </div>
 
+      {/* Mayoristas trae su propia tabla y su propio detalle: el FilterToolbar
+          y la Section de abajo filtran órdenes y requisiciones, que aquí no
+          aplican, así que se ocultan en vez de mostrarse vacíos. */}
+      {tab === "mayoristas" && <WholesalePanel token={token} canManage={cfg.canCreate} />}
+
+      {tab !== "mayoristas" && (
       <FilterToolbar
         search={{ value: searchQ, onChange: setSearchQ, placeholder: tab === "orders" ? "Buscar OC, proveedor…" : tab === "requisitions" ? "Buscar requisición, título…" : tab === "rfq" ? "Buscar RFQ, requisición…" : "Buscar recepción, OC…" }}
         selects={tab === "orders" ? [{
@@ -1159,6 +1169,7 @@ export default function ProcurementPage() {
           ], "requisiciones")}>Excel</Button>
         ) : undefined}
       />
+      )}
 
       {highlightId && tab !== "receipts" && (
         <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
@@ -1364,6 +1375,7 @@ export default function ProcurementPage() {
         </div>
       )}
 
+      {tab !== "mayoristas" && (
       <Section
         title={
           loading
@@ -1433,6 +1445,7 @@ export default function ProcurementPage() {
           />
         )}
       </Section>
+      )}
 
       {/* ── Rechazar requisición modal ── */}
       {rejectReqModal && (

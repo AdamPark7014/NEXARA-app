@@ -165,6 +165,7 @@ export type ModuleId =
   | "procurement"
   | "documents"
   | "chat"
+  | "reuniones"
   | "bi"
   | "architecture"
   | "news"
@@ -314,6 +315,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "chat", panel: PANELS.ERP, path: "/chat",
     label: "Chat", description: "Canales, DMs y colaboración en tiempo real",
     icon: "💬", allowedRoles: ANY_INTERNAL,
+    group: "Tablero", visible: true,
+  },
+  reuniones: {
+    id: "reuniones", panel: PANELS.ERP, path: "/reuniones",
+    label: "Reuniones", description: "Ritmo operativo, acuerdos y lecciones aprendidas",
+    icon: "📅", allowedRoles: ANY_INTERNAL,
     group: "Tablero", visible: true,
   },
   approvals: {
