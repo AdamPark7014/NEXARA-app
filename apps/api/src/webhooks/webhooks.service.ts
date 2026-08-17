@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { assertPublicHttpUrl, assertResolvesPublic } from './url-guard.js';
 import {
   BadRequestException,
   Injectable,
@@ -241,6 +242,10 @@ export class WebhooksService {
     let responseBody: string | null = null;
     let ok = false;
     try {
+      // Se revalida con el nombre ya resuelto: un dominio público registrado
+      // hoy puede apuntar mañana a una dirección interna, y la validación de
+      // guardado ya habría pasado.
+      await assertResolvesPublic(delivery.webhook.url);
       const res = await fetch(delivery.webhook.url, {
         method: 'POST',
         headers,
@@ -343,15 +348,12 @@ export class WebhooksService {
     }
   }
 
+  /**
+   * Antes sólo comprobaba el protocolo, así que un webhook podía apuntar a la
+   * red interna y —como la respuesta se guarda y se muestra en el registro de
+   * entregas— servir para leer de ella. Ver `url-guard.ts`.
+   */
   private assertUrl(url: string) {
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      throw new BadRequestException('URL inválida');
-    }
-    if (!['https:', 'http:'].includes(parsed.protocol)) {
-      throw new BadRequestException('Solo http/https');
-    }
+    assertPublicHttpUrl(url);
   }
 }
