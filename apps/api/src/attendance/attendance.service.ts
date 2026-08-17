@@ -6,6 +6,14 @@ import { NotificationHierarchyService } from '../notifications/notification-hier
 import { PERMISSIONS } from '../common/permissions.js';
 import { detectDeviceFromUserAgent } from '../common/device-detector.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import {
+  parseWorkDate,
+  workDateColumn,
+  workDateKey,
+  workDayBounds,
+  workDayEnd,
+  workDayStart,
+} from '../common/time/workday.js';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
@@ -24,10 +32,14 @@ export class AttendanceService {
     return ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'].includes(normalized);
   }
 
+  /**
+   * Dia laboral de un instante, listo para una columna `@db.Date`.
+   *
+   * Antes era `setHours(0,0,0,0)` sobre hora local, que en el contenedor es
+   * UTC: una salida a las 19:18 de Mexico caia en el dia siguiente.
+   */
   private getDateOnly(date: Date) {
-    const only = new Date(date);
-    only.setHours(0, 0, 0, 0);
-    return only;
+    return workDateColumn(date);
   }
 
   private computeOpenMinutes(lastEntryAt: Date | null, rangeEnd: Date) {
@@ -38,12 +50,9 @@ export class AttendanceService {
     return Math.max(0, Math.floor((end - start) / 60000));
   }
 
+  /** `AAAA-MM-DD` se interpreta como dia de la zona de la empresa. */
   private parseDateInput(value: string) {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      const [year, month, day] = value.split('-').map((part) => Number(part));
-      return new Date(year, month - 1, day);
-    }
-    return new Date(value);
+    return parseWorkDate(value);
   }
 
   async getCurrentDay(userId: number, companyId?: number | null) {
@@ -58,9 +67,7 @@ export class AttendanceService {
 
   /** Reabre jornada si hay entrada sin salida pero attendanceDay quedó inconsistente. */
   private async reconcileOpenDay(userId: number, referenceDate: Date, companyId: number) {
-    const dayStart = this.getDateOnly(referenceDate);
-    const dayEnd = new Date(dayStart);
-    dayEnd.setHours(23, 59, 59, 999);
+    const { start: dayStart, end: dayEnd } = workDayBounds(referenceDate);
     const tenant = companyWhere(companyId);
 
     const [entry, exit] = await Promise.all([
@@ -87,10 +94,10 @@ export class AttendanceService {
     if (!entry || exit) return null;
 
     return this.prisma.attendanceDay.upsert({
-      where: { companyId_userId_date: { companyId, userId, date: dayStart } },
+      where: { companyId_userId_date: { companyId, userId, date: workDateColumn(referenceDate) } },
       create: {
         userId,
-        date: dayStart,
+        date: workDateColumn(referenceDate),
         totalMinutes: 0,
         lastEntryAt: entry.timestamp,
         isOpen: true,
@@ -110,9 +117,7 @@ export class AttendanceService {
     if (Number.isNaN(base.getTime())) {
       throw new BadRequestException('Fecha invalida');
     }
-    const start = this.getDateOnly(base);
-    const end = new Date(start);
-    end.setHours(23, 59, 59, 999);
+    const { start, end } = workDayBounds(base);
 
     return this.prisma.attendance.findMany({
       where: {
@@ -150,18 +155,22 @@ export class AttendanceService {
     if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
       throw new BadRequestException('Rango invalido');
     }
-    const start = this.getDateOnly(fromDate);
-    const end = this.getDateOnly(toDate);
-    end.setHours(23, 59, 59, 999);
+    const start = workDayStart(fromDate);
+    const end = workDayEnd(toDate);
+    const diaDesde = workDateColumn(fromDate);
+    const diaHasta = workDateColumn(toDate);
     const now = new Date();
     const effectiveEnd = now < end ? now : end;
 
     const days = await this.prisma.attendanceDay.findMany({
       where: {
         userId,
+        // `date` es una columna DATE —medianoche UTC del día laboral—, no un
+        // instante. Compararla contra el inicio del rango, que son las 06:00
+        // UTC, dejaba fuera el primer día.
         date: {
-          gte: start,
-          lte: end,
+          gte: diaDesde,
+          lte: diaHasta,
         },
         ...tenant,
       },
@@ -197,14 +206,14 @@ export class AttendanceService {
         .forEach((event) => {
           if (event.type === 'entrada') {
             openEntryTime = event.timestamp;
-            openEntryDate = this.getDateOnly(event.timestamp).toISOString().split('T')[0];
+            openEntryDate = workDateKey(event.timestamp);
             return;
           }
           if (event.type === 'salida' && openEntryTime) {
             const diffMs = event.timestamp.getTime() - openEntryTime.getTime();
             const minutes = diffMs > 0 ? Math.ceil(diffMs / 60000) : 0;
             total += minutes;
-            const dayKey = openEntryDate || this.getDateOnly(event.timestamp).toISOString().split('T')[0];
+            const dayKey = openEntryDate || workDateKey(event.timestamp);
             dailyMap.set(dayKey, (dailyMap.get(dayKey) || 0) + minutes);
             openEntryTime = null;
             openEntryDate = null;
@@ -216,7 +225,7 @@ export class AttendanceService {
         const diffMs = effectiveEnd.getTime() - entryTime.getTime();
         const minutes = diffMs > 0 ? Math.ceil(diffMs / 60000) : 0;
         total += minutes;
-        const dayKey = openEntryDate || this.getDateOnly(effectiveEnd).toISOString().split('T')[0];
+        const dayKey = openEntryDate || workDateKey(effectiveEnd);
         dailyMap.set(dayKey, (dailyMap.get(dayKey) || 0) + minutes);
       }
 
@@ -248,11 +257,13 @@ export class AttendanceService {
     };
   }
 
+  /**
+   * Rango del dia laboral con fin EXCLUSIVO: quien llama filtra con `lt`.
+   * `workDayEnd` devuelve el ultimo milisegundo, asi que se suma uno.
+   */
   private getDayBounds(date: Date) {
-    const start = this.getDateOnly(date);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-    return { start, end };
+    const { start, end } = workDayBounds(date);
+    return { start, end: new Date(end.getTime() + 1) };
   }
 
   /**
@@ -326,7 +337,7 @@ export class AttendanceService {
     const isEntry = dto.type === 'entrada';
 
     if (isEntry) {
-      const existingEntry = await this.findAttendanceOnDate(userId, 'entrada', today, tenantId);
+      const existingEntry = await this.findAttendanceOnDate(userId, 'entrada', now, tenantId);
       if (existingEntry) {
         throw new BadRequestException('Ya existe una entrada registrada para hoy');
       }
@@ -429,10 +440,10 @@ export class AttendanceService {
     }
 
     // Salida: resolver jornada abierta ANTES de crear el registro (evita salidas huérfanas).
-    const openDay = await this.resolveOpenDay(userId, today, tenantId);
+    const openDay = await this.resolveOpenDay(userId, now, tenantId);
 
     if (!openDay?.isOpen || !openDay.lastEntryAt) {
-      const existingExit = await this.findAttendanceOnDate(userId, 'salida', today, tenantId);
+      const existingExit = await this.findAttendanceOnDate(userId, 'salida', now, tenantId);
       if (existingExit) {
         throw new BadRequestException('Ya existe una salida registrada para hoy');
       }
@@ -440,7 +451,7 @@ export class AttendanceService {
     }
 
     // Limpiar salida huérfana de un intento fallido anterior (jornada sigue abierta).
-    const orphanExit = await this.findAttendanceOnDate(userId, 'salida', today, tenantId);
+    const orphanExit = await this.findAttendanceOnDate(userId, 'salida', now, tenantId);
     if (orphanExit) {
       await this.prisma.attendance.delete({ where: { id: orphanExit.id } });
       this.logger.warn(
@@ -528,7 +539,7 @@ export class AttendanceService {
       userId,
       type,
       timestamp: timestamp.toISOString(),
-      date: this.getDateOnly(timestamp).toISOString().split('T')[0],
+      date: workDateKey(timestamp),
     });
 
     // Obtener admins relevantes y crear notificaciones
@@ -737,9 +748,11 @@ export class AttendanceService {
       );
     }
 
-    const start = this.getDateOnly(fromDate);
-    const end = this.getDateOnly(toDate);
-    end.setHours(23, 59, 59, 999);
+    // Instantes para filtrar por `timestamp`; valores de columna para `date`.
+    const start = workDayStart(fromDate);
+    const end = workDayEnd(toDate);
+    const diaDesde = workDateColumn(fromDate);
+    const diaHasta = workDateColumn(toDate);
     const now = new Date();
     const effectiveEnd = now < end ? now : end;
 
@@ -810,9 +823,10 @@ export class AttendanceService {
         const days = await this.prisma.attendanceDay.findMany({
           where: {
             userId: user.id,
+            // Columna DATE, no instante: ver la nota de `getRangeSummary`.
             date: {
-              gte: start,
-              lte: end,
+              gte: diaDesde,
+              lte: diaHasta,
             },
             ...tenant,
           },
