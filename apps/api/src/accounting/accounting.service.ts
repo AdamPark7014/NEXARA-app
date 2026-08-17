@@ -9,6 +9,7 @@ import { WebhooksService } from '../webhooks/webhooks.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { FolioService } from '../common/folio/folio.service.js';
 import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
+import { cents } from '../pac/cfdi-xml.builder.js';
 
 const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -1647,20 +1648,25 @@ export class AccountingService {
     const emisorRfc = dto.emisorRfc?.trim() || issuer.emisorRfc || null;
     const emisorName = dto.emisorName?.trim() || issuer.emisorName || null;
     const emisorRegime = dto.emisorRegime?.trim() || issuer.emisorRegime || null;
+    // Cada importe se redondea a centavos ANTES de sumarse, igual que hace el
+    // constructor del CFDI. Si aquí se sumara a plena precisión y allí sobre
+    // valores redondeados, el registro guardado diría un total distinto al del
+    // comprobante timbrado —hasta un par de centavos— y no habría forma de
+    // saber cuál de los dos es el bueno.
     const items = dto.items.map((item) => {
-      const base = item.quantity * item.unitPrice - (item.discount || 0);
-      const iva = base * ((item.ivaRate ?? item.taxRate ?? 16) / 100);
-      const ieps = base * ((item.iepsRate || 0) / 100);
-      const isrRet = base * ((item.isrRetRate || 0) / 100);
-      const ivaRet = base * ((item.ivaRetRate || 0) / 100);
-      const total = base + iva + ieps - isrRet - ivaRet;
+      const base = cents(item.quantity * item.unitPrice - (item.discount || 0));
+      const iva = cents(base * ((item.ivaRate ?? item.taxRate ?? 16) / 100));
+      const ieps = cents(base * ((item.iepsRate || 0) / 100));
+      const isrRet = cents(base * ((item.isrRetRate || 0) / 100));
+      const ivaRet = cents(base * ((item.ivaRetRate || 0) / 100));
+      const total = cents(base + iva + ieps - isrRet - ivaRet);
       return { ...item, base, iva, ieps, isrRet, ivaRet, total };
     });
-    const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
-    const totalDiscount = items.reduce((s, i) => s + (i.discount || 0), 0);
-    const taxAmount = items.reduce((s, i) => s + i.iva + i.ieps, 0);
-    const retentions = items.reduce((s, i) => s + i.isrRet + i.ivaRet, 0);
-    const totalAmount = subtotal - totalDiscount + taxAmount - retentions;
+    const subtotal = cents(items.reduce((s, i) => s + cents(i.quantity * i.unitPrice), 0));
+    const totalDiscount = cents(items.reduce((s, i) => s + cents(i.discount || 0), 0));
+    const taxAmount = cents(items.reduce((s, i) => s + i.iva + i.ieps, 0));
+    const retentions = cents(items.reduce((s, i) => s + i.isrRet + i.ivaRet, 0));
+    const totalAmount = cents(subtotal - totalDiscount + taxAmount - retentions);
 
     const invoice = await this.prisma.invoice.create({
       data: {

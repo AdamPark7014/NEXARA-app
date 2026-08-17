@@ -30,9 +30,31 @@ function esc(value: string): string {
   });
 }
 
+/**
+ * Redondeo a centavos, como número.
+ *
+ * Todo importe se redondea **una sola vez, aquí, antes de sumarse**. Sumar
+ * valores a plena precisión y redondear el total al final no da lo mismo que
+ * sumar los valores ya redondeados, y el SAT valida exactamente eso: que
+ * `TotalImpuestosTrasladados` sea la suma de los `Importe` que aparecen
+ * impresos en los conceptos. Un centavo de diferencia y el PAC rechaza el
+ * timbrado con un error que no explica nada.
+ */
+export function cents(n: number): number {
+  const escalado = (Number(n) || 0) * 100;
+  // El epsilon va **relativo a la magnitud**. Uno fijo (`Number.EPSILON`, del
+  // orden de 1e-16) no alcanza para corregir valores grandes: 1.005 se guarda
+  // como 1.00499999999999989, y a escala 100 le falta ~1.4e-14 para llegar al
+  // medio centavo. Con el epsilon fijo se redondeaba hacia abajo justo en los
+  // importes terminados en medio centavo, que son los habituales al aplicar
+  // 16 % sobre precios con dos decimales.
+  const ajuste = Math.abs(escalado) * Number.EPSILON * 4;
+  return Math.round(escalado + Math.sign(escalado) * ajuste) / 100;
+}
+
 /** 2 decimales tipo importe. */
 function m(n: number): string {
-  return (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2);
+  return cents(n).toFixed(2);
 }
 /** 6 decimales tipo tasa/cuota. */
 function r6(n: number): string {
@@ -103,15 +125,17 @@ export function buildSealedCfdi(
   const concepts: BuiltConcept[] = input.items.map((it) => {
     const cantidad = it.quantity;
     const valorUnitario = it.unitPrice;
-    const importe = cantidad * valorUnitario;
-    const descuento = it.discount || 0;
-    const base = importe - descuento;
+    // Cada importe queda redondeado ya aquí, para que lo que se suma sea
+    // exactamente lo que después se imprime en el XML.
+    const importe = cents(cantidad * valorUnitario);
+    const descuento = cents(it.discount || 0);
+    const base = cents(importe - descuento);
     const ivaRate = it.taxRate != null ? it.taxRate / 100 : 0.16;
-    const ivaAmount = base * ivaRate;
-    const ivaRetAmount = it.ivaRetAmount ?? 0;
-    const isrRetAmount = it.isrRetAmount ?? 0;
+    const ivaAmount = cents(base * ivaRate);
+    const ivaRetAmount = cents(it.ivaRetAmount ?? 0);
+    const isrRetAmount = cents(it.isrRetAmount ?? 0);
     const iepsRate = it.iepsRate != null ? it.iepsRate / 100 : 0;
-    const iepsAmount = it.iepsAmount ?? base * iepsRate;
+    const iepsAmount = cents(it.iepsAmount ?? base * iepsRate);
     return {
       claveProdServ: it.satProductKey || '01010101',
       claveUnidad: it.satUnitKey || 'E48',
@@ -129,13 +153,19 @@ export function buildSealedCfdi(
     };
   });
 
-  const subTotal = concepts.reduce((s, c) => s + c.importe, 0);
-  const descuentoTotal = concepts.reduce((s, c) => s + c.descuento, 0);
-  const totalTraslados = concepts.reduce((s, c) => s + c.ivaAmount, 0);
-  const totalRetIva = concepts.reduce((s, c) => s + c.ivaRetAmount, 0);
-  const totalRetIsr = concepts.reduce((s, c) => s + c.isrRetAmount, 0);
-  const totalRetenciones = totalRetIva + totalRetIsr;
-  const total = subTotal - descuentoTotal + totalTraslados - totalRetenciones;
+  // Los totales suman valores YA redondeados, así que coinciden con lo impreso
+  // en cada concepto. El `cents` exterior sólo limpia el ruido binario de la
+  // suma; no cambia el centavo.
+  const subTotal = cents(concepts.reduce((s, c) => s + c.importe, 0));
+  const descuentoTotal = cents(concepts.reduce((s, c) => s + c.descuento, 0));
+  const totalTraslados = cents(concepts.reduce((s, c) => s + c.ivaAmount, 0));
+  const totalRetIva = cents(concepts.reduce((s, c) => s + c.ivaRetAmount, 0));
+  const totalRetIsr = cents(concepts.reduce((s, c) => s + c.isrRetAmount, 0));
+  const totalRetenciones = cents(totalRetIva + totalRetIsr);
+  // La base del traslado global es la suma de las bases de los conceptos, no
+  // `subTotal - descuentoTotal` recalculado: así no puede desviarse de ellas.
+  const baseTraslados = cents(concepts.reduce((s, c) => s + c.base, 0));
+  const total = cents(subTotal - descuentoTotal + totalTraslados - totalRetenciones);
 
   // ── Construcción de nodos Conceptos ──
   const conceptosXml = concepts
@@ -174,7 +204,7 @@ export function buildSealedCfdi(
       : '';
   const trasladosTotalesNode =
     `<cfdi:Traslados>` +
-    `<cfdi:Traslado Base="${m(subTotal - descuentoTotal)}" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="${m(totalTraslados)}"/>` +
+    `<cfdi:Traslado Base="${m(baseTraslados)}" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="${m(totalTraslados)}"/>` +
     `</cfdi:Traslados>`;
   const impuestosTotalesNode =
     `<cfdi:Impuestos${totalRetenciones > 0 ? ` TotalImpuestosRetenidos="${m(totalRetenciones)}"` : ''} TotalImpuestosTrasladados="${m(totalTraslados)}">` +
