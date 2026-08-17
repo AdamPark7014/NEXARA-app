@@ -6,6 +6,7 @@ import { NotificationHierarchyService } from '../notifications/notification-hier
 import { PERMISSIONS } from '../common/permissions.js';
 import { detectDeviceFromUserAgent } from '../common/device-detector.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AttendanceService {
@@ -254,6 +255,37 @@ export class AttendanceService {
     return { start, end };
   }
 
+  /**
+   * Crea el registro dejando que la base impida el duplicado.
+   *
+   * `register` comprueba primero y crea después, y entre las dos cosas caben
+   * dos peticiones: un doble toque en el móvil o un reintento por red mala
+   * creaban las dos. No es hipotético —en producción hay un usuario con dos
+   * salidas el mismo día— y de estos registros sale la nómina.
+   *
+   * La comprobación previa se conserva porque da el mensaje claro en el caso
+   * normal; esto cubre sólo la carrera, y traduce el choque del índice al mismo
+   * mensaje para que quien lo lea no tenga que distinguir un caso del otro.
+   */
+  private async createAttendanceRecord<T extends Prisma.AttendanceCreateArgs>(
+    args: Prisma.SelectSubset<T, Prisma.AttendanceCreateArgs>,
+  ) {
+    try {
+      // Genérico para que el `include` de quien llama siga tipando el retorno.
+      return await this.prisma.attendance.create<T>(args);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const tipo = (args as { data?: { type?: string } })?.data?.type;
+        throw new BadRequestException(
+          tipo === 'entrada'
+            ? 'Ya existe una entrada registrada para hoy'
+            : 'Ya existe una salida registrada para hoy',
+        );
+      }
+      throw error;
+    }
+  }
+
   private async findAttendanceOnDate(userId: number, type: string, date: Date, companyId: number) {
     const { start, end } = this.getDayBounds(date);
     return this.prisma.attendance.findFirst({
@@ -308,11 +340,12 @@ export class AttendanceService {
         );
       }
 
-      const attendance = await this.prisma.attendance.create({
+      const attendance = await this.createAttendanceRecord({
         data: {
           userId,
           type: dto.type,
           timestamp: now,
+          workDate: today,
           deviceInfo,
           photoUrl: dto.photoBase64 || null,
           entryLatitude: dto.latitude || null,
@@ -415,9 +448,10 @@ export class AttendanceService {
       );
     }
 
-    const attendance = await this.prisma.attendance.create({
+    const attendance = await this.createAttendanceRecord({
       data: {
         userId,
+        workDate: today,
         type: dto.type,
         timestamp: now,
         deviceInfo,

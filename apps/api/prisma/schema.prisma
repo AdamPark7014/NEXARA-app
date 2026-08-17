@@ -1354,10 +1354,22 @@ model Attendance {
   entryLongitude Float? // Ubicación GPS al registrar entrada
   exitLatitude   Float? // Ubicación GPS al registrar salida
   exitLongitude  Float? // Ubicación GPS al registrar salida
+  /// Día de la jornada al que pertenece el registro, ya resuelto.
+  ///
+  /// Existe para poder exigir en la base "una entrada y una salida por día".
+  /// El servicio comprobaba primero y creaba después, así que dos peticiones
+  /// simultáneas —un doble toque en el móvil, un reintento por red mala— creaban
+  /// las dos. Ya pasó: hay un usuario con dos salidas el mismo día en
+  /// producción, y de estos registros sale la nómina.
+  ///
+  /// No se puede indexar `timestamp::date` directamente porque convertir zonas
+  /// no es inmutable en Postgres; por eso el día se guarda resuelto.
+  workDate       DateTime?      @db.Date
   companyId      Int
   user           User           @relation(fields: [userId], references: [id])
   company        CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  @@unique([companyId, userId, workDate, type])
   @@index([companyId])
   @@index([userId, timestamp])
 }
