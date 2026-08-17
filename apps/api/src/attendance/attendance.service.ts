@@ -42,11 +42,22 @@ export class AttendanceService {
     return workDateColumn(date);
   }
 
+  /**
+   * Minutos que lleva corriendo una jornada todavía abierta.
+   *
+   * El corte es el menor entre el fin del rango consultado y **el fin de esa
+   * misma jornada**. Sin el segundo tope, una entrada de la que nadie registró
+   * salida seguía acumulando tiempo indefinidamente: en los datos reales había
+   * una del 16 de julio sumando 710 horas porque la siguiente salida era del 15
+   * de agosto. Una jornada no puede durar más que su propio día.
+   */
   private computeOpenMinutes(lastEntryAt: Date | null, rangeEnd: Date) {
     if (!lastEntryAt) return 0;
-    const end = rangeEnd.getTime();
     const start = lastEntryAt.getTime();
-    if (Number.isNaN(start) || end <= start) return 0;
+    if (Number.isNaN(start)) return 0;
+    const finDeSuJornada = workDayEnd(lastEntryAt).getTime();
+    const end = Math.min(rangeEnd.getTime(), finDeSuJornada);
+    if (end <= start) return 0;
     return Math.max(0, Math.floor((end - start) / 60000));
   }
 
