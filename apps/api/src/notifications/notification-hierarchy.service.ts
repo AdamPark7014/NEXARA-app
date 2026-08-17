@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { NotificationsService, INotificationPayload } from './notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
 
 /**
  * Servicio que maneja notificaciones jerárquicas
@@ -53,6 +54,26 @@ export class NotificationHierarchyService {
   }
 
   /**
+   * Acota una búsqueda de destinatarios a la empresa en curso.
+   *
+   * `User` no lleva `companyId` —la pertenencia vive en `UserCompany`— así que
+   * el middleware de aislamiento no puede acotarla, y estas búsquedas devolvían
+   * los administradores de **todas** las empresas. Hoy sólo existe una, así que
+   * no se nota; el día que se dé de alta la segunda, sus administradores
+   * recibirían las notificaciones de la primera, con folios e importes dentro.
+   *
+   * Fuera de una petición HTTP —tareas programadas— no hay empresa en contexto
+   * y devuelve filtro vacío, que es el comportamiento de siempre.
+   *
+   * No se aplica a los dueños de plataforma: esos sí ven todas las empresas a
+   * propósito.
+   */
+  private companyScope() {
+    const companyId = getRequestCompanyId();
+    return companyId ? { companyMemberships: { some: { companyId } } } : {};
+  }
+
+  /**
    * Obtener solo SuperAdmins
    */
   private async getSuperAdmins() {
@@ -62,6 +83,7 @@ export class NotificationHierarchyService {
           role: {
             accesoConsoleAdmin: true,
           },
+          ...this.companyScope(),
         },
       });
     } catch {
@@ -242,9 +264,11 @@ export class NotificationHierarchyService {
       where: {
         ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
         OR: [
+          // Los correos protegidos son dueños de plataforma: ven todas las
+          // empresas a proposito, por eso van fuera del filtro de empresa.
           { email: { in: protectedEmails } },
-          { role: { accesoConsoleAdmin: true } },
-          { role: { accesoEvidencias: true } },
+          { role: { accesoConsoleAdmin: true }, ...this.companyScope() },
+          { role: { accesoEvidencias: true }, ...this.companyScope() },
         ],
       },
       select: { id: true },
@@ -735,7 +759,7 @@ export class NotificationHierarchyService {
     const ids = new Set<number>();
 
     const admins = await this.prisma.user.findMany({
-      where: { role: { accesoConsoleAdmin: true }, NOT: { id: actorId } },
+      where: { role: { accesoConsoleAdmin: true }, NOT: { id: actorId }, ...this.companyScope() },
       select: { id: true },
     });
     admins.forEach((u) => ids.add(u.id));
@@ -1353,6 +1377,7 @@ export class NotificationHierarchyService {
             { orgRoleKey: { in: ['ceo', 'director_admin', 'director_commercial', 'sales_manager'] } },
           ],
         },
+        ...this.companyScope(),
       },
       select: { id: true },
     });
