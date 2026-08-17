@@ -6,6 +6,7 @@ import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js
 import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 import { OPEN_ACTIVITY_WHERE, finishedStatusSqlList } from '../activities/activity-status.js';
 import { kpiFallback } from '../common/kpi-fallback.js';
+import { workDayStart, workMonthStart } from '../common/time/workday.js';
 
 @Injectable()
 export class AnalyticsService {
@@ -195,8 +196,11 @@ export class AnalyticsService {
     const tenantId = requireCompanyId(companyId);
     const scope = companyWhere(tenantId);
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
+    // "Hoy" y "este mes" en hora de la empresa. Con hora del servidor —UTC— el
+    // día empezaba a las 18:00 del anterior en México, así que el tablero
+    // contaba seis horas de ayer como de hoy.
+    const startOfMonth = workMonthStart(now);
+    const startOfDay = workDayStart(now);
 
     const [
       attendanceToday,

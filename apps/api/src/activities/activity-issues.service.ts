@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { workDayEnd } from '../common/time/workday.js';
 
 /**
  * Incidencias y recomendaciones de un servicio.
@@ -395,8 +396,13 @@ function requireText(value: unknown, label: string): string {
   return text.slice(0, 4000);
 }
 
+/**
+ * Fin del día en hora de la empresa.
+ *
+ * Con hora del servidor —UTC— el rango terminaba a las 18:00 de México, así que
+ * las incidencias reportadas por la tarde del último día quedaban fuera del
+ * informe.
+ */
 function endOfDay(d: Date): Date {
-  const c = new Date(d);
-  c.setHours(23, 59, 59, 999);
-  return c;
+  return workDayEnd(d);
 }

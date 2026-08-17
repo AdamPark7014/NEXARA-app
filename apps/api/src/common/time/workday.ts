@@ -122,6 +122,24 @@ export function workDateColumn(instante: Date, tz = WORKDAY_TIMEZONE): Date {
 }
 
 /**
+ * Instante UTC en que empieza el mes en curso, en la zona de la empresa.
+ *
+ * `new Date(y, m, 1)` daba medianoche del servidor —UTC—, que en México es el
+ * último día del mes anterior a las 18:00: los informes mensuales arrastraban
+ * seis horas del mes previo.
+ */
+export function workMonthStart(instante: Date, tz = WORKDAY_TIMEZONE): Date {
+  const p = partesEn(instante, tz);
+  return workDayStart(new Date(Date.UTC(p.year, p.month - 1, 1, 12, 0, 0)), tz);
+}
+
+/** Igual, para el año en curso. */
+export function workYearStart(instante: Date, tz = WORKDAY_TIMEZONE): Date {
+  const p = partesEn(instante, tz);
+  return workDayStart(new Date(Date.UTC(p.year, 0, 1, 12, 0, 0)), tz);
+}
+
+/**
  * Interpreta `AAAA-MM-DD` como un día laboral de la zona.
  *
  * Antes `new Date(y, m-1, d)` lo tomaba como medianoche local del servidor
