@@ -4,15 +4,15 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { CreateGpsDto } from './dto/create-gps.dto.js';
+import { parseWorkDate, workDayBounds, workDayStart } from '../common/time/workday.js';
 
 @Injectable()
 export class GpsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** "Hoy" en hora de la empresa, no la del servidor. */
   private getTodayDateOnly() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return today;
+    return workDayStart(new Date());
   }
 
   async create(createGpsDto: CreateGpsDto, companyId?: number | null) {
@@ -196,19 +196,17 @@ export class GpsService {
     return this.getMyTrajectory(targetUserId, date, companyId);
   }
 
+  /**
+   * Rango del día pedido, en hora de la empresa.
+   *
+   * El recorrido de un técnico se mide por su día, no por el del servidor: en
+   * UTC, la tarde de hoy en México ya cuenta como mañana, así que el trayecto
+   * de la tarde desaparecía del mapa del día.
+   */
   private parseDateRange(date?: string) {
-    let targetDate: Date;
-    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      const parts = date.split('-').map(Number);
-      targetDate = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
-    } else {
-      targetDate = new Date();
-    }
-    const start = new Date(targetDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(targetDate);
-    end.setHours(23, 59, 59, 999);
-    return { start, end };
+    const targetDate =
+      date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? parseWorkDate(date) : new Date();
+    return workDayBounds(targetDate);
   }
 
   findOne(id: number) {
