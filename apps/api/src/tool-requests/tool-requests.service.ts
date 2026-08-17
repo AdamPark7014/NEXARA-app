@@ -473,10 +473,18 @@ export class ToolRequestsService {
       });
 
       if (request.inventoryItemId) {
-        await tx.toolInventoryItem.update({
-          where: { id: request.inventoryItemId },
+        // La comprobación de arriba lee el estado y decide; entre esa lectura y
+        // esta escritura cabe otra entrega. Con un `update` simple las dos
+        // pasaban y la misma herramienta física quedaba asignada a dos
+        // personas. La condición viaja dentro del UPDATE, que Postgres
+        // reevalúa al aplicar la fila.
+        const asignada = await tx.toolInventoryItem.updateMany({
+          where: { id: request.inventoryItemId, status: 'AVAILABLE' },
           data: { status: 'ASSIGNED' },
         });
+        if (asignada.count === 0) {
+          throw new Error('La herramienta ya no está disponible para entrega');
+        }
       }
 
       return updatedRequest;
