@@ -46,8 +46,8 @@ export const showLocalNotification = async (title: string, options?: Notificatio
   try {
     const registration = await navigator.serviceWorker.ready;
     registration.showNotification(title, {
-      icon: '/icon.png',
-      badge: '/icon.png',
+      icon: '/logo-nexara-lockup.png',
+      badge: '/logo-nexara-lockup.png',
       ...options,
     });
   } catch (error) {

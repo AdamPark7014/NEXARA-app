@@ -382,9 +382,9 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         }
 
         .logo {
-          width: 88px;
-          height: 88px;
-          margin: 0 auto 12px;
+          width: min(220px, 72vw);
+          height: auto;
+          margin: 0 auto 14px;
           border-radius: 0;
           display: flex;
           align-items: center;
@@ -395,18 +395,13 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         }
 
         .logoImage {
-          width: 78px;
-          height: 78px;
+          width: min(220px, 72vw);
+          height: auto;
           object-fit: contain;
         }
 
         .brandName {
-          margin: 0 0 8px;
-          text-transform: uppercase;
-          letter-spacing: 0.22rem;
-          font-size: 0.78rem;
-          font-weight: 700;
-          color: var(--text-tertiary);
+          display: none;
         }
 
         .title {
@@ -620,14 +615,14 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           }
 
           .logo {
-            width: 74px;
-            height: 74px;
+            width: min(180px, 70vw);
+            height: auto;
             border-radius: 0;
           }
 
           .logoImage {
-            width: 64px;
-            height: 64px;
+            width: min(180px, 70vw);
+            height: auto;
           }
 
           .title {
@@ -667,7 +662,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           ) : null}
           <div className="logo-container">
             <div className="logo">
-              <Image src="/logo-nexara-lockup.png" alt="Nexara" width={78} height={78} className="logoImage" priority />
+              <Image src="/logo-nexara-lockup.png" alt="Nexara" width={220} height={69} className="logoImage" priority />
             </div>
             <p className="brandName">Nexara</p>
             <h1 className="title">{title || "Iniciar sesión"}</h1>

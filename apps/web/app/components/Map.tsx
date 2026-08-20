@@ -207,7 +207,7 @@ export default function Map() {
         const infoWindow = new mapsAny.InfoWindow({
           content: `
             <div class="nexara-map-info">
-              <img src="/logo-nexara-platform.png" alt="NEXARA" class="nexara-map-logo" />
+              <img src="/logo-nexara-lockup.png" alt="NEXARA" class="nexara-map-logo" />
               <h3 class="nexara-map-title">NEXARA</h3>
               <p class="nexara-map-subtitle">Explanada Puebla · Momoxpan</p>
               <button type="button" class="nexara-map-btn" onclick="window.open('https://maps.app.goo.gl/34XSHPwUSeMAB7x69','_blank','noopener')">

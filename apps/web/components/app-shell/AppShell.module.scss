@@ -139,23 +139,45 @@
 }
 
 .brandLogo {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
+  height: 34px;
+  width: auto;
+  max-width: 148px;
+  border-radius: 0;
   background: transparent;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   flex-shrink: 0;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: none;
+}
 
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    display: block;
-  }
+.brandLogoFull {
+  width: auto;
+  height: 34px;
+  max-width: 148px;
+  object-fit: contain;
+  display: block;
+}
+
+.brandLogoMark {
+  display: none;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.shell[data-collapsed="true"] .brandLogo {
+  width: 34px;
+  max-width: 34px;
+}
+
+.shell[data-collapsed="true"] .brandLogoFull {
+  display: none;
+}
+
+.shell[data-collapsed="true"] .brandLogoMark {
+  display: block;
 }
 
 .brandText {

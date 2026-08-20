@@ -6,6 +6,14 @@ import { Space_Grotesk, Inter_Tight, Manrope, Fraunces, JetBrains_Mono } from "n
 import ClientLayout from "./ClientLayout";
 import Providers from "./providers";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
+import {
+  NEXARA_APPLE_TOUCH,
+  NEXARA_FAVICON_192,
+  NEXARA_FAVICON_48,
+  NEXARA_FAVICON_512,
+  NEXARA_FAVICON_ICO,
+  NEXARA_LOGO_LOCKUP,
+} from "@/lib/brand";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -46,13 +54,7 @@ const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").re
 const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "";
 const googleSiteVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim() || "";
 const bingSiteVerification = process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION?.trim() || "";
-const defaultOgImage = "/logo-nexara-lockup.png";
-/** URL nueva (v2) para forzar recacheo del favicon en Google SERP. */
-const brandIcon48 = "/brand/nexara-mark-v2-48.png";
-const brandIcon192 = "/brand/nexara-mark-v2-192.png";
-const brandIcon512 = "/brand/nexara-mark-v2-512.png";
-const brandIconIco = "/brand/nexara-mark-v2.ico";
-const brandApple = "/brand/nexara-mark-v2-180.png";
+const defaultOgImage = NEXARA_LOGO_LOCKUP;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -90,16 +92,16 @@ export const metadata: Metadata = {
   applicationName: "NEXARA",
   icons: {
     icon: [
-      { url: brandIconIco, sizes: "48x48" },
-      { url: brandIcon48, sizes: "48x48", type: "image/png" },
-      { url: brandIcon192, sizes: "192x192", type: "image/png" },
-      { url: brandIcon512, sizes: "512x512", type: "image/png" },
+      { url: NEXARA_FAVICON_ICO, sizes: "48x48" },
+      { url: NEXARA_FAVICON_48, sizes: "48x48", type: "image/png" },
+      { url: NEXARA_FAVICON_192, sizes: "192x192", type: "image/png" },
+      { url: NEXARA_FAVICON_512, sizes: "512x512", type: "image/png" },
       // Fallbacks legacy (mismo isotipo)
       { url: "/favicon.ico", sizes: "48x48" },
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
     ],
-    shortcut: brandIconIco,
-    apple: [{ url: brandApple, sizes: "180x180", type: "image/png" }],
+    shortcut: NEXARA_FAVICON_ICO,
+    apple: [{ url: NEXARA_APPLE_TOUCH, sizes: "180x180", type: "image/png" }],
   },
   openGraph: {
     type: "website",
@@ -167,8 +169,8 @@ export default function RootLayout({
     "@type": "Organization",
     name: "NEXARA",
     url: siteUrl,
-    logo: `${siteUrl}/logo-nexara-lockup.png`,
-    image: `${siteUrl}/logo-nexara-lockup.png`,
+    logo: `${siteUrl}${NEXARA_LOGO_LOCKUP}`,
+    image: `${siteUrl}${NEXARA_LOGO_LOCKUP}`,
     description:
       "NEXARA integra CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas en México.",
     contactPoint: {
@@ -189,8 +191,8 @@ export default function RootLayout({
     description:
       "CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas en Puebla, CDMX y cobertura nacional.",
     url: siteUrl,
-    image: `${siteUrl}/logo-nexara-lockup.png`,
-    logo: `${siteUrl}/logo-nexara-lockup.png`,
+    image: `${siteUrl}${NEXARA_LOGO_LOCKUP}`,
+    logo: `${siteUrl}${NEXARA_LOGO_LOCKUP}`,
     telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "",
     email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || "",
     address: {
