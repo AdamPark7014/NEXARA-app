@@ -167,7 +167,7 @@ export default function RootLayout({
     "@type": "Organization",
     name: "NEXARA",
     url: siteUrl,
-    logo: `${siteUrl}/brand/nexara-mark-v2-192.png`,
+    logo: `${siteUrl}/logo-nexara-lockup.png`,
     image: `${siteUrl}/logo-nexara-lockup.png`,
     description:
       "NEXARA integra CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas en México.",
@@ -190,7 +190,7 @@ export default function RootLayout({
       "CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas en Puebla, CDMX y cobertura nacional.",
     url: siteUrl,
     image: `${siteUrl}/logo-nexara-lockup.png`,
-    logo: `${siteUrl}/brand/nexara-mark-v2-192.png`,
+    logo: `${siteUrl}/logo-nexara-lockup.png`,
     telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "",
     email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || "",
     address: {

@@ -667,7 +667,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           ) : null}
           <div className="logo-container">
             <div className="logo">
-              <Image src="/logo-nexara-platform.png" alt="Nexara" width={78} height={78} className="logoImage" priority />
+              <Image src="/logo-nexara-lockup.png" alt="Nexara" width={78} height={78} className="logoImage" priority />
             </div>
             <p className="brandName">Nexara</p>
             <h1 className="title">{title || "Iniciar sesión"}</h1>
