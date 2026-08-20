@@ -347,7 +347,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
         <div className={styles.brand}>
           <div className={styles.brandLogo} aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-nexara-platform.png" alt="" width={38} height={38} />
+            <img src="/logo-nexara-lockup.png" alt="" width={38} height={38} />
           </div>
           <div className={styles.brandText}>
             <div className={styles.brandName}>NEXARA</div>
