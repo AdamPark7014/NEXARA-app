@@ -355,7 +355,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               className={styles.brandLogoMark}
-              src="/icon.png"
+              src="/logo-nexara-platform.png"
               alt=""
             />
           </div>

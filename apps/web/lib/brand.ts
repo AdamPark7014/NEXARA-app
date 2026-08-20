@@ -3,8 +3,11 @@
  * Usar siempre estos paths para logo de UI y favicon.
  */
 
-/** Lockup horizontal (principal / headers / login / shell). */
+/** Lockup horizontal (principal / headers / shell expandido). */
 export const NEXARA_LOGO_LOCKUP = "/logo-nexara-lockup.png";
+
+/** Isotipo cuadrado (login paneles / pestaña / shell colapsado). */
+export const NEXARA_LOGO_MARK = "/logo-nexara-platform.png";
 
 /** Favicon / iconos de pestaña (mismo asset en todos los hosts). */
 export const NEXARA_FAVICON_ICO = "/brand/nexara-mark-v2.ico";

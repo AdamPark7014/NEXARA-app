@@ -323,52 +323,168 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
   return (
     <>
       <style jsx>{`
-        .login-container {
+        .login-shell {
           min-height: 100vh;
           min-height: 100dvh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          display: grid;
+          grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
           position: relative;
           isolation: isolate;
           overflow: hidden;
-          padding: clamp(14px, 2.2vw, 30px);
-          background:
-            radial-gradient(circle at 12% -10%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 42%),
-            radial-gradient(circle at 88% -4%, color-mix(in srgb, var(--secondary) 12%, transparent), transparent 44%),
-            linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, var(--surface-2) 88%, var(--background)) 100%);
+          background: #071018;
+          color: #e8eef5;
+          font-family: var(--nx-font-body, "Manrope", system-ui, sans-serif);
         }
 
-        .login-container::before {
+        .brand-pane {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          padding: clamp(28px, 4vw, 56px);
+          background:
+            radial-gradient(ellipse 80% 60% at 18% 20%, rgba(46, 200, 216, 0.22), transparent 55%),
+            radial-gradient(ellipse 70% 50% at 85% 75%, rgba(240, 138, 30, 0.16), transparent 50%),
+            linear-gradient(155deg, #0a1520 0%, #0d1c28 42%, #081018 100%);
+          overflow: hidden;
+        }
+
+        .brand-pane::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(140, 190, 220, 0.07) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(140, 190, 220, 0.07) 1px, transparent 1px);
+          background-size: 48px 48px;
+          mask-image: radial-gradient(ellipse 70% 65% at 40% 35%, black 10%, transparent 75%);
+          pointer-events: none;
+          animation: grid-drift 18s linear infinite;
+        }
+
+        .brand-pane::after {
+          content: "";
+          position: absolute;
+          width: 420px;
+          height: 420px;
+          right: -120px;
+          bottom: -140px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(16, 161, 131, 0.28), transparent 68%);
+          pointer-events: none;
+        }
+
+        @keyframes grid-drift {
+          from { transform: translate3d(0, 0, 0); }
+          to { transform: translate3d(24px, 16px, 0); }
+        }
+
+        .brand-top {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          gap: 14px;
+        }
+
+        .brand-mark {
+          width: 52px;
+          height: 52px;
+          object-fit: contain;
+          filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
+        }
+
+        .brand-word {
+          margin: 0;
+          font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+          font-size: 1.15rem;
+          font-weight: 700;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+          color: #f4fbff;
+        }
+
+        .brand-hero {
+          position: relative;
+          z-index: 1;
+          max-width: 34rem;
+          margin: clamp(40px, 8vh, 90px) 0;
+          animation: rise-in 0.55s ease-out both;
+        }
+
+        .brand-kicker {
+          margin: 0 0 14px;
+          font-size: 0.78rem;
+          font-weight: 600;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: #7ec8d8;
+        }
+
+        .brand-title {
+          margin: 0 0 16px;
+          font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+          font-size: clamp(2rem, 3.4vw, 3rem);
+          line-height: 1.08;
+          letter-spacing: -0.03em;
+          font-weight: 700;
+          color: #f7fbff;
+          text-wrap: balance;
+        }
+
+        .brand-copy {
+          margin: 0;
+          max-width: 32ch;
+          font-size: 1.02rem;
+          line-height: 1.55;
+          color: rgba(210, 226, 238, 0.82);
+        }
+
+        .brand-foot {
+          position: relative;
+          z-index: 1;
+          font-size: 0.82rem;
+          color: rgba(180, 205, 220, 0.55);
+        }
+
+        .form-pane {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: clamp(20px, 3vw, 40px);
+          background:
+            linear-gradient(180deg, #f3f7fb 0%, #e8eef4 100%);
+          color: #122033;
+        }
+
+        .form-pane::before {
           content: "";
           position: absolute;
           inset: 0;
           background:
-            linear-gradient(90deg, color-mix(in srgb, var(--border) 40%, transparent) 1px, transparent 1px),
-            linear-gradient(color-mix(in srgb, var(--border) 40%, transparent) 1px, transparent 1px);
-          background-size: 34px 34px;
-          mask-image: radial-gradient(circle at 50% 30%, black 14%, transparent 76%);
-          opacity: 0.32;
-          z-index: -1;
+            radial-gradient(circle at 90% 8%, rgba(16, 161, 131, 0.08), transparent 36%),
+            radial-gradient(circle at 10% 90%, rgba(110, 197, 216, 0.1), transparent 40%);
+          pointer-events: none;
         }
 
         .login-card {
           position: relative;
+          z-index: 1;
           width: 100%;
-          max-width: 540px;
-          border-radius: 24px;
-          padding: clamp(26px, 4vw, 44px) clamp(18px, 3vw, 36px);
-          background:
-            linear-gradient(165deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface-2) 88%, transparent));
-          border: 1px solid var(--border);
-          box-shadow: var(--elev-2);
-          animation: login-card-enter 0.34s ease-out;
+          max-width: 420px;
+          padding: clamp(28px, 3.5vw, 40px);
+          border-radius: 18px;
+          background: rgba(255, 255, 255, 0.92);
+          border: 1px solid rgba(18, 42, 64, 0.08);
+          box-shadow: 0 24px 48px rgba(12, 28, 44, 0.1);
+          animation: rise-in 0.45s ease-out 0.08s both;
         }
 
-        @keyframes login-card-enter {
+        @keyframes rise-in {
           from {
             opacity: 0;
-            transform: translateY(20px);
+            transform: translateY(16px);
           }
           to {
             opacity: 1;
@@ -376,65 +492,66 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           }
         }
 
-        .logo-container {
-          text-align: center;
-          margin-bottom: clamp(22px, 2.8vw, 34px);
-        }
-
-        .logo {
-          width: min(220px, 72vw);
-          height: auto;
-          margin: 0 auto 14px;
-          border-radius: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: transparent;
-          border: none;
-          box-shadow: none;
-        }
-
-        .logoImage {
-          width: min(220px, 72vw);
-          height: auto;
-          object-fit: contain;
-        }
-
-        .brandName {
+        .mobile-brand {
           display: none;
+          text-align: center;
+          margin-bottom: 22px;
+        }
+
+        .mobile-brand img {
+          width: 72px;
+          height: 72px;
+          object-fit: contain;
+          margin: 0 auto 10px;
+        }
+
+        .mobile-brand span {
+          display: block;
+          font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+          font-size: 0.78rem;
+          font-weight: 700;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: #5a7288;
+        }
+
+        .logo-container {
+          margin-bottom: 26px;
         }
 
         .title {
           margin: 0 0 8px;
-          font-size: clamp(1.72rem, 2.8vw, 2.16rem);
-          line-height: 1.14;
-          letter-spacing: -0.02em;
-          text-wrap: balance;
-          color: var(--text-primary);
+          font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+          font-size: clamp(1.55rem, 2.4vw, 1.85rem);
+          line-height: 1.15;
+          letter-spacing: -0.025em;
+          font-weight: 700;
+          color: #0f1c2a;
         }
 
         .subtitle {
           margin: 0;
-          font-size: clamp(0.9rem, 1.5vw, 0.98rem);
-          line-height: 1.54;
-          color: var(--text-secondary);
-          text-wrap: pretty;
+          font-size: 0.95rem;
+          line-height: 1.5;
+          color: #5b6f82;
         }
 
         .form {
-          margin-top: clamp(20px, 2vw, 30px);
+          margin-top: 26px;
+          display: grid;
+          gap: 16px;
         }
 
         .input-group {
-          margin-bottom: 16px;
+          display: grid;
+          gap: 7px;
         }
 
         .input-label {
-          display: block;
-          margin-bottom: 7px;
-          font-size: 0.9rem;
-          font-weight: 600;
-          color: var(--text-secondary);
+          font-size: 0.8rem;
+          font-weight: 650;
+          letter-spacing: 0.02em;
+          color: #3d5266;
         }
 
         .input-wrapper {
@@ -449,42 +566,46 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           left: 14px;
           width: 18px;
           height: 18px;
-          color: var(--text-tertiary);
+          color: #7a90a4;
           pointer-events: none;
-          transition: color 0.2s ease;
           z-index: 1;
+          transition: color 0.2s ease;
         }
 
-        .login-card .input {
-          padding-left: 44px;
-          font-size: 0.94rem;
-          color: var(--text-primary);
-          background: color-mix(in srgb, var(--surface) 94%, var(--surface-2));
-          border-color: var(--border);
+        .login-card :global(.input),
+        .login-card .field {
+          width: 100%;
+          min-height: 48px;
+          padding: 0 14px 0 44px;
+          border-radius: 12px;
+          border: 1px solid rgba(18, 42, 64, 0.14);
+          background: #f7fafc;
+          color: #122033;
+          font-size: 0.95rem;
+          font-family: inherit;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
         }
 
-        .login-card .input:hover {
-          border-color: var(--border-strong);
+        .login-card :global(.input):hover,
+        .login-card .field:hover {
+          border-color: rgba(16, 161, 131, 0.35);
         }
 
-        .login-card .input:focus {
-          border-color: color-mix(in srgb, var(--primary) 58%, var(--border));
-          box-shadow: var(--ring-soft);
-          background: color-mix(in srgb, var(--surface) 98%, #fff);
+        .login-card :global(.input):focus,
+        .login-card .field:focus {
           outline: none;
+          border-color: #10a183;
+          background: #fff;
+          box-shadow: 0 0 0 3px rgba(16, 161, 131, 0.16);
         }
 
-        .login-card .input:focus + .input-icon {
-          color: var(--primary);
-        }
-
-        .login-card .input::placeholder {
-          color: var(--text-tertiary);
-          opacity: 0.84;
+        .login-card :global(.input):focus + .input-icon,
+        .input-wrapper:focus-within .input-icon {
+          color: #0b7d65;
         }
 
         .input-has-toggle {
-          padding-right: 52px;
+          padding-right: 48px !important;
         }
 
         .password-toggle {
@@ -493,9 +614,9 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           width: 34px;
           height: 34px;
           border: none;
-          border-radius: 10px;
+          border-radius: 9px;
           background: transparent;
-          color: var(--text-tertiary);
+          color: #7a90a4;
           cursor: pointer;
           display: inline-flex;
           align-items: center;
@@ -504,92 +625,94 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         }
 
         .password-toggle:hover {
-          color: var(--text-primary);
-          background: color-mix(in srgb, var(--surface-2) 80%, transparent);
-        }
-
-        .password-toggle:focus-visible {
-          outline: 2px solid color-mix(in srgb, var(--primary) 46%, transparent);
-          outline-offset: 1px;
+          color: #122033;
+          background: rgba(18, 42, 64, 0.06);
         }
 
         .submit-button {
           width: 100%;
-          margin-top: 6px;
+          margin-top: 4px;
           min-height: 50px;
           border: none;
-          border-radius: var(--radius-sm);
-          background: linear-gradient(140deg, var(--primary) 0%, var(--secondary) 100%);
+          border-radius: 12px;
+          background: linear-gradient(135deg, #0b7d65 0%, #10a183 55%, #2a9fb8 100%);
           color: #fff;
           font-size: 0.98rem;
           font-weight: 700;
           letter-spacing: 0.01em;
+          font-family: var(--nx-font-ui, "Inter Tight", system-ui, sans-serif);
           cursor: pointer;
-          box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 28%, transparent);
-          transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+          transition: transform 0.2s ease, filter 0.2s ease;
         }
 
-        .submit-button:hover {
+        .submit-button:hover:not(:disabled) {
           transform: translateY(-1px);
-          box-shadow: 0 14px 26px color-mix(in srgb, var(--primary) 30%, transparent);
-          filter: saturate(1.04) brightness(1.03);
-        }
-
-        .submit-button:active {
-          transform: translateY(0);
+          filter: brightness(1.04);
         }
 
         .submit-button:disabled {
-          opacity: 0.66;
+          opacity: 0.65;
           cursor: not-allowed;
-          box-shadow: none;
           transform: none;
         }
 
-        .submit-button:focus-visible {
-          outline: 3px solid color-mix(in srgb, var(--primary) 40%, transparent);
-          outline-offset: 2px;
+        .sso-button {
+          width: 100%;
+          min-height: 46px;
+          border-radius: 12px;
+          border: 1px solid rgba(18, 42, 64, 0.16);
+          background: #fff;
+          color: #1c3348;
+          font-size: 0.92rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .sso-button:hover {
+          border-color: rgba(16, 161, 131, 0.4);
+          background: #f4fbf9;
         }
 
         .access-notice {
-          margin-bottom: 14px;
+          margin-bottom: 16px;
           padding: 12px 14px;
-          border-radius: var(--radius-sm);
-          border: 1px solid color-mix(in srgb, var(--primary) 42%, var(--border));
-          background: color-mix(in srgb, var(--primary) 10%, var(--surface));
-          color: var(--text-primary);
+          border-radius: 12px;
+          border: 1px solid rgba(16, 161, 131, 0.28);
+          background: rgba(16, 161, 131, 0.08);
+          color: #1c3348;
           font-size: 0.87rem;
           line-height: 1.45;
         }
 
         .error-message {
-          margin-top: 18px;
           padding: 12px 14px;
-          border-radius: var(--radius-sm);
-          border: 1px solid var(--state-danger-border);
-          background: var(--state-danger-bg);
-          color: var(--state-danger-text);
+          border-radius: 12px;
+          border: 1px solid rgba(180, 50, 50, 0.28);
+          background: rgba(180, 50, 50, 0.08);
+          color: #8a1f1f;
           font-size: 0.87rem;
           line-height: 1.45;
         }
 
         .footer {
-          margin-top: 28px;
-          padding-top: 20px;
+          margin-top: 24px;
+          padding-top: 18px;
           text-align: center;
-          border-top: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+          border-top: 1px solid rgba(18, 42, 64, 0.08);
         }
 
         .footer-text {
           margin: 0;
-          font-size: 0.8rem;
-          color: var(--text-tertiary);
+          font-size: 0.78rem;
+          letter-spacing: 0.04em;
+          color: #7a90a4;
         }
 
         .loader {
           display: inline-block;
-          width: 16px;
-          height: 16px;
+          width: 15px;
+          height: 15px;
           margin-right: 8px;
           border-radius: 50%;
           border: 2px solid rgba(255, 255, 255, 0.32);
@@ -599,192 +722,206 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         }
 
         @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
+          to { transform: rotate(360deg); }
         }
 
-        @media (max-width: 520px) {
-          .login-container {
-            padding: 12px;
+        @media (max-width: 920px) {
+          .login-shell {
+            grid-template-columns: 1fr;
           }
 
-          .login-card {
-            border-radius: 18px;
-            padding: 24px 14px;
+          .brand-pane {
+            display: none;
           }
 
-          .logo {
-            width: min(180px, 70vw);
-            height: auto;
-            border-radius: 0;
+          .mobile-brand {
+            display: block;
           }
 
-          .logoImage {
-            width: min(180px, 70vw);
-            height: auto;
-          }
-
-          .title {
-            font-size: 1.52rem;
-          }
-
-          .subtitle {
-            font-size: 0.86rem;
-          }
-
-          .footer {
-            margin-top: 22px;
-            padding-top: 16px;
+          .form-pane {
+            min-height: 100vh;
+            min-height: 100dvh;
           }
         }
 
         @media (prefers-reduced-motion: reduce) {
+          .brand-pane::before,
+          .brand-hero,
           .login-card,
           .loader {
             animation: none;
           }
 
-          .submit-button,
-          .password-toggle,
-          .input-icon {
+          .submit-button {
             transition: none;
           }
         }
       `}</style>
 
-      <div className="login-container">
-        <div className="login-card">
-          {accessNotice ? (
-            <div className="access-notice" role="status">
-              {accessNotice}
-            </div>
-          ) : null}
-          <div className="logo-container">
-            <div className="logo">
-              <Image src="/logo-nexara-lockup.png" alt="Nexara" width={220} height={69} className="logoImage" priority />
-            </div>
-            <p className="brandName">Nexara</p>
-            <h1 className="title">{title || "Iniciar sesión"}</h1>
-            <p className="subtitle">{subtitle || "Ingresa a tu cuenta de Nexara"}</p>
+      <div className="login-shell">
+        <aside className="brand-pane" aria-hidden="true">
+          <div className="brand-top">
+            <Image
+              src="/logo-nexara-platform.png"
+              alt=""
+              width={52}
+              height={52}
+              className="brand-mark"
+              priority
+            />
+            <p className="brand-word">Nexara</p>
           </div>
+          <div className="brand-hero">
+            <p className="brand-kicker">Plataforma operativa</p>
+            <h2 className="brand-title">Control, campo y continuidad en una sola firma.</h2>
+            <p className="brand-copy">
+              Accede a tu panel para gestionar CCTV, redes, soporte TI y la operación del día a día.
+            </p>
+          </div>
+          <p className="brand-foot">nexara.com.mx · Puebla · CDMX · cobertura nacional</p>
+        </aside>
 
-          <form className="form" onSubmit={handleLogin}>
-            <div className="input-group">
-              <label className="input-label" htmlFor="email">
-                Correo electrónico
-              </label>
-              <div className="input-wrapper">
-                <svg className="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M3 8L10.89 13.26C11.5412 13.6788 12.4588 13.6788 13.11 13.26L21 8M5 19H19C20.1046 19 21 18.1046 21 17V7C21 5.89543 20.1046 5 19 5H5C3.89543 5 3 5.89543 3 7V17C3 18.1046 3.89543 19 5 19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <input
-                  id="email"
-                  type="email"
-                  className="input"
-                  placeholder="gerencia@nexara.com.mx"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                />
+        <main className="form-pane">
+          <div className="login-card">
+            {accessNotice ? (
+              <div className="access-notice" role="status">
+                {accessNotice}
               </div>
+            ) : null}
+
+            <div className="mobile-brand">
+              <Image
+                src="/logo-nexara-platform.png"
+                alt="Nexara"
+                width={72}
+                height={72}
+                priority
+              />
+              <span>Nexara</span>
             </div>
 
-            <div className="input-group">
-              <label className="input-label" htmlFor="password">
-                Contraseña
-              </label>
-              <div className="input-wrapper">
-                <svg className="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 15V17M6 21H18C19.1046 21 20 20.1046 20 19V13C20 11.8954 19.1046 11 18 11H6C4.89543 11 4 11.8954 4 13V19C4 20.1046 4.89543 21 6 21ZM16 11V7C16 4.79086 14.2091 3 12 3C9.79086 3 8 4.79086 8 7V11H16Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  className="input input-has-toggle"
-                  placeholder="••••••••••••"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                >
-                  {showPassword ? (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  ) : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M2.45801 12C3.73201 7.943 7.52301 5 12 5C16.478 5 20.268 7.943 21.542 12C20.268 16.057 16.478 19 12 19C7.52301 19 3.73201 16.057 2.45801 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  )}
-                </button>
-              </div>
+            <div className="logo-container">
+              <h1 className="title">{title || "Iniciar sesión"}</h1>
+              <p className="subtitle">{subtitle || "Ingresa a tu cuenta de Nexara"}</p>
             </div>
 
-            {mfaRequired && (
+            <form className="form" onSubmit={handleLogin}>
               <div className="input-group">
-                <label className="input-label" htmlFor="mfaCode">
-                  Código MFA
+                <label className="input-label" htmlFor="email">
+                  Correo electrónico
                 </label>
                 <div className="input-wrapper">
-                  <svg className="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <svg className="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M3 8L10.89 13.26C11.5412 13.6788 12.4588 13.6788 13.11 13.26L21 8M5 19H19C20.1046 19 21 18.1046 21 17V7C21 5.89543 20.1046 5 19 5H5C3.89543 5 3 5.89543 3 7V17C3 18.1046 3.89543 19 5 19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                   <input
-                    id="mfaCode"
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    className="input"
-                    placeholder="000000"
-                    value={mfaCode}
-                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    id="email"
+                    type="email"
+                    className="input field"
+                    placeholder="gerencia@nexara.com.mx"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
                     required
-                    autoFocus
+                    autoComplete="email"
                   />
                 </div>
               </div>
-            )}
 
-            <button type="submit" className="submit-button" disabled={isLoading}>
-              {isLoading && <span className="loader"></span>}
-              {isLoading ? "Iniciando sesión..." : mfaRequired ? "Verificar MFA" : "Entrar"}
-            </button>
-
-            {mode === "console" && ssoEnabled && (
-              <button
-                type="button"
-                className="submit-button"
-                style={{ marginTop: 10, background: "transparent", border: "1px solid var(--border, #ccc)", color: "inherit" }}
-                onClick={() => {
-                  window.location.href = buildApiUrl("auth/oidc/start");
-                }}
-              >
-                Continuar con SSO / OIDC
-              </button>
-            )}
-
-            {error && (
-              <div className="error-message" role="alert">
-                <strong>Error:</strong> {error}
+              <div className="input-group">
+                <label className="input-label" htmlFor="password">
+                  Contraseña
+                </label>
+                <div className="input-wrapper">
+                  <svg className="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 15V17M6 21H18C19.1046 21 20 20.1046 20 19V13C20 11.8954 19.1046 11 18 11H6C4.89543 11 4 11.8954 4 13V19C4 20.1046 4.89543 21 6 21ZM16 11V7C16 4.79086 14.2091 3 12 3C9.79086 3 8 4.79086 8 7V11H16Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    className="input field input-has-toggle"
+                    placeholder="••••••••••••"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {showPassword ? (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    ) : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M2.45801 12C3.73201 7.943 7.52301 5 12 5C16.478 5 20.268 7.943 21.542 12C20.268 16.057 16.478 19 12 19C7.52301 19 3.73201 16.057 2.45801 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
-            )}
-          </form>
 
-          <div className="footer">
-            <p className="footer-text">Tecnología que impulsa tu negocio</p>
+              {mfaRequired && (
+                <div className="input-group">
+                  <label className="input-label" htmlFor="mfaCode">
+                    Código MFA
+                  </label>
+                  <div className="input-wrapper">
+                    <svg className="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <input
+                      id="mfaCode"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      className="input field"
+                      placeholder="000000"
+                      value={mfaCode}
+                      onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      required
+                      autoFocus
+                    />
+                  </div>
+                </div>
+              )}
+
+              <button type="submit" className="submit-button" disabled={isLoading}>
+                {isLoading && <span className="loader"></span>}
+                {isLoading ? "Iniciando sesión..." : mfaRequired ? "Verificar MFA" : "Entrar"}
+              </button>
+
+              {mode === "console" && ssoEnabled && (
+                <button
+                  type="button"
+                  className="sso-button"
+                  onClick={() => {
+                    window.location.href = buildApiUrl("auth/oidc/start");
+                  }}
+                >
+                  Continuar con SSO / OIDC
+                </button>
+              )}
+
+              {error && (
+                <div className="error-message" role="alert">
+                  <strong>Error:</strong> {error}
+                </div>
+              )}
+            </form>
+
+            <div className="footer">
+              <p className="footer-text">Tecnología que impulsa tu negocio</p>
+            </div>
           </div>
-        </div>
+        </main>
       </div>
     </>
   );
 }
+
 
