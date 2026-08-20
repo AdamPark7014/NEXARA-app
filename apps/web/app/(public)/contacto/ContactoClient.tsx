@@ -7,7 +7,6 @@ import shared from "../_shared/public.module.css";
 import styles from "./page.module.css";
 import { buildApiUrl } from "@/lib/api-base";
 import { openExternalUrl } from "@/lib/open-external-url";
-import Map from "@/app/components/Map";
 import EditorialImage from "../../components/EditorialImage";
 import type { PageVisualsContent } from "@/lib/page-content-api";
 import { findGeoCity } from "@/lib/seo/geo-cities";
@@ -18,6 +17,7 @@ const WA_LABEL = "+52 222 696 0350";
 const PHONE_LABEL = "+52 220 179 1871";
 const PHONE_TEL = "tel:+522201791871";
 const COMPANY_EMAIL = "gerencia@nexara.com.mx";
+const MAPS_PLACE_URL = "https://maps.app.goo.gl/34XSHPwUSeMAB7x69";
 
 type Props = {
   visuals: PageVisualsContent;
@@ -246,8 +246,28 @@ export default function ContactoClient({ visuals }: Props) {
               <Link href="/cobertura">más ciudades</Link>
             </p>
           </div>
-          <div className={styles.mapWrap}>
-            <Map />
+          <div className={styles.locationCard}>
+            <div className={styles.locationCopy}>
+              <p className={styles.locationLabel}>Base operativa</p>
+              <p className={styles.locationAddress}>
+                Explanada Puebla · Santiago Momoxpan, Puebla
+              </p>
+              <p className={styles.locationHint}>
+                Visitas con cita. Para llegar, usa el enlace de Google Maps.
+              </p>
+            </div>
+            <a
+              className={`${shared.btn} ${shared.btnSecondary}`}
+              href={MAPS_PLACE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                e.preventDefault();
+                openExternalUrl(MAPS_PLACE_URL);
+              }}
+            >
+              Abrir en Google Maps
+            </a>
           </div>
         </div>
       </section>

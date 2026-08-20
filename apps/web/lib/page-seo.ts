@@ -64,10 +64,10 @@ const DEFAULT_OG = "/logo-nexara-lockup.png";
 
 export const DEFAULT_PAGE_SEO: Record<PageSeoKey, PageSeoContent> = {
   home: {
-    title: "NEXARA | CCTV, Cómputo, Redes y Soluciones TI en México",
+    title: "NEXARA | CCTV, redes y soporte TI en México",
     description:
-      "NEXARA: cámaras CCTV, equipo de cómputo, redes WiFi, soporte TI y ERP industrial para empresas en Puebla, CDMX y toda México.",
-    ogTitle: "NEXARA | Soluciones TI para un mundo conectado",
+      "Integramos CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas. Una sola firma: diseño, instalación y operación en Puebla, CDMX y cobertura nacional.",
+    ogTitle: "NEXARA | CCTV, redes y soporte TI",
     ogDescription:
       "CCTV, redes, cómputo y soporte TI con una sola firma responsable. Puebla · CDMX · cobertura nacional.",
     ogImageUrl: DEFAULT_OG,
@@ -76,9 +76,9 @@ export const DEFAULT_PAGE_SEO: Record<PageSeoKey, PageSeoContent> = {
     noIndex: false,
   },
   servicios: {
-    title: "Servicios | CCTV, redes, cómputo y soporte TI",
+    title: "Servicios | CCTV, redes y TI",
     description:
-      "Seguridad inteligente, conectividad, infraestructura TI, soporte y plataformas a medida — soluciones diseñadas para operar desde el primer día.",
+      "Videovigilancia, redes Wi‑Fi, cómputo, infraestructura y soporte TI — diseño, instalación y operación bajo el mismo contrato.",
     ogTitle: "Servicios NEXARA — CCTV, redes y soporte TI",
     ogDescription:
       "Videovigilancia, redes Wi‑Fi, cómputo y mesa de ayuda con instalación y operación bajo el mismo contrato.",
@@ -87,10 +87,10 @@ export const DEFAULT_PAGE_SEO: Record<PageSeoKey, PageSeoContent> = {
     noIndex: false,
   },
   soluciones: {
-    title: "Soluciones por industria | Nexara",
+    title: "Soluciones por industria | NEXARA",
     description:
       "Soluciones Nexara por vertical: retail, manufactura, hospitalidad, salud, educación y gobierno.",
-    ogTitle: "Soluciones por industria | Nexara",
+    ogTitle: "Soluciones por industria | NEXARA",
     ogDescription:
       "Cada vertical con su riesgo típico: CCTV, redes y soporte alineados a tu operación.",
     ogImageUrl: DEFAULT_OG,
@@ -98,19 +98,19 @@ export const DEFAULT_PAGE_SEO: Record<PageSeoKey, PageSeoContent> = {
     noIndex: true,
   },
   nosotros: {
-    title: "Nosotros | Equipo de integración tecnológica",
+    title: "Nosotros | NEXARA",
     description:
-      "Quiénes somos: ingeniería, implementación y soporte tecnológico desde Puebla y Ciudad de México, con cobertura nacional.",
-    ogTitle: "Nosotros | Nexara",
+      "Ingeniería, implementación y soporte tecnológico desde Puebla y Ciudad de México, con cobertura nacional.",
+    ogTitle: "Nosotros | NEXARA",
     ogDescription: "Donde la tecnología se convierte en resultados operativos.",
     ogImageUrl: DEFAULT_OG,
     keywords: "empresa tecnología Puebla, integradores TI México, Nexara equipo",
     noIndex: false,
   },
   contacto: {
-    title: "Contacto | Cotiza CCTV, redes y soporte TI",
+    title: "Contacto | Cotizar con NEXARA",
     description:
-      "Contacta a NEXARA para cotizaciones, soporte TI, CCTV, redes y proyectos tecnológicos en Puebla, CDMX y México.",
+      "Agenda un diagnóstico con NEXARA: CCTV, redes, cómputo y soporte TI en Puebla, CDMX y México.",
     ogTitle: "Contacto | NEXARA",
     ogDescription: "Agenda un diagnóstico. Te decimos qué instalar, qué posponer y qué presupuesto tiene sentido.",
     ogImageUrl: DEFAULT_OG,
@@ -118,29 +118,29 @@ export const DEFAULT_PAGE_SEO: Record<PageSeoKey, PageSeoContent> = {
     noIndex: false,
   },
   proyectos: {
-    title: "Proyectos | Casos de integración tecnológica",
+    title: "Proyectos | NEXARA",
     description:
-      "Casos y proyectos representativos ejecutados por Nexara en retail, manufactura, hospitalidad y más.",
-    ogTitle: "Proyectos | Nexara",
+      "Casos y proyectos de CCTV, redes y soporte ejecutados por Nexara en retail, manufactura, hospitalidad y más.",
+    ogTitle: "Proyectos | NEXARA",
     ogDescription: "Implementaciones reales de CCTV, redes y soporte en sitios que no pueden fallar.",
     ogImageUrl: DEFAULT_OG,
     keywords: "casos de éxito TI, proyectos CCTV, implementación redes",
     noIndex: false,
   },
   blog: {
-    title: "Blog | Noticias y guías de campo",
+    title: "Blog | NEXARA",
     description:
       "Noticias, guías y notas de campo sobre CCTV, redes, cómputo y soporte TI.",
-    ogTitle: "Blog | Nexara",
+    ogTitle: "Blog | NEXARA",
     ogDescription: "Notas prácticas de instalación, operación y soporte tecnológico.",
     ogImageUrl: DEFAULT_OG,
     keywords: "blog CCTV, guías redes empresariales, soporte TI",
     noIndex: false,
   },
   cobertura: {
-    title: "Cobertura y clientes | NEXARA en México",
+    title: "Cobertura | Puebla y CDMX",
     description:
-      "Cobertura de proyectos NEXARA y referencias de clientes en México: CCTV, cómputo, redes y soporte TI.",
+      "Operamos desde Puebla y CDMX con alcance nacional: CCTV, cómputo, redes y soporte TI.",
     ogTitle: "Cobertura | NEXARA",
     ogDescription: "Operamos desde Puebla y CDMX con alcance a toda la República.",
     ogImageUrl: DEFAULT_OG,

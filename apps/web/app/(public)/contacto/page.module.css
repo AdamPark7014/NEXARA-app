@@ -248,6 +248,45 @@
   overflow: hidden;
 }
 
+.locationCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px;
+  border-radius: 14px;
+  border: 1px solid rgba(140, 190, 255, 0.14);
+  background:
+    linear-gradient(145deg, rgba(18, 36, 58, 0.92), rgba(10, 18, 32, 0.96));
+}
+
+.locationCopy {
+  min-width: 0;
+}
+
+.locationLabel {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7f9bb8;
+}
+
+.locationAddress {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #f4f8ff;
+}
+
+.locationHint {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #9bb0cc;
+}
+
 @media (max-width: 900px) {
   .formLayout {
     grid-template-columns: 1fr;
@@ -269,6 +308,12 @@
   .mapWrap {
     height: clamp(220px, 55vw, 280px);
     border-radius: 12px;
+  }
+
+  .locationCard {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 18px;
   }
 }
 

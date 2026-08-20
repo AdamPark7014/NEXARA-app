@@ -557,6 +557,6 @@ export const config = {
      * - Favicon e íconos: favicon.ico, icon.png, etc.
      * - Archivos públicos: robots.txt, sitemap.xml
      */
-    '/((?!_next/static|_next/image|_next/webpack-hmr|favicon.ico|icon.png|robots.txt|sitemap.xml).*)',
+    '/((?!_next/static|_next/image|_next/webpack-hmr|favicon.ico|icon.png|icon-48.png|icon-192.png|apple-touch-icon.png|apple-icon.png|robots.txt|sitemap.xml).*)',
   ],
 };

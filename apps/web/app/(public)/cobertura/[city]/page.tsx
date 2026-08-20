@@ -92,11 +92,12 @@ export default function CoberturaCityPage({ params }: { params: Params }) {
 
   const localSchema = {
     "@context": "https://schema.org",
-    "@type": "LocalBusiness",
+    "@type": "ProfessionalService",
     name: `NEXARA · ${city.name}`,
     description: `CCTV, redes, cómputo y soporte TI en ${city.name}, ${city.region}.`,
     url: `${siteUrl}${path}`,
     image: `${siteUrl}/logo-nexara-lockup.png`,
+    logo: `${siteUrl}/icon-192.png`,
     telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "+52-222-696-0350",
     areaServed: {
       "@type": "City",
