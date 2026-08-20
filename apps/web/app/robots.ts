@@ -62,7 +62,19 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: "Googlebot-Image",
-        allow: ["/", "/images/", "/uploads/", "/*.jpg", "/*.jpeg", "/*.png", "/*.webp", "/*.gif"],
+        allow: [
+          "/",
+          "/brand/",
+          "/images/",
+          "/uploads/",
+          "/favicon.ico",
+          "/*.ico",
+          "/*.jpg",
+          "/*.jpeg",
+          "/*.png",
+          "/*.webp",
+          "/*.gif",
+        ],
         disallow: ["/api/", "/console/", "/studio/", "/crm/", "/ops/", "/erp/"],
       },
       {

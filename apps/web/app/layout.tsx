@@ -47,7 +47,12 @@ const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "";
 const googleSiteVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim() || "";
 const bingSiteVerification = process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION?.trim() || "";
 const defaultOgImage = "/logo-nexara-lockup.png";
-const brandIcon = "/icon.png";
+/** URL nueva (v2) para forzar recacheo del favicon en Google SERP. */
+const brandIcon48 = "/brand/nexara-mark-v2-48.png";
+const brandIcon192 = "/brand/nexara-mark-v2-192.png";
+const brandIcon512 = "/brand/nexara-mark-v2-512.png";
+const brandIconIco = "/brand/nexara-mark-v2.ico";
+const brandApple = "/brand/nexara-mark-v2-180.png";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -85,13 +90,16 @@ export const metadata: Metadata = {
   applicationName: "NEXARA",
   icons: {
     icon: [
+      { url: brandIconIco, sizes: "48x48" },
+      { url: brandIcon48, sizes: "48x48", type: "image/png" },
+      { url: brandIcon192, sizes: "192x192", type: "image/png" },
+      { url: brandIcon512, sizes: "512x512", type: "image/png" },
+      // Fallbacks legacy (mismo isotipo)
       { url: "/favicon.ico", sizes: "48x48" },
-      { url: "/icon-48.png", sizes: "48x48", type: "image/png" },
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: brandIcon, sizes: "512x512", type: "image/png" },
     ],
-    shortcut: "/favicon.ico",
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: brandIconIco,
+    apple: [{ url: brandApple, sizes: "180x180", type: "image/png" }],
   },
   openGraph: {
     type: "website",
@@ -159,7 +167,7 @@ export default function RootLayout({
     "@type": "Organization",
     name: "NEXARA",
     url: siteUrl,
-    logo: `${siteUrl}/icon-192.png`,
+    logo: `${siteUrl}/brand/nexara-mark-v2-192.png`,
     image: `${siteUrl}/logo-nexara-lockup.png`,
     description:
       "NEXARA integra CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas en México.",
@@ -182,7 +190,7 @@ export default function RootLayout({
       "CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas en Puebla, CDMX y cobertura nacional.",
     url: siteUrl,
     image: `${siteUrl}/logo-nexara-lockup.png`,
-    logo: `${siteUrl}/icon-192.png`,
+    logo: `${siteUrl}/brand/nexara-mark-v2-192.png`,
     telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "",
     email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || "",
     address: {
