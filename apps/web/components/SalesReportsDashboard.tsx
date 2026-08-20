@@ -141,7 +141,7 @@ export default function SalesReportsDashboard({
     setGeneratePdfLoading(true);
     try {
       // Build logo URL with nexara.com.mx domain
-      const logoUrl = 'https://nexara.com.mx/logo-nexara.png';
+      const logoUrl = 'https://nexara.com.mx/logo-nexara-lockup.png';
 
       const res = await fetch(buildApiUrl("ventas/reportes/generar-pdf"), {
         method: 'POST',

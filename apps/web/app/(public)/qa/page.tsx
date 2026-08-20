@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     url: `${siteUrl}/qa`,
     title: "Preguntas Frecuentes de Tecnologia Empresarial | Nexara",
     description: "Aclara dudas clave antes de implementar soluciones tecnologicas empresariales.",
-    images: [{ url: "/logo-nexara.png", width: 1200, height: 630, alt: "FAQ Nexara" }],
+    images: [{ url: "/logo-nexara-lockup.png", width: 1200, height: 630, alt: "FAQ Nexara" }],
   },
 };
 
