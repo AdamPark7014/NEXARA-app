@@ -140,12 +140,14 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
     url: `${siteUrl}${landingPath}`,
     image: heroImage.startsWith("http") ? heroImage : `${siteUrl}${heroImage}`,
     provider: {
-      "@type": "LocalBusiness",
+      "@type": "Organization",
       name: "NEXARA",
       url: siteUrl,
+      logo: `${siteUrl}/icon-192.png`,
       telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "+52-222-696-0350",
       address: {
         "@type": "PostalAddress",
+        streetAddress: "Explanada Puebla, Santiago Momoxpan",
         addressLocality: "Puebla",
         addressRegion: "Puebla",
         addressCountry: "MX",

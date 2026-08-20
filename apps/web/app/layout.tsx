@@ -47,55 +47,60 @@ const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "";
 const googleSiteVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim() || "";
 const bingSiteVerification = process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION?.trim() || "";
 const defaultOgImage = "/logo-nexara-lockup.png";
+const brandIcon = "/icon.png";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "NEXARA | CCTV, Computo, Redes y Soluciones TI en Mexico",
+    default: "NEXARA | CCTV, redes y soporte TI en México",
     template: "%s | NEXARA",
   },
   description:
-    "NEXARA: camaras CCTV, equipo de computo, redes WiFi, soporte TI y ERP industrial para empresas en Puebla, CDMX y toda Mexico.",
+    "Integramos CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas. Una sola firma: diseño, instalación y operación en Puebla, CDMX y cobertura nacional.",
   keywords: [
     // CCTV / videovigilancia
-    "cctv", "camaras de seguridad", "camaras ip", "videovigilancia",
-    "cctv Puebla", "camaras de seguridad Puebla", "cctv CDMX",
-    "camaras de seguridad CDMX", "instalacion de camaras Puebla",
-    "sistema de camaras Mexico",
+    "cctv", "cámaras de seguridad", "cámaras ip", "videovigilancia",
+    "cctv Puebla", "cámaras de seguridad Puebla", "cctv CDMX",
+    "cámaras de seguridad CDMX", "instalación de cámaras Puebla",
+    "sistema de cámaras México",
     // Cómputo
-    "equipo de computo", "venta de computadoras", "laptops",
-    "computo Puebla", "equipo de computo Puebla", "renta de equipo",
-    "mantenimiento de computo",
+    "equipo de cómputo", "venta de computadoras", "laptops",
+    "cómputo Puebla", "equipo de cómputo Puebla", "renta de equipo",
+    "mantenimiento de cómputo",
     // Redes
     "redes empresariales", "wifi empresarial", "cableado estructurado",
     "redes Puebla", "wifi empresarial CDMX",
     // Soporte TI
-    "soporte tecnico", "soporte ti", "mesa de ayuda ti",
-    "soporte tecnico Puebla", "outsourcing ti Mexico",
-    // ERP / infraestructura
-    "ERP industrial", "software empresarial", "transformacion digital",
+    "soporte técnico", "soporte ti", "mesa de ayuda ti",
+    "soporte técnico Puebla", "outsourcing ti México",
+    // Infraestructura
     "infraestructura ti", "ciberseguridad empresarial",
     // Marca
     "Nexara", "Nexara Puebla", "Nexara CDMX",
-    "soluciones tecnologicas Puebla", "empresa de tecnologia Puebla",
+    "soluciones tecnológicas Puebla", "empresa de tecnología Puebla",
   ],
   authors: [{ name: "NEXARA", url: siteUrl }],
   creator: "NEXARA",
   publisher: "NEXARA",
   applicationName: "NEXARA",
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/icon-48.png", sizes: "48x48", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: brandIcon, sizes: "512x512", type: "image/png" },
+    ],
     shortcut: "/favicon.ico",
-    apple: "/favicon.ico",
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   openGraph: {
     type: "website",
     locale: "es_MX",
     url: siteUrl,
     siteName: "NEXARA",
-    title: "NEXARA | CCTV, Computo, Redes y Soluciones TI en Mexico",
+    title: "NEXARA | CCTV, redes y soporte TI en México",
     description:
-      "Camaras CCTV, equipo de computo, redes WiFi, soporte TI y ERP industrial para empresas en Puebla, CDMX y Mexico.",
+      "CCTV, redes Wi‑Fi, cómputo y soporte TI con una sola firma responsable. Puebla · CDMX · cobertura nacional.",
     images: [
       {
         url: defaultOgImage,
@@ -107,9 +112,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "NEXARA | CCTV, Computo, Redes y Soluciones TI en Mexico",
+    title: "NEXARA | CCTV, redes y soporte TI en México",
     description:
-      "Camaras CCTV, equipo de computo, redes WiFi, soporte TI y ERP industrial para empresas en Puebla, CDMX y Mexico.",
+      "CCTV, redes Wi‑Fi, cómputo y soporte TI con una sola firma responsable. Puebla · CDMX · cobertura nacional.",
     images: [defaultOgImage],
   },
   robots: {
@@ -154,12 +159,15 @@ export default function RootLayout({
     "@type": "Organization",
     name: "NEXARA",
     url: siteUrl,
-    logo: `${siteUrl}/logo-nexara-lockup.png`,
+    logo: `${siteUrl}/icon-192.png`,
+    image: `${siteUrl}/logo-nexara-lockup.png`,
     description:
-      "NEXARA — Camaras CCTV, equipo de computo, redes WiFi, soporte TI y ERP industrial para empresas en Mexico.",
+      "NEXARA integra CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas en México.",
     contactPoint: {
       "@type": "ContactPoint",
       contactType: "customer service",
+      telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || undefined,
+      email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || undefined,
       areaServed: "MX",
       availableLanguage: "Spanish",
     },
@@ -168,24 +176,21 @@ export default function RootLayout({
 
   const localBusinessJson = {
     "@context": "https://schema.org",
-    "@type": "LocalBusiness",
+    "@type": "ProfessionalService",
     name: "NEXARA",
     description:
-      "Camaras CCTV, equipo de computo, redes WiFi, soporte TI y ERP industrial para empresas en Puebla, CDMX y toda la Republica Mexicana.",
+      "CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas en Puebla, CDMX y cobertura nacional.",
     url: siteUrl,
     image: `${siteUrl}/logo-nexara-lockup.png`,
+    logo: `${siteUrl}/icon-192.png`,
     telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "",
     email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || "",
     address: {
       "@type": "PostalAddress",
+      streetAddress: "Explanada Puebla, Santiago Momoxpan",
       addressLocality: process.env.NEXT_PUBLIC_CITY || "Puebla",
       addressRegion: process.env.NEXT_PUBLIC_STATE || "Puebla",
       addressCountry: "MX",
-    },
-    geo: {
-      "@type": "GeoCoordinates",
-      latitude: "19.0414",
-      longitude: "-98.2063",
     },
     openingHoursSpecification: {
       "@type": "OpeningHoursSpecification",
@@ -193,7 +198,7 @@ export default function RootLayout({
       opens: "09:00",
       closes: "18:00",
     },
-    areaServed: ["Puebla", "Ciudad de Mexico", "Republica Mexicana"],
+    areaServed: ["Puebla", "Ciudad de Mexico", "Mexico"],
     priceRange: "$$",
     hasOfferCatalog: {
       "@type": "OfferCatalog",
@@ -203,10 +208,8 @@ export default function RootLayout({
         { "@type": "Offer", itemOffered: { "@type": "Service", name: "Equipo de computo" } },
         { "@type": "Offer", itemOffered: { "@type": "Service", name: "Redes y WiFi empresarial" } },
         { "@type": "Offer", itemOffered: { "@type": "Service", name: "Soporte TI para PyMEs" } },
-        { "@type": "Offer", itemOffered: { "@type": "Service", name: "ERP industrial" } },
         { "@type": "Offer", itemOffered: { "@type": "Service", name: "Infraestructura TI" } },
         { "@type": "Offer", itemOffered: { "@type": "Service", name: "Mesa de ayuda TI" } },
-        { "@type": "Offer", itemOffered: { "@type": "Service", name: "Ciberseguridad empresarial" } },
       ],
     },
   };
@@ -232,7 +235,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJson) }}
         />
-        {/* LocalBusiness structured data — drives geo-targeted results */}
+        {/* ProfessionalService structured data (sin geo/mapa en SERP) */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJson) }}

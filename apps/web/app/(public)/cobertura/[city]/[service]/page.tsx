@@ -40,8 +40,9 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
   }
 
   const path = `/cobertura/${city.slug}/${service.slug}`;
-  const title = `${service.name} en ${city.name} | Cotiza con NEXARA`;
-  const description = `${service.summary} Servicio en ${city.name}, ${city.region}: instalación, documentación y soporte. Agenda diagnóstico con Nexara.`;
+  const title = `${service.name} en ${city.name} | NEXARA`;
+  const placeLabel = city.name === city.region ? city.name : `${city.name}, ${city.region}`;
+  const description = `${service.summary} Servicio en ${placeLabel}: instalación, documentación y soporte. Agenda diagnóstico con Nexara.`;
   const ogImage = getSolucionHeroImage(service.slug);
   const category = categoryFromSlug(service.slug);
   const keywords = [
@@ -128,14 +129,16 @@ export default function CoberturaCityServicePage({ params }: { params: Params })
       containedInPlace: { "@type": "AdministrativeArea", name: city.region },
     },
     provider: {
-      "@type": "LocalBusiness",
+      "@type": "Organization",
       name: "NEXARA",
       url: siteUrl,
+      logo: `${siteUrl}/icon-192.png`,
       telephone: process.env.NEXT_PUBLIC_CONTACT_PHONE || "+52-222-696-0350",
       address: {
         "@type": "PostalAddress",
-        addressLocality: city.name,
-        addressRegion: city.region,
+        streetAddress: "Explanada Puebla, Santiago Momoxpan",
+        addressLocality: "Puebla",
+        addressRegion: "Puebla",
         addressCountry: "MX",
       },
     },
