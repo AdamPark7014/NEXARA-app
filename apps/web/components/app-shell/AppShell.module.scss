@@ -140,28 +140,19 @@
 
 .brandLogo {
   height: 34px;
-  width: auto;
-  max-width: 148px;
+  width: 34px;
   border-radius: 0;
   background: transparent;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   flex-shrink: 0;
   overflow: visible;
   box-shadow: none;
 }
 
-.brandLogoFull {
-  width: auto;
-  height: 34px;
-  max-width: 148px;
-  object-fit: contain;
-  display: block;
-}
-
 .brandLogoMark {
-  display: none;
+  display: block;
   width: 34px;
   height: 34px;
   object-fit: contain;
@@ -170,14 +161,6 @@
 .shell[data-collapsed="true"] .brandLogo {
   width: 34px;
   max-width: 34px;
-}
-
-.shell[data-collapsed="true"] .brandLogoFull {
-  display: none;
-}
-
-.shell[data-collapsed="true"] .brandLogoMark {
-  display: block;
 }
 
 .brandText {

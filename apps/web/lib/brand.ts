@@ -1,12 +1,14 @@
 /**
- * Marca NEXARA unificada (sitio público + core + subdominios).
- * Usar siempre estos paths para logo de UI y favicon.
+ * Marca NEXARA — assets por superficie.
+ *
+ * - Lockup (`logo-nexara-lockup.png`): solo sitio público (nexara.com.mx).
+ * - Mark (`logo-nexara-platform.png`): login + paneles (CRM / ERP / OPS / …).
  */
 
-/** Lockup horizontal (principal / headers / shell expandido). */
+/** Lockup horizontal — marketing / sitio principal. */
 export const NEXARA_LOGO_LOCKUP = "/logo-nexara-lockup.png";
 
-/** Isotipo cuadrado (login paneles / pestaña / shell colapsado). */
+/** Isotipo cuadrado — login y shell de paneles. */
 export const NEXARA_LOGO_MARK = "/logo-nexara-platform.png";
 
 /**

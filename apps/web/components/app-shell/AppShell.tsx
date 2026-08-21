@@ -25,6 +25,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
 import CompanySwitcher from "@/components/CompanySwitcher";
+import { NEXARA_LOGO_MARK } from "@/lib/brand";
 import {
   MODULES,
   PANEL_META,
@@ -348,18 +349,13 @@ export default function AppShell({ panel, children }: AppShellProps) {
           <div className={styles.brandLogo} aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              className={styles.brandLogoFull}
-              src="/logo-nexara-lockup.png"
-              alt=""
-            />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
               className={styles.brandLogoMark}
-              src="/logo-nexara-platform.png"
+              src={NEXARA_LOGO_MARK}
               alt=""
             />
           </div>
           <div className={styles.brandText}>
+            <div className={styles.brandName}>Nexara</div>
             <div className={styles.brandPanel}>
               {panelMeta.name.replace(/^NEXARA\s+/i, "")}
             </div>
