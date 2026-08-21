@@ -815,7 +815,7 @@ export const createSalesQuote = async (
     clientCompany?: string;
     clientEmail?: string;
     projectName?: string;
-    items: Array<{ name: string; qty: number; unitPrice: number; discount?: number; tax?: number; description?: string }>;
+    items: Array<Record<string, unknown> & { name: string; qty: number; unitPrice: number }>;
   },
 ) => {
   return apiRequest<unknown>(
@@ -829,12 +829,9 @@ export const createSalesQuote = async (
         currency: "MXN",
         status: "DRAFT",
         items: payload.items.map((i) => ({
-          name: i.name,
-          qty: i.qty,
-          unitPrice: i.unitPrice,
+          ...i,
           discount: i.discount ?? 0,
           tax: i.tax ?? 16,
-          description: i.description,
         })),
       }),
     },

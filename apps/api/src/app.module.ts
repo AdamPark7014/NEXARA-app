@@ -34,6 +34,7 @@ import { HeroVideoModule } from './hero-video/hero-video.module.js';
 import { WorkProjectsModule } from './work-projects/work-projects.module';
 import { EmployeePaymentsModule } from './employee-payments/employee-payments.module';
 import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
+import { SmartQuoteModule } from './smart-quote/smart-quote.module.js';
 import { ServiceClientsModule } from './service-clients/service-clients.module';
 import { ClientAuthModule } from './client-auth/client-auth.module';
 import { PortalAuthModule } from './portal-auth/portal-auth.module.js';
@@ -128,6 +129,7 @@ import { AiModule } from './ai/ai.module.js';
     WorkProjectsModule,
     EmployeePaymentsModule,
     CotizacionesModule,
+    SmartQuoteModule,
     ServiceClientsModule,
     ClientAuthModule,
     PortalAuthModule,

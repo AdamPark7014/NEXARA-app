@@ -21,6 +21,15 @@ export type RawCotizacionItem = {
   unit?: string | null;
   qty?: number | string | null;
   unitPrice?: number | string | null;
+  unitCost?: number | string | null;
+  supplierId?: number | string | null;
+  supplierSku?: string | null;
+  productCtId?: number | string | null;
+  marginPercent?: number | string | null;
+  stockSnapshot?: number | string | null;
+  leadTimeDays?: number | string | null;
+  scoreReason?: string | null;
+  optimizationMode?: string | null;
   discount?: number | string | null;
   tax?: number | string | null;
   ieps?: number | string | null;
@@ -47,6 +56,15 @@ export type NormalizedCotizacionItem = {
   unit: string;
   qty: number;
   unitPrice: number;
+  unitCost: number | null;
+  supplierId: number | null;
+  supplierSku: string | null;
+  productCtId: number | null;
+  marginPercent: number | null;
+  stockSnapshot: number | null;
+  leadTimeDays: number | null;
+  scoreReason: string | null;
+  optimizationMode: string | null;
   discount: number;
   tax: number;
   ieps: number;
@@ -156,6 +174,16 @@ export function normalizeItems(items: RawCotizacionItem[] | undefined | null): N
     unit: item.unit?.trim() || 'pieza',
     qty: Math.max(1, Number(item.qty) || 1),
     unitPrice: Number(item.unitPrice) || 0,
+    unitCost: item.unitCost != null && item.unitCost !== '' ? Number(item.unitCost) : null,
+    supplierId: item.supplierId ? Number(item.supplierId) : null,
+    supplierSku: item.supplierSku?.trim() || null,
+    productCtId: item.productCtId ? Number(item.productCtId) : null,
+    marginPercent:
+      item.marginPercent != null && item.marginPercent !== '' ? Number(item.marginPercent) : null,
+    stockSnapshot: item.stockSnapshot != null ? Number(item.stockSnapshot) : null,
+    leadTimeDays: item.leadTimeDays != null ? Number(item.leadTimeDays) : null,
+    scoreReason: item.scoreReason?.trim() || null,
+    optimizationMode: item.optimizationMode?.trim() || null,
     discount: percent(item.discount),
     tax: percent(item.tax),
     ieps: percent(item.ieps),

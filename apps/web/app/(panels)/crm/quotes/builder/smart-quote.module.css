@@ -1,0 +1,537 @@
+.sq {
+  --sq-radius: 16px;
+  --sq-radius-sm: 12px;
+  --sq-pad: 22px;
+  --sq-gap: 18px;
+  display: grid;
+  gap: 18px;
+  padding-bottom: 88px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.sqCoach {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: var(--sq-radius-sm);
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+}
+
+.sqCoachIcon {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 16px;
+}
+
+.sqCoachBody {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sqCoachTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sqCoachText {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.sqStepper {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.sqStep {
+  appearance: none;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--sq-radius-sm);
+  padding: 14px 14px 14px 16px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.sqStep:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  transform: translateY(-1px);
+}
+
+.sqStep:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.sqStepActive {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 9%, var(--surface));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.sqStepDone {
+  border-color: color-mix(in srgb, #16a34a 35%, var(--border));
+  background: color-mix(in srgb, #16a34a 6%, var(--surface));
+}
+
+.sqStepNum {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.sqStepActive .sqStepNum {
+  background: var(--primary);
+  color: #fff;
+  border-color: transparent;
+}
+
+.sqStepDone .sqStepNum {
+  background: #16a34a;
+  color: #fff;
+  border-color: transparent;
+}
+
+.sqStepLabel {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sqStepHint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.sqLayout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: start;
+}
+
+.sqMain {
+  flex: 1 1 520px;
+  min-width: 0;
+  display: grid;
+  gap: var(--sq-gap);
+}
+
+.sqRail {
+  flex: 1 1 300px;
+  max-width: 360px;
+  width: 100%;
+  position: sticky;
+  top: 12px;
+}
+
+.sqCard {
+  border: 1px solid var(--border);
+  border-radius: var(--sq-radius);
+  background: var(--surface);
+  padding: var(--sq-pad);
+  display: grid;
+  gap: 16px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.sqCardTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.sqCardLead {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.sqFieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.sqLabel {
+  display: grid;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text-secondary);
+}
+
+.sqInput,
+.sqSelect,
+.sqTextarea {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: 14px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sqInput:focus,
+.sqSelect:focus,
+.sqTextarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.sqTextarea {
+  min-height: 132px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.sqHelp {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+.sqPaths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sqPath {
+  flex: 1 1 170px;
+  appearance: none;
+  text-align: left;
+  cursor: pointer;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 16px;
+  display: grid;
+  gap: 8px;
+  min-height: 148px;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.sqPath:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.sqPathOn {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.sqPathIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 15px;
+}
+
+.sqPathTitle {
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.sqPathDesc {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.sqPathMeta {
+  margin-top: auto;
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+}
+
+.sqChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sqChip {
+  appearance: none;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  border-radius: 999px;
+  padding: 8px 13px;
+  font-size: 13px;
+  font-weight: 650;
+  transition: all 0.12s ease;
+}
+
+.sqChip:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.sqChipOn {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.sqChipSoft {
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-weight: 550;
+  font-size: 12px;
+}
+
+.sqFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.sqOffer {
+  display: grid;
+  grid-template-columns: 76px 1fr auto;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  align-items: center;
+  background: var(--surface);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.sqOffer:hover {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+}
+
+.sqOfferRec {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface));
+}
+
+.sqThumb {
+  width: 76px;
+  height: 76px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--border);
+}
+
+.sqBadge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.sqBadgeRec {
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+  color: var(--primary);
+}
+
+.sqStockOk {
+  color: #15803d;
+}
+
+.sqStockWarn {
+  color: #b45309;
+}
+
+.sqRailCard {
+  border: 1px solid var(--border);
+  border-radius: var(--sq-radius);
+  background: var(--surface);
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.sqRailHead {
+  display: grid;
+  gap: 4px;
+}
+
+.sqRailEyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.sqRailTitle {
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.3;
+}
+
+.sqRailMeta {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.sqLine {
+  display: grid;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sqLineTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sqLineName {
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.sqGhostBtn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+}
+
+.sqTotals {
+  display: grid;
+  gap: 8px;
+  padding-top: 2px;
+  border-top: 1px solid var(--border);
+}
+
+.sqTotalRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.sqTotalMain {
+  font-size: 16px;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.sqKpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.sqKpi {
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.sqKpiLabel {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sqKpiValue {
+  margin-top: 4px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.sqStickyBar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border);
+  display: none;
+}
+
+.sqStickyInner {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+@media (max-width: 960px) {
+  .sqFieldGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .sqRail {
+    position: static;
+    max-width: none;
+  }
+
+  .sqStickyBar {
+    display: block;
+  }
+
+  .sqKpis {
+    grid-template-columns: 1fr;
+  }
+}

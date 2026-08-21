@@ -60,6 +60,7 @@ coverage/
 # Uploads and temp
 uploads/
 temp/
+.tmp-ftp-inspect/
 
 # Android nativo (apps/mobile-native) — salidas de Gradle; no versionar
 apps/mobile-native/android/**/build/
