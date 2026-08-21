@@ -323,168 +323,47 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
   return (
     <>
       <style jsx>{`
-        .login-shell {
+        .stage {
           min-height: 100vh;
           min-height: 100dvh;
           display: grid;
-          grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+          place-items: center;
+          padding: clamp(20px, 4vw, 40px);
           position: relative;
           isolation: isolate;
           overflow: hidden;
-          background: #071018;
-          color: #e8eef5;
           font-family: var(--nx-font-body, "Manrope", system-ui, sans-serif);
-        }
-
-        .brand-pane {
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          padding: clamp(28px, 4vw, 56px);
           background:
-            radial-gradient(ellipse 80% 60% at 18% 20%, rgba(46, 200, 216, 0.22), transparent 55%),
-            radial-gradient(ellipse 70% 50% at 85% 75%, rgba(240, 138, 30, 0.16), transparent 50%),
-            linear-gradient(155deg, #0a1520 0%, #0d1c28 42%, #081018 100%);
-          overflow: hidden;
+            radial-gradient(ellipse 90% 70% at 50% -10%, rgba(16, 161, 131, 0.18), transparent 55%),
+            radial-gradient(ellipse 60% 50% at 100% 100%, rgba(110, 197, 216, 0.12), transparent 45%),
+            linear-gradient(165deg, #0b1219 0%, #101820 45%, #0c141c 100%);
+          color: #e8eef4;
         }
 
-        .brand-pane::before {
+        .stage::before {
           content: "";
           position: absolute;
           inset: 0;
           background-image:
-            linear-gradient(rgba(140, 190, 220, 0.07) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(140, 190, 220, 0.07) 1px, transparent 1px);
-          background-size: 48px 48px;
-          mask-image: radial-gradient(ellipse 70% 65% at 40% 35%, black 10%, transparent 75%);
+            linear-gradient(rgba(148, 186, 210, 0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(148, 186, 210, 0.05) 1px, transparent 1px);
+          background-size: 56px 56px;
+          mask-image: radial-gradient(ellipse 55% 50% at 50% 40%, black, transparent 75%);
           pointer-events: none;
-          animation: grid-drift 18s linear infinite;
+          z-index: 0;
         }
 
-        .brand-pane::after {
-          content: "";
-          position: absolute;
-          width: 420px;
-          height: 420px;
-          right: -120px;
-          bottom: -140px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(16, 161, 131, 0.28), transparent 68%);
-          pointer-events: none;
-        }
-
-        @keyframes grid-drift {
-          from { transform: translate3d(0, 0, 0); }
-          to { transform: translate3d(24px, 16px, 0); }
-        }
-
-        .brand-top {
+        .panel {
           position: relative;
           z-index: 1;
-          display: flex;
-          align-items: center;
-          gap: 14px;
+          width: min(100%, 420px);
+          animation: enter 0.4s ease-out both;
         }
 
-        .brand-mark {
-          width: 52px;
-          height: 52px;
-          object-fit: contain;
-          filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
-        }
-
-        .brand-word {
-          margin: 0;
-          font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-          font-size: 1.15rem;
-          font-weight: 700;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          color: #f4fbff;
-        }
-
-        .brand-hero {
-          position: relative;
-          z-index: 1;
-          max-width: 34rem;
-          margin: clamp(40px, 8vh, 90px) 0;
-          animation: rise-in 0.55s ease-out both;
-        }
-
-        .brand-kicker {
-          margin: 0 0 14px;
-          font-size: 0.78rem;
-          font-weight: 600;
-          letter-spacing: 0.16em;
-          text-transform: uppercase;
-          color: #7ec8d8;
-        }
-
-        .brand-title {
-          margin: 0 0 16px;
-          font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-          font-size: clamp(2rem, 3.4vw, 3rem);
-          line-height: 1.08;
-          letter-spacing: -0.03em;
-          font-weight: 700;
-          color: #f7fbff;
-          text-wrap: balance;
-        }
-
-        .brand-copy {
-          margin: 0;
-          max-width: 32ch;
-          font-size: 1.02rem;
-          line-height: 1.55;
-          color: rgba(210, 226, 238, 0.82);
-        }
-
-        .brand-foot {
-          position: relative;
-          z-index: 1;
-          font-size: 0.82rem;
-          color: rgba(180, 205, 220, 0.55);
-        }
-
-        .form-pane {
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: clamp(20px, 3vw, 40px);
-          background:
-            linear-gradient(180deg, #f3f7fb 0%, #e8eef4 100%);
-          color: #122033;
-        }
-
-        .form-pane::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background:
-            radial-gradient(circle at 90% 8%, rgba(16, 161, 131, 0.08), transparent 36%),
-            radial-gradient(circle at 10% 90%, rgba(110, 197, 216, 0.1), transparent 40%);
-          pointer-events: none;
-        }
-
-        .login-card {
-          position: relative;
-          z-index: 1;
-          width: 100%;
-          max-width: 420px;
-          padding: clamp(28px, 3.5vw, 40px);
-          border-radius: 18px;
-          background: rgba(255, 255, 255, 0.92);
-          border: 1px solid rgba(18, 42, 64, 0.08);
-          box-shadow: 0 24px 48px rgba(12, 28, 44, 0.1);
-          animation: rise-in 0.45s ease-out 0.08s both;
-        }
-
-        @keyframes rise-in {
+        @keyframes enter {
           from {
             opacity: 0;
-            transform: translateY(16px);
+            transform: translateY(12px);
           }
           to {
             opacity: 1;
@@ -492,436 +371,375 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           }
         }
 
-        .mobile-brand {
-          display: none;
+        .brand {
+          display: grid;
+          justify-items: center;
+          gap: 14px;
+          margin-bottom: 28px;
           text-align: center;
-          margin-bottom: 22px;
         }
 
-        .mobile-brand img {
+        .brand img {
           width: 72px;
           height: 72px;
           object-fit: contain;
-          margin: 0 auto 10px;
         }
 
-        .mobile-brand span {
-          display: block;
-          font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-          font-size: 0.78rem;
-          font-weight: 700;
-          letter-spacing: 0.2em;
-          text-transform: uppercase;
-          color: #5a7288;
-        }
-
-        .logo-container {
-          margin-bottom: 26px;
-        }
-
-        .title {
-          margin: 0 0 8px;
-          font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-          font-size: clamp(1.55rem, 2.4vw, 1.85rem);
-          line-height: 1.15;
-          letter-spacing: -0.025em;
-          font-weight: 700;
-          color: #0f1c2a;
-        }
-
-        .subtitle {
+        .brand-name {
           margin: 0;
-          font-size: 0.95rem;
-          line-height: 1.5;
-          color: #5b6f82;
+          font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+          font-size: 0.8rem;
+          font-weight: 700;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          color: rgba(220, 236, 246, 0.88);
+        }
+
+        .heading {
+          margin: 0 0 6px;
+          font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+          font-size: clamp(1.45rem, 2.5vw, 1.7rem);
+          font-weight: 650;
+          letter-spacing: -0.02em;
+          line-height: 1.2;
+          color: #f4f8fc;
+          text-align: center;
+        }
+
+        .subheading {
+          margin: 0 0 26px;
+          font-size: 0.92rem;
+          line-height: 1.45;
+          color: rgba(180, 202, 218, 0.78);
+          text-align: center;
         }
 
         .form {
-          margin-top: 26px;
           display: grid;
-          gap: 16px;
+          gap: 14px;
         }
 
-        .input-group {
+        .field-group {
           display: grid;
           gap: 7px;
         }
 
-        .input-label {
-          font-size: 0.8rem;
+        .label {
+          font-size: 0.78rem;
           font-weight: 650;
-          letter-spacing: 0.02em;
-          color: #3d5266;
+          letter-spacing: 0.03em;
+          color: rgba(190, 210, 224, 0.9);
         }
 
-        .input-wrapper {
+        .control {
           position: relative;
           display: flex;
           align-items: center;
-          min-width: 0;
         }
 
-        .input-icon {
+        .control-icon {
           position: absolute;
           left: 14px;
           width: 18px;
           height: 18px;
-          color: #7a90a4;
+          color: rgba(150, 178, 196, 0.85);
           pointer-events: none;
           z-index: 1;
-          transition: color 0.2s ease;
         }
 
-        .login-card :global(.input),
-        .login-card .field {
+        .control :global(input),
+        .control .input {
           width: 100%;
           min-height: 48px;
           padding: 0 14px 0 44px;
-          border-radius: 12px;
-          border: 1px solid rgba(18, 42, 64, 0.14);
-          background: #f7fafc;
-          color: #122033;
+          border-radius: 10px;
+          border: 1px solid rgba(160, 190, 210, 0.16);
+          background: rgba(255, 255, 255, 0.04);
+          color: #f2f7fb;
           font-size: 0.95rem;
           font-family: inherit;
-          transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-        }
-
-        .login-card :global(.input):hover,
-        .login-card .field:hover {
-          border-color: rgba(16, 161, 131, 0.35);
-        }
-
-        .login-card :global(.input):focus,
-        .login-card .field:focus {
           outline: none;
-          border-color: #10a183;
-          background: #fff;
-          box-shadow: 0 0 0 3px rgba(16, 161, 131, 0.16);
+          transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .login-card :global(.input):focus + .input-icon,
-        .input-wrapper:focus-within .input-icon {
-          color: #0b7d65;
+        .control :global(input)::placeholder,
+        .control .input::placeholder {
+          color: rgba(160, 185, 205, 0.45);
         }
 
-        .input-has-toggle {
-          padding-right: 48px !important;
+        .control :global(input):hover,
+        .control .input:hover {
+          border-color: rgba(160, 190, 210, 0.28);
         }
 
-        .password-toggle {
+        .control :global(input):focus,
+        .control .input:focus {
+          border-color: rgba(16, 161, 131, 0.7);
+          background: rgba(255, 255, 255, 0.06);
+          box-shadow: 0 0 0 3px rgba(16, 161, 131, 0.18);
+        }
+
+        .control:focus-within .control-icon {
+          color: #4dc2a9;
+        }
+
+        .has-toggle :global(input),
+        .has-toggle .input {
+          padding-right: 46px;
+        }
+
+        .toggle {
           position: absolute;
           right: 8px;
           width: 34px;
           height: 34px;
-          border: none;
-          border-radius: 9px;
+          border: 0;
+          border-radius: 8px;
           background: transparent;
-          color: #7a90a4;
+          color: rgba(160, 185, 205, 0.75);
+          display: grid;
+          place-items: center;
           cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          transition: color 0.2s ease, background-color 0.2s ease;
         }
 
-        .password-toggle:hover {
-          color: #122033;
-          background: rgba(18, 42, 64, 0.06);
+        .toggle:hover {
+          color: #e8eef4;
+          background: rgba(255, 255, 255, 0.05);
         }
 
-        .submit-button {
-          width: 100%;
+        .submit {
           margin-top: 4px;
-          min-height: 50px;
-          border: none;
-          border-radius: 12px;
-          background: linear-gradient(135deg, #0b7d65 0%, #10a183 55%, #2a9fb8 100%);
+          min-height: 48px;
+          border: 0;
+          border-radius: 10px;
+          background: #10a183;
           color: #fff;
-          font-size: 0.98rem;
+          font-size: 0.95rem;
           font-weight: 700;
-          letter-spacing: 0.01em;
           font-family: var(--nx-font-ui, "Inter Tight", system-ui, sans-serif);
+          letter-spacing: 0.01em;
           cursor: pointer;
-          transition: transform 0.2s ease, filter 0.2s ease;
+          transition: background 0.2s ease, transform 0.15s ease;
         }
 
-        .submit-button:hover:not(:disabled) {
+        .submit:hover:not(:disabled) {
+          background: #0d8f74;
           transform: translateY(-1px);
-          filter: brightness(1.04);
         }
 
-        .submit-button:disabled {
-          opacity: 0.65;
+        .submit:disabled {
+          opacity: 0.6;
           cursor: not-allowed;
           transform: none;
         }
 
-        .sso-button {
-          width: 100%;
-          min-height: 46px;
-          border-radius: 12px;
-          border: 1px solid rgba(18, 42, 64, 0.16);
-          background: #fff;
-          color: #1c3348;
-          font-size: 0.92rem;
+        .sso {
+          min-height: 44px;
+          border-radius: 10px;
+          border: 1px solid rgba(160, 190, 210, 0.2);
+          background: transparent;
+          color: rgba(220, 236, 246, 0.9);
+          font-size: 0.9rem;
           font-weight: 600;
           cursor: pointer;
           transition: border-color 0.2s ease, background 0.2s ease;
         }
 
-        .sso-button:hover {
-          border-color: rgba(16, 161, 131, 0.4);
-          background: #f4fbf9;
+        .sso:hover {
+          border-color: rgba(16, 161, 131, 0.45);
+          background: rgba(16, 161, 131, 0.08);
         }
 
-        .access-notice {
+        .notice {
           margin-bottom: 16px;
           padding: 12px 14px;
-          border-radius: 12px;
-          border: 1px solid rgba(16, 161, 131, 0.28);
-          background: rgba(16, 161, 131, 0.08);
-          color: #1c3348;
-          font-size: 0.87rem;
+          border-radius: 10px;
+          border: 1px solid rgba(16, 161, 131, 0.35);
+          background: rgba(16, 161, 131, 0.1);
+          color: #d7f3ec;
+          font-size: 0.86rem;
           line-height: 1.45;
         }
 
-        .error-message {
+        .error {
           padding: 12px 14px;
-          border-radius: 12px;
-          border: 1px solid rgba(180, 50, 50, 0.28);
-          background: rgba(180, 50, 50, 0.08);
-          color: #8a1f1f;
-          font-size: 0.87rem;
+          border-radius: 10px;
+          border: 1px solid rgba(220, 90, 90, 0.35);
+          background: rgba(160, 40, 40, 0.16);
+          color: #ffd0d0;
+          font-size: 0.86rem;
           line-height: 1.45;
         }
 
-        .footer {
-          margin-top: 24px;
-          padding-top: 18px;
+        .foot {
+          margin: 22px 0 0;
           text-align: center;
-          border-top: 1px solid rgba(18, 42, 64, 0.08);
-        }
-
-        .footer-text {
-          margin: 0;
-          font-size: 0.78rem;
+          font-size: 0.75rem;
           letter-spacing: 0.04em;
-          color: #7a90a4;
+          color: rgba(150, 175, 195, 0.55);
         }
 
         .loader {
           display: inline-block;
-          width: 15px;
-          height: 15px;
+          width: 14px;
+          height: 14px;
           margin-right: 8px;
           border-radius: 50%;
-          border: 2px solid rgba(255, 255, 255, 0.32);
+          border: 2px solid rgba(255, 255, 255, 0.28);
           border-top-color: #fff;
-          animation: spin 0.8s linear infinite;
-          vertical-align: text-bottom;
+          animation: spin 0.75s linear infinite;
+          vertical-align: -2px;
         }
 
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
 
-        @media (max-width: 920px) {
-          .login-shell {
-            grid-template-columns: 1fr;
-          }
-
-          .brand-pane {
-            display: none;
-          }
-
-          .mobile-brand {
-            display: block;
-          }
-
-          .form-pane {
-            min-height: 100vh;
-            min-height: 100dvh;
-          }
-        }
-
         @media (prefers-reduced-motion: reduce) {
-          .brand-pane::before,
-          .brand-hero,
-          .login-card,
+          .panel,
           .loader {
             animation: none;
           }
-
-          .submit-button {
+          .submit {
             transition: none;
           }
         }
       `}</style>
 
-      <div className="login-shell">
-        <aside className="brand-pane" aria-hidden="true">
-          <div className="brand-top">
+      <div className="stage">
+        <div className="panel">
+          <div className="brand">
             <Image
               src="/logo-nexara-platform.png"
-              alt=""
-              width={52}
-              height={52}
-              className="brand-mark"
+              alt="Nexara"
+              width={72}
+              height={72}
               priority
             />
-            <p className="brand-word">Nexara</p>
+            <p className="brand-name">Nexara</p>
           </div>
-          <div className="brand-hero">
-            <p className="brand-kicker">Plataforma operativa</p>
-            <h2 className="brand-title">Control, campo y continuidad en una sola firma.</h2>
-            <p className="brand-copy">
-              Accede a tu panel para gestionar CCTV, redes, soporte TI y la operación del día a día.
-            </p>
-          </div>
-          <p className="brand-foot">nexara.com.mx · Puebla · CDMX · cobertura nacional</p>
-        </aside>
 
-        <main className="form-pane">
-          <div className="login-card">
-            {accessNotice ? (
-              <div className="access-notice" role="status">
-                {accessNotice}
+          {accessNotice ? (
+            <div className="notice" role="status">
+              {accessNotice}
+            </div>
+          ) : null}
+
+          <h1 className="heading">{title || "Iniciar sesión"}</h1>
+          <p className="subheading">{subtitle || "Ingresa a tu cuenta de Nexara"}</p>
+
+          <form className="form" onSubmit={handleLogin}>
+            <div className="field-group">
+              <label className="label" htmlFor="email">
+                Correo electrónico
+              </label>
+              <div className="control">
+                <svg className="control-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M3 8L10.89 13.26C11.5412 13.6788 12.4588 13.6788 13.11 13.26L21 8M5 19H19C20.1046 19 21 18.1046 21 17V7C21 5.89543 20.1046 5 19 5H5C3.89543 5 3 5.89543 3 7V17C3 18.1046 3.89543 19 5 19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <input
+                  id="email"
+                  type="email"
+                  className="input"
+                  placeholder="gerencia@nexara.com.mx"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
               </div>
-            ) : null}
-
-            <div className="mobile-brand">
-              <Image
-                src="/logo-nexara-platform.png"
-                alt="Nexara"
-                width={72}
-                height={72}
-                priority
-              />
-              <span>Nexara</span>
             </div>
 
-            <div className="logo-container">
-              <h1 className="title">{title || "Iniciar sesión"}</h1>
-              <p className="subtitle">{subtitle || "Ingresa a tu cuenta de Nexara"}</p>
-            </div>
-
-            <form className="form" onSubmit={handleLogin}>
-              <div className="input-group">
-                <label className="input-label" htmlFor="email">
-                  Correo electrónico
-                </label>
-                <div className="input-wrapper">
-                  <svg className="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M3 8L10.89 13.26C11.5412 13.6788 12.4588 13.6788 13.11 13.26L21 8M5 19H19C20.1046 19 21 18.1046 21 17V7C21 5.89543 20.1046 5 19 5H5C3.89543 5 3 5.89543 3 7V17C3 18.1046 3.89543 19 5 19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  <input
-                    id="email"
-                    type="email"
-                    className="input field"
-                    placeholder="gerencia@nexara.com.mx"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    required
-                    autoComplete="email"
-                  />
-                </div>
-              </div>
-
-              <div className="input-group">
-                <label className="input-label" htmlFor="password">
-                  Contraseña
-                </label>
-                <div className="input-wrapper">
-                  <svg className="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M12 15V17M6 21H18C19.1046 21 20 20.1046 20 19V13C20 11.8954 19.1046 11 18 11H6C4.89543 11 4 11.8954 4 13V19C4 20.1046 4.89543 21 6 21ZM16 11V7C16 4.79086 14.2091 3 12 3C9.79086 3 8 4.79086 8 7V11H16Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    className="input field input-has-toggle"
-                    placeholder="••••••••••••"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    required
-                    autoComplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    className="password-toggle"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                  >
-                    {showPassword ? (
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    ) : (
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M2.45801 12C3.73201 7.943 7.52301 5 12 5C16.478 5 20.268 7.943 21.542 12C20.268 16.057 16.478 19 12 19C7.52301 19 3.73201 16.057 2.45801 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {mfaRequired && (
-                <div className="input-group">
-                  <label className="input-label" htmlFor="mfaCode">
-                    Código MFA
-                  </label>
-                  <div className="input-wrapper">
-                    <svg className="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    <input
-                      id="mfaCode"
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      className="input field"
-                      placeholder="000000"
-                      value={mfaCode}
-                      onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                      required
-                      autoFocus
-                    />
-                  </div>
-                </div>
-              )}
-
-              <button type="submit" className="submit-button" disabled={isLoading}>
-                {isLoading && <span className="loader"></span>}
-                {isLoading ? "Iniciando sesión..." : mfaRequired ? "Verificar MFA" : "Entrar"}
-              </button>
-
-              {mode === "console" && ssoEnabled && (
+            <div className="field-group">
+              <label className="label" htmlFor="password">
+                Contraseña
+              </label>
+              <div className="control has-toggle">
+                <svg className="control-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 15V17M6 21H18C19.1046 21 20 20.1046 20 19V13C20 11.8954 19.1046 11 18 11H6C4.89543 11 4 11.8954 4 13V19C4 20.1046 4.89543 21 6 21ZM16 11V7C16 4.79086 14.2091 3 12 3C9.79086 3 8 4.79086 8 7V11H16Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  className="input"
+                  placeholder="••••••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
                 <button
                   type="button"
-                  className="sso-button"
-                  onClick={() => {
-                    window.location.href = buildApiUrl("auth/oidc/start");
-                  }}
+                  className="toggle"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 >
-                  Continuar con SSO / OIDC
+                  {showPassword ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M2.45801 12C3.73201 7.943 7.52301 5 12 5C16.478 5 20.268 7.943 21.542 12C20.268 16.057 16.478 19 12 19C7.52301 19 3.73201 16.057 2.45801 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
                 </button>
-              )}
-
-              {error && (
-                <div className="error-message" role="alert">
-                  <strong>Error:</strong> {error}
-                </div>
-              )}
-            </form>
-
-            <div className="footer">
-              <p className="footer-text">Tecnología que impulsa tu negocio</p>
+              </div>
             </div>
-          </div>
-        </main>
+
+            {mfaRequired && (
+              <div className="field-group">
+                <label className="label" htmlFor="mfaCode">
+                  Código MFA
+                </label>
+                <div className="control">
+                  <svg className="control-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <input
+                    id="mfaCode"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    className="input"
+                    placeholder="000000"
+                    value={mfaCode}
+                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    required
+                    autoFocus
+                  />
+                </div>
+              </div>
+            )}
+
+            <button type="submit" className="submit" disabled={isLoading}>
+              {isLoading && <span className="loader" />}
+              {isLoading ? "Iniciando sesión..." : mfaRequired ? "Verificar MFA" : "Entrar"}
+            </button>
+
+            {mode === "console" && ssoEnabled && (
+              <button
+                type="button"
+                className="sso"
+                onClick={() => {
+                  window.location.href = buildApiUrl("auth/oidc/start");
+                }}
+              >
+                Continuar con SSO / OIDC
+              </button>
+            )}
+
+            {error && (
+              <div className="error" role="alert">
+                <strong>Error:</strong> {error}
+              </div>
+            )}
+          </form>
+
+          <p className="foot">Tecnología que impulsa tu negocio</p>
+        </div>
       </div>
     </>
   );
 }
-
-
