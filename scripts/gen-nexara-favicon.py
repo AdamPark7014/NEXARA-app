@@ -28,7 +28,7 @@ cropped = img.crop((minx, miny, maxx + 1, maxy + 1))
 
 
 def make_square(size, pad_ratio=0.12):
-    canvas = Image.new("RGBA", (size, size), (7, 12, 22, 255))
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     inner = int(size * (1 - 2 * pad_ratio))
     mark = cropped.copy()
     mark.thumbnail((inner, inner), Image.Resampling.LANCZOS)

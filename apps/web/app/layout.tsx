@@ -92,15 +92,15 @@ export const metadata: Metadata = {
   applicationName: "NEXARA",
   icons: {
     icon: [
-      { url: NEXARA_FAVICON_ICO, sizes: "48x48" },
+      // Prefer PNG (transparent) over ICO so tabs don't show a black square
       { url: NEXARA_FAVICON_48, sizes: "48x48", type: "image/png" },
       { url: NEXARA_FAVICON_192, sizes: "192x192", type: "image/png" },
       { url: NEXARA_FAVICON_512, sizes: "512x512", type: "image/png" },
-      // Fallbacks legacy (mismo isotipo)
+      { url: NEXARA_FAVICON_ICO, sizes: "48x48" },
       { url: "/favicon.ico", sizes: "48x48" },
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
     ],
-    shortcut: NEXARA_FAVICON_ICO,
+    shortcut: NEXARA_FAVICON_48,
     apple: [{ url: NEXARA_APPLE_TOUCH, sizes: "180x180", type: "image/png" }],
   },
   openGraph: {
