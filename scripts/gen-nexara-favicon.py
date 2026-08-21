@@ -1,7 +1,7 @@
 from PIL import Image
 from pathlib import Path
 
-src = Path(r"C:\dev\apps\NEXARA-app\apps\web\public\logo-nexara.png")
+src = Path(r"C:\dev\apps\NEXARA-app\apps\web\public\logo-nexara-platform.png")
 public = Path(r"C:\dev\apps\NEXARA-app\apps\web\public")
 appdir = Path(r"C:\dev\apps\NEXARA-app\apps\web\app")
 
