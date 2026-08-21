@@ -99,6 +99,18 @@ services:
       EFIRMA_CER_PATH: ${EFIRMA_CER_PATH:-}
       EFIRMA_KEY_PATH: ${EFIRMA_KEY_PATH:-}
       UPLOADS_ROOT: /app/uploads
+      # CT Online — Smart Quote catalog sync
+      CT_FTP_HOST: ${CT_FTP_HOST:-}
+      CT_FTP_USER: ${CT_FTP_USER:-}
+      CT_FTP_PASSWORD: ${CT_FTP_PASSWORD:-}
+      CT_FTP_SECURE: ${CT_FTP_SECURE:-0}
+      CT_FTP_PATH: ${CT_FTP_PATH:-/catalogo_xml}
+      CT_FTP_JSON_FILE: ${CT_FTP_JSON_FILE:-productos.json}
+      CT_FTP_XML_FILE: ${CT_FTP_XML_FILE:-productos.xml}
+      CT_SUPPLIER_CODE: ${CT_SUPPLIER_CODE:-CT}
+      CT_PREFERRED_WAREHOUSE: ${CT_PREFERRED_WAREHOUSE:-PUE}
+      CT_SYNC_CRON_MINUTES: ${CT_SYNC_CRON_MINUTES:-15}
+      CT_SYNC_ENABLED: ${CT_SYNC_ENABLED:-1}
     volumes:
       - ../uploads:/app/uploads
     networks:
