@@ -65,4 +65,18 @@ describe('quote-scoring', () => {
     expect(a.costMxn).toBe(100);
     expect(a.sellPriceSuggested).toBe(200);
   });
+
+  it('resolves image url from imagen or imageUrl', () => {
+    const scored = scoreProducts(
+      [
+        {
+          ...rows[0],
+          imagen: null,
+          imageUrl: 'http://static.ctonline.mx/imagenes/A/A_full.jpg',
+        } as any,
+      ],
+      { mode: 'BALANCE', targetMarginPercent: 30, preferredWarehouse: 'PUE' },
+    );
+    expect(scored[0].imagen).toBe('https://static.ctonline.mx/imagenes/A/A_full.jpg');
+  });
 });

@@ -78,6 +78,45 @@ function money(n: number) {
   }).format(n || 0);
 }
 
+/** CT Cloudflare bloquea hotlink con Referer; servimos vía proxy same-origin. */
+function ctProxiedImageUrl(src: string | null | undefined): string | null {
+  if (!src?.trim()) return null;
+  try {
+    const u = new URL(src.trim());
+    if (u.protocol === 'http:') u.protocol = 'https:';
+    if (u.hostname !== 'static.ctonline.mx') return src.trim();
+    return `/ct-media?u=${encodeURIComponent(u.toString())}`;
+  } catch {
+    return src.trim();
+  }
+}
+
+function ProductThumb({ src, alt }: { src: string | null; alt: string }) {
+  const proxied = ctProxiedImageUrl(src);
+  const [broken, setBroken] = useState(!proxied);
+  if (broken || !proxied) {
+    return (
+      <div className={styles.sqThumb}>
+        <span className={styles.sqThumbFallback}>Sin imagen</span>
+      </div>
+    );
+  }
+  return (
+    <div className={styles.sqThumb}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        className={styles.sqThumbImg}
+        src={proxied}
+        alt={alt}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => setBroken(true)}
+      />
+    </div>
+  );
+}
+
+
 function lineSell(l: QuoteLinePayload) {
   const product = l.qty * l.unitPrice;
   const labor = (l.laborHours || 0) * (l.laborRate || 0);
@@ -120,6 +159,7 @@ export default function SmartQuoteBuilderPage() {
   const [copilotQuestions, setCopilotQuestions] = useState<string[]>([]);
   const [qtyDraft, setQtyDraft] = useState<Record<number, number>>({});
   const [searchedOnce, setSearchedOnce] = useState(false);
+  const [expandedOffer, setExpandedOffer] = useState<number | null>(null);
   const [cfg, setCfg] = useState({
     template: "CCTV" as "CCTV" | "WIFI" | "ACCESS",
     cameras: 12,
@@ -630,22 +670,30 @@ export default function SmartQuoteBuilderPage() {
               <div style={{ display: "grid", gap: 10 }}>
                 {offers.map((o) => {
                   const rec = o.badges.includes("RECOMMENDED");
+                  const open = expandedOffer === o.id;
+                  const specs = o.especificaciones || [];
+                  const warehouses = o.stockByWarehouse || [];
                   return (
                     <article key={o.id} className={`${styles.sqOffer} ${rec ? styles.sqOfferRec : ""}`}>
-                      <div
-                        className={styles.sqThumb}
-                        style={{ backgroundImage: o.imagen ? `url(${o.imagen})` : undefined }}
-                      />
+                      <ProductThumb src={o.imagen} alt={o.nombre || o.clave || "Producto"} />
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontWeight: 750, fontSize: 14, lineHeight: 1.35 }}>{o.nombre}</div>
-                        <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 3 }}>
-                          {o.marca} · {o.clave}
+                        <div className={styles.sqOfferMeta}>
+                          {o.marca ? <span>{o.marca}</span> : null}
+                          {o.modelo ? <span>Modelo {o.modelo}</span> : null}
+                          {o.clave ? <span>SKU {o.clave}</span> : null}
+                          {o.numParte ? <span>P/N {o.numParte}</span> : null}
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4 }}>
+                          {[o.categoria, o.subcategoria].filter(Boolean).join(" · ") || "Sin categoría"}
                           {" · "}
                           <span className={o.stockTotal > 0 ? styles.sqStockOk : styles.sqStockWarn}>
                             {o.stockTotal > 0 ? `${o.stockTotal} disponibles` : "Sin stock"}
                           </span>
+                          {o.stockPreferred > 0 ? ` · ${o.stockPreferred} en almacén preferido` : null}
                           {o.leadTimeDays <= 1 ? " · inmediato" : ` · ~${o.leadTimeDays} días`}
                         </div>
+                        {o.descripcion ? <p className={styles.sqOfferDesc}>{o.descripcion}</p> : null}
                         <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 8 }}>
                           {o.badges.map((b) => (
                             <span
@@ -655,12 +703,52 @@ export default function SmartQuoteBuilderPage() {
                               {BADGE_ES[b] || b}
                             </span>
                           ))}
+                          {o.protegido ? <span className={styles.sqBadge}>Precio protegido</span> : null}
+                          {(o.promociones?.length || 0) > 0 ? (
+                            <span className={styles.sqBadge}>Promoción CT</span>
+                          ) : null}
                         </div>
+                        {warehouses.length > 0 ? (
+                          <div className={styles.sqWh}>
+                            {warehouses.slice(0, open ? 8 : 4).map((w) => (
+                              <span key={w.code} className={styles.sqWhChip}>
+                                {w.code}: {w.qty}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                        {open && specs.length > 0 ? (
+                          <div className={styles.sqSpecs}>
+                            {specs.slice(0, 8).map((s) => (
+                              <div key={`${s.tipo}-${s.valor}`} className={styles.sqSpecItem}>
+                                <strong>{s.tipo}:</strong> {s.valor}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                        {open ? (
+                          <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-tertiary)" }}>
+                            {o.ean ? `EAN ${o.ean}` : null}
+                            {o.ean && o.upc ? " · " : null}
+                            {o.upc ? `UPC ${o.upc}` : null}
+                            {o.sustituto && o.sustituto !== o.clave ? ` · Sustituto ${o.sustituto}` : null}
+                            {showCosts ? ` · Costo CT ${money(o.precio)} ${o.moneda}` : null}
+                          </div>
+                        ) : null}
+                        {(specs.length > 0 || o.ean || o.upc || o.descripcion) && (
+                          <button
+                            type="button"
+                            className={styles.sqDetailsToggle}
+                            onClick={() => setExpandedOffer(open ? null : o.id)}
+                          >
+                            {open ? "Ocultar detalle" : "Ver más datos"}
+                          </button>
+                        )}
                         <div style={{ marginTop: 8, fontSize: 15, fontWeight: 800 }}>
                           {money(o.sellPriceSuggested)}
                           {showCosts && (
                             <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)" }}>
-                              costo {money(o.costMxn)}
+                              costo {money(o.costMxn)} · margen {o.marginPercent}%
                             </span>
                           )}
                         </div>

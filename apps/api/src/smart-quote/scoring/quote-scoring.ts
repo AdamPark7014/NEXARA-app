@@ -1,5 +1,7 @@
 export type OptimizeMode = 'PRICE' | 'SPEED' | 'MARGIN' | 'PREMIUM' | 'BALANCE';
 
+export type ProductSpec = { tipo: string; valor: string };
+
 export type ScoredOffer = {
   id: number;
   clave: string | null;
@@ -11,16 +13,21 @@ export type ScoredOffer = {
   subcategoria: string | null;
   descripcion: string | null;
   imagen: string | null;
+  ean: string | null;
+  upc: string | null;
   precio: number;
   moneda: string;
   tipoCambio: number | null;
   costMxn: number;
   stockTotal: number;
   stockPreferred: number;
+  stockByWarehouse: Array<{ code: string; qty: number }>;
   leadTimeDays: number;
   protegido: boolean;
+  activo: boolean;
   sustituto: string | null;
-  especificaciones: unknown;
+  especificaciones: ProductSpec[];
+  promociones: unknown[];
   score: number;
   badges: Array<'BEST_PRICE' | 'BEST_STOCK' | 'FASTEST' | 'BEST_MARGIN' | 'RECOMMENDED' | 'SUBSTITUTE'>;
   sellPriceSuggested: number;
@@ -35,6 +42,43 @@ const WEIGHTS: Record<OptimizeMode, Record<string, number>> = {
   BALANCE: { price: 0.3, stock: 0.2, lead: 0.2, margin: 0.15, brand: 0.1, promo: 0.05 },
 };
 
+/** CT a veces bloquea hotlink con Referer; la URL igual debe quedar usable en <img referrerPolicy="no-referrer">. */
+export function resolveProductImage(row: {
+  imagen?: string | null;
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
+}): string | null {
+  const raw = [row.imagen, row.imageUrl, row.thumbnailUrl]
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .find((v) => v.length > 0);
+  if (!raw) return null;
+  if (raw.startsWith('//')) return `https:${raw}`;
+  if (raw.startsWith('http://')) return `https://${raw.slice('http://'.length)}`;
+  return raw;
+}
+
+function normalizeSpecs(value: unknown): ProductSpec[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((s) => {
+      if (!s || typeof s !== 'object') return null;
+      const tipo = String((s as any).tipo || (s as any).type || '').trim();
+      const valor = String((s as any).valor || (s as any).value || '').trim();
+      if (!tipo || !valor) return null;
+      return { tipo, valor };
+    })
+    .filter((s): s is ProductSpec => Boolean(s))
+    .slice(0, 12);
+}
+
+function stockBreakdown(existencia: Record<string, number>): Array<{ code: string; qty: number }> {
+  return Object.entries(existencia)
+    .map(([code, qty]) => ({ code, qty: Number(qty) || 0 }))
+    .filter((x) => x.qty > 0)
+    .sort((a, b) => b.qty - a.qty)
+    .slice(0, 8);
+}
+
 export function scoreProducts(
   rows: Array<{
     id: number;
@@ -46,12 +90,17 @@ export function scoreProducts(
     categoria: string | null;
     subcategoria: string | null;
     descripcion_corta: string | null;
-    imagen: string | null;
+    imagen?: string | null;
+    imageUrl?: string | null;
+    thumbnailUrl?: string | null;
+    ean?: string | null;
+    upc?: string | null;
     precio: number | null;
     moneda: string | null;
     tipoCambio: number | null;
     existencia: unknown;
     protegido: boolean;
+    activo?: boolean;
     sustituto: string | null;
     especificaciones: unknown;
     promociones: unknown;
@@ -84,16 +133,21 @@ export function scoreProducts(
     const margin = opts.targetMarginPercent / 100;
     const sellPriceSuggested =
       margin >= 0.99 ? cost * 2 : Math.round((cost / (1 - Math.max(0.01, margin))) * 100) / 100;
-    const hasPromo = Array.isArray(r.promociones) && r.promociones.length > 0;
+    const promociones = Array.isArray(r.promociones) ? r.promociones : [];
+    const hasPromo = promociones.length > 0;
     return {
       ...r,
+      imagen: resolveProductImage(r),
       costMxn: cost,
       stockTotal,
       stockPreferred,
+      stockByWarehouse: stockBreakdown(existencia),
       leadTimeDays,
       sellPriceSuggested,
       marginPercent: opts.targetMarginPercent,
       hasPromo,
+      especificaciones: normalizeSpecs(r.especificaciones),
+      promociones,
       brandBoost: r.marca && preferredBrands.has(r.marca.toUpperCase()) ? 1 : 0.5,
     };
   });
@@ -138,16 +192,21 @@ export function scoreProducts(
       subcategoria: e.subcategoria,
       descripcion: e.descripcion_corta,
       imagen: e.imagen,
+      ean: e.ean || null,
+      upc: e.upc || null,
       precio: Number(e.precio) || 0,
       moneda: (e.moneda || 'MXN').toUpperCase(),
       tipoCambio: e.tipoCambio,
       costMxn: e.costMxn,
       stockTotal: e.stockTotal,
       stockPreferred: e.stockPreferred,
+      stockByWarehouse: e.stockByWarehouse,
       leadTimeDays: e.leadTimeDays,
       protegido: e.protegido,
+      activo: e.activo !== false,
       sustituto: e.sustituto,
       especificaciones: e.especificaciones,
+      promociones: e.promociones,
       score,
       badges: [],
       sellPriceSuggested: e.sellPriceSuggested,
@@ -160,7 +219,9 @@ export function scoreProducts(
   if (scored.length) {
     const bestPrice = [...scored].sort((a, b) => a.costMxn - b.costMxn)[0];
     const bestStock = [...scored].sort((a, b) => b.stockTotal - a.stockTotal)[0];
-    const fastest = [...scored].sort((a, b) => a.leadTimeDays - b.leadTimeDays || b.stockPreferred - a.stockPreferred)[0];
+    const fastest = [...scored].sort(
+      (a, b) => a.leadTimeDays - b.leadTimeDays || b.stockPreferred - a.stockPreferred,
+    )[0];
     bestPrice.badges.push('BEST_PRICE');
     bestStock.badges.push('BEST_STOCK');
     fastest.badges.push('FASTEST');
