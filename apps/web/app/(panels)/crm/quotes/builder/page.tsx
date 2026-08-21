@@ -1,0 +1,1043 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import PageHeader from "@/components/ui/PageHeader";
+import Button from "@/components/ui/Button";
+import InlineAlert from "@/components/ui/InlineAlert";
+import EmptyState from "@/components/ui/EmptyState";
+import { useUser } from "@/components/UserContext";
+import { createSalesQuote, listSalesClients, type SalesClient } from "@/lib/sales-api";
+import {
+  offerToLine,
+  smartQuoteCheckMargin,
+  smartQuoteConfigure,
+  smartQuoteCopilotDraft,
+  smartQuoteCtStatus,
+  smartQuoteLaborSuggest,
+  smartQuoteSearch,
+  type OptimizeMode,
+  type QuoteLinePayload,
+  type SmartOffer,
+} from "@/lib/smart-quote-api";
+import styles from "./smart-quote.module.css";
+
+type Step = 1 | 2 | 3;
+type EntryPath = "search" | "solution" | "ai";
+
+const PRIORITIES: Array<{ id: OptimizeMode; label: string; hint: string }> = [
+  { id: "BALANCE", label: "Equilibrado", hint: "Buen balance entre precio, stock y margen" },
+  { id: "PRICE", label: "Más económico", hint: "Prioriza el menor costo del mayorista" },
+  { id: "SPEED", label: "Entrega rápida", hint: "Prioriza lo que hay en stock ahora" },
+  { id: "MARGIN", label: "Más rentable", hint: "Prioriza el margen de Nexara" },
+  { id: "PREMIUM", label: "Premium", hint: "Prioriza marcas y opciones de mayor calidad" },
+];
+
+const QUICK_SEARCHES = [
+  "cámara IP 4MP exterior",
+  "switch PoE 24 puertos",
+  "NVR 32 canales",
+  "access point WiFi 6",
+  "UPS",
+];
+
+const BADGE_ES: Record<string, string> = {
+  BEST_PRICE: "Mejor precio",
+  BEST_STOCK: "Más stock",
+  FASTEST: "Entrega rápida",
+  BEST_MARGIN: "Más rentable",
+  RECOMMENDED: "Recomendado",
+  SUBSTITUTE: "Alternativa",
+  LABOR: "Servicio",
+};
+
+const COACH: Record<Step, { icon: string; title: string; text: string }> = {
+  1: {
+    icon: "👋",
+    title: "Empecemos por lo simple",
+    text: "Dinos para quién es y qué priorizar. En el siguiente paso armamos los productos.",
+  },
+  2: {
+    icon: "✨",
+    title: "Ahora elige el equipo",
+    text: "Agrega lo que necesitas. A la derecha verás tu cotización actualizarse en vivo.",
+  },
+  3: {
+    icon: "✅",
+    title: "Último vistazo",
+    text: "Revisa cantidades y, si aplica, agrega instalación. Luego genera la cotización formal.",
+  },
+};
+
+function money(n: number) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    maximumFractionDigits: 0,
+  }).format(n || 0);
+}
+
+function lineSell(l: QuoteLinePayload) {
+  const product = l.qty * l.unitPrice;
+  const labor = (l.laborHours || 0) * (l.laborRate || 0);
+  const sub = product + labor;
+  const disc = sub * ((l.discount || 0) / 100);
+  const taxable = sub - disc;
+  return taxable + taxable * ((l.tax || 0) / 100);
+}
+
+function shortName(name?: string | null, max = 42) {
+  if (!name) return "Producto";
+  return name.length > max ? `${name.slice(0, max - 1)}…` : name;
+}
+
+export default function SmartQuoteBuilderPage() {
+  const { user } = useUser();
+  const token = user?.token ?? "";
+  const router = useRouter();
+
+  const [step, setStep] = useState<Step>(1);
+  const [path, setPath] = useState<EntryPath>("search");
+  const [clients, setClients] = useState<SalesClient[]>([]);
+  const [clientId, setClientId] = useState("");
+  const [projectName, setProjectName] = useState("");
+  const [optimize, setOptimize] = useState<OptimizeMode>("BALANCE");
+  const [targetMargin, setTargetMargin] = useState(30);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [query, setQuery] = useState("");
+  const [offers, setOffers] = useState<SmartOffer[]>([]);
+  const [lines, setLines] = useState<QuoteLinePayload[]>([]);
+  const [showCosts, setShowCosts] = useState(true);
+  const [loadingSearch, setLoadingSearch] = useState(false);
+  const [loadingAction, setLoadingAction] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [ctStatus, setCtStatus] = useState<{ total: number; lastSync: { finishedAt?: string } | null } | null>(null);
+  const [marginAlert, setMarginAlert] = useState<string | null>(null);
+  const [copilotPrompt, setCopilotPrompt] = useState("");
+  const [copilotQuestions, setCopilotQuestions] = useState<string[]>([]);
+  const [qtyDraft, setQtyDraft] = useState<Record<number, number>>({});
+  const [searchedOnce, setSearchedOnce] = useState(false);
+  const [cfg, setCfg] = useState({
+    template: "CCTV" as "CCTV" | "WIFI" | "ACCESS",
+    cameras: 12,
+    storageDays: 30,
+    accessPoints: 8,
+    doors: 2,
+    zone: "LOCAL_PUE",
+  });
+
+  useEffect(() => {
+    if (!token) return;
+    listSalesClients(token)
+      .then((list) => {
+        setClients(list);
+        if (list.length === 1) setClientId(String(list[0].id));
+      })
+      .catch(() => setClients([]));
+    smartQuoteCtStatus(token).then(setCtStatus).catch(() => setCtStatus(null));
+  }, [token]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3200);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const client = useMemo(() => clients.find((c) => String(c.id) === clientId), [clients, clientId]);
+
+  const totals = useMemo(() => {
+    const sell = lines.reduce((a, l) => a + lineSell(l), 0);
+    const cost = lines.reduce((a, l) => a + l.qty * (Number(l.unitCost) || 0), 0);
+    const margin = sell > 0 ? ((sell - cost) / sell) * 100 : 0;
+    return { sell, cost, margin, count: lines.length };
+  }, [lines]);
+
+  useEffect(() => {
+    if (!token || !lines.length) {
+      setMarginAlert(null);
+      return;
+    }
+    const first = lines.find((l) => l.unitCost != null);
+    if (!first) return;
+    const qty = Math.max(1, lines.reduce((a, l) => a + l.qty, 0));
+    smartQuoteCheckMargin(token, {
+      unitCost: totals.cost / qty,
+      unitPrice: totals.sell / qty,
+      category: first.category,
+      brand: first.brand || undefined,
+    })
+      .then((r) => setMarginAlert(r.ok ? null : r.message))
+      .catch(() => setMarginAlert(null));
+  }, [token, lines, totals]);
+
+  const canGoStep2 = Boolean(clientId || projectName.trim());
+  const canGoStep3 = lines.length > 0;
+  const step1Done = canGoStep2;
+  const step2Done = canGoStep3;
+
+  const runSearch = useCallback(
+    async (qOverride?: string) => {
+      const q = (qOverride ?? query).trim();
+      if (!token || !q) return;
+      if (qOverride) setQuery(qOverride);
+      setLoadingSearch(true);
+      setError(null);
+      setSearchedOnce(true);
+      try {
+        const res = await smartQuoteSearch(token, {
+          q,
+          optimize,
+          targetMargin,
+          inStockOnly: true,
+          take: 24,
+        });
+        setOffers(res.data);
+        if (!res.data.length) {
+          setToast("No encontramos stock con esa búsqueda. Prueba otra palabra o cambia la prioridad.");
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se pudo buscar en el catálogo");
+        setOffers([]);
+      } finally {
+        setLoadingSearch(false);
+      }
+    },
+    [token, query, optimize, targetMargin],
+  );
+
+  const addOffer = (offer: SmartOffer) => {
+    const qty = Math.max(1, qtyDraft[offer.id] || 1);
+    setLines((prev) => [...prev, offerToLine(offer, qty, optimize)]);
+    setToast(`Listo: agregaste ${qty} × ${shortName(offer.nombre || offer.clave, 36)}`);
+  };
+
+  const mergeProposal = (
+    hardware: QuoteLinePayload[],
+    labor: Array<Record<string, unknown>>,
+    logistics: QuoteLinePayload | null,
+    notes?: string[],
+  ) => {
+    const next: QuoteLinePayload[] = [...hardware];
+    for (const s of labor || []) {
+      next.push({
+        category: String(s.category || "ENGINEERING"),
+        name: String(s.name || "Servicio"),
+        qty: Number(s.qty) || 1,
+        unitPrice: Number(s.unitPrice) || 0,
+        unitCost: Number(s.unitCost) || 0,
+        discount: 0,
+        tax: 16,
+        laborHours: Number(s.laborHours) || 0,
+        laborRate: Number(s.laborRate) || 0,
+      });
+    }
+    if (logistics) {
+      next.push({
+        ...logistics,
+        discount: logistics.discount ?? 0,
+        tax: logistics.tax ?? 16,
+      });
+    }
+    setLines(next);
+    setStep(3);
+    setToast(
+      notes?.length
+        ? notes[0]
+        : `Propuesta lista: ${next.length} concepto${next.length === 1 ? "" : "s"}. Revísala y genera.`,
+    );
+  };
+
+  const runConfigure = async () => {
+    if (!token) return;
+    setLoadingAction(true);
+    setError(null);
+    try {
+      const res = await smartQuoteConfigure(token, {
+        template: cfg.template,
+        cameras: cfg.template === "CCTV" ? cfg.cameras : undefined,
+        storageDays: cfg.template === "CCTV" ? cfg.storageDays : undefined,
+        accessPoints: cfg.template === "WIFI" ? cfg.accessPoints : undefined,
+        doors: cfg.template === "ACCESS" ? cfg.doors : undefined,
+        optimize,
+        targetMarginPercent: targetMargin,
+        logisticsZone: cfg.zone,
+        includeLabor: true,
+      });
+      mergeProposal(res.hardware || [], res.labor || [], res.logistics, res.notes);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo armar la solución");
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const runCopilot = async () => {
+    if (!token || !copilotPrompt.trim()) return;
+    setLoadingAction(true);
+    setError(null);
+    try {
+      const draft = await smartQuoteCopilotDraft(token, copilotPrompt.trim());
+      setCopilotQuestions(draft.intent.questions || []);
+      setOptimize(draft.intent.optimize);
+      mergeProposal(draft.proposal.hardware || [], draft.proposal.labor || [], draft.proposal.logistics, draft.proposal.notes);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo generar el borrador");
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const suggestLabor = async () => {
+    if (!token || !lines.length) return;
+    setLoadingAction(true);
+    try {
+      const sugg = await smartQuoteLaborSuggest(
+        token,
+        lines.map((l) => ({ category: l.category, qty: l.qty, name: l.name })),
+      );
+      if (!sugg.length) {
+        setToast("No encontramos servicios sugeridos para estos productos.");
+        return;
+      }
+      const asLines: QuoteLinePayload[] = sugg.map((s) => ({
+        category: s.category,
+        name: s.name,
+        qty: s.qty,
+        unitPrice: s.unitPrice,
+        unitCost: s.unitCost,
+        discount: 0,
+        tax: 16,
+        laborHours: s.laborHours,
+        laborRate: s.laborRate,
+        scoreReason: "LABOR",
+        optimizationMode: optimize,
+      }));
+      setLines((prev) => [...prev, ...asLines]);
+      setToast(`Agregamos ${asLines.length} servicio${asLines.length === 1 ? "" : "s"} de instalación / ingeniería.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo calcular la mano de obra");
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const saveQuote = async () => {
+    if (!token || !lines.length) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const quoteNumber = `NXR-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+      const issueDate = new Date().toISOString().slice(0, 10);
+      const validUntil = new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10);
+      await createSalesQuote(token, {
+        quoteNumber,
+        issueDate,
+        validUntil,
+        salesClientId: client?.id,
+        clientCompany: client?.name || client?.legalName || undefined,
+        clientName: client?.name,
+        projectName: projectName || undefined,
+        items: lines.map((l) => ({
+          name: l.name,
+          qty: l.qty,
+          unitPrice: l.unitPrice,
+          discount: l.discount,
+          tax: l.tax,
+          description: l.description || undefined,
+          category: l.category,
+          brand: l.brand || undefined,
+          model: l.model || undefined,
+          sku: l.sku || undefined,
+          partNumber: l.partNumber || undefined,
+          unitCost: l.unitCost ?? undefined,
+          productCtId: l.productCtId,
+          supplierSku: l.supplierSku || undefined,
+          marginPercent: l.marginPercent ?? undefined,
+          stockSnapshot: l.stockSnapshot ?? undefined,
+          leadTimeDays: l.leadTimeDays ?? undefined,
+          scoreReason: l.scoreReason || undefined,
+          optimizationMode: l.optimizationMode || optimize,
+          laborHours: l.laborHours || 0,
+          laborRate: l.laborRate || 0,
+          deliveryTime: l.deliveryTime || undefined,
+        })) as any,
+      });
+      router.push("/crm/quotes");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar la cotización");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const goStep = (next: Step) => {
+    if (next === 2 && !canGoStep2) {
+      setToast("Selecciona un cliente o escribe el nombre del proyecto.");
+      return;
+    }
+    if (next === 3 && !canGoStep3) {
+      setToast("Agrega al menos un producto antes de revisar.");
+      return;
+    }
+    setStep(next);
+  };
+
+  const coach = COACH[step];
+  const catalogHint = ctStatus
+    ? `${ctStatus.total.toLocaleString("es-MX")} productos del mayorista listos para cotizar`
+    : "Catálogo del mayorista listo para cotizar";
+
+  return (
+    <div className={styles.sq}>
+      <PageHeader
+        variant="hero"
+        eyebrow="CRM · Cotizaciones"
+        title="Cotizar con confianza"
+        subtitle={`${catalogHint}. En minutos pasas de un requerimiento a una propuesta profesional.`}
+        meta={
+          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+            <Link href="/crm/quotes" style={{ color: "var(--text-tertiary)" }}>
+              Volver a cotizaciones
+            </Link>
+          </span>
+        }
+        actions={
+          <Button variant="ghost" size="sm" onClick={() => setShowCosts((v) => !v)}>
+            {showCosts ? "Vista cliente" : "Vista interna"}
+          </Button>
+        }
+      />
+
+      <div className={styles.sqStepper} role="navigation" aria-label="Pasos de cotización">
+        {(
+          [
+            { id: 1 as Step, label: "Cliente", hint: "Para quién es", done: step1Done },
+            { id: 2 as Step, label: "Productos", hint: "Qué incluir", done: step2Done },
+            { id: 3 as Step, label: "Confirmar", hint: "Generar propuesta", done: false },
+          ] as const
+        ).map((s) => {
+          const active = step === s.id;
+          const done = s.id < step || (s.id === 1 && step1Done && step > 1) || (s.id === 2 && step2Done && step > 2);
+          return (
+            <button
+              key={s.id}
+              type="button"
+              className={`${styles.sqStep} ${active ? styles.sqStepActive : ""} ${done && !active ? styles.sqStepDone : ""}`}
+              onClick={() => goStep(s.id)}
+              disabled={s.id === 2 && !canGoStep2}
+            >
+              <span className={styles.sqStepNum}>{done && !active ? "✓" : s.id}</span>
+              <span>
+                <div className={styles.sqStepLabel}>{s.label}</div>
+                <div className={styles.sqStepHint}>{s.hint}</div>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className={styles.sqCoach} role="note">
+        <div className={styles.sqCoachIcon} aria-hidden>
+          {coach.icon}
+        </div>
+        <div className={styles.sqCoachBody}>
+          <div className={styles.sqCoachTitle}>{coach.title}</div>
+          <div className={styles.sqCoachText}>{coach.text}</div>
+        </div>
+      </div>
+
+      {error && <InlineAlert message={error} variant="danger" onDismiss={() => setError(null)} />}
+      {marginAlert && <InlineAlert message={marginAlert} variant="warning" onDismiss={() => setMarginAlert(null)} />}
+      {toast && <InlineAlert message={toast} variant="success" onDismiss={() => setToast(null)} />}
+
+      <div className={styles.sqLayout}>
+        <main className={styles.sqMain}>
+          {step === 1 && (
+            <section className={styles.sqCard}>
+              <div>
+                <h2 className={styles.sqCardTitle}>¿Para quién cotizamos?</h2>
+                <p className={styles.sqCardLead}>
+                  Con esto personalizamos la propuesta. Luego eliges cómo armar los productos.
+                </p>
+              </div>
+
+              <div className={styles.sqFieldGrid}>
+                <label className={styles.sqLabel}>
+                  Cliente
+                  <select
+                    className={styles.sqSelect}
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                  >
+                    <option value="">Selecciona un cliente…</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={styles.sqLabel}>
+                  Proyecto (opcional pero recomendado)
+                  <input
+                    className={styles.sqInput}
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    placeholder="Ej. CCTV Bodega Norte"
+                  />
+                </label>
+              </div>
+
+              <div>
+                <div className={styles.sqLabel} style={{ marginBottom: 8 }}>
+                  ¿Qué priorizamos en este proyecto?
+                </div>
+                <div className={styles.sqChips}>
+                  {PRIORITIES.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`${styles.sqChip} ${optimize === p.id ? styles.sqChipOn : ""}`}
+                      onClick={() => setOptimize(p.id)}
+                      title={p.hint}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                <div className={styles.sqHelp} style={{ marginTop: 8 }}>
+                  {PRIORITIES.find((p) => p.id === optimize)?.hint}
+                </div>
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  className={styles.sqGhostBtn}
+                  style={{ fontSize: 13, color: "var(--text-secondary)", fontWeight: 600 }}
+                  onClick={() => setShowAdvanced((v) => !v)}
+                >
+                  {showAdvanced ? "Ocultar opciones avanzadas" : "Opciones avanzadas (margen)"}
+                </button>
+                {showAdvanced && (
+                  <label className={styles.sqLabel} style={{ marginTop: 10 }}>
+                    Margen objetivo: {targetMargin}%
+                    <input
+                      type="range"
+                      min={15}
+                      max={50}
+                      value={targetMargin}
+                      onChange={(e) => setTargetMargin(Number(e.target.value))}
+                    />
+                    <span className={styles.sqHelp}>
+                      Usamos este margen para sugerir el precio de venta sobre el costo del mayorista.
+                    </span>
+                  </label>
+                )}
+              </div>
+
+              <div>
+                <div className={styles.sqLabel} style={{ marginBottom: 8 }}>
+                  ¿Cómo quieres armarla?
+                </div>
+                <div className={styles.sqPaths}>
+                  <button
+                    type="button"
+                    className={`${styles.sqPath} ${path === "search" ? styles.sqPathOn : ""}`}
+                    onClick={() => setPath("search")}
+                  >
+                    <span className={styles.sqPathIcon}>🔎</span>
+                    <span className={styles.sqPathTitle}>Buscar productos</span>
+                    <span className={styles.sqPathDesc}>Ideal si ya sabes qué equipo necesitas.</span>
+                    <span className={styles.sqPathMeta}>Lo más usado</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.sqPath} ${path === "solution" ? styles.sqPathOn : ""}`}
+                    onClick={() => setPath("solution")}
+                  >
+                    <span className={styles.sqPathIcon}>🧩</span>
+                    <span className={styles.sqPathTitle}>Armar solución</span>
+                    <span className={styles.sqPathDesc}>Dices el alcance y te proponemos el paquete.</span>
+                    <span className={styles.sqPathMeta}>CCTV · WiFi · Acceso</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.sqPath} ${path === "ai" ? styles.sqPathOn : ""}`}
+                    onClick={() => setPath("ai")}
+                  >
+                    <span className={styles.sqPathIcon}>💬</span>
+                    <span className={styles.sqPathTitle}>Describirlo</span>
+                    <span className={styles.sqPathDesc}>Lo escribes como se lo dirías a un colega.</span>
+                    <span className={styles.sqPathMeta}>Borrador automático</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.sqFooter}>
+                <span className={styles.sqHelp}>
+                  {canGoStep2
+                    ? "Todo listo para pasar a productos."
+                    : "Selecciona un cliente o escribe el proyecto para continuar."}
+                </span>
+                <Button variant="primary" size="lg" disabled={!canGoStep2} onClick={() => goStep(2)}>
+                  Continuar a productos
+                </Button>
+              </div>
+            </section>
+          )}
+
+          {step === 2 && path === "search" && (
+            <section className={styles.sqCard}>
+              <div>
+                <h2 className={styles.sqCardTitle}>Busca y agrega</h2>
+                <p className={styles.sqCardLead}>
+                  Te ordenamos las mejores opciones según <strong>{PRIORITIES.find((p) => p.id === optimize)?.label}</strong>.
+                  Un clic y queda en tu cotización.
+                </p>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+                <input
+                  className={styles.sqInput}
+                  autoFocus
+                  placeholder="¿Qué necesitas? Ej. cámara 4MP, switch PoE…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && void runSearch()}
+                />
+                <Button variant="primary" onClick={() => void runSearch()} loading={loadingSearch}>
+                  Buscar
+                </Button>
+              </div>
+
+              <div className={styles.sqChips}>
+                {QUICK_SEARCHES.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    className={`${styles.sqChip} ${styles.sqChipSoft}`}
+                    onClick={() => void runSearch(q)}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: "grid", gap: 10 }}>
+                {offers.map((o) => {
+                  const rec = o.badges.includes("RECOMMENDED");
+                  return (
+                    <article key={o.id} className={`${styles.sqOffer} ${rec ? styles.sqOfferRec : ""}`}>
+                      <div
+                        className={styles.sqThumb}
+                        style={{ backgroundImage: o.imagen ? `url(${o.imagen})` : undefined }}
+                      />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 750, fontSize: 14, lineHeight: 1.35 }}>{o.nombre}</div>
+                        <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 3 }}>
+                          {o.marca} · {o.clave}
+                          {" · "}
+                          <span className={o.stockTotal > 0 ? styles.sqStockOk : styles.sqStockWarn}>
+                            {o.stockTotal > 0 ? `${o.stockTotal} disponibles` : "Sin stock"}
+                          </span>
+                          {o.leadTimeDays <= 1 ? " · inmediato" : ` · ~${o.leadTimeDays} días`}
+                        </div>
+                        <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 8 }}>
+                          {o.badges.map((b) => (
+                            <span
+                              key={b}
+                              className={`${styles.sqBadge} ${b === "RECOMMENDED" ? styles.sqBadgeRec : ""}`}
+                            >
+                              {BADGE_ES[b] || b}
+                            </span>
+                          ))}
+                        </div>
+                        <div style={{ marginTop: 8, fontSize: 15, fontWeight: 800 }}>
+                          {money(o.sellPriceSuggested)}
+                          {showCosts && (
+                            <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)" }}>
+                              costo {money(o.costMxn)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gap: 8, justifyItems: "stretch" }}>
+                        <input
+                          className={styles.sqInput}
+                          type="number"
+                          min={1}
+                          value={qtyDraft[o.id] || 1}
+                          onChange={(e) =>
+                            setQtyDraft((prev) => ({
+                              ...prev,
+                              [o.id]: Math.max(1, Number(e.target.value) || 1),
+                            }))
+                          }
+                          style={{ width: 76, textAlign: "center", padding: "8px" }}
+                          aria-label="Cantidad"
+                        />
+                        <Button variant="primary" size="sm" onClick={() => addOffer(o)}>
+                          Agregar
+                        </Button>
+                      </div>
+                    </article>
+                  );
+                })}
+
+                {!offers.length && !loadingSearch && (
+                  <EmptyState
+                    icon="🔎"
+                    title={searchedOnce ? "Sin resultados con stock" : "Busca tu primer producto"}
+                    description={
+                      searchedOnce
+                        ? "Prueba otra descripción o una de las sugerencias de arriba."
+                        : "Escribe lo que el cliente necesita o elige una búsqueda rápida."
+                    }
+                  />
+                )}
+              </div>
+
+              <div className={styles.sqFooter}>
+                <Button variant="ghost" onClick={() => setStep(1)}>
+                  Atrás
+                </Button>
+                <Button variant="primary" size="lg" disabled={!canGoStep3} onClick={() => goStep(3)}>
+                  Revisar ({lines.length})
+                </Button>
+              </div>
+            </section>
+          )}
+
+          {step === 2 && path === "solution" && (
+            <section className={styles.sqCard}>
+              <div>
+                <h2 className={styles.sqCardTitle}>Cuéntanos el alcance</h2>
+                <p className={styles.sqCardLead}>
+                  Con estos datos armamos una propuesta completa: equipos, instalación y entrega.
+                </p>
+              </div>
+
+              <div className={styles.sqChips}>
+                {(
+                  [
+                    { id: "CCTV" as const, label: "Videovigilancia" },
+                    { id: "WIFI" as const, label: "Red WiFi" },
+                    { id: "ACCESS" as const, label: "Control de acceso" },
+                  ] as const
+                ).map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={`${styles.sqChip} ${cfg.template === t.id ? styles.sqChipOn : ""}`}
+                    onClick={() => setCfg({ ...cfg, template: t.id })}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className={styles.sqFieldGrid}>
+                {cfg.template === "CCTV" && (
+                  <>
+                    <label className={styles.sqLabel}>
+                      Número de cámaras
+                      <input
+                        className={styles.sqInput}
+                        type="number"
+                        min={1}
+                        value={cfg.cameras}
+                        onChange={(e) => setCfg({ ...cfg, cameras: Number(e.target.value) || 1 })}
+                      />
+                    </label>
+                    <label className={styles.sqLabel}>
+                      Días de grabación
+                      <input
+                        className={styles.sqInput}
+                        type="number"
+                        min={7}
+                        value={cfg.storageDays}
+                        onChange={(e) => setCfg({ ...cfg, storageDays: Number(e.target.value) || 30 })}
+                      />
+                    </label>
+                  </>
+                )}
+                {cfg.template === "WIFI" && (
+                  <label className={styles.sqLabel}>
+                    Access points
+                    <input
+                      className={styles.sqInput}
+                      type="number"
+                      min={1}
+                      value={cfg.accessPoints}
+                      onChange={(e) => setCfg({ ...cfg, accessPoints: Number(e.target.value) || 1 })}
+                    />
+                  </label>
+                )}
+                {cfg.template === "ACCESS" && (
+                  <label className={styles.sqLabel}>
+                    Puertas a controlar
+                    <input
+                      className={styles.sqInput}
+                      type="number"
+                      min={1}
+                      value={cfg.doors}
+                      onChange={(e) => setCfg({ ...cfg, doors: Number(e.target.value) || 1 })}
+                    />
+                  </label>
+                )}
+                <label className={styles.sqLabel}>
+                  Zona de entrega / instalación
+                  <select
+                    className={styles.sqSelect}
+                    value={cfg.zone}
+                    onChange={(e) => setCfg({ ...cfg, zone: e.target.value })}
+                  >
+                    <option value="LOCAL_PUE">Local · Puebla</option>
+                    <option value="CDMX">Ciudad de México</option>
+                    <option value="FORANEO">Foráneo</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className={styles.sqFooter}>
+                <Button variant="ghost" onClick={() => setStep(1)}>
+                  Atrás
+                </Button>
+                <Button variant="primary" size="lg" onClick={() => void runConfigure()} loading={loadingAction}>
+                  Armar propuesta
+                </Button>
+              </div>
+            </section>
+          )}
+
+          {step === 2 && path === "ai" && (
+            <section className={styles.sqCard}>
+              <div>
+                <h2 className={styles.sqCardTitle}>Descríbelo como se lo dirías a un colega</h2>
+                <p className={styles.sqCardLead}>
+                  Generamos un borrador con precios y stock reales del mayorista. Tú solo revisas y ajustas.
+                </p>
+              </div>
+
+              <textarea
+                className={styles.sqTextarea}
+                autoFocus
+                placeholder='Ej. "Necesito 50 cámaras en un almacén, priorizando disponibilidad e instalación en máximo 10 días en Puebla"'
+                value={copilotPrompt}
+                onChange={(e) => setCopilotPrompt(e.target.value)}
+              />
+
+              {copilotQuestions.length > 0 && (
+                <div style={{ padding: 14, borderRadius: 12, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Para afinar después</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "var(--text-secondary)" }}>
+                    {copilotQuestions.map((q) => (
+                      <li key={q}>{q}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className={styles.sqFooter}>
+                <Button variant="ghost" onClick={() => setStep(1)}>
+                  Atrás
+                </Button>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  onClick={() => void runCopilot()}
+                  loading={loadingAction}
+                  disabled={!copilotPrompt.trim()}
+                >
+                  Generar borrador
+                </Button>
+              </div>
+            </section>
+          )}
+
+          {step === 3 && (
+            <section className={styles.sqCard}>
+              <div>
+                <h2 className={styles.sqCardTitle}>Todo listo para generar</h2>
+                <p className={styles.sqCardLead}>
+                  Ajusta cantidades en el panel de la derecha. Si el proyecto incluye instalación, agrégala aquí.
+                </p>
+              </div>
+
+              <div className={styles.sqKpis}>
+                <div className={styles.sqKpi}>
+                  <div className={styles.sqKpiLabel}>Conceptos</div>
+                  <div className={styles.sqKpiValue}>{totals.count}</div>
+                </div>
+                <div className={styles.sqKpi}>
+                  <div className={styles.sqKpiLabel}>Total cliente</div>
+                  <div className={styles.sqKpiValue}>{money(totals.sell)}</div>
+                </div>
+                <div className={styles.sqKpi}>
+                  <div className={styles.sqKpiLabel}>Margen</div>
+                  <div className={styles.sqKpiValue}>{totals.count ? `${totals.margin.toFixed(0)}%` : "—"}</div>
+                </div>
+              </div>
+
+              {!lines.length ? (
+                <EmptyState
+                  icon="📋"
+                  title="Aún no hay conceptos"
+                  description="Regresa un paso y agrega productos o arma una solución."
+                  action={
+                    <Button variant="secondary" onClick={() => setStep(2)}>
+                      Ir a productos
+                    </Button>
+                  }
+                />
+              ) : (
+                <div className={styles.sqHelp}>
+                  Al generar, la cotización queda en CRM como borrador. Desde ahí puedes descargar PDF o enviarla al cliente.
+                </div>
+              )}
+
+              <div className={styles.sqFooter}>
+                <Button variant="ghost" onClick={() => setStep(2)}>
+                  Seguir agregando
+                </Button>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <Button variant="secondary" onClick={() => void suggestLabor()} loading={loadingAction} disabled={!lines.length}>
+                    + Instalación
+                  </Button>
+                  <Button variant="primary" size="lg" onClick={() => void saveQuote()} loading={saving} disabled={!lines.length}>
+                    Generar cotización
+                  </Button>
+                </div>
+              </div>
+            </section>
+          )}
+        </main>
+
+        <aside className={styles.sqRail}>
+          <div className={styles.sqRailCard}>
+            <div className={styles.sqRailHead}>
+              <div className={styles.sqRailEyebrow}>TU PROPUESTA</div>
+              <div className={styles.sqRailTitle}>
+                {client?.name || "Cliente por definir"}
+                {projectName ? ` · ${projectName}` : ""}
+              </div>
+              <div className={styles.sqRailMeta}>
+                {PRIORITIES.find((p) => p.id === optimize)?.label}
+                {showCosts ? ` · margen objetivo ${targetMargin}%` : ""}
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gap: 10, maxHeight: 300, overflow: "auto" }}>
+              {lines.length === 0 ? (
+                <div className={styles.sqHelp} style={{ padding: "8px 0" }}>
+                  Aquí aparecerá todo lo que agregues. Empieza en el paso 2.
+                </div>
+              ) : (
+                lines.map((l, idx) => (
+                  <div key={`${l.sku || l.name}-${idx}`} className={styles.sqLine}>
+                    <div className={styles.sqLineTop}>
+                      <div className={styles.sqLineName}>{shortName(l.name, 48)}</div>
+                      <button
+                        type="button"
+                        className={styles.sqGhostBtn}
+                        aria-label="Quitar de la cotización"
+                        onClick={() => setLines((prev) => prev.filter((_, i) => i !== idx))}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                      <span style={{ color: "var(--text-tertiary)" }}>Cant.</span>
+                      <input
+                        className={styles.sqInput}
+                        type="number"
+                        min={1}
+                        value={l.qty}
+                        onChange={(e) => {
+                          const qty = Math.max(1, Number(e.target.value) || 1);
+                          setLines((prev) => prev.map((x, i) => (i === idx ? { ...x, qty } : x)));
+                        }}
+                        style={{ width: 64, padding: "5px 8px", fontSize: 13 }}
+                      />
+                      <strong style={{ marginLeft: "auto", fontSize: 13 }}>{money(lineSell(l))}</strong>
+                    </div>
+                    {showCosts && l.unitCost != null && (
+                      <div className={styles.sqHelp}>Costo {money((l.unitCost || 0) * l.qty)}</div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className={styles.sqTotals}>
+              {showCosts && (
+                <div className={styles.sqTotalRow}>
+                  <span>Costo Nexara</span>
+                  <strong>{money(totals.cost)}</strong>
+                </div>
+              )}
+              <div className={`${styles.sqTotalRow} ${styles.sqTotalMain}`}>
+                <span>Total al cliente</span>
+                <span>{money(totals.sell)}</span>
+              </div>
+              {showCosts && (
+                <div
+                  className={styles.sqTotalRow}
+                  style={{
+                    color: totals.margin > 0 && totals.margin < 20 ? "#b45309" : undefined,
+                  }}
+                >
+                  <span>Margen estimado</span>
+                  <strong>{totals.count ? `${totals.margin.toFixed(1)}%` : "—"}</strong>
+                </div>
+              )}
+            </div>
+
+            {step === 3 && (
+              <div style={{ display: "grid", gap: 8 }}>
+                <Button variant="secondary" fullWidth onClick={() => void suggestLabor()} loading={loadingAction} disabled={!lines.length}>
+                  Agregar instalación
+                </Button>
+                <Button variant="primary" fullWidth size="lg" onClick={() => void saveQuote()} loading={saving} disabled={!lines.length}>
+                  Generar cotización
+                </Button>
+              </div>
+            )}
+
+            {step < 3 && lines.length > 0 && (
+              <Button variant="primary" fullWidth onClick={() => goStep(3)}>
+                Ir a confirmar ({lines.length})
+              </Button>
+            )}
+          </div>
+        </aside>
+      </div>
+
+      <div className={styles.sqStickyBar}>
+        <div className={styles.sqStickyInner}>
+          <div>
+            <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{totals.count} conceptos</div>
+            <div style={{ fontWeight: 800 }}>{money(totals.sell)}</div>
+          </div>
+          {step < 3 ? (
+            <Button
+              variant="primary"
+              onClick={() => goStep(step === 1 ? 2 : 3)}
+              disabled={step === 1 ? !canGoStep2 : !canGoStep3}
+            >
+              Continuar
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => void saveQuote()} loading={saving} disabled={!lines.length}>
+              Generar
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

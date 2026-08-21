@@ -348,7 +348,14 @@ export default function QuotesPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={openForm}>Nueva cotización</Button>}
+            {cfg.canCreate && (
+              <>
+                <Link href="/crm/quotes/builder">
+                  <Button variant="secondary" iconLeft="⚡">Cotizar en minutos</Button>
+                </Link>
+                <Button variant="primary" iconLeft="+" onClick={openForm}>Nueva cotización</Button>
+              </>
+            )}
           </>
         }
       />

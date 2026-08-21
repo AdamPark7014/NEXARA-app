@@ -52,6 +52,43 @@ export class CotizacionItemDto {
   @Min(0)
   unitPrice!: number;
 
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  unitCost?: number;
+
+  @IsOptional()
+  @IsInt()
+  supplierId?: number;
+
+  @IsOptional()
+  @IsString()
+  supplierSku?: string;
+
+  @IsOptional()
+  @IsInt()
+  productCtId?: number;
+
+  @IsOptional()
+  @IsNumber()
+  marginPercent?: number;
+
+  @IsOptional()
+  @IsInt()
+  stockSnapshot?: number;
+
+  @IsOptional()
+  @IsInt()
+  leadTimeDays?: number;
+
+  @IsOptional()
+  @IsString()
+  scoreReason?: string;
+
+  @IsOptional()
+  @IsString()
+  optimizationMode?: string;
+
   @IsInt()
   @Min(0)
   @Max(100)
