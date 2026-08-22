@@ -11,9 +11,12 @@
 }
 
 .sqExploreMode {
-  max-width: 1320px;
+  max-width: none;
+  width: 100%;
   gap: 10px;
   padding-top: 0;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 .sqExploreTop {
@@ -86,12 +89,23 @@
 }
 
 .sqExploreMode .sqLayout {
-  gap: 12px;
+  display: block;
+  gap: 0;
+}
+
+.sqExploreMode .sqMain {
+  flex: none;
+  width: 100%;
+  max-width: none;
 }
 
 .sqExploreMode .sqCard {
   padding: 12px;
   border-radius: 14px;
+}
+
+.sqExploreMode .sqWorkspace {
+  gap: 12px;
 }
 
 .sqExploreMode .sqControlDeck {
@@ -107,16 +121,60 @@
 }
 
 .sqExploreMode .sqProductGrid {
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
   gap: 10px;
+  padding-bottom: 96px;
 }
 
 .sqExploreMode .sqProductMedia {
-  height: 120px;
+  height: 112px;
 }
 
+.sqExploreMode .sqProductBody {
+  min-height: 100px;
+  padding: 10px 10px 6px;
+}
+
+/* La propuesta flota y no roba ancho al catálogo */
 .sqExploreMode .sqRail {
-  top: 8px;
+  position: fixed;
+  right: 20px;
+  bottom: 72px;
+  width: min(300px, calc(100vw - 32px));
+  max-width: 300px;
+  z-index: 35;
+  flex: none;
+  top: auto;
+}
+
+.sqExploreMode .sqRailCard {
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+  max-height: min(52vh, 420px);
+  overflow: auto;
+}
+
+.sqExploreMode .sqRailCompact .sqRailCard {
+  max-height: none;
+  padding: 12px 14px;
+}
+
+.sqExploreMode .sqRailCompact .sqRailTitle {
+  font-size: 13px;
+}
+
+@media (max-width: 960px) {
+  .sqExploreMode .sqRail {
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+    bottom: 70px;
+  }
+
+  .sqExploreMode .sqProductGrid {
+    padding-bottom: 140px;
+  }
 }
 
 .sqCoach {

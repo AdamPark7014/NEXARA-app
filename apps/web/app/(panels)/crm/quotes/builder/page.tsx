@@ -1356,7 +1356,7 @@ export default function SmartQuoteBuilderPage() {
           )}
         </main>
 
-        <aside className={styles.sqRail}>
+        <aside className={`${styles.sqRail} ${exploring && lines.length === 0 ? styles.sqRailCompact : ""}`}>
           <div className={styles.sqRailCard}>
             <div className={styles.sqRailHead}>
               <div className={styles.sqRailEyebrow}>TU PROPUESTA</div>
@@ -1370,10 +1370,12 @@ export default function SmartQuoteBuilderPage() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gap: 10, maxHeight: 300, overflow: "auto" }}>
+            <div style={{ display: "grid", gap: 10, maxHeight: exploring ? 220 : 300, overflow: "auto" }}>
               {lines.length === 0 ? (
-                <div className={styles.sqHelp} style={{ padding: "8px 0" }}>
-                  Aquí aparecerá todo lo que agregues. Empieza en el paso 2.
+                <div className={styles.sqHelp} style={{ padding: "4px 0" }}>
+                  {exploring
+                    ? "Agrega productos del catálogo; el total se actualiza aquí."
+                    : "Aquí aparecerá todo lo que agregues."}
                 </div>
               ) : (
                 lines.map((l, idx) => (
