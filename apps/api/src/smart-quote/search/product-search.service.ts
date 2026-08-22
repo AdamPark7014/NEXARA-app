@@ -36,17 +36,40 @@ export class ProductSearchService {
     if (params.subcategory) where.subcategoria = { contains: params.subcategory, mode: 'insensitive' };
 
     if (params.q?.trim()) {
-      const q = params.q.trim();
-      where.OR = [
-        { clave: { contains: q, mode: 'insensitive' } },
-        { numParte: { contains: q, mode: 'insensitive' } },
-        { nombre: { contains: q, mode: 'insensitive' } },
-        { modelo: { contains: q, mode: 'insensitive' } },
-        { marca: { contains: q, mode: 'insensitive' } },
-        { descripcion_corta: { contains: q, mode: 'insensitive' } },
-        { categoria: { contains: q, mode: 'insensitive' } },
-        { subcategoria: { contains: q, mode: 'insensitive' } },
-      ];
+      const tokens = params.q
+        .trim()
+        .split(/[\s,;|/]+/)
+        .map((t) => t.trim())
+        .filter((t) => t.length >= 2)
+        .slice(0, 6);
+
+      if (tokens.length <= 1) {
+        const q = tokens[0] || params.q.trim();
+        where.OR = [
+          { clave: { contains: q, mode: 'insensitive' } },
+          { numParte: { contains: q, mode: 'insensitive' } },
+          { nombre: { contains: q, mode: 'insensitive' } },
+          { modelo: { contains: q, mode: 'insensitive' } },
+          { marca: { contains: q, mode: 'insensitive' } },
+          { descripcion_corta: { contains: q, mode: 'insensitive' } },
+          { categoria: { contains: q, mode: 'insensitive' } },
+          { subcategoria: { contains: q, mode: 'insensitive' } },
+        ];
+      } else {
+        // Cada token debe aparecer en algún campo (AND de ORs) → búsqueda más precisa
+        where.AND = tokens.map((token) => ({
+          OR: [
+            { clave: { contains: token, mode: 'insensitive' } },
+            { numParte: { contains: token, mode: 'insensitive' } },
+            { nombre: { contains: token, mode: 'insensitive' } },
+            { modelo: { contains: token, mode: 'insensitive' } },
+            { marca: { contains: token, mode: 'insensitive' } },
+            { descripcion_corta: { contains: token, mode: 'insensitive' } },
+            { categoria: { contains: token, mode: 'insensitive' } },
+            { subcategoria: { contains: token, mode: 'insensitive' } },
+          ],
+        }));
+      }
     }
 
     if (params.includeSubstitutesFor) {

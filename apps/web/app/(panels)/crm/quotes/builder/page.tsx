@@ -57,18 +57,18 @@ const BADGE_ES: Record<string, string> = {
 const COACH: Record<Step, { icon: string; title: string; text: string }> = {
   1: {
     icon: "👋",
-    title: "Empecemos por lo simple",
-    text: "Dinos para quién es y qué priorizar. En el siguiente paso armamos los productos.",
+    title: "Contexto del proyecto",
+    text: "Cliente y modo de armado. La prioridad también la puedes cambiar después, en vivo.",
   },
   2: {
-    icon: "✨",
-    title: "Ahora elige el equipo",
-    text: "Agrega lo que necesitas. A la derecha verás tu cotización actualizarse en vivo.",
+    icon: "🛍️",
+    title: "Catálogo vivo",
+    text: "Ya ves productos. Filtra, cambia prioridad o margen y el ranking se recalcula al instante.",
   },
   3: {
     icon: "✅",
     title: "Último vistazo",
-    text: "Revisa cantidades y, si aplica, agrega instalación. Luego genera la cotización formal.",
+    text: "Ajusta cantidades, agrega instalación y genera la cotización formal.",
   },
 };
 
@@ -138,7 +138,7 @@ export default function SmartQuoteBuilderPage() {
   const token = user?.token ?? "";
   const router = useRouter();
 
-  const [step, setStep] = useState<Step>(1);
+  const [step, setStep] = useState<Step>(2);
   const [path, setPath] = useState<EntryPath>("search");
   const [clients, setClients] = useState<SalesClient[]>([]);
   const [clientId, setClientId] = useState("");
@@ -164,6 +164,9 @@ export default function SmartQuoteBuilderPage() {
   const [expandedOffer, setExpandedOffer] = useState<number | null>(null);
   const [filterBrand, setFilterBrand] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
+  const [inStockOnly, setInStockOnly] = useState(true);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [resultMeta, setResultMeta] = useState(0);
   const [facetBrands, setFacetBrands] = useState<string[]>([]);
   const [facetCategories, setFacetCategories] = useState<string[]>([]);
   const [cfg, setCfg] = useState({
@@ -245,9 +248,9 @@ export default function SmartQuoteBuilderPage() {
 
   const runSearch = useCallback(
     async (qOverride?: string) => {
+      if (!token) return;
       const q = (qOverride ?? query).trim();
-      if (!token || (!q && !filterBrand && !filterCategory)) return;
-      if (qOverride) setQuery(qOverride);
+      if (qOverride !== undefined) setQuery(qOverride);
       setLoadingSearch(true);
       setError(null);
       setSearchedOnce(true);
@@ -258,12 +261,13 @@ export default function SmartQuoteBuilderPage() {
           category: filterCategory || undefined,
           optimize,
           targetMargin,
-          inStockOnly: true,
-          take: 24,
+          inStockOnly,
+          take: 36,
         });
         setOffers(res.data);
+        setResultMeta(res.meta?.totalCandidates ?? res.data.length);
         if (!res.data.length) {
-          setToast("No encontramos stock con esa búsqueda. Prueba otra palabra o cambia la prioridad.");
+          setToast("Sin coincidencias. Prueba otra palabra, quita filtros o incluye sin stock.");
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : "No se pudo buscar en el catálogo");
@@ -272,8 +276,31 @@ export default function SmartQuoteBuilderPage() {
         setLoadingSearch(false);
       }
     },
-    [token, query, optimize, targetMargin, filterBrand, filterCategory],
+    [token, query, optimize, targetMargin, filterBrand, filterCategory, inStockOnly],
   );
+
+  // Catálogo vivo: carga inicial + reconsulta al cambiar filtros / prioridad / margen
+  useEffect(() => {
+    if (!token || step !== 2 || path !== "search") return;
+    const t = setTimeout(() => {
+      void runSearch();
+    }, query.trim() ? 320 : 80);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce intentionally keyed
+  }, [token, step, path, query, optimize, targetMargin, filterBrand, filterCategory, inStockOnly]);
+
+  // Remoldea precios de líneas CT cuando cambias el margen objetivo
+  useEffect(() => {
+    setLines((prev) =>
+      prev.map((l) => {
+        const cost = Number(l.unitCost) || 0;
+        if (cost <= 0 || !l.productCtId) return l;
+        const m = Math.min(0.9, Math.max(0.05, targetMargin / 100));
+        const unitPrice = Math.round((cost / (1 - m)) * 100) / 100;
+        return { ...l, unitPrice, marginPercent: targetMargin };
+      }),
+    );
+  }, [targetMargin]);
 
   const loadSubstitutes = async (clave: string) => {
     if (!token || !clave) return;
@@ -481,8 +508,8 @@ export default function SmartQuoteBuilderPage() {
       <PageHeader
         variant="hero"
         eyebrow="CRM · Cotizaciones"
-        title="Cotizar con confianza"
-        subtitle={`${catalogHint}. En minutos pasas de un requerimiento a una propuesta profesional.`}
+        title="Cotizador profesional"
+        subtitle={`${catalogHint}. Explora, filtra y cambia prioridad en tiempo real mientras armas la propuesta.`}
         meta={
           <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
             <Link href="/crm/quotes" style={{ color: "var(--text-tertiary)" }}>
@@ -677,71 +704,288 @@ export default function SmartQuoteBuilderPage() {
           )}
 
           {step === 2 && path === "search" && (
-            <section className={styles.sqCard}>
-              <div>
-                <h2 className={styles.sqCardTitle}>Busca y agrega</h2>
-                <p className={styles.sqCardLead}>
-                  Te ordenamos las mejores opciones según <strong>{PRIORITIES.find((p) => p.id === optimize)?.label}</strong>.
-                  Un clic y queda en tu cotización.
-                </p>
-              </div>
+            <section className={`${styles.sqCard} ${styles.sqWorkspace}`}>
+              <div className={styles.sqControlDeck}>
+                <div>
+                  <h2 className={styles.sqCardTitle}>Explora y arma</h2>
+                  <p className={styles.sqCardLead}>
+                    Catálogo CT en vivo. Cambia prioridad o margen y el ranking se recalcula solo.
+                  </p>
+                </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
-                <input
-                  className={styles.sqInput}
-                  autoFocus
-                  placeholder="¿Qué necesitas? Ej. cámara 4MP, switch PoE…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && void runSearch()}
-                />
-                <Button variant="primary" onClick={() => void runSearch()} loading={loadingSearch}>
-                  Buscar
-                </Button>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                <select
-                  className={styles.sqInput}
-                  value={filterBrand}
-                  onChange={(e) => setFilterBrand(e.target.value)}
-                  aria-label="Marca"
-                >
-                  <option value="">Todas las marcas</option>
-                  {facetBrands.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className={styles.sqInput}
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
-                  aria-label="Categoría"
-                >
-                  <option value="">Todas las categorías</option>
-                  {facetCategories.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className={styles.sqChips}>
-                {QUICK_SEARCHES.map((q) => (
-                  <button
-                    key={q}
-                    type="button"
-                    className={`${styles.sqChip} ${styles.sqChipSoft}`}
-                    onClick={() => void runSearch(q)}
+                <div className={styles.sqSearchRow}>
+                  <input
+                    className={styles.sqSearchInput}
+                    autoFocus
+                    placeholder="Escribe y filtra al instante… cámara 4MP, switch PoE, UPS…"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setQuery("");
+                      setFilterBrand("");
+                      setFilterCategory("");
+                    }}
                   >
-                    {q}
+                    Limpiar
+                  </Button>
+                </div>
+
+                <div className={styles.sqPriorityStrip}>
+                  {PRIORITIES.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`${styles.sqPriorityBtn} ${optimize === p.id ? styles.sqPriorityBtnOn : ""}`}
+                      onClick={() => {
+                        setOptimize(p.id);
+                        setToast(`Prioridad: ${p.label}`);
+                      }}
+                      title={p.hint}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className={styles.sqMarginRow}>
+                  <span>Margen {targetMargin}%</span>
+                  <input
+                    type="range"
+                    min={15}
+                    max={55}
+                    value={targetMargin}
+                    onChange={(e) => setTargetMargin(Number(e.target.value))}
+                  />
+                  <label style={{ display: "inline-flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={inStockOnly}
+                      onChange={(e) => setInStockOnly(e.target.checked)}
+                    />
+                    Solo stock
+                  </label>
+                </div>
+
+                <div className={styles.sqFilterRow}>
+                  <select
+                    className={styles.sqInput}
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    aria-label="Cliente"
+                  >
+                    <option value="">Cliente (opcional ahora)…</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className={styles.sqInput}
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    placeholder="Proyecto / obra"
+                  />
+                  <select
+                    className={styles.sqInput}
+                    value={filterBrand}
+                    onChange={(e) => setFilterBrand(e.target.value)}
+                    aria-label="Marca"
+                  >
+                    <option value="">Todas las marcas</option>
+                    {facetBrands.map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className={styles.sqInput}
+                    value={filterCategory}
+                    onChange={(e) => setFilterCategory(e.target.value)}
+                    aria-label="Categoría"
+                  >
+                    <option value="">Categoría (lista)</option>
+                    {facetCategories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={styles.sqLiveBar}>
+                  <div className={styles.sqViewToggle}>
+                    <button
+                      type="button"
+                      className={`${styles.sqViewBtn} ${viewMode === "grid" ? styles.sqViewBtnOn : ""}`}
+                      onClick={() => setViewMode("grid")}
+                    >
+                      Rejilla
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.sqViewBtn} ${viewMode === "list" ? styles.sqViewBtnOn : ""}`}
+                      onClick={() => setViewMode("list")}
+                    >
+                      Lista
+                    </button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowCosts((v) => !v)}
+                    title="Mostrar/ocultar costos internos"
+                  >
+                    {showCosts ? "Ocultar costos" : "Ver costos"}
+                  </Button>
+                </div>
+
+                <div className={styles.sqCatStrip}>
+                  <button
+                    type="button"
+                    className={`${styles.sqCatPill} ${!filterCategory ? styles.sqCatPillOn : ""}`}
+                    onClick={() => setFilterCategory("")}
+                  >
+                    Todas
                   </button>
-                ))}
+                  {facetCategories.slice(0, 14).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={`${styles.sqCatPill} ${filterCategory === c ? styles.sqCatPillOn : ""}`}
+                      onClick={() => setFilterCategory(filterCategory === c ? "" : c)}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+
+                <div className={styles.sqChips}>
+                  {QUICK_SEARCHES.map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      className={`${styles.sqChip} ${styles.sqChipSoft}`}
+                      onClick={() => setQuery(q)}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+
+                <div className={styles.sqLiveBar}>
+                  <div className={styles.sqLiveMeta}>
+                    <span className={styles.sqPulse} aria-hidden />
+                    <span>
+                      {loadingSearch
+                        ? "Actualizando catálogo…"
+                        : `${offers.length} productos · ${resultMeta || "—"} candidatos · ${PRIORITIES.find((p) => p.id === optimize)?.label}`}
+                    </span>
+                  </div>
+                  <span className={styles.sqHelp}>
+                    {PRIORITIES.find((p) => p.id === optimize)?.hint}
+                  </span>
+                </div>
               </div>
 
+              {loadingSearch && !offers.length ? (
+                <div className={styles.sqSkeletonGrid}>
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className={styles.sqSkeletonCard} />
+                  ))}
+                </div>
+              ) : null}
+
+              {viewMode === "grid" && offers.length > 0 ? (
+                <div className={styles.sqProductGrid}>
+                  {offers.map((o) => {
+                    const rec = o.badges.includes("RECOMMENDED");
+                    const img = ctProxiedImageUrl(o.imagen);
+                    return (
+                      <article
+                        key={o.id}
+                        className={`${styles.sqProductCard} ${rec ? styles.sqProductCardRec : ""}`}
+                      >
+                        <div className={styles.sqProductMedia}>
+                          {img ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={img} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                          ) : (
+                            <span className={styles.sqThumbFallback}>Sin imagen</span>
+                          )}
+                          {rec ? (
+                            <span
+                              className={styles.sqBadgeRec}
+                              style={{ position: "absolute", top: 8, left: 8 }}
+                            >
+                              Top
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className={styles.sqProductBody}>
+                          <div className={styles.sqProductName}>{o.nombre}</div>
+                          <div className={styles.sqProductMeta}>
+                            {[o.marca, o.clave].filter(Boolean).join(" · ")}
+                            {" · "}
+                            <span className={o.stockTotal > 0 ? styles.sqStockOk : styles.sqStockWarn}>
+                              {o.stockTotal > 0 ? `${o.stockTotal} u.` : "Sin stock"}
+                            </span>
+                          </div>
+                          <div>
+                            <div className={styles.sqProductPrice}>{money(o.sellPriceSuggested)}</div>
+                            {showCosts ? (
+                              <div className={styles.sqProductCost}>
+                                costo {money(o.costMxn)} · {o.marginPercent}%
+                              </div>
+                            ) : null}
+                          </div>
+                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                            {o.badges.slice(0, 2).map((b) => (
+                              <span key={b} className={styles.sqBadge}>
+                                {BADGE_ES[b] || b}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className={styles.sqProductActions}>
+                          <input
+                            className={styles.sqInput}
+                            type="number"
+                            min={1}
+                            value={qtyDraft[o.id] || 1}
+                            onChange={(e) =>
+                              setQtyDraft((prev) => ({
+                                ...prev,
+                                [o.id]: Math.max(1, Number(e.target.value) || 1),
+                              }))
+                            }
+                            aria-label="Cantidad"
+                          />
+                          <Button variant="primary" size="sm" onClick={() => addOffer(o)}>
+                            Agregar
+                          </Button>
+                        </div>
+                        {o.clave ? (
+                          <button
+                            type="button"
+                            className={styles.sqDetailsToggle}
+                            style={{ margin: "0 12px 12px" }}
+                            onClick={() => void loadSubstitutes(o.clave!)}
+                          >
+                            Ver alternativas
+                          </button>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              {viewMode === "list" ? (
               <div style={{ display: "grid", gap: 10 }}>
                 {offers.map((o) => {
                   const rec = o.badges.includes("RECOMMENDED");
@@ -859,23 +1103,24 @@ export default function SmartQuoteBuilderPage() {
                     </article>
                   );
                 })}
+              </div>
+              ) : null}
 
                 {!offers.length && !loadingSearch && (
                   <EmptyState
                     icon="🔎"
-                    title={searchedOnce ? "Sin resultados con stock" : "Busca tu primer producto"}
+                    title={searchedOnce ? "Sin resultados" : "Cargando catálogo…"}
                     description={
                       searchedOnce
-                        ? "Prueba otra descripción o una de las sugerencias de arriba."
-                        : "Escribe lo que el cliente necesita o elige una búsqueda rápida."
+                        ? "Prueba otra palabra, otra categoría o desactiva “Solo stock”."
+                        : "En un momento verás productos recomendados."
                     }
                   />
                 )}
-              </div>
 
               <div className={styles.sqFooter}>
                 <Button variant="ghost" onClick={() => setStep(1)}>
-                  Atrás
+                  Cliente / modo
                 </Button>
                 <Button variant="primary" size="lg" disabled={!canGoStep3} onClick={() => goStep(3)}>
                   Revisar ({lines.length})
