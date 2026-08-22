@@ -13,6 +13,7 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
 import { DetailField, DetailFieldGrid, DetailSection, formatDate, DetailError } from "@/components/detail/DetailFrame";
+import CtOrderPanel from "../components/CtOrderPanel";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -141,10 +142,11 @@ export default function QuoteDetailPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const downloadPdf = async () => {
+  const downloadPdf = async (internal = false) => {
     if (!token) return;
     try {
-      const res = await fetch(buildApiUrl(`cotizaciones/${id}/pdf`), {
+      const path = internal ? `cotizaciones/${id}/pdf/internal` : `cotizaciones/${id}/pdf`;
+      const res = await fetch(buildApiUrl(path), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -152,7 +154,7 @@ export default function QuoteDetailPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `cotizacion-${quote?.quoteNumber ?? id}.pdf`;
+      a.download = `cotizacion-${quote?.quoteNumber ?? id}${internal ? "-interno" : ""}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -184,6 +186,24 @@ export default function QuoteDetailPage() {
   const discountNum = Number(quote.discountTotal);
   const taxNum = Number(quote.taxTotal);
 
+  const economics = (() => {
+    if (!quote) return { costTotal: 0, sellNet: 0, marginAmt: 0, marginPct: 0 };
+    let costTotal = 0;
+    let sellNet = 0;
+    for (const item of quote.items) {
+      const cost = item.unitCost != null && item.unitCost !== "" ? Number(item.unitCost) : 0;
+      if (cost > 0) costTotal += cost * Number(item.qty);
+      sellNet +=
+        Number(item.qty) * Number(item.unitPrice) +
+        Number(item.laborHours || 0) * Number(item.laborRate || 0);
+    }
+    costTotal = Math.round(costTotal * 100) / 100;
+    sellNet = Math.round(sellNet * 100) / 100;
+    const marginAmt = Math.round((sellNet - costTotal) * 100) / 100;
+    const marginPct = sellNet > 0 ? Math.round((marginAmt / sellNet) * 1000) / 10 : 0;
+    return { costTotal, sellNet, marginAmt, marginPct };
+  })();
+
   return (
     <>
       <PageHeader
@@ -214,7 +234,10 @@ export default function QuoteDetailPage() {
               </Button>
             </Link>
             <Button variant="secondary" iconLeft="📄" onClick={() => void downloadPdf()}>
-              Descargar PDF
+              PDF cliente
+            </Button>
+            <Button variant="ghost" iconLeft="📊" onClick={() => void downloadPdf(true)}>
+              PDF interno
             </Button>
             {cfg.canEdit && quote.status === "DRAFT" && (
               <Button variant="primary" iconLeft="✉️" onClick={() => setShowSend(true)}>
@@ -313,6 +336,13 @@ export default function QuoteDetailPage() {
         )}
       </div>
 
+      <CtOrderPanel
+        token={token}
+        cotizacionId={id}
+        quoteStatus={quote.status}
+        canManage={cfg.canEdit}
+      />
+
       {/* Header info */}
       <DetailSection title="Informacion general">
         <DetailFieldGrid>
@@ -350,12 +380,12 @@ export default function QuoteDetailPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "2px solid var(--border)" }}>
-                  {["#", "Descripción", "Marca / Modelo", "Cant.", "P. Unitario", "Costo", "MO", "Desc.", "IVA", "Total"].map((h) => (
+                  {["#", "Descripción", "Marca / Modelo", "Cant.", "P. venta neto", "Costo prov.", "Margen", "MO", "Desc.", "IVA", "Total"].map((h) => (
                     <th
                       key={h}
                       style={{
                         padding: "8px 10px",
-                        textAlign: ["#", "Cant.", "Desc.", "IVA", "MO"].includes(h) ? "center" : h === "P. Unitario" || h === "Costo" || h === "Total" ? "right" : "left",
+                        textAlign: ["#", "Cant.", "Desc.", "IVA", "MO", "Margen"].includes(h) ? "center" : h === "P. venta neto" || h === "Costo prov." || h === "Total" ? "right" : "left",
                         fontWeight: 700,
                         color: "var(--text-secondary)",
                         fontSize: 11.5,
@@ -414,6 +444,18 @@ export default function QuoteDetailPage() {
                       {cost != null && !Number.isNaN(cost) ? <Money value={cost} /> : "—"}
                     </td>
                     <td style={{ padding: "10px", textAlign: "center", fontSize: 11.5, color: "var(--text-secondary)" }}>
+                      {cost != null && cost > 0 ? (
+                        <>
+                          {item.marginPercent != null ? `${item.marginPercent}%` : "—"}
+                          <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+                            <Money value={(Number(item.unitPrice) - cost) * Number(item.qty)} />
+                          </div>
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td style={{ padding: "10px", textAlign: "center", fontSize: 11.5, color: "var(--text-secondary)" }}>
                       {laborH > 0 ? `${laborH}h${laborR > 0 ? ` × $${laborR}` : ""}` : "—"}
                     </td>
                     <td style={{ padding: "10px", textAlign: "center", color: item.discount > 0 ? "var(--warning)" : "var(--text-tertiary)", fontSize: 12 }}>
@@ -435,6 +477,14 @@ export default function QuoteDetailPage() {
       </Section>
 
       {/* Totals */}
+      {economics.costTotal > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 14 }}>
+          <KpiCard label="Costo proveedor" value={<Money value={economics.costTotal} />} />
+          <KpiCard label="Venta neta" value={<Money value={economics.sellNet} />} />
+          <KpiCard label="Margen bruto" value={`${economics.marginPct}%`} hint={<Money value={economics.marginAmt} />} />
+          <KpiCard label="IVA trasladado" value={<Money value={taxNum} />} />
+        </div>
+      )}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8, marginBottom: 32 }}>
         <div style={{ minWidth: 300, padding: 20, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>

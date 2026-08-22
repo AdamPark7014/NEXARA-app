@@ -339,7 +339,7 @@ export default function SmartQuoteBuilderPage() {
         next[idx] = { ...next[idx], qty: next[idx].qty + n };
         return next;
       }
-      return [...prev, offerToLine(offer, n, optimize)];
+      return [...prev, offerToLine(offer, n, optimize, targetMargin)];
     });
     setToast(`+${n} · ${shortName(offer.nombre || offer.clave, 36)}`);
   };
@@ -496,6 +496,7 @@ export default function SmartQuoteBuilderPage() {
           sku: l.sku || undefined,
           partNumber: l.partNumber || undefined,
           unitCost: l.unitCost ?? undefined,
+          supplierCode: l.productCtId ? "CT" : l.supplierCode ?? undefined,
           productCtId: l.productCtId,
           supplierSku: l.supplierSku || undefined,
           marginPercent: l.marginPercent ?? undefined,
@@ -717,7 +718,8 @@ export default function SmartQuoteBuilderPage() {
                       onChange={(e) => setTargetMargin(Number(e.target.value))}
                     />
                     <span className={styles.sqHelp}>
-                      Usamos este margen para sugerir el precio de venta sobre el costo del mayorista.
+                      El catálogo muestra <strong>costo CT</strong> (neto). Al cliente se cotiza{" "}
+                      <strong>precio de venta + IVA {CT_IVA_PERCENT}%</strong> según este margen.
                     </span>
                   </label>
                 )}
@@ -967,7 +969,7 @@ export default function SmartQuoteBuilderPage() {
                         </div>
                         <div className={styles.sqDensePriceCol}>
                           <div className={styles.sqDensePrice}>{money(o.sellPriceSuggested)}</div>
-                          <div className={styles.sqDenseTax}>sin IVA</div>
+                          <div className={styles.sqDenseTax}>venta neto · +IVA</div>
                         </div>
                         {inCart > 0 ? <span className={styles.sqDenseBadge}>×{inCart}</span> : null}
                       </button>
@@ -1372,6 +1374,13 @@ export default function SmartQuoteBuilderPage() {
               </div>
             </div>
 
+            {showCosts && (
+              <div className={styles.sqPricingCallout}>
+                <strong>Vista interna:</strong> costo CT (neto) → venta al cliente + IVA {CT_IVA_PERCENT}%.
+                El PDF para el cliente solo muestra precio de venta.
+              </div>
+            )}
+
             <div style={{ display: "grid", gap: 10, maxHeight: 300, overflow: "auto" }}>
               {lines.length === 0 ? (
                 <div className={styles.sqHelp} style={{ padding: "4px 0" }}>
@@ -1406,8 +1415,17 @@ export default function SmartQuoteBuilderPage() {
                       />
                       <strong style={{ marginLeft: "auto", fontSize: 13 }}>{money(lineSell(l))}</strong>
                     </div>
-                    {showCosts && l.unitCost != null && (
-                      <div className={styles.sqHelp}>Costo {money((l.unitCost || 0) * l.qty)}</div>
+                    {showCosts && l.unitCost != null && l.unitCost > 0 && (
+                      <div className={styles.sqLineEconomics}>
+                        <span>CT {money(l.unitCost)}/u</span>
+                        <span>Venta {money(l.unitPrice)}/u</span>
+                        <span>
+                          Margen{" "}
+                          {l.unitPrice > 0
+                            ? `${(((l.unitPrice - l.unitCost) / l.unitPrice) * 100).toFixed(0)}%`
+                            : "—"}
+                        </span>
+                      </div>
                     )}
                   </div>
                 ))

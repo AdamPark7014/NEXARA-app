@@ -31,6 +31,7 @@ import {
   type NormalizedCotizacionItem,
   type RawCotizacionItem,
 } from './cotizacion-totals.js';
+import { CtPurchaseOrderService } from '../smart-quote/orders/ct-purchase-order.service.js';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 
@@ -51,6 +52,8 @@ export class CotizacionesService {
     private readonly notificationsService: NotificationsService,
     private readonly notificationHierarchy: NotificationHierarchyService,
     @Inject(forwardRef(() => VentasService)) private readonly ventasService: VentasService,
+    @Inject(forwardRef(() => CtPurchaseOrderService))
+    private readonly ctPurchaseOrders: CtPurchaseOrderService,
   ) {}
 
   private get db() {
@@ -403,12 +406,25 @@ export class CotizacionesService {
         })
         .catch(() => undefined);
     }
+
+    if (status === CotizacionStatus.APPROVED) {
+      void this.applyQuoteApprovedSideEffects({
+        id,
+        quoteNumber: result.quoteNumber,
+        companyId: result.companyId,
+      });
+    }
+
     return result;
   }
 
-  async getPdfBuffer(id: number, companyId?: number | null) {
+  async getPdfBuffer(id: number, companyId?: number | null, internal = false) {
     const quote = await this.findOne(id, companyId);
-    return this.buildPdf(quote);
+    return this.buildPdf(quote, internal);
+  }
+
+  async getInternalPdfBuffer(id: number, companyId?: number | null) {
+    return this.getPdfBuffer(id, companyId, true);
   }
 
   async generatePdfFile(id: number, companyId?: number | null) {
@@ -479,12 +495,32 @@ export class CotizacionesService {
     return updated;
   }
 
+  private async applyQuoteApprovedSideEffects(
+    quote: { id: number; quoteNumber: string; companyId: number },
+  ) {
+    try {
+      const draft = await this.ctPurchaseOrders.createDraftOnApproval(quote.id, quote.companyId);
+      if (draft) {
+        await this.notificationsService.notifyCtOrderDraftReady(quote.id, quote.quoteNumber);
+      }
+    } catch (error) {
+      console.error('CT draft on approval:', error);
+    }
+  }
+
   /** Firma → notificar vendedor, marcar oportunidad vinculada como WON. */
   private async applyQuoteSignedSideEffects(
-    quote: { id: number; quoteNumber: string; total: unknown; createdById?: number | null },
+    quote: {
+      id: number;
+      quoteNumber: string;
+      total: unknown;
+      companyId: number;
+      createdById?: number | null;
+    },
     signer: SignCotizacionDto,
   ) {
     await this.notificationsService.notifyQuoteSigned(quote.id, signer.name.trim(), signer.email.trim());
+    void this.applyQuoteApprovedSideEffects(quote);
 
     const links = await this.db.salesOpportunityQuote.findMany({
       where: { cotizacionId: quote.id },
@@ -608,7 +644,7 @@ export class CotizacionesService {
     return updated;
   }
 
-  private async buildPdf(quote: any) {
+  private async buildPdf(quote: any, internal = false) {
     const items = quote.items.map((item: any) => ({
       category: item.category,
       name: item.name,
@@ -621,6 +657,8 @@ export class CotizacionesService {
       unit: item.unit,
       qty: item.qty,
       unitPrice: Number(item.unitPrice),
+      unitCost: item.unitCost != null ? Number(item.unitCost) : null,
+      marginPercent: item.marginPercent != null ? Number(item.marginPercent) : null,
       discount: item.discount,
       tax: item.tax,
       ieps: item.ieps,
@@ -631,7 +669,8 @@ export class CotizacionesService {
       lineTotal: Number(item.lineTotal),
     }));
 
-    return generateCotizacionPdf({
+    return generateCotizacionPdf(
+      {
       quoteNumber: quote.quoteNumber,
       issueDate: quote.issueDate.toISOString().slice(0, 10),
       validUntil: quote.validUntil ? quote.validUntil.toISOString().slice(0, 10) : null,
@@ -657,7 +696,9 @@ export class CotizacionesService {
       retentionTotal: Number(quote.retentionTotal || 0),
       total: Number(quote.total),
       items,
-    });
+    },
+    { internal },
+    );
   }
 
   private buildTransporter() {

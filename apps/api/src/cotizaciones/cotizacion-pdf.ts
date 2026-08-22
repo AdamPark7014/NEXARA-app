@@ -14,6 +14,8 @@ export type CotizacionPdfItem = {
   unit?: string | null;
   qty: number;
   unitPrice: number;
+  unitCost?: number | null;
+  marginPercent?: number | null;
   discount: number;
   tax: number;
   ieps?: number;
@@ -51,6 +53,11 @@ export type CotizacionPdfPayload = {
   retentionTotal?: number;
   total: number;
   items: CotizacionPdfItem[];
+};
+
+export type CotizacionPdfOptions = {
+  /** Incluye costo proveedor y margen — no enviar al cliente. */
+  internal?: boolean;
 };
 
 const COMPANY = {
@@ -319,7 +326,7 @@ const TABLE_COLS: TableCol[] = [
   { key: 'num', label: '#', width: 22, align: 'center' },
   { key: 'desc', label: 'Descripción', width: 240, align: 'left' },
   { key: 'qty', label: 'Cant.', width: 38, align: 'center' },
-  { key: 'unit', label: 'P. unitario', width: 76, align: 'right' },
+  { key: 'unit', label: 'P. venta neto', width: 76, align: 'right' },
   { key: 'tax', label: 'IVA', width: 40, align: 'center' },
   { key: 'total', label: 'Importe', width: 78, align: 'right' },
 ];
@@ -453,6 +460,44 @@ const drawSummary = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: number): num
   return y + boxH + 20;
 };
 
+const drawInternalEconomics = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: number): number => {
+  const { doc, margin, contentWidth } = ctx;
+  let costTotal = 0;
+  let sellNet = 0;
+  for (const item of payload.items) {
+    const cost = Number(item.unitCost) || 0;
+    if (cost > 0) costTotal += cost * item.qty;
+    sellNet += item.qty * item.unitPrice + (item.laborHours || 0) * (item.laborRate || 0);
+  }
+  sellNet = Math.round(sellNet * 100) / 100;
+  costTotal = Math.round(costTotal * 100) / 100;
+  const marginAmt = Math.round((sellNet - costTotal) * 100) / 100;
+  const marginPct = sellNet > 0 ? Math.round((marginAmt / sellNet) * 1000) / 10 : 0;
+
+  y = ensureY(ctx, y, 88);
+  doc.save();
+  doc.roundedRect(margin, y, contentWidth, 78, 5).fill(COLORS.fill);
+  doc.roundedRect(margin, y, contentWidth, 78, 5).strokeColor(COLORS.line).lineWidth(0.6).stroke();
+  doc.restore();
+
+  doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(9).text('Desglose interno (costo vs cliente)', margin + 12, y + 10);
+  const rows: Array<[string, string]> = [
+    ['Costo proveedor (neto)', formatMoney(costTotal, payload.currency)],
+    ['Precio al cliente (neto)', formatMoney(sellNet, payload.currency)],
+    ['Margen bruto', `${formatMoney(marginAmt, payload.currency)} (${marginPct}%)`],
+    ['IVA trasladado', formatMoney(payload.taxTotal, payload.currency)],
+    ['Total al cliente', formatMoney(payload.total, payload.currency)],
+  ];
+  let ly = y + 26;
+  doc.font('Helvetica').fontSize(8.5).fillColor(COLORS.text);
+  for (const [label, value] of rows) {
+    doc.text(label, margin + 12, ly, { width: contentWidth * 0.55 });
+    doc.text(value, margin + 12, ly, { width: contentWidth - 24, align: 'right' });
+    ly += 11;
+  }
+  return y + 88;
+};
+
 const drawSection = (ctx: PdfCtx, y: number, title: string): number => {
   y = ensureY(ctx, y, 28);
   const { doc, margin } = ctx;
@@ -533,7 +578,10 @@ const drawTerms = (ctx: PdfCtx, payload: CotizacionPdfPayload, startY: number): 
   return drawSignatures(ctx, y, payload);
 };
 
-export const generateCotizacionPdf = (payload: CotizacionPdfPayload): Promise<Buffer> => {
+export const generateCotizacionPdf = (
+  payload: CotizacionPdfPayload,
+  options: CotizacionPdfOptions = {},
+): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
       size: 'A4',
@@ -562,7 +610,22 @@ export const generateCotizacionPdf = (payload: CotizacionPdfPayload): Promise<Bu
     };
 
     let y = drawLetterhead(ctx, payload);
+    if (options.internal) {
+      doc.fillColor(COLORS.muted).font('Helvetica-Bold').fontSize(8).text('DOCUMENTO INTERNO — incluye costos de proveedor', ctx.margin, y - 4);
+      y += 10;
+    } else {
+      doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7.5).text(
+        'Precios de venta netos (sin IVA). El IVA se muestra por partida y en el resumen.',
+        ctx.margin,
+        y - 2,
+        { width: ctx.contentWidth },
+      );
+      y += 10;
+    }
     y = drawItemsTable(ctx, payload, y);
+    if (options.internal) {
+      y = drawInternalEconomics(ctx, payload, y);
+    }
     y = drawSummary(ctx, payload, y);
     y = drawTerms(ctx, payload, y + 8);
 

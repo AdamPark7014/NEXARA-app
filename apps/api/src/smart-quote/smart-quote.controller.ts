@@ -22,6 +22,8 @@ import { CommercialRulesService } from './rules/commercial-rules.service.js';
 import { SolutionConfiguratorService } from './configurator/solution-configurator.service.js';
 import { QuoteVersionService } from './versioning/quote-version.service.js';
 import { QuoteCopilotService } from './ai/quote-copilot.service.js';
+import { CtPurchaseOrderService } from './orders/ct-purchase-order.service.js';
+import { SupplierAnalyticsService } from './analytics/supplier-analytics.service.js';
 import type { OptimizeMode } from './scoring/quote-scoring.js';
 
 @Controller('smart-quote')
@@ -36,6 +38,8 @@ export class SmartQuoteController {
     private readonly versions: QuoteVersionService,
     private readonly copilot: QuoteCopilotService,
     private readonly jobs: JobQueueService,
+    private readonly ctOrders: CtPurchaseOrderService,
+    private readonly supplierStats: SupplierAnalyticsService,
   ) {}
 
   // ── Sync CT (Fase 0) ──────────────────────────────────────────
@@ -215,6 +219,71 @@ export class SmartQuoteController {
     @CurrentCompanyId() companyId: number | null,
   ) {
     return this.versions.get(id, version, companyId);
+  }
+
+  // ── CT Online — pedidos (solo partidas CT, post-aprobación) ───
+  @Get('ct/orders/preview/:cotizacionId')
+  @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_MANAGE] })
+  previewCtOrder(
+    @Param('cotizacionId', ParseIntPipe) cotizacionId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ctOrders.previewCtLines(cotizacionId, companyId!);
+  }
+
+  @Get('ct/orders/:cotizacionId')
+  @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW] })
+  listCtOrders(
+    @Param('cotizacionId', ParseIntPipe) cotizacionId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ctOrders.listForQuote(cotizacionId, companyId!);
+  }
+
+  @Post('ct/orders/:cotizacionId')
+  @RBAC({ permissions: [PERMISSIONS.SALES_MANAGE] })
+  submitCtOrder(
+    @Param('cotizacionId', ParseIntPipe) cotizacionId: number,
+    @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.ctOrders.submitFromQuote(cotizacionId, companyId!, user?.id, body as any);
+  }
+
+  @Get('ct/config')
+  @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW] })
+  ctConfig() {
+    return this.ctOrders.getCtConfig();
+  }
+
+  @Post('ct/orders/confirm/:orderId')
+  @RBAC({ permissions: [PERMISSIONS.SALES_MANAGE] })
+  confirmCtOrder(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ctOrders.confirmOrder(orderId, companyId!);
+  }
+
+  @Post('ct/orders/refresh/:orderId')
+  @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_MANAGE] })
+  refreshCtOrder(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ctOrders.refreshOrderStatus(orderId, companyId!);
+  }
+
+  @Get('supplier-stats')
+  @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW] })
+  supplierStatsQuery(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.supplierStats.getQuoteSupplierStats(companyId!, { from, to, status });
   }
 
   // ── AI Copilot (Fase 4) ───────────────────────────────────────

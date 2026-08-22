@@ -564,6 +564,29 @@ export class NotificationsService {
     }
   }
 
+  async notifyCtOrderDraftReady(quoteId: number, quoteNumber: string) {
+    try {
+      const quote = await this.prisma.cotizacion.findUnique({
+        where: { id: quoteId },
+        select: { createdById: true },
+      });
+      if (!quote?.createdById) return;
+      await this.createNotification({
+        userId: quote.createdById,
+        type: 'CT_ORDER_DRAFT',
+        category: 'quotes',
+        title: `Pedido CT — ${quoteNumber}`,
+        message:
+          'El cliente aprobó la cotización. Revisa el borrador de pedido a CT Online y confirma envío.',
+        relatedEntityId: quoteId,
+        entityType: 'Cotizacion',
+        relatedUrl: `/crm/quotes/${quoteId}`,
+      });
+    } catch (error) {
+      this.logger.error('Error notifying CT draft:', error);
+    }
+  }
+
   /**
    * Notification helper for order creation
    */

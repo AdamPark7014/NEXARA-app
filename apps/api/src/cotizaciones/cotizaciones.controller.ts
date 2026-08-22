@@ -84,6 +84,20 @@ export class CotizacionesController {
     res.send(pdf);
   }
 
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
+  @Get(':id/pdf/internal')
+  async downloadInternalPdf(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.cotizacionesService.getInternalPdfBuffer(id, companyId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=cotizacion-${id}-interno.pdf`);
+    res.send(pdf);
+  }
+
   @Get('public/:token')
   getPublic(@Param('token') token: string) {
     return this.cotizacionesService.getPublicByToken(token);

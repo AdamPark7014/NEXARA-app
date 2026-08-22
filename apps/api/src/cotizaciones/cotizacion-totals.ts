@@ -1,4 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
+import {
+  inferSupplierCode,
+  resolveQuoteLinePricing,
+} from '../smart-quote/pricing/supplier-pricing.js';
 
 /**
  * Aritmética de cotizaciones.
@@ -25,6 +29,7 @@ export type RawCotizacionItem = {
   supplierId?: number | string | null;
   supplierSku?: string | null;
   productCtId?: number | string | null;
+  supplierCode?: string | null;
   marginPercent?: number | string | null;
   stockSnapshot?: number | string | null;
   leadTimeDays?: number | string | null;
@@ -60,6 +65,7 @@ export type NormalizedCotizacionItem = {
   supplierId: number | null;
   supplierSku: string | null;
   productCtId: number | null;
+  supplierCode: string | null;
   marginPercent: number | null;
   stockSnapshot: number | null;
   leadTimeDays: number | null;
@@ -160,41 +166,56 @@ export function normalizeItems(items: RawCotizacionItem[] | undefined | null): N
 
   const percent = (value: unknown) => Math.max(0, Math.min(100, Number(value) || 0));
 
-  return items.map((item) => ({
-    productId: item.productId ? Number(item.productId) : null,
-    category: item.category?.trim() || 'Otros',
-    name: item.name?.trim() || 'Concepto',
-    description: item.description?.trim() || null,
-    scope: item.scope?.trim() || null,
-    brand: item.brand?.trim() || null,
-    model: item.model?.trim() || null,
-    sku: item.sku?.trim() || null,
-    partNumber: item.partNumber?.trim() || null,
-    batchReference: item.batchReference?.trim() || null,
-    unit: item.unit?.trim() || 'pieza',
-    qty: Math.max(1, Number(item.qty) || 1),
-    unitPrice: Number(item.unitPrice) || 0,
-    unitCost: item.unitCost != null && item.unitCost !== '' ? Number(item.unitCost) : null,
-    supplierId: item.supplierId ? Number(item.supplierId) : null,
-    supplierSku: item.supplierSku?.trim() || null,
-    productCtId: item.productCtId ? Number(item.productCtId) : null,
-    marginPercent:
-      item.marginPercent != null && item.marginPercent !== '' ? Number(item.marginPercent) : null,
-    stockSnapshot: item.stockSnapshot != null ? Number(item.stockSnapshot) : null,
-    leadTimeDays: item.leadTimeDays != null ? Number(item.leadTimeDays) : null,
-    scoreReason: item.scoreReason?.trim() || null,
-    optimizationMode: item.optimizationMode?.trim() || null,
-    discount: percent(item.discount),
-    tax: percent(item.tax),
-    ieps: percent(item.ieps),
-    retention: percent(item.retention),
-    laborHours: Math.max(0, Number(item.laborHours) || 0),
-    laborRate: Math.max(0, Number(item.laborRate) || 0),
-    warrantyMonths: Math.max(0, Number(item.warrantyMonths) || 0),
-    deliveryTime: item.deliveryTime?.trim() || null,
-    countryOrigin: item.countryOrigin?.trim() || null,
-    notes: item.notes?.trim() || null,
-  }));
+  return items.map((item) => {
+    const supplierCode = inferSupplierCode({
+      productCtId: item.productCtId ? Number(item.productCtId) : null,
+      supplierCode: item.supplierCode?.trim() || null,
+    });
+    const pricing = resolveQuoteLinePricing({
+      unitCost: item.unitCost != null && item.unitCost !== '' ? Number(item.unitCost) : null,
+      unitPrice: Number(item.unitPrice) || 0,
+      marginPercent:
+        item.marginPercent != null && item.marginPercent !== '' ? Number(item.marginPercent) : null,
+      supplierCode,
+      taxPercent: percent(item.tax) || undefined,
+    });
+
+    return {
+      productId: item.productId ? Number(item.productId) : null,
+      category: item.category?.trim() || 'Otros',
+      name: item.name?.trim() || 'Concepto',
+      description: item.description?.trim() || null,
+      scope: item.scope?.trim() || null,
+      brand: item.brand?.trim() || null,
+      model: item.model?.trim() || null,
+      sku: item.sku?.trim() || null,
+      partNumber: item.partNumber?.trim() || null,
+      batchReference: item.batchReference?.trim() || null,
+      unit: item.unit?.trim() || 'pieza',
+      qty: Math.max(1, Number(item.qty) || 1),
+      unitPrice: pricing.unitPrice,
+      unitCost: pricing.unitCost,
+      supplierId: item.supplierId ? Number(item.supplierId) : null,
+      supplierSku: item.supplierSku?.trim() || null,
+      productCtId: item.productCtId ? Number(item.productCtId) : null,
+      supplierCode: pricing.supplierCode,
+      marginPercent: pricing.marginPercent,
+      stockSnapshot: item.stockSnapshot != null ? Number(item.stockSnapshot) : null,
+      leadTimeDays: item.leadTimeDays != null ? Number(item.leadTimeDays) : null,
+      scoreReason: item.scoreReason?.trim() || null,
+      optimizationMode: item.optimizationMode?.trim() || null,
+      discount: percent(item.discount),
+      tax: pricing.taxPercent,
+      ieps: percent(item.ieps),
+      retention: percent(item.retention),
+      laborHours: Math.max(0, Number(item.laborHours) || 0),
+      laborRate: Math.max(0, Number(item.laborRate) || 0),
+      warrantyMonths: Math.max(0, Number(item.warrantyMonths) || 0),
+      deliveryTime: item.deliveryTime?.trim() || null,
+      countryOrigin: item.countryOrigin?.trim() || null,
+      notes: item.notes?.trim() || null,
+    };
+  });
 }
 
 /**
