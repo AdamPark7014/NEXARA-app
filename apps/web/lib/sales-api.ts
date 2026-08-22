@@ -814,7 +814,15 @@ export const createSalesQuote = async (
     clientName?: string;
     clientCompany?: string;
     clientEmail?: string;
+    clientPhone?: string;
+    clientAddress?: string;
     projectName?: string;
+    scope?: string;
+    paymentTerms?: string;
+    deliveryTime?: string;
+    depositPercent?: number;
+    note?: string;
+    preparedBy?: string;
     items: Array<Record<string, unknown> & { name: string; qty: number; unitPrice: number }>;
   },
 ) => {
