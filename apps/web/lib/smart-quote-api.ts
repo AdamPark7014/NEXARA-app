@@ -118,6 +118,31 @@ export async function smartQuoteCtStatus(token: string) {
   }>("smart-quote/ct/status", token, undefined, "No se pudo leer estado CT");
 }
 
+export async function smartQuoteFacets(token: string) {
+  return sqRequest<{
+    brands: Array<{ name: string | null; count: number }>;
+    categories: Array<{ name: string | null; count: number }>;
+  }>("smart-quote/facets", token, undefined, "No se pudieron cargar filtros CT");
+}
+
+export async function smartQuoteSubstitutes(
+  token: string,
+  clave: string,
+  params?: { optimize?: OptimizeMode; targetMargin?: number; take?: number },
+) {
+  const qs = new URLSearchParams();
+  if (params?.optimize) qs.set("optimize", params.optimize);
+  if (params?.targetMargin != null) qs.set("targetMargin", String(params.targetMargin));
+  if (params?.take) qs.set("take", String(params.take));
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return sqRequest<SmartOffer[]>(
+    `smart-quote/substitutes/${encodeURIComponent(clave)}${suffix}`,
+    token,
+    undefined,
+    "No se pudieron cargar sustitutos",
+  );
+}
+
 export async function smartQuoteTriggerSync(token: string, source: "PRIMARY" | "FULL" = "PRIMARY") {
   return sqRequest<unknown>(
     "smart-quote/ct/sync",

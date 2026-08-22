@@ -15,8 +15,10 @@ import {
   smartQuoteConfigure,
   smartQuoteCopilotDraft,
   smartQuoteCtStatus,
+  smartQuoteFacets,
   smartQuoteLaborSuggest,
   smartQuoteSearch,
+  smartQuoteSubstitutes,
   type OptimizeMode,
   type QuoteLinePayload,
   type SmartOffer,
@@ -160,6 +162,10 @@ export default function SmartQuoteBuilderPage() {
   const [qtyDraft, setQtyDraft] = useState<Record<number, number>>({});
   const [searchedOnce, setSearchedOnce] = useState(false);
   const [expandedOffer, setExpandedOffer] = useState<number | null>(null);
+  const [filterBrand, setFilterBrand] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [facetBrands, setFacetBrands] = useState<string[]>([]);
+  const [facetCategories, setFacetCategories] = useState<string[]>([]);
   const [cfg, setCfg] = useState({
     template: "CCTV" as "CCTV" | "WIFI" | "ACCESS",
     cameras: 12,
@@ -178,6 +184,25 @@ export default function SmartQuoteBuilderPage() {
       })
       .catch(() => setClients([]));
     smartQuoteCtStatus(token).then(setCtStatus).catch(() => setCtStatus(null));
+    smartQuoteFacets(token)
+      .then((f) => {
+        setFacetBrands(
+          (f.brands || [])
+            .map((b) => b.name)
+            .filter((n): n is string => Boolean(n))
+            .slice(0, 40),
+        );
+        setFacetCategories(
+          (f.categories || [])
+            .map((c) => c.name)
+            .filter((n): n is string => Boolean(n))
+            .slice(0, 30),
+        );
+      })
+      .catch(() => {
+        setFacetBrands([]);
+        setFacetCategories([]);
+      });
   }, [token]);
 
   useEffect(() => {
@@ -221,14 +246,16 @@ export default function SmartQuoteBuilderPage() {
   const runSearch = useCallback(
     async (qOverride?: string) => {
       const q = (qOverride ?? query).trim();
-      if (!token || !q) return;
+      if (!token || (!q && !filterBrand && !filterCategory)) return;
       if (qOverride) setQuery(qOverride);
       setLoadingSearch(true);
       setError(null);
       setSearchedOnce(true);
       try {
         const res = await smartQuoteSearch(token, {
-          q,
+          q: q || undefined,
+          brand: filterBrand || undefined,
+          category: filterCategory || undefined,
           optimize,
           targetMargin,
           inStockOnly: true,
@@ -245,8 +272,27 @@ export default function SmartQuoteBuilderPage() {
         setLoadingSearch(false);
       }
     },
-    [token, query, optimize, targetMargin],
+    [token, query, optimize, targetMargin, filterBrand, filterCategory],
   );
+
+  const loadSubstitutes = async (clave: string) => {
+    if (!token || !clave) return;
+    setLoadingSearch(true);
+    try {
+      const data = await smartQuoteSubstitutes(token, clave, {
+        optimize,
+        targetMargin,
+        take: 12,
+      });
+      setOffers(data);
+      setSearchedOnce(true);
+      setToast(`Alternativas para ${clave}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudieron cargar alternativas");
+    } finally {
+      setLoadingSearch(false);
+    }
+  };
 
   const addOffer = (offer: SmartOffer) => {
     const qty = Math.max(1, qtyDraft[offer.id] || 1);
@@ -654,6 +700,35 @@ export default function SmartQuoteBuilderPage() {
                 </Button>
               </div>
 
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <select
+                  className={styles.sqInput}
+                  value={filterBrand}
+                  onChange={(e) => setFilterBrand(e.target.value)}
+                  aria-label="Marca"
+                >
+                  <option value="">Todas las marcas</option>
+                  {facetBrands.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={styles.sqInput}
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  aria-label="Categoría"
+                >
+                  <option value="">Todas las categorías</option>
+                  {facetCategories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className={styles.sqChips}>
                 {QUICK_SEARCHES.map((q) => (
                   <button
@@ -771,6 +846,15 @@ export default function SmartQuoteBuilderPage() {
                         <Button variant="primary" size="sm" onClick={() => addOffer(o)}>
                           Agregar
                         </Button>
+                        {o.clave ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void loadSubstitutes(o.clave!)}
+                          >
+                            Alternativas
+                          </Button>
+                        ) : null}
                       </div>
                     </article>
                   );

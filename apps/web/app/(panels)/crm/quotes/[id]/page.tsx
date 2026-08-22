@@ -22,6 +22,8 @@ interface CotizacionItem {
   description?: string | null;
   qty: number;
   unitPrice: string;
+  unitCost?: string | number | null;
+  marginPercent?: number | null;
   discount: number;
   tax: number;
   ieps: number;
@@ -29,7 +31,10 @@ interface CotizacionItem {
   lineTotal: string;
   brand?: string | null;
   model?: string | null;
+  sku?: string | null;
   unit?: string | null;
+  laborHours?: number | null;
+  laborRate?: number | string | null;
   warrantyMonths?: number;
   deliveryTime?: string | null;
   notes?: string | null;
@@ -193,10 +198,21 @@ export default function QuoteDetailPage() {
         subtitle={[quote.clientCompany, quote.clientName].filter(Boolean).join(" · ")}
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Button variant="ghost" iconLeft="↩" onClick={() => router.back()}>Volver</Button>
-            <Button variant="secondary" iconLeft="📄" onClick={() => void downloadPdf()}>Descargar PDF</Button>
+            <Button variant="ghost" iconLeft="↩" onClick={() => router.back()}>
+              Volver
+            </Button>
+            <Link href="/crm/quotes/builder">
+              <Button variant="secondary" iconLeft="⚡">
+                Nueva rápida
+              </Button>
+            </Link>
+            <Button variant="secondary" iconLeft="📄" onClick={() => void downloadPdf()}>
+              Descargar PDF
+            </Button>
             {cfg.canEdit && quote.status === "DRAFT" && (
-              <Button variant="primary" iconLeft="✉️" onClick={() => setShowSend(true)}>Enviar cotizacion</Button>
+              <Button variant="primary" iconLeft="✉️" onClick={() => setShowSend(true)}>
+                Enviar cotización
+              </Button>
             )}
           </div>
         }
@@ -208,6 +224,26 @@ export default function QuoteDetailPage() {
         <KpiCard label="Anticipo" value={quote.depositPercent ? `${quote.depositPercent}%` : "—"} icon="💳" hint={quote.depositPercent ? `MXN ${(Number(quote.total) * quote.depositPercent / 100).toFixed(0)}` : undefined} />
         <KpiCard label="Estado" value={STATUS_LABEL[quote.status] ?? quote.status} variant={STATUS_VARIANT[quote.status] ?? "default"} icon="📄" />
       </div>
+
+      {quote.status === "DRAFT" && (
+        <div
+          style={{
+            marginBottom: 14,
+            padding: "14px 16px",
+            borderRadius: 14,
+            border: "1px solid color-mix(in srgb, var(--primary) 30%, var(--border))",
+            background: "color-mix(in srgb, var(--primary) 6%, var(--surface))",
+            display: "grid",
+            gap: 8,
+          }}
+        >
+          <div style={{ fontWeight: 750, fontSize: 14 }}>Borrador listo para enviar</div>
+          <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+            Revisa partidas y condiciones. Cuando esté bien, descarga el PDF o envíalo al cliente.
+            Si necesitas armar otra con el mayorista, usa <strong>Nueva rápida</strong>.
+          </p>
+        </div>
+      )}
 
       {/* Quote lifecycle stepper */}
       {(() => {
@@ -297,12 +333,12 @@ export default function QuoteDetailPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "2px solid var(--border)" }}>
-                  {["#", "Descripcion", "Marca / Modelo", "Cant.", "P. Unitario", "Desc.", "IVA", "Total"].map((h) => (
+                  {["#", "Descripción", "Marca / Modelo", "Cant.", "P. Unitario", "Costo", "MO", "Desc.", "IVA", "Total"].map((h) => (
                     <th
                       key={h}
                       style={{
                         padding: "8px 10px",
-                        textAlign: ["#", "Cant.", "Desc.", "IVA"].includes(h) ? "center" : "left",
+                        textAlign: ["#", "Cant.", "Desc.", "IVA", "MO"].includes(h) ? "center" : h === "P. Unitario" || h === "Costo" || h === "Total" ? "right" : "left",
                         fontWeight: 700,
                         color: "var(--text-secondary)",
                         fontSize: 11.5,
@@ -315,7 +351,11 @@ export default function QuoteDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {quote.items.map((item, idx) => (
+                {quote.items.map((item, idx) => {
+                  const cost = item.unitCost != null && item.unitCost !== "" ? Number(item.unitCost) : null;
+                  const laborH = Number(item.laborHours || 0);
+                  const laborR = Number(item.laborRate || 0);
+                  return (
                   <tr
                     key={item.id}
                     style={{
@@ -326,6 +366,9 @@ export default function QuoteDetailPage() {
                     <td style={{ padding: "10px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 12 }}>{idx + 1}</td>
                     <td style={{ padding: "10px" }}>
                       <div style={{ fontWeight: 600 }}>{item.name}</div>
+                      {item.sku && (
+                        <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>SKU {item.sku}</div>
+                      )}
                       {item.description && (
                         <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 2 }}>{item.description}</div>
                       )}
@@ -333,7 +376,12 @@ export default function QuoteDetailPage() {
                         <div style={{ fontSize: 11, color: "var(--text-tertiary)", fontStyle: "italic" }}>{item.notes}</div>
                       )}
                       {item.warrantyMonths ? (
-                        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Garantia: {item.warrantyMonths} meses</div>
+                        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Garantía: {item.warrantyMonths} meses</div>
+                      ) : null}
+                      {item.marginPercent != null ? (
+                        <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>
+                          Margen {item.marginPercent}%
+                        </div>
                       ) : null}
                     </td>
                     <td style={{ padding: "10px" }}>
@@ -345,6 +393,12 @@ export default function QuoteDetailPage() {
                     <td style={{ padding: "10px", textAlign: "right" }}>
                       <Money value={Number(item.unitPrice)} />
                     </td>
+                    <td style={{ padding: "10px", textAlign: "right", fontSize: 12, color: "var(--text-secondary)" }}>
+                      {cost != null && !Number.isNaN(cost) ? <Money value={cost} /> : "—"}
+                    </td>
+                    <td style={{ padding: "10px", textAlign: "center", fontSize: 11.5, color: "var(--text-secondary)" }}>
+                      {laborH > 0 ? `${laborH}h${laborR > 0 ? ` × $${laborR}` : ""}` : "—"}
+                    </td>
                     <td style={{ padding: "10px", textAlign: "center", color: item.discount > 0 ? "var(--warning)" : "var(--text-tertiary)", fontSize: 12 }}>
                       {item.discount > 0 ? `-${item.discount}%` : "—"}
                     </td>
@@ -355,7 +409,8 @@ export default function QuoteDetailPage() {
                       <Money value={Number(item.lineTotal)} />
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
