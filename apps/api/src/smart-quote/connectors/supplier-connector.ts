@@ -1,5 +1,9 @@
 export type SupplierPullSource = 'JSON' | 'XML' | 'API' | 'CSV';
 
+/** Re-export homologación de precios — ver `pricing/supplier-pricing.ts`. */
+export type { SupplierPricingPolicy } from '../pricing/supplier-pricing.js';
+export { SUPPLIER_PRICING_POLICIES } from '../pricing/supplier-pricing.js';
+
 export type NormalizedSupplierProduct = {
   externalId: number | null;
   sku: string;

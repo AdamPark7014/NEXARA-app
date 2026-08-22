@@ -570,6 +570,7 @@ model User {
   employeePaymentsCreated   EmployeePayment[]          @relation("EmployeePaymentCreator")
   cotizaciones              Cotizacion[]
   cotizacionVersions        CotizacionVersion[]
+  supplierPurchaseOrders    SupplierPurchaseOrder[]
   salesClientsManaged       SalesClient[]              @relation("SalesClientOwner")
   salesClientDocuments      SalesClientDocument[]      @relation("SalesClientDocumentUploader")
   salesLeadsCreated         SalesLead[]                @relation("SalesLeadCreator")
@@ -1709,6 +1710,7 @@ model Cotizacion {
   deletedAt       DateTime?
   items           CotizacionItem[]
   versions        CotizacionVersion[]
+  supplierOrders  SupplierPurchaseOrder[]
   createdBy       User?                    @relation(fields: [createdById], references: [id])
   company         CompanyProfile           @relation(fields: [companyId], references: [id], onDelete: Restrict)
   salesClient     SalesClient?             @relation(fields: [salesClientId], references: [id], onDelete: SetNull)
@@ -1745,6 +1747,8 @@ model CotizacionItem {
   supplierId        Int?
   supplierSku       String?    @db.VarChar(120)
   productCtId       Int?
+  /// Código mayorista homologado (CT, SYSCOM, …).
+  supplierCode      String?    @db.VarChar(20)
   marginPercent     Decimal?   @db.Decimal(7, 2)
   stockSnapshot     Int?
   leadTimeDays      Int?
@@ -1785,6 +1789,32 @@ model CotizacionVersion {
   @@unique([cotizacionId, version])
   @@index([cotizacionId])
   @@map("cotizacion_versions")
+}
+
+/// Pedido a mayorista (CT API, etc.) generado desde cotización aprobada.
+model SupplierPurchaseOrder {
+  id              Int       @id @default(autoincrement())
+  companyId       Int
+  cotizacionId    Int?
+  supplierCode    String    @db.VarChar(40)
+  idPedido        Int
+  almacen         String    @db.VarChar(10)
+  status          String    @default("DRAFT") @db.VarChar(40)
+  externalFolio   String?   @db.VarChar(40)
+  confirmedAt     DateTime?
+  requestPayload  Json
+  responsePayload Json?
+  errorMessage    String?
+  createdById     Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  company         CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  cotizacion      Cotizacion?    @relation(fields: [cotizacionId], references: [id], onDelete: SetNull)
+  createdBy       User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, supplierCode])
+  @@index([cotizacionId])
+  @@map("supplier_purchase_orders")
 }
 
 model LaborRateCard {
@@ -4878,6 +4908,7 @@ model CompanyProfile {
   salesClients              SalesClient[]
   salesLeads                SalesLead[]
   cotizaciones              Cotizacion[]
+  supplierPurchaseOrders    SupplierPurchaseOrder[]
   outboundWebhooks          OutboundWebhook[]
   chatChannels              ChatChannel[]
   maintenanceContracts      MaintenanceContract[]

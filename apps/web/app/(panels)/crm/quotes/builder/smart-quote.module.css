@@ -293,7 +293,32 @@
   letter-spacing: -0.02em;
 }
 
-.sqDenseTax {
+.sqLineEconomics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+}
+
+.sqLineEconomics span {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+}
+
+.sqPricingCallout {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+}
+
   font-size: 10.5px;
   color: var(--text-tertiary);
 }

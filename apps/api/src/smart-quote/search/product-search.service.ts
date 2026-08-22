@@ -240,6 +240,7 @@ export class ProductSearchService {
       unitPrice: offer.sellPriceSuggested,
       unitCost: offer.costMxn,
       supplierSku: offer.clave,
+      supplierCode: 'CT',
       marginPercent: offer.marginPercent,
       stockSnapshot: offer.stockTotal,
       leadTimeDays: offer.leadTimeDays,

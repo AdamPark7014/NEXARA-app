@@ -11,6 +11,9 @@ import { SolutionConfiguratorService } from './configurator/solution-configurato
 import { QuoteVersionService } from './versioning/quote-version.service.js';
 import { QuoteCopilotService } from './ai/quote-copilot.service.js';
 import { SmartQuoteController } from './smart-quote.controller.js';
+import { CtPurchaseOrderService } from './orders/ct-purchase-order.service.js';
+import { SupplierAnalyticsService } from './analytics/supplier-analytics.service.js';
+import { CtOnlineApiConnector } from './connectors/ct-online-api.connector.js';
 import { SmartQuoteCronService } from './smart-quote.cron.js';
 
 @Injectable()
@@ -47,6 +50,9 @@ class SmartQuoteJobHandlers implements OnModuleInit {
     SolutionConfiguratorService,
     QuoteVersionService,
     QuoteCopilotService,
+    CtOnlineApiConnector,
+    CtPurchaseOrderService,
+    SupplierAnalyticsService,
     SmartQuoteJobHandlers,
     SmartQuoteCronService,
   ],
@@ -57,6 +63,8 @@ class SmartQuoteJobHandlers implements OnModuleInit {
     CommercialRulesService,
     SolutionConfiguratorService,
     QuoteCopilotService,
+    CtPurchaseOrderService,
+    SupplierAnalyticsService,
   ],
 })
 export class SmartQuoteModule {}

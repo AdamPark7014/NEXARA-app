@@ -16,6 +16,7 @@ import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import { buildApiUrl } from "@/lib/api-base";
 import { smartQuoteCtStatus } from "@/lib/smart-quote-api";
+import SupplierStatsBar from "./components/SupplierStatsBar";
 import styles from "./quotes.module.css";
 
 const toDateInput = (date: Date) => {
@@ -395,6 +396,8 @@ export default function QuotesPage() {
           </Link>
         </div>
       )}
+
+      <SupplierStatsBar token={token} from={periodFrom} to={periodTo} />
 
       {syncLabel && (
         <div style={{ marginBottom: 14 }}>

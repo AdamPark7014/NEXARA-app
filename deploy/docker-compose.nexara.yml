@@ -111,6 +111,13 @@ services:
       CT_PREFERRED_WAREHOUSE: ${CT_PREFERRED_WAREHOUSE:-PUE}
       CT_SYNC_CRON_MINUTES: ${CT_SYNC_CRON_MINUTES:-15}
       CT_SYNC_ENABLED: ${CT_SYNC_ENABLED:-1}
+      # CT Online — pedidos API (distinto del FTP de catálogo)
+      CT_API_BASE_URL: ${CT_API_BASE_URL:-}
+      CT_API_EMAIL: ${CT_API_EMAIL:-}
+      CT_API_CLIENTE: ${CT_API_CLIENTE:-}
+      CT_API_RFC: ${CT_API_RFC:-}
+      CT_API_ALMACEN: ${CT_API_ALMACEN:-01A}
+      CT_FALLBACK_FX: ${CT_FALLBACK_FX:-17}
     volumes:
       - ../uploads:/app/uploads
     networks:

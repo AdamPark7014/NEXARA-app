@@ -48,6 +48,7 @@ export type QuoteLinePayload = {
   unitPrice: number;
   unitCost?: number | null;
   supplierSku?: string | null;
+  supplierCode?: string | null;
   marginPercent?: number | null;
   stockSnapshot?: number | null;
   leadTimeDays?: number | null;
@@ -256,7 +257,22 @@ export async function smartQuoteCopilotDraft(token: string, prompt: string) {
 /** IVA México. CT publica precio de lista sin IVA; se aplica al armar la cotización. */
 export const CT_IVA_PERCENT = 16;
 
-export function offerToLine(offer: SmartOffer, qty = 1, optimize: OptimizeMode = "BALANCE"): QuoteLinePayload {
+/** Precio de venta neto desde costo y margen % sobre venta. */
+export function sellFromCost(cost: number, marginPercent: number) {
+  const m = Math.min(0.95, Math.max(0.01, marginPercent / 100));
+  return Math.round((cost / (1 - m)) * 100) / 100;
+}
+
+export function offerToLine(
+  offer: SmartOffer,
+  qty = 1,
+  optimize: OptimizeMode = "BALANCE",
+  targetMarginPercent?: number,
+): QuoteLinePayload {
+  const margin = targetMarginPercent ?? offer.marginPercent ?? 30;
+  const unitCost = offer.costMxn;
+  const unitPrice =
+    targetMarginPercent != null ? sellFromCost(unitCost, margin) : offer.sellPriceSuggested;
   return {
     productCtId: offer.id,
     category: offer.categoria || "CT",
@@ -268,11 +284,11 @@ export function offerToLine(offer: SmartOffer, qty = 1, optimize: OptimizeMode =
     partNumber: offer.numParte,
     unit: "pieza",
     qty,
-    // sellPriceSuggested / costMxn vienen netos (sin IVA) desde el feed CT.
-    unitPrice: offer.sellPriceSuggested,
-    unitCost: offer.costMxn,
+    unitPrice,
+    unitCost,
     supplierSku: offer.clave,
-    marginPercent: offer.marginPercent,
+    supplierCode: "CT",
+    marginPercent: margin,
     stockSnapshot: offer.stockTotal,
     leadTimeDays: offer.leadTimeDays,
     scoreReason: offer.badges[0] || "RECOMMENDED",
@@ -281,4 +297,115 @@ export function offerToLine(offer: SmartOffer, qty = 1, optimize: OptimizeMode =
     tax: CT_IVA_PERCENT,
     deliveryTime: offer.leadTimeDays <= 1 ? "Inmediata" : `${offer.leadTimeDays} días`,
   };
+}
+
+export type CtEnvioForm = {
+  nombre: string;
+  direccion: string;
+  entreCalles?: string;
+  noExterior: string;
+  noInterior?: string;
+  colonia: string;
+  estado: string;
+  ciudad: string;
+  codigoPostal: string;
+  telefono: string;
+};
+
+export type CtOrderPreview = {
+  lines: Array<{
+    clave: string | null;
+    nombre: string;
+    qty: number;
+    unitCost: number;
+    unitSell: number;
+    lineCost: number;
+    lineSell: number;
+    marginPercent: number | null;
+  }>;
+  subtotalCost: number;
+  subtotalSell: number;
+  marginAmount: number;
+  quoteStatus: string;
+  defaultEnvio: CtEnvioForm | null;
+  config: { apiConfigured: boolean; defaultAlmacen: string; warehouses: Array<{ code: string; label: string }> };
+  existingOrders: SupplierPurchaseOrderRow[];
+};
+
+export type SupplierPurchaseOrderRow = {
+  id: number;
+  status: string;
+  externalFolio: string | null;
+  almacen: string;
+  errorMessage: string | null;
+  createdAt: string;
+  confirmedAt: string | null;
+};
+
+export type SupplierStatsResponse = {
+  suppliers: Array<{
+    supplierCode: string;
+    label: string;
+    lineCount: number;
+    quoteCount: number;
+    costNet: number;
+    sellNet: number;
+    taxAmount: number;
+    sellWithTax: number;
+    marginAmount: number;
+    marginPercent: number;
+    priceIncludesTax: boolean;
+    customerTaxPercent: number;
+  }>;
+  totals: {
+    quoteCount: number;
+    costNet: number;
+    sellNet: number;
+    taxAmount: number;
+    sellWithTax: number;
+    marginAmount: number;
+    marginPercent: number;
+  };
+};
+
+export async function smartQuoteSupplierStats(
+  token: string,
+  params?: { from?: string; to?: string; status?: string },
+) {
+  const qs = new URLSearchParams();
+  if (params?.from) qs.set("from", params.from);
+  if (params?.to) qs.set("to", params.to);
+  if (params?.status) qs.set("status", params.status);
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return sqRequest<SupplierStatsResponse>(`smart-quote/supplier-stats${suffix}`, token);
+}
+
+export async function smartQuoteCtOrderPreview(token: string, cotizacionId: number) {
+  return sqRequest<CtOrderPreview>(`smart-quote/ct/orders/preview/${cotizacionId}`, token);
+}
+
+export async function smartQuoteCtOrderSubmit(
+  token: string,
+  cotizacionId: number,
+  body: {
+    almacen: string;
+    confirm?: boolean;
+    envio: CtEnvioForm[];
+  },
+) {
+  return sqRequest<SupplierPurchaseOrderRow>(
+    `smart-quote/ct/orders/${cotizacionId}`,
+    token,
+    { method: "POST", body: JSON.stringify(body) },
+    "No se pudo enviar pedido a CT",
+  );
+}
+
+export async function smartQuoteCtOrderConfirm(token: string, orderId: number) {
+  return sqRequest<SupplierPurchaseOrderRow>(
+    `smart-quote/ct/orders/confirm/${orderId}`,
+    token,
+    { method: "POST", body: "{}" },
+    "No se pudo confirmar pedido CT",
+  );
 }
