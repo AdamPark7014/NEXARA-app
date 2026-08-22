@@ -648,7 +648,7 @@ export default function NewQuotePage() {
             </div>
           </section>
 
-          {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+          {error && <InlineAlert message={error} variant="danger" />}
         </div>
 
         <aside className={styles.quotesRail}>

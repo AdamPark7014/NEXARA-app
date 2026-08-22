@@ -301,6 +301,13 @@ export class CotizacionesService {
       include: { items: true },
     });
     assertCompanyAccess(existing, companyId, 'Cotizacion');
+
+    if (existing.status !== CotizacionStatus.DRAFT) {
+      throw new BadRequestException(
+        'Solo se pueden editar cotizaciones en borrador. Las enviadas o aprobadas son inmutables.',
+      );
+    }
+
     const tenantId = existing.companyId ?? companyId ?? null;
 
     if (dto.opportunityId) {
