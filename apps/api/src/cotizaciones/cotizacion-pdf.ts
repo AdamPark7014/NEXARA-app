@@ -53,14 +53,37 @@ export type CotizacionPdfPayload = {
   items: CotizacionPdfItem[];
 };
 
+const COMPANY = {
+  name: 'NEXARA',
+  tagline: 'Integración tecnológica · CCTV · Redes · Soporte TI',
+  web: 'sales.nexara.com.mx',
+  email: 'ventas@nexara.com.mx',
+};
+
+const COLORS = {
+  navy: '#0B1F3A',
+  teal: '#0F766E',
+  accent: '#14B8A6',
+  text: '#1E293B',
+  muted: '#64748B',
+  line: '#CBD5E1',
+  fill: '#F8FAFC',
+  white: '#FFFFFF',
+};
+
+const MARGIN = 48;
+const FOOTER_ZONE = 42;
+const TABLE_HEADER_H = 22;
+const ROW_PAD = 6;
+const TABLE_ROW_H = 34;
+
 const formatMoney = (value: number, currency: string) =>
   new Intl.NumberFormat('es-MX', {
     style: 'currency',
     currency,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value || 0);
-
-const toText = (value?: string | number | null) => (value ? String(value) : '—');
 
 const formatDisplayDate = (iso?: string | null) => {
   if (!iso) return '—';
@@ -82,34 +105,25 @@ const statusLabel = (status: string) => {
 
 const DEFAULT_EXCLUSIONS = [
   'Obra civil, canalización, postes, bases y demoliciones no descritas en el alcance.',
-  'Gestión de permisos municipales, prediales o de terceros no listados.',
-  'Consumibles eléctricos fuera de lo especificado (cableado adicional, ductos, breakers).',
-  'Equipos o licencias de terceros no incluidos en las partidas.',
-  'Servicios fuera de horario laboral estándar, salvo convenio escrito.',
+  'Permisos municipales, prediales o de terceros no listados.',
+  'Consumibles eléctricos adicionales no especificados en partidas.',
+  'Equipos o licencias de terceros no incluidos explícitamente.',
 ];
 
 const DEFAULT_WARRANTY = [
-  'Garantía de equipos conforme a fabricante (mínimo 12 meses salvo especificación por partida).',
-  'Garantía de instalación Nexara: 90 días sobre mano de obra realizada por nuestro personal.',
-  'No aplica garantía por mal uso, daños por terceros, variaciones eléctricas o falta de mantenimiento.',
+  'Equipos: garantía del fabricante (mínimo 12 meses salvo indicación por partida).',
+  'Instalación Nexara: 90 días sobre mano de obra ejecutada por nuestro personal.',
+  'No aplica por mal uso, daños de terceros o falta de mantenimiento.',
 ];
 
-const DEFAULT_VALIDITY = [
-  'Precios sujetos a disponibilidad de inventario del mayorista al momento de confirmar la orden.',
-  'Tipo de cambio y costos de importación pueden ajustar precios en partidas USD al confirmar.',
-  'La vigencia de esta propuesta aplica solo sobre el alcance y cantidades aquí descritas.',
-];
-
-const loadLogo = () => {
+const loadLogo = (): Buffer | null => {
   const candidates = [
+    path.resolve(__dirname, '../assets/logo-nexara.png'),
+    path.resolve(process.cwd(), 'src/assets/logo-nexara.png'),
+    path.resolve(process.cwd(), 'dist/assets/logo-nexara.png'),
     path.resolve(process.cwd(), '../web/public/logo-nexara-platform.png'),
     path.resolve(process.cwd(), '../../apps/web/public/logo-nexara-platform.png'),
-    path.resolve(process.cwd(), '../web/public/logo-nexara.png'),
-    path.resolve(process.cwd(), '../../apps/web/public/logo-nexara.png'),
-    path.resolve(process.cwd(), 'dist/assets/logo-nexara.png'),
-    path.resolve(process.cwd(), 'src/assets/logo-nexara.png'),
   ];
-
   for (const filePath of candidates) {
     try {
       if (fs.existsSync(filePath)) return fs.readFileSync(filePath);
@@ -120,482 +134,439 @@ const loadLogo = () => {
   return null;
 };
 
-export const generateCotizacionPdf = (payload: CotizacionPdfPayload): Promise<Buffer> => {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 42 });
-    const chunks: Buffer[] = [];
+type PdfCtx = {
+  doc: PDFKit.PDFDocument;
+  margin: number;
+  contentWidth: number;
+  pageWidth: number;
+  pageHeight: number;
+  pageBottom: number;
+  pageNo: number;
+  logo: Buffer | null;
+};
 
-    doc.on('data', (chunk) => chunks.push(chunk));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', (error) => reject(error));
+const resetCursor = (doc: PDFKit.PDFDocument, x: number, y: number) => {
+  doc.x = x;
+  doc.y = y;
+};
 
-    const colors = {
-      navy: '#0B1F3A',
-      blue: '#0F766E',
-      accent: '#14B8A6',
-      light: '#ECFDF8',
-      softGray: '#F8FAFC',
-      text: '#0F172A',
-      muted: '#64748B',
-      line: '#E2E8F0',
-      white: '#FFFFFF',
-    };
+/** Texto acotado: evita que PDFKit inserte páginas en blanco por desbordamiento. */
+const boundedText = (
+  doc: PDFKit.PDFDocument,
+  text: string,
+  x: number,
+  y: number,
+  opts: {
+    width: number;
+    height?: number;
+    align?: 'left' | 'right' | 'center' | 'justify';
+    ellipsis?: boolean;
+    lineGap?: number;
+  },
+): number => {
+  const h = opts.height ?? doc.heightOfString(text, { width: opts.width, lineGap: opts.lineGap });
+  doc.save();
+  doc.rect(x, y, opts.width, h).clip();
+  doc.text(text, x, y, {
+    width: opts.width,
+    height: h,
+    align: opts.align,
+    ellipsis: opts.ellipsis ?? false,
+    lineGap: opts.lineGap,
+  });
+  doc.restore();
+  resetCursor(doc, x, y + h);
+  return h;
+};
 
-    const margin = doc.page.margins.left;
-    const pageWidth = doc.page.width;
-    const pageHeight = doc.page.height;
-    const contentWidth = pageWidth - margin * 2;
-    const logo = loadLogo();
-    let pageNo = 1;
+const pageBottom = (doc: PDFKit.PDFDocument) => doc.page.height - FOOTER_ZONE;
 
-    const footer = () => {
-      const y = pageHeight - 36;
-      doc.save();
-      doc.moveTo(margin, y - 8).lineTo(margin + contentWidth, y - 8).strokeColor(colors.line).lineWidth(0.6).stroke();
-      doc.fillColor(colors.muted).fontSize(8).font('Helvetica');
-      doc.text('NEXARA · Propuesta comercial confidencial', margin, y, { width: contentWidth * 0.7 });
-      doc.text(`Pág. ${pageNo}`, margin, y, { width: contentWidth, align: 'right' });
-      doc.restore();
-    };
+const drawFooter = (ctx: PdfCtx) => {
+  const { doc, margin, contentWidth, pageHeight, pageNo } = ctx;
+  const y = pageHeight - 30;
+  doc.save();
+  doc.moveTo(margin, y - 10).lineTo(margin + contentWidth, y - 10).strokeColor(COLORS.line).lineWidth(0.5).stroke();
+  doc.restore();
+  doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7.5);
+  boundedText(doc, `${COMPANY.name} · ${COMPANY.web} · ${COMPANY.email}`, margin, y, {
+    width: contentWidth * 0.72,
+    height: 10,
+    ellipsis: true,
+  });
+  boundedText(doc, `Página ${pageNo}`, margin, y, { width: contentWidth, height: 10, align: 'right' });
+};
 
-    const newPage = () => {
-      footer();
-      doc.addPage();
-      pageNo += 1;
-    };
-
-    const ensureSpace = (needed: number) => {
-      if (doc.y + needed > pageHeight - 56) {
-        newPage();
-        drawPageChrome();
-        doc.y = 58;
-      }
-    };
-
-    const drawPageChrome = () => {
-      doc.save();
-      doc.rect(0, 0, pageWidth, 8).fill(colors.blue);
-      doc.restore();
-    };
-
-    const sectionTitle = (label: string) => {
-      ensureSpace(36);
-      doc.fillColor(colors.navy).fontSize(12).font('Helvetica-Bold').text(label, margin, doc.y);
-      doc
-        .moveTo(margin, doc.y + 4)
-        .lineTo(margin + 56, doc.y + 4)
-        .strokeColor(colors.accent)
-        .lineWidth(2)
-        .stroke();
-      doc.moveDown(0.8);
-    };
-
-    const bulletList = (items: string[]) => {
-      doc.fillColor(colors.text).fontSize(9.5).font('Helvetica');
-      for (const item of items) {
-        ensureSpace(28);
-        const y = doc.y;
-        doc.fillColor(colors.accent).text('•', margin, y, { width: 12 });
-        doc.fillColor(colors.text).text(item, margin + 14, y, { width: contentWidth - 14 });
-        doc.moveDown(0.35);
-      }
-    };
-
-    // ── Portada ──────────────────────────────────────────────────────────
+const startPage = (ctx: PdfCtx, withMiniHeader: boolean) => {
+  const { doc, margin, contentWidth, logo } = ctx;
+  if (withMiniHeader) {
     doc.save();
-    doc.rect(0, 0, pageWidth, pageHeight).fill(colors.navy);
-    doc.rect(0, pageHeight * 0.62, pageWidth, pageHeight * 0.38).fill(colors.blue);
+    doc.rect(0, 0, ctx.pageWidth, 4).fill(COLORS.teal);
     doc.restore();
-
     if (logo) {
       try {
-        doc.image(logo, margin, 56, { fit: [72, 72] });
+        doc.image(logo, margin, 14, { fit: [52, 52] });
       } catch {
-        // ignore corrupt logo
+        // ignore
       }
     }
-
-    doc.fillColor(colors.white).fontSize(28).font('Helvetica-Bold').text('NEXARA', margin, 150, {
-      width: contentWidth,
-    });
+    doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(11).text(COMPANY.name, margin + (logo ? 60 : 0), 18);
     doc
-      .fontSize(11)
+      .fillColor(COLORS.muted)
       .font('Helvetica')
-      .fillColor('#99F6E4')
-      .text('Integración tecnológica · CCTV · Redes · Soporte TI', margin, 186, { width: contentWidth });
+      .fontSize(7.5)
+      .text('Cotización comercial', margin + (logo ? 60 : 0), 32);
+    return 52;
+  }
+  return MARGIN;
+};
 
-    doc
-      .fillColor(colors.white)
-      .fontSize(22)
-      .font('Helvetica-Bold')
-      .text('Propuesta comercial', margin, 250, { width: contentWidth });
+const addPage = (ctx: PdfCtx): number => {
+  drawFooter(ctx);
+  ctx.doc.addPage();
+  ctx.pageNo += 1;
+  const y = startPage(ctx, true);
+  resetCursor(ctx.doc, ctx.margin, y);
+  return y;
+};
 
-    doc
-      .fontSize(14)
-      .font('Helvetica')
-      .fillColor('#E2E8F0')
-      .text(payload.projectName || 'Solución tecnológica a la medida', margin, 284, {
-        width: contentWidth * 0.85,
-      });
+const ensureY = (ctx: PdfCtx, y: number, needed: number): number => {
+  if (y + needed <= ctx.pageBottom) return y;
+  return addPage(ctx);
+};
 
-    const coverMetaY = 360;
-    doc.fillColor('#99F6E4').fontSize(9).font('Helvetica-Bold').text('FOLIO', margin, coverMetaY);
-    doc.fillColor(colors.white).fontSize(16).font('Helvetica-Bold').text(payload.quoteNumber, margin, coverMetaY + 14);
+const drawLetterhead = (ctx: PdfCtx, payload: CotizacionPdfPayload): number => {
+  const { doc, margin, contentWidth, logo } = ctx;
+  let y = MARGIN;
 
-    doc.fillColor('#99F6E4').fontSize(9).font('Helvetica-Bold').text('CLIENTE', margin + 220, coverMetaY);
-    doc
-      .fillColor(colors.white)
-      .fontSize(13)
-      .font('Helvetica-Bold')
-      .text(payload.clientCompany || payload.clientName || 'Cliente', margin + 220, coverMetaY + 14, {
-        width: contentWidth - 220,
-      });
+  doc.save();
+  doc.rect(0, 0, ctx.pageWidth, 6).fill(COLORS.teal);
+  doc.restore();
 
-    doc.fillColor('#99F6E4').fontSize(9).font('Helvetica-Bold').text('EMISIÓN', margin, coverMetaY + 70);
-    doc
-      .fillColor(colors.white)
-      .fontSize(11)
-      .font('Helvetica')
-      .text(formatDisplayDate(payload.issueDate), margin, coverMetaY + 84);
-
-    doc.fillColor('#99F6E4').fontSize(9).font('Helvetica-Bold').text('VIGENCIA', margin + 220, coverMetaY + 70);
-    doc
-      .fillColor(colors.white)
-      .fontSize(11)
-      .font('Helvetica')
-      .text(formatDisplayDate(payload.validUntil), margin + 220, coverMetaY + 84);
-
-    doc
-      .fillColor(colors.white)
-      .fontSize(10)
-      .font('Helvetica')
-      .text(`Total propuesto: ${formatMoney(payload.total, payload.currency)}`, margin, pageHeight - 120, {
-        width: contentWidth,
-      });
-    doc
-      .fontSize(9)
-      .fillColor('#CCFBF1')
-      .text(
-        `Elaboró: ${payload.preparedBy || 'Equipo comercial Nexara'}${payload.preparedRole ? ` · ${payload.preparedRole}` : ''}`,
-        margin,
-        pageHeight - 98,
-        { width: contentWidth },
-      );
-    doc
-      .fontSize(8)
-      .fillColor('#99F6E4')
-      .text('Documento confidencial. Uso exclusivo del destinatario.', margin, pageHeight - 70, {
-        width: contentWidth,
-      });
-
-    // ── Página comercial ─────────────────────────────────────────────────
-    newPage();
-    drawPageChrome();
-    doc.y = 36;
-
-    doc.fillColor(colors.navy).fontSize(16).font('Helvetica-Bold').text('Detalle de la propuesta', margin, doc.y);
-    doc
-      .fillColor(colors.muted)
-      .fontSize(9)
-      .font('Helvetica')
-      .text(`${statusLabel(payload.status)} · ${payload.currency}`, margin, doc.y + 4);
-    doc.moveDown(1.2);
-
-    sectionTitle('Cliente y proyecto');
-
-    const cardPad = 10;
-    const leftW = (contentWidth - 14) * 0.52;
-    const rightW = contentWidth - leftW - 14;
-    const infoY = doc.y;
-
-    const drawCard = (
-      x: number,
-      y: number,
-      w: number,
-      title: string,
-      rows: Array<{ label: string; value: string }>,
-    ) => {
-      let innerY = y + cardPad + 16;
-      const rowHeights = rows.map((r) =>
-        Math.max(12, doc.heightOfString(r.value || '—', { width: w - cardPad * 2 - 78 })),
-      );
-      const h = cardPad * 2 + 16 + rowHeights.reduce((a, b) => a + b + 6, 0);
-      doc.save();
-      doc.roundedRect(x, y, w, h, 8).fill(colors.softGray);
-      doc.restore();
-      doc.fillColor(colors.navy).fontSize(10).font('Helvetica-Bold').text(title, x + cardPad, y + cardPad);
-      rows.forEach((r, i) => {
-        doc.fillColor(colors.muted).fontSize(8).font('Helvetica').text(r.label, x + cardPad, innerY, { width: 72 });
-        doc
-          .fillColor(colors.text)
-          .fontSize(9)
-          .font('Helvetica')
-          .text(r.value || '—', x + cardPad + 76, innerY, { width: w - cardPad * 2 - 78 });
-        innerY += rowHeights[i] + 6;
-      });
-      return h;
-    };
-
-    const h1 = drawCard(margin, infoY, leftW, 'Cliente', [
-      { label: 'Empresa', value: toText(payload.clientCompany) },
-      { label: 'Contacto', value: toText(payload.clientName) },
-      { label: 'Email', value: toText(payload.clientEmail) },
-      { label: 'Teléfono', value: toText(payload.clientPhone) },
-      { label: 'Dirección', value: toText(payload.clientAddress) },
-    ]);
-    const h2 = drawCard(margin + leftW + 14, infoY, rightW, 'Proyecto', [
-      { label: 'Nombre', value: toText(payload.projectName) },
-      { label: 'Alcance', value: toText(payload.scope) },
-      { label: 'Entrega', value: toText(payload.deliveryTime) },
-      { label: 'Pago', value: toText(payload.paymentTerms) },
-      { label: 'Anticipo', value: payload.depositPercent ? `${payload.depositPercent}%` : '—' },
-    ]);
-    doc.y = infoY + Math.max(h1, h2) + 18;
-
-    if (payload.scope) {
-      sectionTitle('Alcance incluido');
-      doc.fillColor(colors.text).fontSize(9.5).font('Helvetica').text(payload.scope, margin, doc.y, {
-        width: contentWidth,
-        align: 'left',
-      });
-      doc.moveDown(0.8);
+  const logoX = margin;
+  const textX = logo ? margin + 64 : margin;
+  if (logo) {
+    try {
+      doc.image(logo, logoX, y, { fit: [56, 56] });
+    } catch {
+      // ignore
     }
+  }
 
-    sectionTitle('Conceptos y partidas');
+  doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(18).text(COMPANY.name, textX, y);
+  doc.fillColor(COLORS.muted).font('Helvetica').fontSize(8.5).text(COMPANY.tagline, textX, y + 22);
+  doc.fontSize(8).text(`${COMPANY.web}  ·  ${COMPANY.email}`, textX, y + 36);
 
-    const columns = [
-      { label: '#', width: 22 },
-      { label: 'Concepto', width: 188 },
-      { label: 'Marca / Modelo', width: 88 },
-      { label: 'Cant', width: 32 },
-      { label: 'P. Unit', width: 58 },
-      { label: 'Imp.', width: 48 },
-      { label: 'Total', width: 54 },
-    ];
+  const boxW = 168;
+  const boxX = margin + contentWidth - boxW;
+  const boxY = y;
+  doc.save();
+  doc.roundedRect(boxX, boxY, boxW, 62, 6).fill(COLORS.fill);
+  doc.roundedRect(boxX, boxY, boxW, 62, 6).strokeColor(COLORS.line).lineWidth(0.8).stroke();
+  doc.restore();
 
-    const drawTableHeader = (y: number) => {
-      doc.save();
-      doc.roundedRect(margin, y, contentWidth, 22, 4).fill(colors.navy);
-      doc.restore();
-      doc.fillColor(colors.white).fontSize(8).font('Helvetica-Bold');
-      let x = margin + 6;
-      columns.forEach((col) => {
-        doc.text(col.label, x, y + 7, { width: col.width - 6 });
-        x += col.width;
-      });
-    };
+  doc.fillColor(COLORS.muted).font('Helvetica-Bold').fontSize(7).text('COTIZACIÓN', boxX + 10, boxY + 8);
+  doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(12).text(payload.quoteNumber, boxX + 10, boxY + 18);
+  doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7.5);
+  doc.text(`Emisión: ${formatDisplayDate(payload.issueDate)}`, boxX + 10, boxY + 34);
+  doc.text(`Vigencia: ${formatDisplayDate(payload.validUntil)}`, boxX + 10, boxY + 44);
+  doc.text(statusLabel(payload.status), boxX + 10, boxY + 54, { width: boxW - 20, align: 'right' });
 
-    const ensureTableSpace = (needed: number) => {
-      if (doc.y + needed > pageHeight - 56) {
-        newPage();
-        drawPageChrome();
-        doc.y = 48;
-        drawTableHeader(doc.y);
-        doc.y += 28;
-      }
-    };
+  y = Math.max(y + 62, boxY + 72);
+  doc.moveTo(margin, y).lineTo(margin + contentWidth, y).strokeColor(COLORS.line).lineWidth(0.8).stroke();
+  y += 14;
 
-    drawTableHeader(doc.y);
-    doc.y += 28;
-
-    payload.items.forEach((item, index) => {
-      const laborLine =
-        item.laborHours || item.laborRate
-          ? `MO: ${item.laborHours || 0}h × ${formatMoney(item.laborRate || 0, payload.currency)}`
-          : null;
-      const warrantyLine = item.warrantyMonths ? `Garantía: ${item.warrantyMonths} meses` : null;
-      const deliveryLine = item.deliveryTime ? `Entrega: ${item.deliveryTime}` : null;
-      const metaLine = [item.category, item.sku, item.partNumber].filter(Boolean).join(' · ');
-      const conceptText = [
-        item.name,
-        item.description || null,
-        metaLine || null,
-        laborLine,
-        warrantyLine,
-        deliveryLine,
-      ]
-        .filter(Boolean)
-        .join('\n');
-      const brandText = [item.brand, item.model].filter(Boolean).join('\n') || '—';
-      const taxText = `IVA ${item.tax || 0}%`;
-
-      const heights = [
-        doc.heightOfString(String(index + 1), { width: columns[0].width - 6 }),
-        doc.heightOfString(conceptText, { width: columns[1].width - 6 }),
-        doc.heightOfString(brandText, { width: columns[2].width - 6 }),
-        doc.heightOfString(String(item.qty), { width: columns[3].width - 6 }),
-        doc.heightOfString(formatMoney(item.unitPrice, payload.currency), { width: columns[4].width - 6 }),
-        doc.heightOfString(taxText, { width: columns[5].width - 6 }),
-        doc.heightOfString(formatMoney(item.lineTotal, payload.currency), { width: columns[6].width - 6 }),
-      ];
-      const rowHeight = Math.max(...heights) + 10;
-      ensureTableSpace(rowHeight + 6);
-
-      const rowY = doc.y;
-      if (index % 2 === 1) {
-        doc.save();
-        doc.rect(margin, rowY - 3, contentWidth, rowHeight).fill(colors.softGray);
-        doc.restore();
-      }
-
-      doc.fillColor(colors.text).fontSize(8.5).font('Helvetica');
-      let x = margin + 6;
-      const cells = [
-        String(index + 1),
-        conceptText,
-        brandText,
-        String(item.qty),
-        formatMoney(item.unitPrice, payload.currency),
-        taxText,
-        formatMoney(item.lineTotal, payload.currency),
-      ];
-      cells.forEach((cell, i) => {
-        doc.font(i === 6 ? 'Helvetica-Bold' : 'Helvetica');
-        doc.text(cell, x, rowY, { width: columns[i].width - 6 });
-        x += columns[i].width;
-      });
-      doc.y = rowY + rowHeight;
-    });
-
-    // Resumen financiero
-    ensureSpace(150);
-    doc.moveDown(0.6);
-    const summaryW = 250;
-    const summaryX = margin + contentWidth - summaryW;
-    const summaryRows: Array<[string, string, boolean]> = [
-      ['Subtotal', formatMoney(payload.subtotal, payload.currency), false],
-      ['Descuentos', `− ${formatMoney(payload.discountTotal, payload.currency)}`, false],
-      ['IVA', formatMoney(payload.taxTotal, payload.currency), false],
-    ];
-    if ((payload.iepsTotal || 0) > 0) {
-      summaryRows.push(['IEPS', formatMoney(payload.iepsTotal || 0, payload.currency), false]);
+  const colW = (contentWidth - 16) / 2;
+  const drawInfoCol = (x: number, title: string, lines: string[]) => {
+    doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(9).text(title, x, y);
+    let ly = y + 14;
+    doc.font('Helvetica').fontSize(8.5).fillColor(COLORS.text);
+    for (const line of lines) {
+      const lh = doc.heightOfString(line, { width: colW });
+      boundedText(doc, line, x, ly, { width: colW, height: lh });
+      ly += lh + 2;
     }
-    if ((payload.retentionTotal || 0) > 0) {
-      summaryRows.push(['Retenciones', `− ${formatMoney(payload.retentionTotal || 0, payload.currency)}`, false]);
-    }
-    summaryRows.push(['Total', formatMoney(payload.total, payload.currency), true]);
-    if (payload.depositPercent > 0) {
-      const depositAmt = (payload.total * payload.depositPercent) / 100;
-      summaryRows.push([
-        `Anticipo ${payload.depositPercent}%`,
-        formatMoney(depositAmt, payload.currency),
-        false,
-      ]);
-    }
+    return ly;
+  };
 
-    const boxH = 18 + summaryRows.length * 16 + 14;
+  const clientLines = [
+    payload.clientCompany || payload.clientName || '—',
+    payload.clientName && payload.clientCompany ? `Attn: ${payload.clientName}` : '',
+    payload.clientEmail || '',
+    payload.clientPhone || '',
+    payload.clientAddress || '',
+  ].filter(Boolean);
+
+  const projectLines = [
+    payload.projectName ? `Proyecto: ${payload.projectName}` : '',
+    payload.scope ? `Alcance: ${payload.scope}` : '',
+    payload.paymentTerms ? `Pago: ${payload.paymentTerms}` : '',
+    payload.deliveryTime ? `Entrega: ${payload.deliveryTime}` : '',
+    payload.depositPercent ? `Anticipo: ${payload.depositPercent}%` : '',
+  ].filter(Boolean);
+
+  const yLeft = drawInfoCol(margin, 'Cliente', clientLines.length ? clientLines : ['—']);
+  const yRight = drawInfoCol(margin + colW + 16, 'Condiciones', projectLines.length ? projectLines : ['Según partidas']);
+  y = Math.max(yLeft, yRight) + 12;
+
+  doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(11).text('Detalle de partidas', margin, y);
+  y += 18;
+  return y;
+};
+
+type TableCol = { key: string; label: string; width: number; align: 'left' | 'right' | 'center' };
+
+const TABLE_COLS: TableCol[] = [
+  { key: 'num', label: '#', width: 22, align: 'center' },
+  { key: 'desc', label: 'Descripción', width: 240, align: 'left' },
+  { key: 'qty', label: 'Cant.', width: 38, align: 'center' },
+  { key: 'unit', label: 'P. unitario', width: 76, align: 'right' },
+  { key: 'tax', label: 'IVA', width: 40, align: 'center' },
+  { key: 'total', label: 'Importe', width: 78, align: 'right' },
+];
+
+const drawTableHeader = (ctx: PdfCtx, y: number): number => {
+  const { doc, margin } = ctx;
+  doc.save();
+  doc.rect(margin, y, ctx.contentWidth, TABLE_HEADER_H).fill(COLORS.navy);
+  doc.restore();
+  doc.fillColor(COLORS.white).font('Helvetica-Bold').fontSize(7.5);
+  let x = margin + 4;
+  for (const col of TABLE_COLS) {
+    doc.text(col.label, x, y + 7, { width: col.width - 6, align: col.align });
+    x += col.width;
+  }
+  return y + TABLE_HEADER_H + 4;
+};
+
+const itemDescription = (item: CotizacionPdfItem) => {
+  const meta = [item.brand, item.model, item.sku ? `SKU ${item.sku}` : null].filter(Boolean).join(' · ');
+  return meta ? `${item.name}\n${meta}` : item.name;
+};
+
+const measureRow = () => TABLE_ROW_H;
+
+const drawTableRow = (
+  ctx: PdfCtx,
+  y: number,
+  item: CotizacionPdfItem,
+  index: number,
+  currency: string,
+  stripe: boolean,
+): number => {
+  const { doc, margin } = ctx;
+  const rowH = measureRow();
+
+  if (stripe) {
     doc.save();
-    doc.roundedRect(summaryX, doc.y, summaryW, boxH, 8).fill(colors.light);
+    doc.rect(margin, y - 2, ctx.contentWidth, rowH).fill(COLORS.fill);
     doc.restore();
-    let sy = doc.y + 12;
-    doc.fillColor(colors.navy).fontSize(10).font('Helvetica-Bold').text('Resumen financiero', summaryX + 12, sy);
-    sy += 18;
-    summaryRows.forEach(([label, value, strong]) => {
-      doc.font(strong ? 'Helvetica-Bold' : 'Helvetica').fontSize(9).fillColor(strong ? colors.navy : colors.text);
-      doc.text(label, summaryX + 12, sy, { width: summaryW - 24 });
-      doc.text(value, summaryX + 12, sy, { width: summaryW - 24, align: 'right' });
-      sy += 16;
+  }
+
+  const cells = [
+    String(index + 1),
+    itemDescription(item),
+    String(item.qty),
+    formatMoney(item.unitPrice, currency),
+    `${item.tax || 0}%`,
+    formatMoney(item.lineTotal, currency),
+  ];
+
+  let x = margin + 4;
+  const textHeight = rowH - ROW_PAD * 2;
+  cells.forEach((cell, i) => {
+    const col = TABLE_COLS[i];
+    if (i === 0) doc.font('Helvetica').fontSize(8).fillColor(COLORS.muted);
+    else if (i === 1) doc.font('Helvetica').fontSize(8.5).fillColor(COLORS.text);
+    else if (i === 5) doc.font('Helvetica-Bold').fontSize(8.5).fillColor(COLORS.navy);
+    else doc.font('Helvetica').fontSize(8).fillColor(COLORS.text);
+    boundedText(doc, cell, x, y + ROW_PAD, {
+      width: col.width - 8,
+      height: textHeight,
+      align: col.align,
+      ellipsis: i === 1,
+      lineGap: 0,
     });
-    doc.y = doc.y + boxH + 16;
+    x += col.width;
+  });
 
-    // ── Condiciones ──────────────────────────────────────────────────────
-    newPage();
-    drawPageChrome();
-    doc.y = 40;
-    doc.fillColor(colors.navy).fontSize(16).font('Helvetica-Bold').text('Condiciones comerciales', margin, doc.y);
-    doc.moveDown(1);
+  doc.moveTo(margin, y + rowH - 2).lineTo(margin + ctx.contentWidth, y + rowH - 2).strokeColor(COLORS.line).lineWidth(0.3).stroke();
+  return y + rowH;
+};
 
-    sectionTitle('Vigencia de la propuesta');
-    doc
-      .fillColor(colors.text)
-      .fontSize(9.5)
-      .font('Helvetica')
-      .text(
-        `Esta cotización es válida hasta el ${formatDisplayDate(payload.validUntil)}. ` +
-          'Después de esa fecha, precios y disponibilidad pueden cambiar sin previo aviso.',
-        margin,
-        doc.y,
-        { width: contentWidth },
-      );
-    doc.moveDown(0.5);
-    bulletList(DEFAULT_VALIDITY);
+const drawItemsTable = (ctx: PdfCtx, payload: CotizacionPdfPayload, startY: number): number => {
+  let y = drawTableHeader(ctx, startY);
 
-    sectionTitle('Términos de pago y entrega');
-    if (payload.paymentTerms) {
-      doc.fillColor(colors.text).fontSize(9.5).font('Helvetica').text(`Pago: ${payload.paymentTerms}`, {
-        width: contentWidth,
-      });
-      doc.moveDown(0.3);
+  payload.items.forEach((item, index) => {
+    const rowH = measureRow();
+    if (y + rowH > ctx.pageBottom) {
+      y = addPage(ctx);
+      y = drawTableHeader(ctx, y);
     }
-    if (payload.deliveryTime) {
-      doc.fillColor(colors.text).fontSize(9.5).font('Helvetica').text(`Entrega: ${payload.deliveryTime}`, {
-        width: contentWidth,
-      });
-      doc.moveDown(0.3);
-    }
-    if (payload.depositPercent > 0) {
-      doc
-        .fillColor(colors.text)
-        .fontSize(9.5)
-        .font('Helvetica')
-        .text(
-          `Anticipo solicitado: ${payload.depositPercent}% (${formatMoney(
-            (payload.total * payload.depositPercent) / 100,
-            payload.currency,
-          )}). El saldo se liquida según los términos acordados.`,
-          { width: contentWidth },
-        );
-      doc.moveDown(0.3);
-    }
+    y = drawTableRow(ctx, y, item, index, payload.currency, index % 2 === 1);
+  });
 
-    sectionTitle('Garantías');
-    const warrantyFromItems = Array.from(
-      new Set(
-        payload.items
-          .filter((i) => i.warrantyMonths && i.warrantyMonths > 0)
-          .map((i) => `${i.name}: ${i.warrantyMonths} meses`),
-      ),
-    ).slice(0, 8);
-    bulletList([...DEFAULT_WARRANTY, ...warrantyFromItems.map((w) => `Partida — ${w}`)]);
+  return y + 8;
+};
 
-    sectionTitle('Exclusiones (fuera de alcance)');
-    bulletList(DEFAULT_EXCLUSIONS);
+const drawSummary = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: number): number => {
+  const { doc, margin, contentWidth } = ctx;
+  const boxW = 220;
+  const rows: Array<[string, string, boolean]> = [
+    ['Subtotal', formatMoney(payload.subtotal, payload.currency), false],
+  ];
+  if (payload.discountTotal > 0) {
+    rows.push(['Descuentos', `− ${formatMoney(payload.discountTotal, payload.currency)}`, false]);
+  }
+  rows.push(['IVA', formatMoney(payload.taxTotal, payload.currency), false]);
+  if ((payload.iepsTotal || 0) > 0) rows.push(['IEPS', formatMoney(payload.iepsTotal || 0, payload.currency), false]);
+  if ((payload.retentionTotal || 0) > 0) {
+    rows.push(['Retenciones', `− ${formatMoney(payload.retentionTotal || 0, payload.currency)}`, false]);
+  }
+  rows.push(['TOTAL', formatMoney(payload.total, payload.currency), true]);
+  if (payload.depositPercent > 0) {
+    rows.push([
+      `Anticipo (${payload.depositPercent}%)`,
+      formatMoney((payload.total * payload.depositPercent) / 100, payload.currency),
+      false,
+    ]);
+  }
 
-    if (payload.note) {
-      sectionTitle('Notas adicionales');
-      doc.fillColor(colors.text).fontSize(9.5).font('Helvetica').text(payload.note, {
-        width: contentWidth,
-      });
-      doc.moveDown(0.6);
-    }
+  const boxH = 16 + rows.length * 15 + 12;
+  y = ensureY(ctx, y, boxH + 20);
+  const boxX = margin + contentWidth - boxW;
 
-    sectionTitle('Aceptación');
-    doc
-      .fillColor(colors.muted)
-      .fontSize(9)
-      .font('Helvetica')
-      .text(
-        'Al firmar, el cliente acepta el alcance, precios, vigencia y exclusiones de esta propuesta.',
-        { width: contentWidth },
-      );
-    doc.moveDown(1.4);
+  doc.save();
+  doc.roundedRect(boxX, y, boxW, boxH, 5).fill(COLORS.fill);
+  doc.roundedRect(boxX, y, boxW, boxH, 5).strokeColor(COLORS.line).lineWidth(0.6).stroke();
+  doc.restore();
 
-    const sigW = (contentWidth - 24) / 2;
-    const sigY = doc.y;
-    const drawSig = (x: number, title: string, subtitle: string) => {
-      doc
-        .moveTo(x, sigY + 48)
-        .lineTo(x + sigW, sigY + 48)
-        .strokeColor(colors.line)
-        .lineWidth(1)
-        .stroke();
-      doc.fillColor(colors.navy).fontSize(9).font('Helvetica-Bold').text(title, x, sigY + 56, { width: sigW });
-      doc.fillColor(colors.muted).fontSize(8).font('Helvetica').text(subtitle, x, sigY + 70, { width: sigW });
+  let sy = y + 10;
+  doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(9).text('Resumen', boxX + 12, sy);
+  sy += 16;
+  for (const [label, value, strong] of rows) {
+    doc.font(strong ? 'Helvetica-Bold' : 'Helvetica').fontSize(strong ? 10 : 8.5);
+    doc.fillColor(strong ? COLORS.navy : COLORS.text);
+    boundedText(doc, label, boxX + 12, sy, { width: boxW - 24, height: strong ? 14 : 12 });
+    boundedText(doc, value, boxX + 12, sy, { width: boxW - 24, height: strong ? 14 : 12, align: 'right' });
+    sy += strong ? 18 : 15;
+  }
+  return y + boxH + 20;
+};
+
+const drawSection = (ctx: PdfCtx, y: number, title: string): number => {
+  y = ensureY(ctx, y, 28);
+  const { doc, margin } = ctx;
+  doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(10).text(title, margin, y);
+  doc.moveTo(margin, y + 14).lineTo(margin + 48, y + 14).strokeColor(COLORS.accent).lineWidth(1.5).stroke();
+  return y + 22;
+};
+
+const drawParagraph = (ctx: PdfCtx, y: number, text: string): number => {
+  const { doc, margin, contentWidth } = ctx;
+  doc.fillColor(COLORS.text).font('Helvetica').fontSize(8.5);
+  const h = doc.heightOfString(text, { width: contentWidth });
+  y = ensureY(ctx, y, h + 4);
+  boundedText(doc, text, margin, y, { width: contentWidth, height: h, lineGap: 2 });
+  return y + h + 8;
+};
+
+const drawBullets = (ctx: PdfCtx, y: number, items: string[]): number => {
+  const { doc, margin, contentWidth } = ctx;
+  doc.font('Helvetica').fontSize(8.5).fillColor(COLORS.text);
+  for (const item of items) {
+    const h = doc.heightOfString(item, { width: contentWidth - 14 });
+    y = ensureY(ctx, y, h + 6);
+    boundedText(doc, '•', margin, y, { width: 8, height: h });
+    boundedText(doc, item, margin + 12, y, { width: contentWidth - 14, height: h, lineGap: 1 });
+    y += h + 6;
+  }
+  return y;
+};
+
+const drawSignatures = (ctx: PdfCtx, y: number, payload: CotizacionPdfPayload): number => {
+  const { doc, margin, contentWidth } = ctx;
+  y = ensureY(ctx, y, 90);
+  const sigW = (contentWidth - 24) / 2;
+
+  const drawSig = (x: number, title: string, subtitle: string) => {
+    doc.moveTo(x, y + 44).lineTo(x + sigW, y + 44).strokeColor(COLORS.line).lineWidth(0.8).stroke();
+    doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(8.5).text(title, x, y + 50, { width: sigW });
+    doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7.5).text(subtitle, x, y + 62, { width: sigW });
+  };
+
+  drawSig(margin, 'Por NEXARA', `${payload.preparedBy || 'Equipo comercial'} · Firma y sello`);
+  drawSig(margin + sigW + 24, 'Aceptación del cliente', 'Nombre, cargo y firma');
+  return y + 80;
+};
+
+const drawTerms = (ctx: PdfCtx, payload: CotizacionPdfPayload, startY: number): number => {
+  let y = drawSection(ctx, startY, 'Condiciones comerciales');
+
+  y = drawParagraph(
+    ctx,
+    y,
+    `Vigencia: esta cotización es válida hasta el ${formatDisplayDate(payload.validUntil)}. ` +
+      'Después de esa fecha, precios y disponibilidad pueden cambiar sin previo aviso.',
+  );
+
+  y = drawSection(ctx, y, 'Garantías');
+  const warrantyExtras = payload.items
+    .filter((i) => i.warrantyMonths && i.warrantyMonths > 0)
+    .slice(0, 6)
+    .map((i) => `${i.name}: ${i.warrantyMonths} meses`);
+  y = drawBullets(ctx, y, [...DEFAULT_WARRANTY, ...warrantyExtras]);
+
+  y = drawSection(ctx, y, 'Exclusiones');
+  y = drawBullets(ctx, y, DEFAULT_EXCLUSIONS);
+
+  if (payload.note) {
+    y = drawSection(ctx, y, 'Notas');
+    y = drawParagraph(ctx, y, payload.note);
+  }
+
+  y = drawSection(ctx, y, 'Aceptación');
+  y = drawParagraph(
+    ctx,
+    y,
+    'Al firmar, el cliente acepta el alcance, precios, vigencia y exclusiones de esta propuesta.',
+  );
+  return drawSignatures(ctx, y, payload);
+};
+
+export const generateCotizacionPdf = (payload: CotizacionPdfPayload): Promise<Buffer> => {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: MARGIN,
+      autoFirstPage: true,
+      info: {
+        Title: `Cotización ${payload.quoteNumber}`,
+        Author: COMPANY.name,
+        Subject: payload.projectName || 'Propuesta comercial',
+      },
+    });
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    const ctx: PdfCtx = {
+      doc,
+      margin: MARGIN,
+      contentWidth: doc.page.width - MARGIN * 2,
+      pageWidth: doc.page.width,
+      pageHeight: doc.page.height,
+      pageBottom: pageBottom(doc),
+      pageNo: 1,
+      logo: loadLogo(),
     };
-    drawSig(margin, 'Por Nexara', `${payload.preparedBy || 'Equipo comercial'} · Firma / sello`);
-    drawSig(margin + sigW + 24, 'Por el cliente', 'Nombre, cargo y firma de aceptación');
 
-    footer();
+    let y = drawLetterhead(ctx, payload);
+    y = drawItemsTable(ctx, payload, y);
+    y = drawSummary(ctx, payload, y);
+    y = drawTerms(ctx, payload, y + 8);
+
+    drawFooter(ctx);
     doc.end();
   });
 };
