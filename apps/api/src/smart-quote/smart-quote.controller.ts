@@ -95,7 +95,7 @@ export class SmartQuoteController {
       inStockOnly: inStockOnly !== '0' && inStockOnly !== 'false',
       optimize: optimize || 'BALANCE',
       targetMarginPercent: targetMargin ? Number(targetMargin) : 30,
-      take: take ? Number(take) : 40,
+      take: take ? Number(take) : 24,
     });
   }
 

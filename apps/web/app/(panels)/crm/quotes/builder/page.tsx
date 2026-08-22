@@ -262,7 +262,7 @@ export default function SmartQuoteBuilderPage() {
   const step2Done = canGoStep3;
 
   const runSearch = useCallback(
-    async (qOverride?: string) => {
+    async (qOverride?: string, signal?: AbortSignal) => {
       if (!token) return;
       const q = (qOverride ?? query).trim();
       if (qOverride !== undefined) setQuery(qOverride);
@@ -270,36 +270,46 @@ export default function SmartQuoteBuilderPage() {
       setError(null);
       setSearchedOnce(true);
       try {
-        const res = await smartQuoteSearch(token, {
-          q: q || undefined,
-          brand: filterBrand || undefined,
-          category: filterCategory || undefined,
-          optimize,
-          targetMargin,
-          inStockOnly,
-          take: 36,
-        });
+        const res = await smartQuoteSearch(
+          token,
+          {
+            q: q || undefined,
+            brand: filterBrand || undefined,
+            category: filterCategory || undefined,
+            optimize,
+            targetMargin,
+            inStockOnly,
+            take: 24,
+          },
+          { signal },
+        );
+        if (signal?.aborted) return;
         setOffers(res.data);
         if (!res.data.length) {
-          setToast("Sin coincidencias. Prueba otra palabra, quita filtros o incluye sin stock.");
+          setToast("Sin coincidencias. Prueba otra palabra o quita Stock.");
         }
       } catch (e) {
+        if (signal?.aborted || (e instanceof DOMException && e.name === "AbortError")) return;
         setError(e instanceof Error ? e.message : "No se pudo buscar en el catálogo");
-        setOffers([]);
       } finally {
-        setLoadingSearch(false);
+        if (!signal?.aborted) setLoadingSearch(false);
       }
     },
     [token, query, optimize, targetMargin, filterBrand, filterCategory, inStockOnly],
   );
 
-  // Catálogo vivo: carga inicial + reconsulta al cambiar filtros / prioridad / margen
+  // Catálogo vivo: aborta la petición anterior al tipear (evita colas lentas).
   useEffect(() => {
     if (!token || step !== 2 || path !== "search") return;
+    const ac = new AbortController();
+    const delay = query.trim() ? 220 : 60;
     const t = setTimeout(() => {
-      void runSearch();
-    }, query.trim() ? 320 : 80);
-    return () => clearTimeout(t);
+      void runSearch(undefined, ac.signal);
+    }, delay);
+    return () => {
+      clearTimeout(t);
+      ac.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce intentionally keyed
   }, [token, step, path, query, optimize, targetMargin, filterBrand, filterCategory, inStockOnly]);
 
@@ -460,7 +470,7 @@ export default function SmartQuoteBuilderPage() {
       const quoteNumber = `NXR-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
       const issueDate = new Date().toISOString().slice(0, 10);
       const validUntil = new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10);
-      await createSalesQuote(token, {
+      const created = await createSalesQuote(token, {
         quoteNumber,
         issueDate,
         validUntil,
@@ -493,7 +503,8 @@ export default function SmartQuoteBuilderPage() {
           deliveryTime: l.deliveryTime || undefined,
         })) as any,
       });
-      router.push("/crm/quotes");
+      setToast(`Cotización ${quoteNumber} lista`);
+      router.push(`/crm/quotes/${created.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo guardar la cotización");
     } finally {

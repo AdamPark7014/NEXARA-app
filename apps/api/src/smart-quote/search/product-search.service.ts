@@ -4,6 +4,50 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { CtCatalogSyncService, costMxn, stockAtWarehouse, sumStock } from '../sync/ct-catalog-sync.service.js';
 import { scoreProducts, type OptimizeMode, type ScoredOffer } from '../scoring/quote-scoring.js';
 
+/** Campos mínimos para ranking/UI — evita jalar especificaciones/promociones pesadas. */
+const SEARCH_SELECT = {
+  id: true,
+  clave: true,
+  numParte: true,
+  nombre: true,
+  modelo: true,
+  marca: true,
+  categoria: true,
+  subcategoria: true,
+  descripcion_corta: true,
+  imagen: true,
+  imageUrl: true,
+  thumbnailUrl: true,
+  ean: true,
+  upc: true,
+  precio: true,
+  moneda: true,
+  tipoCambio: true,
+  existencia: true,
+  protegido: true,
+  activo: true,
+  sustituto: true,
+} satisfies Prisma.ProductCTSelect;
+
+type SearchRow = Prisma.ProductCTGetPayload<{ select: typeof SEARCH_SELECT }>;
+
+function looksLikeSku(q: string) {
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{1,24}$/.test(q) && !/\s/.test(q);
+}
+
+function tokenOrFields(token: string): Prisma.ProductCTWhereInput {
+  // Campos indexables / útiles; sin descripcion/categoría (más lentos y ruidosos).
+  return {
+    OR: [
+      { clave: { contains: token, mode: 'insensitive' } },
+      { numParte: { contains: token, mode: 'insensitive' } },
+      { nombre: { contains: token, mode: 'insensitive' } },
+      { modelo: { contains: token, mode: 'insensitive' } },
+      { marca: { contains: token, mode: 'insensitive' } },
+    ],
+  };
+}
+
 @Injectable()
 export class ProductSearchService {
   constructor(
@@ -22,10 +66,11 @@ export class ProductSearchService {
     take?: number;
     includeSubstitutesFor?: string;
   }): Promise<{ data: ScoredOffer[]; meta: { totalCandidates: number; mode: OptimizeMode } }> {
-    const take = Math.min(Math.max(params.take || 40, 1), 100);
+    const take = Math.min(Math.max(params.take || 24, 1), 60);
     const mode = params.optimize || 'BALANCE';
     const margin = params.targetMarginPercent ?? 30;
     const preferred = this.sync.preferredWarehouse();
+    const inStockOnly = params.inStockOnly !== false;
 
     const where: Prisma.ProductCTWhereInput = {
       activo: true,
@@ -35,93 +80,85 @@ export class ProductSearchService {
     if (params.category) where.categoria = { contains: params.category, mode: 'insensitive' };
     if (params.subcategory) where.subcategoria = { contains: params.subcategory, mode: 'insensitive' };
 
-    if (params.q?.trim()) {
-      const tokens = params.q
-        .trim()
+    const rawQ = params.q?.trim() || '';
+    if (rawQ) {
+      const tokens = rawQ
         .split(/[\s,;|/]+/)
         .map((t) => t.trim())
         .filter((t) => t.length >= 2)
-        .slice(0, 6);
+        .slice(0, 4);
 
       if (tokens.length <= 1) {
-        const q = tokens[0] || params.q.trim();
-        where.OR = [
-          { clave: { contains: q, mode: 'insensitive' } },
-          { numParte: { contains: q, mode: 'insensitive' } },
-          { nombre: { contains: q, mode: 'insensitive' } },
-          { modelo: { contains: q, mode: 'insensitive' } },
-          { marca: { contains: q, mode: 'insensitive' } },
-          { descripcion_corta: { contains: q, mode: 'insensitive' } },
-          { categoria: { contains: q, mode: 'insensitive' } },
-          { subcategoria: { contains: q, mode: 'insensitive' } },
-        ];
+        const q = tokens[0] || rawQ;
+        if (looksLikeSku(q)) {
+          // Camino rápido SKU: equals / startsWith usa mejor el índice único de clave.
+          where.OR = [
+            { clave: { equals: q, mode: 'insensitive' } },
+            { clave: { startsWith: q, mode: 'insensitive' } },
+            { numParte: { contains: q, mode: 'insensitive' } },
+            { modelo: { contains: q, mode: 'insensitive' } },
+          ];
+        } else {
+          Object.assign(where, tokenOrFields(q));
+        }
       } else {
-        // Cada token debe aparecer en algún campo (AND de ORs) → búsqueda más precisa
-        where.AND = tokens.map((token) => ({
-          OR: [
-            { clave: { contains: token, mode: 'insensitive' } },
-            { numParte: { contains: token, mode: 'insensitive' } },
-            { nombre: { contains: token, mode: 'insensitive' } },
-            { modelo: { contains: token, mode: 'insensitive' } },
-            { marca: { contains: token, mode: 'insensitive' } },
-            { descripcion_corta: { contains: token, mode: 'insensitive' } },
-            { categoria: { contains: token, mode: 'insensitive' } },
-            { subcategoria: { contains: token, mode: 'insensitive' } },
-          ],
-        }));
+        where.AND = tokens.map((token) => tokenOrFields(token));
       }
     }
 
     if (params.includeSubstitutesFor) {
       where.OR = [
-        ...(where.OR || []),
+        ...(Array.isArray(where.OR) ? where.OR : where.OR ? [where.OR] : []),
         { sustituto: params.includeSubstitutesFor },
         { clave: params.includeSubstitutesFor },
       ];
     }
 
-    let rows = await this.prisma.productCT.findMany({
+    // Over-fetch corto: stock se filtra en memoria (JSONB). Slim select = menos I/O.
+    const fetchTake = inStockOnly ? Math.min(take * 4, 80) : Math.min(take * 2, 48);
+
+    let rows: SearchRow[] = await this.prisma.productCT.findMany({
       where,
-      take: take * 3,
-      orderBy: [{ updatedAt: 'desc' }],
+      select: SEARCH_SELECT,
+      take: fetchTake,
+      orderBy: rawQ ? [{ clave: 'asc' }] : [{ updatedAt: 'desc' }],
     });
 
-    if (params.inStockOnly) {
+    if (inStockOnly) {
       rows = rows.filter((r) => sumStock(r.existencia as Record<string, number>) > 0);
     }
 
-    // Prefer preferred warehouse stock when ranking candidates before scoring
     rows.sort((a, b) => {
       const sa = stockAtWarehouse(a.existencia as Record<string, number>, preferred);
       const sb = stockAtWarehouse(b.existencia as Record<string, number>, preferred);
-      return sb - sa;
+      if (sb !== sa) return sb - sa;
+      return sumStock(b.existencia as Record<string, number>) - sumStock(a.existencia as Record<string, number>);
     });
 
-    const scored = scoreProducts(rows.slice(0, take * 2), {
-      mode,
-      targetMarginPercent: margin,
-      preferredWarehouse: preferred,
-    }).slice(0, take);
-
-    // Auto-expand substitutes when top results have no stock
-    if (scored.length && scored[0].stockTotal === 0 && scored[0].clave) {
-      const subs = await this.findSubstitutes(scored[0].clave, mode, margin, 8);
-      for (const s of subs) {
-        if (!scored.find((x) => x.id === s.id)) {
-          s.badges.push('SUBSTITUTE');
-          scored.push(s);
-        }
-      }
-    }
+    const scored = scoreProducts(
+      rows.slice(0, take).map((r) => ({
+        ...r,
+        especificaciones: [],
+        promociones: [],
+      })),
+      {
+        mode,
+        targetMarginPercent: margin,
+        preferredWarehouse: preferred,
+      },
+    );
 
     return {
-      data: scored.slice(0, take),
+      data: scored,
       meta: { totalCandidates: rows.length, mode },
     };
   }
 
   async findSubstitutes(clave: string, mode: OptimizeMode, margin: number, take = 10) {
-    const base = await this.prisma.productCT.findUnique({ where: { clave } });
+    const base = await this.prisma.productCT.findUnique({
+      where: { clave },
+      select: { id: true, clave: true, sustituto: true, subcategoria: true, marca: true },
+    });
     if (!base) return [];
     const preferred = this.sync.preferredWarehouse();
 
@@ -141,14 +178,18 @@ export class ProductSearchService {
           { subcategoria: base.subcategoria || undefined },
         ],
       },
-      take: 40,
+      select: SEARCH_SELECT,
+      take: 30,
     });
 
-    return scoreProducts(candidates, {
-      mode,
-      targetMarginPercent: margin,
-      preferredWarehouse: preferred,
-    })
+    return scoreProducts(
+      candidates.map((r) => ({ ...r, especificaciones: [], promociones: [] })),
+      {
+        mode,
+        targetMarginPercent: margin,
+        preferredWarehouse: preferred,
+      },
+    )
       .filter((s) => s.stockTotal > 0)
       .slice(0, take)
       .map((s) => {
