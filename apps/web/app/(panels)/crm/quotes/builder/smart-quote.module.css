@@ -319,6 +319,7 @@
   border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
 }
 
+.sqDenseTax {
   font-size: 10.5px;
   color: var(--text-tertiary);
 }
