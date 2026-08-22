@@ -201,6 +201,13 @@ export default function QuoteDetailPage() {
             <Button variant="ghost" iconLeft="↩" onClick={() => router.back()}>
               Volver
             </Button>
+            {cfg.canEdit && quote.status === "DRAFT" && (
+              <Link href={`/crm/quotes/${quote.id}/edit`}>
+                <Button variant="secondary" iconLeft="✏️">
+                  Editar borrador
+                </Button>
+              </Link>
+            )}
             <Link href="/crm/quotes/builder">
               <Button variant="secondary" iconLeft="⚡">
                 Nueva rápida
@@ -239,9 +246,19 @@ export default function QuoteDetailPage() {
         >
           <div style={{ fontWeight: 750, fontSize: 14 }}>Borrador listo para enviar</div>
           <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-            Revisa partidas y condiciones. Cuando esté bien, descarga el PDF o envíalo al cliente.
-            Si necesitas armar otra con el mayorista, usa <strong>Nueva rápida</strong>.
+            Revisa partidas y condiciones. Puedes <strong>editar el borrador</strong>, descargar el PDF
+            profesional o enviarlo al cliente. Si necesitas otra con el mayorista, usa{" "}
+            <strong>Nueva rápida</strong>.
           </p>
+          {cfg.canEdit && (
+            <div style={{ marginTop: 4 }}>
+              <Link href={`/crm/quotes/${quote.id}/edit`}>
+                <Button size="sm" variant="primary" iconLeft="✏️">
+                  Editar borrador
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       )}
 

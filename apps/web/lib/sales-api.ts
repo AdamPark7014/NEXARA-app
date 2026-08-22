@@ -826,7 +826,7 @@ export const createSalesQuote = async (
     items: Array<Record<string, unknown> & { name: string; qty: number; unitPrice: number }>;
   },
 ) => {
-  return apiRequest<unknown>(
+  return apiRequest<{ id: number }>(
     "cotizaciones",
     {
       token,
@@ -844,6 +844,54 @@ export const createSalesQuote = async (
       }),
     },
     "No se pudo crear la cotización",
+  );
+};
+
+export const getSalesQuoteDetail = async (token: string, id: number) => {
+  return apiRequest<Record<string, unknown>>(
+    `ventas/cotizaciones/${id}`,
+    { token, method: "GET" },
+    "No se pudo cargar la cotización",
+  );
+};
+
+export const updateSalesQuote = async (
+  token: string,
+  id: number,
+  payload: {
+    validUntil?: string;
+    salesClientId?: number;
+    clientName?: string;
+    clientCompany?: string;
+    clientEmail?: string;
+    clientPhone?: string;
+    clientAddress?: string;
+    projectName?: string;
+    scope?: string;
+    paymentTerms?: string;
+    deliveryTime?: string;
+    depositPercent?: number;
+    note?: string;
+    preparedBy?: string;
+    items?: Array<Record<string, unknown> & { name: string; qty: number; unitPrice: number }>;
+  },
+) => {
+  return apiRequest<{ id: number }>(
+    `cotizaciones/${id}`,
+    {
+      token,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...payload,
+        items: payload.items?.map((i) => ({
+          ...i,
+          discount: i.discount ?? 0,
+          tax: i.tax ?? 16,
+        })),
+      }),
+    },
+    "No se pudo actualizar la cotización",
   );
 };
 

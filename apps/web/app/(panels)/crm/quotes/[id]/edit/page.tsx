@@ -2,17 +2,23 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
+import EmptyState from "@/components/ui/EmptyState";
 import Modal from "@/components/ui/Modal";
 import CatalogPicker from "@/components/CatalogPicker";
 import { useUser } from "@/components/UserContext";
-import { createSalesQuote, listSalesClients, type SalesClient } from "@/lib/sales-api";
+import {
+  getSalesQuoteDetail,
+  listSalesClients,
+  updateSalesQuote,
+  type SalesClient,
+} from "@/lib/sales-api";
 import { smartQuoteSearch, type SmartOffer } from "@/lib/smart-quote-api";
 import type { CatalogProduct } from "@/lib/catalog-api";
-import styles from "../quotes.module.css";
+import styles from "../../quotes.module.css";
 
 type LineItem = {
   name: string;
@@ -75,10 +81,17 @@ function ctThumb(src: string | null | undefined) {
   }
 }
 
-export default function NewQuotePage() {
+export default function EditQuotePage() {
   const { user } = useUser();
   const token = user?.token ?? "";
   const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const quoteId = Number(params.id);
+
+  const [loadingQuote, setLoadingQuote] = useState(true);
+  const [quoteNumber, setQuoteNumber] = useState("");
+  const [quoteStatus, setQuoteStatus] = useState("DRAFT");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [clients, setClients] = useState<SalesClient[]>([]);
   const [clientQuery, setClientQuery] = useState("");
@@ -112,6 +125,86 @@ export default function NewQuotePage() {
     if (!token) return;
     listSalesClients(token).then(setClients).catch(() => setClients([]));
   }, [token]);
+
+  useEffect(() => {
+    if (!token || !quoteId) return;
+    setLoadingQuote(true);
+    setLoadError(null);
+    getSalesQuoteDetail(token, quoteId)
+      .then((raw) => {
+        const q = raw as {
+          quoteNumber?: string;
+          status?: string;
+          salesClientId?: number | null;
+          clientCompany?: string | null;
+          clientName?: string | null;
+          clientEmail?: string | null;
+          clientPhone?: string | null;
+          clientAddress?: string | null;
+          projectName?: string | null;
+          scope?: string | null;
+          paymentTerms?: string | null;
+          deliveryTime?: string | null;
+          depositPercent?: number | null;
+          note?: string | null;
+          validUntil?: string | null;
+          issueDate?: string;
+          items?: Array<Record<string, unknown>>;
+        };
+        if (q.status && q.status !== "DRAFT") {
+          setLoadError("Solo se pueden editar cotizaciones en borrador.");
+          setQuoteStatus(q.status);
+          setQuoteNumber(q.quoteNumber || "");
+          return;
+        }
+        setQuoteNumber(q.quoteNumber || "");
+        setQuoteStatus(q.status || "DRAFT");
+        setSalesClientId(q.salesClientId ? String(q.salesClientId) : "");
+        setClientCompany(q.clientCompany || "");
+        setClientName(q.clientName || "");
+        setClientEmail(q.clientEmail || "");
+        setClientPhone(q.clientPhone || "");
+        setClientAddress(q.clientAddress || "");
+        setClientQuery(q.clientCompany || q.clientName || "");
+        setProjectName(q.projectName || "");
+        setScope(q.scope || "");
+        setPaymentTerms(q.paymentTerms || "50% anticipo · 50% contra entrega");
+        setDeliveryTime(q.deliveryTime || "Según disponibilidad de almacén");
+        setDepositPercent(Number(q.depositPercent ?? 50));
+        setNotes(q.note || "");
+        if (q.validUntil && q.issueDate) {
+          const days = Math.max(
+            1,
+            Math.ceil(
+              (new Date(String(q.validUntil).slice(0, 10)).getTime() -
+                new Date(String(q.issueDate).slice(0, 10)).getTime()) /
+                86400000,
+            ),
+          );
+          setValidDays(days);
+        }
+        const mapped = (q.items || []).map((it) => ({
+          name: String(it.name || ""),
+          description: String(it.description || ""),
+          brand: String(it.brand || ""),
+          model: String(it.model || ""),
+          sku: String(it.sku || ""),
+          qty: Number(it.qty) || 1,
+          unitPrice: Number(it.unitPrice) || 0,
+          unitCost: Number(it.unitCost) || 0,
+          discount: Number(it.discount) || 0,
+          tax: Number(it.tax) || 16,
+          laborHours: Number(it.laborHours) || 0,
+          laborRate: Number(it.laborRate) || 0,
+          deliveryTime: String(it.deliveryTime || ""),
+        }));
+        setLines(mapped.length ? mapped : [emptyLine()]);
+      })
+      .catch((e) => {
+        setLoadError(e instanceof Error ? e.message : "No se pudo cargar la cotización");
+      })
+      .finally(() => setLoadingQuote(false));
+  }, [token, quoteId]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -216,15 +309,12 @@ export default function NewQuotePage() {
   const readyLines = validLines.length > 0;
 
   const save = async () => {
-    if (!token || !readyClient || !readyLines) return;
+    if (!token || !readyClient || !readyLines || !quoteId) return;
     setSaving(true);
     setError(null);
     try {
-      const quoteNumber = `COT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 900 + 100)}`;
       const validUntil = new Date(Date.now() + validDays * 86400000).toISOString().slice(0, 10);
-      const created = (await createSalesQuote(token, {
-        quoteNumber,
-        issueDate: new Date().toISOString().slice(0, 10),
+      await updateSalesQuote(token, quoteId, {
         validUntil,
         salesClientId: salesClientId ? Number(salesClientId) : undefined,
         clientCompany: clientCompany.trim(),
@@ -258,16 +348,33 @@ export default function NewQuotePage() {
               ? Math.round(((l.unitPrice - l.unitCost) / l.unitPrice) * 1000) / 10
               : undefined,
         })),
-      })) as { id?: number };
-
-      if (created?.id) router.push(`/crm/quotes/${created.id}`);
-      else router.push("/crm/quotes");
+      });
+      router.push(`/crm/quotes/${quoteId}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo crear la cotización");
+      setError(e instanceof Error ? e.message : "No se pudo guardar la cotización");
     } finally {
       setSaving(false);
     }
   };
+
+  if (loadingQuote) {
+    return <EmptyState icon="⏳" title="Cargando cotización…" description="Preparando el editor." />;
+  }
+
+  if (loadError) {
+    return (
+      <EmptyState
+        icon="⚠️"
+        title="No se puede editar"
+        description={loadError}
+        action={
+          <Link href={`/crm/quotes/${quoteId || ""}`}>
+            <Button variant="secondary">Volver al detalle</Button>
+          </Link>
+        }
+      />
+    );
+  }
 
   return (
     <>
@@ -277,19 +384,18 @@ export default function NewQuotePage() {
             <Link href="/crm/quotes" style={{ color: "var(--text-tertiary)", textDecoration: "none" }}>
               Cotizaciones
             </Link>
-            {" / "}Nueva
+            {" / "}
+            <Link href={`/crm/quotes/${quoteId}`} style={{ color: "var(--text-tertiary)", textDecoration: "none" }}>
+              {quoteNumber || quoteId}
+            </Link>
+            {" / "}Editar
           </>
         }
-        title="Cotización profesional"
-        subtitle="Formulario completo con cliente, condiciones comerciales y partidas detalladas."
+        title={`Editar ${quoteNumber || "borrador"}`}
+        subtitle="Ajusta cliente, partidas y condiciones. Solo disponible en estado borrador."
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link href="/crm/quotes/builder">
-              <Button variant="secondary" iconLeft="⚡">
-                Cotizar en minutos
-              </Button>
-            </Link>
-            <Link href="/crm/quotes">
+            <Link href={`/crm/quotes/${quoteId}`}>
               <Button variant="ghost">Cancelar</Button>
             </Link>
           </div>
@@ -297,12 +403,12 @@ export default function NewQuotePage() {
       />
 
       <div className={styles.quotesCoach}>
-        <div className={styles.quotesCoachIcon}>✍️</div>
+        <div className={styles.quotesCoachIcon}>✏️</div>
         <div>
-          <p className={styles.quotesCoachTitle}>Úsalo cuando ya sabes qué vas a cotizar</p>
+          <p className={styles.quotesCoachTitle}>Editando borrador ({quoteStatus})</p>
           <p className={styles.quotesCoachText}>
-            Si aún estás eligiendo equipo del mayorista, ve a <strong>Cotizar en minutos</strong>. Aquí armás
-            una propuesta formal con condiciones, mano de obra y catálogo.
+            Los cambios reemplazan las partidas actuales. Al guardar, el PDF se regenera con la nueva
+            información.
           </p>
         </div>
       </div>
@@ -692,7 +798,7 @@ export default function NewQuotePage() {
               disabled={!readyClient || !readyLines || saving}
               onClick={() => void save()}
             >
-              Crear cotización
+              Guardar cambios
             </Button>
             <ul className={styles.quotesChecklist}>
               <li>
