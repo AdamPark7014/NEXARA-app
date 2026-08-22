@@ -1324,7 +1324,7 @@ export default function SmartQuoteBuilderPage() {
               loading={saving}
               disabled={!lines.length}
             >
-              Generar cotización
+              Generar y ver cotización
             </Button>
           </aside>
         )}
