@@ -177,6 +177,7 @@ export default function SmartQuoteBuilderPage() {
   const [resultMeta, setResultMeta] = useState(0);
   const [facetBrands, setFacetBrands] = useState<string[]>([]);
   const [facetCategories, setFacetCategories] = useState<string[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
   const [cfg, setCfg] = useState({
     template: "CCTV" as "CCTV" | "WIFI" | "ACCESS",
     cameras: 12,
@@ -215,6 +216,10 @@ export default function SmartQuoteBuilderPage() {
         setFacetCategories([]);
       });
   }, [token]);
+
+  useEffect(() => {
+    if (!lines.length) setCartOpen(false);
+  }, [lines.length]);
 
   useEffect(() => {
     if (!toast) return;
@@ -1366,7 +1371,8 @@ export default function SmartQuoteBuilderPage() {
           )}
         </main>
 
-        <aside className={`${styles.sqRail} ${exploring && lines.length === 0 ? styles.sqRailCompact : ""}`}>
+        {!exploring && (
+        <aside className={styles.sqRail}>
           <div className={styles.sqRailCard}>
             <div className={styles.sqRailHead}>
               <div className={styles.sqRailEyebrow}>TU PROPUESTA</div>
@@ -1380,12 +1386,10 @@ export default function SmartQuoteBuilderPage() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gap: 10, maxHeight: exploring ? 220 : 300, overflow: "auto" }}>
+            <div style={{ display: "grid", gap: 10, maxHeight: 300, overflow: "auto" }}>
               {lines.length === 0 ? (
                 <div className={styles.sqHelp} style={{ padding: "4px 0" }}>
-                  {exploring
-                    ? "Agrega productos del catálogo; el total se actualiza aquí."
-                    : "Aquí aparecerá todo lo que agregues."}
+                  Aquí aparecerá todo lo que agregues.
                 </div>
               ) : (
                 lines.map((l, idx) => (
@@ -1474,20 +1478,93 @@ export default function SmartQuoteBuilderPage() {
             )}
           </div>
         </aside>
+        )}
       </div>
+
+      {exploring && cartOpen && lines.length > 0 && (
+        <div className={styles.sqCartSheet} role="dialog" aria-label="Tu propuesta">
+          <div className={styles.sqCartSheetHead}>
+            <div className={styles.sqCartSheetTitle}>TU PROPUESTA</div>
+            <button type="button" className={styles.sqGhostBtn} onClick={() => setCartOpen(false)} aria-label="Cerrar">
+              ✕
+            </button>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>
+            {client?.name || "Cliente por definir"}
+            {projectName ? ` · ${projectName}` : ""}
+          </div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {lines.map((l, idx) => (
+              <div key={`${l.sku || l.name}-sheet-${idx}`} className={styles.sqLine}>
+                <div className={styles.sqLineTop}>
+                  <div className={styles.sqLineName}>{shortName(l.name, 48)}</div>
+                  <button
+                    type="button"
+                    className={styles.sqGhostBtn}
+                    aria-label="Quitar"
+                    onClick={() => setLines((prev) => prev.filter((_, i) => i !== idx))}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                  <span style={{ color: "var(--text-tertiary)" }}>Cant.</span>
+                  <input
+                    className={styles.sqInput}
+                    type="number"
+                    min={1}
+                    value={l.qty}
+                    onChange={(e) => {
+                      const qty = Math.max(1, Number(e.target.value) || 1);
+                      setLines((prev) => prev.map((x, i) => (i === idx ? { ...x, qty } : x)));
+                    }}
+                    style={{ width: 64, padding: "5px 8px", fontSize: 13 }}
+                  />
+                  <strong style={{ marginLeft: "auto", fontSize: 13 }}>{money(lineSell(l))}</strong>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className={styles.sqTotals}>
+            <div className={styles.sqTotalRow}>
+              <span>Subtotal</span>
+              <strong>{money(totals.subtotal)}</strong>
+            </div>
+            <div className={styles.sqTotalRow}>
+              <span>IVA ({CT_IVA_PERCENT}%)</span>
+              <strong>{money(totals.tax)}</strong>
+            </div>
+            <div className={`${styles.sqTotalRow} ${styles.sqTotalMain}`}>
+              <span>Total</span>
+              <span>{money(totals.sell)}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={styles.sqStickyBar}>
         <div className={styles.sqStickyInner}>
-          <div>
-            <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-              {totals.count} conceptos · IVA incl.
+          <div className={exploring ? styles.sqStickyMeta : undefined}>
+            <div>
+              <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                {totals.count} conceptos · IVA incl.
+                {exploring && client?.name ? ` · ${client.name}` : ""}
+              </div>
+              <div style={{ fontWeight: 800 }}>{money(totals.sell)}</div>
             </div>
-            <div style={{ fontWeight: 800 }}>{money(totals.sell)}</div>
+            {exploring && lines.length > 0 && (
+              <Button variant="ghost" onClick={() => setCartOpen((v) => !v)}>
+                {cartOpen ? "Ocultar" : "Ver propuesta"}
+              </Button>
+            )}
           </div>
           {step < 3 ? (
             <Button
               variant="primary"
-              onClick={() => goStep(step === 1 ? 2 : 3)}
+              onClick={() => {
+                setCartOpen(false);
+                goStep(step === 1 ? 2 : 3);
+              }}
               disabled={step === 1 ? false : !canGoStep3}
             >
               Continuar

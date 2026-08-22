@@ -123,7 +123,7 @@
 .sqExploreMode .sqProductGrid {
   grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
   gap: 10px;
-  padding-bottom: 96px;
+  padding-bottom: 80px;
 }
 
 .sqExploreMode .sqProductMedia {
@@ -135,45 +135,70 @@
   padding: 10px 10px 6px;
 }
 
-/* La propuesta flota y no roba ancho al catálogo */
+/* En explorar: sin panel flotante que tape productos */
 .sqExploreMode .sqRail {
+  display: none;
+}
+
+.sqExploreMode .sqStickyBar {
+  display: block;
+}
+
+.sqExploreMode .sqStickyInner {
+  max-width: none;
+  width: 100%;
+}
+
+.sqStickyMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  min-width: 0;
+}
+
+.sqCartSheet {
   position: fixed;
-  right: 20px;
-  bottom: 72px;
-  width: min(300px, calc(100vw - 32px));
-  max-width: 300px;
-  z-index: 35;
-  flex: none;
-  top: auto;
-}
-
-.sqExploreMode .sqRailCard {
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
-  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
-  max-height: min(52vh, 420px);
+  left: 12px;
+  right: 12px;
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  z-index: 39;
+  max-width: 480px;
+  margin-left: auto;
+  max-height: min(48vh, 420px);
   overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+  padding: 14px;
+  display: grid;
+  gap: 12px;
 }
 
-.sqExploreMode .sqRailCompact .sqRailCard {
-  max-height: none;
-  padding: 12px 14px;
+.sqCartSheetHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.sqExploreMode .sqRailCompact .sqRailTitle {
+.sqCartSheetTitle {
   font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
 }
 
 @media (max-width: 960px) {
-  .sqExploreMode .sqRail {
-    right: 12px;
-    left: 12px;
-    width: auto;
-    max-width: none;
-    bottom: 70px;
+  .sqExploreMode .sqProductGrid {
+    padding-bottom: 88px;
   }
 
-  .sqExploreMode .sqProductGrid {
-    padding-bottom: 140px;
+  .sqCartSheet {
+    left: 8px;
+    right: 8px;
+    max-width: none;
   }
 }
 
