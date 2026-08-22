@@ -29,7 +29,7 @@ CREATE INDEX IF NOT EXISTS "supplier_purchase_orders_cotizacionId_idx"
 DO $$ BEGIN
   ALTER TABLE "supplier_purchase_orders"
     ADD CONSTRAINT "supplier_purchase_orders_companyId_fkey"
-    FOREIGN KEY ("companyId") REFERENCES "company_profiles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+    FOREIGN KEY ("companyId") REFERENCES "company_profile"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
