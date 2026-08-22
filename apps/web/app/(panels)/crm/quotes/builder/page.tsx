@@ -464,6 +464,11 @@ export default function SmartQuoteBuilderPage() {
 
   const saveQuote = async () => {
     if (!token || !lines.length) return;
+    if (!clientId && !client?.name) {
+      setError("Selecciona un cliente arriba (o en el carrito) antes de generar la cotización.");
+      setToast("Falta el cliente para guardar la cotización");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -476,7 +481,7 @@ export default function SmartQuoteBuilderPage() {
         validUntil,
         salesClientId: client?.id,
         clientCompany: client?.name || client?.legalName || undefined,
-        clientName: client?.name,
+        clientName: client?.name || "Cliente por definir",
         projectName: projectName || undefined,
         items: lines.map((l) => ({
           name: l.name,
@@ -503,8 +508,14 @@ export default function SmartQuoteBuilderPage() {
           deliveryTime: l.deliveryTime || undefined,
         })) as any,
       });
+      const newId = Number((created as { id?: number })?.id);
+      if (!Number.isFinite(newId) || newId <= 0) {
+        setToast("Cotización guardada. Ábrela desde Mis cotizaciones.");
+        router.push("/crm/quotes");
+        return;
+      }
       setToast(`Cotización ${quoteNumber} lista`);
-      router.push(`/crm/quotes/${created.id}`);
+      router.push(`/crm/quotes/${newId}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo guardar la cotización");
     } finally {
@@ -551,12 +562,15 @@ export default function SmartQuoteBuilderPage() {
       <div className={styles.sqExploreTop}>
         <div className={styles.sqExploreTopLeft}>
           <Link href="/crm/quotes" className={styles.sqExploreBack}>
-            ← Cotizaciones
+            ← Mis cotizaciones
           </Link>
           <span className={styles.sqExploreTitle}>Explorador CT</span>
           <span className={styles.sqExploreHint}>{catalogHint}</span>
         </div>
         <div className={styles.sqExploreTopActions}>
+          <Link href="/crm/quotes" className={styles.sqMiniStep} style={{ textDecoration: "none" }}>
+            Ver todas
+          </Link>
           <button type="button" className={styles.sqMiniStep} onClick={() => setStep(1)}>
             Cliente
           </button>
@@ -1307,8 +1321,9 @@ export default function SmartQuoteBuilderPage() {
                 value={clientId}
                 onChange={(e) => setClientId(e.target.value)}
                 aria-label="Cliente"
+                style={{ borderColor: "color-mix(in srgb, #b45309 55%, var(--border))" }}
               >
-                <option value="">Asignar cliente (opcional)…</option>
+                <option value="">Cliente obligatorio…</option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -1326,6 +1341,19 @@ export default function SmartQuoteBuilderPage() {
             >
               Generar y ver cotización
             </Button>
+            <Link
+              href="/crm/quotes"
+              style={{
+                display: "block",
+                textAlign: "center",
+                fontSize: 12.5,
+                fontWeight: 650,
+                color: "var(--text-tertiary)",
+                textDecoration: "none",
+              }}
+            >
+              Ver todas mis cotizaciones
+            </Link>
           </aside>
         )}
 
