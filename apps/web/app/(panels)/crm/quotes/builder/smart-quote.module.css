@@ -10,6 +10,115 @@
   margin: 0 auto;
 }
 
+.sqExploreMode {
+  max-width: 1320px;
+  gap: 10px;
+  padding-top: 0;
+}
+
+.sqExploreTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 2px 2px;
+}
+
+.sqExploreTopLeft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sqExploreBack {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--text-tertiary);
+  text-decoration: none;
+}
+
+.sqExploreBack:hover {
+  color: var(--primary);
+}
+
+.sqExploreTitle {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.sqExploreHint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.sqExploreTopActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.sqMiniStep {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 6px 11px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.sqMiniStep:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.sqMiniStepOn {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  color: var(--primary);
+}
+
+.sqExploreMode .sqLayout {
+  gap: 12px;
+}
+
+.sqExploreMode .sqCard {
+  padding: 12px;
+  border-radius: 14px;
+}
+
+.sqExploreMode .sqControlDeck {
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  top: 0;
+}
+
+.sqExploreMode .sqSearchInput {
+  padding: 12px 14px;
+  font-size: 14.5px;
+}
+
+.sqExploreMode .sqProductGrid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.sqExploreMode .sqProductMedia {
+  height: 120px;
+}
+
+.sqExploreMode .sqRail {
+  top: 8px;
+}
+
 .sqCoach {
   display: flex;
   gap: 12px;

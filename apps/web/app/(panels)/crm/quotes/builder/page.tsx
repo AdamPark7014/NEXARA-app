@@ -487,24 +487,22 @@ export default function SmartQuoteBuilderPage() {
   };
 
   const goStep = (next: Step) => {
-    if (next === 2 && !canGoStep2) {
-      setToast("Selecciona un cliente o escribe el nombre del proyecto.");
-      return;
-    }
     if (next === 3 && !canGoStep3) {
-      setToast("Agrega al menos un producto antes de revisar.");
+      setToast("Agrega al menos un producto antes de confirmar.");
       return;
     }
     setStep(next);
   };
 
   const coach = COACH[step];
+  const exploring = step === 2 && path === "search";
   const catalogHint = ctStatus
     ? `${ctStatus.total.toLocaleString("es-MX")} productos del mayorista listos para cotizar`
     : "Catálogo del mayorista listo para cotizar";
 
   return (
-    <div className={styles.sq}>
+    <div className={`${styles.sq} ${exploring ? styles.sqExploreMode : ""}`}>
+      {!exploring ? (
       <PageHeader
         variant="hero"
         eyebrow="CRM · Cotizaciones"
@@ -523,7 +521,38 @@ export default function SmartQuoteBuilderPage() {
           </Button>
         }
       />
+      ) : (
+      <div className={styles.sqExploreTop}>
+        <div className={styles.sqExploreTopLeft}>
+          <Link href="/crm/quotes" className={styles.sqExploreBack}>
+            ← Cotizaciones
+          </Link>
+          <span className={styles.sqExploreTitle}>Explorador CT</span>
+          <span className={styles.sqExploreHint}>{catalogHint}</span>
+        </div>
+        <div className={styles.sqExploreTopActions}>
+          <button type="button" className={styles.sqMiniStep} onClick={() => setStep(1)}>
+            Cliente
+          </button>
+          <button type="button" className={`${styles.sqMiniStep} ${styles.sqMiniStepOn}`}>
+            Productos
+          </button>
+          <button
+            type="button"
+            className={styles.sqMiniStep}
+            onClick={() => goStep(3)}
+            disabled={!canGoStep3}
+          >
+            Confirmar ({lines.length})
+          </button>
+          <Button variant="ghost" size="sm" onClick={() => setShowCosts((v) => !v)}>
+            {showCosts ? "Vista cliente" : "Vista interna"}
+          </Button>
+        </div>
+      </div>
+      )}
 
+      {!exploring && (
       <div className={styles.sqStepper} role="navigation" aria-label="Pasos de cotización">
         {(
           [
@@ -540,7 +569,6 @@ export default function SmartQuoteBuilderPage() {
               type="button"
               className={`${styles.sqStep} ${active ? styles.sqStepActive : ""} ${done && !active ? styles.sqStepDone : ""}`}
               onClick={() => goStep(s.id)}
-              disabled={s.id === 2 && !canGoStep2}
             >
               <span className={styles.sqStepNum}>{done && !active ? "✓" : s.id}</span>
               <span>
@@ -551,7 +579,9 @@ export default function SmartQuoteBuilderPage() {
           );
         })}
       </div>
+      )}
 
+      {!exploring && (
       <div className={styles.sqCoach} role="note">
         <div className={styles.sqCoachIcon} aria-hidden>
           {coach.icon}
@@ -561,6 +591,7 @@ export default function SmartQuoteBuilderPage() {
           <div className={styles.sqCoachText}>{coach.text}</div>
         </div>
       </div>
+      )}
 
       {error && <InlineAlert message={error} variant="danger" onDismiss={() => setError(null)} />}
       {marginAlert && <InlineAlert message={marginAlert} variant="warning" onDismiss={() => setMarginAlert(null)} />}
@@ -692,12 +723,10 @@ export default function SmartQuoteBuilderPage() {
 
               <div className={styles.sqFooter}>
                 <span className={styles.sqHelp}>
-                  {canGoStep2
-                    ? "Todo listo para pasar a productos."
-                    : "Selecciona un cliente o escribe el proyecto para continuar."}
+                  Puedes ir al explorador ya; el cliente también se elige allá.
                 </span>
-                <Button variant="primary" size="lg" disabled={!canGoStep2} onClick={() => goStep(2)}>
-                  Continuar a productos
+                <Button variant="primary" size="lg" onClick={() => goStep(2)}>
+                  Ir al explorador
                 </Button>
               </div>
             </section>
@@ -706,18 +735,11 @@ export default function SmartQuoteBuilderPage() {
           {step === 2 && path === "search" && (
             <section className={`${styles.sqCard} ${styles.sqWorkspace}`}>
               <div className={styles.sqControlDeck}>
-                <div>
-                  <h2 className={styles.sqCardTitle}>Explora y arma</h2>
-                  <p className={styles.sqCardLead}>
-                    Catálogo CT en vivo. Cambia prioridad o margen y el ranking se recalcula solo.
-                  </p>
-                </div>
-
                 <div className={styles.sqSearchRow}>
                   <input
                     className={styles.sqSearchInput}
                     autoFocus
-                    placeholder="Escribe y filtra al instante… cámara 4MP, switch PoE, UPS…"
+                    placeholder="Buscar en el catálogo CT… cámara 4MP, switch PoE, UPS, Hikvision…"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
@@ -1444,7 +1466,7 @@ export default function SmartQuoteBuilderPage() {
             <Button
               variant="primary"
               onClick={() => goStep(step === 1 ? 2 : 3)}
-              disabled={step === 1 ? !canGoStep2 : !canGoStep3}
+              disabled={step === 1 ? false : !canGoStep3}
             >
               Continuar
             </Button>
