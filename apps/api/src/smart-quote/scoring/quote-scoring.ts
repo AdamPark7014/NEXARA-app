@@ -122,7 +122,7 @@ export function scoreProducts(
         : {};
     const stockTotal = Object.values(existencia).reduce((a, b) => a + (Number(b) || 0), 0);
     const stockPreferred = Number(existencia[opts.preferredWarehouse] || 0);
-    const price = Number(r.precio) || 0;
+    const price = Number(r.precio) || 0; // CT feed = neto, sin IVA
     const currency = (r.moneda || 'MXN').toUpperCase();
     const fx = r.tipoCambio;
     const cost =
@@ -131,6 +131,7 @@ export function scoreProducts(
         : Math.round(price * (fx && fx > 0 ? fx : 17) * 100) / 100;
     const leadTimeDays = stockPreferred > 0 ? 1 : stockTotal > 0 ? 3 : 21;
     const margin = opts.targetMarginPercent / 100;
+    // Precio de venta sugerido también neto; el IVA (16%) se aplica en la línea de cotización.
     const sellPriceSuggested =
       margin >= 0.99 ? cost * 2 : Math.round((cost / (1 - Math.max(0.01, margin))) * 100) / 100;
     const promociones = Array.isArray(r.promociones) ? r.promociones : [];

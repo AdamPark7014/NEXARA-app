@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { createSalesQuote, listSalesClients, type SalesClient } from "@/lib/sales-api";
 import {
+  CT_IVA_PERCENT,
   offerToLine,
   smartQuoteCheckMargin,
   smartQuoteConfigure,
@@ -119,13 +120,20 @@ function ProductThumb({ src, alt }: { src: string | null; alt: string }) {
 }
 
 
-function lineSell(l: QuoteLinePayload) {
+/** CT publica precios sin IVA; unitPrice/unitCost son netos y tax% se suma aquí. */
+function lineAmounts(l: QuoteLinePayload) {
   const product = l.qty * l.unitPrice;
   const labor = (l.laborHours || 0) * (l.laborRate || 0);
   const sub = product + labor;
   const disc = sub * ((l.discount || 0) / 100);
-  const taxable = sub - disc;
-  return taxable + taxable * ((l.tax || 0) / 100);
+  const taxable = Math.max(0, sub - disc);
+  const taxRate = (l.tax ?? 16) / 100;
+  const taxAmount = taxable * taxRate;
+  return { taxable, taxAmount, total: taxable + taxAmount };
+}
+
+function lineSell(l: QuoteLinePayload) {
+  return lineAmounts(l).total;
 }
 
 function shortName(name?: string | null, max = 42) {
@@ -217,10 +225,14 @@ export default function SmartQuoteBuilderPage() {
   const client = useMemo(() => clients.find((c) => String(c.id) === clientId), [clients, clientId]);
 
   const totals = useMemo(() => {
-    const sell = lines.reduce((a, l) => a + lineSell(l), 0);
+    const amounts = lines.map(lineAmounts);
+    const subtotal = amounts.reduce((a, x) => a + x.taxable, 0);
+    const tax = amounts.reduce((a, x) => a + x.taxAmount, 0);
+    const sell = amounts.reduce((a, x) => a + x.total, 0);
     const cost = lines.reduce((a, l) => a + l.qty * (Number(l.unitCost) || 0), 0);
-    const margin = sell > 0 ? ((sell - cost) / sell) * 100 : 0;
-    return { sell, cost, margin, count: lines.length };
+    // Margen comercial sobre precios sin IVA (misma base que CT y que la utilidad).
+    const margin = subtotal > 0 ? ((subtotal - cost) / subtotal) * 100 : 0;
+    return { subtotal, tax, sell, cost, margin, count: lines.length };
   }, [lines]);
 
   useEffect(() => {
@@ -233,7 +245,7 @@ export default function SmartQuoteBuilderPage() {
     const qty = Math.max(1, lines.reduce((a, l) => a + l.qty, 0));
     smartQuoteCheckMargin(token, {
       unitCost: totals.cost / qty,
-      unitPrice: totals.sell / qty,
+      unitPrice: totals.subtotal / qty,
       category: first.category,
       brand: first.brand || undefined,
     })
@@ -342,7 +354,7 @@ export default function SmartQuoteBuilderPage() {
         unitPrice: Number(s.unitPrice) || 0,
         unitCost: Number(s.unitCost) || 0,
         discount: 0,
-        tax: 16,
+        tax: CT_IVA_PERCENT,
         laborHours: Number(s.laborHours) || 0,
         laborRate: Number(s.laborRate) || 0,
       });
@@ -351,7 +363,7 @@ export default function SmartQuoteBuilderPage() {
       next.push({
         ...logistics,
         discount: logistics.discount ?? 0,
-        tax: logistics.tax ?? 16,
+        tax: logistics.tax ?? CT_IVA_PERCENT,
       });
     }
     setLines(next);
@@ -422,7 +434,7 @@ export default function SmartQuoteBuilderPage() {
         unitPrice: s.unitPrice,
         unitCost: s.unitCost,
         discount: 0,
-        tax: 16,
+        tax: CT_IVA_PERCENT,
         laborHours: s.laborHours,
         laborRate: s.laborRate,
         scoreReason: "LABOR",
@@ -458,7 +470,7 @@ export default function SmartQuoteBuilderPage() {
           qty: l.qty,
           unitPrice: l.unitPrice,
           discount: l.discount,
-          tax: l.tax,
+          tax: l.tax ?? CT_IVA_PERCENT,
           description: l.description || undefined,
           category: l.category,
           brand: l.brand || undefined,
@@ -959,11 +971,10 @@ export default function SmartQuoteBuilderPage() {
                           </div>
                           <div>
                             <div className={styles.sqProductPrice}>{money(o.sellPriceSuggested)}</div>
-                            {showCosts ? (
-                              <div className={styles.sqProductCost}>
-                                costo {money(o.costMxn)} · {o.marginPercent}%
-                              </div>
-                            ) : null}
+                            <div className={styles.sqProductCost}>
+                              sin IVA · +{CT_IVA_PERCENT}%
+                              {showCosts ? ` · costo CT ${money(o.costMxn)} · ${o.marginPercent}%` : ""}
+                            </div>
                           </div>
                           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                             {o.badges.slice(0, 2).map((b) => (
@@ -1087,11 +1098,10 @@ export default function SmartQuoteBuilderPage() {
                         )}
                         <div style={{ marginTop: 8, fontSize: 15, fontWeight: 800 }}>
                           {money(o.sellPriceSuggested)}
-                          {showCosts && (
-                            <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)" }}>
-                              costo {money(o.costMxn)} · margen {o.marginPercent}%
-                            </span>
-                          )}
+                          <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)" }}>
+                            sin IVA · +{CT_IVA_PERCENT}%
+                            {showCosts ? ` · costo ${money(o.costMxn)} · margen ${o.marginPercent}%` : ""}
+                          </span>
                         </div>
                       </div>
                       <div style={{ display: "grid", gap: 8, justifyItems: "stretch" }}>
@@ -1313,7 +1323,7 @@ export default function SmartQuoteBuilderPage() {
                   <div className={styles.sqKpiValue}>{totals.count}</div>
                 </div>
                 <div className={styles.sqKpi}>
-                  <div className={styles.sqKpiLabel}>Total cliente</div>
+                  <div className={styles.sqKpiLabel}>Total c/IVA</div>
                   <div className={styles.sqKpiValue}>{money(totals.sell)}</div>
                 </div>
                 <div className={styles.sqKpi}>
@@ -1417,10 +1427,18 @@ export default function SmartQuoteBuilderPage() {
             <div className={styles.sqTotals}>
               {showCosts && (
                 <div className={styles.sqTotalRow}>
-                  <span>Costo Nexara</span>
+                  <span>Costo Nexara (sin IVA)</span>
                   <strong>{money(totals.cost)}</strong>
                 </div>
               )}
+              <div className={styles.sqTotalRow}>
+                <span>Subtotal</span>
+                <strong>{money(totals.subtotal)}</strong>
+              </div>
+              <div className={styles.sqTotalRow}>
+                <span>IVA ({CT_IVA_PERCENT}%)</span>
+                <strong>{money(totals.tax)}</strong>
+              </div>
               <div className={`${styles.sqTotalRow} ${styles.sqTotalMain}`}>
                 <span>Total al cliente</span>
                 <span>{money(totals.sell)}</span>
@@ -1461,7 +1479,9 @@ export default function SmartQuoteBuilderPage() {
       <div className={styles.sqStickyBar}>
         <div className={styles.sqStickyInner}>
           <div>
-            <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{totals.count} conceptos</div>
+            <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+              {totals.count} conceptos · IVA incl.
+            </div>
             <div style={{ fontWeight: 800 }}>{money(totals.sell)}</div>
           </div>
           {step < 3 ? (

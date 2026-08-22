@@ -249,6 +249,9 @@ export async function smartQuoteCopilotDraft(token: string, prompt: string) {
   );
 }
 
+/** IVA México. CT publica precio de lista sin IVA; se aplica al armar la cotización. */
+export const CT_IVA_PERCENT = 16;
+
 export function offerToLine(offer: SmartOffer, qty = 1, optimize: OptimizeMode = "BALANCE"): QuoteLinePayload {
   return {
     productCtId: offer.id,
@@ -261,6 +264,7 @@ export function offerToLine(offer: SmartOffer, qty = 1, optimize: OptimizeMode =
     partNumber: offer.numParte,
     unit: "pieza",
     qty,
+    // sellPriceSuggested / costMxn vienen netos (sin IVA) desde el feed CT.
     unitPrice: offer.sellPriceSuggested,
     unitCost: offer.costMxn,
     supplierSku: offer.clave,
@@ -270,7 +274,7 @@ export function offerToLine(offer: SmartOffer, qty = 1, optimize: OptimizeMode =
     scoreReason: offer.badges[0] || "RECOMMENDED",
     optimizationMode: optimize,
     discount: 0,
-    tax: 16,
+    tax: CT_IVA_PERCENT,
     deliveryTime: offer.leadTimeDays <= 1 ? "Inmediata" : `${offer.leadTimeDays} días`,
   };
 }

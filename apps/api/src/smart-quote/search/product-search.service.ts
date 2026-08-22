@@ -205,7 +205,7 @@ export class ProductSearchService {
       scoreReason: offer.badges[0] || 'RECOMMENDED',
       optimizationMode,
       discount: 0,
-      tax: 16,
+      tax: 16, // CT es sin IVA; se factura IVA al cliente
       laborHours: 0,
       laborRate: 0,
       deliveryTime: offer.leadTimeDays <= 1 ? 'Inmediata' : `${offer.leadTimeDays} días`,
