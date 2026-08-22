@@ -13,10 +13,11 @@
 .sqExploreMode {
   max-width: none;
   width: 100%;
-  gap: 10px;
+  gap: 8px;
   padding-top: 0;
   padding-left: 4px;
   padding-right: 4px;
+  padding-bottom: 16px;
 }
 
 .sqExploreTop {
@@ -93,112 +94,321 @@
   gap: 0;
 }
 
+.sqExploreMode .sqLayoutPos {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
 .sqExploreMode .sqMain {
-  flex: none;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
   max-width: none;
 }
 
 .sqExploreMode .sqCard {
-  padding: 12px;
-  border-radius: 14px;
+  padding: 10px;
+  border-radius: 12px;
 }
 
 .sqExploreMode .sqWorkspace {
-  gap: 12px;
+  gap: 8px;
 }
 
 .sqExploreMode .sqControlDeck {
   gap: 8px;
-  padding: 10px 12px;
-  border-radius: 14px;
+  padding: 8px 10px;
+  border-radius: 12px;
   top: 0;
+  position: sticky;
+  z-index: 5;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(8px);
 }
 
 .sqExploreMode .sqSearchInput {
-  padding: 12px 14px;
-  font-size: 14.5px;
+  padding: 10px 12px;
+  font-size: 14px;
+  flex: 1 1 220px;
+  min-width: 160px;
 }
 
 .sqExploreMode .sqProductGrid {
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 10px;
-  padding-bottom: 80px;
+  padding-bottom: 8px;
 }
 
 .sqExploreMode .sqProductMedia {
-  height: 112px;
+  height: 100px;
 }
 
 .sqExploreMode .sqProductBody {
-  min-height: 100px;
+  min-height: 88px;
   padding: 10px 10px 6px;
 }
 
-/* En explorar: sin panel flotante que tape productos */
 .sqExploreMode .sqRail {
   display: none;
 }
 
 .sqExploreMode .sqStickyBar {
-  display: block;
+  display: none;
 }
 
-.sqExploreMode .sqStickyInner {
-  max-width: none;
-  width: 100%;
-}
-
-.sqStickyMeta {
+.sqPosToolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 14px;
-  min-width: 0;
-}
-
-.sqCartSheet {
-  position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: calc(64px + env(safe-area-inset-bottom));
-  z-index: 39;
-  max-width: 480px;
-  margin-left: auto;
-  max-height: min(48vh, 420px);
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--surface);
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
-  padding: 14px;
-  display: grid;
-  gap: 12px;
-}
-
-.sqCartSheetHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 8px;
 }
 
-.sqCartSheetTitle {
+.sqPosCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sqPosMore {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.sqPosMoreRow {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.2fr) repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-items: center;
+}
+
+.sqPosMargin {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text-secondary);
+}
+
+.sqDenseList {
+  display: grid;
+  gap: 4px;
+}
+
+.sqDenseSkeleton {
+  height: 56px;
+  border-radius: 10px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--border) 55%, var(--surface)),
+    color-mix(in srgb, var(--border) 25%, var(--surface)),
+    color-mix(in srgb, var(--border) 55%, var(--surface))
+  );
+  background-size: 200% 100%;
+  animation: sqShimmer 1.1s ease-in-out infinite;
+}
+
+.sqDenseRow {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.sqDenseRow:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+}
+
+.sqDenseRowOn {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+
+.sqDenseRow :global(.sqThumb),
+.sqDenseRow .sqThumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+}
+
+.sqDenseRow .sqThumbImg {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.sqDenseRow .sqThumbFallback {
+  font-size: 9px;
+}
+
+.sqDenseBody {
+  min-width: 0;
+}
+
+.sqDenseName {
   font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sqDenseMeta {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sqDensePriceCol {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sqDensePrice {
+  font-size: 14px;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: -0.02em;
+}
+
+.sqDenseTax {
+  font-size: 10.5px;
   color: var(--text-tertiary);
 }
 
+.sqDenseBadge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sqPosCart {
+  flex: 0 0 260px;
+  width: 260px;
+  position: sticky;
+  top: 8px;
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.sqPosCartHead {
+  display: grid;
+  gap: 2px;
+}
+
+.sqPosCartTitle {
+  font-size: 13px;
+  font-weight: 750;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.sqPosCartLines {
+  display: grid;
+  gap: 8px;
+  max-height: min(42vh, 360px);
+  overflow: auto;
+}
+
+.sqPosLine {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sqPosLineName {
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.sqPosLineControls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sqQtyBtn {
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.sqQtyBtn:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.sqPosQty {
+  min-width: 22px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.sqPosLineTotal {
+  margin-left: auto;
+  font-size: 12.5px;
+}
+
 @media (max-width: 960px) {
-  .sqExploreMode .sqProductGrid {
-    padding-bottom: 88px;
+  .sqExploreMode .sqLayoutPos {
+    flex-direction: column;
   }
 
-  .sqCartSheet {
-    left: 8px;
-    right: 8px;
-    max-width: none;
+  .sqPosCart {
+    flex: none;
+    width: 100%;
+    position: static;
+    max-height: none;
+  }
+
+  .sqPosMoreRow {
+    grid-template-columns: 1fr;
   }
 }
 

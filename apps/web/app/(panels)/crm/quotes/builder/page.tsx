@@ -19,7 +19,6 @@ import {
   smartQuoteFacets,
   smartQuoteLaborSuggest,
   smartQuoteSearch,
-  smartQuoteSubstitutes,
   type OptimizeMode,
   type QuoteLinePayload,
   type SmartOffer,
@@ -44,16 +43,6 @@ const QUICK_SEARCHES = [
   "access point WiFi 6",
   "UPS",
 ];
-
-const BADGE_ES: Record<string, string> = {
-  BEST_PRICE: "Mejor precio",
-  BEST_STOCK: "Más stock",
-  FASTEST: "Entrega rápida",
-  BEST_MARGIN: "Más rentable",
-  RECOMMENDED: "Recomendado",
-  SUBSTITUTE: "Alternativa",
-  LABOR: "Servicio",
-};
 
 const COACH: Record<Step, { icon: string; title: string; text: string }> = {
   1: {
@@ -167,17 +156,14 @@ export default function SmartQuoteBuilderPage() {
   const [marginAlert, setMarginAlert] = useState<string | null>(null);
   const [copilotPrompt, setCopilotPrompt] = useState("");
   const [copilotQuestions, setCopilotQuestions] = useState<string[]>([]);
-  const [qtyDraft, setQtyDraft] = useState<Record<number, number>>({});
   const [searchedOnce, setSearchedOnce] = useState(false);
-  const [expandedOffer, setExpandedOffer] = useState<number | null>(null);
   const [filterBrand, setFilterBrand] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [inStockOnly, setInStockOnly] = useState(true);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [resultMeta, setResultMeta] = useState(0);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [facetBrands, setFacetBrands] = useState<string[]>([]);
   const [facetCategories, setFacetCategories] = useState<string[]>([]);
-  const [cartOpen, setCartOpen] = useState(false);
+  const [moreFilters, setMoreFilters] = useState(false);
   const [cfg, setCfg] = useState({
     template: "CCTV" as "CCTV" | "WIFI" | "ACCESS",
     cameras: 12,
@@ -218,16 +204,28 @@ export default function SmartQuoteBuilderPage() {
   }, [token]);
 
   useEffect(() => {
-    if (!lines.length) setCartOpen(false);
-  }, [lines.length]);
-
-  useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3200);
+    const t = setTimeout(() => setToast(null), 1800);
     return () => clearTimeout(t);
   }, [toast]);
 
   const client = useMemo(() => clients.find((c) => String(c.id) === clientId), [clients, clientId]);
+
+  const qtyInCart = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const l of lines) {
+      const key =
+        (l.sku && `sku:${l.sku}`) ||
+        (l.productCtId != null ? `id:${l.productCtId}` : `name:${l.name}`);
+      map.set(key, (map.get(key) || 0) + l.qty);
+    }
+    return map;
+  }, [lines]);
+
+  const offerCartQty = (o: SmartOffer) => {
+    if (o.clave) return qtyInCart.get(`sku:${o.clave}`) || 0;
+    return qtyInCart.get(`id:${o.id}`) || 0;
+  };
 
   const totals = useMemo(() => {
     const amounts = lines.map(lineAmounts);
@@ -282,7 +280,6 @@ export default function SmartQuoteBuilderPage() {
           take: 36,
         });
         setOffers(res.data);
-        setResultMeta(res.meta?.totalCandidates ?? res.data.length);
         if (!res.data.length) {
           setToast("Sin coincidencias. Prueba otra palabra, quita filtros o incluye sin stock.");
         }
@@ -319,29 +316,30 @@ export default function SmartQuoteBuilderPage() {
     );
   }, [targetMargin]);
 
-  const loadSubstitutes = async (clave: string) => {
-    if (!token || !clave) return;
-    setLoadingSearch(true);
-    try {
-      const data = await smartQuoteSubstitutes(token, clave, {
-        optimize,
-        targetMargin,
-        take: 12,
-      });
-      setOffers(data);
-      setSearchedOnce(true);
-      setToast(`Alternativas para ${clave}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudieron cargar alternativas");
-    } finally {
-      setLoadingSearch(false);
-    }
+  const addOffer = (offer: SmartOffer, qty = 1) => {
+    const n = Math.max(1, qty);
+    setLines((prev) => {
+      const idx = prev.findIndex(
+        (l) =>
+          (offer.clave && l.sku === offer.clave) ||
+          (l.productCtId != null && l.productCtId === offer.id),
+      );
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], qty: next[idx].qty + n };
+        return next;
+      }
+      return [...prev, offerToLine(offer, n, optimize)];
+    });
+    setToast(`+${n} · ${shortName(offer.nombre || offer.clave, 36)}`);
   };
 
-  const addOffer = (offer: SmartOffer) => {
-    const qty = Math.max(1, qtyDraft[offer.id] || 1);
-    setLines((prev) => [...prev, offerToLine(offer, qty, optimize)]);
-    setToast(`Listo: agregaste ${qty} × ${shortName(offer.nombre || offer.clave, 36)}`);
+  const bumpLineQty = (idx: number, delta: number) => {
+    setLines((prev) =>
+      prev
+        .map((l, i) => (i === idx ? { ...l, qty: Math.max(0, l.qty + delta) } : l))
+        .filter((l) => l.qty > 0),
+    );
   };
 
   const mergeProposal = (
@@ -614,7 +612,7 @@ export default function SmartQuoteBuilderPage() {
       {marginAlert && <InlineAlert message={marginAlert} variant="warning" onDismiss={() => setMarginAlert(null)} />}
       {toast && <InlineAlert message={toast} variant="success" onDismiss={() => setToast(null)} />}
 
-      <div className={styles.sqLayout}>
+      <div className={`${styles.sqLayout} ${exploring && lines.length > 0 ? styles.sqLayoutPos : ""}`}>
         <main className={styles.sqMain}>
           {step === 1 && (
             <section className={styles.sqCard}>
@@ -750,18 +748,46 @@ export default function SmartQuoteBuilderPage() {
           )}
 
           {step === 2 && path === "search" && (
-            <section className={`${styles.sqCard} ${styles.sqWorkspace}`}>
+            <section className={`${styles.sqCard} ${styles.sqWorkspace} ${styles.sqPosDesk}`}>
               <div className={styles.sqControlDeck}>
-                <div className={styles.sqSearchRow}>
+                <div className={styles.sqPosToolbar}>
                   <input
                     className={styles.sqSearchInput}
                     autoFocus
-                    placeholder="Buscar en el catálogo CT… cámara 4MP, switch PoE, UPS, Hikvision…"
+                    placeholder="Buscar SKU, marca o producto… Enter agrega el primero"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (offers[0]) addOffer(offers[0], 1);
+                      }
+                    }}
                   />
+                  <label className={styles.sqPosCheck}>
+                    <input
+                      type="checkbox"
+                      checked={inStockOnly}
+                      onChange={(e) => setInStockOnly(e.target.checked)}
+                    />
+                    Stock
+                  </label>
+                  <select
+                    className={styles.sqInput}
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    aria-label="Cliente"
+                  >
+                    <option value="">Cliente…</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
                   <Button
-                    variant="secondary"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       setQuery("");
                       setFilterBrand("");
@@ -770,101 +796,14 @@ export default function SmartQuoteBuilderPage() {
                   >
                     Limpiar
                   </Button>
-                </div>
-
-                <div className={styles.sqPriorityStrip}>
-                  {PRIORITIES.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className={`${styles.sqPriorityBtn} ${optimize === p.id ? styles.sqPriorityBtnOn : ""}`}
-                      onClick={() => {
-                        setOptimize(p.id);
-                        setToast(`Prioridad: ${p.label}`);
-                      }}
-                      title={p.hint}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className={styles.sqMarginRow}>
-                  <span>Margen {targetMargin}%</span>
-                  <input
-                    type="range"
-                    min={15}
-                    max={55}
-                    value={targetMargin}
-                    onChange={(e) => setTargetMargin(Number(e.target.value))}
-                  />
-                  <label style={{ display: "inline-flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
-                    <input
-                      type="checkbox"
-                      checked={inStockOnly}
-                      onChange={(e) => setInStockOnly(e.target.checked)}
-                    />
-                    Solo stock
-                  </label>
-                </div>
-
-                <div className={styles.sqFilterRow}>
-                  <select
-                    className={styles.sqInput}
-                    value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
-                    aria-label="Cliente"
+                  <button
+                    type="button"
+                    className={`${styles.sqMiniStep} ${moreFilters ? styles.sqMiniStepOn : ""}`}
+                    onClick={() => setMoreFilters((v) => !v)}
                   >
-                    <option value="">Cliente (opcional ahora)…</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    className={styles.sqInput}
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                    placeholder="Proyecto / obra"
-                  />
-                  <select
-                    className={styles.sqInput}
-                    value={filterBrand}
-                    onChange={(e) => setFilterBrand(e.target.value)}
-                    aria-label="Marca"
-                  >
-                    <option value="">Todas las marcas</option>
-                    {facetBrands.map((b) => (
-                      <option key={b} value={b}>
-                        {b}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className={styles.sqInput}
-                    value={filterCategory}
-                    onChange={(e) => setFilterCategory(e.target.value)}
-                    aria-label="Categoría"
-                  >
-                    <option value="">Categoría (lista)</option>
-                    {facetCategories.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className={styles.sqLiveBar}>
+                    Más
+                  </button>
                   <div className={styles.sqViewToggle}>
-                    <button
-                      type="button"
-                      className={`${styles.sqViewBtn} ${viewMode === "grid" ? styles.sqViewBtnOn : ""}`}
-                      onClick={() => setViewMode("grid")}
-                    >
-                      Rejilla
-                    </button>
                     <button
                       type="button"
                       className={`${styles.sqViewBtn} ${viewMode === "list" ? styles.sqViewBtnOn : ""}`}
@@ -872,70 +811,143 @@ export default function SmartQuoteBuilderPage() {
                     >
                       Lista
                     </button>
+                    <button
+                      type="button"
+                      className={`${styles.sqViewBtn} ${viewMode === "grid" ? styles.sqViewBtnOn : ""}`}
+                      onClick={() => setViewMode("grid")}
+                    >
+                      Rejilla
+                    </button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowCosts((v) => !v)}
-                    title="Mostrar/ocultar costos internos"
-                  >
-                    {showCosts ? "Ocultar costos" : "Ver costos"}
-                  </Button>
                 </div>
 
-                <div className={styles.sqCatStrip}>
-                  <button
-                    type="button"
-                    className={`${styles.sqCatPill} ${!filterCategory ? styles.sqCatPillOn : ""}`}
-                    onClick={() => setFilterCategory("")}
-                  >
-                    Todas
-                  </button>
-                  {facetCategories.slice(0, 14).map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      className={`${styles.sqCatPill} ${filterCategory === c ? styles.sqCatPillOn : ""}`}
-                      onClick={() => setFilterCategory(filterCategory === c ? "" : c)}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
-
-                <div className={styles.sqChips}>
-                  {QUICK_SEARCHES.map((q) => (
-                    <button
-                      key={q}
-                      type="button"
-                      className={`${styles.sqChip} ${styles.sqChipSoft}`}
-                      onClick={() => setQuery(q)}
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
+                {moreFilters && (
+                  <div className={styles.sqPosMore}>
+                    <div className={styles.sqPriorityStrip}>
+                      {PRIORITIES.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className={`${styles.sqPriorityBtn} ${optimize === p.id ? styles.sqPriorityBtnOn : ""}`}
+                          onClick={() => setOptimize(p.id)}
+                          title={p.hint}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className={styles.sqPosMoreRow}>
+                      <label className={styles.sqPosMargin}>
+                        Margen {targetMargin}%
+                        <input
+                          type="range"
+                          min={15}
+                          max={55}
+                          value={targetMargin}
+                          onChange={(e) => setTargetMargin(Number(e.target.value))}
+                        />
+                      </label>
+                      <input
+                        className={styles.sqInput}
+                        value={projectName}
+                        onChange={(e) => setProjectName(e.target.value)}
+                        placeholder="Proyecto / obra"
+                      />
+                      <select
+                        className={styles.sqInput}
+                        value={filterBrand}
+                        onChange={(e) => setFilterBrand(e.target.value)}
+                        aria-label="Marca"
+                      >
+                        <option value="">Todas las marcas</option>
+                        {facetBrands.map((b) => (
+                          <option key={b} value={b}>
+                            {b}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className={styles.sqInput}
+                        value={filterCategory}
+                        onChange={(e) => setFilterCategory(e.target.value)}
+                        aria-label="Categoría"
+                      >
+                        <option value="">Categoría</option>
+                        {facetCategories.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className={styles.sqChips}>
+                      {QUICK_SEARCHES.map((q) => (
+                        <button
+                          key={q}
+                          type="button"
+                          className={`${styles.sqChip} ${styles.sqChipSoft}`}
+                          onClick={() => setQuery(q)}
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className={styles.sqLiveBar}>
                   <div className={styles.sqLiveMeta}>
                     <span className={styles.sqPulse} aria-hidden />
                     <span>
                       {loadingSearch
-                        ? "Actualizando catálogo…"
-                        : `${offers.length} productos · ${resultMeta || "—"} candidatos · ${PRIORITIES.find((p) => p.id === optimize)?.label}`}
+                        ? "Buscando…"
+                        : `${offers.length} · clic = +1 · Enter = primero · ${PRIORITIES.find((p) => p.id === optimize)?.label}`}
                     </span>
                   </div>
-                  <span className={styles.sqHelp}>
-                    {PRIORITIES.find((p) => p.id === optimize)?.hint}
-                  </span>
                 </div>
               </div>
 
               {loadingSearch && !offers.length ? (
-                <div className={styles.sqSkeletonGrid}>
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className={styles.sqSkeletonCard} />
+                <div className={styles.sqDenseList}>
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <div key={i} className={styles.sqDenseSkeleton} />
                   ))}
+                </div>
+              ) : null}
+
+              {viewMode === "list" && offers.length > 0 ? (
+                <div className={styles.sqDenseList} role="list">
+                  {offers.map((o) => {
+                    const inCart = offerCartQty(o);
+                    return (
+                      <button
+                        key={o.id}
+                        type="button"
+                        role="listitem"
+                        className={`${styles.sqDenseRow} ${inCart ? styles.sqDenseRowOn : ""}`}
+                        onClick={() => addOffer(o, 1)}
+                        title="Clic para agregar +1"
+                      >
+                        <ProductThumb src={o.imagen} alt="" />
+                        <div className={styles.sqDenseBody}>
+                          <div className={styles.sqDenseName}>{o.nombre}</div>
+                          <div className={styles.sqDenseMeta}>
+                            {[o.marca, o.clave].filter(Boolean).join(" · ")}
+                            {" · "}
+                            <span className={o.stockTotal > 0 ? styles.sqStockOk : styles.sqStockWarn}>
+                              {o.stockTotal > 0 ? `${o.stockTotal} u.` : "Sin stock"}
+                            </span>
+                            {showCosts ? ` · CT ${money(o.costMxn)}` : ""}
+                          </div>
+                        </div>
+                        <div className={styles.sqDensePriceCol}>
+                          <div className={styles.sqDensePrice}>{money(o.sellPriceSuggested)}</div>
+                          <div className={styles.sqDenseTax}>sin IVA</div>
+                        </div>
+                        {inCart > 0 ? <span className={styles.sqDenseBadge}>×{inCart}</span> : null}
+                      </button>
+                    );
+                  })}
                 </div>
               ) : null}
 
@@ -944,10 +956,20 @@ export default function SmartQuoteBuilderPage() {
                   {offers.map((o) => {
                     const rec = o.badges.includes("RECOMMENDED");
                     const img = ctProxiedImageUrl(o.imagen);
+                    const inCart = offerCartQty(o);
                     return (
                       <article
                         key={o.id}
                         className={`${styles.sqProductCard} ${rec ? styles.sqProductCardRec : ""}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => addOffer(o, 1)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            addOffer(o, 1);
+                          }
+                        }}
                       >
                         <div className={styles.sqProductMedia}>
                           {img ? (
@@ -956,7 +978,11 @@ export default function SmartQuoteBuilderPage() {
                           ) : (
                             <span className={styles.sqThumbFallback}>Sin imagen</span>
                           )}
-                          {rec ? (
+                          {inCart > 0 ? (
+                            <span className={styles.sqDenseBadge} style={{ position: "absolute", top: 8, right: 8 }}>
+                              ×{inCart}
+                            </span>
+                          ) : rec ? (
                             <span
                               className={styles.sqBadgeRec}
                               style={{ position: "absolute", top: 8, left: 8 }}
@@ -976,193 +1002,26 @@ export default function SmartQuoteBuilderPage() {
                           </div>
                           <div>
                             <div className={styles.sqProductPrice}>{money(o.sellPriceSuggested)}</div>
-                            <div className={styles.sqProductCost}>
-                              sin IVA · +{CT_IVA_PERCENT}%
-                              {showCosts ? ` · costo CT ${money(o.costMxn)} · ${o.marginPercent}%` : ""}
-                            </div>
-                          </div>
-                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                            {o.badges.slice(0, 2).map((b) => (
-                              <span key={b} className={styles.sqBadge}>
-                                {BADGE_ES[b] || b}
-                              </span>
-                            ))}
+                            <div className={styles.sqProductCost}>sin IVA · clic = +1</div>
                           </div>
                         </div>
-                        <div className={styles.sqProductActions}>
-                          <input
-                            className={styles.sqInput}
-                            type="number"
-                            min={1}
-                            value={qtyDraft[o.id] || 1}
-                            onChange={(e) =>
-                              setQtyDraft((prev) => ({
-                                ...prev,
-                                [o.id]: Math.max(1, Number(e.target.value) || 1),
-                              }))
-                            }
-                            aria-label="Cantidad"
-                          />
-                          <Button variant="primary" size="sm" onClick={() => addOffer(o)}>
-                            Agregar
-                          </Button>
-                        </div>
-                        {o.clave ? (
-                          <button
-                            type="button"
-                            className={styles.sqDetailsToggle}
-                            style={{ margin: "0 12px 12px" }}
-                            onClick={() => void loadSubstitutes(o.clave!)}
-                          >
-                            Ver alternativas
-                          </button>
-                        ) : null}
                       </article>
                     );
                   })}
                 </div>
               ) : null}
 
-              {viewMode === "list" ? (
-              <div style={{ display: "grid", gap: 10 }}>
-                {offers.map((o) => {
-                  const rec = o.badges.includes("RECOMMENDED");
-                  const open = expandedOffer === o.id;
-                  const specs = o.especificaciones || [];
-                  const warehouses = o.stockByWarehouse || [];
-                  return (
-                    <article key={o.id} className={`${styles.sqOffer} ${rec ? styles.sqOfferRec : ""}`}>
-                      <ProductThumb src={o.imagen} alt={o.nombre || o.clave || "Producto"} />
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 750, fontSize: 14, lineHeight: 1.35 }}>{o.nombre}</div>
-                        <div className={styles.sqOfferMeta}>
-                          {o.marca ? <span>{o.marca}</span> : null}
-                          {o.modelo ? <span>Modelo {o.modelo}</span> : null}
-                          {o.clave ? <span>SKU {o.clave}</span> : null}
-                          {o.numParte ? <span>P/N {o.numParte}</span> : null}
-                        </div>
-                        <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4 }}>
-                          {[o.categoria, o.subcategoria].filter(Boolean).join(" · ") || "Sin categoría"}
-                          {" · "}
-                          <span className={o.stockTotal > 0 ? styles.sqStockOk : styles.sqStockWarn}>
-                            {o.stockTotal > 0 ? `${o.stockTotal} disponibles` : "Sin stock"}
-                          </span>
-                          {o.stockPreferred > 0 ? ` · ${o.stockPreferred} en almacén preferido` : null}
-                          {o.leadTimeDays <= 1 ? " · inmediato" : ` · ~${o.leadTimeDays} días`}
-                        </div>
-                        {o.descripcion ? <p className={styles.sqOfferDesc}>{o.descripcion}</p> : null}
-                        <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 8 }}>
-                          {o.badges.map((b) => (
-                            <span
-                              key={b}
-                              className={`${styles.sqBadge} ${b === "RECOMMENDED" ? styles.sqBadgeRec : ""}`}
-                            >
-                              {BADGE_ES[b] || b}
-                            </span>
-                          ))}
-                          {o.protegido ? <span className={styles.sqBadge}>Precio protegido</span> : null}
-                          {(o.promociones?.length || 0) > 0 ? (
-                            <span className={styles.sqBadge}>Promoción CT</span>
-                          ) : null}
-                        </div>
-                        {warehouses.length > 0 ? (
-                          <div className={styles.sqWh}>
-                            {warehouses.slice(0, open ? 8 : 4).map((w) => (
-                              <span key={w.code} className={styles.sqWhChip}>
-                                {w.code}: {w.qty}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                        {open && specs.length > 0 ? (
-                          <div className={styles.sqSpecs}>
-                            {specs.slice(0, 8).map((s) => (
-                              <div key={`${s.tipo}-${s.valor}`} className={styles.sqSpecItem}>
-                                <strong>{s.tipo}:</strong> {s.valor}
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                        {open ? (
-                          <div style={{ marginTop: 8, fontSize: 12, color: "var(--text-tertiary)" }}>
-                            {o.ean ? `EAN ${o.ean}` : null}
-                            {o.ean && o.upc ? " · " : null}
-                            {o.upc ? `UPC ${o.upc}` : null}
-                            {o.sustituto && o.sustituto !== o.clave ? ` · Sustituto ${o.sustituto}` : null}
-                            {showCosts ? ` · Costo CT ${money(o.precio)} ${o.moneda}` : null}
-                          </div>
-                        ) : null}
-                        {(specs.length > 0 || o.ean || o.upc || o.descripcion) && (
-                          <button
-                            type="button"
-                            className={styles.sqDetailsToggle}
-                            onClick={() => setExpandedOffer(open ? null : o.id)}
-                          >
-                            {open ? "Ocultar detalle" : "Ver más datos"}
-                          </button>
-                        )}
-                        <div style={{ marginTop: 8, fontSize: 15, fontWeight: 800 }}>
-                          {money(o.sellPriceSuggested)}
-                          <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 500, color: "var(--text-tertiary)" }}>
-                            sin IVA · +{CT_IVA_PERCENT}%
-                            {showCosts ? ` · costo ${money(o.costMxn)} · margen ${o.marginPercent}%` : ""}
-                          </span>
-                        </div>
-                      </div>
-                      <div style={{ display: "grid", gap: 8, justifyItems: "stretch" }}>
-                        <input
-                          className={styles.sqInput}
-                          type="number"
-                          min={1}
-                          value={qtyDraft[o.id] || 1}
-                          onChange={(e) =>
-                            setQtyDraft((prev) => ({
-                              ...prev,
-                              [o.id]: Math.max(1, Number(e.target.value) || 1),
-                            }))
-                          }
-                          style={{ width: 76, textAlign: "center", padding: "8px" }}
-                          aria-label="Cantidad"
-                        />
-                        <Button variant="primary" size="sm" onClick={() => addOffer(o)}>
-                          Agregar
-                        </Button>
-                        {o.clave ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => void loadSubstitutes(o.clave!)}
-                          >
-                            Alternativas
-                          </Button>
-                        ) : null}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-              ) : null}
-
-                {!offers.length && !loadingSearch && (
-                  <EmptyState
-                    icon="🔎"
-                    title={searchedOnce ? "Sin resultados" : "Cargando catálogo…"}
-                    description={
-                      searchedOnce
-                        ? "Prueba otra palabra, otra categoría o desactiva “Solo stock”."
-                        : "En un momento verás productos recomendados."
-                    }
-                  />
-                )}
-
-              <div className={styles.sqFooter}>
-                <Button variant="ghost" onClick={() => setStep(1)}>
-                  Cliente / modo
-                </Button>
-                <Button variant="primary" size="lg" disabled={!canGoStep3} onClick={() => goStep(3)}>
-                  Revisar ({lines.length})
-                </Button>
-              </div>
+              {!offers.length && !loadingSearch && (
+                <EmptyState
+                  icon="🔎"
+                  title={searchedOnce ? "Sin resultados" : "Cargando catálogo…"}
+                  description={
+                    searchedOnce
+                      ? "Prueba otra palabra o desactiva “Stock” en la barra."
+                      : "En un momento verás productos recomendados."
+                  }
+                />
+              )}
             </section>
           )}
 
@@ -1371,6 +1230,94 @@ export default function SmartQuoteBuilderPage() {
           )}
         </main>
 
+        {exploring && lines.length > 0 && (
+          <aside className={styles.sqPosCart} aria-label="Propuesta">
+            <div className={styles.sqPosCartHead}>
+              <div className={styles.sqRailEyebrow}>PROPUESTA</div>
+              <div className={styles.sqPosCartTitle}>
+                {client?.name || "Sin cliente"}
+                {projectName ? ` · ${projectName}` : ""}
+              </div>
+            </div>
+            <div className={styles.sqPosCartLines}>
+              {lines.map((l, idx) => (
+                <div key={`${l.sku || l.name}-${idx}`} className={styles.sqPosLine}>
+                  <div className={styles.sqPosLineName}>{shortName(l.name, 36)}</div>
+                  <div className={styles.sqPosLineControls}>
+                    <button type="button" className={styles.sqQtyBtn} onClick={() => bumpLineQty(idx, -1)} aria-label="Menos">
+                      −
+                    </button>
+                    <span className={styles.sqPosQty}>{l.qty}</span>
+                    <button type="button" className={styles.sqQtyBtn} onClick={() => bumpLineQty(idx, 1)} aria-label="Más">
+                      +
+                    </button>
+                    <strong className={styles.sqPosLineTotal}>{money(lineSell(l))}</strong>
+                    <button
+                      type="button"
+                      className={styles.sqGhostBtn}
+                      aria-label="Quitar"
+                      onClick={() => setLines((prev) => prev.filter((_, i) => i !== idx))}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className={styles.sqTotals}>
+              {showCosts && (
+                <div className={styles.sqTotalRow}>
+                  <span>Costo</span>
+                  <strong>{money(totals.cost)}</strong>
+                </div>
+              )}
+              <div className={styles.sqTotalRow}>
+                <span>Subtotal</span>
+                <strong>{money(totals.subtotal)}</strong>
+              </div>
+              <div className={styles.sqTotalRow}>
+                <span>IVA {CT_IVA_PERCENT}%</span>
+                <strong>{money(totals.tax)}</strong>
+              </div>
+              <div className={`${styles.sqTotalRow} ${styles.sqTotalMain}`}>
+                <span>Total</span>
+                <span>{money(totals.sell)}</span>
+              </div>
+              {showCosts && (
+                <div className={styles.sqTotalRow}>
+                  <span>Margen</span>
+                  <strong>{totals.margin.toFixed(1)}%</strong>
+                </div>
+              )}
+            </div>
+            {!clientId && (
+              <select
+                className={styles.sqInput}
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                aria-label="Cliente"
+              >
+                <option value="">Asignar cliente (opcional)…</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <Button
+              variant="primary"
+              fullWidth
+              size="lg"
+              onClick={() => void saveQuote()}
+              loading={saving}
+              disabled={!lines.length}
+            >
+              Generar cotización
+            </Button>
+          </aside>
+        )}
+
         {!exploring && (
         <aside className={styles.sqRail}>
           <div className={styles.sqRailCard}>
@@ -1481,90 +1428,19 @@ export default function SmartQuoteBuilderPage() {
         )}
       </div>
 
-      {exploring && cartOpen && lines.length > 0 && (
-        <div className={styles.sqCartSheet} role="dialog" aria-label="Tu propuesta">
-          <div className={styles.sqCartSheetHead}>
-            <div className={styles.sqCartSheetTitle}>TU PROPUESTA</div>
-            <button type="button" className={styles.sqGhostBtn} onClick={() => setCartOpen(false)} aria-label="Cerrar">
-              ✕
-            </button>
-          </div>
-          <div style={{ fontSize: 13, fontWeight: 700 }}>
-            {client?.name || "Cliente por definir"}
-            {projectName ? ` · ${projectName}` : ""}
-          </div>
-          <div style={{ display: "grid", gap: 10 }}>
-            {lines.map((l, idx) => (
-              <div key={`${l.sku || l.name}-sheet-${idx}`} className={styles.sqLine}>
-                <div className={styles.sqLineTop}>
-                  <div className={styles.sqLineName}>{shortName(l.name, 48)}</div>
-                  <button
-                    type="button"
-                    className={styles.sqGhostBtn}
-                    aria-label="Quitar"
-                    onClick={() => setLines((prev) => prev.filter((_, i) => i !== idx))}
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-                  <span style={{ color: "var(--text-tertiary)" }}>Cant.</span>
-                  <input
-                    className={styles.sqInput}
-                    type="number"
-                    min={1}
-                    value={l.qty}
-                    onChange={(e) => {
-                      const qty = Math.max(1, Number(e.target.value) || 1);
-                      setLines((prev) => prev.map((x, i) => (i === idx ? { ...x, qty } : x)));
-                    }}
-                    style={{ width: 64, padding: "5px 8px", fontSize: 13 }}
-                  />
-                  <strong style={{ marginLeft: "auto", fontSize: 13 }}>{money(lineSell(l))}</strong>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className={styles.sqTotals}>
-            <div className={styles.sqTotalRow}>
-              <span>Subtotal</span>
-              <strong>{money(totals.subtotal)}</strong>
-            </div>
-            <div className={styles.sqTotalRow}>
-              <span>IVA ({CT_IVA_PERCENT}%)</span>
-              <strong>{money(totals.tax)}</strong>
-            </div>
-            <div className={`${styles.sqTotalRow} ${styles.sqTotalMain}`}>
-              <span>Total</span>
-              <span>{money(totals.sell)}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {!exploring && (
       <div className={styles.sqStickyBar}>
         <div className={styles.sqStickyInner}>
-          <div className={exploring ? styles.sqStickyMeta : undefined}>
-            <div>
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                {totals.count} conceptos · IVA incl.
-                {exploring && client?.name ? ` · ${client.name}` : ""}
-              </div>
-              <div style={{ fontWeight: 800 }}>{money(totals.sell)}</div>
+          <div>
+            <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+              {totals.count} conceptos · IVA incl.
             </div>
-            {exploring && lines.length > 0 && (
-              <Button variant="ghost" onClick={() => setCartOpen((v) => !v)}>
-                {cartOpen ? "Ocultar" : "Ver propuesta"}
-              </Button>
-            )}
+            <div style={{ fontWeight: 800 }}>{money(totals.sell)}</div>
           </div>
           {step < 3 ? (
             <Button
               variant="primary"
-              onClick={() => {
-                setCartOpen(false);
-                goStep(step === 1 ? 2 : 3);
-              }}
+              onClick={() => goStep(step === 1 ? 2 : 3)}
               disabled={step === 1 ? false : !canGoStep3}
             >
               Continuar
@@ -1576,6 +1452,7 @@ export default function SmartQuoteBuilderPage() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
