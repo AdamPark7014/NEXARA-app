@@ -74,6 +74,9 @@ async function sqRequest<T>(
       ...(init?.headers || {}),
     },
   });
+  if (init?.signal?.aborted) {
+    throw new DOMException("Aborted", "AbortError");
+  }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(typeof data?.message === "string" ? data.message : fallback);
@@ -92,6 +95,7 @@ export async function smartQuoteSearch(
     inStockOnly?: boolean;
     take?: number;
   },
+  init?: RequestInit,
 ) {
   const qs = new URLSearchParams();
   if (params.q) qs.set("q", params.q);
@@ -104,7 +108,7 @@ export async function smartQuoteSearch(
   return sqRequest<{ data: SmartOffer[]; meta: { totalCandidates: number; mode: OptimizeMode } }>(
     `smart-quote/search?${qs}`,
     token,
-    undefined,
+    init,
     "No se pudo buscar en catálogo CT",
   );
 }
