@@ -166,7 +166,7 @@ export class CtFtpConnector implements SupplierConnector {
       active: row.activo === 1 || row.activo === true,
       protected: row.protegido === 1 || row.protegido === true,
       existencia,
-      price: Number(row.precio) || 0,
+      price: Number(row.precio) || 0, // CT: precio de lista SIN IVA (términos ctonline.mx)
       currency: (row.moneda || 'MXN').toUpperCase(),
       exchangeRate: row.tipoCambio != null ? Number(row.tipoCambio) : null,
       specifications: Array.isArray(row.especificaciones)
