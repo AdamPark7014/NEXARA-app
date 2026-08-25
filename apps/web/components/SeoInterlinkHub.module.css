@@ -1,47 +1,41 @@
-/* Hub SEO genérico (por industria), sin jerarquía de sectores de /proyectos */
+/* Hub de enlaces internos — lenguaje del DS público (editorial, sin cajas
+   anidadas). Solo se usa en páginas (public); hereda los --ds-* definidos
+   en shared.page y trae fallbacks por si algún consumidor queda fuera. */
 
 .section {
   display: grid;
-  gap: clamp(16px, 2.2vw, 22px);
-  padding: clamp(20px, 2.4vw, 28px);
-  border-radius: 20px;
-  border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
-  background: linear-gradient(
-    165deg,
-    color-mix(in srgb, var(--surface) 96%, var(--background)),
-    color-mix(in srgb, var(--surface) 88%, #070f18)
-  );
-  box-shadow: 0 14px 36px color-mix(in srgb, var(--shadow) 30%, transparent);
+  gap: clamp(22px, 3vw, 32px);
+  padding-top: clamp(28px, 3.5vw, 40px);
+  border-top: 1px solid var(--ds-line, rgba(140, 190, 255, 0.12));
 }
 
 .head {
   display: grid;
   gap: 8px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid color-mix(in srgb, var(--primary) 12%, var(--border));
+  max-width: 56ch;
 }
 
 .title {
   margin: 0;
-  font-size: clamp(1.05rem, 1.85vw, 1.28rem);
-  font-weight: 850;
-  color: var(--foreground);
+  font-family: var(--ds-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(1.1rem, 1.9vw, 1.3rem);
+  font-weight: 600;
+  color: var(--ds-ink, #eef4ff);
   letter-spacing: -0.02em;
   line-height: 1.25;
 }
 
 .subtitle {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   line-height: 1.55;
-  color: var(--text-secondary);
-  max-width: 68ch;
+  color: var(--ds-muted, #9bb0cc);
 }
 
 .columns {
   display: grid;
   grid-template-columns: 1fr;
-  gap: clamp(18px, 2.4vw, 24px);
+  gap: clamp(20px, 3vw, 32px);
 }
 
 @media (min-width: 640px) {
@@ -52,26 +46,25 @@
 
 @media (min-width: 1024px) {
   .columns {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 20px 28px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 24px 32px;
   }
 }
 
 .column {
   min-width: 0;
-  padding: 14px 16px 16px;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--primary) 10%, var(--border));
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  padding-top: 14px;
+  border-top: 1px solid var(--ds-line, rgba(140, 190, 255, 0.12));
 }
 
 .columnTitle {
-  margin: 0 0 10px 0;
+  margin: 0 0 12px 0;
+  font-family: var(--ds-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
   font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--primary) 88%, var(--foreground));
+  color: var(--ds-cyan, #2dd8f2);
 }
 
 .linkList {
@@ -79,51 +72,29 @@
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .textLink {
   display: inline;
   font-size: 0.92rem;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.45;
-  color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
+  color: var(--ds-muted, #9bb0cc);
   text-decoration: none;
   transition: color 0.15s ease;
 }
 
 .textLink:hover {
-  color: var(--primary);
+  color: var(--ds-cyan-soft, #9fecfa);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
 .textLink:focus-visible {
-  outline: none;
+  outline: 2px solid var(--ds-cyan, #2dd8f2);
+  outline-offset: 2px;
   border-radius: 4px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent);
-}
-
-:global(body.dark) .section {
-  border-color: color-mix(in srgb, var(--primary) 20%, var(--border));
-  background: linear-gradient(
-    165deg,
-    color-mix(in srgb, var(--surface) 92%, #050a10),
-    color-mix(in srgb, #0a1620 90%, var(--surface))
-  );
-}
-
-:global(body.dark) .column {
-  border-color: color-mix(in srgb, var(--primary) 14%, var(--border));
-  background: color-mix(in srgb, var(--surface) 88%, #050810);
-}
-
-:global(body.dark) .textLink {
-  color: color-mix(in srgb, var(--foreground) 94%, var(--primary));
-}
-
-:global(body.dark) .textLink:hover {
-  color: color-mix(in srgb, var(--primary) 92%, #eafffb);
 }
 
 .columnTitleLink {
@@ -138,7 +109,7 @@
 
 .geoStrip {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .geoList {
@@ -153,37 +124,37 @@
 .geoChip {
   display: inline-flex;
   align-items: center;
-  padding: 7px 12px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
-  background: color-mix(in srgb, var(--surface) 92%, var(--primary));
-  color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
-  font-size: 0.82rem;
-  font-weight: 650;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--ds-line, rgba(140, 190, 255, 0.12));
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--ds-muted, #9bb0cc);
+  font-size: 0.85rem;
+  font-weight: 500;
   text-decoration: none;
   line-height: 1.2;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
 
 .geoChip:hover {
-  border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
-  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
-  color: var(--primary);
+  border-color: var(--ds-cyan, #2dd8f2);
+  color: var(--ds-cyan-soft, #9fecfa);
 }
 
 .footerCta {
-  margin: 4px 0 0;
+  margin: 0;
   font-size: 0.88rem;
-  color: var(--text-secondary);
+  color: var(--ds-faint, #6f85a5);
 }
 
 .ctaLink {
-  color: color-mix(in srgb, var(--primary) 90%, var(--foreground));
-  font-weight: 650;
+  color: var(--ds-cyan, #2dd8f2);
+  font-weight: 600;
   text-decoration: none;
 }
 
 .ctaLink:hover {
+  color: var(--ds-cyan-soft, #9fecfa);
   text-decoration: underline;
   text-underline-offset: 3px;
 }

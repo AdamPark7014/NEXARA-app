@@ -37,17 +37,19 @@
 }
 
 .inner {
-  max-width: var(--nx-content-width, 1120px);
+  /* Un poco más ancho que el resto de la app: el sitio público aprovecha
+     mejor el desktop y reduce el scroll vertical */
+  max-width: 1200px;
   margin: 0 auto;
   padding: 0 clamp(24px, 4vw, 48px);
 }
 
 .section {
-  padding: var(--nx-section-gap, clamp(64px, 8vw, 104px)) 0;
+  padding: clamp(52px, 6vw, 80px) 0;
 }
 
 .sectionTight {
-  padding: clamp(40px, 5vw, 64px) 0;
+  padding: clamp(34px, 4vw, 52px) 0;
 }
 
 /* Bandas de imagen editorial: menos aire vertical que las secciones de copy */
@@ -65,7 +67,7 @@
 
 .sectionHead {
   max-width: 36rem;
-  margin: 0 0 clamp(32px, 4vw, 48px);
+  margin: 0 0 clamp(26px, 3.5vw, 40px);
 }
 
 .eyebrow {
@@ -199,6 +201,23 @@
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--ds-line);
+}
+
+/* Desktop: dos columnas — mitad de scroll, mismo ritmo editorial */
+@media (min-width: 981px) {
+  .capList {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: clamp(36px, 4.5vw, 64px);
+  }
+
+  .capRow:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .capRow:last-child .capText {
+    max-width: 64ch;
+  }
 }
 
 .capRow {
@@ -379,6 +398,11 @@
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--ds-cyan);
+  transition: color 150ms ease, letter-spacing 150ms ease;
+}
+
+.industryCell:hover .industryCellLink {
+  color: var(--ds-cyan-soft);
 }
 
 /* Principles — tipographic columns (Nosotros) */
@@ -559,15 +583,16 @@
 .teamCard {
   background: transparent;
   border: none;
-  padding: 0;
+  border-top: 1px solid var(--ds-line);
+  padding: 16px 0 0;
   text-align: left;
 }
 
 .teamPhoto {
-  width: 64px;
-  height: 64px;
-  margin: 0 0 12px;
-  border-radius: 12px;
+  width: 88px;
+  height: 88px;
+  margin: 0 0 14px;
+  border-radius: 16px;
   overflow: hidden;
   border: 1px solid var(--ds-line);
   background: rgba(45, 216, 242, 0.08);
@@ -583,7 +608,7 @@
 
 .teamInitials {
   font-family: var(--ds-font-display);
-  font-size: 0.9rem;
+  font-size: 1.2rem;
   font-weight: 600;
   color: var(--ds-cyan-soft);
 }
@@ -686,6 +711,96 @@
   height: 6px;
   border-radius: 2px;
   background: var(--ds-cyan);
+}
+
+/* Checklist — puntos de servicio escaneables (sustituye pilas de chips) */
+.checkList {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 32px;
+}
+
+.checkList li {
+  position: relative;
+  padding-left: 27px;
+  font-size: 0.93rem;
+  line-height: 1.5;
+  color: #c5d4ea;
+}
+
+.checkList li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.28em;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1px solid rgba(45, 216, 242, 0.45);
+  background: rgba(45, 216, 242, 0.08);
+}
+
+.checkList li::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: calc(0.28em + 4px);
+  width: 8px;
+  height: 4px;
+  border-left: 1.5px solid var(--ds-cyan);
+  border-bottom: 1.5px solid var(--ds-cyan);
+  transform: rotate(-45deg);
+}
+
+/* Datos operativos en filas etiqueta/valor (nosotros, contacto) */
+.factList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  border-top: 1px solid var(--ds-line);
+}
+
+.factRow {
+  display: grid;
+  grid-template-columns: minmax(0, 0.5fr) minmax(0, 1fr);
+  gap: 8px 24px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--ds-line);
+}
+
+.factLabel {
+  font-family: var(--ds-font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ds-faint);
+  padding-top: 4px;
+}
+
+.factValue {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--ds-ink);
+}
+
+/* Cabecera de sección con acción a la derecha */
+.sectionHeadRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px 32px;
+  flex-wrap: wrap;
+  margin: 0 0 clamp(32px, 4vw, 48px);
+}
+
+.sectionHeadRow .sectionHead {
+  margin: 0;
 }
 
 /* Secondary routes still need these */
@@ -814,8 +929,9 @@
   .splitGrid { grid-template-columns: 1fr; }
   .capRow { grid-template-columns: 3rem minmax(0, 1fr); }
   .capGo { display: none; }
+  .checkList { grid-template-columns: 1fr; }
   .section {
-    padding: clamp(48px, 7vw, 72px) 0;
+    padding: clamp(44px, 6vw, 60px) 0;
   }
   .inner {
     padding: 0 clamp(18px, 4vw, 32px);
@@ -835,6 +951,7 @@
   .ctaActions, .heroActions { flex-direction: column; }
   .ctaBand { padding: 28px 20px; border-radius: 14px; }
   .ctaTitle { max-width: none; }
+  .factRow { grid-template-columns: 1fr; gap: 4px; padding: 12px 0; }
   .sectionTitle { font-size: clamp(1.55rem, 7vw, 2rem); }
   .capNum { font-size: 0.8rem; }
   .capRow { gap: 12px; padding: 18px 0; }

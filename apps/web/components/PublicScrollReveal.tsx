@@ -22,16 +22,23 @@ export default function PublicScrollReveal() {
     const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
 
     let io: IntersectionObserver | null = null;
+    let mo: MutationObserver | null = null;
     let cancelled = false;
 
     const setup = () => {
       if (cancelled) return;
       const elements = Array.from(document.querySelectorAll<RevealEl>("[data-reveal]"));
-      if (elements.length === 0) return;
 
       if (prefersReduced) {
         // Keep everything visible and skip transitions.
         for (const el of elements) el.classList.add("reveal-visible");
+        // Contenido que llegue después (páginas async) también queda visible.
+        mo = new MutationObserver(() => {
+          for (const el of document.querySelectorAll<RevealEl>("[data-reveal]:not(.reveal-visible)")) {
+            el.classList.add("reveal-visible");
+          }
+        });
+        mo.observe(document.body, { childList: true, subtree: true });
         return;
       }
 
@@ -85,6 +92,28 @@ export default function PublicScrollReveal() {
       for (const el of elements) {
         io.observe(el);
       }
+
+      // Las páginas públicas son async (fetch de Studio en el server): en
+      // navegación cliente sus nodos [data-reveal] montan DESPUÉS de este
+      // setup y quedarían invisibles hasta un refresh. Observamos el DOM y
+      // registramos lo que vaya llegando.
+      const observeLate = (root: ParentNode) => {
+        for (const el of Array.from(root.querySelectorAll<RevealEl>("[data-reveal]:not(.reveal-visible)"))) {
+          io?.observe(el);
+        }
+      };
+      mo = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          for (const node of Array.from(m.addedNodes)) {
+            if (!(node instanceof HTMLElement)) continue;
+            if (node.matches?.("[data-reveal]") && !node.classList.contains("reveal-visible")) {
+              io?.observe(node);
+            }
+            observeLate(node);
+          }
+        }
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
     };
 
     // Delay setup so route content is in the DOM.
@@ -96,6 +125,7 @@ export default function PublicScrollReveal() {
     return () => {
       cancelled = true;
       io?.disconnect();
+      mo?.disconnect();
       window.cancelAnimationFrame(raf1);
       if (typeof raf2 === "number") window.cancelAnimationFrame(raf2);
     };

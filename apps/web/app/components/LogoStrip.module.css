@@ -1,0 +1,129 @@
+/* Logos de marcas / certificaciones — celdas claras uniformes, logos a color.
+   La marquesina es CSS puro: track duplicado + translateX(-50%) en loop. */
+
+.strip {
+  display: grid;
+  gap: clamp(14px, 2vw, 20px);
+}
+
+.label {
+  margin: 0;
+  font-family: var(--nx-font-ui, "Inter Tight", "Manrope", system-ui, sans-serif);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ds-faint, #6f85a5);
+}
+
+/* Celda badge: fondo claro constante para que cualquier logo (a color,
+   oscuro o JPEG) viva en el tema oscuro sin ensuciarlo */
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 136px;
+  height: 60px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: #f4f7fb;
+  border: 1px solid rgba(140, 190, 255, 0.16);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.cell:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+}
+
+.logo {
+  display: block;
+  max-height: 36px;
+  max-width: 104px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+/* ── Retícula estática ── */
+.row {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+  justify-items: stretch;
+  gap: 10px 12px;
+}
+
+.row .cell {
+  width: 100%;
+}
+
+/* ── Marquesina ── */
+.viewport {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
+}
+
+.track {
+  list-style: none;
+  margin: 0;
+  padding: 2px 0 8px;
+  display: flex;
+  gap: 12px;
+  width: max-content;
+  animation: marquee calc(var(--marquee-count, 18) * 3.2s) linear infinite;
+}
+
+.trackReverse {
+  animation-direction: reverse;
+}
+
+.viewport:hover .track {
+  animation-play-state: paused;
+}
+
+@keyframes marquee {
+  to {
+    /* -50% del track = un set completo (el segundo set es el duplicado) */
+    transform: translateX(calc(-50% - 6px));
+  }
+}
+
+@media (max-width: 600px) {
+  .cell {
+    width: 116px;
+    height: 52px;
+    padding: 8px 12px;
+  }
+
+  .logo {
+    max-height: 30px;
+    max-width: 90px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track {
+    animation: none;
+    width: auto;
+    flex-wrap: wrap;
+  }
+
+  .viewport {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  /* Sin animación no hay loop: el set duplicado sobra */
+  .track [aria-hidden="true"] {
+    display: none;
+  }
+
+  .cell {
+    transition: none;
+  }
+}

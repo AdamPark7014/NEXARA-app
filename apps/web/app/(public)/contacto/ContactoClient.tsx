@@ -8,14 +8,15 @@ import styles from "./page.module.css";
 import { buildApiUrl } from "@/lib/api-base";
 import { openExternalUrl } from "@/lib/open-external-url";
 import EditorialImage from "../../components/EditorialImage";
+import Map from "../../components/Map";
 import type { PageVisualsContent } from "@/lib/page-content-api";
 import { findGeoCity } from "@/lib/seo/geo-cities";
 import { findServiceLanding } from "@/lib/seo/programmatic-landings";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 
 const WA_LABEL = "+52 222 696 0350";
-const PHONE_LABEL = "+52 220 179 1871";
-const PHONE_TEL = "tel:+522201791871";
+const PHONE_LABEL = "+52 222 696 0350";
+const PHONE_TEL = "tel:+522226960350";
 const COMPANY_EMAIL = "gerencia@nexara.com.mx";
 const MAPS_PLACE_URL = "https://maps.app.goo.gl/34XSHPwUSeMAB7x69";
 
@@ -162,6 +163,12 @@ export default function ContactoClient({ visuals }: Props) {
             </aside>
 
             <div className={styles.formCard} data-reveal="right">
+              <div className={styles.formCardHead}>
+                <h2 className={styles.formCardTitle}>Cuéntanos tu proyecto</h2>
+                <p className={styles.formCardNote}>
+                  Respuesta típica en menos de 24 horas en horario laboral.
+                </p>
+              </div>
               {!submitted ? (
                 <form className={styles.form} onSubmit={onSubmit}>
                   <div className={styles.formRow}>
@@ -246,28 +253,31 @@ export default function ContactoClient({ visuals }: Props) {
               <Link href="/cobertura">más ciudades</Link>
             </p>
           </div>
-          <div className={styles.locationCard}>
-            <div className={styles.locationCopy}>
-              <p className={styles.locationLabel}>Base operativa</p>
-              <p className={styles.locationAddress}>
-                Explanada Puebla · Santiago Momoxpan, Puebla
-              </p>
-              <p className={styles.locationHint}>
-                Visitas con cita. Para llegar, usa el enlace de Google Maps.
-              </p>
+          <div className={styles.mapFrame} data-reveal="up">
+            <Map />
+            <div className={styles.locationCard}>
+              <div className={styles.locationCopy}>
+                <p className={styles.locationLabel}>Base operativa</p>
+                <p className={styles.locationAddress}>
+                  Explanada Puebla · Santiago Momoxpan, Puebla
+                </p>
+                <p className={styles.locationHint}>
+                  Visitas con cita. Para llegar, usa el enlace de Google Maps.
+                </p>
+              </div>
+              <a
+                className={`${shared.btn} ${shared.btnSecondary}`}
+                href={MAPS_PLACE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  openExternalUrl(MAPS_PLACE_URL);
+                }}
+              >
+                Abrir en Google Maps
+              </a>
             </div>
-            <a
-              className={`${shared.btn} ${shared.btnSecondary}`}
-              href={MAPS_PLACE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                e.preventDefault();
-                openExternalUrl(MAPS_PLACE_URL);
-              }}
-            >
-              Abrir en Google Maps
-            </a>
           </div>
         </div>
       </section>

@@ -124,6 +124,30 @@
   background: #0a1424;
 }
 
+.formCardHead {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(140, 190, 255, 0.12);
+}
+
+.formCardTitle {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: #fff;
+  line-height: 1.15;
+}
+
+.formCardNote {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #9bb0cc;
+}
+
 .form {
   display: grid;
   gap: 14px;
@@ -229,7 +253,8 @@
 }
 
 .mapHeader {
-  margin-bottom: 16px;
+  max-width: 920px;
+  margin: 0 auto 18px;
 }
 
 .mapTitle {
@@ -246,6 +271,18 @@
   height: clamp(240px, 28vw, 300px);
   border-radius: 14px;
   overflow: hidden;
+}
+
+/* Mapa centrado, con la tarjeta de dirección integrada debajo */
+.mapFrame {
+  display: grid;
+  gap: 14px;
+  max-width: 920px;
+  margin-inline: auto;
+}
+
+.mapFrame > div:first-child {
+  height: clamp(300px, 36vw, 420px);
 }
 
 .locationCard {

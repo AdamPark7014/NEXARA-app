@@ -1,4 +1,16 @@
-/* Editorial images — soft edges, full opacity, text harmony */
+/* Editorial images — marcos adaptativos a la proporción real de la foto.
+ *
+ * Sistema:
+ * - Cada layout define una ventana de proporción permitida (--ei-min-ar /
+ *   --ei-max-ar) y una altura máxima (--ei-maxh). El componente mide la foto
+ *   al cargar y fija --ei-ar = clamp(fotoAR, min, max), de modo que el
+ *   recorte en modo cover nunca es brutal.
+ * - Si la foto no cabe en la ventana (recorte > 18%), el componente pone
+ *   data-fit="contain": la foto se muestra completa sobre un fondo de sí
+ *   misma difuminado (letterbox premium). Nada se corta.
+ * - Las bandas full-bleed (bleedCinema / bleedLandscape) conservan altura
+ *   fija de banda; ahí el modo contain es el que protege la foto.
+ */
 
 .figure {
   --ei-radius: 18px;
@@ -6,6 +18,11 @@
   --ei-ink: #eef4ff;
   --ei-muted: #9bb0cc;
   --ei-cyan: #2dd8f2;
+  /* Ventana adaptativa por defecto (la sobreescribe cada layout) */
+  --ei-ar: 1.66;
+  --ei-min-ar: 1.25;
+  --ei-max-ar: 1.9;
+  --ei-maxh: 400px;
   margin: 0;
   position: relative;
   isolation: isolate;
@@ -16,18 +33,48 @@
   overflow: hidden;
   border-radius: var(--ei-radius);
   background: var(--ei-bg);
-  opacity: 1;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  width: 100%;
+  aspect-ratio: var(--ei-ar);
+  max-height: var(--ei-maxh);
+  /* Mantiene la proporción exacta cuando --ei-maxh limita la altura */
+  max-width: calc(var(--ei-maxh) * var(--ei-ar));
+  margin-inline: auto;
   min-width: 0;
 }
 
-.img {
-  display: block;
+.img,
+.fill {
+  position: absolute;
+  inset: 0;
   width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.img {
   object-fit: cover;
-  opacity: 1;
-  filter: none;
-  background: var(--ei-bg);
-  transform: scale(1.01);
+  background: transparent;
+  z-index: 1;
+}
+
+/* Fondo difuminado: solo visible en modo letterbox */
+.fill {
+  object-fit: cover;
+  filter: blur(26px) saturate(1.08) brightness(0.7);
+  transform: scale(1.15);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.figure[data-fit="contain"] .img {
+  object-fit: contain;
+  padding: clamp(8px, 1.6vw, 16px);
+  filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.42));
+}
+
+.figure[data-fit="contain"] .fill {
+  opacity: 0.55;
 }
 
 .imgDesktop { display: block; }
@@ -48,11 +95,16 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
   border-radius: inherit;
   background:
-    linear-gradient(180deg, rgba(5, 10, 20, 0.2) 0%, transparent 30%, transparent 70%, rgba(5, 10, 20, 0.36) 100%),
-    linear-gradient(90deg, rgba(5, 10, 20, 0.14) 0%, transparent 20%, transparent 80%, rgba(5, 10, 20, 0.14) 100%);
+    linear-gradient(180deg, rgba(5, 10, 20, 0.18) 0%, transparent 28%, transparent 72%, rgba(5, 10, 20, 0.3) 100%),
+    linear-gradient(90deg, rgba(5, 10, 20, 0.1) 0%, transparent 18%, transparent 82%, rgba(5, 10, 20, 0.1) 100%);
+}
+
+/* En letterbox la foto ya va completa: el velo solo ensuciaría */
+.figure[data-fit="contain"] .veil {
+  background: none;
 }
 
 /* ── Text copy paired with media ───────────────────────────── */
@@ -106,8 +158,12 @@
   margin-inline: auto;
 }
 
-.composeSplit .frame {
-  width: 100%;
+.mediaLeft.composeSplit {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+}
+
+.mediaLeft.composeSplit .frame {
+  order: -1;
 }
 
 .composeBar {
@@ -133,24 +189,49 @@
 
 /* ── Layouts ─────────────────────────────────────────────── */
 
-.bleedCinema {
+/* Bandas full-bleed: altura de banda fija; la foto se protege con letterbox */
+
+.bleedCinema,
+.bleedLandscape {
   width: 100%;
   max-width: none;
 }
 
-.bleedCinema .frame {
+.bleedCinema .frame,
+.bleedLandscape .frame {
   --ei-radius: 0;
-  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
-  mask-image: linear-gradient(180deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  aspect-ratio: auto;
+  max-width: none;
+  max-height: none;
 }
 
-.bleedCinema .img {
-  height: clamp(140px, 16vw, 230px);
-  aspect-ratio: 10 / 3;
+/* Alturas cover: si cambian, actualizar bleedCoverHeight() en EditorialImage.tsx */
+.bleedCinema .frame {
+  height: clamp(200px, 22vw, 320px);
 }
 
-.bleedCinema .veil {
-  background: linear-gradient(180deg, rgba(5, 10, 20, 0.4) 0%, transparent 40%, transparent 60%, rgba(5, 10, 20, 0.5) 100%);
+.bleedLandscape .frame {
+  height: clamp(240px, 30vw, 420px);
+}
+
+/* En letterbox la banda crece un poco para dar presencia a la foto completa */
+.bleedCinema[data-fit="contain"] .frame {
+  height: clamp(240px, 27vw, 400px);
+}
+
+.bleedLandscape[data-fit="contain"] .frame {
+  height: clamp(260px, 33vw, 460px);
+}
+
+/* Fundido vertical suave — solo cuando la foto va en cover */
+.bleedCinema[data-fit="cover"] .frame,
+.bleedLandscape[data-fit="cover"] .frame {
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 9%, #000 91%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 9%, #000 91%, transparent 100%);
+}
+
+.bleedCinema[data-fit="cover"] .veil {
+  background: linear-gradient(180deg, rgba(5, 10, 20, 0.35) 0%, transparent 40%, transparent 60%, rgba(5, 10, 20, 0.45) 100%);
 }
 
 .bleedCinema.composeBar .bar,
@@ -160,63 +241,65 @@
   padding-inline: clamp(24px, 4vw, 48px);
 }
 
-.bleedLandscape {
-  width: 100%;
-  max-width: none;
+/* En marcos framed (incl. bandas demotadas) el frame va centrado:
+   el pie de foto se centra con él para no quedar descolgado */
+.framedWide.composeBar .bar,
+.framedSquare.composeBar .bar,
+.insetOffset.composeBar .bar {
+  margin-inline: auto;
+  text-align: center;
+  justify-items: center;
 }
 
-.bleedLandscape .frame {
-  --ei-radius: 0;
-  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
-  mask-image: linear-gradient(180deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
-}
-
-.bleedLandscape .img {
-  height: clamp(220px, 32vw, 400px);
-  aspect-ratio: 32 / 15;
-}
+/* Marcos framed: adoptan la proporción de la foto dentro de su ventana */
 
 .framedWide {
   width: 100%;
   max-width: 1120px;
   margin-inline: auto;
+  --ei-ar: 1.78;
+  --ei-min-ar: 1.3;
+  --ei-max-ar: 1.9;
+  --ei-maxh: clamp(240px, 32vw, 400px);
 }
 
 .framedWide:not(.composeSplit) .frame {
   --ei-radius: 20px;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 18px 48px rgba(0, 0, 0, 0.28);
 }
 
-.framedWide:not(.composeSplit) .img {
-  height: clamp(210px, 30vw, 360px);
-  aspect-ratio: 16 / 9;
-}
-
-.framedWide.composeSplit .img {
-  height: clamp(200px, 28vw, 340px);
-  aspect-ratio: 16 / 10;
-  border-radius: 18px;
+.framedWide.composeSplit {
+  --ei-ar: 1.6;
+  /* Piso bajo: una foto vertical de campo vive bien en marco casi cuadrado
+     dentro de la columna del split (letterbox con blur si hace falta) */
+  --ei-min-ar: 0.85;
+  --ei-max-ar: 1.8;
+  --ei-maxh: clamp(240px, 34vw, 430px);
 }
 
 .framedWide.composeSplit .frame {
   --ei-radius: 18px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.26);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 16px 40px rgba(0, 0, 0, 0.26);
 }
 
 .framedSquare {
   width: min(100%, 440px);
   margin-inline: auto;
+  --ei-ar: 1;
+  --ei-min-ar: 0.8;
+  --ei-max-ar: 1.25;
+  --ei-maxh: 440px;
 }
 
 .framedSquare .frame {
   --ei-radius: 22px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.26);
-}
-
-.framedSquare .img {
-  aspect-ratio: 1 / 1;
-  height: auto;
-  max-height: 440px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 16px 40px rgba(0, 0, 0, 0.26);
 }
 
 .portraitFeatured {
@@ -224,39 +307,43 @@
   max-width: 400px;
   margin-inline: auto 0;
   justify-self: end;
+  --ei-ar: 0.75;
+  --ei-min-ar: 0.62;
+  --ei-max-ar: 1.05;
+  --ei-maxh: min(520px, 66vh);
 }
 
 .portraitFeatured .frame {
   --ei-radius: 24px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
-}
-
-.portraitFeatured .img {
-  aspect-ratio: 3 / 4;
-  height: auto;
-  max-height: min(520px, 66vh);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 20px 50px rgba(0, 0, 0, 0.3);
 }
 
 .asideCompact {
   width: 100%;
-  max-width: 240px;
+  max-width: 260px;
+  --ei-ar: 0.9;
+  --ei-min-ar: 0.72;
+  --ei-max-ar: 1.4;
+  --ei-maxh: 260px;
 }
 
 .asideCompact .frame {
   --ei-radius: 16px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
-}
-
-.asideCompact .img {
-  aspect-ratio: 4 / 5;
-  height: auto;
-  max-height: 200px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 12px 28px rgba(0, 0, 0, 0.22);
 }
 
 .insetOffset {
   width: 100%;
   max-width: 1120px;
   margin-inline: auto;
+  --ei-ar: 1.75;
+  --ei-min-ar: 1.3;
+  --ei-max-ar: 1.9;
+  --ei-maxh: clamp(220px, 28vw, 380px);
 }
 
 .insetOffset:not(.composeSplit) {
@@ -265,38 +352,32 @@
   margin-right: auto;
 }
 
+.insetOffset:not(.composeSplit) .frame {
+  margin-left: 0;
+}
+
 .insetOffset .frame {
   --ei-radius: 20px;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.26);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 18px 44px rgba(0, 0, 0, 0.26);
 }
 
-.insetOffset:not(.composeSplit) .frame {
-  -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 90%, transparent 100%);
-  mask-image: linear-gradient(90deg, #000 0%, #000 90%, transparent 100%);
-}
-
-.insetOffset .img {
-  height: clamp(200px, 26vw, 340px);
-  aspect-ratio: 7 / 4;
-}
-
-.insetOffset.composeSplit .img {
-  aspect-ratio: 5 / 3;
+.insetOffset.composeSplit {
+  --ei-ar: 1.66;
+  --ei-min-ar: 1.15;
+  --ei-max-ar: 1.85;
 }
 
 @media (max-width: 900px) {
-  .composeSplit {
+  .composeSplit,
+  .mediaLeft.composeSplit {
     grid-template-columns: 1fr;
     gap: 16px;
   }
 
   .copyCol {
     max-width: none;
-  }
-
-  .insetOffset:not(.composeSplit) .frame {
-    -webkit-mask-image: none;
-    mask-image: none;
   }
 
   .portraitFeatured {
@@ -308,42 +389,38 @@
 @media (max-width: 768px) {
   .figure { --ei-radius: 16px; }
 
-  .bleedCinema .img {
-    height: clamp(140px, 38vw, 200px);
-    aspect-ratio: 3 / 2;
+  .bleedCinema .frame {
+    height: clamp(180px, 44vw, 260px);
   }
 
-  .bleedLandscape .img {
-    height: clamp(180px, 46vw, 260px);
-    aspect-ratio: 6 / 5;
+  .bleedLandscape .frame {
+    height: clamp(200px, 52vw, 300px);
   }
 
-  .framedWide:not(.composeSplit) .img,
-  .insetOffset .img {
-    height: clamp(160px, 44vw, 240px);
-    aspect-ratio: 3 / 2;
+  .framedWide,
+  .framedWide.composeSplit,
+  .insetOffset,
+  .insetOffset.composeSplit {
+    --ei-ar: 1.5;
+    --ei-min-ar: 1;
+    --ei-max-ar: 1.7;
+    --ei-maxh: clamp(210px, 64vw, 320px);
   }
 
-  .portraitFeatured .img {
-    max-height: 380px;
-    aspect-ratio: 4 / 5;
+  .portraitFeatured {
+    --ei-maxh: 400px;
   }
 
   .asideCompact {
     max-width: 100%;
-  }
-
-  .asideCompact .img {
-    max-height: 180px;
-    aspect-ratio: 4 / 3;
+    --ei-ar: 1.33;
+    --ei-min-ar: 1;
+    --ei-max-ar: 1.7;
+    --ei-maxh: 220px;
   }
 
   .insetOffset:not(.composeSplit) {
     width: 100%;
     max-width: none;
   }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .img { transform: none; }
 }

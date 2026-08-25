@@ -4,6 +4,7 @@ import shared from "../_shared/public.module.css";
 import styles from "./page.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
 import EditorialImage from "../../components/EditorialImage";
+import LogoStrip from "../../components/LogoStrip";
 import heroStyles from "../../components/PublicPageHero.module.css";
 import { buildApiUrl } from "@/lib/api-base";
 import { resolveUserAvatarUrl } from "@/lib/user-avatar";
@@ -31,6 +32,28 @@ const principios = [
     title: "Compromiso continuo",
     text: "La entrega es el inicio de una relación, no el final del proyecto. Brindamos seguimiento, soporte técnico y mejora continua para garantizar la estabilidad y evolución de cada implementación.",
   },
+];
+
+/** Datos operativos reales — mismos claims que la home. */
+const OPERACION = [
+  { label: "Sedes", value: "Puebla · Ciudad de México, con cobertura nacional" },
+  { label: "Modelo", value: "Diseño, instalación y soporte bajo una sola responsabilidad técnica" },
+  { label: "Respuesta", value: "Típicamente en menos de 24 horas en horario laboral" },
+  { label: "Método", value: "Diagnóstico en sitio antes de la propuesta; entrega documentada" },
+];
+
+/** Certificaciones y alianzas técnicas — assets reales en /public/certificaciones. */
+const CERTIFICACIONES = [
+  { src: "/certificaciones/certificaciones-01.png", alt: "Linksys" },
+  { src: "/certificaciones/certificaciones-02.png", alt: "Belden" },
+  { src: "/certificaciones/certificaciones-03.png", alt: "Intellinet" },
+  { src: "/certificaciones/certificaciones-04.png", alt: "Lenovo SEG Silver Partner" },
+  { src: "/certificaciones/certificaciones-04.1.png.webp", alt: "Lenovo SEG Authorized Solutions" },
+  { src: "/certificaciones/certificaciones-05.png.jpeg", alt: "Grandstream" },
+  { src: "/certificaciones/certificaciones-06.png", alt: "HikVision" },
+  { src: "/certificaciones/certificaciones-07.png", alt: "Sophos" },
+  { src: "/certificaciones/certificaciones-08.png", alt: "Mimosa" },
+  { src: "/certificaciones/certificaciones-09.png.jpeg", alt: "Dell Technologies Authorized Partner" },
 ];
 
 const expertosFallback = [
@@ -82,7 +105,11 @@ const fetchPublicExperts = async (): Promise<ExpertCard[]> => {
       }));
     }
 
-    const data = (await response.json()) as PublicTeamUser[];
+    const raw = (await response.json()) as PublicTeamUser[];
+    // Cuentas internas/de prueba no pertenecen al equipo público.
+    const data = Array.isArray(raw)
+      ? raw.filter((u) => !/revisor\s*google\s*play|reviewer|cuenta\s*de\s*prueba/i.test(u.nombre || ""))
+      : raw;
     if (!Array.isArray(data) || data.length === 0) {
       return expertosFallback.map((expert, index) => ({
         key: `fallback-${index}`,
@@ -166,12 +193,14 @@ export default async function NosotrosPage() {
               <p className={styles.storyLeadSecondary}>
                 No solo entregamos un proyecto: construimos relaciones de largo plazo respaldadas por experiencia técnica, metodologías claras y un servicio cercano.
               </p>
-              <p className={styles.storyLeadSecondary}>
-                Transformamos necesidades tecnológicas en soluciones confiables mediante un proceso que integra consultoría, diseño, implementación y soporte especializado. Cada entrega está documentada, validada y orientada a garantizar una operación estable desde el primer día.
-              </p>
-              <p className={styles.storyLeadSecondary}>
-                Con cobertura nacional y presencia en Puebla y Ciudad de México, integramos videovigilancia, redes empresariales, infraestructura, Wi‑Fi, cómputo y soporte TI bajo una sola responsabilidad técnica. Un solo equipo, un solo proceso y un único compromiso con la calidad de cada proyecto.
-              </p>
+              <ul className={`${shared.factList} ${styles.storyFacts}`}>
+                {OPERACION.map((f) => (
+                  <li key={f.label} className={shared.factRow}>
+                    <span className={shared.factLabel}>{f.label}</span>
+                    <p className={shared.factValue}>{f.value}</p>
+                  </li>
+                ))}
+              </ul>
             </div>
             {storyImg?.desktopUrl ? (
               <div className={styles.storyMedia}>
@@ -186,6 +215,15 @@ export default async function NosotrosPage() {
                 />
               </div>
             ) : null}
+          </div>
+
+          <div className={styles.storyDetailGrid} data-reveal="up">
+            <p className={styles.storyLeadSecondary}>
+              Transformamos necesidades tecnológicas en soluciones confiables mediante un proceso que integra consultoría, diseño, implementación y soporte especializado. Cada entrega está documentada, validada y orientada a garantizar una operación estable desde el primer día.
+            </p>
+            <p className={styles.storyLeadSecondary}>
+              Con cobertura nacional y presencia en Puebla y Ciudad de México, integramos videovigilancia, redes empresariales, infraestructura, Wi‑Fi, cómputo y soporte TI bajo una sola responsabilidad técnica. Un solo equipo, un solo proceso y un único compromiso con la calidad de cada proyecto.
+            </p>
           </div>
         </div>
       </section>
@@ -206,6 +244,22 @@ export default async function NosotrosPage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section
+        id="certificaciones"
+        className={`${shared.sectionTight} ${shared.sectionDivider}`}
+        aria-label="Certificaciones"
+        data-reveal="soft"
+      >
+        <div className={shared.inner}>
+          <LogoStrip
+            label="Certificaciones y alianzas técnicas"
+            items={CERTIFICACIONES}
+            display="marquee"
+            rows={1}
+          />
         </div>
       </section>
 
