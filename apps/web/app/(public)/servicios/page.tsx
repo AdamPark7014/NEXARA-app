@@ -119,7 +119,7 @@ export default async function ServiciosPage() {
                 <article key={s.id} id={s.id} className={shared.serviceBlock} data-reveal="up">
                   <h2 className={shared.serviceBlockTitle}>{s.title}</h2>
                   <p className={shared.serviceBlockText}>{s.text}</p>
-                  <ul className={shared.servicePoints}>
+                  <ul className={shared.checkList}>
                     {s.points.map((pt) => (
                       <li key={pt}>{pt}</li>
                     ))}
@@ -159,7 +159,7 @@ export default async function ServiciosPage() {
               <article key={s.id} id={s.id} className={shared.serviceBlock} data-reveal="up">
                 <h2 className={shared.serviceBlockTitle}>{s.title}</h2>
                 <p className={shared.serviceBlockText}>{s.text}</p>
-                <ul className={shared.servicePoints}>
+                <ul className={shared.checkList}>
                   {s.points.map((pt) => (
                     <li key={pt}>{pt}</li>
                   ))}
@@ -181,7 +181,7 @@ export default async function ServiciosPage() {
               Desde la infraestructura física hasta el soporte y la evolución tecnológica, centralizamos todo el proyecto bajo un mismo equipo. Esto reduce tiempos, mejora la coordinación y garantiza una implementación consistente de principio a fin.
             </p>
           </div>
-          <ul className={shared.servicePoints}>
+          <ul className={shared.checkList}>
             <li>Ingeniería basada en las necesidades reales de tu operación.</li>
             <li>Implementación con estándares profesionales y documentación completa.</li>
             <li>Soporte técnico especializado antes, durante y después de la entrega.</li>

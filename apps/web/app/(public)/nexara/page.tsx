@@ -4,6 +4,7 @@ import shared from "../_shared/public.module.css";
 import styles from "./home-sections.module.css";
 import HomeHero from "../../components/HomeHero";
 import EditorialImage from "../../components/EditorialImage";
+import LogoStrip from "../../components/LogoStrip";
 import {
   fetchPageSection,
   fetchPageVisuals,
@@ -60,6 +61,12 @@ const METRICS = [
   { value: "Campo", label: "Diagnóstico en sitio antes de la propuesta" },
 ];
 
+/** Logos reales en /public/marcas — decorativos, el grupo lleva la etiqueta. */
+const MARCAS = Array.from({ length: 36 }, (_, i) => ({
+  src: `/marcas/marcas-${String(i + 1).padStart(2, "0")}.png`,
+  alt: "",
+}));
+
 const INDUSTRIA_BLURBS: Record<string, { risk: string; text: string }> = {
   Retail: {
     risk: "Multi-sede",
@@ -109,6 +116,17 @@ export default async function NexaraPage() {
       <HomeHero />
 
       <div className={styles.homeBody}>
+        <section className={styles.brandBand} aria-label="Fabricantes" data-reveal="soft">
+          <div className={shared.inner}>
+            <LogoStrip
+              label="Integramos tecnología de fabricantes líderes"
+              items={MARCAS}
+              display="marquee"
+              rows={2}
+            />
+          </div>
+        </section>
+
         <section className={shared.section} aria-label="Capacidades" data-reveal="up">
           <div className={shared.inner}>
             <header className={`${shared.sectionHead} ${styles.headSplit}`}>
@@ -148,19 +166,29 @@ export default async function NexaraPage() {
         </section>
 
         {slotCaps?.desktopUrl ? (
-          <div className={`${shared.sectionImageBandBleed} ${styles.visualBridge}`}>
-            <EditorialImage
-              desktopUrl={slotCaps.desktopUrl}
-              mobileUrl={slotCaps.mobileUrl}
-              alt={slotCaps.alt}
-              caption={slotCaps.caption || "Campo y entrega — entre el diseño y el soporte."}
-              kicker="En sitio"
-              title={slotCaps.caption ? undefined : "Donde la propuesta se vuelve instalación"}
-              layout={slotCaps.layout}
-              objectPosition={slotCaps.objectPosition}
-              compose="caption-bar"
-            />
-          </div>
+          <section className={shared.sectionTight} aria-label="En sitio" data-reveal="up">
+            <div className={shared.inner}>
+              <EditorialImage
+                desktopUrl={slotCaps.desktopUrl}
+                mobileUrl={slotCaps.mobileUrl}
+                alt={slotCaps.alt}
+                kicker="En sitio"
+                title="Donde la propuesta se vuelve instalación"
+                caption={
+                  slotCaps.caption ||
+                  "Campo y entrega — entre el diseño y el soporte. Fotografía de proyectos reales, no banco de imágenes."
+                }
+                layout={
+                  slotCaps.layout === "bleed_cinema" || slotCaps.layout === "bleed_landscape"
+                    ? "framed_wide"
+                    : slotCaps.layout
+                }
+                objectPosition={slotCaps.objectPosition}
+                compose="split"
+                mediaSide="right"
+              />
+            </div>
+          </section>
         ) : null}
 
         <section id="proceso" className={`${shared.section} ${styles.band}`} data-reveal="up">
@@ -203,19 +231,26 @@ export default async function NexaraPage() {
         </section>
 
         {slotInd?.desktopUrl ? (
-          <div className={`${shared.sectionImageBandBleed} ${styles.visualBridge}`}>
-            <EditorialImage
-              desktopUrl={slotInd.desktopUrl}
-              mobileUrl={slotInd.mobileUrl}
-              alt={slotInd.alt}
-              caption={slotInd.caption || "Cada industria con su riesgo; cada sitio con su alcance."}
-              kicker="Sectores"
-              title={slotInd.caption ? undefined : "Antes de hablar de verticales"}
-              layout={slotInd.layout}
-              objectPosition={slotInd.objectPosition}
-              compose="caption-bar"
-            />
-          </div>
+          <section className={shared.sectionTight} aria-label="Trabajo en campo" data-reveal="up">
+            <div className={shared.inner}>
+              <EditorialImage
+                desktopUrl={slotInd.desktopUrl}
+                mobileUrl={slotInd.mobileUrl}
+                alt={slotInd.alt}
+                kicker="Sectores"
+                title="Antes de hablar de verticales"
+                caption={slotInd.caption || "Cada industria con su riesgo; cada sitio con su alcance."}
+                layout={
+                  slotInd.layout === "bleed_cinema" || slotInd.layout === "bleed_landscape"
+                    ? "framed_wide"
+                    : slotInd.layout
+                }
+                objectPosition={slotInd.objectPosition}
+                compose="split"
+                mediaSide="left"
+              />
+            </div>
+          </section>
         ) : null}
 
         <section className={shared.section} aria-label="Industrias" data-reveal="up">
@@ -262,25 +297,48 @@ export default async function NexaraPage() {
 
         <section className={shared.section} data-reveal="up">
           <div className={shared.inner}>
-            <header className={shared.sectionHead}>
-              <p className={shared.eyebrow}>Cobertura</p>
-              <h2 className={shared.sectionTitle}>
-                Cotiza cerca de{" "}
-                <span className={shared.sectionTitleAccent}>tu ciudad</span>
-              </h2>
-            </header>
-            <div className={styles.geoRow}>
-              {GEO_CITIES.filter((c) => c.mode === "base" || c.slug === "queretaro").map((c) => (
-                <Link key={c.slug} href={`/cobertura/${c.slug}/camaras-cctv`} className={styles.geoChip}>
-                  CCTV {c.name}
-                </Link>
-              ))}
-              <Link href="/cobertura/puebla/redes-y-conectividad" className={styles.geoChip}>
-                Redes Puebla
-              </Link>
-              <Link href="/cobertura/cdmx/soporte-ti-pyme" className={styles.geoChip}>
-                Soporte CDMX
-              </Link>
+            <div className={styles.coverageSplit}>
+              <div className={styles.coverageCopy}>
+                <header>
+                  <p className={shared.eyebrow}>Cobertura</p>
+                  <h2 className={shared.sectionTitle}>
+                    Cotiza cerca de{" "}
+                    <span className={shared.sectionTitleAccent}>tu ciudad</span>
+                  </h2>
+                  <p className={shared.sectionLead}>
+                    Base operativa en Puebla y CDMX, con presencia en campo por todo el país. Elige tu ciudad y llega con contexto.
+                  </p>
+                </header>
+                <div className={styles.geoRow}>
+                  {GEO_CITIES.filter((c) => c.mode === "base" || c.slug === "queretaro").map((c) => (
+                    <Link key={c.slug} href={`/cobertura/${c.slug}/camaras-cctv`} className={styles.geoChip}>
+                      CCTV {c.name}
+                    </Link>
+                  ))}
+                  <Link href="/cobertura/puebla/redes-y-conectividad" className={styles.geoChip}>
+                    Redes Puebla
+                  </Link>
+                  <Link href="/cobertura/cdmx/soporte-ti-pyme" className={styles.geoChip}>
+                    Soporte CDMX
+                  </Link>
+                </div>
+                <p className={styles.sectionMore}>
+                  <Link href="/cobertura">Toda la cobertura →</Link>
+                </p>
+              </div>
+              <figure className={styles.mapPanel} data-reveal="right">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/mapa-operaciones.png"
+                  alt="Mapa de cobertura NEXARA en México: zonas de operación por estado"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <figcaption className={styles.mapCaption}>
+                  <span>Geografía de operaciones NEXARA</span>
+                  <Link href="/cobertura">Ver detalle por ciudad →</Link>
+                </figcaption>
+              </figure>
             </div>
             <SeoInterlinkHub
               title="Rutas que más convierten"
@@ -288,6 +346,7 @@ export default async function NexaraPage() {
               currentPath="/"
               maxIndustries={4}
               maxServicesPerIndustry={3}
+              showGeo={false}
             />
           </div>
         </section>

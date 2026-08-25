@@ -67,14 +67,15 @@
 
 .geoChip {
   display: inline-flex;
-  padding: 8px 12px;
-  border-radius: 999px;
+  padding: 8px 14px;
+  border-radius: 10px;
   border: 1px solid rgba(140, 190, 255, 0.16);
   background: rgba(255, 255, 255, 0.02);
   color: #cfe0f7;
   text-decoration: none;
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
 
 .geoChip:hover {
@@ -86,6 +87,78 @@
 .visualBridge :global(figure),
 .visualBridge figure {
   max-width: none;
+}
+
+/* Franja de marcas bajo el hero */
+.brandBand {
+  padding: clamp(26px, 3.5vw, 40px) 0;
+  border-bottom: 1px solid rgba(140, 190, 255, 0.1);
+}
+
+/* Cobertura: copy + chips a la izquierda, mapa a la derecha */
+.coverageSplit {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: clamp(28px, 4.5vw, 64px);
+  align-items: center;
+  margin-bottom: clamp(28px, 4vw, 44px);
+}
+
+.coverageCopy {
+  display: grid;
+  gap: 18px;
+  justify-items: start;
+}
+
+/* El gap del grid ya marca el ritmo: sin márgenes propios aquí */
+.coverageCopy .geoRow,
+.coverageCopy .sectionMore {
+  margin: 0;
+}
+
+.mapPanel {
+  margin: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(140, 190, 255, 0.14);
+  background: #0a1424;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
+}
+
+.mapPanel img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.mapCaption {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px 20px;
+  flex-wrap: wrap;
+  padding: 11px 16px;
+  border-top: 1px solid rgba(140, 190, 255, 0.1);
+  font-size: 0.8rem;
+  color: #6f85a5;
+}
+
+.mapCaption a {
+  color: #2dd8f2;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.mapCaption a:hover {
+  color: #9fecfa;
+}
+
+@media (max-width: 900px) {
+  .coverageSplit {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    align-items: start;
+  }
 }
 
 @media (max-width: 800px) {

@@ -228,8 +228,8 @@ export default function PrivacidadPage() {
           </p>
           <p>
             <strong>Teléfono:</strong>{" "}
-            <a className={styles.link} href="tel:+522201791871">
-              2201791871
+            <a className={styles.link} href="tel:+522226960350">
+              2226960350
             </a>
           </p>
           <p>

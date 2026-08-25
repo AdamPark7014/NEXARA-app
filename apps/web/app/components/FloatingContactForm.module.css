@@ -68,7 +68,7 @@
   position: fixed;
   right: 16px;
   top: calc(var(--header-offset, 72px) + 72px);
-  width: 408px;
+  width: 448px;
   max-width: calc(100vw - 32px);
   max-height: min(620px, calc(100dvh - var(--header-offset, 72px) - 128px));
   border-radius: 14px;
@@ -191,85 +191,118 @@
   color: #eef4ff;
 }
 
-.selectWrap {
-  position: relative;
-}
-
-.selectTrigger {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* Fila de dos campos en el panel */
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
-  padding: 9px 11px;
-  border-radius: 8px;
-  border: 1px solid rgba(140, 190, 255, 0.18);
-  background: rgba(255, 255, 255, 0.04);
-  color: #eef4ff;
-  font-size: 0.93rem;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
-.selectTrigger:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.formRow .formField {
+  min-width: 0;
 }
 
-.selectTrigger:focus-visible {
-  outline: none;
-  border-color: #2dd8f2;
-  box-shadow: 0 0 0 3px rgba(45, 216, 242, 0.14);
-}
-
-.selectPlaceholder {
-  color: #7288ad;
-}
-
-.selectInvalid {
-  border-color: #f07178;
-}
-
-.selectMenu {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: 5;
-  margin: 0;
-  padding: 6px;
-  list-style: none;
+/* Segmented Empresa / Persona */
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
   border-radius: 10px;
-  border: 1px solid rgba(140, 190, 255, 0.22);
-  background: #0b1729;
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(140, 190, 255, 0.18);
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.selectOption {
-  width: 100%;
-  display: block;
-  padding: 10px 12px;
+.segmentedOption {
+  padding: 8px 10px;
   border: none;
   border-radius: 7px;
   background: transparent;
-  color: #eef4ff;
-  font-size: 0.92rem;
+  color: #9bb0cc;
+  font-size: 0.88rem;
+  font-weight: 600;
   font-family: inherit;
-  text-align: left;
   cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
 }
 
-.selectOption:hover,
-.selectOption:focus-visible {
-  outline: none;
+.segmentedOption:focus-visible {
+  outline: 2px solid #2dd8f2;
+  outline-offset: 1px;
+}
+
+.segmentedActive {
   background: rgba(45, 216, 242, 0.16);
   color: #ffffff;
 }
 
-.selectOptionActive {
-  background: rgba(45, 216, 242, 0.22);
+/* Motivo como chips (un tap, sin dropdown) */
+.chipGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 8px 13px;
+  border-radius: 9px;
+  border: 1px solid rgba(140, 190, 255, 0.2);
+  background: rgba(255, 255, 255, 0.03);
+  color: #c5d4ea;
+  font-size: 0.85rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.chip:hover {
+  border-color: rgba(45, 216, 242, 0.5);
   color: #ffffff;
+}
+
+.chip:focus-visible {
+  outline: 2px solid #2dd8f2;
+  outline-offset: 1px;
+}
+
+.chipActive {
+  border-color: #2dd8f2;
+  background: rgba(45, 216, 242, 0.14);
+  color: #ffffff;
+}
+
+.chipInvalid {
+  border-color: rgba(240, 113, 120, 0.6);
+}
+
+/* Acceso directo a WhatsApp en la cabecera del panel */
+.waQuick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(37, 211, 102, 0.4);
+  background: rgba(37, 211, 102, 0.1);
+  color: #6fe39a;
+  font-size: 0.71rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.waQuick:hover {
+  background: rgba(37, 211, 102, 0.2);
+  color: #a7f0c3;
+}
+
+.waIcon {
+  width: 13px;
+  height: 13px;
+  fill: currentColor;
+  flex-shrink: 0;
 }
 
 .fieldError {
@@ -414,5 +447,9 @@
     width: auto;
     max-width: none;
     max-height: min(560px, calc(100dvh - var(--header-offset, 64px) - 140px));
+  }
+
+  .formRow {
+    grid-template-columns: 1fr;
   }
 }

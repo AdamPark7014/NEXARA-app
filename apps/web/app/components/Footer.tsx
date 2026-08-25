@@ -8,8 +8,8 @@ import { openCookiePreferences } from "@/lib/cookie-consent";
 const WA_URL = "https://wa.me/522226960350?text=Hola%2C%20me%20interesa%20informaci%C3%B3n%20de%20Nexara";
 const WA_LABEL = "+52 222 696 0350";
 const COMPANY_EMAIL = "gerencia@nexara.com.mx";
-const COMPANY_PHONE_LABEL = "+52 220 179 1871";
-const COMPANY_TEL = "tel:+522201791871";
+const COMPANY_PHONE_LABEL = "+52 222 696 0350";
+const COMPANY_TEL = "tel:+522226960350";
 
 const Icon = {
   Facebook: () => (
@@ -48,6 +48,18 @@ export default function Footer() {
     <footer className={styles.footer}>
       <div className={styles.topAccent} />
       <div className={styles.footerInner}>
+        <div className={styles.ctaRow}>
+          <div className={styles.ctaCopy}>
+            <p className={styles.ctaKicker}>¿Arrancamos?</p>
+            <p className={styles.ctaTitle}>
+              Cuéntanos tu sitio y te decimos qué instalar, qué posponer y con qué presupuesto.
+            </p>
+          </div>
+          <Link href="/contacto" className={styles.ctaButton} data-track-conversion="footer_cta">
+            Cotiza tu proyecto <span aria-hidden>→</span>
+          </Link>
+        </div>
+
         <div className={styles.brandRow}>
           <div className={styles.brandBlock}>
             <Link href="/" className={styles.brandLogoLink} aria-label="Nexara — Inicio">
@@ -91,7 +103,18 @@ export default function Footer() {
               <li><Link href="/servicios#redes">Redes y Wi‑Fi</Link></li>
               <li><Link href="/servicios#computo">Cómputo</Link></li>
               <li><Link href="/servicios#soporte">Soporte TI</Link></li>
-              <li><Link href="/cobertura">Cobertura</Link></li>
+              <li><Link href="/servicios#software">Plataformas a medida</Link></li>
+            </ul>
+          </nav>
+
+          <nav className={styles.linkCol} aria-label="Cobertura">
+            <h4 className={styles.colTitle}>Cobertura</h4>
+            <ul className={styles.list}>
+              <li><Link href="/cobertura/puebla">Puebla</Link></li>
+              <li><Link href="/cobertura/cdmx">Ciudad de México</Link></li>
+              <li><Link href="/cobertura/cholula">San Andrés Cholula</Link></li>
+              <li><Link href="/cobertura/queretaro">Querétaro</Link></li>
+              <li><Link href="/cobertura">Todas las ciudades</Link></li>
             </ul>
           </nav>
 

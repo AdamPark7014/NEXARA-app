@@ -99,8 +99,8 @@ export default function TerminosPage() {
           </p>
           <p>
             Teléfono:{" "}
-            <a className={styles.link} href="tel:+522201791871">
-              220 179 1871
+            <a className={styles.link} href="tel:+522226960350">
+              222 696 0350
             </a>
           </p>
         </div>

@@ -46,6 +46,66 @@
   gap: clamp(28px, 4vw, 40px);
 }
 
+/* CTA de cierre — última oportunidad de conversión antes del directorio */
+.ctaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(20px, 3vw, 40px);
+  flex-wrap: wrap;
+  padding-bottom: clamp(24px, 3.5vw, 36px);
+  border-bottom: 1px solid var(--f-linea);
+}
+
+.ctaCopy {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ctaKicker {
+  margin: 0;
+  font-family: var(--f-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--f-acento);
+}
+
+.ctaTitle {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: clamp(1.15rem, 2.2vw, 1.55rem);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--f-papel);
+  max-width: 34ch;
+  text-wrap: balance;
+}
+
+.ctaButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 13px 22px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2dd8f2, #12b6d4);
+  color: #04131a;
+  font-family: var(--f-ui);
+  font-size: 0.94rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 180ms ease, filter 180ms ease;
+}
+
+.ctaButton:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
 /* Marca + redes en una sola franja */
 .brandRow {
   display: flex;
@@ -117,11 +177,11 @@
   background: rgba(45, 216, 242, 0.08);
 }
 
-/* Tres columnas equilibradas */
+/* Cuatro columnas equilibradas */
 .navGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(24px, 4vw, 48px);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(20px, 3.5vw, 44px);
   align-items: start;
 }
 
@@ -295,6 +355,11 @@
 
 @media (max-width: 800px) {
   .brandRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ctaRow {
     flex-direction: column;
     align-items: flex-start;
   }
