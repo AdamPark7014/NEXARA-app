@@ -83,6 +83,21 @@ export async function fetchPublicHeroSlides(): Promise<HeroSlide[]> {
   return res.json();
 }
 
+/** SSR / ISR — poster del video y fallback de carrusel sin esperar al cliente. */
+export async function fetchPublicHeroSlidesCached(): Promise<HeroSlide[]> {
+  try {
+    const res = await fetch(buildApiUrl("hero-slides/public"), {
+      headers: { Accept: "application/json" },
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
 // ── Admin (Studio) ───────────────────────────────────────────────────
 
 export const listHeroSlides = (token: string): Promise<HeroSlide[]> =>

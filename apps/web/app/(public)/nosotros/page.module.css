@@ -15,7 +15,12 @@
 .storyMedia {
   justify-self: end;
   width: 100%;
-  max-width: 400px;
+  max-width: min(100%, 440px);
+}
+
+.storyMedia :global(figure[data-layout="framed_wide"]) {
+  max-width: 100%;
+  margin-inline: 0;
 }
 
 .storyMedia :global(figure),

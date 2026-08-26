@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import shared from "../_shared/public.module.css";
 import styles from "./home-sections.module.css";
-import HomeHero from "../../components/HomeHero";
+import HomeHero, { type HomeHeroBootstrap } from "../../components/HomeHero";
 import EditorialImage from "../../components/EditorialImage";
 import LogoStrip from "../../components/LogoStrip";
 import {
@@ -14,11 +14,14 @@ import {
   INDUSTRIA_SLUGS,
   type ProcesoItem,
   type CtaContent,
+  type HeroMediaConfig,
 } from "@/lib/page-content-api";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { GEO_CITIES } from "@/lib/seo/geo-cities";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
+import { fetchPublicHeroSlidesCached, resolveHeroImageUrl } from "@/lib/hero-slides-api";
+import { fetchPublicHeroVideoCached, resolveHeroVideoUrl } from "@/lib/hero-video-api";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("home");
@@ -97,12 +100,53 @@ const INDUSTRIA_BLURBS: Record<string, { risk: string; text: string }> = {
 const resolveIndustriaSlug = (label: string) =>
   INDUSTRIA_SLUGS[label] || label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
+async function fetchHomeHeroBootstrap(): Promise<HomeHeroBootstrap> {
+  const [mediaRow, video, slides] = await Promise.all([
+    fetchPageSection<HeroMediaConfig>("home_hero"),
+    fetchPublicHeroVideoCached(),
+    fetchPublicHeroSlidesCached(),
+  ]);
+
+  const mediaType = mediaRow?.mediaType === "video" ? "video" : "carousel";
+  const hasVideo = Boolean(video?.videoUrl && video.isActive);
+  const useVideo = mediaType === "video" || hasVideo;
+
+  const rawSlides = slides.map((s) => ({
+    id: s.id,
+    imageUrl: s.imageUrl,
+    imageUrlMobile: s.imageUrlMobile ?? null,
+    altText: s.altText,
+  }));
+
+  let posterUrl: string | null = null;
+  if (video?.posterUrl) {
+    posterUrl = resolveHeroVideoUrl(video.posterUrl);
+  } else if (rawSlides[0]?.imageUrl) {
+    posterUrl = resolveHeroImageUrl(rawSlides[0].imageUrl);
+  }
+
+  return {
+    mediaType: useVideo ? "video" : "carousel",
+    video:
+      useVideo && video?.videoUrl
+        ? {
+            videoUrl: video.videoUrl,
+            videoUrlMobile: video.videoUrlMobile ?? null,
+            isActive: video.isActive,
+          }
+        : null,
+    slides: rawSlides,
+    posterUrl,
+  };
+}
+
 export default async function NexaraPage() {
-  const [procesoData, industriasData, ctaData, visuals] = await Promise.all([
+  const [procesoData, industriasData, ctaData, visuals, heroBootstrap] = await Promise.all([
     fetchPageSection<{ items: ProcesoItem[] }>("home_proceso"),
     fetchPageSection<{ items: string[] }>("home_industrias"),
     fetchPageSection<CtaContent>("home_cta"),
     fetchPageVisuals("page_home"),
+    fetchHomeHeroBootstrap(),
   ]);
 
   const proceso = (procesoData?.items ?? DEFAULT_PROCESO).slice(0, 3);
@@ -110,10 +154,37 @@ export default async function NexaraPage() {
   const cta = ctaData ?? DEFAULT_CTA;
   const slotCaps = visuals.slots.find((s) => s.id === "home_band_capabilities");
   const slotInd = visuals.slots.find((s) => s.id === "home_band_industrias");
+  const heroVideoDesktop = heroBootstrap.video?.videoUrl
+    ? resolveHeroVideoUrl(heroBootstrap.video.videoUrl)
+    : null;
+  const heroVideoMobile = heroBootstrap.video?.videoUrlMobile
+    ? resolveHeroVideoUrl(heroBootstrap.video.videoUrlMobile)
+    : heroVideoDesktop;
 
   return (
     <main className={`${shared.page} home-main-flush`} aria-label="Nexara — Inicio">
-      <HomeHero />
+      {heroBootstrap.posterUrl ? (
+        <link rel="preload" as="image" href={heroBootstrap.posterUrl} fetchPriority="high" />
+      ) : null}
+      {heroVideoDesktop ? (
+        <link
+          rel="preload"
+          as="video"
+          href={heroVideoDesktop}
+          media="(min-width: 768px)"
+          fetchPriority="high"
+        />
+      ) : null}
+      {heroVideoMobile ? (
+        <link
+          rel="preload"
+          as="video"
+          href={heroVideoMobile}
+          media="(max-width: 767px)"
+          fetchPriority="high"
+        />
+      ) : null}
+      <HomeHero bootstrap={heroBootstrap} />
 
       <div className={styles.homeBody}>
         <section className={styles.brandBand} aria-label="Fabricantes" data-reveal="soft">

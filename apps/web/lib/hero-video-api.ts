@@ -65,6 +65,21 @@ export async function fetchPublicHeroVideo(): Promise<HeroVideo | null> {
   return data ?? null;
 }
 
+/** SSR / ISR — evita round-trip en el cliente para el hero. */
+export async function fetchPublicHeroVideoCached(): Promise<HeroVideo | null> {
+  try {
+    const res = await fetch(buildApiUrl("hero-video/public"), {
+      headers: { Accept: "application/json" },
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Admin (Studio) ───────────────────────────────────────────────────
 
 export const getHeroVideo = (token: string): Promise<HeroVideo | null> =>

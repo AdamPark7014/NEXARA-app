@@ -5,16 +5,16 @@
 - **Rama:** main
 
 ## Hecho en este turno
-- **API producción:** fix `ServiceSheetsModule` → Studio/CMS vuelve a responder.
-- **Home editorial:** fotos verticales en split usan marco `portrait_featured`
-  (sin banda ancha + blur lateral). Slot industrias → layout retrato + kicker
-  «En campo».
+- **Nosotros:** foto panorámica en slot retrato → marco `framed_wide` (sin
+  letterbox oscuro); carga eager en la imagen de historia.
+- **Home hero video:** bootstrap SSR + preload de poster y video; capa poster
+  instantánea hasta `canplay`; `preload=auto`; cache stream 24h.
 
 ## A medias — CUIDADO
 - nada
 
 ## Siguiente paso
-1. Deploy web si Adam no ve el cambio en home.
+1. Verificar home y /nosotros en prod tras deploy.
 
 ## No tocar
 - `apps/web/app/(subdomains)/tickets/layout.tsx`

@@ -213,6 +213,7 @@ export default async function NosotrosPage() {
                   layout={storyImg.layout}
                   objectPosition={storyImg.objectPosition}
                   compose="solo"
+                  priority
                 />
               </div>
             ) : null}
