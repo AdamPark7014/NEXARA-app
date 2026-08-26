@@ -93,7 +93,7 @@ export class HeroVideoController {
       const contentType = ext === '.webm' ? 'video/webm' : 'video/mp4';
 
       res.setHeader('Content-Type', contentType);
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
       res.setHeader('Accept-Ranges', 'bytes');
 
       if (!range) {

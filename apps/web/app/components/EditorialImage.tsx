@@ -24,6 +24,8 @@ type EditorialImageProps = {
   compose?: "solo" | "split" | "caption-bar";
   /** En compose split: lado de la foto (default "right"). */
   mediaSide?: "left" | "right";
+  /** LCP / above-fold: eager + fetchPriority high. */
+  priority?: boolean;
 };
 
 const LAYOUT_CLASS: Record<PageImageLayout, string> = {
@@ -105,6 +107,7 @@ export default function EditorialImage({
   title,
   compose,
   mediaSide = "right",
+  priority = false,
 }: EditorialImageProps) {
   const figureRef = useRef<HTMLElement | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
@@ -150,6 +153,14 @@ export default function EditorialImage({
         FIXED_FRAME_LAYOUTS.has(layout))
     ) {
       target = "portrait_featured";
+    }
+    // Panorámica en marco retrato (solo): letterbox feo → editorial ancha con cover.
+    if (
+      target === "portrait_featured" &&
+      !isSplitCompose &&
+      photoAr > 1.12
+    ) {
+      target = "framed_wide";
     }
 
     if (target !== effLayout) {
@@ -276,8 +287,9 @@ export default function EditorialImage({
           src={desktopSrc}
           alt=""
           aria-hidden
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
           decoding="async"
+          fetchPriority={priority ? "high" : undefined}
         />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -285,16 +297,18 @@ export default function EditorialImage({
           src={mobileSrc}
           alt=""
           aria-hidden
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
           decoding="async"
+          fetchPriority={priority ? "high" : undefined}
         />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           className={`${styles.img} ${styles.imgDesktop}`}
           src={desktopSrc}
           alt={alt}
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
           decoding="async"
+          fetchPriority={priority ? "high" : undefined}
           onLoad={handleLoad("d")}
           onError={handleError("d")}
         />
@@ -303,8 +317,9 @@ export default function EditorialImage({
           className={`${styles.img} ${styles.imgMobile}`}
           src={mobileSrc}
           alt={alt}
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
           decoding="async"
+          fetchPriority={priority ? "high" : undefined}
           onLoad={handleLoad("m")}
           onError={handleError("m")}
         />

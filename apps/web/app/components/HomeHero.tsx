@@ -35,17 +35,33 @@ type RawVideo = {
   isActive: boolean;
 };
 
+export type HomeHeroBootstrap = {
+  mediaType: HeroMediaConfig["mediaType"];
+  video: RawVideo | null;
+  slides: RawSlide[];
+  /** Poster resuelto (slide o posterUrl del video) para pintar antes del decode. */
+  posterUrl: string | null;
+};
+
 function pickUrl(desktop: string, mobile: string | null | undefined, isMobile: boolean) {
   if (isMobile && mobile) return mobile;
   return desktop;
 }
 
-export default function HomeHero() {
-  const [rawSlides, setRawSlides] = useState<RawSlide[]>([]);
-  const [rawVideo, setRawVideo] = useState<RawVideo | null>(null);
-  const [preferVideo, setPreferVideo] = useState(false);
+export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap | null }) {
+  const bootVideo = bootstrap?.video;
+  const bootUseVideo =
+    Boolean(bootstrap) &&
+    (bootstrap!.mediaType === "video" ||
+      Boolean(bootstrap!.video?.videoUrl && bootstrap!.video?.isActive));
+
+  const [rawSlides, setRawSlides] = useState<RawSlide[]>(bootstrap?.slides ?? []);
+  const [rawVideo, setRawVideo] = useState<RawVideo | null>(bootVideo ?? null);
+  const [preferVideo, setPreferVideo] = useState(bootUseVideo);
+  const [posterUrl, setPosterUrl] = useState<string | null>(bootstrap?.posterUrl ?? null);
   const [isMobile, setIsMobile] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
   const [index, setIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -59,6 +75,8 @@ export default function HomeHero() {
   }, []);
 
   useEffect(() => {
+    if (bootstrap) return;
+
     let cancelled = false;
 
     const load = async () => {
@@ -86,6 +104,9 @@ export default function HomeHero() {
             isActive: publicVideo.isActive,
           });
           setVideoFailed(false);
+          if (publicVideo.posterUrl) {
+            setPosterUrl(resolveHeroVideoUrl(publicVideo.posterUrl));
+          }
           return;
         }
 
@@ -100,6 +121,10 @@ export default function HomeHero() {
             altText: s.altText,
           })),
         );
+        const first = slides[0];
+        if (first?.imageUrl) {
+          setPosterUrl(resolveHeroImageUrl(first.imageUrl));
+        }
       } catch {
         /* atmósfera */
       }
@@ -109,7 +134,7 @@ export default function HomeHero() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [bootstrap]);
 
   const videoUrl =
     preferVideo && rawVideo?.videoUrl
@@ -124,6 +149,14 @@ export default function HomeHero() {
 
   const showVideo = Boolean(videoUrl) && !videoFailed;
   const hasMedia = showVideo || dynamicSlides.length > 0;
+  const activePoster =
+    posterUrl ||
+    (showVideo && dynamicSlides[0]?.src) ||
+  null;
+
+  useEffect(() => {
+    setVideoReady(false);
+  }, [videoUrl]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -177,17 +210,28 @@ export default function HomeHero() {
         if (!showVideo) startAutoPlay();
       }}
     >
+      {activePoster && showVideo ? (
+        <div
+          className={`${styles.posterLayer} ${videoReady ? styles.posterHidden : ""}`}
+          style={{ backgroundImage: `url("${activePoster}")` }}
+          aria-hidden
+        />
+      ) : null}
+
       {showVideo ? (
         <video
           key={videoUrl ?? "video"}
           ref={videoRef}
-          className={styles.bgVideo}
+          className={`${styles.bgVideo} ${videoReady ? styles.bgVideoReady : ""}`}
           src={videoUrl ?? undefined}
+          poster={activePoster ?? undefined}
           autoPlay
           muted
           loop
           playsInline
-          preload="metadata"
+          preload="auto"
+          onLoadedData={() => setVideoReady(true)}
+          onCanPlay={() => setVideoReady(true)}
           onError={() => {
             setVideoFailed(true);
           }}
