@@ -135,18 +135,28 @@
 }
 
 .sqExploreMode .sqProductGrid {
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+  gap: 12px;
   padding-bottom: 8px;
 }
 
 .sqExploreMode .sqProductMedia {
-  height: 100px;
+  height: 108px;
 }
 
 .sqExploreMode .sqProductBody {
-  min-height: 88px;
-  padding: 10px 10px 6px;
+  min-height: 0;
+  padding: 10px 12px 12px;
+}
+
+.sqExploreMode .sqProductName {
+  font-size: 12.5px;
+  -webkit-line-clamp: 4;
+}
+
+.sqExploreMode .sqWhChip {
+  font-size: 11.5px;
+  padding: 3px 8px;
 }
 
 .sqExploreMode .sqRail {
@@ -1018,19 +1028,19 @@
 
 .sqProductGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
   gap: 12px;
 }
 
 .sqProductCard {
-  display: grid;
-  grid-template-rows: 140px auto auto;
-  gap: 0;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface);
   overflow: hidden;
   transition: border-color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
+  cursor: pointer;
 }
 
 .sqProductCard:hover {
@@ -1050,31 +1060,67 @@
   display: grid;
   place-items: center;
   position: relative;
-  height: 140px;
+  height: 120px;
+  flex-shrink: 0;
 }
 
 .sqProductMedia img {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 10px;
+  padding: 8px;
+}
+
+.sqProductStockStrip {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, #15803d 7%, var(--surface));
+  border-bottom: 1px solid color-mix(in srgb, #15803d 18%, var(--border));
+}
+
+.sqStockBandLabel {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #166534;
+  line-height: 1;
+}
+
+.sqStockMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 
 .sqProductBody {
-  padding: 12px 12px 8px;
+  padding: 10px 12px 12px;
   display: grid;
   gap: 6px;
-  min-height: 118px;
+  flex: 1;
+  min-height: 0;
+}
+
+.sqProductFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .sqProductName {
   font-size: 13px;
   font-weight: 750;
-  line-height: 1.35;
+  line-height: 1.4;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  word-break: break-word;
 }
 
 .sqProductMeta {
