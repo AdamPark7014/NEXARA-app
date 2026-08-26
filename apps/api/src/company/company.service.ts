@@ -67,27 +67,35 @@ export class CompanyService {
     isSuperAdmin?: boolean;
   }) {
     const primary = await this.get();
-    const wantedId = input.companyId || primary.id;
 
     if (!input.userId) {
-      return this.resolve(wantedId);
+      return this.resolve(input.companyId || primary.id);
     }
 
     if (input.isSuperAdmin) {
-      return this.resolve(wantedId);
+      return this.resolve(input.companyId || primary.id);
     }
 
-    await this.ensureMembership(input.userId, primary.id, true);
+    if (input.companyId) {
+      const membership = await this.prisma.userCompany.findUnique({
+        where: {
+          userId_companyId: { userId: input.userId, companyId: input.companyId },
+        },
+      });
+      if (!membership) {
+        throw new ForbiddenException('No tienes acceso a esta empresa');
+      }
+      return this.resolve(input.companyId);
+    }
 
-    const membership = await this.prisma.userCompany.findUnique({
-      where: {
-        userId_companyId: { userId: input.userId, companyId: wantedId },
-      },
+    const defaultMembership = await this.prisma.userCompany.findFirst({
+      where: { userId: input.userId, isDefault: true },
     });
-    if (!membership) {
-      throw new ForbiddenException('No tienes acceso a esta empresa');
+    if (defaultMembership) {
+      return this.resolve(defaultMembership.companyId);
     }
-    return this.resolve(wantedId);
+
+    return this.resolve(primary.id);
   }
 
   /** Empresas visibles para el usuario (membership; super-admin ve todas activas). */
