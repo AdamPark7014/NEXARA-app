@@ -20,7 +20,7 @@ import { buildStudioPageMetadata } from "@/lib/page-seo";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { GEO_CITIES } from "@/lib/seo/geo-cities";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
-import { fetchPublicHeroSlidesCached, resolveHeroImageUrl } from "@/lib/hero-slides-api";
+import { fetchPublicHeroSlidesCached } from "@/lib/hero-slides-api";
 import { fetchPublicHeroVideoCached, resolveHeroVideoUrl } from "@/lib/hero-video-api";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -121,8 +121,6 @@ async function fetchHomeHeroBootstrap(): Promise<HomeHeroBootstrap> {
   let posterUrl: string | null = null;
   if (video?.posterUrl) {
     posterUrl = resolveHeroVideoUrl(video.posterUrl);
-  } else if (rawSlides[0]?.imageUrl) {
-    posterUrl = resolveHeroImageUrl(rawSlides[0].imageUrl);
   }
 
   return {

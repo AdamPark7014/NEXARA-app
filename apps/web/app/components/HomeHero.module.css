@@ -45,28 +45,6 @@
   /* Logo animado suele estar a la derecha; priorizamos esa zona */
   object-position: center right;
   filter: brightness(0.7) saturate(1.05) contrast(1.04);
-  opacity: 0;
-  transition: opacity 420ms ease;
-}
-
-.bgVideoReady {
-  opacity: 1;
-}
-
-.posterLayer {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background-color: #050a14;
-  background-size: cover;
-  background-position: center right;
-  filter: brightness(0.7) saturate(1.05) contrast(1.04);
-  transition: opacity 420ms ease;
-}
-
-.posterHidden {
-  opacity: 0;
-  pointer-events: none;
 }
 
 .slides { overflow: hidden; }
