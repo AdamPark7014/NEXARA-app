@@ -8,6 +8,7 @@ import heroStyles from "../../components/PublicPageHero.module.css";
 import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
+import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("servicios");
@@ -110,7 +111,7 @@ export default async function ServiciosPage() {
                 </a>
               ))}
               <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary} ${shared.serviceNavCta}`}>
-                Cotizar proyecto <span className={shared.btnArrow} aria-hidden>→</span>
+                Cotiza tu proyecto <span className={shared.btnArrow} aria-hidden>→</span>
               </Link>
             </nav>
 
@@ -212,8 +213,21 @@ export default async function ServiciosPage() {
             </p>
             <div className={shared.ctaActions}>
               <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`} data-track-conversion="servicios_footer_cta">
-                Hablar con un especialista <span className={shared.btnArrow}>→</span>
+                Cotiza tu proyecto <span className={shared.btnArrow}>→</span>
               </Link>
+              <a
+                href={buildWhatsAppLeadUrl({
+                  industryName: "mi empresa",
+                  serviceName: "CCTV, redes o soporte",
+                  path: "/servicios",
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${shared.btn} ${shared.btnSecondary}`}
+                data-track-conversion="servicios_wa"
+              >
+                WhatsApp
+              </a>
               <Link href="/cobertura/puebla" className={`${shared.btn} ${shared.btnSecondary}`}>
                 Cobertura Puebla
               </Link>

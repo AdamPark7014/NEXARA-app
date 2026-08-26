@@ -1,23 +1,3 @@
-/* Soluciones · estilos específicos */
+/* Soluciones · estilos específicos (hub usa shared.industryCell) */
 
-.indCard {
-  text-decoration: none;
-  color: inherit;
-  display: block;
-}
-
-.indCta {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 14px;
-  font-family: "Manrope", var(--nx-font-body, system-ui), sans-serif;
-  font-size: 0.86rem;
-  font-weight: 600;
-  color: var(--ds-pino);
-  transition: gap 200ms ease;
-}
-
-.indCard:hover .indCta {
-  gap: 12px;
-}
+/* Legacy .indCard / .indCta — sin referencias en page.tsx */

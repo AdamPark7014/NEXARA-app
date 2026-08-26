@@ -10,6 +10,10 @@ import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
+import { INDUSTRIA_SLUGS } from "@/lib/page-content-api";
+
+const resolveIndustriaSlug = (label: string) =>
+  INDUSTRIA_SLUGS[label] || label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("proyectos");
@@ -187,51 +191,65 @@ export default async function ProyectosPage() {
 
           {studioProjects.length ? (
             <div className={styles.studioCasesList} data-reveal-stagger>
-              {studioProjects.map((p) => (
-                <article key={p.id} className={styles.studioCaseCard} data-reveal="up">
-                  <div className={styles.studioCaseMedia}>
-                    <Image
-                      src={normalizeProjectImageUrl(p.mainImage)}
-                      alt={p.title}
-                      fill
-                      sizes="(max-width: 1024px) 100vw, 42vw"
-                      className={styles.studioCasePhoto}
-                      unoptimized
-                    />
-                    {p.impact ? <span className={styles.caseMetric}>{p.impact}</span> : null}
-                  </div>
-                  <div className={styles.studioCaseBody}>
-                    <span className={styles.caseSector}>{p.sector || "Proyecto"}</span>
-                    <h3 className={styles.studioCaseTitle}>{p.title}</h3>
-                    <p className={styles.studioCaseSummary}>{p.summary}</p>
+              {studioProjects.map((p) => {
+                const sectorSlug = resolveIndustriaSlug(p.sector || "Proyecto");
+                return (
+                  <article key={p.id} className={styles.studioCaseCard} data-reveal="up">
+                    <div className={styles.studioCaseMedia}>
+                      <Image
+                        src={normalizeProjectImageUrl(p.mainImage)}
+                        alt={p.title}
+                        fill
+                        sizes="(max-width: 1024px) 100vw, 42vw"
+                        className={styles.studioCasePhoto}
+                        unoptimized
+                      />
+                      {p.impact ? <span className={styles.caseMetric}>{p.impact}</span> : null}
+                    </div>
+                    <div className={styles.studioCaseBody}>
+                      <span className={styles.caseSector}>{p.sector || "Proyecto"}</span>
+                      <h3 className={styles.studioCaseTitle}>{p.title}</h3>
+                      <p className={styles.studioCaseSummary}>{p.summary}</p>
 
-                    {p.services?.length > 0 && (
-                      <p className={styles.infoRow}>
-                        <strong>Servicios:</strong> {p.services.join(" · ")}
-                      </p>
-                    )}
+                      {p.services?.length > 0 && (
+                        <p className={styles.infoRow}>
+                          <strong>Servicios:</strong> {p.services.join(" · ")}
+                        </p>
+                      )}
 
-                    {p.highlights?.length > 0 && (
-                      <ul className={styles.highlights}>
-                        {p.highlights.slice(0, 4).map((h, idx) => (
-                          <li key={`${p.id}-h-${idx}`}>{h}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </article>
-              ))}
+                      {p.highlights?.length > 0 && (
+                        <ul className={styles.highlights}>
+                          {p.highlights.slice(0, 4).map((h, idx) => (
+                            <li key={`${p.id}-h-${idx}`}>{h}</li>
+                          ))}
+                        </ul>
+                      )}
+
+                      <div className={styles.studioCaseActions}>
+                        <Link
+                          href={`/soluciones/${sectorSlug}`}
+                          className={`${shared.btn} ${shared.btnSecondary} ${styles.studioCaseBtn}`}
+                        >
+                          Ver vertical <span className={shared.btnArrow}>→</span>
+                        </Link>
+                        <Link
+                          href={`/contacto?industry=${sectorSlug}`}
+                          className={`${shared.btn} ${shared.btnPrimary} ${styles.studioCaseBtn}`}
+                        >
+                          Cotizar similar <span className={shared.btnArrow}>→</span>
+                        </Link>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <div className={shared.industryBoard} data-reveal-stagger>
               {casos.map((c) => (
                 <Link
                   key={c.title}
-                  href={`/soluciones/${c.sector
-                    .toLowerCase()
-                    .normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "")
-                    .replace(/educacion/, "educacion")}`}
+                  href={`/soluciones/${resolveIndustriaSlug(c.sector)}`}
                   className={`${shared.industryCell} ${styles.caseCell}`}
                   data-reveal="up"
                 >
@@ -268,7 +286,7 @@ export default async function ProyectosPage() {
             </p>
             <div className={shared.ctaActions}>
               <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
-                Iniciar conversación <span className={shared.btnArrow}>→</span>
+                Cotiza tu proyecto <span className={shared.btnArrow}>→</span>
               </Link>
               <a
                 href={buildWhatsAppLeadUrl({

@@ -28,6 +28,7 @@ export default function ContactoClient({ visuals }: Props) {
   const searchParams = useSearchParams();
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const asideImg = visuals.slots[0];
 
@@ -61,6 +62,7 @@ export default function ContactoClient({ visuals }: Props) {
 
   const onSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
+    setSubmitError(null);
     setLoading(true);
     const form = e.currentTarget;
     const formData = new FormData(form);
@@ -86,10 +88,12 @@ export default function ContactoClient({ visuals }: Props) {
         body: JSON.stringify(payload),
       });
       if (!response.ok) {
+        setSubmitError("No se pudo enviar el mensaje. Intenta de nuevo o escríbenos por WhatsApp.");
         setLoading(false);
         return;
       }
     } catch {
+      setSubmitError("Error de conexión. Revisa tu internet e intenta de nuevo.");
       setLoading(false);
       return;
     }
@@ -208,6 +212,11 @@ export default function ContactoClient({ visuals }: Props) {
                       disabled={loading}
                     />
                   </label>
+                  {submitError ? (
+                    <p className={styles.formError} role="alert">
+                      {submitError}
+                    </p>
+                  ) : null}
                   <button
                     type="submit"
                     className={`${shared.btn} ${shared.btnPrimary} ${styles.submitBtn}`}

@@ -113,6 +113,8 @@ const navLinks = [
   { name: 'Inicio', href: '/' },
   { name: 'Soluciones', href: '/soluciones' },
   { name: 'Servicios', href: '/servicios' },
+  { name: 'Proyectos', href: '/proyectos' },
+  { name: 'Cobertura', href: '/cobertura' },
   { name: 'Nosotros', href: '/nosotros' },
   { name: 'Contacto', href: '/contacto' },
 ];
@@ -241,10 +243,12 @@ export default function Header() {
         <div className={styles.rightSection}>
           {(pathname && pathname.startsWith('/console')) && <BackupRestorePanel />}
 
-          <Link href="/contacto" className={styles.contactCta} onClick={closeMobileMenu}>
-            Cotiza tu proyecto
-            <span aria-hidden className={styles.contactArrow}>→</span>
-          </Link>
+          {!isActiveLink('/contacto') && (
+            <Link href="/contacto" className={styles.contactCta} onClick={closeMobileMenu}>
+              Cotiza tu proyecto
+              <span aria-hidden className={styles.contactArrow}>→</span>
+            </Link>
+          )}
 
           {/* Mobile Menu Button */}
           <button

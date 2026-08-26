@@ -341,7 +341,7 @@ export default function IndustryHubPage({ params }: { params: Params }) {
                 className={`${shared.btn} ${shared.btnPrimary}`}
                 data-track-conversion="industry_hub_cta"
               >
-                Hablar con un especialista <span className={shared.btnArrow}>→</span>
+                Cotiza tu proyecto <span className={shared.btnArrow}>→</span>
               </Link>
               <a
                 href={waHref}

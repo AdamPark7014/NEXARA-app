@@ -291,6 +291,8 @@ export default async function NexaraPage() {
             </div>
             <p className={styles.sectionMore}>
               <Link href="/soluciones">Todas las industrias →</Link>
+              {" · "}
+              <Link href="/proyectos">Ver casos de campo →</Link>
             </p>
           </div>
         </section>
