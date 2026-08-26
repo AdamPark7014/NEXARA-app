@@ -21,16 +21,10 @@ export type CtPedidoFromQuoteDto = {
   envio: CtSolicitarPedidoRequest['envio'];
 };
 
+import { CT_ORDER_WAREHOUSES, preferredCatalogWarehouse } from '../ct-warehouses.js';
+
 /** Almacenes CT comunes (código API → etiqueta). */
-export const CT_WAREHOUSES: Array<{ code: string; label: string }> = [
-  { code: '01A', label: 'Hermosillo' },
-  { code: '14A', label: 'Puebla' },
-  { code: '13A', label: 'CDMX' },
-  { code: '35A', label: 'Monterrey' },
-  { code: '46A', label: 'Guadalajara' },
-  { code: '03A', label: 'Chihuahua' },
-  { code: '07A', label: 'León' },
-];
+export const CT_WAREHOUSES = CT_ORDER_WAREHOUSES;
 
 @Injectable()
 export class CtPurchaseOrderService {
@@ -44,7 +38,7 @@ export class CtPurchaseOrderService {
   defaultAlmacen() {
     const env = process.env.CT_API_ALMACEN;
     if (env && env.length <= 4) return env;
-    const wh = process.env.CT_PREFERRED_WAREHOUSE || 'PUE';
+    const wh = preferredCatalogWarehouse();
     const map: Record<string, string> = {
       PUE: '14A',
       MTY: '35A',

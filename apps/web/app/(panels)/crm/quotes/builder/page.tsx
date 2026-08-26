@@ -18,11 +18,16 @@ import {
   smartQuoteCtStatus,
   smartQuoteFacets,
   smartQuoteLaborSuggest,
+  smartQuoteLogistics,
   smartQuoteSearch,
+  smartQuoteSubstitutes,
+  type LogisticsZone,
   type OptimizeMode,
   type QuoteLinePayload,
   type SmartOffer,
 } from "@/lib/smart-quote-api";
+import { codesForCity, stockAtPreferred, warehouseLabel } from "@/lib/ct-warehouse-labels";
+import Modal from "@/components/ui/Modal";
 import styles from "./smart-quote.module.css";
 
 type Step = 1 | 2 | 3;
@@ -42,6 +47,26 @@ const QUICK_SEARCHES = [
   "NVR 32 canales",
   "access point WiFi 6",
   "UPS",
+];
+
+type FacetOption = { name: string; count: number };
+
+const BADGE_META: Record<
+  string,
+  { label: string; className: string }
+> = {
+  BEST_PRICE: { label: "Mejor precio", className: "sqBadgePrice" },
+  BEST_STOCK: { label: "Más stock", className: "sqBadgeStock" },
+  FASTEST: { label: "Entrega rápida", className: "sqBadgeSpeed" },
+  BEST_MARGIN: { label: "Mejor margen", className: "sqBadgeRec" },
+  RECOMMENDED: { label: "Recomendado", className: "sqBadgeRec" },
+  SUBSTITUTE: { label: "Sustituto", className: "sqBadgeSpeed" },
+};
+
+const FALLBACK_ZONES: LogisticsZone[] = [
+  { zoneCode: "LOCAL_PUE", zoneName: "Puebla (local)", baseCost: 350, basePrice: 650 },
+  { zoneCode: "CDMX", zoneName: "Ciudad de México", baseCost: 900, basePrice: 1500 },
+  { zoneCode: "FORANEO", zoneName: "Foráneo nacional", baseCost: 1800, basePrice: 2800 },
 ];
 
 const COACH: Record<Step, { icon: string; title: string; text: string }> = {
@@ -68,6 +93,97 @@ function money(n: number) {
     currency: "MXN",
     maximumFractionDigits: 0,
   }).format(n || 0);
+}
+
+function formatEta(days: number | null | undefined): string {
+  if (days == null || days <= 0) return "Consultar";
+  if (days <= 1) return "Inmediata";
+  return `${days}d`;
+}
+
+function formatSyncTime(iso?: string): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" });
+  } catch {
+    return "—";
+  }
+}
+
+function offerHasPromo(offer: SmartOffer): boolean {
+  return Boolean(offer.hasPromo || (offer.promociones && offer.promociones.length > 0));
+}
+
+function aggregateStockChips(
+  rows: SmartOffer["stockByWarehouse"],
+  preferredCodes: string[],
+  max = 6,
+): Array<{ city: string; qty: number; preferred: boolean }> {
+  if (!rows?.length) return [];
+  const pref = new Set(preferredCodes.map((c) => c.toUpperCase()));
+  const byCity = new Map<string, { qty: number; preferred: boolean }>();
+  for (const r of rows) {
+    if (r.qty <= 0) continue;
+    const city = r.city || warehouseLabel(r.code);
+    const isPref = pref.has(r.code.toUpperCase());
+    const prev = byCity.get(city);
+    if (prev) {
+      prev.qty += r.qty;
+      prev.preferred = prev.preferred || isPref;
+    } else {
+      byCity.set(city, { qty: r.qty, preferred: isPref });
+    }
+  }
+  return [...byCity.entries()]
+    .map(([city, v]) => ({ city, ...v }))
+    .sort((a, b) => {
+      if (a.preferred !== b.preferred) return a.preferred ? -1 : 1;
+      return b.qty - a.qty;
+    })
+    .slice(0, max);
+}
+
+function lineMarginWarning(l: QuoteLinePayload): string | null {
+  const cost = Number(l.unitCost) || 0;
+  const price = Number(l.unitPrice) || 0;
+  if (cost <= 0 || price <= 0) return null;
+  const margin = ((price - cost) / price) * 100;
+  if (margin < 15) return `Margen bajo (${margin.toFixed(0)}%)`;
+  if (margin < 20) return `Margen ajustado (${margin.toFixed(0)}%)`;
+  return null;
+}
+
+function solutionPreviewItems(template: "CCTV" | "WIFI" | "ACCESS", cfg: {
+  cameras: number;
+  storageDays: number;
+  accessPoints: number;
+  doors: number;
+}) {
+  if (template === "CCTV") {
+    const channels = Math.max(16, Math.ceil(cfg.cameras / 8) * 8);
+    const tb = Math.max(2, Math.ceil((cfg.cameras * cfg.storageDays) / 60));
+    return [
+      { icon: "📷", text: `${cfg.cameras} cámara${cfg.cameras === 1 ? "" : "s"} IP (exterior/interior)` },
+      { icon: "🖥️", text: `NVR ~${channels} canales` },
+      { icon: "💾", text: `Disco HDD ~${tb} TB (${cfg.storageDays} días de grabación)` },
+      { icon: "🔌", text: `Switch PoE (${Math.ceil(cfg.cameras / 16) || 1} u.)` },
+      { icon: "🔋", text: "UPS sugerido (si aplica)" },
+      { icon: "🛠️", text: "Instalación / cableado (opcional)" },
+    ];
+  }
+  if (template === "WIFI") {
+    return [
+      { icon: "📶", text: `${cfg.accessPoints} access point${cfg.accessPoints === 1 ? "" : "s"} WiFi` },
+      { icon: "🔌", text: `Switch PoE (${Math.ceil(cfg.accessPoints / 12) || 1} u.)` },
+      { icon: "🛠️", text: "Instalación en sitio" },
+    ];
+  }
+  return [
+    { icon: "🚪", text: `${cfg.doors} punto${cfg.doors === 1 ? "" : "s"} de acceso` },
+    { icon: "🪪", text: "Lectores / controladora" },
+    { icon: "🔐", text: "Cerraduras magnéticas / pestillos" },
+    { icon: "🛠️", text: "Instalación y configuración" },
+  ];
 }
 
 /** CT Cloudflare bloquea hotlink con Referer; servimos vía proxy same-origin. */
@@ -108,6 +224,158 @@ function ProductThumb({ src, alt }: { src: string | null; alt: string }) {
   );
 }
 
+function OfferStockRow({
+  offer,
+  preferredCodes,
+}: {
+  offer: SmartOffer;
+  preferredCodes: string[];
+}) {
+  const prefQty = stockAtPreferred(offer.stockByWarehouse, preferredCodes) || offer.stockPreferred;
+  const prefCity = warehouseLabel(preferredCodes[0] ?? "PUE");
+  let chips = aggregateStockChips(offer.stockByWarehouse, preferredCodes);
+  if (!chips.length && offer.stockTotal > 0) {
+    chips = [{ city: "Red CT", qty: offer.stockTotal, preferred: prefQty > 0 }];
+  }
+  const eta = formatEta(offer.leadTimeDays);
+  const etaFast = offer.leadTimeDays <= 1;
+
+  if (!offer.stockTotal) {
+    return (
+      <div className={styles.sqStockRow}>
+        <span className={`${styles.sqWhChip} ${styles.sqWhChipEmpty}`}>Sin stock CT</span>
+        <span className={`${styles.sqEtaChip} ${styles.sqEtaChipWarn}`}>{eta}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.sqStockRow}>
+      <div className={styles.sqWhChips}>
+        {chips.map((c) => (
+          <span
+            key={c.city}
+            className={`${styles.sqWhChip} ${c.preferred ? styles.sqWhChipPref : ""}`}
+            title={`Stock en ${c.city}`}
+          >
+            {c.city} {c.qty}
+          </span>
+        ))}
+      </div>
+      {prefQty > 0 ? (
+        <span className={styles.sqPickupBadge} title={`Recoger en ${prefCity}`}>
+          Recoger · {prefCity}
+        </span>
+      ) : (
+        <span className={styles.sqPickupBadgeRemote}>Pedir traslado</span>
+      )}
+      <span className={`${styles.sqEtaChip} ${etaFast ? styles.sqEtaChipFast : ""}`}>{eta}</span>
+    </div>
+  );
+}
+
+function OfferBadges({ offer }: { offer: SmartOffer }) {
+  const chips: Array<{ key: string; label: string; className: string }> = [];
+  for (const b of offer.badges || []) {
+    const meta = BADGE_META[b];
+    if (meta) chips.push({ key: b, label: meta.label, className: styles[meta.className as keyof typeof styles] as string });
+  }
+  if (offerHasPromo(offer)) {
+    chips.push({ key: "promo", label: "Promo", className: styles.sqBadgePromo });
+  }
+  if (offer.protegido) {
+    chips.push({ key: "protegido", label: "Protegido", className: styles.sqBadgeProtected });
+  }
+  if (offer.moneda?.toUpperCase() === "USD" && offer.tipoCambio) {
+    chips.push({
+      key: "fx",
+      label: `USD TC ${offer.tipoCambio.toFixed(2)}`,
+      className: styles.sqBadgeFx,
+    });
+  }
+  if (!chips.length) return null;
+  return (
+    <div className={styles.sqBadgeRow}>
+      {chips.map((c) => (
+        <span key={c.key} className={`${styles.sqBadgeChip} ${c.className}`}>
+          {c.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function OfferMetaLine({ offer }: { offer: SmartOffer }) {
+  const parts: Array<{ label: string; value: string }> = [];
+  if (offer.marca) parts.push({ label: "Marca", value: offer.marca });
+  if (offer.clave) parts.push({ label: "Clave", value: offer.clave });
+  if (offer.numParte) parts.push({ label: "P/N", value: offer.numParte });
+  if (offer.modelo) parts.push({ label: "Modelo", value: offer.modelo });
+  if (!parts.length) return null;
+  return (
+    <div className={styles.sqMetaLine}>
+      {parts.map((p) => (
+        <span key={p.label}>
+          <strong>{p.label}</strong>
+          {p.value}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function CtStatusBar({
+  ctStatus,
+  preferredWarehouse,
+}: {
+  ctStatus: {
+    total: number;
+    withStock?: number;
+    lastSync: { finishedAt?: string } | null;
+    preferredWarehouse?: string;
+  } | null;
+  preferredWarehouse: string;
+}) {
+  if (!ctStatus) return null;
+  const wh = preferredWarehouse || ctStatus.preferredWarehouse || "PUE";
+  return (
+    <div className={styles.sqHeaderMeta}>
+      {ctStatus.lastSync?.finishedAt ? (
+        <span className={styles.sqHeaderMetaItem}>
+          <strong>Sync CT</strong> {formatSyncTime(ctStatus.lastSync.finishedAt)}
+        </span>
+      ) : null}
+      {ctStatus.withStock != null ? (
+        <span className={styles.sqHeaderMetaItem}>
+          <strong>Con stock</strong> {ctStatus.withStock.toLocaleString("es-MX")}
+        </span>
+      ) : null}
+      <span className={styles.sqHeaderMetaItem}>
+        <strong>Recoger</strong> {warehouseLabel(wh)}
+      </span>
+      <span className={styles.sqHeaderMetaItem}>
+        <strong>Catálogo</strong> {ctStatus.total.toLocaleString("es-MX")} SKUs
+      </span>
+    </div>
+  );
+}
+
+function CartLineMeta({ line, showCosts }: { line: QuoteLinePayload; showCosts: boolean }) {
+  const warn = showCosts ? lineMarginWarning(line) : null;
+  return (
+    <div className={styles.sqPosLineMeta}>
+      {line.leadTimeDays != null ? (
+        <span className={`${styles.sqEtaChip} ${line.leadTimeDays <= 1 ? styles.sqEtaChipFast : ""}`}>
+          {formatEta(line.leadTimeDays)}
+        </span>
+      ) : null}
+      {line.stockSnapshot != null && line.stockSnapshot > 0 ? (
+        <span>{line.stockSnapshot} u. CT</span>
+      ) : null}
+      {warn ? <span className={styles.sqMarginWarn}>{warn}</span> : null}
+    </div>
+  );
+}
 
 /** CT publica precios sin IVA; unitPrice/unitCost son netos y tax% se suma aquí. */
 function lineAmounts(l: QuoteLinePayload) {
@@ -152,7 +420,17 @@ export default function SmartQuoteBuilderPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [ctStatus, setCtStatus] = useState<{ total: number; lastSync: { finishedAt?: string } | null } | null>(null);
+  const [ctStatus, setCtStatus] = useState<{
+    total: number;
+    withStock?: number;
+    lastSync: { finishedAt?: string } | null;
+    preferredWarehouse?: string;
+  } | null>(null);
+  const [preferredWarehouse, setPreferredWarehouse] = useState("PUE");
+  const [logisticsZones, setLogisticsZones] = useState<LogisticsZone[]>(FALLBACK_ZONES);
+  const [subModalClave, setSubModalClave] = useState<string | null>(null);
+  const [substitutes, setSubstitutes] = useState<SmartOffer[]>([]);
+  const [loadingSubstitutes, setLoadingSubstitutes] = useState(false);
   const [marginAlert, setMarginAlert] = useState<string | null>(null);
   const [copilotPrompt, setCopilotPrompt] = useState("");
   const [copilotQuestions, setCopilotQuestions] = useState<string[]>([]);
@@ -161,8 +439,8 @@ export default function SmartQuoteBuilderPage() {
   const [filterCategory, setFilterCategory] = useState("");
   const [inStockOnly, setInStockOnly] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
-  const [facetBrands, setFacetBrands] = useState<string[]>([]);
-  const [facetCategories, setFacetCategories] = useState<string[]>([]);
+  const [facetBrands, setFacetBrands] = useState<FacetOption[]>([]);
+  const [facetCategories, setFacetCategories] = useState<FacetOption[]>([]);
   const [moreFilters, setMoreFilters] = useState(false);
   const [cfg, setCfg] = useState({
     template: "CCTV" as "CCTV" | "WIFI" | "ACCESS",
@@ -181,19 +459,24 @@ export default function SmartQuoteBuilderPage() {
         if (list.length === 1) setClientId(String(list[0].id));
       })
       .catch(() => setClients([]));
-    smartQuoteCtStatus(token).then(setCtStatus).catch(() => setCtStatus(null));
+    smartQuoteCtStatus(token)
+      .then((s) => {
+        setCtStatus(s);
+        if (s.preferredWarehouse) setPreferredWarehouse(s.preferredWarehouse);
+      })
+      .catch(() => setCtStatus(null));
     smartQuoteFacets(token)
       .then((f) => {
         setFacetBrands(
           (f.brands || [])
-            .map((b) => b.name)
-            .filter((n): n is string => Boolean(n))
+            .filter((b): b is { name: string; count: number } => Boolean(b.name))
+            .map((b) => ({ name: b.name!, count: b.count }))
             .slice(0, 40),
         );
         setFacetCategories(
           (f.categories || [])
-            .map((c) => c.name)
-            .filter((n): n is string => Boolean(n))
+            .filter((c): c is { name: string; count: number } => Boolean(c.name))
+            .map((c) => ({ name: c.name!, count: c.count }))
             .slice(0, 30),
         );
       })
@@ -201,6 +484,11 @@ export default function SmartQuoteBuilderPage() {
         setFacetBrands([]);
         setFacetCategories([]);
       });
+    smartQuoteLogistics(token)
+      .then((zones) => {
+        if (zones?.length) setLogisticsZones(zones);
+      })
+      .catch(() => setLogisticsZones(FALLBACK_ZONES));
   }, [token]);
 
   useEffect(() => {
@@ -208,6 +496,18 @@ export default function SmartQuoteBuilderPage() {
     const t = setTimeout(() => setToast(null), 1800);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    if (!token || !subModalClave) {
+      setSubstitutes([]);
+      return;
+    }
+    setLoadingSubstitutes(true);
+    smartQuoteSubstitutes(token, subModalClave, { optimize, targetMargin, take: 12 })
+      .then(setSubstitutes)
+      .catch(() => setSubstitutes([]))
+      .finally(() => setLoadingSubstitutes(false));
+  }, [token, subModalClave, optimize, targetMargin]);
 
   const client = useMemo(() => clients.find((c) => String(c.id) === clientId), [clients, clientId]);
 
@@ -261,6 +561,13 @@ export default function SmartQuoteBuilderPage() {
   const step1Done = canGoStep2;
   const step2Done = canGoStep3;
 
+  const pickupWarehouseCodes = useMemo(() => {
+    if (cfg.zone === "LOCAL_PUE") return codesForCity("Puebla");
+    const wh = preferredWarehouse || ctStatus?.preferredWarehouse || "PUE";
+    const city = warehouseLabel(wh);
+    return [...new Set([wh, ...codesForCity(city)])];
+  }, [cfg.zone, preferredWarehouse, ctStatus?.preferredWarehouse]);
+
   const runSearch = useCallback(
     async (qOverride?: string, signal?: AbortSignal) => {
       if (!token) return;
@@ -285,6 +592,7 @@ export default function SmartQuoteBuilderPage() {
         );
         if (signal?.aborted) return;
         setOffers(res.data);
+        if (res.meta?.preferredWarehouse) setPreferredWarehouse(res.meta.preferredWarehouse);
         if (!res.data.length) {
           setToast("Sin coincidencias. Prueba otra palabra o quita Stock.");
         }
@@ -537,6 +845,10 @@ export default function SmartQuoteBuilderPage() {
   const catalogHint = ctStatus
     ? `${ctStatus.total.toLocaleString("es-MX")} productos del mayorista listos para cotizar`
     : "Catálogo del mayorista listo para cotizar";
+  const solutionPreview = useMemo(
+    () => solutionPreviewItems(cfg.template, cfg),
+    [cfg.template, cfg.cameras, cfg.storageDays, cfg.accessPoints, cfg.doors],
+  );
 
   return (
     <div className={`${styles.sq} ${exploring ? styles.sqExploreMode : ""}`}>
@@ -547,11 +859,14 @@ export default function SmartQuoteBuilderPage() {
         title="Cotizador profesional"
         subtitle={`${catalogHint}. Explora, filtra y cambia prioridad en tiempo real mientras armas la propuesta.`}
         meta={
-          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-            <Link href="/crm/quotes" style={{ color: "var(--text-tertiary)" }}>
-              Volver a cotizaciones
-            </Link>
-          </span>
+          <>
+            <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+              <Link href="/crm/quotes" style={{ color: "var(--text-tertiary)" }}>
+                Volver a cotizaciones
+              </Link>
+            </span>
+            <CtStatusBar ctStatus={ctStatus} preferredWarehouse={preferredWarehouse} />
+          </>
         }
         actions={
           <Button variant="ghost" size="sm" onClick={() => setShowCosts((v) => !v)}>
@@ -567,6 +882,7 @@ export default function SmartQuoteBuilderPage() {
           </Link>
           <span className={styles.sqExploreTitle}>Explorador CT</span>
           <span className={styles.sqExploreHint}>{catalogHint}</span>
+          <CtStatusBar ctStatus={ctStatus} preferredWarehouse={preferredWarehouse} />
         </div>
         <div className={styles.sqExploreTopActions}>
           <Link href="/crm/quotes" className={styles.sqMiniStep} style={{ textDecoration: "none" }}>
@@ -737,8 +1053,10 @@ export default function SmartQuoteBuilderPage() {
                   >
                     <span className={styles.sqPathIcon}>🔎</span>
                     <span className={styles.sqPathTitle}>Buscar productos</span>
-                    <span className={styles.sqPathDesc}>Ideal si ya sabes qué equipo necesitas.</span>
-                    <span className={styles.sqPathMeta}>Lo más usado</span>
+                    <span className={styles.sqPathDesc}>
+                      Explora el catálogo CT con stock por almacén, filtros por marca y ranking en vivo según tu prioridad.
+                    </span>
+                    <span className={styles.sqPathMeta}>Lo más usado · chips de almacén</span>
                   </button>
                   <button
                     type="button"
@@ -747,8 +1065,10 @@ export default function SmartQuoteBuilderPage() {
                   >
                     <span className={styles.sqPathIcon}>🧩</span>
                     <span className={styles.sqPathTitle}>Armar solución</span>
-                    <span className={styles.sqPathDesc}>Dices el alcance y te proponemos el paquete.</span>
-                    <span className={styles.sqPathMeta}>CCTV · WiFi · Acceso</span>
+                    <span className={styles.sqPathDesc}>
+                      Describe el alcance (cámaras, APs, puertas) y armamos BOM con NVR, HDD, switch e instalación.
+                    </span>
+                    <span className={styles.sqPathMeta}>CCTV · WiFi · Acceso · preview en vivo</span>
                   </button>
                   <button
                     type="button"
@@ -757,8 +1077,10 @@ export default function SmartQuoteBuilderPage() {
                   >
                     <span className={styles.sqPathIcon}>💬</span>
                     <span className={styles.sqPathTitle}>Describirlo</span>
-                    <span className={styles.sqPathDesc}>Lo escribes como se lo dirías a un colega.</span>
-                    <span className={styles.sqPathMeta}>Borrador automático</span>
+                    <span className={styles.sqPathDesc}>
+                      Escribe el proyecto en lenguaje natural; generamos borrador con precios CT y stock real.
+                    </span>
+                    <span className={styles.sqPathMeta}>Copiloto · borrador automático</span>
                   </button>
                 </div>
               </div>
@@ -888,8 +1210,8 @@ export default function SmartQuoteBuilderPage() {
                       >
                         <option value="">Todas las marcas</option>
                         {facetBrands.map((b) => (
-                          <option key={b} value={b}>
-                            {b}
+                          <option key={b.name} value={b.name}>
+                            {b.name} ({b.count.toLocaleString("es-MX")})
                           </option>
                         ))}
                       </select>
@@ -901,8 +1223,8 @@ export default function SmartQuoteBuilderPage() {
                       >
                         <option value="">Categoría</option>
                         {facetCategories.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
+                          <option key={c.name} value={c.name}>
+                            {c.name} ({c.count.toLocaleString("es-MX")})
                           </option>
                         ))}
                       </select>
@@ -947,32 +1269,44 @@ export default function SmartQuoteBuilderPage() {
                   {offers.map((o) => {
                     const inCart = offerCartQty(o);
                     return (
-                      <button
+                      <div
                         key={o.id}
-                        type="button"
                         role="listitem"
                         className={`${styles.sqDenseRow} ${inCart ? styles.sqDenseRowOn : ""}`}
-                        onClick={() => addOffer(o, 1)}
-                        title="Clic para agregar +1"
                       >
-                        <ProductThumb src={o.imagen} alt="" />
-                        <div className={styles.sqDenseBody}>
-                          <div className={styles.sqDenseName}>{o.nombre}</div>
-                          <div className={styles.sqDenseMeta}>
-                            {[o.marca, o.clave].filter(Boolean).join(" · ")}
-                            {" · "}
-                            <span className={o.stockTotal > 0 ? styles.sqStockOk : styles.sqStockWarn}>
-                              {o.stockTotal > 0 ? `${o.stockTotal} u.` : "Sin stock"}
-                            </span>
-                            {showCosts ? ` · CT ${money(o.costMxn)}` : ""}
+                        <button
+                          type="button"
+                          className={styles.sqDenseRowMain}
+                          onClick={() => addOffer(o, 1)}
+                          title="Clic para agregar +1"
+                        >
+                          <ProductThumb src={o.imagen} alt="" />
+                          <div className={styles.sqDenseBody}>
+                            <div className={styles.sqDenseName}>{o.nombre}</div>
+                            <OfferMetaLine offer={o} />
+                            <OfferBadges offer={o} />
+                            {showCosts ? (
+                              <div className={styles.sqDenseMeta}>CT {money(o.costMxn)} · venta {money(o.sellPriceSuggested)}</div>
+                            ) : null}
+                            <OfferStockRow offer={o} preferredCodes={pickupWarehouseCodes} />
                           </div>
-                        </div>
-                        <div className={styles.sqDensePriceCol}>
-                          <div className={styles.sqDensePrice}>{money(o.sellPriceSuggested)}</div>
-                          <div className={styles.sqDenseTax}>venta neto · +IVA</div>
-                        </div>
+                          <div className={styles.sqDensePriceCol}>
+                            <div className={styles.sqDensePrice}>{money(o.sellPriceSuggested)}</div>
+                            <div className={styles.sqDenseTax}>venta neto · +IVA</div>
+                          </div>
+                        </button>
+                        {o.clave ? (
+                          <button
+                            type="button"
+                            className={styles.sqSubstBtn}
+                            onClick={() => setSubModalClave(o.clave!)}
+                            title="Ver sustitutos"
+                          >
+                            ↔ Alt.
+                          </button>
+                        ) : null}
                         {inCart > 0 ? <span className={styles.sqDenseBadge}>×{inCart}</span> : null}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -1020,16 +1354,26 @@ export default function SmartQuoteBuilderPage() {
                         </div>
                         <div className={styles.sqProductBody}>
                           <div className={styles.sqProductName}>{o.nombre}</div>
-                          <div className={styles.sqProductMeta}>
-                            {[o.marca, o.clave].filter(Boolean).join(" · ")}
-                            {" · "}
-                            <span className={o.stockTotal > 0 ? styles.sqStockOk : styles.sqStockWarn}>
-                              {o.stockTotal > 0 ? `${o.stockTotal} u.` : "Sin stock"}
-                            </span>
-                          </div>
-                          <div>
-                            <div className={styles.sqProductPrice}>{money(o.sellPriceSuggested)}</div>
-                            <div className={styles.sqProductCost}>sin IVA · clic = +1</div>
+                          <OfferMetaLine offer={o} />
+                          <OfferBadges offer={o} />
+                          <OfferStockRow offer={o} preferredCodes={pickupWarehouseCodes} />
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                            <div>
+                              <div className={styles.sqProductPrice}>{money(o.sellPriceSuggested)}</div>
+                              <div className={styles.sqProductCost}>sin IVA · clic = +1</div>
+                            </div>
+                            {o.clave ? (
+                              <button
+                                type="button"
+                                className={styles.sqSubstBtn}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSubModalClave(o.clave!);
+                                }}
+                              >
+                                ↔ Alt.
+                              </button>
+                            ) : null}
                           </div>
                         </div>
                       </article>
@@ -1055,92 +1399,155 @@ export default function SmartQuoteBuilderPage() {
           {step === 2 && path === "solution" && (
             <section className={styles.sqCard}>
               <div>
-                <h2 className={styles.sqCardTitle}>Cuéntanos el alcance</h2>
+                <h2 className={styles.sqCardTitle}>Arma una solución completa</h2>
                 <p className={styles.sqCardLead}>
-                  Con estos datos armamos una propuesta completa: equipos, instalación y entrega.
+                  Elige el tipo de proyecto, ajusta cantidades y zona de entrega. Incluimos equipos, accesorios e instalación sugerida.
                 </p>
               </div>
 
-              <div className={styles.sqChips}>
-                {(
-                  [
-                    { id: "CCTV" as const, label: "Videovigilancia" },
-                    { id: "WIFI" as const, label: "Red WiFi" },
-                    { id: "ACCESS" as const, label: "Control de acceso" },
-                  ] as const
-                ).map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className={`${styles.sqChip} ${cfg.template === t.id ? styles.sqChipOn : ""}`}
-                    onClick={() => setCfg({ ...cfg, template: t.id })}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
+              <div className={styles.sqSolutionGrid}>
+                <div className={styles.sqSolutionTemplates}>
+                  {(
+                    [
+                      {
+                        id: "CCTV" as const,
+                        icon: "📹",
+                        title: "Videovigilancia",
+                        desc: "Cámaras IP + grabador NVR, almacenamiento HDD y red PoE para el sitio.",
+                        includes: ["Cámaras", "NVR", "HDD", "Switch PoE"],
+                      },
+                      {
+                        id: "WIFI" as const,
+                        icon: "📶",
+                        title: "Red WiFi",
+                        desc: "Cobertura inalámbrica con access points gestionados y switch PoE.",
+                        includes: ["Access points", "Switch PoE", "Instalación"],
+                      },
+                      {
+                        id: "ACCESS" as const,
+                        icon: "🚪",
+                        title: "Control de acceso",
+                        desc: "Lectores, controladora y cerraduras para puertas peatonales o vehiculares.",
+                        includes: ["Lectores", "Controladora", "Cerraduras"],
+                      },
+                    ] as const
+                  ).map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className={`${styles.sqSolutionCard} ${cfg.template === t.id ? styles.sqSolutionCardOn : ""}`}
+                      onClick={() => setCfg({ ...cfg, template: t.id })}
+                    >
+                      <span className={styles.sqSolutionIcon} aria-hidden>
+                        {t.icon}
+                      </span>
+                      <span>
+                        <div className={styles.sqSolutionCardTitle}>{t.title}</div>
+                        <div className={styles.sqSolutionCardDesc}>{t.desc}</div>
+                        <div className={styles.sqSolutionIncludes}>
+                          {t.includes.map((inc) => (
+                            <span key={inc} className={styles.sqSolutionIncludeChip}>
+                              {inc}
+                            </span>
+                          ))}
+                        </div>
+                      </span>
+                    </button>
+                  ))}
 
-              <div className={styles.sqFieldGrid}>
-                {cfg.template === "CCTV" && (
-                  <>
-                    <label className={styles.sqLabel}>
-                      Número de cámaras
-                      <input
-                        className={styles.sqInput}
-                        type="number"
-                        min={1}
-                        value={cfg.cameras}
-                        onChange={(e) => setCfg({ ...cfg, cameras: Number(e.target.value) || 1 })}
-                      />
-                    </label>
-                    <label className={styles.sqLabel}>
-                      Días de grabación
-                      <input
-                        className={styles.sqInput}
-                        type="number"
-                        min={7}
-                        value={cfg.storageDays}
-                        onChange={(e) => setCfg({ ...cfg, storageDays: Number(e.target.value) || 30 })}
-                      />
-                    </label>
-                  </>
-                )}
-                {cfg.template === "WIFI" && (
-                  <label className={styles.sqLabel}>
-                    Access points
-                    <input
-                      className={styles.sqInput}
-                      type="number"
-                      min={1}
-                      value={cfg.accessPoints}
-                      onChange={(e) => setCfg({ ...cfg, accessPoints: Number(e.target.value) || 1 })}
-                    />
-                  </label>
-                )}
-                {cfg.template === "ACCESS" && (
-                  <label className={styles.sqLabel}>
-                    Puertas a controlar
-                    <input
-                      className={styles.sqInput}
-                      type="number"
-                      min={1}
-                      value={cfg.doors}
-                      onChange={(e) => setCfg({ ...cfg, doors: Number(e.target.value) || 1 })}
-                    />
-                  </label>
-                )}
-                <label className={styles.sqLabel}>
-                  Zona de entrega / instalación
-                  <select
-                    className={styles.sqSelect}
-                    value={cfg.zone}
-                    onChange={(e) => setCfg({ ...cfg, zone: e.target.value })}
-                  >
-                    <option value="LOCAL_PUE">Local · Puebla</option>
-                    <option value="CDMX">Ciudad de México</option>
-                    <option value="FORANEO">Foráneo</option>
-                  </select>
-                </label>
+                  <div className={styles.sqFieldGrid}>
+                    {cfg.template === "CCTV" && (
+                      <>
+                        <label className={styles.sqLabel}>
+                          Número de cámaras
+                          <input
+                            className={styles.sqInput}
+                            type="number"
+                            min={1}
+                            value={cfg.cameras}
+                            onChange={(e) => setCfg({ ...cfg, cameras: Number(e.target.value) || 1 })}
+                          />
+                        </label>
+                        <label className={styles.sqLabel}>
+                          Días de grabación
+                          <input
+                            className={styles.sqInput}
+                            type="number"
+                            min={7}
+                            value={cfg.storageDays}
+                            onChange={(e) => setCfg({ ...cfg, storageDays: Number(e.target.value) || 30 })}
+                          />
+                        </label>
+                      </>
+                    )}
+                    {cfg.template === "WIFI" && (
+                      <label className={styles.sqLabel}>
+                        Access points
+                        <input
+                          className={styles.sqInput}
+                          type="number"
+                          min={1}
+                          value={cfg.accessPoints}
+                          onChange={(e) => setCfg({ ...cfg, accessPoints: Number(e.target.value) || 1 })}
+                        />
+                      </label>
+                    )}
+                    {cfg.template === "ACCESS" && (
+                      <label className={styles.sqLabel}>
+                        Puertas a controlar
+                        <input
+                          className={styles.sqInput}
+                          type="number"
+                          min={1}
+                          value={cfg.doors}
+                          onChange={(e) => setCfg({ ...cfg, doors: Number(e.target.value) || 1 })}
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className={styles.sqLabel} style={{ marginBottom: 8 }}>
+                      Zona de entrega / instalación
+                    </div>
+                    <div className={styles.sqZoneGrid}>
+                      {logisticsZones.map((z) => (
+                        <button
+                          key={z.zoneCode}
+                          type="button"
+                          className={`${styles.sqZoneOption} ${cfg.zone === z.zoneCode ? styles.sqZoneOptionOn : ""}`}
+                          onClick={() => setCfg({ ...cfg, zone: z.zoneCode })}
+                        >
+                          <span>
+                            <div className={styles.sqZoneName}>{z.zoneName}</div>
+                            <div className={styles.sqZoneHint}>
+                              Logística estimada {money(Number(z.basePrice))} · costo {money(Number(z.baseCost))}
+                            </div>
+                          </span>
+                          {cfg.zone === z.zoneCode ? <span aria-hidden>✓</span> : null}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.sqSolutionPreview}>
+                  <div className={styles.sqSolutionPreviewTitle}>Tu paquete incluirá</div>
+                  <ul className={styles.sqSolutionPreviewList}>
+                    {solutionPreview.map((item) => (
+                      <li key={item.text} className={styles.sqSolutionPreviewItem}>
+                        <span className={styles.sqSolutionPreviewIcon} aria-hidden>
+                          {item.icon}
+                        </span>
+                        <span>{item.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className={styles.sqSolutionPreviewHint}>
+                    Buscamos equipos con stock CT según tu prioridad ({PRIORITIES.find((p) => p.id === optimize)?.label}).
+                    Puedes ajustar todo después en el explorador o en confirmar.
+                  </div>
+                </div>
               </div>
 
               <div className={styles.sqFooter}>
@@ -1148,7 +1555,7 @@ export default function SmartQuoteBuilderPage() {
                   Atrás
                 </Button>
                 <Button variant="primary" size="lg" onClick={() => void runConfigure()} loading={loadingAction}>
-                  Armar propuesta
+                  Armar propuesta completa
                 </Button>
               </div>
             </section>
@@ -1270,6 +1677,7 @@ export default function SmartQuoteBuilderPage() {
               {lines.map((l, idx) => (
                 <div key={`${l.sku || l.name}-${idx}`} className={styles.sqPosLine}>
                   <div className={styles.sqPosLineName}>{shortName(l.name, 36)}</div>
+                  <CartLineMeta line={l} showCosts={showCosts} />
                   <div className={styles.sqPosLineControls}>
                     <button type="button" className={styles.sqQtyBtn} onClick={() => bumpLineQty(idx, -1)} aria-label="Menos">
                       −
@@ -1400,6 +1808,7 @@ export default function SmartQuoteBuilderPage() {
                         ✕
                       </button>
                     </div>
+                    <CartLineMeta line={l} showCosts={showCosts} />
                     <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
                       <span style={{ color: "var(--text-tertiary)" }}>Cant.</span>
                       <input
@@ -1510,6 +1919,50 @@ export default function SmartQuoteBuilderPage() {
         </div>
       </div>
       )}
+
+      <Modal
+        open={Boolean(subModalClave)}
+        onClose={() => setSubModalClave(null)}
+        title={subModalClave ? `Alternativas · ${subModalClave}` : "Alternativas"}
+        maxWidth={640}
+      >
+        {loadingSubstitutes ? (
+          <div className={styles.sqHelp}>Buscando sustitutos con stock CT…</div>
+        ) : substitutes.length === 0 ? (
+          <EmptyState
+            icon="↔"
+            title="Sin alternativas"
+            description="No encontramos sustitutos compatibles para este SKU."
+          />
+        ) : (
+          <div className={styles.sqSubstList}>
+            {substitutes.map((o) => (
+              <div key={o.id} className={styles.sqSubstRow}>
+                <ProductThumb src={o.imagen} alt="" />
+                <div>
+                  <div className={styles.sqDenseName}>{o.nombre}</div>
+                  <OfferMetaLine offer={o} />
+                  <OfferBadges offer={o} />
+                  <OfferStockRow offer={o} preferredCodes={pickupWarehouseCodes} />
+                  <div className={styles.sqDenseMeta} style={{ marginTop: 6 }}>
+                    {money(o.sellPriceSuggested)} venta · CT {money(o.costMxn)}
+                  </div>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    addOffer(o, 1);
+                    setSubModalClave(null);
+                  }}
+                >
+                  Agregar
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
