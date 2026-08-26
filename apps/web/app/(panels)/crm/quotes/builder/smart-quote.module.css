@@ -216,14 +216,10 @@
 }
 
 .sqDenseRow {
-  appearance: none;
   width: 100%;
-  text-align: left;
-  cursor: pointer;
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto auto;
-  gap: 10px;
+  display: flex;
   align-items: center;
+  gap: 8px;
   padding: 6px 8px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1173,6 +1169,31 @@
   color: #b45309;
 }
 
+.sqStockLoc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+  font-size: 11px;
+  line-height: 1.35;
+  margin-top: 3px;
+  color: var(--text-tertiary);
+}
+
+.sqStockLocPickup {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.sqStockLocRemote {
+  color: #b45309;
+}
+
+.sqStockLocDetail {
+  color: var(--text-tertiary);
+  opacity: 0.92;
+}
+
 .sqRailCard {
   border: 1px solid var(--border);
   border-radius: var(--sq-radius);
@@ -1333,6 +1354,454 @@
   }
 
   .sqSpecs {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Warehouse / badge chips (CT Explorer) ─────────────────────── */
+
+.sqStockRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.sqWhChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.sqWhChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 750;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #15803d 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, #15803d 28%, var(--border));
+  color: #166534;
+  line-height: 1.2;
+}
+
+.sqWhChipPref {
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.sqWhChipEmpty {
+  background: color-mix(in srgb, #b45309 8%, var(--surface));
+  border-color: color-mix(in srgb, #b45309 30%, var(--border));
+  color: #92400e;
+}
+
+.sqPickupBadge {
+  font-size: 11px;
+  font-weight: 750;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, #15803d 12%, var(--surface));
+  color: #15803d;
+  border: 1px solid color-mix(in srgb, #15803d 25%, var(--border));
+}
+
+.sqPickupBadgeRemote {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, #b45309 10%, var(--surface));
+  color: #b45309;
+  border: 1px solid color-mix(in srgb, #b45309 28%, var(--border));
+}
+
+.sqEtaChip {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.sqEtaChipFast {
+  background: color-mix(in srgb, #16a34a 12%, var(--surface));
+  border-color: color-mix(in srgb, #16a34a 30%, var(--border));
+  color: #15803d;
+}
+
+.sqEtaChipWarn {
+  background: color-mix(in srgb, #b45309 10%, var(--surface));
+  border-color: color-mix(in srgb, #b45309 30%, var(--border));
+  color: #b45309;
+}
+
+.sqBadgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.sqBadgeChip {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.sqBadgePrice {
+  background: color-mix(in srgb, #2563eb 10%, var(--surface));
+  border-color: color-mix(in srgb, #2563eb 28%, var(--border));
+  color: #1d4ed8;
+}
+
+.sqBadgeStock {
+  background: color-mix(in srgb, #16a34a 10%, var(--surface));
+  border-color: color-mix(in srgb, #16a34a 28%, var(--border));
+  color: #15803d;
+}
+
+.sqBadgeSpeed {
+  background: color-mix(in srgb, #0891b2 10%, var(--surface));
+  border-color: color-mix(in srgb, #0891b2 28%, var(--border));
+  color: #0e7490;
+}
+
+.sqBadgeRec {
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+  color: var(--primary);
+}
+
+.sqBadgePromo {
+  background: color-mix(in srgb, #db2777 10%, var(--surface));
+  border-color: color-mix(in srgb, #db2777 28%, var(--border));
+  color: #be185d;
+}
+
+.sqBadgeProtected {
+  background: color-mix(in srgb, #7c3aed 10%, var(--surface));
+  border-color: color-mix(in srgb, #7c3aed 28%, var(--border));
+  color: #6d28d9;
+}
+
+.sqBadgeFx {
+  background: color-mix(in srgb, #ca8a04 10%, var(--surface));
+  border-color: color-mix(in srgb, #ca8a04 28%, var(--border));
+  color: #a16207;
+}
+
+.sqMetaLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.35;
+}
+
+.sqMetaLine span strong {
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-right: 3px;
+}
+
+.sqHeaderMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+.sqHeaderMetaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.sqHeaderMetaItem strong {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.sqSubstBtn {
+  appearance: none;
+  flex-shrink: 0;
+  align-self: center;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 6px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sqSubstBtn:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+  color: var(--primary);
+}
+
+.sqDenseRowMain {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+}
+
+.sqPosLineMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+}
+
+.sqMarginWarn {
+  font-weight: 700;
+  color: #b45309;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, #b45309 10%, var(--surface));
+}
+
+.sqSubstList {
+  display: grid;
+  gap: 8px;
+  max-height: min(60vh, 420px);
+  overflow: auto;
+}
+
+.sqSubstRow {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.sqSubstRow:hover {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+}
+
+/* ── Solution builder ──────────────────────────────────────────── */
+
+.sqSolutionGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.sqSolutionTemplates {
+  display: grid;
+  gap: 10px;
+}
+
+.sqSolutionCard {
+  appearance: none;
+  text-align: left;
+  cursor: pointer;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.sqSolutionCard:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.sqSolutionCardOn {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.sqSolutionIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.sqSolutionCardTitle {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.sqSolutionCardDesc {
+  margin-top: 4px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.sqSolutionIncludes {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sqSolutionIncludeChip {
+  font-size: 11px;
+  font-weight: 650;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.sqSolutionPreview {
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+  border-radius: 16px;
+  padding: 16px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--primary) 8%, var(--surface)),
+    var(--surface)
+  );
+  display: grid;
+  gap: 12px;
+}
+
+.sqSolutionPreviewTitle {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.sqSolutionPreviewList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sqSolutionPreviewItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.sqSolutionPreviewIcon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.sqSolutionPreviewHint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.45;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.sqZoneGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.sqZoneOption {
+  appearance: none;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  transition: border-color 0.12s ease;
+}
+
+.sqZoneOption:hover {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+}
+
+.sqZoneOptionOn {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+
+.sqZoneName {
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--text-primary);
+}
+
+.sqZoneHint {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+@media (max-width: 960px) {
+  .sqSolutionGrid {
     grid-template-columns: 1fr;
   }
 }

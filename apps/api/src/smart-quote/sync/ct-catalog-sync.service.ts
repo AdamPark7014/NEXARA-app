@@ -3,18 +3,15 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { CtFtpConnector } from '../connectors/ct-ftp.connector.js';
 import type { NormalizedSupplierProduct, SupplierPullSource } from '../connectors/supplier-connector.js';
+import { CT_WAREHOUSE_OPTIONS, normalizeExistencia, preferredCatalogWarehouse, stockAtPreferredWarehouse, stockAtWarehouseCodes } from '../ct-warehouses.js';
 
-export function sumStock(existencia: Record<string, number> | null | undefined): number {
-  if (!existencia) return 0;
-  return Object.values(existencia).reduce((a, b) => a + (Number(b) || 0), 0);
+export function sumStock(existencia: unknown): number {
+  const normalized = normalizeExistencia(existencia);
+  return Object.values(normalized).reduce((a, b) => a + b, 0);
 }
 
-export function stockAtWarehouse(
-  existencia: Record<string, number> | null | undefined,
-  warehouse: string,
-): number {
-  if (!existencia) return 0;
-  return Number(existencia[warehouse] || 0);
+export function stockAtWarehouse(existencia: unknown, warehouse: string): number {
+  return stockAtWarehouseCodes(existencia, [warehouse]);
 }
 
 export function costMxn(price: number, currency: string, fx: number | null | undefined): number {
@@ -172,7 +169,7 @@ export class CtCatalogSyncService {
       const ct = await this.prisma.productCT.findUnique({ where: { clave: p.sku } });
       if (!ct) continue;
       const stock = sumStock(p.existencia);
-      const warehouseStock = stockAtWarehouse(p.existencia, preferred);
+      const warehouseStock = stockAtPreferredWarehouse(p.existencia, preferred);
       const leadTime = warehouseStock > 0 ? 1 : stock > 0 ? 3 : 15;
       await this.prisma.supplierProduct.upsert({
         where: {
@@ -223,6 +220,13 @@ export class CtCatalogSyncService {
       where: { supplierCode: this.connector.code, status: 'OK' },
       orderBy: { finishedAt: 'desc' },
     });
-    return { total, active, withStock, lastSync: last };
+    return {
+      total,
+      active,
+      withStock,
+      lastSync: last,
+      preferredWarehouse: preferredCatalogWarehouse(),
+      warehouses: CT_WAREHOUSE_OPTIONS,
+    };
   }
 }

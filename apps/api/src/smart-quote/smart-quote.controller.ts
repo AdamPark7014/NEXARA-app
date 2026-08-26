@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   ParseIntPipe,
   Post,
@@ -107,6 +108,21 @@ export class SmartQuoteController {
   @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW] })
   facets() {
     return this.search.facets();
+  }
+
+  @Get('product/:clave')
+  @RBAC({ anyPermissions: [PERMISSIONS.COTIZACIONES_ACCESS, PERMISSIONS.SALES_VIEW] })
+  async getProduct(
+    @Param('clave') clave: string,
+    @Query('optimize') optimize?: OptimizeMode,
+    @Query('targetMargin') targetMargin?: string,
+  ) {
+    const result = await this.search.getProduct(clave, {
+      optimize: optimize || 'BALANCE',
+      targetMarginPercent: targetMargin ? Number(targetMargin) : 30,
+    });
+    if (!result) throw new NotFoundException(`Producto CT no encontrado: ${clave}`);
+    return result;
   }
 
   @Get('substitutes/:clave')

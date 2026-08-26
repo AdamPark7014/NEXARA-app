@@ -1,6 +1,10 @@
+import { normalizeExistencia, stockAtPreferredWarehouse, stockRowsFromExistencia } from '../ct-warehouses.js';
+
 export type OptimizeMode = 'PRICE' | 'SPEED' | 'MARGIN' | 'PREMIUM' | 'BALANCE';
 
 export type ProductSpec = { tipo: string; valor: string };
+
+export type StockByWarehouseRow = { code: string; qty: number; label: string; city?: string };
 
 export type ScoredOffer = {
   id: number;
@@ -21,13 +25,16 @@ export type ScoredOffer = {
   costMxn: number;
   stockTotal: number;
   stockPreferred: number;
-  stockByWarehouse: Array<{ code: string; qty: number }>;
+  stockByWarehouse: StockByWarehouseRow[];
   leadTimeDays: number;
   protegido: boolean;
   activo: boolean;
   sustituto: string | null;
   especificaciones: ProductSpec[];
   promociones: unknown[];
+  hasPromo: boolean;
+  promocionesCount: number;
+  promocionesSummary: string[];
   score: number;
   badges: Array<'BEST_PRICE' | 'BEST_STOCK' | 'FASTEST' | 'BEST_MARGIN' | 'RECOMMENDED' | 'SUBSTITUTE'>;
   sellPriceSuggested: number;
@@ -71,12 +78,27 @@ function normalizeSpecs(value: unknown): ProductSpec[] {
     .slice(0, 12);
 }
 
-function stockBreakdown(existencia: Record<string, number>): Array<{ code: string; qty: number }> {
-  return Object.entries(existencia)
-    .map(([code, qty]) => ({ code, qty: Number(qty) || 0 }))
-    .filter((x) => x.qty > 0)
-    .sort((a, b) => b.qty - a.qty)
-    .slice(0, 8);
+function stockBreakdown(existencia: unknown): Array<{ code: string; qty: number; label: string; city?: string }> {
+  return stockRowsFromExistencia(existencia, 8);
+}
+
+function summarizePromociones(promociones: unknown[]): { count: number; summary: string[] } {
+  const list = Array.isArray(promociones) ? promociones : [];
+  const summary = list
+    .slice(0, 5)
+    .map((p) => {
+      if (!p || typeof p !== 'object') return typeof p === 'string' ? p.trim() : '';
+      const row = p as Record<string, unknown>;
+      const label = [row.nombre, row.name, row.descripcion, row.description, row.tipo, row.type]
+        .map((v) => (typeof v === 'string' ? v.trim() : ''))
+        .find((v) => v.length > 0);
+      if (label) return label;
+      const precio = row.precio ?? row.precioPromocion ?? row.price;
+      if (precio != null && String(precio).trim()) return `Promo $${precio}`;
+      return 'Promoción';
+    })
+    .filter((s): s is string => Boolean(s));
+  return { count: list.length, summary };
 }
 
 export function scoreProducts(
@@ -116,12 +138,9 @@ export function scoreProducts(
   const preferredBrands = new Set((opts.preferredBrands || []).map((b) => b.toUpperCase()));
 
   const enriched = rows.map((r) => {
-    const existencia =
-      r.existencia && typeof r.existencia === 'object' && !Array.isArray(r.existencia)
-        ? (r.existencia as Record<string, number>)
-        : {};
-    const stockTotal = Object.values(existencia).reduce((a, b) => a + (Number(b) || 0), 0);
-    const stockPreferred = Number(existencia[opts.preferredWarehouse] || 0);
+    const existencia = normalizeExistencia(r.existencia);
+    const stockTotal = Object.values(existencia).reduce((a, b) => a + b, 0);
+    const stockPreferred = stockAtPreferredWarehouse(existencia, opts.preferredWarehouse);
     const price = Number(r.precio) || 0; // CT feed = neto, sin IVA
     const currency = (r.moneda || 'MXN').toUpperCase();
     const fx = r.tipoCambio;
@@ -135,7 +154,8 @@ export function scoreProducts(
     const sellPriceSuggested =
       margin >= 0.99 ? cost * 2 : Math.round((cost / (1 - Math.max(0.01, margin))) * 100) / 100;
     const promociones = Array.isArray(r.promociones) ? r.promociones : [];
-    const hasPromo = promociones.length > 0;
+    const promoMeta = summarizePromociones(promociones);
+    const hasPromo = promoMeta.count > 0;
     return {
       ...r,
       imagen: resolveProductImage(r),
@@ -147,6 +167,8 @@ export function scoreProducts(
       sellPriceSuggested,
       marginPercent: opts.targetMarginPercent,
       hasPromo,
+      promocionesCount: promoMeta.count,
+      promocionesSummary: promoMeta.summary,
       especificaciones: normalizeSpecs(r.especificaciones),
       promociones,
       brandBoost: r.marca && preferredBrands.has(r.marca.toUpperCase()) ? 1 : 0.5,
@@ -208,6 +230,9 @@ export function scoreProducts(
       sustituto: e.sustituto,
       especificaciones: e.especificaciones,
       promociones: e.promociones,
+      hasPromo: e.hasPromo,
+      promocionesCount: e.promocionesCount,
+      promocionesSummary: e.promocionesSummary,
       score,
       badges: [],
       sellPriceSuggested: e.sellPriceSuggested,

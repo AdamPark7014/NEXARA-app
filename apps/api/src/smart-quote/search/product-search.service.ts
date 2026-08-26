@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { CtCatalogSyncService, costMxn, stockAtWarehouse, sumStock } from '../sync/ct-catalog-sync.service.js';
+import { CT_WAREHOUSE_OPTIONS, type CtWarehouseOption, stockAtPreferredWarehouse } from '../ct-warehouses.js';
+import { CtCatalogSyncService, costMxn, sumStock } from '../sync/ct-catalog-sync.service.js';
 import { scoreProducts, type OptimizeMode, type ScoredOffer } from '../scoring/quote-scoring.js';
 
-/** Campos mínimos para ranking/UI — evita jalar especificaciones/promociones pesadas. */
+/** Campos mínimos para ranking/UI — evita jalar especificaciones pesadas. */
 const SEARCH_SELECT = {
   id: true,
   clave: true,
@@ -27,6 +28,12 @@ const SEARCH_SELECT = {
   protegido: true,
   activo: true,
   sustituto: true,
+  promociones: true,
+} satisfies Prisma.ProductCTSelect;
+
+const PRODUCT_DETAIL_SELECT = {
+  ...SEARCH_SELECT,
+  especificaciones: true,
 } satisfies Prisma.ProductCTSelect;
 
 type SearchRow = Prisma.ProductCTGetPayload<{ select: typeof SEARCH_SELECT }>;
@@ -65,7 +72,15 @@ export class ProductSearchService {
     targetMarginPercent?: number;
     take?: number;
     includeSubstitutesFor?: string;
-  }): Promise<{ data: ScoredOffer[]; meta: { totalCandidates: number; mode: OptimizeMode } }> {
+  }): Promise<{
+    data: ScoredOffer[];
+    meta: {
+      totalCandidates: number;
+      mode: OptimizeMode;
+      preferredWarehouse: string;
+      warehouses: CtWarehouseOption[];
+    };
+  }> {
     const take = Math.min(Math.max(params.take || 24, 1), 60);
     const mode = params.optimize || 'BALANCE';
     const margin = params.targetMarginPercent ?? 30;
@@ -125,21 +140,20 @@ export class ProductSearchService {
     });
 
     if (inStockOnly) {
-      rows = rows.filter((r) => sumStock(r.existencia as Record<string, number>) > 0);
+      rows = rows.filter((r) => sumStock(r.existencia) > 0);
     }
 
     rows.sort((a, b) => {
-      const sa = stockAtWarehouse(a.existencia as Record<string, number>, preferred);
-      const sb = stockAtWarehouse(b.existencia as Record<string, number>, preferred);
+      const sa = stockAtPreferredWarehouse(a.existencia, preferred);
+      const sb = stockAtPreferredWarehouse(b.existencia, preferred);
       if (sb !== sa) return sb - sa;
-      return sumStock(b.existencia as Record<string, number>) - sumStock(a.existencia as Record<string, number>);
+      return sumStock(b.existencia) - sumStock(a.existencia);
     });
 
     const scored = scoreProducts(
       rows.slice(0, take).map((r) => ({
         ...r,
         especificaciones: [],
-        promociones: [],
       })),
       {
         mode,
@@ -150,7 +164,12 @@ export class ProductSearchService {
 
     return {
       data: scored,
-      meta: { totalCandidates: rows.length, mode },
+      meta: {
+        totalCandidates: rows.length,
+        mode,
+        preferredWarehouse: preferred,
+        warehouses: CT_WAREHOUSE_OPTIONS,
+      },
     };
   }
 
@@ -183,7 +202,7 @@ export class ProductSearchService {
     });
 
     return scoreProducts(
-      candidates.map((r) => ({ ...r, especificaciones: [], promociones: [] })),
+      candidates.map((r) => ({ ...r, especificaciones: [] })),
       {
         mode,
         targetMarginPercent: margin,
@@ -196,6 +215,37 @@ export class ProductSearchService {
         if (!s.badges.includes('SUBSTITUTE')) s.badges.push('SUBSTITUTE');
         return s;
       });
+  }
+
+  async getProduct(
+    clave: string,
+    params?: { optimize?: OptimizeMode; targetMarginPercent?: number },
+  ): Promise<{
+    data: ScoredOffer;
+    meta: { preferredWarehouse: string; warehouses: CtWarehouseOption[] };
+  } | null> {
+    const row = await this.prisma.productCT.findUnique({
+      where: { clave },
+      select: PRODUCT_DETAIL_SELECT,
+    });
+    if (!row) return null;
+
+    const mode = params?.optimize || 'BALANCE';
+    const margin = params?.targetMarginPercent ?? 30;
+    const preferred = this.sync.preferredWarehouse();
+    const scored = scoreProducts([row], {
+      mode,
+      targetMarginPercent: margin,
+      preferredWarehouse: preferred,
+    });
+
+    return {
+      data: scored[0],
+      meta: {
+        preferredWarehouse: preferred,
+        warehouses: CT_WAREHOUSE_OPTIONS,
+      },
+    };
   }
 
   async facets() {

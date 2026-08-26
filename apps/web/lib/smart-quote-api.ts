@@ -21,17 +21,27 @@ export type SmartOffer = {
   costMxn: number;
   stockTotal: number;
   stockPreferred: number;
-  stockByWarehouse?: Array<{ code: string; qty: number }>;
+  stockByWarehouse?: Array<{ code: string; qty: number; label?: string; city?: string }>;
   leadTimeDays: number;
   protegido: boolean;
   activo?: boolean;
   sustituto: string | null;
   especificaciones?: Array<{ tipo: string; valor: string }>;
   promociones?: unknown[];
+  hasPromo?: boolean;
   score: number;
   badges: string[];
   sellPriceSuggested: number;
   marginPercent: number;
+};
+
+export type LogisticsZone = {
+  id?: number;
+  zoneCode: string;
+  zoneName: string;
+  baseCost: number | string;
+  basePrice: number | string;
+  active?: boolean;
 };
 
 export type QuoteLinePayload = {
@@ -106,7 +116,15 @@ export async function smartQuoteSearch(
   if (params.targetMargin != null) qs.set("targetMargin", String(params.targetMargin));
   if (params.inStockOnly === false) qs.set("inStockOnly", "0");
   if (params.take) qs.set("take", String(params.take));
-  return sqRequest<{ data: SmartOffer[]; meta: { totalCandidates: number; mode: OptimizeMode } }>(
+  return sqRequest<{
+    data: SmartOffer[];
+    meta: {
+      totalCandidates: number;
+      mode: OptimizeMode;
+      preferredWarehouse?: string;
+      warehouses?: Array<{ code: string; label: string; city?: string }>;
+    };
+  }>(
     `smart-quote/search?${qs}`,
     token,
     init,
@@ -119,6 +137,8 @@ export async function smartQuoteCtStatus(token: string) {
     total: number;
     active: number;
     withStock: number;
+    preferredWarehouse?: string;
+    warehouses?: Array<{ code: string; label: string; city?: string }>;
     lastSync: { finishedAt?: string; status?: string; rowsUpserted?: number } | null;
   }>("smart-quote/ct/status", token, undefined, "No se pudo leer estado CT");
 }
@@ -128,6 +148,22 @@ export async function smartQuoteFacets(token: string) {
     brands: Array<{ name: string | null; count: number }>;
     categories: Array<{ name: string | null; count: number }>;
   }>("smart-quote/facets", token, undefined, "No se pudieron cargar filtros CT");
+}
+
+export async function smartQuoteLogistics(token: string) {
+  return sqRequest<LogisticsZone[]>(
+    "smart-quote/logistics",
+    token,
+    undefined,
+    "No se pudieron cargar zonas logísticas",
+  );
+}
+
+/** Detalle de un SKU CT (vía búsqueda exacta hasta endpoint dedicado). */
+export async function smartQuoteProduct(token: string, clave: string) {
+  const res = await smartQuoteSearch(token, { q: clave, take: 8, inStockOnly: false });
+  const key = clave.trim().toLowerCase();
+  return res.data.find((o) => o.clave?.toLowerCase() === key) ?? res.data[0] ?? null;
 }
 
 export async function smartQuoteSubstitutes(
