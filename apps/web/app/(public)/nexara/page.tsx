@@ -173,7 +173,7 @@ export default async function NexaraPage() {
           fetchPriority="high"
         />
       ) : null}
-      {heroVideoMobile ? (
+      {heroVideoMobile && heroVideoMobile !== heroVideoDesktop ? (
         <link
           rel="preload"
           as="video"
