@@ -31,7 +31,11 @@ yarn-error.log*
 logs/
 
 # IDEs
-.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
 .idea/
 .claude/
 
@@ -84,3 +88,6 @@ apps/mobile-native/ios/**/*.xcworkspace/xcuserdata/
 apps/mobile-native/ios/Pods/
 apps/mobile-native/ios/**/*.ipa
 apps/mobile-native/ios/**/GoogleService-Info.plist
+
+# secretos: hojas de credenciales
+*credenciales*.xlsx
