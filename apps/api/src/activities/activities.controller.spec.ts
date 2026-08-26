@@ -9,6 +9,7 @@ import { ExcelImportService } from '../common/excel-import.service.js';
 import { RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 
 /**
  * `GET /activities` enruta a un método distinto del servicio según el alcance
@@ -48,6 +49,7 @@ describe('ActivitiesController', () => {
         { provide: UsersService, useValue: usersService },
         { provide: ExcelExportService, useValue: { exportToExcel: jest.fn() } },
         { provide: ExcelImportService, useValue: { importExcel: jest.fn() } },
+        { provide: DomainEventBusService, useValue: { publish: jest.fn() } },
       ],
     })
       .overrideGuard(RbacGuard)

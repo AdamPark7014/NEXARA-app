@@ -173,13 +173,15 @@ export function normalizeItems(items: RawCotizacionItem[] | undefined | null): N
       productCtId: item.productCtId ? Number(item.productCtId) : null,
       supplierCode: item.supplierCode?.trim() || null,
     });
+    const taxProvided = item.tax != null && item.tax !== '';
+    const taxPercent = taxProvided ? percent(item.tax) : undefined;
     const pricing = resolveQuoteLinePricing({
       unitCost: item.unitCost != null && item.unitCost !== '' ? Number(item.unitCost) : null,
       unitPrice: Number(item.unitPrice) || 0,
       marginPercent:
         item.marginPercent != null && item.marginPercent !== '' ? Number(item.marginPercent) : null,
       supplierCode,
-      taxPercent: percent(item.tax) || undefined,
+      taxPercent,
     });
 
     return {
@@ -208,7 +210,7 @@ export function normalizeItems(items: RawCotizacionItem[] | undefined | null): N
       scoreReason: item.scoreReason?.trim() || null,
       optimizationMode: item.optimizationMode?.trim() || null,
       discount: percent(item.discount),
-      tax: pricing.taxPercent,
+      tax: taxProvided ? taxPercent! : pricing.taxPercent,
       ieps: percent(item.ieps),
       retention: percent(item.retention),
       laborHours: Math.max(0, Number(item.laborHours) || 0),
