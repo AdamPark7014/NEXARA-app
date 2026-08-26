@@ -302,6 +302,41 @@
     0 16px 40px rgba(0, 0, 0, 0.26);
 }
 
+.portraitFeatured.composeSplit {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  justify-self: stretch;
+  --ei-min-ar: 0.62;
+  --ei-max-ar: 1.05;
+  --ei-maxh: clamp(280px, 38vw, 480px);
+}
+
+.portraitFeatured.composeSplit .frame {
+  --ei-radius: 20px;
+  max-width: min(100%, calc(var(--ei-maxh) * var(--ei-ar)));
+  margin-inline: auto;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 20px 50px rgba(0, 0, 0, 0.3);
+}
+
+.mediaLeft.portraitFeatured.composeSplit .frame {
+  margin-inline: 0 auto;
+}
+
+.portraitFeatured.composeSplit[data-fit="contain"] .img {
+  padding: clamp(6px, 1.2vw, 12px);
+}
+
+.mediaLeft.portraitFeatured.composeSplit {
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+}
+
+.portraitFeatured.composeSplit:not(.mediaLeft) {
+  grid-template-columns: minmax(0, 1.22fr) minmax(0, 0.78fr);
+}
+
 .portraitFeatured {
   width: 100%;
   max-width: 400px;
@@ -378,6 +413,17 @@
 
   .copyCol {
     max-width: none;
+  }
+
+  .portraitFeatured.composeSplit,
+  .mediaLeft.portraitFeatured.composeSplit,
+  .portraitFeatured.composeSplit:not(.mediaLeft) {
+    grid-template-columns: 1fr;
+  }
+
+  .portraitFeatured.composeSplit .frame,
+  .mediaLeft.portraitFeatured.composeSplit .frame {
+    margin-inline: auto;
   }
 
   .portraitFeatured {

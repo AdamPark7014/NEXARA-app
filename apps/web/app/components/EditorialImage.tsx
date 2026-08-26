@@ -139,6 +139,19 @@ export default function EditorialImage({
       if (photoAr < 0.95) target = "framed_square";
       else if (photoAr < 1.55) target = "framed_wide";
     }
+    // Foto vertical en split: marco retrato (cover) en vez de banda ancha + blur.
+    const isSplitCompose =
+      compose === "split" || figure?.classList.contains(styles.composeSplit);
+    if (
+      isSplitCompose &&
+      photoAr < 1.08 &&
+      (target === "framed_wide" ||
+        target === "framed_square" ||
+        FIXED_FRAME_LAYOUTS.has(layout))
+    ) {
+      target = "portrait_featured";
+    }
+
     if (target !== effLayout) {
       // El resto se recalcula en el segundo pase, ya con la clase nueva
       // aplicada (las ventanas AR viven en el CSS de cada layout).
@@ -159,7 +172,7 @@ export default function EditorialImage({
     }
 
     setFit(cropBetween(photoAr, effectiveAr) > MAX_CROP ? "contain" : "cover");
-  }, [layout, effLayout]);
+  }, [layout, effLayout, compose]);
 
   useEffect(() => {
     // Imágenes servidas desde caché pueden completarse antes de que React
