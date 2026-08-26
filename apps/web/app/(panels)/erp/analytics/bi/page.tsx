@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -16,6 +16,7 @@ import { getBiSectionConfig } from "@/lib/section-views";
 import { apiRequest } from "@/lib/api-base";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES, type RoleKey } from "@/lib/rbac";
+import { biRecommendationHref, buildBiQuickLinks } from "@/lib/bi-drill-links";
 
 const ERP_BI_ROLES = new Set<RoleKey>([
   ROLES.CEO, ROLES.DIR_ADMIN, ROLES.DIR_OPERACIONES,
@@ -47,6 +48,8 @@ export default function BiPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getBiSectionConfig(user), [user]);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const focusSection = searchParams.get("section") ?? "";
   const token = user?.token ?? "";
 
   useEffect(() => {
@@ -87,6 +90,17 @@ export default function BiPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (!focusSection || loading) return;
+    const id = `bi-${focusSection}`;
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      el.style.outline = "2px solid var(--primary)";
+      setTimeout(() => { el.style.outline = ""; }, 2000);
+    }
+  }, [focusSection, loading]);
+
   const totalMargin = margin.reduce((s, m) => s + m.margin, 0);
   const totalBudget = margin.reduce((s, m) => s + m.budget, 0);
   const avgMarginPct = margin.length > 0 ? +(margin.reduce((s, m) => s + m.marginPercent, 0) / margin.length).toFixed(1) : 0;
@@ -106,7 +120,16 @@ export default function BiPage() {
   }, [clientsRoi, clientSearch]);
 
   const marginCols: Column<MarginRow>[] = [
-    { key: "projectType", label: "Línea de negocio", width: 180 },
+    {
+      key: "projectType",
+      label: "Línea de negocio",
+      width: 180,
+      render: (r) => (
+        <Link href="/ops/projects" style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>
+          {r.projectType}
+        </Link>
+      ),
+    },
     { key: "count", label: "Proyectos", width: 90 },
     { key: "budget", label: "Presupuesto", render: (r) => <Money value={r.budget} />, width: 130 },
     { key: "cost", label: "Costo", render: (r) => <Money value={r.cost} />, width: 130 },
@@ -145,7 +168,7 @@ export default function BiPage() {
   ];
 
   const clientCols: Column<ClientRoiRow>[] = [
-    { key: "clientName", label: "Cliente", render: (r) => <Link href={`/ops/service-clients/${r.clientId}`} style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{r.clientName}</Link> },
+    { key: "clientName", label: "Cliente", render: (r) => <Link href={`/crm/clients/${r.clientId}`} style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{r.clientName}</Link> },
     { key: "projects", label: "Proyectos", width: 90 },
     { key: "revenue", label: "Ingreso", render: (r) => <Money value={r.revenue} />, width: 130 },
     { key: "cost", label: "Costo", render: (r) => <Money value={r.cost} />, width: 130 },
@@ -164,6 +187,11 @@ export default function BiPage() {
   ];
 
   const periodLabel = period === "month" ? "Último mes" : period === "quarter" ? "Último trimestre" : "Último año";
+  const slaCost = Number(intel?.cost?.opportunityCostOverdueSla || 0);
+  const quickLinks = buildBiQuickLinks({
+    topClientId: topClient?.clientId,
+    hasSlaRisk: slaCost > 0 || (intel?.what?.dangerCount ?? 0) > 0,
+  });
 
   return (
     <>
@@ -192,7 +220,31 @@ export default function BiPage() {
 
       {!loading && !error && (
         <>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+            {quickLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                style={{
+                  display: "inline-flex",
+                  flexDirection: "column",
+                  gap: 2,
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  border: "1px solid var(--border)",
+                  background: "var(--surface)",
+                  textDecoration: "none",
+                  minWidth: 140,
+                }}
+              >
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--foreground)" }}>{link.label}</span>
+                <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{link.desc}</span>
+              </Link>
+            ))}
+          </div>
+
           {intel && (
+            <div id="bi-intelligence">
             <Section
               eyebrow="Inteligencia"
               title="Qué está pasando · Qué hacer"
@@ -216,15 +268,20 @@ export default function BiPage() {
                   <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45 }}>
                     SLA vencido est.:{" "}
                     <strong>
-                      {new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(
-                        Number(intel.cost?.opportunityCostOverdueSla || 0),
-                      )}
+                      {new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(slaCost)}
                     </strong>
                   </p>
+                  {slaCost > 0 && (
+                    <Link href="/ops/dispatch" style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600, marginTop: 8, display: "inline-block" }}>
+                      Ir al centro de despacho →
+                    </Link>
+                  )}
                 </div>
               </div>
               <div style={{ display: "grid", gap: 8 }}>
-                {(intel.recommendations || []).slice(0, 4).map((r) => (
+                {(intel.recommendations || []).slice(0, 4).map((r) => {
+                  const href = biRecommendationHref(r.action);
+                  return (
                   <div
                     key={r.action}
                     style={{
@@ -238,14 +295,21 @@ export default function BiPage() {
                     }}
                   >
                     <Tag variant={r.priority === "P0" ? "danger" : r.priority === "P1" ? "warning" : "neutral"}>{r.priority}</Tag>
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 600 }}>{r.action}</div>
                       <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{r.impact}</div>
+                      {href && (
+                        <Link href={href} style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600, marginTop: 6, display: "inline-block" }}>
+                          Ver detalle →
+                        </Link>
+                      )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </Section>
+            </div>
           )}
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(175px, 1fr))", gap: 12, marginBottom: 20 }}>
@@ -255,10 +319,18 @@ export default function BiPage() {
             <KpiCard label="Ingenieros rankeados" value={engineers.length} icon="🚀" hint="Últimos 90 días" />
             <KpiCard label="% cierre promedio" value={`${avgCompletion}%`} variant={avgCompletion >= 80 ? "positive" : avgCompletion >= 60 ? "warning" : "danger"} icon="✅" hint="OTs cerradas vs totales" />
             {topClient && (
-              <KpiCard label="Top cliente ROI" value={`${topClient.roi}%`} variant="accent" icon="🏆" hint={topClient.clientName} />
+              <KpiCard
+                label="Top cliente ROI"
+                value={`${topClient.roi}%`}
+                variant="accent"
+                icon="🏆"
+                hint={topClient.clientName}
+                onClick={() => router.push(`/crm/clients/${topClient.clientId}`)}
+              />
             )}
           </div>
 
+          <div id="bi-margins">
           <Section eyebrow="Finanzas" title="Margen por línea de negocio" subtitle={periodLabel}>
             {margin.length > 0 && (() => {
               const maxBudget = Math.max(...margin.map((r) => r.budget), 1);
@@ -266,7 +338,9 @@ export default function BiPage() {
                 <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
                   {margin.map((r) => (
                     <div key={r.projectType} style={{ display: "grid", gridTemplateColumns: "160px 1fr 80px", gap: 10, alignItems: "center" }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.projectType}</span>
+                      <Link href="/ops/projects" style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--primary)", textDecoration: "none" }}>
+                        {r.projectType}
+                      </Link>
                       <div style={{ position: "relative", height: 20, background: "var(--surface-2)", borderRadius: 4, overflow: "hidden" }}>
                         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(r.budget / maxBudget) * 100}%`, background: "color-mix(in srgb, var(--primary) 20%, transparent)", borderRadius: 4 }} />
                         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(0, (r.margin / maxBudget) * 100)}%`, background: r.margin >= 0 ? "var(--success)" : "var(--danger)", borderRadius: 4, opacity: 0.7 }} />
@@ -297,13 +371,17 @@ export default function BiPage() {
             />
             <DataTable columns={marginCols} rows={margin} rowKey={(r) => r.projectType} emptyTitle="Sin datos" emptyDescription="No hay proyectos con presupuesto registrado." />
           </Section>
+          </div>
 
+          <div id="bi-engineers">
           <Section eyebrow="Operaciones" title="Eficiencia operativa · Top ingenieros" subtitle="Últimos 90 días">
             {engineers.length > 0 && (
               <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
                 {engineers.slice(0, 10).map((r) => (
                   <div key={r.engineerId} style={{ display: "grid", gridTemplateColumns: "140px 1fr 56px", gap: 10, alignItems: "center" }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.engineerName}</span>
+                    <Link href={`/erp/hr/${r.engineerId}`} style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--primary)", textDecoration: "none" }}>
+                      {r.engineerName}
+                    </Link>
                     <div style={{ position: "relative", height: 16, background: "var(--surface-2)", borderRadius: 4, overflow: "hidden" }}>
                       <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${r.completionRate}%`, background: r.completionRate >= 80 ? "var(--success)" : r.completionRate >= 60 ? "var(--warning)" : "var(--danger)", borderRadius: 4, opacity: 0.75, transition: "width 0.3s" }} />
                     </div>
@@ -328,7 +406,9 @@ export default function BiPage() {
             />
             <DataTable columns={engCols} rows={visibleEngineers} rowKey={(r) => r.engineerId} emptyTitle="Sin datos" emptyDescription="No hay actividades cerradas en los últimos 90 días." />
           </Section>
+          </div>
 
+          <div id="bi-clients">
           <Section eyebrow="Clientes" title="ROI por cliente" subtitle={periodLabel}>
             <FilterToolbar
               search={{ value: clientSearch, onChange: setClientSearch, placeholder: "Buscar cliente…" }}
@@ -346,6 +426,7 @@ export default function BiPage() {
             />
             <DataTable columns={clientCols} rows={visibleClients} rowKey={(r) => r.clientId} emptyTitle="Sin datos" emptyDescription="No hay proyectos facturados en el periodo seleccionado." />
           </Section>
+          </div>
         </>
       )}
     </>

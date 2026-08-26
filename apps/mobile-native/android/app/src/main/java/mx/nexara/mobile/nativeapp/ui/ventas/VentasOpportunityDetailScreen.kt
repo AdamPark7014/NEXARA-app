@@ -2,6 +2,7 @@ package mx.nexara.mobile.nativeapp.ui.ventas
 
 import android.app.Application
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.api.CrmActivityDto
 import mx.nexara.mobile.nativeapp.data.api.CrmOppAttachmentDto
 import mx.nexara.mobile.nativeapp.data.api.CrmOppHistoryEventDto
 import mx.nexara.mobile.nativeapp.data.api.CrmOppNoteDto
@@ -35,10 +37,14 @@ import mx.nexara.mobile.nativeapp.data.crm.CrmRepository
 import mx.nexara.mobile.nativeapp.ui.common.CapturedMedia
 import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
 import mx.nexara.mobile.nativeapp.ui.common.PdfViewerScreen
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 import java.io.File
 
-private val tabs = listOf("Resumen", "Notas", "Adjuntos", "Cotizaciones", "Historial")
+private val tabs = listOf("Resumen", "Notas", "Actividades", "Adjuntos", "Cotizaciones", "Historial")
 
 data class OppDetailUiState(
     val isLoading: Boolean = true,
@@ -54,6 +60,12 @@ data class OppDetailUiState(
     val savingForm: Boolean = false,
     val pdfFile: File? = null,
     val pdfTitle: String = "",
+    val activities: List<CrmActivityDto> = emptyList(),
+    val loadingActivities: Boolean = false,
+    val completingActivity: Boolean = false,
+    val showStageDialog: Boolean = false,
+    val updatingStage: Boolean = false,
+    val pickedStage: String = "",
 )
 
 class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidViewModel(app) {
@@ -75,8 +87,62 @@ class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidVie
         }
     }
 
-    fun setTab(i: Int) = _state.update { it.copy(tab = i) }
+    fun setTab(i: Int) {
+        _state.update { it.copy(tab = i) }
+        if (i == 2 && _state.value.activities.isEmpty() && !_state.value.loadingActivities) loadActivities()
+    }
     fun setNoteText(t: String) = _state.update { it.copy(noteText = t) }
+
+    fun openStageDialog() = _state.update {
+        it.copy(
+            showStageDialog = true,
+            pickedStage = it.detail.stage.ifBlank { OPPORTUNITY_STAGES.first().first },
+            actionError = null,
+        )
+    }
+
+    fun closeStageDialog() = _state.update { it.copy(showStageDialog = false) }
+
+    fun setPickedStage(stage: String) = _state.update { it.copy(pickedStage = stage) }
+
+    fun updateStage() {
+        val stage = _state.value.pickedStage
+        viewModelScope.launch {
+            _state.update { it.copy(updatingStage = true, actionError = null) }
+            try {
+                withContext(Dispatchers.IO) { repo.updateOpportunityStage(oppId, stage) }
+                _state.update { it.copy(updatingStage = false, showStageDialog = false) }
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(updatingStage = false, actionError = e.message) }
+            }
+        }
+    }
+
+    fun loadActivities() {
+        viewModelScope.launch {
+            _state.update { it.copy(loadingActivities = true) }
+            try {
+                val acts = withContext(Dispatchers.IO) { repo.crmActivitiesForOpportunity(oppId) }
+                _state.update { it.copy(loadingActivities = false, activities = acts) }
+            } catch (e: Exception) {
+                _state.update { it.copy(loadingActivities = false, actionError = e.message) }
+            }
+        }
+    }
+
+    fun completeActivity(activityId: Long) {
+        viewModelScope.launch {
+            _state.update { it.copy(completingActivity = true, actionError = null) }
+            try {
+                withContext(Dispatchers.IO) { repo.completeCrmActivity(activityId, "Completada desde móvil") }
+                loadActivities()
+                _state.update { it.copy(completingActivity = false) }
+            } catch (e: Exception) {
+                _state.update { it.copy(completingActivity = false, actionError = e.message) }
+            }
+        }
+    }
 
     fun addNote() {
         val msg = _state.value.noteText.trim()
@@ -223,7 +289,7 @@ fun VentasOpportunityDetailScreen(oppId: Long, onBack: () -> Unit) {
             }
         }
         when {
-            state.isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+            state.isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) { NxLoadingBlock("Cargando oportunidad…") }
             !state.error.isNullOrBlank() && detail.isEmpty -> NxEmptyState(
                 title = "No se pudo cargar",
                 subtitle = state.error ?: "",
@@ -231,11 +297,12 @@ fun VentasOpportunityDetailScreen(oppId: Long, onBack: () -> Unit) {
                 onAction = vm::refresh,
             )
             else -> when (state.tab) {
-                0 -> OppSummaryTab(detail)
+                0 -> OppSummaryTab(detail, onChangeStage = vm::openStageDialog)
                 1 -> OppNotesTab(detail.notes, state, vm)
-                2 -> OppAttachmentsTab(detail.attachments, state, vm)
-                3 -> OppQuotesTab(detail.quotes, onOpen = { url, title -> vm.openQuotePdf(url, title) })
-                else -> OppHistorialTab(detail.history)
+                2 -> OppActivitiesTab(state, vm)
+                3 -> OppAttachmentsTab(detail.attachments, state, vm)
+                4 -> OppQuotesTab(detail.quotes, onOpen = { url, title -> vm.openQuotePdf(url, title) })
+                else -> OppHistorialTab(detail)
             }
         }
     }
@@ -265,21 +332,72 @@ fun VentasOpportunityDetailScreen(oppId: Long, onBack: () -> Unit) {
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancelar") } },
         )
     }
+
+    if (state.showStageDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!state.updatingStage) vm.closeStageDialog() },
+            title = { Text("Mover etapa") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(detail.displayTitle, fontWeight = FontWeight.SemiBold)
+                    OPPORTUNITY_STAGES.forEach { (id, label) ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable { vm.setPickedStage(id) },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = state.pickedStage == id, onClick = { vm.setPickedStage(id) })
+                            Text(label)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = vm::updateStage, enabled = !state.updatingStage) {
+                    Text(if (state.updatingStage) "Guardando…" else "Guardar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = vm::closeStageDialog, enabled = !state.updatingStage) { Text("Cancelar") }
+            },
+        )
+    }
 }
 
 @Composable
-private fun OppSummaryTab(detail: CrmOpportunityDetailDto) {
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+private fun OppSummaryTab(detail: CrmOpportunityDetailDto, onChangeStage: () -> Unit) {
+    @Suppress("UNCHECKED_CAST")
+    val owner = detail.raw["owner"] as? Map<String, Any?>
+    val ownerName = owner?.let { (it["nombre"] ?: it["name"])?.toString().orEmpty() }.orEmpty()
+    val quotesCount = detail.quotes.size
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(NxColors.Surface),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         item {
-            OppStageChip(detail.stageKey)
-            Spacer(Modifier.height(8.dp))
-            detailRow("Valor", oppFmtMxn(detail.value))
-            if (detail.probability > 0) {
-                detailRow("Probabilidad", "${detail.probability.toInt()}%")
+            NxPanelShell {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    OppStageChip(detail.stageKey)
+                    TextButton(onClick = onChangeStage) { Text("Cambiar etapa") }
+                }
+                Spacer(Modifier.height(8.dp))
+                if (detail.probability > 0) {
+                    Text("${detail.probability.toInt()}% probabilidad", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    LinearProgressIndicator(
+                        progress = { (detail.probability / 100.0).coerceIn(0.0, 1.0).toFloat() },
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        color = OppGreen,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                detailRow("Valor", oppFmtMxn(detail.value))
+                detailRow("Cliente", detail.clientName)
+                detailRow("Ejecutivo", ownerName)
+                detailRow("Cierre estimado", detail.expectedCloseDate.take(10))
+                detailRow("Cotizaciones", if (quotesCount > 0) "$quotesCount vinculadas" else "")
+                detailRow("Descripción", detail.description)
             }
-            detailRow("Cliente", detail.clientName)
-            detailRow("Cierre estimado", detail.expectedCloseDate.take(10))
-            detailRow("Descripción", detail.description)
         }
     }
 }
@@ -288,10 +406,11 @@ private fun OppSummaryTab(detail: CrmOpportunityDetailDto) {
 private fun OppNotesTab(notes: List<CrmOppNoteDto>, state: OppDetailUiState, vm: OppDetailViewModel) {
     Column(Modifier.fillMaxSize()) {
         LazyColumn(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).background(NxColors.Surface),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            item { NxSectionHeader("Notas de seguimiento", "${notes.size} registradas") }
             if (!state.actionError.isNullOrBlank()) {
                 item { Text(state.actionError ?: "", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
@@ -304,15 +423,13 @@ private fun OppNotesTab(notes: List<CrmOppNoteDto>, state: OppDetailUiState, vm:
                 }
             } else {
                 items(notes, key = { it.rowKey }) { note ->
-                    Card(shape = RoundedCornerShape(10.dp)) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(note.message, style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                note.createdAt.take(16),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                    NxPanelShell {
+                        Text(note.message, style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            note.createdAt.take(16),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
@@ -338,8 +455,59 @@ private fun OppNotesTab(notes: List<CrmOppNoteDto>, state: OppDetailUiState, vm:
 }
 
 @Composable
+private fun OppActivitiesTab(state: OppDetailUiState, vm: OppDetailViewModel) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(NxColors.Surface),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item { NxSectionHeader("Actividades CRM", "${state.activities.size} vinculadas") }
+        if (!state.actionError.isNullOrBlank()) {
+            item { Text(state.actionError ?: "", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        }
+        when {
+            state.loadingActivities -> item { NxLoadingBlock("Cargando actividades…") }
+            state.activities.isEmpty() -> item {
+                NxEmptyState(
+                    title = "Sin actividades",
+                    subtitle = "Las tareas CRM vinculadas a esta oportunidad aparecerán aquí.",
+                )
+            }
+            else -> items(state.activities, key = { it.rowKey }) { act ->
+                NxPanelShell {
+                    Text(act.displayTitle, fontWeight = FontWeight.SemiBold)
+                    if (act.activityType.isNotBlank()) {
+                        Text(act.activityType, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    val date = act.dueDate?.take(16).orEmpty()
+                    if (date.isNotBlank()) {
+                        Text("Vence: $date", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (!act.notes.isNullOrBlank()) {
+                        Text(act.notes.orEmpty(), style = MaterialTheme.typography.bodySmall)
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text(act.status, style = MaterialTheme.typography.labelSmall, color = OppGreen)
+                        if (act.status.uppercase() == "PENDING") {
+                            TextButton(
+                                onClick = { vm.completeActivity(act.id) },
+                                enabled = !state.completingActivity,
+                            ) { Text(if (state.completingActivity) "…" else "Completar") }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun OppAttachmentsTab(attachments: List<CrmOppAttachmentDto>, state: OppDetailUiState, vm: OppDetailViewModel) {
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        NxSectionHeader("Adjuntos", "${attachments.size} archivos")
         if (!state.actionError.isNullOrBlank()) {
             Text(state.actionError ?: "", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
@@ -361,15 +529,13 @@ private fun OppAttachmentsTab(attachments: List<CrmOppAttachmentDto>, state: Opp
             )
         } else {
             attachments.forEach { ev ->
-                Card(shape = RoundedCornerShape(10.dp)) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(ev.displayName, fontWeight = FontWeight.SemiBold)
-                        Text(
-                            if (ev.url.isNotBlank()) toAbsoluteAssetUrl(ev.url) else "—",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                NxPanelShell {
+                    Text(ev.displayName, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        if (ev.url.isNotBlank()) toAbsoluteAssetUrl(ev.url) else "—",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
@@ -378,7 +544,12 @@ private fun OppAttachmentsTab(attachments: List<CrmOppAttachmentDto>, state: Opp
 
 @Composable
 private fun OppQuotesTab(quotes: List<CrmOppQuoteDto>, onOpen: (String, String) -> Unit) {
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(NxColors.Surface),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item { NxSectionHeader("Cotizaciones vinculadas", "${quotes.size} total") }
         if (quotes.isEmpty()) {
             item {
                 NxEmptyState(
@@ -388,19 +559,18 @@ private fun OppQuotesTab(quotes: List<CrmOppQuoteDto>, onOpen: (String, String) 
             }
         } else {
             items(quotes, key = { it.rowKey }) { q ->
-                Card(
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.then(
-                        if (q.pdfUrl.isNotBlank()) Modifier.clickable { onOpen(q.pdfUrl, q.displayLabel) } else Modifier,
-                    ),
+                NxPanelShell(
+                    onClick = if (q.pdfUrl.isNotBlank()) {
+                        { onOpen(q.pdfUrl, q.displayLabel) }
+                    } else {
+                        null
+                    },
                 ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(q.displayLabel, fontWeight = FontWeight.SemiBold)
-                        if (q.pdfUrl.isNotBlank()) {
-                            Text("Toca para ver PDF", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                        }
-                        Text(q.createdAt.take(16), style = MaterialTheme.typography.labelSmall)
+                    Text(q.displayLabel, fontWeight = FontWeight.SemiBold)
+                    if (q.pdfUrl.isNotBlank()) {
+                        Text("Toca para ver PDF", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
+                    Text(q.createdAt.take(16), style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
@@ -408,9 +578,34 @@ private fun OppQuotesTab(quotes: List<CrmOppQuoteDto>, onOpen: (String, String) 
 }
 
 @Composable
-private fun OppHistorialTab(history: List<CrmOppHistoryEventDto>) {
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (history.isEmpty()) {
+private fun OppHistorialTab(detail: CrmOpportunityDetailDto) {
+    val history = detail.history
+    val createdAt = detail.raw["createdAt"]?.toString().orEmpty()
+    val updatedAt = detail.raw["updatedAt"]?.toString().orEmpty()
+    val syntheticEvents = buildList {
+        if (createdAt.isNotBlank()) add(CrmOppHistoryEventDto(action = "Oportunidad creada", createdAt = createdAt))
+        if (updatedAt.isNotBlank() && updatedAt != createdAt) {
+            add(CrmOppHistoryEventDto(action = "Última actualización", createdAt = updatedAt))
+        }
+        detail.notes.forEach { note ->
+            add(
+                CrmOppHistoryEventDto(
+                    action = "Nota",
+                    createdAt = note.createdAt,
+                    detail = note.message,
+                ),
+            )
+        }
+    }
+    val events = if (history.isNotEmpty()) history else syntheticEvents
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(NxColors.Surface),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item { NxSectionHeader("Historial", "${events.size} eventos") }
+        if (events.isEmpty()) {
             item {
                 NxEmptyState(
                     title = "Sin historial",
@@ -418,21 +613,19 @@ private fun OppHistorialTab(history: List<CrmOppHistoryEventDto>) {
                 )
             }
         } else {
-            items(history.take(50), key = { it.rowKey }) { h ->
-                Card(shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(h.displayAction, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            if (h.createdAt.isNotBlank()) {
-                                Text(h.createdAt.take(16), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+            items(events.take(50), key = { it.rowKey }) { h ->
+                NxPanelShell {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(h.displayAction, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        if (h.createdAt.isNotBlank()) {
+                            Text(h.createdAt.take(16), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        if (h.userName.isNotBlank()) {
-                            Text("Por: ${h.userName}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        if (h.detail.isNotBlank()) {
-                            Text(h.detail, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
-                        }
+                    }
+                    if (h.userName.isNotBlank()) {
+                        Text("Por: ${h.userName}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (h.detail.isNotBlank()) {
+                        Text(h.detail, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
                     }
                 }
             }

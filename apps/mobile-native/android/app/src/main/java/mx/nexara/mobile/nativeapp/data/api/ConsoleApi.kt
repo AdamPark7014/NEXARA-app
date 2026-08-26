@@ -2,9 +2,11 @@ package mx.nexara.mobile.nativeapp.data.api
 
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
+import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -16,13 +18,16 @@ data class ViaticDto(
     val estatusPago: String? = null,
     val estatus: String? = null,
     val razonGasto: String? = null,
+    val motivo: String? = null,
     val categoria: String? = null,
     val createdAt: String? = null,
     val usuario: SimpleUserDto? = null,
+    val actividadId: Long? = null,
     val actividad: ActivityShortDto? = null,
     val ticketEvidenciaUrl: String? = null,
 ) {
     fun displayStatus(): String = estatusPago ?: estatus ?: "—"
+    fun linkedActivityId(): Long? = actividadId ?: actividad?.id
 }
 
 data class CreateViaticJsonRequest(
@@ -33,25 +38,178 @@ data class CreateViaticJsonRequest(
     val ticketEvidenciaUrl: String,
 )
 
+data class AssignViaticJsonRequest(
+    val usuarioId: Long,
+    val montoSolicitado: Double,
+    val motivo: String,
+    val categoria: String? = null,
+    val actividadId: Long? = null,
+    val projectId: Long? = null,
+    val vehicleId: Long? = null,
+)
+
 data class ViaticApproveRequest(
     val action: String,
     val note: String? = null,
 )
 
 data class ActivityShortDto(
-    val anNumber: String,
+    val id: Long? = null,
+    val anNumber: String? = null,
+)
+
+data class ActivityClientDto(
+    val id: Long? = null,
+    val name: String? = null,
+)
+
+data class ActivityEvidenceSummaryDto(
+    val reviewStatus: String? = null,
+    val entryLatitude: Double? = null,
+    val entryLongitude: Double? = null,
+    val exitLatitude: Double? = null,
+    val exitLongitude: Double? = null,
 )
 
 data class ActivityDto(
     val id: Long,
     val estatus: String,
     val titulo: String? = null,
+    val anNumber: String? = null,
+    val descripcion: String? = null,
+    val indicaciones: String? = null,
+    val prioridad: String? = null,
+    val ticketType: String? = null,
+    val branchName: String? = null,
+    val branchAddress: String? = null,
+    val branchCity: String? = null,
+    val branchState: String? = null,
     val fechaAsignacion: String? = null,
     val fechaInicio: String? = null,
+    val fechaEntregaEsperada: String? = null,
+    val fechaMaxima: String? = null,
     val fechaFinalizacion: String? = null,
+    val tiempoEstimadoMin: Int? = null,
+    val tiempoMaximoMin: Int? = null,
+    val slaAlertedAt: String? = null,
+    val branchLatitude: Double? = null,
+    val branchLongitude: Double? = null,
     val creador: SimpleUserDto? = null,
     val responsableId: Long? = null,
     val responsable: SimpleUserDto? = null,
+    val client: ActivityClientDto? = null,
+    val activityEvidence: ActivityEvidenceSummaryDto? = null,
+)
+
+data class UpdateActivityRequest(
+    val estatus: String? = null,
+    val prioridad: String? = null,
+    val descripcion: String? = null,
+    val indicaciones: String? = null,
+    val fechaInicio: String? = null,
+    val fechaEntregaEsperada: String? = null,
+    val fechaFinalizacion: String? = null,
+)
+
+data class CreateActivityRequest(
+    val titulo: String,
+    val indicaciones: String? = null,
+    val prioridad: String? = null,
+    val activityType: String? = "INTERNAL",
+    val ticketType: String? = null,
+    val ticketTypeCustom: String? = null,
+    val workType: String? = null,
+    val clientId: Long? = null,
+    val projectId: Long? = null,
+    val branchName: String? = null,
+    val branchNumber: String? = null,
+    val branchCity: String? = null,
+    val branchState: String? = null,
+    val branchAddress: String? = null,
+    val tiempoEstimadoMin: Int? = null,
+    val tiempoMaximoMin: Int? = null,
+    val creadoPorId: Long,
+    val responsableId: Long,
+    val estatus: String? = "Pendiente",
+    val fechaInicio: String? = null,
+)
+
+data class CreateActivityResponse(
+    val id: Long? = null,
+)
+
+data class ExecuteActivityRequest(
+    val estatus: String? = null,
+    val fechaInicio: String? = null,
+    val fechaFinalizacion: String? = null,
+)
+
+data class ReassignActivityRequest(
+    val aUsuarioId: Long,
+    val motivo: String? = null,
+    val retirarAnterior: Boolean? = null,
+)
+
+data class ActivityIncidentDto(
+    val id: Long,
+    val activityId: Long,
+    val tipo: String,
+    val severidad: String,
+    val descripcion: String,
+    val accionTomada: String? = null,
+    val horasPerdidas: Double? = null,
+    val reportadoPor: SimpleUserDto? = null,
+    val resueltoPor: SimpleUserDto? = null,
+    val resueltoAt: String? = null,
+    val createdAt: String? = null,
+)
+
+data class ActivityRecommendationCotizacionDto(
+    val id: Long,
+    val quoteNumber: String,
+    val status: String? = null,
+    val total: Double? = null,
+)
+
+data class ActivityRecommendationDto(
+    val id: Long,
+    val activityId: Long,
+    val tipo: String,
+    val prioridad: String,
+    val estado: String,
+    val descripcion: String,
+    val costoEstimado: Double? = null,
+    val cotizacionId: Long? = null,
+    val cotizacion: ActivityRecommendationCotizacionDto? = null,
+    val creadoPor: SimpleUserDto? = null,
+    val cerradoAt: String? = null,
+    val createdAt: String? = null,
+)
+
+data class AddActivityIncidentRequest(
+    val tipo: String,
+    val severidad: String? = null,
+    val descripcion: String,
+    val accionTomada: String? = null,
+    val horasPerdidas: Double? = null,
+)
+
+data class ResolveActivityIncidentRequest(
+    val accionTomada: String? = null,
+)
+
+data class AddActivityRecommendationRequest(
+    val tipo: String,
+    val prioridad: String? = null,
+    val descripcion: String,
+    val costoEstimado: Double? = null,
+)
+
+data class UpdateActivityRecommendationRequest(
+    val estado: String? = null,
+    val prioridad: String? = null,
+    val cotizacionId: Long? = null,
+    val costoEstimado: Double? = null,
 )
 
 data class SimpleUserDto(
@@ -129,6 +287,11 @@ interface ConsoleApi {
         @retrofit2.http.Body body: CreateViaticJsonRequest,
     ): ViaticDto
 
+    @retrofit2.http.POST("viatics/assign")
+    suspend fun assignViatic(
+        @retrofit2.http.Body body: AssignViaticJsonRequest,
+    ): ViaticDto
+
     @PATCH("viatics/{id}/approve")
     suspend fun approveViatic(
         @Path("id") id: Long,
@@ -139,6 +302,85 @@ interface ConsoleApi {
     suspend fun getActivities(
         @Query("scope") scope: String? = null,
     ): List<ActivityDto>
+
+    @retrofit2.http.POST("activities")
+    suspend fun createActivity(
+        @retrofit2.http.Body body: CreateActivityRequest,
+    ): CreateActivityResponse
+
+    @GET("activities/next-an")
+    suspend fun getNextAnNumberRaw(): okhttp3.ResponseBody
+
+    @GET("activities/dispatch-board")
+    suspend fun getDispatchBoardRaw(): okhttp3.ResponseBody
+
+    @GET("activity-feed")
+    suspend fun getActivityFeedRaw(@Query("limit") limit: Int = 40): okhttp3.ResponseBody
+
+    @GET("activities/{id}")
+    suspend fun getActivity(
+        @Path("id") id: Long,
+    ): ActivityDto
+
+    @PATCH("activities/{id}")
+    suspend fun patchActivity(
+        @Path("id") id: Long,
+        @retrofit2.http.Body body: UpdateActivityRequest,
+    ): ActivityDto
+
+    @PATCH("activities/{id}/execute")
+    suspend fun patchActivityExecute(
+        @Path("id") id: Long,
+        @retrofit2.http.Body body: ExecuteActivityRequest,
+    ): ActivityDto
+
+    @POST("activities/{id}/reasignar")
+    suspend fun reassignActivity(
+        @Path("id") id: Long,
+        @Body body: ReassignActivityRequest,
+    ): ActivityDto
+
+    @GET("activities/{activityId}/incidencias")
+    suspend fun getActivityIncidents(
+        @Path("activityId") activityId: Long,
+    ): List<ActivityIncidentDto>
+
+    @retrofit2.http.POST("activities/{activityId}/incidencias")
+    suspend fun addActivityIncident(
+        @Path("activityId") activityId: Long,
+        @retrofit2.http.Body body: AddActivityIncidentRequest,
+    ): ActivityIncidentDto
+
+    @PATCH("activities/{activityId}/incidencias/{incidentId}/resolver")
+    suspend fun resolveActivityIncident(
+        @Path("activityId") activityId: Long,
+        @Path("incidentId") incidentId: Long,
+        @retrofit2.http.Body body: ResolveActivityIncidentRequest = ResolveActivityIncidentRequest(),
+    ): ActivityIncidentDto
+
+    @PATCH("activities/{activityId}/incidencias/{incidentId}/reabrir")
+    suspend fun reopenActivityIncident(
+        @Path("activityId") activityId: Long,
+        @Path("incidentId") incidentId: Long,
+    ): okhttp3.ResponseBody
+
+    @GET("activities/{activityId}/recomendaciones")
+    suspend fun getActivityRecommendations(
+        @Path("activityId") activityId: Long,
+    ): List<ActivityRecommendationDto>
+
+    @retrofit2.http.POST("activities/{activityId}/recomendaciones")
+    suspend fun addActivityRecommendation(
+        @Path("activityId") activityId: Long,
+        @retrofit2.http.Body body: AddActivityRecommendationRequest,
+    ): ActivityRecommendationDto
+
+    @PATCH("activities/{activityId}/recomendaciones/{recommendationId}")
+    suspend fun updateActivityRecommendation(
+        @Path("activityId") activityId: Long,
+        @Path("recommendationId") recommendationId: Long,
+        @retrofit2.http.Body body: UpdateActivityRecommendationRequest,
+    ): ActivityRecommendationDto
 
     @GET("users/assignable")
     suspend fun getAssignableUsers(): List<VisibleUserDto>
@@ -230,6 +472,18 @@ interface ConsoleApi {
         @retrofit2.http.Path("activityId") activityId: Long,
     ): okhttp3.ResponseBody
 
+    @GET("activities/{id}/timeline")
+    suspend fun getActivityTimeline(@retrofit2.http.Path("id") id: Long): okhttp3.ResponseBody
+
+    @GET("activities/{id}/materiales")
+    suspend fun getActivityMaterials(@retrofit2.http.Path("id") id: Long): okhttp3.ResponseBody
+
+    @GET("activities/{id}/team")
+    suspend fun getActivityTeam(@retrofit2.http.Path("id") id: Long): okhttp3.ResponseBody
+
+    @GET("activities/{id}/reasignaciones")
+    suspend fun getActivityReassignments(@retrofit2.http.Path("id") id: Long): okhttp3.ResponseBody
+
     @retrofit2.http.POST("activity-evidence/{activityId}/approve")
     suspend fun approveEvidence(
         @retrofit2.http.Path("activityId") activityId: Long,
@@ -258,10 +512,21 @@ interface ConsoleApi {
     @GET("gps/team")
     suspend fun getGpsTeam(): List<GpsLocationDto>
 
+    @GET("gps/trajectory")
+    suspend fun getGpsTrajectory(
+        @Query("date") date: String? = null,
+        @Query("userId") userId: Long? = null,
+    ): List<GpsLocationDto>
+
     @retrofit2.http.POST("gps")
     suspend fun postGpsLocation(
         @retrofit2.http.Body body: PostGpsLocationRequest,
     ): okhttp3.ResponseBody
+
+    @PATCH("gps/consent")
+    suspend fun patchGpsConsent(
+        @retrofit2.http.Body body: GpsConsentRequest,
+    ): GpsConsentResponse
 
     // ── Tools ────────────────────────────────────────────────────────────────
 
@@ -424,6 +689,16 @@ interface ConsoleApi {
         @Path("id") projectId: Long,
         @Path("engineerId") engineerId: Long,
     ): okhttp3.ResponseBody
+
+    // ── User profile (console users) ───────────────────────────────────────
+
+    @GET("users/profile/me")
+    suspend fun getMyProfile(): UserProfileMeDto
+
+    @retrofit2.http.PATCH("users/profile/me")
+    suspend fun updateMyProfile(
+        @retrofit2.http.Body body: UpdateUserProfileBody,
+    ): UserProfileDataDto
 
     // ── System settings (console.admin) ─────────────────────────────────────
 
@@ -774,6 +1049,14 @@ data class PostGpsLocationRequest(
     val ultimaActualizacion: String,
 )
 
+data class GpsConsentRequest(
+    val enabled: Boolean,
+)
+
+data class GpsConsentResponse(
+    val consent: Boolean? = null,
+)
+
 data class ToolUserRefDto(
     val nombre: String,
     val email: String? = null,
@@ -908,6 +1191,58 @@ data class ToolRenewalDto(
 
 data class ToolRenewalRejectRequest(
     val reason: String,
+)
+
+data class UserProfileMeDto(
+    val id: Long,
+    val nombre: String,
+    val email: String,
+    val perfil: UserProfileDataDto? = null,
+    val role: UserRoleRefDto? = null,
+    val department: UserDepartmentRefDto? = null,
+)
+
+data class UserProfileDataDto(
+    val telefono: String? = null,
+    val fechaNacimiento: String? = null,
+    val direccion: String? = null,
+    val colonia: String? = null,
+    val ciudad: String? = null,
+    val estado: String? = null,
+    val codigoPostal: String? = null,
+    val pais: String? = null,
+    val curp: String? = null,
+    val rfc: String? = null,
+    val ineNumero: String? = null,
+    val nss: String? = null,
+    val contactoEmergenciaNombre: String? = null,
+    val contactoEmergenciaTelefono: String? = null,
+    val estatus: String? = null,
+)
+
+data class UserRoleRefDto(
+    val nombre: String? = null,
+)
+
+data class UserDepartmentRefDto(
+    val nombre: String? = null,
+)
+
+data class UpdateUserProfileBody(
+    val telefono: String? = null,
+    val fechaNacimiento: String? = null,
+    val direccion: String? = null,
+    val colonia: String? = null,
+    val ciudad: String? = null,
+    val estado: String? = null,
+    val codigoPostal: String? = null,
+    val pais: String? = null,
+    val curp: String? = null,
+    val rfc: String? = null,
+    val ineNumero: String? = null,
+    val nss: String? = null,
+    val contactoEmergenciaNombre: String? = null,
+    val contactoEmergenciaTelefono: String? = null,
 )
 
 data class SystemSettingDto(

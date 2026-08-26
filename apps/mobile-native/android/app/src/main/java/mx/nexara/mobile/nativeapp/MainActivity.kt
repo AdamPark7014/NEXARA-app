@@ -4,22 +4,26 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import com.google.firebase.messaging.FirebaseMessaging
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -30,10 +34,13 @@ import mx.nexara.mobile.nativeapp.data.api.DevicesApi
 import mx.nexara.mobile.nativeapp.data.api.RegisterFcmTokenRequest
 import mx.nexara.mobile.nativeapp.push.NexaraNotifications
 import mx.nexara.mobile.nativeapp.access.DeepLinkParser
+import mx.nexara.mobile.nativeapp.access.NotificationDeepLinkResolver
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.security.AppLock
+import mx.nexara.mobile.nativeapp.security.AppLockScreen
 import mx.nexara.mobile.nativeapp.ui.NexaraScaffold
 import mx.nexara.mobile.nativeapp.ui.NexaraApp
+import mx.nexara.mobile.nativeapp.screenshots.ScreenshotAutomation
 import mx.nexara.mobile.nativeapp.ui.theme.NexaraTheme
 
 class MainActivity : FragmentActivity() {
@@ -41,6 +48,8 @@ class MainActivity : FragmentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* respuesta opcional */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         NexaraNotifications.ensureChannels(this)
@@ -56,25 +65,38 @@ class MainActivity : FragmentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     var locked by remember { mutableStateOf(false) }
+                    var isUnlocking by remember { mutableStateOf(false) }
+                    var unlockAttempt by remember { mutableStateOf(0) }
                     val authRepo = remember { AuthRepository(this@MainActivity) }
                     val activity = this@MainActivity
 
-                    // Bridge Activity background → Compose lock state
-                    androidx.compose.runtime.DisposableEffect(Unit) {
+                    LaunchedEffect(locked, unlockAttempt) {
+                        if (!locked) return@LaunchedEffect
+                        isUnlocking = true
+                        val ok = AppLock.authenticate(activity)
+                        isUnlocking = false
+                        if (ok) {
+                            AppLock.clearBackground(activity)
+                            locked = false
+                        }
+                    }
+
+                    DisposableEffect(Unit) {
                         val callbacks = object : android.app.Application.ActivityLifecycleCallbacks {
                             override fun onActivityStopped(a: android.app.Activity) {
                                 if (a !== activity) return
                                 if (activity.isChangingConfigurations) return
                                 if (authRepo.loadSession() != null && AppLock.shouldLock(activity)) {
-                                    locked = true
+                                    AppLock.recordBackground(activity)
                                 }
                             }
                             override fun onActivityStarted(a: android.app.Activity) {
                                 if (a !== activity) return
-                                if (locked && authRepo.loadSession() != null) {
-                                    CoroutineScope(Dispatchers.Main).launch {
-                                        if (AppLock.authenticate(activity)) locked = false
-                                    }
+                                if (
+                                    authRepo.loadSession() != null &&
+                                    AppLock.shouldLockAfterBackground(activity)
+                                ) {
+                                    locked = true
                                 }
                             }
                             override fun onActivityCreated(a: android.app.Activity, b: Bundle?) {}
@@ -92,12 +114,10 @@ class MainActivity : FragmentActivity() {
                             NexaraApp()
                         }
                     } else {
-                        androidx.compose.foundation.layout.Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = androidx.compose.ui.Alignment.Center,
-                        ) {
-                            androidx.compose.material3.Text("NEXARA bloqueado — confirma tu identidad")
-                        }
+                        AppLockScreen(
+                            isUnlocking = isUnlocking,
+                            onUnlock = { if (!isUnlocking) unlockAttempt++ },
+                        )
                     }
                 }
             }
@@ -111,8 +131,44 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun handleDeepLink(intent: Intent?) {
-        val uri: Uri = intent?.data ?: return
-        PendingDeepLink.destination = DeepLinkParser.parse(uri)
+        if (intent == null) return
+
+        val uri = intent.data
+        if (ScreenshotAutomation.isDebugAutomationUri(uri) && uri != null) {
+            lifecycleScope.launch {
+                val action = uri.pathSegments.firstOrNull()?.lowercase()
+                ScreenshotAutomation.handle(
+                    context = applicationContext,
+                    uri = uri,
+                    emailExtra = intent.getStringExtra(ScreenshotAutomation.EXTRA_EMAIL),
+                    passwordExtra = intent.getStringExtra(ScreenshotAutomation.EXTRA_PASSWORD),
+                )
+                if (action == "auto-login") {
+                    recreate()
+                }
+            }
+            return
+        }
+
+        if (uri != null) {
+            DeepLinkParser.parse(uri)?.let { PendingDeepLink.publish(it) }
+            return
+        }
+
+        val pushData = pushDataFromIntent(intent)
+        NotificationDeepLinkResolver.resolveFromPushData(pushData)?.let { PendingDeepLink.publish(it) }
+    }
+
+    private fun pushDataFromIntent(intent: Intent): Map<String, String> {
+        val extras = intent.extras ?: return emptyMap()
+        return extras.keySet()
+            .asSequence()
+            .filter { it.startsWith("nexara_") }
+            .mapNotNull { key ->
+                val value = extras.getString(key)?.trim().orEmpty()
+                if (value.isBlank()) null else key.removePrefix("nexara_") to value
+            }
+            .toMap()
     }
 
     private fun askNotificationPermissionIfNeeded() {
@@ -142,4 +198,3 @@ class MainActivity : FragmentActivity() {
         }
     }
 }
-

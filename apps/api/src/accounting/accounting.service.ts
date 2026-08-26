@@ -1,15 +1,15 @@
-import { Injectable, BadRequestException, NotFoundException, Optional, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { PacService } from '../pac/pac.service.js';
 import { SatService } from '../pac/sat.service.js';
-import { WebhooksService } from '../webhooks/webhooks.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { FolioService } from '../common/folio/folio.service.js';
 import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
 import { cents } from '../pac/cfdi-xml.builder.js';
+import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 
 const escapeXml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -24,7 +24,7 @@ export class AccountingService {
     private readonly pacService: PacService,
     private readonly satService: SatService,
     private readonly folio: FolioService,
-    @Optional() private readonly webhooks?: WebhooksService,
+    private readonly domainEvents: DomainEventBusService,
   ) {}
 
   private readonly satPaymentFormValues = new Set([
@@ -2406,28 +2406,35 @@ export class AccountingService {
 
     const newPaid = Number(invoice.paidAmount) + dto.amount;
     const fullyPaid = newPaid >= Number(invoice.totalAmount) - 0.01;
-    void this.webhooks
-      ?.emit('payment.registered', {
+    this.domainEvents.publishEntityLifecycle('created', {
+      entityType: 'PAYMENT',
+      entityId: payment.id,
+      companyId: invoice.companyId,
+      userId,
+      payload: {
         paymentId: payment.id,
         invoiceId: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
         amount: dto.amount,
         currency: invoice.currency,
         status: fullyPaid ? 'PAID' : 'PARTIALLY_PAID',
-        companyId: invoice.companyId,
-      }, invoice.companyId)
-      .catch(() => undefined);
+      },
+    });
     if (fullyPaid) {
-      void this.webhooks
-        ?.emit('invoice.paid', {
+      this.domainEvents.publishEntityLifecycle('updated', {
+        entityType: 'INVOICE',
+        entityId: invoice.id,
+        companyId: invoice.companyId,
+        userId,
+        payload: {
+          fullyPaid: true,
           invoiceId: invoice.id,
           invoiceNumber: invoice.invoiceNumber,
           totalAmount: Number(invoice.totalAmount),
           currency: invoice.currency,
           type: invoice.type,
-          companyId: invoice.companyId,
-        }, invoice.companyId)
-        .catch(() => undefined);
+        },
+      });
     }
 
     let journalEntryId: number | null = null;

@@ -130,6 +130,28 @@ export class ActivitiesController {
     return this.activitiesService.create(createActivityDto, companyId);
   }
 
+  @Get('summary')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
+  summary(@CurrentCompanyId() companyId: number | null) {
+    return this.activitiesService.getSummary(companyId);
+  }
+
+  @Get('dispatch-board')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  async dispatchBoard(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null) {
+    if (user.isSuperAdmin) {
+      return this.activitiesService.getDispatchBoard(companyId);
+    }
+    if (this.hasTeamActivitiesScope(user)) {
+      const scopeUsers = await this.usersService.findUsersForConsoleActivityScope();
+      const allowedUserIds = scopeUsers.map((u: { id: number }) => u.id);
+      return this.activitiesService.getDispatchBoard(companyId, allowedUserIds);
+    }
+    return this.activitiesService.getDispatchBoard(companyId, [user.id]);
+  }
+
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })

@@ -6,6 +6,7 @@ import { NotificationHierarchyService } from '../../notifications/notification-h
 import { MaintenanceContractsService } from '../../maintenance-contracts/maintenance-contracts.service.js';
 import { VehiclesService } from '../../vehicles/vehicles.service.js';
 import { WebhooksService } from '../../webhooks/webhooks.service.js';
+import { DomainEventBusService } from '../../domain-events/domain-event-bus.service.js';
 import { OPEN_ACTIVITY_WHERE } from '../../activities/activity-status.js';
 
 @Injectable()
@@ -18,6 +19,7 @@ export class CronService {
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly maintenanceContracts: MaintenanceContractsService,
     private readonly vehiclesService: VehiclesService,
+    private readonly domainEvents: DomainEventBusService,
     @Optional() private readonly webhooks?: WebhooksService,
   ) {}
 
@@ -58,6 +60,40 @@ export class CronService {
           Number(inv.totalAmount),
           days,
         );
+      }
+    }
+
+    if (overdue.length) {
+      const byCompany = new Map<number, typeof overdue>();
+      for (const inv of overdue) {
+        const cid = inv.companyId;
+        if (cid == null) continue;
+        const list = byCompany.get(cid) || [];
+        list.push(inv);
+        byCompany.set(cid, list);
+      }
+      for (const [companyId, items] of byCompany) {
+        this.domainEvents.publishEntityLifecycle('updated', {
+          entityType: 'INVOICE',
+          entityId: companyId,
+          companyId,
+          payload: {
+            alertType: 'overdue',
+            count: items.length,
+            totalOutstanding: items.reduce(
+              (sum, i) => sum + Number(i.totalAmount) - Number(i.paidAmount),
+              0,
+            ),
+            invoices: items.slice(0, 30).map((i) => ({
+              id: i.id,
+              invoiceNumber: i.invoiceNumber,
+              dueDate: i.dueDate?.toISOString(),
+              totalAmount: Number(i.totalAmount),
+              paidAmount: Number(i.paidAmount),
+              clientName: i.client?.name ?? i.receptorName,
+            })),
+          },
+        });
       }
     }
     this.logger.log(`Facturas vencidas procesadas: ${overdue.length}`);
@@ -264,37 +300,40 @@ export class CronService {
     });
     if (!stale.length) return;
     this.logger.log(`Usuarios inactivos 30d: ${stale.length}`);
-    if (this.webhooks) {
-      const memberships = await this.prisma.userCompany.findMany({
-        where: { userId: { in: stale.map((u) => u.id) } },
-        select: { userId: true, companyId: true },
+    const memberships = await this.prisma.userCompany.findMany({
+      where: { userId: { in: stale.map((u) => u.id) } },
+      select: { userId: true, companyId: true },
+    });
+    const byCompany = new Map<number, typeof stale>();
+    for (const m of memberships) {
+      const user = stale.find((u) => u.id === m.userId);
+      if (!user) continue;
+      const list = byCompany.get(m.companyId) || [];
+      list.push(user);
+      byCompany.set(m.companyId, list);
+    }
+    if (!byCompany.size) {
+      const primary = await this.prisma.companyProfile.findFirst({
+        where: { isPrimary: true },
+        select: { id: true },
       });
-      const byCompany = new Map<number, typeof stale>();
-      for (const m of memberships) {
-        const user = stale.find((u) => u.id === m.userId);
-        if (!user) continue;
-        const list = byCompany.get(m.companyId) || [];
-        list.push(user);
-        byCompany.set(m.companyId, list);
-      }
-      if (!byCompany.size) {
-        const primary = await this.prisma.companyProfile.findFirst({
-          where: { isPrimary: true },
-          select: { id: true },
-        });
-        if (primary) byCompany.set(primary.id, stale);
-      }
-      for (const [companyId, users] of byCompany) {
-        await this.webhooks.emit(
-          'user.inactive',
-          {
-            count: users.length,
-            users: users.map((u) => ({ id: u.id, email: u.email, lastLoginAt: u.lastLoginAt })),
-            companyId,
-          },
-          companyId,
-        );
-      }
+      if (primary) byCompany.set(primary.id, stale);
+    }
+    for (const [companyId, users] of byCompany) {
+      this.domainEvents.publishEntityLifecycle('updated', {
+        entityType: 'USER',
+        entityId: companyId,
+        companyId,
+        payload: {
+          alertType: 'inactive',
+          count: users.length,
+          users: users.map((u) => ({
+            id: u.id,
+            email: u.email,
+            lastLoginAt: u.lastLoginAt,
+          })),
+        },
+      });
     }
   }
 
@@ -310,7 +349,7 @@ export class CronService {
     const low = levels.filter(
       (l) => Number(l.reorderPoint) > 0 && Number(l.quantity) <= Number(l.reorderPoint),
     );
-    if (low.length && this.webhooks) {
+    if (low.length) {
       const byCompany = new Map<number, typeof low>();
       for (const l of low) {
         const cid = l.warehouse?.companyId;
@@ -320,11 +359,13 @@ export class CronService {
         byCompany.set(cid, list);
       }
       for (const [companyId, items] of byCompany) {
-        await this.webhooks.emit(
-          'stock.low',
-          {
+        this.domainEvents.publishEntityLifecycle('updated', {
+          entityType: 'INVENTORY',
+          entityId: companyId,
+          companyId,
+          payload: {
+            alertType: 'low',
             count: items.length,
-            companyId,
             items: items.slice(0, 30).map((l) => ({
               productId: l.productId,
               sku: l.product?.sku,
@@ -333,8 +374,7 @@ export class CronService {
               reorderPoint: Number(l.reorderPoint),
             })),
           },
-          companyId,
-        );
+        });
       }
     }
 
@@ -346,7 +386,7 @@ export class CronService {
     });
     const moved = new Set(recentMoves.map((m) => m.productId));
     const dead = levels.filter((l) => Number(l.quantity) > 0 && !moved.has(l.productId));
-    if (dead.length && this.webhooks) {
+    if (dead.length) {
       const byCompany = new Map<number, typeof dead>();
       for (const l of dead) {
         const cid = l.warehouse?.companyId;
@@ -356,11 +396,13 @@ export class CronService {
         byCompany.set(cid, list);
       }
       for (const [companyId, items] of byCompany) {
-        await this.webhooks.emit(
-          'stock.dead',
-          {
+        this.domainEvents.publishEntityLifecycle('updated', {
+          entityType: 'INVENTORY',
+          entityId: companyId,
+          companyId,
+          payload: {
+            alertType: 'dead',
             count: items.length,
-            companyId,
             value: items.reduce((s, l) => s + Number(l.quantity) * Number(l.unitCost), 0),
             items: items.slice(0, 30).map((l) => ({
               productId: l.productId,
@@ -369,8 +411,7 @@ export class CronService {
               quantity: Number(l.quantity),
             })),
           },
-          companyId,
-        );
+        });
       }
     }
   }
@@ -400,30 +441,29 @@ export class CronService {
     });
     if (!breaches.length) return;
     this.logger.warn(`SLA breaches abiertos: ${breaches.length}`);
-    if (this.webhooks) {
-      const byCompany = new Map<number, typeof breaches>();
-      for (const t of breaches) {
-        const list = byCompany.get(t.companyId) || [];
-        list.push(t);
-        byCompany.set(t.companyId, list);
-      }
-      for (const [companyId, tickets] of byCompany) {
-        await this.webhooks.emit(
-          'ticket.sla_breach',
-          {
-            count: tickets.length,
-            companyId,
-            tickets: tickets.slice(0, 20).map((t) => ({
-              id: t.id,
-              anNumber: t.anNumber,
-              titulo: t.titulo,
-              prioridad: t.prioridad,
-              assigneeId: t.responsableId,
-            })),
-          },
-          companyId,
-        );
-      }
+    const byCompany = new Map<number, typeof breaches>();
+    for (const t of breaches) {
+      const list = byCompany.get(t.companyId) || [];
+      list.push(t);
+      byCompany.set(t.companyId, list);
+    }
+    for (const [companyId, tickets] of byCompany) {
+      this.domainEvents.publishEntityLifecycle('updated', {
+        entityType: 'ACTIVITY',
+        entityId: tickets[0]?.id ?? companyId,
+        companyId,
+        payload: {
+          alertType: 'sla_breach',
+          count: tickets.length,
+          tickets: tickets.slice(0, 20).map((t) => ({
+            id: t.id,
+            anNumber: t.anNumber,
+            titulo: t.titulo,
+            prioridad: t.prioridad,
+            assigneeId: t.responsableId,
+          })),
+        },
+      });
     }
   }
 }

@@ -31,18 +31,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.data.api.LunchBreakDto
-import mx.nexara.mobile.nativeapp.data.api.NewsPostDto
-import mx.nexara.mobile.nativeapp.data.api.ContactMessageDto
-import mx.nexara.mobile.nativeapp.data.api.NewsletterSubscriberDto
-import mx.nexara.mobile.nativeapp.data.api.AuditEntryDto
-import mx.nexara.mobile.nativeapp.data.api.ExpenseDto
-import mx.nexara.mobile.nativeapp.data.api.FineDto
-import mx.nexara.mobile.nativeapp.data.api.EmployeePaymentDto
-import mx.nexara.mobile.nativeapp.data.api.DocumentDto
-import mx.nexara.mobile.nativeapp.data.api.JournalEntryDto
 import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
 import mx.nexara.mobile.nativeapp.ui.common.CapturedMedia
-import mx.nexara.mobile.nativeapp.ui.common.SimpleRow
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
 
 private fun fmtMoney(v: Double?): String =
     if (v == null) "—" else "$" + String.format("%,.2f", v)
@@ -51,284 +43,248 @@ private fun nn(s: String?): String = if (s.isNullOrBlank()) "—" else s
 
 // ── News ──────────────────────────────────────────────────────────────────
 @Composable
-fun NewsModuleScreen() {
-    var items by remember { mutableStateOf<List<NewsPostDto>>(emptyList()) }
-    var query by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(true) }
-    val context = LocalContext.current
-    val repo = remember(context) { ExtraRepository(context) }
-    LaunchedEffect(Unit) { items = withContext(Dispatchers.IO) { repo.news() }; loading = false }
-    val filtered = if (query.isBlank()) items else items.filter {
-        (it.title ?: "").contains(query, true) || (it.excerpt ?: "").contains(query, true)
-    }
-    val published = items.count { it.status?.lowercase() == "published" || it.status?.lowercase() == "publicada" }
-    val drafts = items.size - published
-    Column(Modifier.fillMaxSize()) {
-        if (items.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                OpsKpiAndroid("Total", items.size.toString(), Modifier.weight(1f))
-                OpsKpiAndroid("Publicadas", published.toString(), Modifier.weight(1f))
-                OpsKpiAndroid("Borradores", drafts.toString(), Modifier.weight(1f))
-            }
+fun NewsModuleScreen() = TypedModuleListScreen(
+    title = "Noticias",
+    loadingMessage = "Cargando noticias…",
+    searchPlaceholder = "Buscar noticia…",
+    statusOptions = listOf("Todos", "Publicadas", "Borradores"),
+    statusOf = { it.status.orEmpty() },
+    statusMatches = { item, opt ->
+        val st = item.status?.lowercase().orEmpty()
+        when (opt.lowercase()) {
+            "todos" -> true
+            "publicadas" -> st.contains("publish") || st.contains("publicad")
+            "borradores" -> st.contains("draft") || st.contains("borrador")
+            else -> true
         }
-        SearchBarAndroid(query, "Buscar noticia…") { query = it }
-        if (loading) { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() } }
-        else LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(filtered.take(60), key = { it.id }) { n ->
-                Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(nn(n.title), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                            if (!n.excerpt.isNullOrBlank()) Text(n.excerpt!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            val isDraft = n.status?.lowercase()?.contains("draft") == true || n.status?.lowercase()?.contains("borrador") == true
-                            Text(if (isDraft) "Borrador" else "Publicada", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (isDraft) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary)
-                            if (!n.publishedAt.isNullOrBlank()) Text(n.publishedAt!!.take(10), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
+    },
+    kpisOf = { list ->
+        val published = list.count {
+            val st = it.status?.lowercase().orEmpty()
+            st.contains("publish") || st.contains("publicad")
         }
-    }
-}
+        listOf(
+            "Total" to list.size.toString(),
+            "Publicadas" to published.toString(),
+            "Borradores" to (list.size - published).toString(),
+        )
+    },
+    load = { it.news() },
+    keyOf = { "nw-${it.id}" },
+    titleOf = { nn(it.title) },
+    subtitleOf = { it.excerpt.orEmpty() },
+    metaOf = { it.publishedAt.orEmpty().take(10) },
+    trailingOf = {
+        val st = it.status?.lowercase().orEmpty()
+        if (st.contains("draft") || st.contains("borrador")) "Borrador" else "Publicada"
+    },
+    matches = { row, q ->
+        (row.title ?: "").lowercase().contains(q) || (row.excerpt ?: "").lowercase().contains(q)
+    },
+    detailPairs = { d ->
+        listOf(
+            "Título" to nn(d.title),
+            "Resumen" to (d.excerpt ?: ""),
+            "Estado" to (d.status ?: ""),
+            "Publicación" to (d.publishedAt ?: ""),
+        )
+    },
+)
 
 // ── Contact messages ──────────────────────────────────────────────────────
 @Composable
-fun ContactMessagesModuleScreen() {
-    var items by remember { mutableStateOf<List<ContactMessageDto>>(emptyList()) }
-    var query by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(true) }
-    val context = LocalContext.current
-    val repo = remember(context) { ExtraRepository(context) }
-    LaunchedEffect(Unit) { items = withContext(Dispatchers.IO) { repo.contactMessages() }; loading = false }
-    val filtered = if (query.isBlank()) items else items.filter {
-        listOfNotNull(it.name, it.subject, it.email, it.message).any { s -> s.contains(query, true) }
-    }
-    Column(Modifier.fillMaxSize()) {
-        if (items.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                OpsKpiAndroid("Mensajes", items.size.toString(), Modifier.weight(1f))
-                OpsKpiAndroid("Sin leer", items.count { it.status?.lowercase() == "unread" || it.status == null }.toString(), Modifier.weight(1f))
-            }
-        }
-        SearchBarAndroid(query, "Buscar mensaje…") { query = it }
-        if (loading) { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() } }
-        else LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(filtered.take(60), key = { it.id }) { m ->
-                Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(nn(m.subject ?: m.name), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                            if (!m.message.isNullOrBlank()) Text(m.message!!.take(80), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
-                            if (!m.email.isNullOrBlank()) Text(m.email!!, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        if (!m.createdAt.isNullOrBlank()) Text(m.createdAt!!.take(10), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
-    }
-}
+fun ContactMessagesModuleScreen() = TypedModuleListScreen(
+    title = "Mensajes de contacto",
+    loadingMessage = "Cargando mensajes…",
+    searchPlaceholder = "Buscar mensaje…",
+    kpisOf = { list ->
+        listOf(
+            "Mensajes" to list.size.toString(),
+            "Sin leer" to list.count { it.status?.lowercase() == "unread" || it.status == null }.toString(),
+        )
+    },
+    load = { it.contactMessages() },
+    keyOf = { "cm-${it.id}" },
+    titleOf = { nn(it.subject ?: it.name) },
+    subtitleOf = { it.message.orEmpty().take(80) },
+    metaOf = { it.email.orEmpty() },
+    trailingOf = { it.createdAt.orEmpty().take(10) },
+    matches = { row, q ->
+        listOfNotNull(row.name, row.subject, row.email, row.message).any { s -> s.contains(q, true) }
+    },
+    detailPairs = { d ->
+        listOf(
+            "Asunto" to nn(d.subject ?: d.name),
+            "Nombre" to nn(d.name),
+            "Email" to nn(d.email),
+            "Teléfono" to nn(d.phone),
+            "Mensaje" to (d.message ?: ""),
+            "Estado" to (d.status ?: ""),
+            "Fecha" to (d.createdAt ?: ""),
+        )
+    },
+)
 
 // ── Newsletter ────────────────────────────────────────────────────────────
 @Composable
-fun NewsletterModuleScreen() {
-    var items by remember { mutableStateOf<List<NewsletterSubscriberDto>>(emptyList()) }
-    var query by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(true) }
-    val context = LocalContext.current
-    val repo = remember(context) { ExtraRepository(context) }
-    LaunchedEffect(Unit) { items = withContext(Dispatchers.IO) { repo.newsletter() }; loading = false }
-    val filtered = if (query.isBlank()) items else items.filter {
-        listOfNotNull(it.name, it.email).any { s -> s.contains(query, true) }
-    }
-    val active = items.count { it.status?.lowercase() != "unsubscribed" }
-    Column(Modifier.fillMaxSize()) {
-        if (items.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                OpsKpiAndroid("Suscriptores", items.size.toString(), Modifier.weight(1f))
-                OpsKpiAndroid("Activos", active.toString(), Modifier.weight(1f))
-            }
-        }
-        SearchBarAndroid(query, "Buscar suscriptor…") { query = it }
-        if (loading) { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() } }
-        else LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(filtered.take(60), key = { it.id }) { s ->
-                Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(nn(s.email), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                            if (!s.name.isNullOrBlank()) Text(s.name!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        val unsub = s.status?.lowercase() == "unsubscribed"
-                        Text(if (unsub) "Baja" else "Activo", fontSize = 10.sp, fontWeight = FontWeight.Bold,
-                            color = if (unsub) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
-        }
-    }
-}
+fun NewsletterModuleScreen() = TypedModuleListScreen(
+    title = "Newsletter",
+    loadingMessage = "Cargando suscriptores…",
+    searchPlaceholder = "Buscar suscriptor…",
+    kpisOf = { list ->
+        val active = list.count { it.status?.lowercase() != "unsubscribed" }
+        listOf(
+            "Suscriptores" to list.size.toString(),
+            "Activos" to active.toString(),
+        )
+    },
+    load = { it.newsletter() },
+    keyOf = { "nl-${it.id}" },
+    titleOf = { nn(it.email) },
+    subtitleOf = { it.name.orEmpty() },
+    trailingOf = {
+        if (it.status?.lowercase() == "unsubscribed") "Baja" else "Activo"
+    },
+    matches = { row, q ->
+        listOfNotNull(row.name, row.email).any { s -> s.contains(q, true) }
+    },
+    detailPairs = { d ->
+        listOf(
+            "Email" to nn(d.email),
+            "Nombre" to nn(d.name),
+            "Estado" to (d.status ?: ""),
+            "Fecha" to (d.createdAt ?: ""),
+        )
+    },
+)
 
 // ── Audit ─────────────────────────────────────────────────────────────────
 @Composable
-fun AuditModuleScreen() {
-    var items by remember { mutableStateOf<List<AuditEntryDto>>(emptyList()) }
-    var query by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(true) }
-    val context = LocalContext.current
-    val repo = remember(context) { ExtraRepository(context) }
-    LaunchedEffect(Unit) { items = withContext(Dispatchers.IO) { repo.audit() }; loading = false }
-    val filtered = if (query.isBlank()) items else items.filter {
-        listOfNotNull(it.action, it.description, it.userName, it.entityType).any { s -> s.contains(query, true) }
-    }
-    Column(Modifier.fillMaxSize()) {
-        if (items.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                OpsKpiAndroid("Registros", items.size.toString(), Modifier.weight(1f))
-            }
-        }
-        SearchBarAndroid(query, "Buscar acción…") { query = it }
-        if (loading) { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() } }
-        else LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            items(filtered.take(80), key = { it.id }) { a ->
-                Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(listOfNotNull(a.action, a.entityType).joinToString(" · ").ifBlank { "Evento" }, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                            if (!a.userName.isNullOrBlank()) Text(a.userName!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        if (!a.createdAt.isNullOrBlank()) Text(a.createdAt!!.take(10), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
-    }
-}
+fun AuditModuleScreen() = TypedModuleListScreen(
+    title = "Auditoría",
+    loadingMessage = "Cargando auditoría…",
+    searchPlaceholder = "Buscar acción…",
+    kpisOf = { list -> listOf("Registros" to list.size.toString()) },
+    load = { it.audit() },
+    keyOf = { "au-${it.id}" },
+    titleOf = { listOfNotNull(it.action, it.entityType).joinToString(" · ").ifBlank { "Evento" } },
+    subtitleOf = { it.userName.orEmpty() },
+    metaOf = { it.description.orEmpty().take(80) },
+    trailingOf = { it.createdAt.orEmpty().take(10) },
+    matches = { row, q ->
+        listOfNotNull(row.action, row.description, row.userName, row.entityType).any { s -> s.contains(q, true) }
+    },
+    detailPairs = { d ->
+        listOf(
+            "Acción" to (d.action ?: ""),
+            "Usuario" to (d.userName ?: ""),
+            "Entidad" to (d.entityType ?: ""),
+            "Descripción" to (d.description ?: ""),
+            "Fecha" to (d.createdAt ?: ""),
+        )
+    },
+)
 
 // ── Expenses ──────────────────────────────────────────────────────────────
 @Composable
-fun ExpensesModuleScreen() {
-    var items by remember { mutableStateOf<List<ExpenseDto>>(emptyList()) }
-    var query by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(true) }
-    val context = LocalContext.current
-    val repo = remember(context) { ExtraRepository(context) }
-    LaunchedEffect(Unit) { items = withContext(Dispatchers.IO) { repo.expenses() }; loading = false }
-    val filtered = if (query.isBlank()) items else items.filter {
-        listOfNotNull(it.concepto, it.usuario?.nombre).any { s -> s.contains(query, true) }
-    }
-    val total = items.sumOf { it.monto ?: 0.0 }
-    Column(Modifier.fillMaxSize()) {
-        if (items.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                OpsKpiAndroid("Gastos", items.size.toString(), Modifier.weight(1f))
-                OpsKpiAndroid("Total", fmtMoney(total), Modifier.weight(1f))
-            }
-        }
-        SearchBarAndroid(query, "Buscar gasto…") { query = it }
-        if (loading) { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() } }
-        else LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(filtered.take(60), key = { it.id }) { e ->
-                Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(nn(e.concepto), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                            if (!e.usuario?.nombre.isNullOrBlank()) Text(e.usuario!!.nombre ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(fmtMoney(e.monto), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                            if (!e.createdAt.isNullOrBlank()) Text(e.createdAt!!.take(10), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+fun ExpensesModuleScreen() = TypedModuleListScreen(
+    title = "Gastos",
+    loadingMessage = "Cargando gastos…",
+    searchPlaceholder = "Buscar gasto…",
+    kpisOf = { list ->
+        listOf(
+            "Gastos" to list.size.toString(),
+            "Total" to fmtMoney(list.sumOf { it.monto ?: 0.0 }),
+        )
+    },
+    load = { it.expenses() },
+    keyOf = { "ex-${it.id}" },
+    titleOf = { nn(it.concepto) },
+    subtitleOf = { it.usuario?.nombre.orEmpty() },
+    metaOf = { it.createdAt.orEmpty().take(10) },
+    trailingOf = { fmtMoney(it.monto) },
+    matches = { row, q ->
+        listOfNotNull(row.concepto, row.usuario?.nombre).any { s -> s.contains(q, true) }
+    },
+    detailPairs = { d ->
+        listOf(
+            "Concepto" to nn(d.concepto),
+            "Monto" to fmtMoney(d.monto),
+            "Categoría" to nn(d.categoria),
+            "Estado" to d.displayStatus(),
+            "Empleado" to nn(d.usuario?.nombre),
+            "Fecha" to (d.createdAt ?: ""),
+        )
+    },
+)
 
 // ── Fines ─────────────────────────────────────────────────────────────────
 @Composable
-fun FinesModuleScreen() {
-    var items by remember { mutableStateOf<List<FineDto>>(emptyList()) }
-    var query by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(true) }
-    val context = LocalContext.current
-    val repo = remember(context) { ExtraRepository(context) }
-    LaunchedEffect(Unit) { items = withContext(Dispatchers.IO) { repo.fines() }; loading = false }
-    val filtered = if (query.isBlank()) items else items.filter {
-        listOfNotNull(it.motivo, it.usuario?.nombre).any { s -> s.contains(query, true) }
-    }
-    val total = items.sumOf { it.monto ?: 0.0 }
-    Column(Modifier.fillMaxSize()) {
-        if (items.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                OpsKpiAndroid("Multas", items.size.toString(), Modifier.weight(1f))
-                OpsKpiAndroid("Total", fmtMoney(total), Modifier.weight(1f))
-            }
-        }
-        SearchBarAndroid(query, "Buscar multa…") { query = it }
-        if (loading) { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() } }
-        else LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(filtered.take(60), key = { it.id }) { f ->
-                Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(nn(f.motivo), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                            if (!f.usuario?.nombre.isNullOrBlank()) Text(f.usuario!!.nombre ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(fmtMoney(f.monto), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                            if (!f.createdAt.isNullOrBlank()) Text(f.createdAt!!.take(10), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+fun FinesModuleScreen() = TypedModuleListScreen(
+    title = "Multas",
+    loadingMessage = "Cargando multas…",
+    searchPlaceholder = "Buscar multa…",
+    kpisOf = { list ->
+        listOf(
+            "Multas" to list.size.toString(),
+            "Total" to fmtMoney(list.sumOf { it.displayAmount() }),
+        )
+    },
+    load = { it.fines() },
+    keyOf = { "fn-${it.id}" },
+    titleOf = { nn(it.displayMotivo()) },
+    subtitleOf = { it.displayUserName().orEmpty() },
+    metaOf = { it.displayDate().orEmpty().take(10) },
+    trailingOf = { fmtMoney(it.displayAmount()) },
+    matches = { row, q ->
+        listOfNotNull(row.displayMotivo(), row.displayUserName()).any { s -> s.contains(q, true) }
+    },
+    detailPairs = { d ->
+        listOf(
+            "Motivo" to nn(d.displayMotivo()),
+            "Tipo" to d.displayTipo(),
+            "Monto" to fmtMoney(d.displayAmount()),
+            "Estado" to d.displayStatus(),
+            "Aprobación" to d.displayApproval(),
+            "Empleado" to nn(d.displayUserName()),
+            "Fecha" to (d.displayDate() ?: ""),
+        )
+    },
+)
 
 // ── Employee payments ─────────────────────────────────────────────────────
 @Composable
-fun EmployeePaymentsModuleScreen() {
-    var items by remember { mutableStateOf<List<EmployeePaymentDto>>(emptyList()) }
-    var query by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(true) }
-    val context = LocalContext.current
-    val repo = remember(context) { ExtraRepository(context) }
-    LaunchedEffect(Unit) { items = withContext(Dispatchers.IO) { repo.employeePayments() }; loading = false }
-    val filtered = if (query.isBlank()) items else items.filter {
-        listOfNotNull(it.concepto, it.usuario?.nombre).any { s -> s.contains(query, true) }
-    }
-    val total = items.sumOf { it.monto ?: 0.0 }
-    Column(Modifier.fillMaxSize()) {
-        if (items.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                OpsKpiAndroid("Pagos", items.size.toString(), Modifier.weight(1f))
-                OpsKpiAndroid("Total", fmtMoney(total), Modifier.weight(1f))
-            }
-        }
-        SearchBarAndroid(query, "Buscar pago…") { query = it }
-        if (loading) { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() } }
-        else LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(filtered.take(60), key = { it.id }) { p ->
-                Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(nn(p.concepto), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                            if (!p.usuario?.nombre.isNullOrBlank()) Text(p.usuario!!.nombre ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(fmtMoney(p.monto), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                            if (!p.createdAt.isNullOrBlank()) Text(p.createdAt!!.take(10), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+fun EmployeePaymentsModuleScreen() = TypedModuleListScreen(
+    title = "Pagos a empleados",
+    loadingMessage = "Cargando pagos…",
+    searchPlaceholder = "Buscar pago…",
+    kpisOf = { list ->
+        listOf(
+            "Pagos" to list.size.toString(),
+            "Total" to fmtMoney(list.sumOf { it.displayAmount() }),
+        )
+    },
+    load = { it.employeePayments() },
+    keyOf = { "ep-${it.id}" },
+    titleOf = { nn(it.displayConcepto()) },
+    subtitleOf = { it.displayUserName().orEmpty() },
+    metaOf = { it.createdAt.orEmpty().take(10) },
+    trailingOf = { fmtMoney(it.displayAmount()) },
+    matches = { row, q ->
+        listOfNotNull(row.displayConcepto(), row.displayUserName()).any { s -> s.contains(q, true) }
+    },
+    detailPairs = { d ->
+        listOf(
+            "Concepto" to nn(d.displayConcepto()),
+            "Monto" to fmtMoney(d.displayAmount()),
+            "Estado" to d.displayStatus(),
+            "Empleado" to nn(d.displayUserName()),
+            "Periodo" to listOfNotNull(d.displayPeriodStart(), d.displayPeriodEnd()).joinToString(" → "),
+            "Horas" to (d.displayHours() ?: ""),
+            "Fecha" to (d.createdAt ?: ""),
+        )
+    },
+)
 
 // ── Cotizaciones ──────────────────────────────────────────────────────────
 @Composable
@@ -380,7 +336,7 @@ fun CotizacionesModuleScreen() {
         }
 
         if (loading) {
-            item { Text("Cargando cotizaciones...", color = Color(0xFF64748B)) }
+            item { NxLoadingBlock("Cargando cotizaciones…") }
             return@LazyColumn
         }
 
@@ -401,13 +357,10 @@ fun CotizacionesModuleScreen() {
 
         // Search
         item {
-            OutlinedTextField(
+            NxSearchField(
                 value = query,
                 onValueChange = { query = it },
-                label = { Text("Buscar folio, cliente") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                placeholder = "Buscar folio, cliente",
             )
             Spacer(Modifier.height(10.dp))
         }
@@ -557,9 +510,7 @@ fun LunchBreaksModuleScreen() {
 
     Column(Modifier.fillMaxSize()) {
         if (state.loading && state.items.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            NxLoadingBlock("Cargando comidas del equipo…")
             return
         }
 
@@ -574,12 +525,10 @@ fun LunchBreaksModuleScreen() {
             }
 
             item {
-                OutlinedTextField(
+                NxSearchField(
                     value = state.query,
                     onValueChange = { vm.setQuery(it) },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Buscar empleado…") },
-                    singleLine = true,
+                    placeholder = "Buscar empleado…",
                 )
             }
 
@@ -884,7 +833,7 @@ fun MyLunchBreaksModuleScreen(currentUserId: Long?) {
         }
 
         if (state.loading) {
-            item { Text("Cargando…", color = SubText) }
+            item { NxLoadingBlock("Cargando historial de comidas…") }
         } else if (!state.error.isNullOrBlank()) {
             item { Text(state.error!!, color = Color(0xFFEF4444)) }
         } else if (state.breaks.isEmpty()) {
@@ -918,133 +867,5 @@ fun MyLunchBreaksModuleScreen(currentUserId: Long?) {
 
         item { Spacer(Modifier.height(24.dp)) }
     }
-}
-
-// ── Documents ─────────────────────────────────────────────────────────────
-@Composable
-fun DocumentsModuleScreen() {
-    var items by remember { mutableStateOf<List<DocumentDto>>(emptyList()) }
-    var query by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(true) }
-    val context = LocalContext.current
-    val repo = remember(context) { ExtraRepository(context) }
-    LaunchedEffect(Unit) { items = withContext(Dispatchers.IO) { repo.documents() }; loading = false }
-    val filtered = if (query.isBlank()) items else items.filter {
-        listOfNotNull(it.title, it.type).any { s -> s.contains(query, true) }
-    }
-    Column(Modifier.fillMaxSize()) {
-        if (items.isNotEmpty()) OpsKpiAndroid("Documentos", items.size.toString(), Modifier.fillMaxWidth().padding(16.dp, 6.dp))
-        SearchBarAndroid(query, "Buscar documento…") { query = it }
-        if (loading) { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() } }
-        else LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(filtered.take(60), key = { it.id }) { d ->
-                Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(nn(d.title), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                            if (!d.type.isNullOrBlank())
-                                Text(d.type!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        if (!d.createdAt.isNullOrBlank()) Text(d.createdAt!!.take(10), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ── Accounting journal entries ────────────────────────────────────────────
-@Composable
-fun AccountingModuleScreen() {
-    var items by remember { mutableStateOf<List<JournalEntryDto>>(emptyList()) }
-    var query by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(true) }
-    val context = LocalContext.current
-    val repo = remember(context) { ExtraRepository(context) }
-    LaunchedEffect(Unit) { items = withContext(Dispatchers.IO) { repo.journalEntries() }; loading = false }
-    val filtered = if (query.isBlank()) items else items.filter {
-        listOfNotNull(it.description, it.reference).any { s -> s.contains(query, true) }
-    }
-    val totalDebit  = items.sumOf { it.totalDebit  ?: 0.0 }
-    val totalCredit = items.sumOf { it.totalCredit ?: 0.0 }
-    Column(Modifier.fillMaxSize()) {
-        if (items.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                OpsKpiAndroid("Asientos", items.size.toString(), Modifier.weight(1f))
-                OpsKpiAndroid("Debe",     fmtMoney(totalDebit),  Modifier.weight(1f))
-                OpsKpiAndroid("Haber",    fmtMoney(totalCredit), Modifier.weight(1f))
-            }
-        }
-        SearchBarAndroid(query, "Buscar asiento…") { query = it }
-        if (loading) { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() } }
-        else LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(filtered.take(60), key = { it.id }) { j ->
-                Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(nn(j.description ?: j.reference), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                            if (!j.reference.isNullOrBlank()) Text(j.reference!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            if ((j.totalDebit ?: 0.0) > 0.0) Text("D: ${fmtMoney(j.totalDebit)}", fontSize = 10.sp, color = MaterialTheme.colorScheme.error)
-                            if ((j.totalCredit ?: 0.0) > 0.0) Text("H: ${fmtMoney(j.totalCredit)}", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
-                            if (!j.entryDate.isNullOrBlank()) Text(j.entryDate!!.take(10), fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ── Invoicing ─────────────────────────────────────────────────────────────
-@Composable
-fun InvoicingModuleScreen() = GenericListModuleScreen(title = "Facturación") { repo ->
-    repo.invoices().map { i ->
-        SimpleRow(
-            id = i.id.toString(),
-            title = nn(i.folio ?: "Factura #${i.id}"),
-            subtitle = nn(i.clientName),
-            meta = i.issueDate,
-            trailing = listOfNotNull(fmtMoney(i.total), i.status).joinToString(" · "),
-        )
-    }
-}
-
-// ── Banking ───────────────────────────────────────────────────────────────
-@Composable
-fun BankingModuleScreen() = GenericListModuleScreen(title = "Banca · Cuentas") { repo ->
-    repo.bankAccounts().map { b ->
-        SimpleRow(
-            id = b.id.toString(),
-            title = nn(b.name),
-            subtitle = listOfNotNull(b.bank, b.accountNumber).joinToString(" · "),
-            trailing = listOfNotNull(fmtMoney(b.balance), b.currency).joinToString(" · "),
-        )
-    }
-}
-
-// ── Shared UI helpers ─────────────────────────────────────────────────────
-@Composable
-fun OpsKpiAndroid(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-fun SearchBarAndroid(query: String, placeholder: String, onQueryChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(12.dp),
-        trailingIcon = if (query.isNotBlank()) ({
-            TextButton(onClick = { onQueryChange("") }) { Text("✕", fontSize = 12.sp) }
-        }) else null,
-    )
 }
 

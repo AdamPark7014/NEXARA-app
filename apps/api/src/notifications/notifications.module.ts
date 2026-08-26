@@ -5,10 +5,11 @@ import { DevicesModule } from '../devices/devices.module.js';
 import { NotificationsService } from './notifications.service.js';
 import { NotificationHierarchyService } from './notification-hierarchy.service.js';
 import { NotificationsController } from './notifications.controller.js';
+import { notificationsGatewayProvider } from './notifications-gateway.provider.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, DevicesModule],
-  providers: [NotificationsService, NotificationHierarchyService],
+  providers: [NotificationsService, NotificationHierarchyService, notificationsGatewayProvider],
   controllers: [NotificationsController],
   exports: [NotificationsService, NotificationHierarchyService], // Export so other modules can use it
 })

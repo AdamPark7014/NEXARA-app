@@ -1,0 +1,11 @@
+node_modules
+dist
+.next
+build
+.turbo
+coverage
+apps/mobile-native/android/**/build
+apps/mobile-native/ios/Pods
+package-lock.json
+*.min.js
+*.min.css

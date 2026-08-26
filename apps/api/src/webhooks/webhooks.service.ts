@@ -12,6 +12,7 @@ import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../
 import { JobQueueService } from '../jobs/job-queue.service.js';
 
 export const WEBHOOK_EVENTS = [
+  'approval.requested',
   'invoice.paid',
   'invoice.overdue',
   'stock.low',
@@ -22,6 +23,25 @@ export const WEBHOOK_EVENTS = [
   'opportunity.won',
   'opportunity.lost',
   'payment.registered',
+  'quote.created',
+  'quote.discount_approved',
+  'quote.discount_rejected',
+  'quote.approved',
+  'approval.approved',
+  'approval.rejected',
+  'expense.approved',
+  'expense.rejected',
+  'viatic.approved',
+  'viatic.rejected',
+  'purchase_order.confirmed',
+  'purchase_order.rejected',
+  'sales_project.approved',
+  'sales_project.rejected',
+  'activity.completed',
+  'activity.closure_approved',
+  'activity.closure_rejected',
+  'client.created',
+  'client.updated',
 ] as const;
 
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number] | string;

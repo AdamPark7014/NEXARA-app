@@ -267,4 +267,210 @@ export class ActivityTeamService {
     const costoTotal = movimientos.reduce((sum, m) => sum + Number(m.totalCost ?? 0), 0);
     return { movimientos, costoTotal };
   }
+
+  /** Timeline unificada: reasignaciones, incidencias, material y eventos de evidencia. */
+  async buildTimeline(activityId: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    await this.loadActivity(activityId, tenantId);
+
+    const activity = await this.prisma.activity.findFirst({
+      where: { id: activityId, ...companyWhere(tenantId) },
+      select: {
+        fechaAsignacion: true,
+        fechaInicio: true,
+        fechaFinalizacion: true,
+      },
+    });
+    if (!activity) throw new NotFoundException('Actividad no encontrada');
+
+    const [reassignments, incidents, recommendations, movements, evidence] = await Promise.all([
+      this.prisma.activityReassignment.findMany({
+        where: { activityId, ...companyWhere(tenantId) },
+        include: {
+          deUsuario: { select: { id: true, nombre: true } },
+          aUsuario: { select: { id: true, nombre: true } },
+          movidaPor: { select: { id: true, nombre: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+      }),
+      this.prisma.activityIncident.findMany({
+        where: { activityId, ...companyWhere(tenantId) },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          descripcion: true,
+          severidad: true,
+          createdAt: true,
+          resueltoAt: true,
+        },
+      }),
+      this.prisma.activityRecommendation.findMany({
+        where: { activityId, ...companyWhere(tenantId) },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          descripcion: true,
+          estado: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.stockMovement.findMany({
+        where: { activityId, ...companyWhere(tenantId) },
+        include: { product: { select: { id: true, sku: true, name: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      }),
+      this.prisma.activityEvidence.findFirst({
+        where: { activityId },
+        select: {
+          reviewStatus: true,
+          reviewedAt: true,
+          serviceSheetCompletedAt: true,
+          serviceSheetUploadedAt: true,
+          entryPhotoUploadedAt: true,
+          exitPhotoUploadedAt: true,
+          reviewedBy: { select: { nombre: true } },
+        },
+      }),
+    ]);
+
+    type TimelineEvent = {
+      id: string;
+      at: string;
+      kind: string;
+      title: string;
+      subtitle?: string;
+      icon: string;
+    };
+
+    const events: TimelineEvent[] = [];
+
+    if (activity.fechaAsignacion) {
+      events.push({
+        id: 'assigned',
+        at: new Date(activity.fechaAsignacion).toISOString(),
+        kind: 'estado',
+        title: 'Actividad asignada',
+        icon: '📋',
+      });
+    }
+    if (activity.fechaInicio) {
+      events.push({
+        id: 'started',
+        at: new Date(activity.fechaInicio).toISOString(),
+        kind: 'estado',
+        title: 'Inicio en campo',
+        icon: '🚀',
+      });
+    }
+
+    for (const r of reassignments) {
+      events.push({
+        id: `reassign-${r.id}`,
+        at: new Date(r.createdAt).toISOString(),
+        kind: 'reasignación',
+        title: `Reasignada a ${r.aUsuario?.nombre ?? 'técnico'}`,
+        subtitle: r.motivo ?? (r.deUsuario ? `Desde ${r.deUsuario.nombre}` : undefined),
+        icon: '👤',
+      });
+    }
+
+    for (const inc of incidents) {
+      events.push({
+        id: `inc-${inc.id}`,
+        at: new Date(inc.createdAt).toISOString(),
+        kind: 'incidencia',
+        title: String(inc.descripcion).slice(0, 120),
+        subtitle: String(inc.severidad ?? ''),
+        icon: '⚠️',
+      });
+      if (inc.resueltoAt) {
+        events.push({
+          id: `inc-res-${inc.id}`,
+          at: new Date(inc.resueltoAt).toISOString(),
+          kind: 'incidencia',
+          title: `Incidencia resuelta`,
+          subtitle: String(inc.descripcion).slice(0, 80),
+          icon: '✅',
+        });
+      }
+    }
+
+    for (const rec of recommendations) {
+      events.push({
+        id: `rec-${rec.id}`,
+        at: new Date(rec.createdAt).toISOString(),
+        kind: 'recomendación',
+        title: String(rec.descripcion).slice(0, 120),
+        subtitle: String(rec.estado ?? ''),
+        icon: '💡',
+      });
+    }
+
+    for (const m of movements) {
+      events.push({
+        id: `mat-${m.id}`,
+        at: new Date(m.createdAt).toISOString(),
+        kind: 'material',
+        title: `${m.product?.name ?? 'Material'} (${m.quantity})`,
+        subtitle: String(m.type),
+        icon: '📦',
+      });
+    }
+
+    if (evidence?.entryPhotoUploadedAt) {
+      events.push({
+        id: 'ev-entry',
+        at: new Date(evidence.entryPhotoUploadedAt).toISOString(),
+        kind: 'evidencia',
+        title: 'Check-in / llegada registrada',
+        icon: '📍',
+      });
+    }
+    if (evidence?.exitPhotoUploadedAt) {
+      events.push({
+        id: 'ev-exit',
+        at: new Date(evidence.exitPhotoUploadedAt).toISOString(),
+        kind: 'evidencia',
+        title: 'Check-out / salida registrada',
+        icon: '📍',
+      });
+    }
+    if (evidence?.serviceSheetCompletedAt) {
+      events.push({
+        id: 'ev-sheet',
+        at: new Date(evidence.serviceSheetCompletedAt).toISOString(),
+        kind: 'evidencia',
+        title: 'Hoja de servicio completada',
+        icon: '📝',
+      });
+    }
+    if (evidence?.reviewedAt) {
+      events.push({
+        id: 'ev-review',
+        at: new Date(evidence.reviewedAt).toISOString(),
+        kind: 'evidencia',
+        title: `Evidencia ${String(evidence.reviewStatus ?? 'revisada').toLowerCase()}`,
+        subtitle: evidence.reviewedBy?.nombre,
+        icon: '📸',
+      });
+    }
+
+    if (activity.fechaFinalizacion) {
+      events.push({
+        id: 'completed',
+        at: new Date(activity.fechaFinalizacion).toISOString(),
+        kind: 'estado',
+        title: 'Actividad finalizada',
+        icon: '✅',
+      });
+    }
+
+    events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+    return { events };
+  }
 }

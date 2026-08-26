@@ -22,10 +22,10 @@ android {
         applicationId = "mx.nexara.mobile.nativeapp"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = (project.findProperty("VERSION_CODE") as String?)?.toIntOrNull() ?: 1
+        versionName = project.findProperty("VERSION_NAME") as String? ?: "0.1.0"
 
-        // Production API base (should include /api).
+        // Production API base (should include /api). Overridden in debug buildType.
         buildConfigField("String", "API_BASE_URL", "\"https://api.nexara.com.mx/api\"")
 
         // Google Maps API key. Lee de -P GOOGLE_MAPS_API_KEY=... o local.properties.
@@ -53,8 +53,26 @@ android {
     }
 
     buildTypes {
-        release {
+        debug {
             isMinifyEnabled = false
+            isShrinkResources = false
+            val screenshotApi = project.findProperty("SCREENSHOT_API") == "true"
+            buildConfigField(
+                "String",
+                "API_BASE_URL",
+                if (screenshotApi) "\"https://api.nexara.com.mx/api\"" else "\"http://10.0.2.2:3001/api\"",
+            )
+        }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
@@ -77,6 +95,10 @@ android {
     }
 
     packaging {
+        jniLibs {
+            // AGP 8.5.1+ zip-aligns uncompressed native libs for 16 KB page sizes.
+            useLegacyPackaging = false
+        }
         resources {
             excludes += setOf(
                 "/META-INF/{AL2.0,LGPL2.1}",
@@ -91,11 +113,13 @@ dependencies {
     androidTestImplementation(composeBom)
 
     implementation("androidx.core:core-ktx:1.17.0")
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.activity:activity-compose:1.11.0")
     
     // Material Components para retrocompatibilidad con Material3 themes en API < 31
     implementation("com.google.android.material:material:1.12.0")
 
+    implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
@@ -117,6 +141,9 @@ dependencies {
     implementation("com.squareup.moshi:moshi-kotlin:1.15.2")
     implementation("com.squareup.retrofit2:converter-scalars:2.11.0")
 
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    implementation("androidx.datastore:datastore-preferences:1.1.7")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.fragment:fragment-ktx:1.8.6")
@@ -129,8 +156,8 @@ dependencies {
     implementation("com.google.android.gms:play-services-maps:19.0.0")
     implementation("com.google.maps.android:maps-compose:4.4.1")
 
-    // CameraX para captura de evidencias / barcode
-    val cameraX = "1.3.4"
+    // CameraX 1.4.2+ ships 16 KB–aligned libimage_processing_util_jni.so (Play requirement).
+    val cameraX = "1.4.2"
     implementation("androidx.camera:camera-core:$cameraX")
     implementation("androidx.camera:camera-camera2:$cameraX")
     implementation("androidx.camera:camera-lifecycle:$cameraX")

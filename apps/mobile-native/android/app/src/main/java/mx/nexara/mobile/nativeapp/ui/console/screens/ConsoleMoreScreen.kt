@@ -10,7 +10,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,6 +29,8 @@ import mx.nexara.mobile.nativeapp.R
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleEntry
 import mx.nexara.mobile.nativeapp.ui.console.ConsoleSidebarGroup
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
 
 /**
  * Pantalla "Más" para la consola: muestra los módulos accesibles agrupados
@@ -51,6 +56,26 @@ fun ConsoleMoreScreen(
     onOpenContabilidad: (() -> Unit)? = null,
     onOpenOfflineQueue: (() -> Unit)? = null,
 ) {
+    var searchQuery by remember { mutableStateOf("") }
+    val normalizedQuery = searchQuery.trim()
+    val filteredGroups = remember(groups, normalizedQuery) {
+        if (normalizedQuery.isBlank()) groups
+        else groups.mapNotNull { group ->
+            val mods = group.modules.filter { m ->
+                m.label.contains(normalizedQuery, ignoreCase = true) ||
+                    m.key.contains(normalizedQuery, ignoreCase = true)
+            }
+            if (mods.isEmpty()) null else group.copy(modules = mods)
+        }
+    }
+    val filteredModules = remember(modules, normalizedQuery) {
+        if (normalizedQuery.isBlank()) modules
+        else modules.filter { m ->
+            m.label.contains(normalizedQuery, ignoreCase = true) ||
+                m.key.contains(normalizedQuery, ignoreCase = true)
+        }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(0.dp),
@@ -65,6 +90,15 @@ fun ConsoleMoreScreen(
                 isSuperAdmin = isSuperAdmin,
             )
             Spacer(Modifier.height(16.dp))
+        }
+
+        item(key = "module-search") {
+            NxSearchField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = "Buscar módulo…",
+            )
+            Spacer(Modifier.height(12.dp))
         }
 
         if (onOpenOfflineQueue != null) {
@@ -127,26 +161,42 @@ fun ConsoleMoreScreen(
 
         // ── Module groups ────────────────────────────────────────────────────
         if (groups.isNotEmpty()) {
-            groups.forEach { group ->
-                item(key = "group-${group.id}") {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        group.title.uppercase(),
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp),
-                        color = Color(0xFF64748B),
-                        modifier = Modifier.padding(horizontal = 2.dp, vertical = 4.dp),
-                    )
-                    Spacer(Modifier.height(4.dp))
+            if (filteredGroups.isNotEmpty()) {
+                filteredGroups.forEach { group ->
+                    item(key = "group-${group.id}") {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            group.title.uppercase(),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp),
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.padding(horizontal = 2.dp, vertical = 4.dp),
+                        )
+                        Spacer(Modifier.height(4.dp))
+                    }
+                    items(group.modules, key = { "g-${group.id}-${it.key}" }) { m ->
+                        ModuleCard(m, onOpenModule)
+                        Spacer(Modifier.height(6.dp))
+                    }
                 }
-                items(group.modules, key = { "g-${group.id}-${it.key}" }) { m ->
-                    ModuleCard(m, onOpenModule)
-                    Spacer(Modifier.height(6.dp))
+            } else if (normalizedQuery.isNotBlank()) {
+                item(key = "search-empty") {
+                    NxEmptyState(
+                        title = "Sin resultados",
+                        subtitle = "Prueba con otro término o revisa el nombre del módulo.",
+                    )
                 }
             }
-        } else {
-            items(modules, key = { it.key }) { m ->
+        } else if (filteredModules.isNotEmpty()) {
+            items(filteredModules, key = { it.key }) { m ->
                 ModuleCard(m, onOpenModule)
                 Spacer(Modifier.height(6.dp))
+            }
+        } else if (normalizedQuery.isNotBlank()) {
+            item(key = "search-empty") {
+                NxEmptyState(
+                    title = "Sin resultados",
+                    subtitle = "Prueba con otro término o revisa el nombre del módulo.",
+                )
             }
         }
 

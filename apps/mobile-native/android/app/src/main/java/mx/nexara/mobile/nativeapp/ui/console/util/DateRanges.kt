@@ -22,3 +22,16 @@ fun currentWeekRange(today: LocalDate = LocalDate.now()): DateRange {
     return DateRange(from = start.format(fmt), to = end.format(fmt))
 }
 
+fun lastWeekRange(today: LocalDate = LocalDate.now()): DateRange {
+    val thisWeekStart = LocalDate.parse(currentWeekRange(today).from)
+    val start = thisWeekStart.minusDays(7)
+    val end = start.plusDays(6)
+    return DateRange(from = start.format(fmt), to = end.format(fmt))
+}
+
+fun currentMonthRange(today: LocalDate = LocalDate.now()): DateRange {
+    val start = today.withDayOfMonth(1)
+    val end = today.withDayOfMonth(today.lengthOfMonth())
+    return DateRange(from = start.format(fmt), to = end.format(fmt))
+}
+

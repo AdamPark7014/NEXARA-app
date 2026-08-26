@@ -1,8 +1,14 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
+import EmptyState from "@/components/ui/EmptyState";
+import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
+import { Tag } from "@/components/ui/DataTable";
 import { DetailError, DetailSection, formatDateTime } from "@/components/detail/DetailFrame";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
-import KpiCard from "@/components/ui/KpiCard";
+import { useUser } from "@/components/UserContext";
+import { listActivityTimeline, type ActivityTimelineEvent } from "@/lib/ops-activities-api";
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -11,112 +17,108 @@ function relativeTime(iso: string): string {
   if (mins < 60) return `Hace ${mins} min`;
   const hrs = Math.round(mins / 60);
   if (hrs < 24) return `Hace ${hrs}h`;
-  const days = Math.round(hrs / 24);
-  if (days < 30) return `Hace ${days} día${days !== 1 ? "s" : ""}`;
-  return new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+  return `Hace ${Math.round(hrs / 24)}d`;
 }
-
-const EVENT_ICON: Record<string, string> = {
-  "Actividad asignada": "📋",
-  "Inicio en campo": "🚀",
-  "Entrega esperada": "📅",
-  "Finalizada": "✅",
-};
 
 export default function ActivityHistoryPage() {
   const { activity, error, reload } = useActivityDetail();
+  const { user } = useUser();
+  const token = user?.token ?? "";
+  const [events, setEvents] = useState<ActivityTimelineEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [timelineError, setTimelineError] = useState<string | null>(null);
+
+  const loadTimeline = useCallback(async () => {
+    if (!token || !activity?.id) return;
+    setLoading(true);
+    setTimelineError(null);
+    try {
+      const data = await listActivityTimeline(token, activity.id);
+      setEvents(data.events ?? []);
+    } catch (e) {
+      setTimelineError(e instanceof Error ? e.message : "No se pudo cargar el historial");
+      setEvents([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, activity?.id]);
+
+  useEffect(() => {
+    void loadTimeline();
+  }, [loadTimeline]);
 
   if (error) return <DetailError message={error} onRetry={reload} />;
   if (!activity) return null;
 
-  const events: Array<{ at: string; label: string; isPast: boolean }> = [];
-  const now = new Date();
-
-  if (activity.fechaAsignacion) {
-    events.push({ at: activity.fechaAsignacion, label: "Actividad asignada", isPast: new Date(activity.fechaAsignacion) < now });
-  }
-  if (activity.fechaInicio) {
-    events.push({ at: activity.fechaInicio, label: "Inicio en campo", isPast: new Date(activity.fechaInicio) < now });
-  }
-  if (activity.fechaEntregaEsperada) {
-    const d = new Date(activity.fechaEntregaEsperada);
-    const overdue = d < now && activity.estatus !== "COMPLETADA" && activity.estatus !== "CANCELADA";
-    events.push({ at: activity.fechaEntregaEsperada, label: overdue ? "⚠️ Entrega esperada (vencida)" : "Entrega esperada", isPast: d < now });
-  }
-  if (activity.fechaFinalizacion) {
-    events.push({ at: activity.fechaFinalizacion, label: "Finalizada", isPast: new Date(activity.fechaFinalizacion) < now });
-  }
-  if (activity.activityEvidence?.reviewedAt) {
-    events.push({
-      at: activity.activityEvidence.reviewedAt,
-      label: `Evidencia ${(activity.activityEvidence.status ?? "revisada").toLowerCase()}`,
-      isPast: true,
-    });
-  }
-  events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
-
-  const pastEvents = events.filter((e) => e.isPast).length;
-  const hasOverdue = events.some((e) => e.label.includes("vencida"));
   const isCompleted = !!activity.fechaFinalizacion;
 
   return (
     <>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
-      <KpiCard label="Total eventos" value={events.length} icon="📅" />
-      <KpiCard label="Completados" value={pastEvents} icon="✅" variant={pastEvents === events.length ? "positive" : "accent"} />
-      <KpiCard label="Estado" value={isCompleted ? "Finalizada" : hasOverdue ? "Vencida" : "En curso"} icon={isCompleted ? "✅" : hasOverdue ? "⚠️" : "⚙️"} variant={isCompleted ? "positive" : hasOverdue ? "danger" : "accent"} />
-      <KpiCard label="Con evidencia" value={activity.activityEvidence ? "Sí" : "No"} icon="📸" variant={activity.activityEvidence ? "positive" : "default"} />
-    </div>
-    <DetailSection title="Línea de tiempo">
-      {events.length === 0 ? (
-        <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>Sin eventos registrados aún.</p>
-      ) : (
-        <div style={{ position: "relative", paddingLeft: 28 }}>
-          {/* Vertical line */}
-          <div style={{ position: "absolute", left: 9, top: 10, bottom: 10, width: 2, background: "var(--border)" }} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+        <KpiCard label="Eventos" value={events.length} icon="📅" />
+        <KpiCard label="Estado" value={isCompleted ? "Finalizada" : activity.estatus} icon="⚙️" variant={isCompleted ? "positive" : "accent"} />
+      </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-            {events.map((ev, idx) => {
-              const icon = Object.keys(EVENT_ICON).find((k) => ev.label.includes(k.replace("⚠️ ", "")));
-              const emoji = icon ? EVENT_ICON[icon] : "🔵";
-              const isFirst = idx === 0;
-              return (
-                <div key={`${ev.at}-${idx}`} style={{ position: "relative", paddingBottom: idx < events.length - 1 ? 20 : 0 }}>
-                  {/* Dot on timeline */}
-                  <div style={{
-                    position: "absolute",
-                    left: -28,
-                    top: 12,
-                    width: 18,
-                    height: 18,
-                    borderRadius: "50%",
-                    background: ev.label.includes("vencida") ? "var(--danger)" : ev.isPast ? "var(--success)" : "var(--primary)",
-                    border: "2px solid var(--surface)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 9,
-                    zIndex: 1,
-                  }} />
-                  <div style={{
-                    padding: "12px 14px",
-                    background: isFirst ? "color-mix(in srgb, var(--primary) 5%, var(--surface))" : "var(--surface)",
-                    border: `1px solid ${isFirst ? "color-mix(in srgb, var(--primary) 20%, var(--border))" : "var(--border)"}`,
-                    borderRadius: 10,
-                  }}>
+      <DetailSection title="Línea de tiempo unificada">
+        {loading && <EmptyState icon="⏳" title="Cargando historial…" description="" />}
+        {timelineError && (
+          <EmptyState
+            icon="⚠️"
+            title="Historial limitado"
+            description={timelineError}
+            action={<Button size="sm" variant="secondary" onClick={() => void loadTimeline()}>Reintentar</Button>}
+          />
+        )}
+
+        {!loading && !timelineError && events.length === 0 && (
+          <EmptyState icon="🕐" title="Sin eventos" description="Aún no hay movimientos registrados en esta actividad." />
+        )}
+
+        {!loading && events.length > 0 && (
+          <div style={{ position: "relative", paddingLeft: 28 }}>
+            <div style={{ position: "absolute", left: 9, top: 10, bottom: 10, width: 2, background: "var(--border)" }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              {events.map((ev, idx) => (
+                <div key={ev.id} style={{ position: "relative", paddingBottom: idx < events.length - 1 ? 16 : 0 }}>
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: -28,
+                      top: 12,
+                      width: 18,
+                      height: 18,
+                      borderRadius: "50%",
+                      background: "var(--primary)",
+                      border: "2px solid var(--surface)",
+                      zIndex: 1,
+                    }}
+                  />
+                  <div
+                    style={{
+                      padding: "12px 14px",
+                      background: idx === 0 ? "color-mix(in srgb, var(--primary) 5%, var(--surface))" : "var(--surface)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 10,
+                    }}
+                  >
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>{emoji} {ev.label}</div>
-                      <span style={{ fontSize: 11, color: "var(--text-tertiary)", flexShrink: 0 }}>{relativeTime(ev.at)}</span>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>
+                        {ev.icon} {ev.title}
+                      </div>
+                      <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{relativeTime(ev.at)}</span>
+                    </div>
+                    <div style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "center" }}>
+                      <Tag variant="neutral">{ev.kind}</Tag>
+                      {ev.subtitle && <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{ev.subtitle}</span>}
                     </div>
                     <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 4 }}>{formatDateTime(ev.at)}</div>
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
-    </DetailSection>
+        )}
+      </DetailSection>
     </>
   );
 }

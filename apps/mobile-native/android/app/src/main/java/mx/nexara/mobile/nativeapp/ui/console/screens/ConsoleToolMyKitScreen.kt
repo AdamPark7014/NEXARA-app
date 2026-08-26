@@ -38,6 +38,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ToolKitAssignmentDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 
 data class MyKitUiState(
     val isLoading: Boolean = true,
@@ -116,7 +117,7 @@ fun ConsoleToolMyKitScreen(
         Spacer(modifier = Modifier.height(10.dp))
 
         if (state.isLoading) {
-            Text("Cargando...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            NxLoadingBlock("Cargando mi kit…")
             return@Column
         }
         if (!state.error.isNullOrBlank()) {

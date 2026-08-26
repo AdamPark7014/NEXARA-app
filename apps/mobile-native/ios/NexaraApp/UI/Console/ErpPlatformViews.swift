@@ -141,7 +141,13 @@ final class ExecutiveVM: ObservableObject {
 }
 
 struct ExecutiveView: View {
+    var panel: PanelId = .erp
     @StateObject private var vm = ExecutiveVM()
+
+    private var drillLinks: [CommandWidget] { CommandCenterAccess.buildExecutiveDrillLinks() }
+    private var commandWidgets: [CommandWidget] {
+        CommandCenterAccess.buildExecutiveDynamicWidgets(vm.data)
+    }
 
     var body: some View {
         ScrollView {
@@ -150,6 +156,14 @@ struct ExecutiveView: View {
                 Text("KPIs cross-módulo del negocio").font(.caption).foregroundColor(.secondary)
                 if vm.isLoading { ProgressView() }
                 else {
+                    CommandCenterRail(
+                        widgets: commandWidgets,
+                        useNavigationLinks: true,
+                        title: "Acciones ejecutivas"
+                    )
+
+                    executiveDrillDownSection
+
                     let h = vm.data.headline
                     let ops = vm.data.operations
                     Text("Finanzas y ventas").font(.headline)
@@ -165,12 +179,27 @@ struct ExecutiveView: View {
                         ErpTile(label: "OT vencidas", value: "\(ops.otOverdue)", accent: .red)
                         ErpTile(label: "Tickets", value: "\(ops.ticketsOpen)", accent: .purple)
                     }
+                    if !vm.data.topAccounts.isEmpty {
+                        Text("Cuentas clave").font(.headline).padding(.top, 8)
+                        ForEach(vm.data.topAccounts) { acc in
+                            if acc.clientId > 0 {
+                                NavigationLink(value: ExecutiveClientRoute(id: Int64(acc.clientId))) {
+                                    executiveAccountRow(acc)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                executiveAccountRow(acc)
+                            }
+                        }
+                    }
                     if !vm.data.alerts.isEmpty {
                         Text("Alertas").font(.headline).padding(.top, 8)
                         ForEach(vm.data.alerts) { a in
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(a.title).font(.subheadline.bold())
-                                if !a.detail.isEmpty { Text(a.detail).font(.caption).foregroundColor(.secondary) }
+                                if !a.detail.isEmpty {
+                                    Text(a.detail).font(.caption).foregroundColor(.secondary)
+                                }
                             }
                             .padding(10).frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color.orange.opacity(0.12)).clipShape(RoundedRectangle(cornerRadius: 10))
@@ -181,9 +210,65 @@ struct ExecutiveView: View {
             .padding()
         }
         .navigationTitle("Ejecutivo")
+        .navigationDestination(for: String.self) { key in
+            ModuleRouter.view(for: panel, key: key)
+        }
+        .navigationDestination(for: ExecutiveClientRoute.self) { route in
+            CrmClientDetailByIdView(clientId: route.id, onBack: {})
+        }
         .task { vm.load() }
         .refreshable { vm.load() }
     }
+
+    private var executiveDrillDownSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Explorar módulos").font(.headline)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(drillLinks) { link in
+                    NavigationLink(value: link.moduleKey) {
+                        HStack(spacing: 8) {
+                            Text(link.icon).font(.title3)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(link.label).font(.caption.weight(.semibold)).foregroundColor(.primary)
+                                if !link.hint.isEmpty {
+                                    Text(link.hint).font(.caption2).foregroundColor(.secondary).lineLimit(1)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(10)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func executiveAccountRow(_ acc: ExecutiveTopAccount) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(acc.clientName).font(.subheadline.weight(.semibold))
+                Text("\(acc.projects) proy. · \(platFmtMxn(acc.revenue))")
+                    .font(.caption).foregroundColor(.secondary)
+            }
+            Spacer()
+            Text(platFmtPct(acc.marginPercent))
+                .font(.subheadline.weight(.bold))
+                .foregroundColor(.teal)
+        }
+        .padding(10)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+private struct ExecutiveClientRoute: Hashable {
+    let id: Int64
 }
 
 // MARK: – Aprobaciones

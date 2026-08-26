@@ -1,21 +1,23 @@
 package mx.nexara.mobile.nativeapp.ui.studio
 
 import android.app.Application
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -33,9 +35,16 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ContactMessageDto
 import mx.nexara.mobile.nativeapp.data.api.UpdateContactMessageBody
 import mx.nexara.mobile.nativeapp.data.studio.StudioRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 
 data class StudioContactsUiState(
     val loading: Boolean = true,
+    val refreshing: Boolean = false,
     val saving: Boolean = false,
     val error: String? = null,
     val items: List<ContactMessageDto> = emptyList(),
@@ -54,14 +63,17 @@ class StudioContactsViewModel(
 
     init { refresh() }
 
-    fun refresh() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun refresh(pullToRefresh: Boolean = false) {
+        _state.update {
+            if (pullToRefresh) it.copy(refreshing = true, error = null)
+            else it.copy(loading = true, error = null)
+        }
         viewModelScope.launch {
             try {
                 val list = withContext(Dispatchers.IO) { repo.contactMessages(limit = 100) }
-                _state.update { it.copy(loading = false, items = list) }
+                _state.update { it.copy(loading = false, refreshing = false, items = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message) }
+                _state.update { it.copy(loading = false, refreshing = false, error = e.message) }
             }
         }
     }
@@ -110,6 +122,7 @@ class StudioContactsViewModel(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudioContactsScreen(
     onBack: () -> Unit,
@@ -121,9 +134,22 @@ fun StudioContactsScreen(
     if (ui.selected != null) {
         val m = ui.selected!!
         StudioScaffold(title = m.subject ?: m.name ?: "Contacto", subtitle = m.email, onBack = vm::closeDetail) { inner ->
-            Column(Modifier.fillMaxSize().padding(inner).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(m.message ?: "", style = MaterialTheme.typography.bodyMedium)
-                Text("Categoría: ${m.category ?: "—"} · Tel: ${m.phone ?: "—"}", style = MaterialTheme.typography.labelSmall, color = StudioMuted)
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .background(NxColors.Surface)
+                    .padding(inner)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                NxPanelShell {
+                    Text(m.message ?: "", style = MaterialTheme.typography.bodyMedium, color = NxColors.Slate)
+                    Text(
+                        "Categoría: ${m.category ?: "—"} · Tel: ${m.phone ?: "—"}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = StudioMuted,
+                    )
+                }
                 OutlinedTextField(ui.statusDraft, vm::patchStatus, label = { Text("Estado") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(ui.responseDraft, vm::patchResponse, label = { Text("Respuesta interna") }, modifier = Modifier.fillMaxWidth().height(120.dp), minLines = 4)
                 TextButton(onClick = vm::saveSelected, enabled = !ui.saving) { Text("Guardar cambios") }
@@ -133,30 +159,71 @@ fun StudioContactsScreen(
         return
     }
 
+    val listTitle = if (leadsOnly) "Leads" else "Contactos"
+    val listSubtitle = if (leadsOnly) "Prospectos del sitio" else "Mensajes del formulario web"
+
     StudioScaffold(
-        title = if (leadsOnly) "Leads" else "Contactos",
-        subtitle = if (leadsOnly) "Prospectos del sitio" else "Mensajes del formulario web",
+        title = listTitle,
+        subtitle = listSubtitle,
         onBack = onBack,
     ) { inner ->
-        when {
-            ui.loading -> StudioLoadingBox()
-            ui.error != null && ui.items.isEmpty() -> StudioErrorState(ui.error!!, vm::refresh)
-            else -> LazyColumn(Modifier.fillMaxSize().padding(inner), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (ui.items.isEmpty()) item { StudioEmptyState("Sin mensajes", "Los formularios del sitio aparecerán aquí.") }
-                items(ui.items, key = { it.id }) { m ->
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                        Column(Modifier.padding(14.dp).fillMaxWidth()) {
-                            androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth()) {
-                                Column(Modifier.fillMaxWidth()) {
-                                    Text(m.subject ?: m.name ?: "—", fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth())
-                                    Text(listOfNotNull(m.name, m.email).joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = StudioMuted)
-                                    StudioStatusChip(m.status ?: "new")
-                                }
-                            }
-                            TextButton(onClick = { vm.open(m) }) { Text("Ver detalle") }
+        PullToRefreshBox(
+            isRefreshing = ui.refreshing,
+            onRefresh = { vm.refresh(pullToRefresh = true) },
+            modifier = Modifier
+                .fillMaxSize()
+                .background(NxColors.Surface)
+                .padding(inner),
+        ) {
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                item {
+                    NxSectionHeader(
+                        listTitle,
+                        listSubtitle,
+                        trailing = if (ui.items.isNotEmpty()) {
+                            { Text("${ui.items.size} mensajes", style = MaterialTheme.typography.labelSmall, color = StudioMuted) }
+                        } else {
+                            null
+                        },
+                    )
+                }
+
+                if (ui.loading && !ui.refreshing) {
+                    item { NxLoadingBlock("Cargando mensajes…") }
+                    return@LazyColumn
+                }
+
+                if (!ui.error.isNullOrBlank() && ui.items.isEmpty()) {
+                    item { NxErrorBlock(ui.error!!, onRetry = { vm.refresh() }) }
+                    return@LazyColumn
+                }
+
+                if (ui.items.isEmpty()) {
+                    item {
+                        NxEmptyState(
+                            title = "Sin mensajes",
+                            subtitle = "Los formularios del sitio aparecerán aquí.",
+                        )
+                    }
+                } else {
+                    items(ui.items, key = { it.id }) { m ->
+                        NxPanelShell(onClick = { vm.open(m) }) {
+                            Text(m.subject ?: m.name ?: "—", fontWeight = FontWeight.SemiBold, color = NxColors.Slate)
+                            Text(
+                                listOfNotNull(m.name, m.email).joinToString(" · "),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = StudioMuted,
+                            )
+                            StudioStatusChip(m.status ?: "new")
                         }
                     }
                 }
+
+                item { Spacer(Modifier.height(24.dp)) }
             }
         }
     }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +30,12 @@ import mx.nexara.mobile.nativeapp.data.api.BankAccountDto
 import mx.nexara.mobile.nativeapp.data.api.ExpenseDto
 import mx.nexara.mobile.nativeapp.data.api.InvoiceDto
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 
 private val GreenLight  = Color(0xFFD1FAE5); private val GreenColor  = Color(0xFF059669)
 private val TealLight   = Color(0xFFCCFBF1); private val TealColor   = Color(0xFF0D9488)
@@ -39,6 +46,7 @@ private val SlateText   = Color(0xFF0F172A); private val SubText     = Color(0xF
 
 data class ContaDashState(
     val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val invoices: List<InvoiceDto> = emptyList(),
     val expenses: List<ExpenseDto> = emptyList(),
@@ -50,30 +58,65 @@ class ContabilidadDashboardViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(ContaDashState())
     val state: StateFlow<ContaDashState> = _state
 
-    fun load() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun load(refresh: Boolean = false) {
+        _state.update {
+            if (refresh) it.copy(isRefreshing = true, error = null)
+            else it.copy(loading = true, error = null)
+        }
         viewModelScope.launch {
             try {
                 val invoices     = withContext(Dispatchers.IO) { repo.invoices() }
                 val expenses     = withContext(Dispatchers.IO) { repo.expenses() }
                 val bankAccounts = withContext(Dispatchers.IO) { repo.bankAccounts() }
-                _state.update { it.copy(loading = false, invoices = invoices, expenses = expenses, bankAccounts = bankAccounts) }
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        isRefreshing = false,
+                        invoices = invoices,
+                        expenses = expenses,
+                        bankAccounts = bankAccounts,
+                    )
+                }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message ?: "Error al cargar contabilidad") }
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        isRefreshing = false,
+                        error = e.message ?: "Error al cargar contabilidad",
+                    )
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ContabilidadDashboardScreen() {
+fun ContabilidadDashboardScreen(
+    onOpenInvoicing: () -> Unit = {},
+    onOpenExpenses: () -> Unit = {},
+    onOpenChat: () -> Unit = {},
+    onOpenViaticos: () -> Unit = {},
+) {
     val vm: ContabilidadDashboardViewModel = viewModel()
     val state by vm.state.collectAsState()
 
-    if (state.invoices.isEmpty() && state.loading && state.error == null) vm.load()
+    LaunchedEffect(Unit) { vm.load() }
 
+    if (state.loading && !state.isRefreshing && state.invoices.isEmpty() && state.error == null) {
+        Box(Modifier.fillMaxSize().background(NxColors.Surface), contentAlignment = Alignment.Center) {
+            NxLoadingBlock("Cargando contabilidad…")
+        }
+        return
+    }
+
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.load(refresh = true) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
@@ -83,14 +126,51 @@ fun ContabilidadDashboardScreen() {
             }
         }
 
-        if (state.loading) { item { Text("Cargando…", color = SubText) }; return@LazyColumn }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ContaQuickActionCard(
+                        modifier = Modifier.weight(1f),
+                        icon = "🧾",
+                        title = "Facturas",
+                        subtitle = "Facturación CFDI",
+                        bg = TealColor,
+                        onClick = onOpenInvoicing,
+                    )
+                    ContaQuickActionCard(
+                        modifier = Modifier.weight(1f),
+                        icon = "📊",
+                        title = "Gastos",
+                        subtitle = "Registros y aprobación",
+                        bg = AmberColor,
+                        onClick = onOpenExpenses,
+                    )
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ContaQuickActionCard(
+                        modifier = Modifier.weight(1f),
+                        icon = "💬",
+                        title = "Chat",
+                        subtitle = "Equipo NEXARA",
+                        bg = BlueColor,
+                        onClick = onOpenChat,
+                    )
+                    ContaQuickActionCard(
+                        modifier = Modifier.weight(1f),
+                        icon = "💼",
+                        title = "Viáticos",
+                        subtitle = "Solicitudes y gastos",
+                        bg = GreenColor,
+                        onClick = onOpenViaticos,
+                    )
+                }
+            }
+        }
+
         if (!state.error.isNullOrBlank()) {
             item {
-                Text(state.error!!, color = RedColor)
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { vm.load() }) { Text("Reintentar") }
+                NxErrorBlock(state.error!!, onRetry = { vm.load(refresh = true) })
             }
-            return@LazyColumn
         }
 
         // ── KPI cards
@@ -114,15 +194,10 @@ fun ContabilidadDashboardScreen() {
 
         // ── Bank accounts
         if (state.bankAccounts.isNotEmpty()) {
-            item { ContaSectionHeader("Cuentas bancarias", "${state.bankAccounts.size} cuentas") }
+            item { NxSectionHeader("Cuentas bancarias", "${state.bankAccounts.size} cuentas") }
             items(state.bankAccounts) { b ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(2.dp),
-                ) {
-                    Row(modifier = Modifier.padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                NxPanelShell {
+                    Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(b.name ?: "Cuenta", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = SlateText)
                             Text(listOfNotNull(b.bank, b.accountNumber?.takeLast(4)?.let { "****$it" }).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = SubText)
@@ -138,7 +213,7 @@ fun ContabilidadDashboardScreen() {
 
         // ── Recent invoices
         if (state.invoices.isNotEmpty()) {
-            item { ContaSectionHeader("Facturas recientes", "Últimas 8") }
+            item { NxSectionHeader("Facturas recientes", "Últimas 8") }
             items(state.invoices.take(8)) { inv ->
                 val statusColor = when {
                     (inv.status ?: "").lowercase().contains("pagad") || (inv.status ?: "").lowercase().contains("cobrad") -> GreenColor
@@ -146,13 +221,8 @@ fun ContabilidadDashboardScreen() {
                     (inv.status ?: "").lowercase().contains("cancelad") -> RedColor
                     else -> SubText
                 }
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(1.dp),
-                ) {
-                    Row(modifier = Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                NxPanelShell {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Box(Modifier.width(4.dp).height(48.dp).clip(RoundedCornerShape(2.dp)).background(statusColor))
                         Column(Modifier.weight(1f)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -173,13 +243,13 @@ fun ContabilidadDashboardScreen() {
 
         // ── Recent expenses
         if (state.expenses.isNotEmpty()) {
-            item { ContaSectionHeader("Gastos recientes", "Últimos 8") }
+            item { NxSectionHeader("Gastos recientes", "Últimos 8") }
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(state.expenses.take(8)) { e ->
                         Card(
                             modifier = Modifier.width(160.dp),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = RoundedCornerShape(NxDimens.PanelRadius),
                             colors = CardDefaults.cardColors(containerColor = Color.White),
                             elevation = CardDefaults.cardElevation(2.dp),
                         ) {
@@ -196,6 +266,31 @@ fun ContabilidadDashboardScreen() {
         }
 
         item { Spacer(Modifier.height(24.dp)) }
+    }
+    }
+}
+
+@Composable
+private fun ContaQuickActionCard(
+    modifier: Modifier,
+    icon: String,
+    title: String,
+    subtitle: String,
+    bg: Color,
+    onClick: () -> Unit,
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(NxDimens.PanelRadius),
+        colors = CardDefaults.cardColors(containerColor = bg),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text(icon, fontSize = 20.sp)
+            Spacer(Modifier.height(6.dp))
+            Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(subtitle, color = Color.White.copy(alpha = 0.9f), fontSize = 11.sp)
+        }
     }
 }
 
@@ -218,14 +313,6 @@ private fun ContaKpiCard(
             Spacer(Modifier.height(2.dp))
             Text(sub, style = MaterialTheme.typography.bodySmall, color = SubText)
         }
-    }
-}
-
-@Composable
-private fun ContaSectionHeader(title: String, detail: String = "") {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-        Text(title, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = SlateText)
-        if (detail.isNotBlank()) Text(detail, style = MaterialTheme.typography.bodySmall, color = SubText)
     }
 }
 

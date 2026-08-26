@@ -12,12 +12,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -26,7 +31,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import mx.nexara.mobile.nativeapp.ui.shared.NotificationsScreen
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.Dispatchers
@@ -35,26 +39,59 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDto
 import mx.nexara.mobile.nativeapp.data.api.CrmLeadDto
+import mx.nexara.mobile.nativeapp.data.crm.CrmRepository
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
+import mx.nexara.mobile.nativeapp.access.DeepLinkDestination
+import mx.nexara.mobile.nativeapp.access.DeepLinkNavigation
 import mx.nexara.mobile.nativeapp.access.PanelId
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTab
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTabBar
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxModuleScaffold
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
+import mx.nexara.mobile.nativeapp.ui.enterprise.nxComposable
+import mx.nexara.mobile.nativeapp.ui.console.ConsoleSidebarGroup
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.PlaceholderScreen
-import mx.nexara.mobile.nativeapp.data.AuthRepository
-import mx.nexara.mobile.nativeapp.ui.console.ConsoleSidebarGroup
 import mx.nexara.mobile.nativeapp.ui.console.ventasSidebarGroups
+import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
 private object VentasRoutes {
     const val Dashboard       = "v/dashboard"
     const val Cotizaciones    = "v/cotizaciones"
+    const val SmartQuote      = "v/smart-quote"
     const val Leads           = "v/leads"
     const val More            = "v/more"
     const val ModulePattern   = "v/m/{key}"
+    const val OpportunityDetail = "v/opportunity/{id}"
+    const val LeadDetail      = "v/lead/{id}"
+    const val QuoteDetail     = "v/quote/{id}"
+    const val ClientDetail    = "v/client/{id}"
     fun module(key: String)   = "v/m/$key"
+}
+
+private fun ventasModuleTitle(key: String): String = when (key) {
+    "chat" -> "Chat del equipo"
+    "my-profile" -> "Mi perfil"
+    "smart-quote", "cotizar", "nueva-cotizacion" -> "Cotizador inteligente"
+    "plantillas", "templates" -> "Plantillas"
+    "licitaciones", "tenders" -> "Licitaciones"
+    "metas", "targets" -> "Metas"
+    "gestion-vendedores", "equipo-comercial", "sales-team" -> "Gestión vendedores"
+    "equipo-comparativa" -> "Comparativa equipo"
+    else -> ModuleCatalog.ventas.firstOrNull { it.key == key }?.label ?: key
 }
 
 // ── NavHost ───────────────────────────────────────────────────────────────────
@@ -70,10 +107,17 @@ fun VentasNavHost(
     val ctx = LocalContext.current
     val user = remember(ctx) { AuthRepository(ctx).loadSession() }
     val crmMoreGroups = remember(user) { ventasSidebarGroups(user) }
+    var chatChannelId by remember { mutableStateOf<Long?>(null) }
+    var chatMessageId by remember { mutableStateOf<Long?>(null) }
 
-    LaunchedEffect(Unit) {
-        val key = PendingDeepLink.consumeModuleFor(PanelId.CRM) ?: return@LaunchedEffect
-        nav.navigate(VentasRoutes.module(key)) { launchSingleTop = true }
+    val deepLinkSignal by PendingDeepLink.signal.collectAsState()
+    LaunchedEffect(deepLinkSignal) {
+        val link = PendingDeepLink.consumeModuleDestination(PanelId.CRM) ?: return@LaunchedEffect
+        if (link.key == "chat") {
+            chatChannelId = DeepLinkNavigation.chatChannelId(link)
+            chatMessageId = DeepLinkNavigation.chatMessageId(link)
+        }
+        nav.navigate(DeepLinkNavigation.ventasRoute(link)) { launchSingleTop = true }
     }
 
     val currentRoute = entry?.destination?.route ?: VentasRoutes.Dashboard
@@ -86,58 +130,124 @@ fun VentasNavHost(
     )
 
     val isBottomLevel = bottomTabs.any { it.first == currentRoute }
+    val showBack = !isBottomLevel
 
-    Scaffold(
+    val currentTitle = when (currentRoute) {
+        VentasRoutes.Dashboard    -> panelTitle
+        VentasRoutes.Cotizaciones -> "Cotizaciones"
+        VentasRoutes.SmartQuote   -> "Cotizador inteligente"
+        VentasRoutes.Leads        -> "Leads"
+        VentasRoutes.More         -> "Más opciones"
+        VentasRoutes.OpportunityDetail -> "Oportunidad"
+        VentasRoutes.LeadDetail   -> "Lead"
+        VentasRoutes.QuoteDetail  -> "Cotización"
+        VentasRoutes.ClientDetail -> "Cliente"
+        VentasRoutes.ModulePattern -> ventasModuleTitle(entry?.arguments?.getString("key").orEmpty())
+        else -> panelTitle
+    }
+
+    NxModuleScaffold(
+        title = currentTitle,
+        showBack = showBack,
+        onBack = { nav.popBackStack() },
+        onExitToPanels = onExitToPanels,
         bottomBar = {
             if (isBottomLevel) {
-                NavigationBar {
-                    bottomTabs.forEach { (route, icon, label) ->
-                        NavigationBarItem(
-                            selected = currentRoute == route,
-                            onClick = {
-                                if (currentRoute != route) {
-                                    nav.navigate(route) {
-                                        popUpTo(VentasRoutes.Dashboard) { saveState = true }
-                                        launchSingleTop = true; restoreState = true
-                                    }
-                                }
-                            },
-                            icon  = { Icon(icon, contentDescription = label) },
-                            label = { Text(label, fontSize = 10.sp) }
-                        )
-                    }
-                }
+                NxBottomTabBar(
+                    tabs = bottomTabs.map { (route, icon, label) ->
+                        NxBottomTab(route, icon, label, 10.sp)
+                    },
+                    isSelected = { it == currentRoute },
+                    onTabSelected = { route ->
+                        nav.navigate(route) {
+                            popUpTo(VentasRoutes.Dashboard) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
             }
-        }
+        },
     ) { padding ->
         NavHost(
             navController = nav,
             startDestination = VentasRoutes.Dashboard,
             modifier = Modifier.padding(padding)
         ) {
-            composable(VentasRoutes.Dashboard) {
-                VentasDashboardScreen()
+            nxComposable(VentasRoutes.Dashboard) {
+                VentasDashboardScreen(
+                    onNewQuote = { nav.navigate(VentasRoutes.SmartQuote) },
+                    onOpenLeads = { nav.navigate(VentasRoutes.Leads) },
+                    onOpenPipeline = { nav.navigate(VentasRoutes.module("pipeline")) },
+                    onOpenAgenda = { nav.navigate(VentasRoutes.module("agenda")) },
+                    onOpenChat = { nav.navigate(VentasRoutes.module("chat")) },
+                )
             }
-            composable(VentasRoutes.Cotizaciones) {
-                VentasCotizacionesScreen()
+            nxComposable(VentasRoutes.Cotizaciones) {
+                VentasCotizacionesScreen(
+                    onNewQuote = { nav.navigate(VentasRoutes.SmartQuote) },
+                )
             }
-            composable(VentasRoutes.Leads) {
-                VentasLeadsApiScreen()
+            nxComposable(VentasRoutes.SmartQuote, style = NxNavAnimStyle.Modal) {
+                SmartQuoteBuilderScreen(
+                    onBack = { nav.popBackStack() },
+                    onSaved = { id ->
+                        nav.navigate("v/quote/$id") {
+                            popUpTo(VentasRoutes.SmartQuote) { inclusive = true }
+                        }
+                    },
+                )
             }
-            composable(VentasRoutes.More) {
+            nxComposable(VentasRoutes.Leads) {
+                VentasLeadsFullScreen(
+                    onNavigateToOpportunity = { id -> nav.navigate("v/opportunity/$id") { launchSingleTop = true } },
+                )
+            }
+            nxComposable(VentasRoutes.OpportunityDetail, style = NxNavAnimStyle.Push) { entry ->
+                val id = entry.arguments?.getString("id")?.toLongOrNull() ?: return@nxComposable
+                VentasOpportunityDetailScreen(oppId = id, onBack = { nav.popBackStack() })
+            }
+            nxComposable(VentasRoutes.LeadDetail, style = NxNavAnimStyle.Push) { entry ->
+                val id = entry.arguments?.getString("id")?.toLongOrNull() ?: return@nxComposable
+                VentasLeadDetailByIdScreen(leadId = id, onBack = { nav.popBackStack() })
+            }
+            nxComposable(VentasRoutes.QuoteDetail, style = NxNavAnimStyle.Push) { entry ->
+                val id = entry.arguments?.getString("id")?.toLongOrNull() ?: return@nxComposable
+                VentasQuoteDetailScreen(cotizacionId = id, onBack = { nav.popBackStack() })
+            }
+            nxComposable(VentasRoutes.ClientDetail, style = NxNavAnimStyle.Push) { entry ->
+                val id = entry.arguments?.getString("id")?.toLongOrNull() ?: return@nxComposable
+                VentasClientDetailByIdScreen(clientId = id, onBack = { nav.popBackStack() })
+            }
+            nxComposable(VentasRoutes.More) {
                 VentasMoreScreen(
                     groups = crmMoreGroups,
                     onOpenModule = { key -> nav.navigate(VentasRoutes.module(key)) },
                     onExitToPanels = onExitToPanels,
                 )
             }
-            composable(VentasRoutes.ModulePattern) { backStack ->
+            nxComposable(VentasRoutes.ModulePattern, style = NxNavAnimStyle.Push) { backStack ->
                 val key = backStack.arguments?.getString("key").orEmpty()
                 when (key) {
-                    "dashboard"           -> VentasDashboardScreen()
+                    "dashboard"           -> VentasDashboardScreen(
+                        onNewQuote = { nav.navigate(VentasRoutes.SmartQuote) },
+                        onOpenLeads = { nav.navigate(VentasRoutes.Leads) },
+                        onOpenPipeline = { nav.navigate(VentasRoutes.module("pipeline")) },
+                        onOpenAgenda = { nav.navigate(VentasRoutes.module("agenda")) },
+                        onOpenChat = { nav.navigate(VentasRoutes.module("chat")) },
+                    )
                     "cotizaciones"          -> VentasCotizacionesScreen()
+                    "smart-quote", "cotizar", "nueva-cotizacion" -> SmartQuoteBuilderScreen(
+                        onBack = { nav.popBackStack() },
+                        onSaved = { id ->
+                            nav.popBackStack()
+                            nav.navigate("v/quote/$id") { launchSingleTop = true }
+                        },
+                    )
                     "plantillas", "templates" -> VentasTemplatesScreen()
-                    "leads"               -> VentasLeadsApiScreen()
+                    "leads"               -> VentasLeadsFullScreen(
+                        onNavigateToOpportunity = { id -> nav.navigate("v/opportunity/$id") { launchSingleTop = true } },
+                    )
                     "oportunidades"       -> VentasOportunidadesScreen()
                     "clientes"            -> VentasClientesScreen()
                     "productos"           -> VentasProductsScreen()
@@ -150,14 +260,38 @@ fun VentasNavHost(
                     "reportes"            -> CrmReportsScreen(CrmReportMode.REPORTES)
                     "crecimiento"           -> CrmReportsScreen(CrmReportMode.CRECIMIENTO)
                     "equipo-comparativa"    -> CrmReportsScreen(CrmReportMode.EQUIPO)
-                    "notificaciones"      -> NotificationsScreen(onBack = { nav.popBackStack() })
-                    "my-profile"          -> MyProfileScreen()
-                    else -> PlaceholderScreen(
-                        title = key,
-                        subtitle = "Módulo CRM: implementación pendiente.",
-                        primaryActionText = "Volver",
-                        onPrimaryAction = { nav.popBackStack() }
+                    "notificaciones"      -> NotificationsScreen(
+                        onBack = { nav.popBackStack() },
+                        onOpenDestination = { dest ->
+                            when (dest) {
+                                is DeepLinkDestination.Module -> {
+                                    if (dest.panel == PanelId.CRM) {
+                                        nav.navigate(VentasRoutes.module(dest.key)) { launchSingleTop = true }
+                                    } else {
+                                        PendingDeepLink.destination = dest
+                                        onExitToPanels()
+                                    }
+                                }
+                                else -> Unit
+                            }
+                        },
                     )
+                    "chat"                -> mx.nexara.mobile.nativeapp.ui.chat.ChatScreen(
+                        onBack = { nav.popBackStack() },
+                        initialChannelId = chatChannelId,
+                        initialMessageId = chatMessageId,
+                    )
+                    "my-profile"          -> MyProfileScreen()
+                    else -> {
+                        val entry = ModuleCatalog.ventas.firstOrNull { it.key == key }
+                        PlaceholderScreen(
+                            title = entry?.label ?: key,
+                            moduleKey = key,
+                            webPath = entry?.webPath,
+                            icon = entry?.icon,
+                            onBack = { nav.popBackStack() },
+                        )
+                    }
                 }
             }
         }
@@ -168,23 +302,30 @@ fun VentasNavHost(
 
 data class VentasCotizacionesUiState(
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val items: List<CotizacionDto> = emptyList(),
     val query: String = "",
     val statusFilter: String = "todos",
 )
 
 class VentasCotizacionesViewModel(app: Application) : AndroidViewModel(app) {
-    private val repo = ExtraRepository(app.applicationContext)
+    private val repo = CrmRepository(app.applicationContext)
     private val _state = MutableStateFlow(VentasCotizacionesUiState())
     val state: StateFlow<VentasCotizacionesUiState> = _state
 
     init { load() }
 
-    fun load() {
+    fun load(refresh: Boolean = false) {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true) }
-            val items = withContext(Dispatchers.IO) { repo.cotizaciones() }
-            _state.update { it.copy(isLoading = false, items = items) }
+            _state.update {
+                if (refresh) it.copy(isRefreshing = true) else it.copy(isLoading = true)
+            }
+            val items = runCatching {
+                withContext(Dispatchers.IO) { repo.cotizaciones() }
+            }.getOrDefault(emptyList())
+            _state.update {
+                it.copy(isLoading = false, isRefreshing = false, items = items)
+            }
         }
     }
 
@@ -194,18 +335,29 @@ class VentasCotizacionesViewModel(app: Application) : AndroidViewModel(app) {
     val filtered: List<CotizacionDto> get() {
         val s = _state.value
         return s.items
-            .let { list -> if (s.statusFilter == "todos") list else list.filter { c -> c.estatus?.lowercase() == s.statusFilter } }
+            .let { list ->
+                if (s.statusFilter == "todos") list
+                else list.filter { c -> c.estatus?.uppercase() == s.statusFilter.uppercase() }
+            }
             .let { list -> if (s.query.isBlank()) list else list.filter { c ->
                 c.folio.orEmpty().contains(s.query, ignoreCase = true) ||
-                c.cliente.orEmpty().contains(s.query, ignoreCase = true)
+                c.cliente.orEmpty().contains(s.query, ignoreCase = true) ||
+                c.projectName.orEmpty().contains(s.query, ignoreCase = true)
             }}
     }
 }
 
-private val CotStatuses = listOf("todos", "pendiente", "aprobada", "rechazada", "en proceso")
+private val CotStatuses = listOf(
+    "todos" to "Todos",
+    "DRAFT" to "Borrador",
+    "SENT" to "Enviada",
+    "APPROVED" to "Aprobada",
+    "REJECTED" to "Rechazada",
+)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun VentasCotizacionesScreen() {
+fun VentasCotizacionesScreen(onNewQuote: () -> Unit = {}) {
     val ctx = LocalContext.current
     val vm: VentasCotizacionesViewModel = viewModel(factory = object : androidx.lifecycle.ViewModelProvider.Factory {
         override fun <T : androidx.lifecycle.ViewModel> create(c: Class<T>): T {
@@ -219,17 +371,37 @@ fun VentasCotizacionesScreen() {
 
     val sel = selected
     if (sel != null) {
-        CotizacionDetail(cot = sel, onBack = { selected = null })
+        VentasQuoteDetailScreen(cotizacionId = sel.id, onBack = { selected = null })
         return
     }
 
-    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // KPI strip
+    val sqRepo = remember(ctx) { mx.nexara.mobile.nativeapp.data.crm.SmartQuoteRepository(ctx.applicationContext) }
+
+    Scaffold(
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = onNewQuote,
+                icon = { Icon(Icons.Default.Add, contentDescription = "Nueva cotización") },
+                text = { Text("Cotizar") },
+            )
+        },
+    ) { innerPadding ->
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.load(refresh = true) },
+        modifier = Modifier.fillMaxSize().padding(innerPadding),
+    ) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(NxColors.Surface),
+        contentPadding = PaddingValues(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         if (!state.isLoading && state.items.isNotEmpty()) {
+            item { NxSectionHeader("Cotizaciones", "${state.items.size} total") }
             item {
                 val total      = state.items.size
-                val aprobadas  = state.items.count { it.estatus?.lowercase() in listOf("aprobada","completada","won") }
-                val pendientes = state.items.count { it.estatus?.lowercase() in listOf("pendiente","en proceso") }
+                val aprobadas  = state.items.count { it.estatus?.uppercase() == "APPROVED" }
+                val pendientes = state.items.count { it.estatus?.uppercase() in listOf("DRAFT", "SENT") }
                 val totalMxn   = state.items.sumOf { it.total ?: 0.0 }
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
@@ -246,16 +418,10 @@ fun VentasCotizacionesScreen() {
 
         // Search
         item {
-            OutlinedTextField(
+            NxSearchField(
                 value = state.query,
-                onValueChange = { vm.setQuery(it) },
-                placeholder = { Text("Buscar cotización…") },
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-                trailingIcon = {
-                    if (state.query.isNotEmpty()) IconButton({ vm.setQuery("") }) { Icon(Icons.Default.Clear, null) }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
+                onValueChange = vm::setQuery,
+                placeholder = "Buscar cotización…",
             )
         }
 
@@ -265,26 +431,44 @@ fun VentasCotizacionesScreen() {
                 Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                CotStatuses.forEach { st ->
+                CotStatuses.forEach { (st, label) ->
                     val isSelected = state.statusFilter == st
                     FilterChip(
                         selected = isSelected,
                         onClick = { vm.setStatus(st) },
-                        label = { Text(st.replaceFirstChar { it.uppercase() }, fontSize = 12.sp) }
+                        label = { Text(label, fontSize = 12.sp) }
                     )
                 }
             }
         }
 
-        if (state.isLoading) {
-            item { Box(Modifier.fillMaxWidth().padding(40.dp), Alignment.Center) { CircularProgressIndicator() } }
+        if (!state.isLoading && state.items.isNotEmpty()) {
+            item { SupplierStatsBar(repo = sqRepo) }
+        }
+
+        if (state.isLoading && !state.isRefreshing) {
+            item { NxSkeletonList() }
         } else if (items.isEmpty()) {
-            item { Text("Sin cotizaciones", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(20.dp)) }
+            item {
+                NxEmptyState(
+                    title = "Sin cotizaciones",
+                    subtitle = if (state.query.isNotBlank() || state.statusFilter != "todos") {
+                        "No hay coincidencias con los filtros actuales. Ajusta la búsqueda o el estado."
+                    } else {
+                        "Crea tu primera cotización con el botón Cotizar en la esquina inferior."
+                    },
+                )
+            }
         } else {
+            item { NxSectionHeader("Resultados", "${items.size} cotizaciones") }
             items(items, key = { it.id }) { cot ->
-                CotizacionRowCard(cot, onClick = { selected = cot })
+                NxPanelShell(onClick = { selected = cot }, contentPadding = PaddingValues(0.dp)) {
+                    CotizacionRowContent(cot)
+                }
             }
         }
+    }
+    }
     }
 }
 
@@ -320,12 +504,15 @@ private fun CotizacionDetail(cot: CotizacionDto, onBack: () -> Unit) {
 
 @Composable
 private fun CotizacionRowCard(cot: CotizacionDto, onClick: () -> Unit = {}) {
+    NxPanelShell(onClick = onClick, contentPadding = PaddingValues(0.dp)) {
+        CotizacionRowContent(cot)
+    }
+}
+
+@Composable
+private fun CotizacionRowContent(cot: CotizacionDto) {
     val color = cotStatusColorAndroid(cot.estatus)
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .clickable { onClick() }
-    ) {
+    Row(Modifier.fillMaxWidth()) {
         Box(Modifier.width(4.dp).height(72.dp).background(color))
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).weight(1f)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -338,7 +525,7 @@ private fun CotizacionRowCard(cot: CotizacionDto, onClick: () -> Unit = {}) {
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Box(
                     Modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.15f)).padding(horizontal = 8.dp, vertical = 2.dp)
-                ) { Text(cot.estatus?.replaceFirstChar { it.uppercase() } ?: "–", color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                ) { Text(cot.estatus?.let { cotStatusLabel(it) } ?: "–", color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                 Text((cot.fecha ?: cot.createdAt)?.take(10) ?: "", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -359,6 +546,7 @@ private fun CotDetailLine(label: String, value: String?) {
 
 data class VentasLeadsUiState(
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val items: List<CrmLeadDto> = emptyList(),
     val query: String = "",
 )
@@ -370,11 +558,13 @@ class VentasLeadsViewModel(app: Application) : AndroidViewModel(app) {
 
     init { load() }
 
-    fun load() {
+    fun load(refresh: Boolean = false) {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true) }
+            _state.update {
+                if (refresh) it.copy(isRefreshing = true) else it.copy(isLoading = true)
+            }
             val items = withContext(Dispatchers.IO) { repo.clientTicketLeadDtos() }
-            _state.update { it.copy(isLoading = false, items = items) }
+            _state.update { it.copy(isLoading = false, isRefreshing = false, items = items) }
         }
     }
 
@@ -394,6 +584,7 @@ class VentasLeadsViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VentasLeadsScreen() {
     val ctx = LocalContext.current
@@ -431,7 +622,7 @@ fun VentasLeadsScreen() {
                         LeadDetailLine("Estado", status)
                         LeadDetailLine("Fecha", lStr(raw, "createdAt", "fecha").take(10))
                         val notes = lead.description.ifBlank { lStr(raw, "notes", "notas") }
-                        if (notes.isNotBlank()) { Divider(); Text(notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        if (notes.isNotBlank()) { HorizontalDivider(); Text(notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                 }
             }
@@ -439,43 +630,58 @@ fun VentasLeadsScreen() {
         return
     }
 
-    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.load(refresh = true) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(NxColors.Surface),
+        contentPadding = PaddingValues(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item { NxSectionHeader("Leads", "${state.items.size} registrados") }
         item {
-            OutlinedTextField(
+            NxSearchField(
                 value = state.query,
-                onValueChange = { vm.setQuery(it) },
-                placeholder = { Text("Buscar lead…") },
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-                trailingIcon = {
-                    if (state.query.isNotEmpty()) IconButton({ vm.setQuery("") }) { Icon(Icons.Default.Clear, null) }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
+                onValueChange = vm::setQuery,
+                placeholder = "Buscar lead…",
             )
         }
 
-        if (state.isLoading) {
-            item { Box(Modifier.fillMaxWidth().padding(40.dp), Alignment.Center) { CircularProgressIndicator() } }
+        if (state.isLoading && !state.isRefreshing) {
+            item { NxLoadingBlock("Cargando leads…") }
         } else if (items.isEmpty()) {
-            item { Text("Sin leads", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(20.dp)) }
+            item {
+                NxEmptyState(
+                    title = "Sin leads",
+                    subtitle = if (state.query.isNotBlank()) {
+                        "No hay coincidencias para \"${state.query}\". Prueba otro término o limpia el filtro."
+                    } else {
+                        "Los leads de tickets y solicitudes aparecerán aquí al sincronizarse."
+                    },
+                )
+            }
         } else {
             items(items, key = { it.rowKey }) { lead ->
-                Box(Modifier.clickable { selected = lead }) { LeadRowCard(lead) }
+                NxPanelShell(onClick = { selected = lead }, contentPadding = PaddingValues(0.dp)) {
+                    LeadRowContent(lead)
+                }
             }
         }
+    }
     }
 }
 
 @Composable
-private fun LeadRowCard(lead: CrmLeadDto) {
+private fun LeadRowContent(lead: CrmLeadDto) {
     val description = lead.displayTitle
     val branch      = lead.branchName.ifBlank { lead.clientName }
     val status      = lead.status
     val date        = lStr(lead.raw, "createdAt", "fecha").take(10)
     val color = cotStatusColorAndroid(status)
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surface).padding(12.dp),
+        Modifier.fillMaxWidth().padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -509,18 +715,48 @@ private fun VentasMoreScreen(
     onOpenModule: (String) -> Unit,
     onExitToPanels: () -> Unit,
 ) {
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        groups.forEach { group ->
-            item {
-                Text(
-                    group.title,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
+    var searchQuery by remember { mutableStateOf("") }
+    val normalizedQuery = searchQuery.trim()
+    val filteredGroups = remember(groups, normalizedQuery) {
+        if (normalizedQuery.isBlank()) groups
+        else groups.mapNotNull { group ->
+            val mods = group.modules.filter { m ->
+                m.label.contains(normalizedQuery, ignoreCase = true) ||
+                    m.key.contains(normalizedQuery, ignoreCase = true)
             }
-            items(group.modules, key = { "${group.id}-${it.key}" }) { m ->
-                MoreRow(m.icon, m.label) { onOpenModule(m.key) }
+            if (mods.isEmpty()) null else group.copy(modules = mods)
+        }
+    }
+
+    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        item {
+            NxSearchField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = "Buscar módulo…",
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+        if (filteredGroups.isNotEmpty()) {
+            filteredGroups.forEach { group ->
+                item {
+                    Text(
+                        group.title,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                }
+                items(group.modules, key = { "${group.id}-${it.key}" }) { m ->
+                    MoreRow(m.icon, m.label) { onOpenModule(m.key) }
+                }
+            }
+        } else if (normalizedQuery.isNotBlank()) {
+            item {
+                NxEmptyState(
+                    title = "Sin resultados",
+                    subtitle = "Prueba con otro término o revisa el nombre del módulo.",
+                )
             }
         }
         item {
@@ -536,17 +772,27 @@ private fun VentasMoreScreen(
 @Composable
 private fun MoreRow(icon: String, label: String, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .semantics {
+                contentDescription = label
+                role = Role.Button
+            }
             .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text(icon, fontSize = 18.sp)
         Text(label, Modifier.weight(1f), fontWeight = FontWeight.Normal, fontSize = 14.sp)
-        IconButton(onClick = onClick, modifier = Modifier.size(24.dp)) {
-            Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(18.dp))
-        }
+        Icon(
+            Icons.Default.ChevronRight,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 
@@ -579,10 +825,3 @@ private fun lStr(m: Map<String, Any?>, vararg keys: String): String {
     return ""
 }
 
-private fun cotStatusColorAndroid(status: String?): Color = when (status?.lowercase()) {
-    "aprobada", "aprobado", "completada", "completado", "won", "cerrado" -> Color(0xFF2E7D32)
-    "pendiente", "pending", "abierto", "open"                            -> Color(0xFFE65100)
-    "rechazada", "rechazado", "cancelada", "cancelado", "lost"           -> Color(0xFFC62828)
-    "en proceso", "in_progress", "en revision"                           -> Color(0xFF1565C0)
-    else -> Color(0xFF757575)
-}

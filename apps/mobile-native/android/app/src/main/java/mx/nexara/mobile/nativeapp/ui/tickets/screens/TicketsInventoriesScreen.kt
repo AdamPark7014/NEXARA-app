@@ -34,6 +34,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ClientPortalInventorySnapshotDto
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.data.tickets.TicketsRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.util.openFile
 import java.io.File
 
@@ -136,7 +137,7 @@ fun TicketsInventoriesScreen(
         }
 
         if (state.isLoading) {
-            Text("Cargando…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            NxLoadingBlock("Cargando inventarios…")
             return@Column
         }
 

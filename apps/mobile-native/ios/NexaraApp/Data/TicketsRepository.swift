@@ -271,4 +271,30 @@ final class TicketsRepository {
         let path = isBranchUser ? "branch-portal/report" : "client-portal/report"
         return try await api.get(path, query: q)
     }
+
+    // MARK: Mis servicios (portal cliente)
+
+    func servicesSummary() async throws -> [String: Any] {
+        ConsoleHelpers.decodeMap(try await api.get("client-portal/services-summary"))
+    }
+
+    func portalInvoices() async throws -> [[String: Any]] {
+        ApiClient.decodeMapList(try await api.get("client-portal/invoices"))
+    }
+
+    func portalQuotes() async throws -> [[String: Any]] {
+        ApiClient.decodeMapList(try await api.get("client-portal/quotes"))
+    }
+
+    func downloadInvoicePdf(id: Int64) async throws -> Data {
+        try await api.getBinary("client-portal/invoices/\(id)/pdf")
+    }
+
+    func downloadInvoiceXml(id: Int64) async throws -> Data {
+        try await api.getBinary("client-portal/invoices/\(id)/xml")
+    }
+
+    func downloadQuotePdf(id: Int64) async throws -> Data {
+        try await api.getBinary("client-portal/quotes/\(id)/pdf")
+    }
 }

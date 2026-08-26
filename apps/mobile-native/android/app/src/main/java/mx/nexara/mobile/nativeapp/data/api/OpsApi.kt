@@ -17,6 +17,12 @@ interface OpsApi {
         @Body body: Map<String, String>,
     ): ResponseBody
 
+    @PATCH("client-ticket-requests/{id}/assign")
+    suspend fun assignClientTicket(
+        @Path("id") id: Long,
+        @Body body: Map<String, Long>,
+    ): ResponseBody
+
     @PATCH("procurement/requisitions/{id}/approve")
     suspend fun approveRequisition(@Path("id") id: Long): ResponseBody
 

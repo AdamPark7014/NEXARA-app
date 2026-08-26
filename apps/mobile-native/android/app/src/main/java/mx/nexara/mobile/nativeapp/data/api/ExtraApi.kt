@@ -515,24 +515,73 @@ data class ExpenseListResponse(
 // ── Fines ─────────────────────────────────────────────────────────────────
 data class FineDto(
     val id: Long,
+    val usuarioId: Long? = null,
+    val tipo: String? = null,
+    val razon: String? = null,
     val motivo: String? = null,
+    val descripcion: String? = null,
     val monto: Double? = null,
+    val referenciaId: Long? = null,
+    val estatusPago: String? = null,
+    val estatusAprobacion: String? = null,
     val estatus: String? = null,
+    val fechaCreacion: String? = null,
+    val fechaPago: String? = null,
+    val notas: String? = null,
     val createdAt: String? = null,
     val usuario: SimpleUserDto? = null,
-)
+) {
+    fun displayMotivo(): String = razon ?: motivo ?: descripcion ?: "Multa"
+    fun displayAmount(): Double = monto ?: 0.0
+    fun displayStatus(): String = estatusPago ?: estatus ?: "—"
+    fun displayApproval(): String = estatusAprobacion ?: "—"
+    fun displayDate(): String? = fechaCreacion ?: createdAt
+    fun displayUserName(): String? = usuario?.nombre
+    fun displayTipo(): String = when (tipo?.lowercase()) {
+        "actividad" -> "Actividad"
+        "vehiculo" -> "Vehículo"
+        "asistencia" -> "Asistencia"
+        "herramienta" -> "Herramienta"
+        else -> tipo ?: "—"
+    }
+}
 
 // ── Employee payments ─────────────────────────────────────────────────────
 data class EmployeePaymentDto(
     val id: Long,
+    val userId: Long? = null,
     val concepto: String? = null,
+    val note: String? = null,
+    val amount: Double? = null,
     val monto: Double? = null,
+    val status: String? = null,
     val estatus: String? = null,
+    val periodFrom: String? = null,
+    val periodTo: String? = null,
     val periodoInicio: String? = null,
     val periodoFin: String? = null,
+    val totalMinutes: Int? = null,
+    val paidAt: String? = null,
+    val contabilidadRef: String? = null,
+    val evidenceUrls: List<String>? = null,
     val createdAt: String? = null,
+    val user: SimpleUserDto? = null,
     val usuario: SimpleUserDto? = null,
-)
+    val createdBy: SimpleUserDto? = null,
+) {
+    fun displayConcepto(): String = concepto ?: note ?: "Pago"
+    fun displayAmount(): Double = amount ?: monto ?: 0.0
+    fun displayStatus(): String = status ?: estatus ?: "—"
+    fun displayUserName(): String? = user?.nombre ?: usuario?.nombre
+    fun displayPeriodStart(): String? = periodFrom ?: periodoInicio
+    fun displayPeriodEnd(): String? = periodTo ?: periodoFin
+    fun displayHours(): String? {
+        val mins = totalMinutes ?: return null
+        if (mins <= 0) return null
+        val hours = mins / 60.0
+        return String.format(java.util.Locale.US, "%.1f h", hours)
+    }
+}
 
 // ── Lunch breaks ──────────────────────────────────────────────────────────
 data class LunchBreakDto(
@@ -569,7 +618,25 @@ data class CotizacionDto(
     val estatus: String? = null,
     val fecha: String? = null,
     val createdAt: String? = null,
-)
+    val salesClientId: Long? = null,
+    val opportunityId: Long? = null,
+    val projectName: String? = null,
+) {
+    companion object {
+        fun fromRaw(row: Map<String, Any?>): CotizacionDto = CotizacionDto(
+            id = ProcParse.lng(row["id"]) ?: 0L,
+            folio = ProcParse.str(row["quoteNumber"], row["folio"]).takeIf { it.isNotBlank() },
+            cliente = ProcParse.str(row["clientName"], row["clientCompany"], row["cliente"]).takeIf { it.isNotBlank() },
+            total = ProcParse.dbl(row["total"]),
+            estatus = ProcParse.str(row["status"], row["estatus"]).takeIf { it.isNotBlank() },
+            fecha = ProcParse.str(row["issueDate"], row["fecha"]).takeIf { it.isNotBlank() },
+            createdAt = ProcParse.str(row["createdAt"]).takeIf { it.isNotBlank() },
+            salesClientId = ProcParse.lng(row["salesClientId"]),
+            opportunityId = ProcParse.lng(row["opportunityId"]),
+            projectName = ProcParse.str(row["projectName"], row["proyecto"]).takeIf { it.isNotBlank() },
+        )
+    }
+}
 
 // ── Documents ─────────────────────────────────────────────────────────────
 data class DocumentDto(

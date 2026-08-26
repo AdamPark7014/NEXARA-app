@@ -30,6 +30,7 @@ export type RawCotizacionItem = {
   supplierSku?: string | null;
   productCtId?: number | string | null;
   supplierCode?: string | null;
+  supplierWarehouseCode?: string | null;
   marginPercent?: number | string | null;
   stockSnapshot?: number | string | null;
   leadTimeDays?: number | string | null;
@@ -66,6 +67,7 @@ export type NormalizedCotizacionItem = {
   supplierSku: string | null;
   productCtId: number | null;
   supplierCode: string | null;
+  supplierWarehouseCode: string | null;
   marginPercent: number | null;
   stockSnapshot: number | null;
   leadTimeDays: number | null;
@@ -199,6 +201,7 @@ export function normalizeItems(items: RawCotizacionItem[] | undefined | null): N
       supplierSku: item.supplierSku?.trim() || null,
       productCtId: item.productCtId ? Number(item.productCtId) : null,
       supplierCode: pricing.supplierCode,
+      supplierWarehouseCode: item.supplierWarehouseCode?.trim()?.slice(0, 10) || null,
       marginPercent: pricing.marginPercent,
       stockSnapshot: item.stockSnapshot != null ? Number(item.stockSnapshot) : null,
       leadTimeDays: item.leadTimeDays != null ? Number(item.leadTimeDays) : null,

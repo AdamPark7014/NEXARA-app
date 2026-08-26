@@ -4,6 +4,7 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import mx.nexara.mobile.nativeapp.BuildConfig
 import mx.nexara.mobile.nativeapp.data.offline.NexaraOffline
+import mx.nexara.mobile.nativeapp.data.session.SessionEvents
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.logging.HttpLoggingInterceptor
@@ -34,7 +35,11 @@ object ApiClient {
                 val next: Request = original.newBuilder()
                     .header("Authorization", "Bearer $token")
                     .build()
-                chain.proceed(next)
+                val response = chain.proceed(next)
+                if (response.code == 401) {
+                    SessionEvents.notifyExpired()
+                }
+                response
             }
             .apply {
                 NexaraOffline.httpInterceptor()?.let { addInterceptor(it) }
@@ -56,6 +61,7 @@ object ApiClient {
 
     val auth: AuthApi = retrofitNoAuth.create(AuthApi::class.java)
     val portalAuth: PortalAuthApi = retrofitNoAuth.create(PortalAuthApi::class.java)
+    val kbPublic: KbPublicApi = retrofitNoAuth.create(KbPublicApi::class.java)
 
     fun healthApi(tokenProvider: () -> String?): HealthApi = authed(tokenProvider).create(HealthApi::class.java)
 }

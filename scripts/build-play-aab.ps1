@@ -1,5 +1,6 @@
 param(
   [switch]$CreateKeystore,
+  [switch]$Clean,
   [string]$KeyAlias = "nexara",
   [string]$StoreFileName = "nexara-upload.jks"
 )
@@ -82,7 +83,8 @@ storeFile=$StoreFileName
   }
 
   Write-Host "Compilando bundleRelease (AAB)..." -ForegroundColor Cyan
-  & .\gradlew.bat clean bundleRelease --no-daemon
+  $gradleTask = if ($Clean) { "clean bundleRelease" } else { "bundleRelease" }
+  & .\gradlew.bat --no-daemon $gradleTask
   if ($LASTEXITCODE -ne 0) {
     throw "bundleRelease falló (exit $LASTEXITCODE)"
   }

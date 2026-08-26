@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,8 +32,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.access.ModulePanelMap
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleEntry
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -42,6 +51,7 @@ import java.time.temporal.ChronoUnit
 
 data class CompaniesState(
     val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val items: List<mx.nexara.mobile.nativeapp.data.api.CompanyDto> = emptyList(),
 )
@@ -51,39 +61,56 @@ class CompaniesViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(CompaniesState())
     val state: StateFlow<CompaniesState> = _state
 
-    fun load() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun load(refresh: Boolean = false) {
+        _state.update { it.copy(loading = !refresh && it.items.isEmpty(), isRefreshing = refresh, error = null) }
         viewModelScope.launch {
             try {
                 val items = withContext(Dispatchers.IO) { repo.companyDtos() }
-                _state.update { it.copy(loading = false, items = items) }
+                _state.update { it.copy(loading = false, isRefreshing = false, items = items) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.toUserMessage("No se pudieron cargar las empresas")) }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CompaniesScreen() {
     val vm: CompaniesViewModel = viewModel()
     val state by vm.state.collectAsState()
     LaunchedEffect(Unit) { vm.load() }
 
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item {
-            GovHeader("Multi-empresa", "Razones sociales y sucursales")
-        }
-        if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
-        if (state.error != null) { item { Text(state.error!!, color = MaterialTheme.colorScheme.error) }; return@LazyColumn }
-        if (state.items.isEmpty()) { item { Text("Sin empresas registradas.", color = Color(0xFF64748B)) }; return@LazyColumn }
-        items(state.items, key = { it.rowKey }) { c ->
-            GovCard(
-                title = c.displayName,
-                subtitle = listOfNotNull(c.rfc.takeIf { it.isNotBlank() }, c.fiscalRegime.takeIf { it.isNotBlank() }).joinToString(" · "),
-                trailing = c.trailingLabel,
-                accent = if (c.isPrimary) Color(0xFF059669) else Color(0xFF64748B),
-            )
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.load(refresh = true) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        LazyColumn(
+            Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item { NxSectionHeader("Multi-empresa", "Razones sociales y sucursales") }
+            when {
+                state.loading -> item { NxLoadingBlock("Cargando empresas…") }
+                state.error != null -> item { NxErrorBlock(state.error!!) { vm.load() } }
+                state.items.isEmpty() -> item {
+                    NxEmptyState(
+                        title = "Sin empresas",
+                        subtitle = "No hay razones sociales registradas.",
+                        actionLabel = "Actualizar",
+                        onAction = { vm.load(refresh = true) },
+                    )
+                }
+                else -> items(state.items, key = { it.rowKey }) { c ->
+                    GovCard(
+                        title = c.displayName,
+                        subtitle = listOfNotNull(c.rfc.takeIf { it.isNotBlank() }, c.fiscalRegime.takeIf { it.isNotBlank() }).joinToString(" · "),
+                        trailing = c.trailingLabel,
+                        accent = if (c.isPrimary) Color(0xFF059669) else Color(0xFF64748B),
+                    )
+                }
+            }
         }
     }
 }
@@ -92,6 +119,7 @@ fun CompaniesScreen() {
 
 data class KbState(
     val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val query: String = "",
     val articles: List<mx.nexara.mobile.nativeapp.data.api.KbArticleDto> = emptyList(),
@@ -105,15 +133,15 @@ class KbViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setQuery(q: String) = _state.update { it.copy(query = q) }
 
-    fun load() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun load(refresh: Boolean = false) {
+        _state.update { it.copy(loading = !refresh && it.articles.isEmpty(), isRefreshing = refresh, error = null) }
         viewModelScope.launch {
             try {
                 val q = _state.value.query.trim().ifBlank { null }
                 val articles = withContext(Dispatchers.IO) { repo.kbArticleDtos(q) }
-                _state.update { it.copy(loading = false, articles = articles) }
+                _state.update { it.copy(loading = false, isRefreshing = false, articles = articles) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
             }
         }
     }
@@ -130,6 +158,7 @@ class KbViewModel(app: Application) : AndroidViewModel(app) {
     fun closeArticle() = _state.update { it.copy(selected = null) }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KbScreen() {
     val vm: KbViewModel = viewModel()
@@ -145,26 +174,44 @@ fun KbScreen() {
     }
 
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            item { GovHeader("Knowledge Base", "Procedimientos y documentación interna") }
-            item {
-                OutlinedTextField(
-                    value = state.query,
-                    onValueChange = { vm.setQuery(it) },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Buscar artículo…") },
-                    singleLine = true,
-                )
-            }
-            if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
-            items(filtered, key = { it.rowKey }) { a ->
-                GovCard(
-                    title = a.title,
-                    subtitle = a.excerpt.ifBlank { a.category },
-                    trailing = a.status,
-                    accent = Color(0xFF6366F1),
-                    modifier = Modifier.clickable { vm.openArticle(a.openKey) },
-                )
+        PullToRefreshBox(
+            isRefreshing = state.isRefreshing,
+            onRefresh = { vm.load(refresh = true) },
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            LazyColumn(
+                Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                item { NxSectionHeader("Knowledge Base", "Procedimientos y documentación interna") }
+                item {
+                    NxSearchField(
+                        value = state.query,
+                        onValueChange = { vm.setQuery(it) },
+                        placeholder = "Buscar artículo…",
+                    )
+                }
+                when {
+                    state.loading -> item { NxLoadingBlock("Cargando artículos…") }
+                    state.error != null -> item { NxErrorBlock(state.error!!) { vm.load() } }
+                    filtered.isEmpty() -> item {
+                        NxEmptyState(
+                            title = "Sin artículos",
+                            subtitle = "No hay documentación que coincida con tu búsqueda.",
+                            actionLabel = "Actualizar",
+                            onAction = { vm.load(refresh = true) },
+                        )
+                    }
+                    else -> items(filtered, key = { it.rowKey }) { a ->
+                        GovCard(
+                            title = a.title,
+                            subtitle = a.excerpt.ifBlank { a.category },
+                            trailing = a.status,
+                            accent = Color(0xFF6366F1),
+                            modifier = Modifier.clickable { vm.openArticle(a.openKey) },
+                        )
+                    }
+                }
             }
         }
         state.selected?.let { article ->
@@ -245,30 +292,34 @@ fun ExportsScreen() {
     val vm: ExportsViewModel = viewModel()
     val state by vm.state.collectAsState()
 
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { GovHeader("Exportaciones", "Reportes CSV por rango de fechas") }
+    LazyColumn(
+        Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item { NxSectionHeader("Exportaciones", "Reportes CSV por rango de fechas") }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(value = state.from, onValueChange = { vm.setFrom(it) }, label = { Text("Desde") }, modifier = Modifier.weight(1f))
                 OutlinedTextField(value = state.to, onValueChange = { vm.setTo(it) }, label = { Text("Hasta") }, modifier = Modifier.weight(1f))
             }
         }
-        state.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
-        state.message?.let { item { Text(it, color = Color(0xFF059669)) } }
+        state.error?.let { item { NxErrorBlock(it) } }
+        state.message?.let { item { Text(it, color = NxColors.Success, fontWeight = FontWeight.Medium) } }
         items(EXPORT_ENTITIES) { (key, label, icon) ->
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+            NxPanelShell {
                 Row(
-                    Modifier.fillMaxWidth().padding(14.dp),
+                    Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(icon, style = MaterialTheme.typography.titleLarge)
-                        Text(label, fontWeight = FontWeight.Medium)
+                        Text(label, fontWeight = FontWeight.Medium, color = NxColors.Slate)
                     }
                     Button(
                         onClick = { vm.download(context, key) },
                         enabled = state.downloading != key,
+                        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
                     ) {
                         Text(if (state.downloading == key) "…" else "CSV")
                     }
@@ -300,10 +351,11 @@ fun ArchitectureScreen() {
     var selected by remember { mutableStateOf("all") }
     val panels = remember { architecturePanels() }
 
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            GovHeader("Arquitectura del ERP", "5 paneles · módulos nativos implementados")
-        }
+    LazyColumn(
+        Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item { NxSectionHeader("Arquitectura del ERP", "5 paneles · módulos nativos implementados") }
         item {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = selected == "all", onClick = { selected = "all" }, label = { Text("Todos") })
@@ -334,6 +386,7 @@ fun ArchitectureScreen() {
 
 data class CalendarState(
     val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val rangeDays: Int = 30,
     val events: List<mx.nexara.mobile.nativeapp.data.api.CalendarEventDto> = emptyList(),
@@ -349,21 +402,22 @@ class ErpCalendarViewModel(app: Application) : AndroidViewModel(app) {
         load()
     }
 
-    fun load() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun load(refresh: Boolean = false) {
+        _state.update { it.copy(loading = !refresh && it.events.isEmpty(), isRefreshing = refresh, error = null) }
         viewModelScope.launch {
             try {
                 val from = java.time.Instant.now().toString()
                 val to = java.time.Instant.now().plus(_state.value.rangeDays.toLong(), ChronoUnit.DAYS).toString()
                 val events = withContext(Dispatchers.IO) { repo.calendarEventDtos(from, to) }
-                _state.update { it.copy(loading = false, events = events) }
+                _state.update { it.copy(loading = false, isRefreshing = false, events = events) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ErpCalendarScreen() {
     val vm: ErpCalendarViewModel = viewModel()
@@ -375,26 +429,45 @@ fun ErpCalendarScreen() {
             .entries.sortedBy { it.key }
     }
 
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { GovHeader("Mi calendario", "OT · CRM · mantenimiento · licitaciones") }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(7 to "7 días", 30 to "30 días", 90 to "90 días").forEach { (d, label) ->
-                    FilterChip(selected = state.rangeDays == d, onClick = { vm.setRange(d) }, label = { Text(label) })
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.load(refresh = true) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        LazyColumn(
+            Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item { NxSectionHeader("Mi calendario", "OT · CRM · mantenimiento · licitaciones") }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(7 to "7 días", 30 to "30 días", 90 to "90 días").forEach { (d, label) ->
+                        FilterChip(selected = state.rangeDays == d, onClick = { vm.setRange(d) }, label = { Text(label) })
+                    }
                 }
             }
-        }
-        if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
-        if (state.events.isEmpty()) { item { Text("Sin eventos en este rango.", color = Color(0xFF64748B)) }; return@LazyColumn }
-        grouped.forEach { (day, list) ->
-            item { Text(day, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A)) }
-            items(list, key = { it.rowKey }) { ev ->
-                GovCard(
-                    title = ev.displayTitle,
-                    subtitle = "${ev.source} · ${ev.type}",
-                    trailing = ev.timeLabel,
-                    accent = Color(0xFF3B82F6),
-                )
+            when {
+                state.loading -> item { NxLoadingBlock("Cargando eventos…") }
+                state.error != null -> item { NxErrorBlock(state.error!!) { vm.load() } }
+                state.events.isEmpty() -> item {
+                    NxEmptyState(
+                        title = "Sin eventos",
+                        subtitle = "No hay eventos en este rango de fechas.",
+                        actionLabel = "Actualizar",
+                        onAction = { vm.load(refresh = true) },
+                    )
+                }
+                else -> grouped.forEach { (day, list) ->
+                    item { Text(day, fontWeight = FontWeight.SemiBold, color = NxColors.Slate) }
+                    items(list, key = { it.rowKey }) { ev ->
+                        GovCard(
+                            title = ev.displayTitle,
+                            subtitle = "${ev.source} · ${ev.type}",
+                            trailing = ev.timeLabel,
+                            accent = Color(0xFF3B82F6),
+                        )
+                    }
+                }
             }
         }
     }
@@ -402,28 +475,54 @@ fun ErpCalendarScreen() {
 
 // ── Organigrama ─────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrgchartScreen() {
     var roots by remember { mutableStateOf<List<mx.nexara.mobile.nativeapp.data.api.OrgNodeDto>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        loading = true
+    suspend fun loadData(refresh: Boolean = false) {
+        if (refresh) isRefreshing = true else loading = true
+        error = null
         try {
             roots = withContext(Dispatchers.IO) { ExtraRepository(context).orgNodeDtos() }
         } catch (e: Exception) {
             error = e.message
         }
         loading = false
+        isRefreshing = false
     }
 
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        item { GovHeader("Organigrama", "Jerarquía y reportes") }
-        if (loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
-        if (error != null) { item { Text(error!!, color = MaterialTheme.colorScheme.error) }; return@LazyColumn }
-        item { OrgchartTree(roots, depth = 0) }
+    LaunchedEffect(Unit) { loadData() }
+
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = { scope.launch { loadData(refresh = true) } },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        LazyColumn(
+            Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            item { NxSectionHeader("Organigrama", "Jerarquía y reportes") }
+            when {
+                loading -> item { NxLoadingBlock("Cargando organigrama…") }
+                error != null -> item { NxErrorBlock(error!!) { scope.launch { loadData() } } }
+                roots.isEmpty() -> item {
+                    NxEmptyState(
+                        title = "Sin datos",
+                        subtitle = "No hay nodos en el organigrama.",
+                        actionLabel = "Actualizar",
+                        onAction = { scope.launch { loadData(refresh = true) } },
+                    )
+                }
+                else -> item { OrgchartTree(roots, depth = 0) }
+            }
+        }
     }
 }
 
@@ -451,6 +550,7 @@ private fun OrgchartTree(nodes: List<mx.nexara.mobile.nativeapp.data.api.OrgNode
 
 data class HrKpisState(
     val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val staff: List<mx.nexara.mobile.nativeapp.data.api.HrStaffDto> = emptyList(),
     val engineers: List<mx.nexara.mobile.nativeapp.data.api.BiEngineerRowDto> = emptyList(),
@@ -461,8 +561,8 @@ class HrKpisViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(HrKpisState())
     val state: StateFlow<HrKpisState> = _state
 
-    fun load() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun load(refresh: Boolean = false) {
+        _state.update { it.copy(loading = !refresh && it.staff.isEmpty(), isRefreshing = refresh, error = null) }
         viewModelScope.launch {
             try {
                 val allStaff = mutableListOf<mx.nexara.mobile.nativeapp.data.api.HrStaffDto>()
@@ -475,14 +575,15 @@ class HrKpisViewModel(app: Application) : AndroidViewModel(app) {
                     page++
                 }
                 val engineers = withContext(Dispatchers.IO) { repo.biEngineerRowDtos(15) }
-                _state.update { it.copy(loading = false, staff = allStaff, engineers = engineers) }
+                _state.update { it.copy(loading = false, isRefreshing = false, staff = allStaff, engineers = engineers) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HrKpisScreen() {
     val vm: HrKpisViewModel = viewModel()
@@ -494,25 +595,39 @@ fun HrKpisScreen() {
     val rotacion = if (total > 0) (bajas.toDouble() / total * 100) else 0.0
     val avgCompletion = state.engineers.map { it.completionRate }.average().let { if (it.isNaN()) 0.0 else it }
 
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { GovHeader("KPIs de personas", "Plantilla · rotación · productividad") }
-        if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                GovMetric(Modifier.weight(1f), "Plantilla", "$total", Color(0xFF3B82F6))
-                GovMetric(Modifier.weight(1f), "Rotación", "${"%.1f".format(rotacion)}%", Color(0xFFF59E0B))
-                GovMetric(Modifier.weight(1f), "Cierre OT", "${avgCompletion.toInt()}%", Color(0xFF059669))
-            }
-        }
-        if (state.engineers.isNotEmpty()) {
-            item { Text("Productividad operativa (90d)", fontWeight = FontWeight.SemiBold) }
-            items(state.engineers, key = { it.rowKey }) { e ->
-                GovCard(
-                    title = e.engineerName,
-                    subtitle = "${e.completed}/${e.totalActivities} OT",
-                    trailing = "${e.completionRate.toInt()}%",
-                    accent = Color(0xFF6366F1),
-                )
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.load(refresh = true) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        LazyColumn(
+            Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item { NxSectionHeader("KPIs de personas", "Plantilla · rotación · productividad") }
+            when {
+                state.loading -> item { NxLoadingBlock("Cargando KPIs…") }
+                state.error != null -> item { NxErrorBlock(state.error!!) { vm.load() } }
+                else -> {
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            GovMetric(Modifier.weight(1f), "Plantilla", "$total", Color(0xFF3B82F6))
+                            GovMetric(Modifier.weight(1f), "Rotación", "${"%.1f".format(rotacion)}%", Color(0xFFF59E0B))
+                            GovMetric(Modifier.weight(1f), "Cierre OT", "${avgCompletion.toInt()}%", Color(0xFF059669))
+                        }
+                    }
+                    if (state.engineers.isNotEmpty()) {
+                        item { Text("Productividad operativa (90d)", fontWeight = FontWeight.SemiBold, color = NxColors.Slate) }
+                        items(state.engineers, key = { it.rowKey }) { e ->
+                            GovCard(
+                                title = e.engineerName,
+                                subtitle = "${e.completed}/${e.totalActivities} OT",
+                                trailing = "${e.completionRate.toInt()}%",
+                                accent = Color(0xFF6366F1),
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -522,19 +637,14 @@ fun HrKpisScreen() {
 
 @Composable
 private fun GovHeader(title: String, subtitle: String) {
-    Column(Modifier.padding(bottom = 4.dp)) {
-        Text(title, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
-        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
-    }
+    NxSectionHeader(title, subtitle)
 }
 
 @Composable
 private fun GovMetric(modifier: Modifier, label: String, value: String, accent: Color) {
-    Card(modifier, colors = CardDefaults.cardColors(containerColor = accent.copy(0.1f)), shape = RoundedCornerShape(12.dp)) {
-        Column(Modifier.padding(12.dp)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = accent)
-            Text(value, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-        }
+    NxPanelShell(modifier) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = accent)
+        Text(value, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = NxColors.Slate)
     }
 }
 
@@ -546,14 +656,21 @@ private fun GovCard(
     accent: Color = Color(0xFF0D9488),
     modifier: Modifier = Modifier,
 ) {
-    Card(modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(1.dp)) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+    NxPanelShell(modifier = modifier) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
-                if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                Text(title, fontWeight = FontWeight.SemiBold, color = NxColors.Slate)
+                if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
             }
             if (trailing.isNotBlank()) {
-                Text(trailing, fontWeight = FontWeight.Bold, color = accent, modifier = Modifier.background(accent.copy(0.12f), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 4.dp))
+                Text(
+                    trailing,
+                    fontWeight = FontWeight.Bold,
+                    color = accent,
+                    modifier = Modifier
+                        .background(accent.copy(0.12f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                )
             }
         }
     }
@@ -586,21 +703,27 @@ private fun stageColor(key: String) = when (key) {
     else                     -> Color(0xFFEF4444)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecruitingScreen() {
     val context = LocalContext.current
     val repo = remember { mx.nexara.mobile.nativeapp.data.extra.ExtraRepository(context) }
+    val scope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
     var candidates by remember { mutableStateOf<List<mx.nexara.mobile.nativeapp.data.api.CandidateDto>>(emptyList()) }
     var query by remember { mutableStateOf("") }
     var showRejected by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<mx.nexara.mobile.nativeapp.data.api.CandidateDto?>(null) }
 
-    LaunchedEffect(Unit) {
-        loading = true
+    suspend fun loadData(refresh: Boolean = false) {
+        if (refresh) isRefreshing = true else loading = true
         candidates = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { repo.candidateDtos() }
         loading = false
+        isRefreshing = false
     }
+
+    LaunchedEffect(Unit) { loadData() }
 
     val filtered = remember(candidates, query, showRejected) {
         candidates.filter { c ->
@@ -621,56 +744,75 @@ fun RecruitingScreen() {
     val sel = selected
     if (sel != null) { CandidateDetail(sel, onBack = { selected = null }); return }
 
-    Column(Modifier.fillMaxSize()) {
-        // KPI strip
-        if (!loading) {
-            Row(
-                Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(10.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                val total      = candidates.size
-                val inProcess  = candidates.count { !it.isRejected && !it.isApproved }
-                val approved   = candidates.count { it.isApproved }
-                val rejected   = candidates.count { it.isRejected }
-                RecruKpiChip("Total", "$total")
-                RecruKpiChip("En proceso", "$inProcess", Color(0xFF3B82F6))
-                RecruKpiChip("Contratados", "$approved", Color(0xFF22C55E))
-                RecruKpiChip("Rechazados", "$rejected", Color(0xFFEF4444))
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = { scope.launch { loadData(refresh = true) } },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        Column(Modifier.fillMaxSize().background(NxColors.Surface)) {
+            if (!loading) {
+                NxPanelShell(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    contentPadding = PaddingValues(10.dp),
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                    ) {
+                        val total      = candidates.size
+                        val inProcess  = candidates.count { !it.isRejected && !it.isApproved }
+                        val approved   = candidates.count { it.isApproved }
+                        val rejected   = candidates.count { it.isRejected }
+                        RecruKpiChip("Total", "$total")
+                        RecruKpiChip("En proceso", "$inProcess", Color(0xFF3B82F6))
+                        RecruKpiChip("Contratados", "$approved", Color(0xFF22C55E))
+                        RecruKpiChip("Rechazados", "$rejected", Color(0xFFEF4444))
+                    }
+                }
             }
-        }
-        // Search + toggle
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = { Text("Buscar candidato…") },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-            )
-            FilterChip(selected = showRejected, onClick = { showRejected = !showRejected }, label = { Text("Rechazados", style = MaterialTheme.typography.labelSmall) })
-        }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                NxSearchField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = "Buscar candidato…",
+                    modifier = Modifier.weight(1f),
+                )
+                FilterChip(selected = showRejected, onClick = { showRejected = !showRejected }, label = { Text("Rechazados", style = MaterialTheme.typography.labelSmall) })
+            }
 
-        if (loading) {
-            Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-        } else {
-            LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
-                grouped.forEach { (stageKey, list) ->
-                    val color = stageColor(stageKey)
-                    val label = STAGE_LABELS[stageKey] ?: stageKey
-                    item(key = "hdr-$stageKey") {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(label, fontWeight = FontWeight.Bold, color = color)
-                            Box(Modifier.background(color.copy(alpha = 0.12f), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
-                                Text("${list.size}", style = MaterialTheme.typography.labelSmall, color = color)
+            when {
+                loading -> Box(Modifier.fillMaxSize(), Alignment.Center) { NxLoadingBlock("Cargando candidatos…") }
+                grouped.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
+                    NxEmptyState(
+                        title = "Sin candidatos",
+                        subtitle = "No hay postulaciones con los filtros actuales.",
+                        actionLabel = "Actualizar",
+                        onAction = { scope.launch { loadData(refresh = true) } },
+                    )
+                }
+                else -> LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
+                    grouped.forEach { (stageKey, list) ->
+                        val color = stageColor(stageKey)
+                        val label = STAGE_LABELS[stageKey] ?: stageKey
+                        item(key = "hdr-$stageKey") {
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(label, fontWeight = FontWeight.Bold, color = color)
+                                Box(Modifier.background(color.copy(alpha = 0.12f), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
+                                    Text("${list.size}", style = MaterialTheme.typography.labelSmall, color = color)
+                                }
                             }
                         }
-                    }
-                    items(list, key = { it.rowKey }) { c ->
-                        RecruCandidateCard(c, color, onClick = { selected = c })
+                        items(list, key = { it.rowKey }) { c ->
+                            RecruCandidateCard(c, color, onClick = { selected = c })
+                        }
                     }
                 }
             }

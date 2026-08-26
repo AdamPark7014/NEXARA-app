@@ -6,6 +6,7 @@ import { AuthModule } from '../auth/auth.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { TicketAlertsService } from './ticket-alerts.service.js';
+import { ActivityLifecycleService } from './activity-lifecycle.service.js';
 import { ActivityTeamService } from './activity-team.service.js';
 import { ActivityTeamController, ActivityReassignController } from './activity-team.controller.js';
 import { ActivityIssuesService } from './activity-issues.service.js';
@@ -32,7 +33,13 @@ import {
     ActivityReassignController,
     ActivitiesController,
   ],
-  providers: [ActivityTeamService, ActivityIssuesService, ActivitiesService, TicketAlertsService],
-  exports: [ActivitiesService],
+  providers: [
+    ActivityTeamService,
+    ActivityIssuesService,
+    ActivitiesService,
+    TicketAlertsService,
+    ActivityLifecycleService,
+  ],
+  exports: [ActivitiesService, ActivityLifecycleService],
 })
 export class ActivitiesModule {}

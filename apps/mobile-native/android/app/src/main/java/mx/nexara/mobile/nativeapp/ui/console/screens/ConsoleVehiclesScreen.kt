@@ -41,6 +41,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.VehicleControlDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 
 data class VehiclesUiState(
@@ -162,7 +163,7 @@ fun ConsoleVehiclesScreen(
         Spacer(modifier = Modifier.height(10.dp))
 
         if (state.isLoading) {
-            Text("Cargando vehículos...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            NxLoadingBlock("Cargando vehículos…")
             return@Column
         }
         if (!state.error.isNullOrBlank()) {

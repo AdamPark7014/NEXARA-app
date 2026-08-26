@@ -93,6 +93,8 @@ import { ScimModule } from './scim/scim.module.js';
 import { ObservabilityModule } from './observability/observability.module.js';
 import { JobsModule } from './jobs/jobs.module.js';
 import { AiModule } from './ai/ai.module.js';
+import { ActivityFeedModule } from './activity-feed/activity-feed.module.js';
+import { DomainEventsModule } from './domain-events/domain-events.module.js';
 
 @Module({
   imports: [
@@ -161,6 +163,7 @@ import { AiModule } from './ai/ai.module.js';
     CronModule,
     HrModule,
     SearchModule,
+    ActivityFeedModule,
     CatalogModule,
     AccessControlModule,
     PacModule,
@@ -177,6 +180,7 @@ import { AiModule } from './ai/ai.module.js';
     MobileCrmModule,
     ExecutiveModule,
     WorkflowModule,
+    DomainEventsModule,
     SlaTrackerModule,
     ExportsModule,
     NocModule,

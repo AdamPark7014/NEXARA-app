@@ -18,6 +18,21 @@ final class CrmRepository {
         return ApiClient.decodeMapList(try await api.get("cotizaciones")).map { Cotizacion(raw: $0) }
     }
 
+    func cotizacionDetail(id: Int) async throws -> [String: Any] {
+        let data = try await api.get("ventas/cotizaciones/\(id)")
+        return ConsoleHelpers.decodeMap(data)
+    }
+
+    func downloadCotizacionPdf(id: Int, internal: Bool = false) async throws -> Data {
+        let path = internal ? "cotizaciones/\(id)/pdf/internal" : "cotizaciones/\(id)/pdf"
+        return try await api.getBinary(path)
+    }
+
+    func sendCotizacion(id: Int, email: String, message: String? = nil) async throws {
+        let body = SendCotizacionBody(email: email, message: message?.isEmpty == true ? nil : message)
+        _ = try await api.postJSON("cotizaciones/\(id)/send", body: body)
+    }
+
     func oportunidades() async throws -> [[String: Any]] {
         try await opportunityItems().map(\.raw)
     }
@@ -32,6 +47,28 @@ final class CrmRepository {
 
     func clientItems() async throws -> [CrmClient] {
         ApiClient.decodeMapList(try await api.get("ventas/clientes")).map { CrmClient(raw: $0) }
+    }
+
+    func clientDetail(id: Int64) async throws -> [String: Any] {
+        ConsoleHelpers.decodeMap(try await api.get("ventas/clientes/\(id)"))
+    }
+
+    func clientSnapshot(id: Int64) async throws -> [String: Any] {
+        ConsoleHelpers.decodeMap(try await api.get("ventas/clientes/\(id)/snapshot"))
+    }
+
+    func updateClient(id: Int64, fields: [String: String]) async throws -> [String: Any] {
+        let data = try await api.patchJSON("ventas/clientes/\(id)", body: fields)
+        return ConsoleHelpers.decodeMap(data)
+    }
+
+    func provisionServiceClient(id: Int64) async throws -> [String: Any] {
+        let data = try await api.postJSON("ventas/clientes/\(id)/provision-service-client", body: EmptyBody())
+        let result = ConsoleHelpers.decodeMap(data)
+        if let salesClient = result["salesClient"] as? [String: Any] {
+            return salesClient
+        }
+        return try await clientDetail(id: id)
     }
 
     func leads() async throws -> [[String: Any]] {
@@ -194,3 +231,7 @@ final class CrmRepository {
 }
 
 private struct EmptyBody: Encodable {}
+private struct SendCotizacionBody: Encodable {
+    let email: String
+    let message: String?
+}

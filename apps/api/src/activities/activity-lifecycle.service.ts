@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ACTIVITY_STATUS, statusVariants } from './activity-status.js';
+import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 /**
  * Efectos en cadena al cerrar una actividad.
@@ -44,7 +46,11 @@ export type ActivityClosureOutcome = {
 export class ActivityLifecycleService {
   private readonly logger = new Logger(ActivityLifecycleService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly domainEvents: DomainEventBusService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   /**
    * Propaga el cierre de una actividad. Nunca lanza: devuelve qué se pudo hacer
@@ -140,7 +146,115 @@ export class ActivityLifecycleService {
     outcome.contractVisitCompleted = await this.completeContractVisit(activityId, outcome);
     outcome.clientTicketClosed = await this.closeClientTicketRequest(activityId, outcome);
 
+    this.publishActivityLifecycle(
+      activityId,
+      input.companyId,
+      ACTIVITY_STATUS.FINALIZADA,
+      { closureApproved: true },
+    );
+
     return outcome;
+  }
+
+  /**
+   * El arquitecto rechazó la validación: la OT vuelve a campo y el técnico es notificado.
+   */
+  async onActivityValidationRejected(input: {
+    activityId: number;
+    companyId: number | null;
+    actorId?: number | null;
+    comments?: string | null;
+  }): Promise<ActivityClosureOutcome> {
+    const outcome: ActivityClosureOutcome = {
+      contractVisitCompleted: false,
+      clientTicketClosed: false,
+      workflowInstanceId: null,
+      errors: [],
+    };
+
+    const { activityId } = input;
+    if (!Number.isFinite(activityId) || activityId <= 0) {
+      outcome.errors.push('activityId inválido');
+      return outcome;
+    }
+
+    try {
+      await this.prisma.activity.updateMany({
+        where: { id: activityId, estatus: { in: statusVariants(ACTIVITY_STATUS.POR_VALIDAR) } },
+        data: { estatus: ACTIVITY_STATUS.EN_PROCESO },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      outcome.errors.push(`revertir a en proceso: ${message}`);
+      this.logger.warn(`No se pudo revertir actividad ${activityId}: ${message}`);
+    }
+
+    try {
+      const activity = await this.prisma.activity.findFirst({
+        where: { id: activityId },
+        select: {
+          id: true,
+          responsableId: true,
+          anNumber: true,
+          titulo: true,
+          companyId: true,
+        },
+      });
+      if (activity?.responsableId) {
+        const label =
+          (activity.anNumber && String(activity.anNumber).trim()) ||
+          (activity.titulo && String(activity.titulo).trim()) ||
+          `Actividad ${activityId}`;
+        const reason = input.comments?.trim();
+        void this.notifications
+          .createNotification({
+            userId: activity.responsableId,
+            type: 'ACTIVITY_VALIDATION_REJECTED',
+            category: 'activities',
+            title: 'Validación rechazada',
+            message: reason
+              ? `Tu OT "${label}" fue devuelta a campo. Motivo: ${reason}`
+              : `Tu OT "${label}" fue devuelta a campo para corrección.`,
+            entityType: 'ACTIVITY',
+            relatedEntityId: activityId,
+            relatedUrl: `/ops/activities/${activityId}`,
+          } as any)
+          .catch(() => null);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      outcome.errors.push(`notificación: ${message}`);
+    }
+
+    this.publishActivityLifecycle(
+      activityId,
+      input.companyId,
+      ACTIVITY_STATUS.EN_PROCESO,
+      {
+        closureRejected: true,
+        comments: input.comments?.trim() || null,
+      },
+      input.actorId,
+    );
+
+    return outcome;
+  }
+
+  private publishActivityLifecycle(
+    activityId: number,
+    companyId: number | null,
+    estatus: string,
+    extra: Record<string, unknown> = {},
+    userId?: number | null,
+  ) {
+    if (!companyId || companyId <= 0) return;
+    this.domainEvents.publishEntityLifecycle('updated', {
+      entityType: 'ACTIVITY',
+      entityId: activityId,
+      companyId,
+      userId: userId ?? undefined,
+      payload: { estatus, ...extra },
+    });
   }
 
   /** Marca como COMPLETED la visita de contrato que originó la actividad. */

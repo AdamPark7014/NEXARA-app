@@ -7,6 +7,9 @@ struct ConsoleTabView: View {
     let onExit: () -> Void
     @State private var selectedTab: String = "dashboard"
     @State private var deepLinkModuleKey: String?
+    @State private var deepLinkModuleParams: [String: String] = [:]
+    @State private var activityDeepLinkId: Int64?
+    @State private var activityDeepLinkTab: String?
     @EnvironmentObject var session: SessionStore
     @ObservedObject private var deepLink = DeepLinkCoordinator.shared
 
@@ -26,7 +29,25 @@ struct ConsoleTabView: View {
                 .tag(tab.id)
             }
         }
-        .deepLinkModulePresenter(panel: panel, presentedKey: $deepLinkModuleKey)
+        .deepLinkModulePresenter(panel: panel, presentedKey: $deepLinkModuleKey, moduleParams: deepLinkModuleParams)
+        .fullScreenCover(isPresented: Binding(
+            get: { activityDeepLinkId != nil },
+            set: { if !$0 { activityDeepLinkId = nil; activityDeepLinkTab = nil } }
+        )) {
+            if let id = activityDeepLinkId {
+                NavigationStack {
+                    ActivityDetailByIdView(activityId: id, initialTabKey: activityDeepLinkTab)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Cerrar") {
+                                    activityDeepLinkId = nil
+                                    activityDeepLinkTab = nil
+                                }
+                            }
+                        }
+                }
+            }
+        }
         .onAppear {
             syncSelectedTab()
             applyDeepLinkIfNeeded()
@@ -81,8 +102,15 @@ struct ConsoleTabView: View {
     }
 
     private func applyDeepLinkIfNeeded() {
-        if let key = deepLink.consumeModule(for: panel) {
-            deepLinkModuleKey = key
+        if let link = deepLink.consumeModuleLink(for: panel) {
+            if (link.key == "activities" || link.key == "my-activities"),
+               let id = link.entityId, id > 0 {
+                activityDeepLinkId = id
+                activityDeepLinkTab = link.params["tab"]
+            } else {
+                deepLinkModuleKey = link.key
+                deepLinkModuleParams = link.params
+            }
         }
     }
 }

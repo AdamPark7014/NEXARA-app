@@ -1,6 +1,7 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
 import android.app.Application
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -29,12 +31,14 @@ import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +57,14 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ServiceSheetListDto
 import mx.nexara.mobile.nativeapp.data.ops.OpsRepository
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 import mx.nexara.mobile.nativeapp.util.mergeIntoNotes
 import mx.nexara.mobile.nativeapp.util.messageSuffixOrNone
 
@@ -92,6 +104,7 @@ private fun rowId(m: Map<String, Any?>): String =
 
 data class ClientTicketsUiState(
     val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val message: String? = null,
     val query: String = "",
@@ -117,15 +130,21 @@ class ClientTicketsViewModel(app: Application) : AndroidViewModel(app) {
     fun select(item: mx.nexara.mobile.nativeapp.data.api.OpsClientTicketRequestDto?) =
         _state.update { it.copy(selected = item) }
 
-    fun refresh() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun refresh(initial: Boolean = true) {
+        _state.update {
+            it.copy(
+                loading = initial && it.items.isEmpty(),
+                isRefreshing = !initial,
+                error = null,
+            )
+        }
         viewModelScope.launch {
             try {
                 val st = _state.value.statusFilter.takeIf { it != "todos" }
                 val list = withContext(Dispatchers.IO) { repo.clientTicketRequestDtos(st) }
-                _state.update { it.copy(loading = false, items = list) }
+                _state.update { it.copy(loading = false, isRefreshing = false, items = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
             }
         }
     }
@@ -154,6 +173,7 @@ class ClientTicketsViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClientTicketsModuleScreen(vm: ClientTicketsViewModel = viewModel()) {
     val s by vm.state.collectAsState()
@@ -195,10 +215,20 @@ fun ClientTicketsModuleScreen(vm: ClientTicketsViewModel = viewModel()) {
     val kpiNew = s.items.count { it.status.equals("NEW", true) }
     val kpiAssigned = s.items.count { it.status.equals("ASSIGNED", true) }
 
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { Text("Tickets de clientes", style = MaterialTheme.typography.titleLarge) }
-        s.message?.let { msg -> item { Text(msg, color = Color(0xFF2E7D32), style = MaterialTheme.typography.bodySmall) } }
-        s.error?.let { err -> item { Text(err, color = MaterialTheme.colorScheme.error) } }
+    PullToRefreshBox(
+        isRefreshing = s.isRefreshing,
+        onRefresh = { vm.refresh(initial = false) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+    LazyColumn(
+        Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item { NxSectionHeader("Tickets de clientes", "${s.items.size} total") }
+        s.message?.let { msg -> item { Text(msg, color = NxColors.Success, style = MaterialTheme.typography.bodySmall) } }
+        if (!s.error.isNullOrBlank()) {
+            item { NxErrorBlock(s.error!!) { vm.refresh(initial = false) } }
+        }
         if (s.items.isNotEmpty()) {
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -229,24 +259,26 @@ fun ClientTicketsModuleScreen(vm: ClientTicketsViewModel = viewModel()) {
             )
         }
         if (s.loading) {
-            item { CircularProgressIndicator() }
+            item { NxLoadingBlock("Cargando tickets…") }
         } else if (vm.filtered().isEmpty()) {
-            item { Text("Sin tickets", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            item {
+                NxEmptyState(
+                    title = "Sin tickets",
+                    subtitle = "No hay solicitudes de clientes con este filtro.",
+                    actionLabel = "Actualizar",
+                    onAction = { vm.refresh(initial = false) },
+                )
+            }
         } else {
             items(vm.filtered().take(80), key = { it.rowKey }) { t ->
-                Card(
-                    onClick = { vm.select(t) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(t.displayTitle, fontWeight = FontWeight.Bold)
-                        Text(t.branchName, style = MaterialTheme.typography.bodySmall)
-                        Text(t.status, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    }
+                NxPanelShell(onClick = { vm.select(t) }) {
+                    Text(t.displayTitle, fontWeight = FontWeight.Bold)
+                    Text(t.branchName, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
+                    NxStatusChip(t.status, clientTicketTone(t.status))
                 }
             }
         }
+    }
     }
 }
 
@@ -255,6 +287,7 @@ fun ClientTicketsModuleScreen(vm: ClientTicketsViewModel = viewModel()) {
 data class ProcurementUiState(
     val tab: Int = 0,
     val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val message: String? = null,
     val query: String = "",
@@ -279,8 +312,14 @@ class ProcurementViewModel(app: Application) : AndroidViewModel(app) {
     fun setRejectReason(v: String) = _state.update { it.copy(rejectReason = v) }
     fun select(item: mx.nexara.mobile.nativeapp.data.api.RequisitionDto?) = _state.update { it.copy(selected = item) }
 
-    fun refresh() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun refresh(initial: Boolean = true) {
+        _state.update {
+            it.copy(
+                loading = initial && it.requisitions.isEmpty() && it.orders.isEmpty(),
+                isRefreshing = !initial,
+                error = null,
+            )
+        }
         viewModelScope.launch {
             try {
                 val reqs = withContext(Dispatchers.IO) { repo.requisitionDtos() }
@@ -289,10 +328,10 @@ class ProcurementViewModel(app: Application) : AndroidViewModel(app) {
                     runCatching { extra.goodsReceiptDtos() }.getOrDefault(emptyList())
                 }
                 _state.update {
-                    it.copy(loading = false, requisitions = reqs, orders = orders, goodsReceipts = gr)
+                    it.copy(loading = false, isRefreshing = false, requisitions = reqs, orders = orders, goodsReceipts = gr)
                 }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
             }
         }
     }
@@ -352,6 +391,7 @@ class ProcurementViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProcurementModuleScreen(vm: ProcurementViewModel = viewModel()) {
     val s by vm.state.collectAsState()
@@ -388,13 +428,28 @@ fun ProcurementModuleScreen(vm: ProcurementViewModel = viewModel()) {
         return
     }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().background(NxColors.Surface)) {
         ScrollableTabRow(selectedTabIndex = s.tab) {
             Tab(selected = s.tab == 0, onClick = { vm.setTab(0) }, text = { Text("Requisiciones") })
             Tab(selected = s.tab == 1, onClick = { vm.setTab(1) }, text = { Text("Órdenes") })
             Tab(selected = s.tab == 2, onClick = { vm.setTab(2) }, text = { Text("Recepciones") })
         }
+        PullToRefreshBox(
+            isRefreshing = s.isRefreshing,
+            onRefresh = { vm.refresh(initial = false) },
+            modifier = Modifier.fillMaxSize(),
+        ) {
         LazyColumn(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                NxSectionHeader(
+                    when (s.tab) {
+                        1 -> "Órdenes de compra"
+                        2 -> "Recepciones de mercancía"
+                        else -> "Requisiciones"
+                    },
+                    subtitle = "Compras y abastecimiento",
+                )
+            }
             item {
                 OutlinedTextField(
                     value = s.query,
@@ -405,63 +460,52 @@ fun ProcurementModuleScreen(vm: ProcurementViewModel = viewModel()) {
                 )
             }
             if (!s.message.isNullOrBlank()) {
-                item { Text(s.message!!, color = Color(0xFF2E7D32), fontWeight = FontWeight.SemiBold) }
+                item { Text(s.message!!, color = NxColors.Success, fontWeight = FontWeight.SemiBold) }
             }
             if (!s.error.isNullOrBlank()) {
-                item { Text(s.error!!, color = MaterialTheme.colorScheme.error) }
+                item { NxErrorBlock(s.error!!) { vm.refresh(initial = false) } }
             }
-            if (s.loading) item { CircularProgressIndicator() }
-            else when (s.tab) {
+            if (s.loading) {
+                item { NxLoadingBlock("Cargando…") }
+            } else when (s.tab) {
                 1 -> {
                     val list = vm.filteredOrders()
-                    if (list.isEmpty()) item { Text("Sin registros") }
+                    if (list.isEmpty()) item { NxEmptyState("Sin órdenes", "No hay órdenes de compra registradas.") }
                     else items(list.take(80), key = { it.rowKey }) { r ->
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(12.dp)) {
-                                Text(r.displayTitle, fontWeight = FontWeight.Bold)
-                                Text(r.supplierName, style = MaterialTheme.typography.bodySmall)
-                                Text(r.status, style = MaterialTheme.typography.labelSmall)
-                            }
+                        NxPanelShell {
+                            Text(r.displayTitle, fontWeight = FontWeight.Bold)
+                            Text(r.supplierName, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
+                            NxStatusChip(r.status, NxTone.Info)
                         }
                     }
                 }
                 2 -> {
                     val list = vm.filteredReceipts()
-                    if (list.isEmpty()) item { Text("Sin recepciones de mercancía") }
+                    if (list.isEmpty()) item { NxEmptyState("Sin recepciones", "No hay recepciones de mercancía.") }
                     else items(list.take(80), key = { it.rowKey }) { r ->
-                        Card(modifier = Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(12.dp)) {
-                                Text(r.displayTitle, fontWeight = FontWeight.Bold)
-                                Text(r.warehouseName, style = MaterialTheme.typography.bodySmall)
-                                Text(r.status, style = MaterialTheme.typography.labelSmall)
-                                r.quantity?.let { qty ->
-                                    Text(
-                                        "Cantidad: $qty",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFF0D9488),
-                                    )
-                                }
+                        NxPanelShell {
+                            Text(r.displayTitle, fontWeight = FontWeight.Bold)
+                            Text(r.warehouseName, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
+                            NxStatusChip(r.status, NxTone.Success)
+                            r.quantity?.let { qty ->
+                                Text("Cantidad: $qty", style = MaterialTheme.typography.labelSmall, color = NxColors.Teal)
                             }
                         }
                     }
                 }
                 else -> {
                     val list = vm.filteredRequisitions()
-                    if (list.isEmpty()) item { Text("Sin registros") }
+                    if (list.isEmpty()) item { NxEmptyState("Sin requisiciones", "No hay requisiciones pendientes.") }
                     else items(list.take(80), key = { it.rowKey }) { r ->
-                        Card(
-                            onClick = { vm.select(r) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Column(Modifier.padding(12.dp)) {
-                                Text(r.displayTitle, fontWeight = FontWeight.Bold)
-                                Text(r.requestedByName, style = MaterialTheme.typography.bodySmall)
-                                Text(r.status, style = MaterialTheme.typography.labelSmall)
-                            }
+                        NxPanelShell(onClick = { vm.select(r) }) {
+                            Text(r.displayTitle, fontWeight = FontWeight.Bold)
+                            Text(r.requestedByName, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
+                            NxStatusChip(r.status, NxTone.Warning)
                         }
                     }
                 }
             }
+        }
         }
     }
 }
@@ -476,20 +520,36 @@ fun WarehouseHubScreen(initialTab: Int = 0) {
 
 // ── Service sheets ───────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ServiceSheetsModuleScreen() {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as Application
     val repo = remember { OpsRepository(app) }
+    val scope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
     var items by remember { mutableStateOf<List<ServiceSheetListDto>>(emptyList()) }
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf<ServiceSheetListDto?>(null) }
 
-    LaunchedEffect(Unit) {
-        loading = true
-        items = withContext(Dispatchers.IO) { repo.serviceSheetDtos() }
-        loading = false
+    fun reload(initial: Boolean = true) {
+        scope.launch {
+            loading = initial && items.isEmpty()
+            isRefreshing = !initial
+            error = null
+            try {
+                items = withContext(Dispatchers.IO) { repo.serviceSheetDtos() }
+            } catch (e: Exception) {
+                error = e.message ?: "No se pudieron cargar hojas de servicio"
+            } finally {
+                loading = false
+                isRefreshing = false
+            }
+        }
     }
+
+    LaunchedEffect(Unit) { reload(initial = true) }
 
     if (selected != null) {
         val s = selected!!
@@ -555,7 +615,16 @@ fun ServiceSheetsModuleScreen() {
         }
     }
 
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = { reload(initial = false) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+    LazyColumn(
+        Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item { NxSectionHeader("Hojas de servicio", "${filtered.size} resultado(s)") }
         item {
             OutlinedTextField(
                 value = query,
@@ -565,19 +634,20 @@ fun ServiceSheetsModuleScreen() {
                 singleLine = true,
             )
         }
-        if (loading) item { CircularProgressIndicator() }
-        else if (filtered.isEmpty()) item { Text("Sin hojas de servicio") }
+        if (loading) item { NxLoadingBlock("Cargando hojas…") }
+        else if (error != null) item { NxErrorBlock(error!!) { reload(initial = false) } }
+        else if (filtered.isEmpty()) item { NxEmptyState("Sin hojas de servicio", "No hay registros con este filtro.", "Actualizar") { reload(initial = false) } }
         else items(filtered.take(80), key = { it.rowKey }) { row ->
-            Card(onClick = { selected = row }, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) {
-                    Text(row.displayTitle, fontWeight = FontWeight.Bold)
-                    Text(
-                        listOf(row.clientName, row.status).filter { it.isNotBlank() }.joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+            NxPanelShell(onClick = { selected = row }) {
+                Text(row.displayTitle, fontWeight = FontWeight.Bold)
+                Text(
+                    listOf(row.clientName, row.status).filter { it.isNotBlank() }.joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NxColors.Muted,
+                )
             }
         }
+    }
     }
 }
 
@@ -586,6 +656,7 @@ fun ServiceSheetsModuleScreen() {
 data class MaintenanceUiState(
     val tab: Int = 0,
     val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val query: String = "",
     val orders: List<mx.nexara.mobile.nativeapp.data.api.WorkOrderDto> = emptyList(),
     val assets: List<mx.nexara.mobile.nativeapp.data.api.MaintenanceAssetDto> = emptyList(),
@@ -609,12 +680,17 @@ class MaintenanceViewModel(app: Application) : AndroidViewModel(app) {
     fun selectAsset(item: mx.nexara.mobile.nativeapp.data.api.MaintenanceAssetDto?) =
         _state.update { it.copy(selectedAsset = item, selectedOrder = null) }
 
-    fun refresh() {
-        _state.update { it.copy(loading = true) }
+    fun refresh(initial: Boolean = true) {
+        _state.update {
+            it.copy(
+                loading = initial && it.orders.isEmpty() && it.assets.isEmpty(),
+                isRefreshing = !initial,
+            )
+        }
         viewModelScope.launch {
             val orders = withContext(Dispatchers.IO) { repo.workOrderDtos() }
             val assets = withContext(Dispatchers.IO) { repo.maintenanceAssetDtos() }
-            _state.update { it.copy(loading = false, orders = orders, assets = assets) }
+            _state.update { it.copy(loading = false, isRefreshing = false, orders = orders, assets = assets) }
         }
     }
 
@@ -705,6 +781,7 @@ private fun woIsDone(status: String): Boolean {
     return s.contains("complet") || s.contains("cerrad") || s.contains("done") || s.contains("closed")
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MaintenanceModuleScreen(
     initialTab: Int = 0,
@@ -811,7 +888,7 @@ fun MaintenanceModuleScreen(
         return
     }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().background(NxColors.Surface)) {
         if (s.orders.isNotEmpty() || s.assets.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 KpiChip("Órdenes", "${s.orders.size}")
@@ -834,53 +911,59 @@ fun MaintenanceModuleScreen(
                     }
             }
         }
-        OutlinedTextField(
-            value = s.query,
-            onValueChange = vm::setQuery,
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            placeholder = { Text("Buscar…") },
-            singleLine = true,
-        )
-        if (s.loading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        } else if (s.tab == 0) {
-            val list = vm.filteredOrders(statusFilter)
-            LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp)) {
+        PullToRefreshBox(
+            isRefreshing = s.isRefreshing,
+            onRefresh = { vm.refresh(initial = false) },
+            modifier = Modifier.fillMaxSize(),
+        ) {
+        Column(Modifier.padding(horizontal = 16.dp)) {
+            OutlinedTextField(
+                value = s.query,
+                onValueChange = vm::setQuery,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                placeholder = { Text("Buscar…") },
+                singleLine = true,
+            )
+            if (s.loading) {
+                NxLoadingBlock("Cargando mantenimiento…")
+            } else if (s.tab == 0) {
+                val list = vm.filteredOrders(statusFilter)
                 if (list.isEmpty()) {
-                    item { Text("Sin registros", color = Color(0xFF64748B), modifier = Modifier.padding(24.dp)) }
+                    NxEmptyState("Sin órdenes", "No hay órdenes de trabajo con este filtro.")
+                } else {
+                    LazyColumn {
+                        items(list.take(80), key = { it.id ?: it.orderNumber }) { row ->
+                            NxPanelShell(
+                                onClick = { vm.selectOrder(row) },
+                                modifier = Modifier.padding(vertical = 4.dp),
+                            ) {
+                                Text(row.displayTitle, fontWeight = FontWeight.Bold)
+                                Text(row.assetName, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
+                                NxStatusChip(row.status, workOrderTone(row.status))
+                            }
+                        }
+                    }
                 }
-                items(list.take(80), key = { it.id ?: it.orderNumber }) { row ->
-                    Card(
-                        onClick = { vm.selectOrder(row) },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(row.displayTitle, fontWeight = FontWeight.Bold)
-                            Text(row.assetName, style = MaterialTheme.typography.bodySmall)
-                            Text(row.status, style = MaterialTheme.typography.labelSmall)
+            } else {
+                val list = vm.filteredAssets()
+                if (list.isEmpty()) {
+                    NxEmptyState("Sin activos", "No hay activos registrados.")
+                } else {
+                    LazyColumn {
+                        items(list.take(80), key = { it.id ?: it.code }) { row ->
+                            NxPanelShell(
+                                onClick = { vm.selectAsset(row) },
+                                modifier = Modifier.padding(vertical = 4.dp),
+                            ) {
+                                Text(row.displayName, fontWeight = FontWeight.Bold)
+                                Text(row.code.ifBlank { row.serialNumber }, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
+                                NxStatusChip(row.status, NxTone.Info)
+                            }
                         }
                     }
                 }
             }
-        } else {
-            val list = vm.filteredAssets()
-            LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp)) {
-                if (list.isEmpty()) {
-                    item { Text("Sin registros", color = Color(0xFF64748B), modifier = Modifier.padding(24.dp)) }
-                }
-                items(list.take(80), key = { it.id ?: it.code }) { row ->
-                    Card(
-                        onClick = { vm.selectAsset(row) },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(row.displayName, fontWeight = FontWeight.Bold)
-                            Text(row.code.ifBlank { row.serialNumber }, style = MaterialTheme.typography.bodySmall)
-                            Text(row.status, style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                }
-            }
+        }
         }
     }
 }
@@ -902,6 +985,21 @@ private fun ActionBtn(label: String, loading: Boolean, onClick: () -> Unit) {
     Button(onClick = onClick, enabled = !loading, modifier = Modifier.fillMaxWidth()) {
         if (loading) CircularProgressIndicator(Modifier.height(20.dp)) else Text(label)
     }
+}
+
+private fun clientTicketTone(status: String): NxTone = when (status.uppercase()) {
+    "NEW" -> NxTone.Warning
+    "ASSIGNED" -> NxTone.Info
+    "APPROVED", "CLOSED" -> NxTone.Success
+    "REJECTED" -> NxTone.Danger
+    else -> NxTone.Neutral
+}
+
+private fun workOrderTone(status: String): NxTone = when {
+    woIsOpen(status) -> NxTone.Warning
+    woInProgress(status) -> NxTone.Info
+    woIsDone(status) -> NxTone.Success
+    else -> NxTone.Neutral
 }
 
 @Composable

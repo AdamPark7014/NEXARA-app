@@ -51,6 +51,13 @@ final class ApiClient {
         return try await perform(req)
     }
 
+    /// Descarga binaria (PDF, imágenes) sin forzar JSON en Accept.
+    func getBinary(_ path: String, query: [String: String] = [:]) async throws -> Data {
+        var req = try buildRequest(path, method: "GET", query: query)
+        req.setValue("*/*", forHTTPHeaderField: "Accept")
+        return try await perform(req)
+    }
+
     func postJSON<T: Encodable>(_ path: String, body: T) async throws -> Data {
         try await sendJSON(path, method: "POST", body: body)
     }

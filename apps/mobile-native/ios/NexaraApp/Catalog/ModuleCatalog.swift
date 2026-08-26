@@ -54,6 +54,7 @@ enum ModuleCatalog {
         ModuleEntry("cotizaciones", "Cotizaciones", "🧮", "/console/cotizaciones"),
         ModuleEntry("gestion-vendedores", "Gestión vendedores", "📈", "/console/gestion-vendedores"),
         ModuleEntry("executive", "Vista ejecutiva", "📊", "/erp/executive"),
+        ModuleEntry("dispatch", "Despacho OT", "🗺️", "/ops/dispatch"),
         ModuleEntry("approvals", "Aprobaciones", "🛡️", "/erp/approvals"),
         ModuleEntry("notifications-center", "Notificaciones", "🔔", "/erp/notifications-center"),
         ModuleEntry("bi", "Business Intelligence", "📈", "/erp/analytics/bi"),

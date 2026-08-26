@@ -187,6 +187,7 @@ export type ModuleId =
   | "crm-reports"
   // OPS
   | "ops-dashboard"
+  | "ops-dispatch"
   | "ops-chat"
   | "ops-activities"
   | "ops-my-activities"
@@ -611,6 +612,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "ops-dashboard", panel: PANELS.OPS, path: "/dashboard",
     label: "Hoy en operaciones", description: "OT abiertas, alertas y SLA",
     icon: "🚀", allowedRoles: OPS_TEAM,
+    group: "Tablero", visible: true,
+  },
+  "ops-dispatch": {
+    id: "ops-dispatch", panel: PANELS.OPS, path: "/dispatch",
+    label: "Centro de despacho", description: "Asignación masiva y mapa en vivo",
+    icon: "🗺️", allowedRoles: OPS_LEADS,
     group: "Tablero", visible: true,
   },
   "ops-chat": {

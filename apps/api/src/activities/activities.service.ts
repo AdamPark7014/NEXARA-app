@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { CreateActivityDto } from './dto/create-activity.dto.js';
 import { UpdateActivityDto } from './dto/update-activity.dto.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
@@ -14,6 +15,7 @@ export class ActivitiesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
+    private readonly domainEvents: DomainEventBusService,
   ) {}
 
   // Dummy implementation to avoid controller errors
@@ -81,6 +83,19 @@ export class ActivitiesService {
         activity.creador?.nombre || 'Sistema',
       );
     }
+
+    this.domainEvents.publishEntityLifecycle('created', {
+      entityType: 'ACTIVITY',
+      entityId: activity.id,
+      companyId: resolvedCompanyId,
+      userId: createActivityDto.responsableId ?? undefined,
+      payload: {
+        estatus: activity.estatus,
+        anNumber: activity.anNumber,
+        titulo: activity.titulo,
+        responsableId: activity.responsableId,
+      },
+    });
 
     return activity;
   }
@@ -253,6 +268,16 @@ export class ActivitiesService {
         responsable: true,
         client: true,
         serviceSheet: true,
+        evidencias: { orderBy: { subidoEn: 'desc' } },
+        assignees: {
+          where: { retiradoAt: null },
+          include: { user: { select: { id: true, nombre: true, email: true } } },
+        },
+        inventorySnapshot: {
+          include: {
+            items: { orderBy: [{ groupName: 'asc' }, { sortOrder: 'asc' }, { id: 'asc' }] },
+          },
+        },
         activityEvidence: {
           include: {
             reviewedBy: {
@@ -267,6 +292,191 @@ export class ActivitiesService {
     });
     assertCompanyAccess(activity, companyId, 'Actividad');
     return activity;
+  }
+
+  /** KPIs para la bandeja de actividades (OPS dashboard). */
+  async getSummary(companyId?: number | null) {
+    const scope = companyWhere(companyId ?? null);
+    const now = new Date();
+    const rows = await this.prisma.activity.findMany({
+      where: { ...scope, deletedAt: null },
+      select: { estatus: true, fechaMaxima: true, fechaEntregaEsperada: true },
+    });
+
+    const closed = new Set(['Finalizada', 'Finalizado', 'COMPLETADA', 'Cancelada', 'CANCELADA', 'Rechazada']);
+    const inProgress = new Set(['En Proceso', 'EN_PROCESO', 'Por Validar', 'POR_VALIDAR']);
+
+    let abiertas = 0;
+    let enProceso = 0;
+    let completadas = 0;
+    let vencidas = 0;
+
+    for (const row of rows) {
+      const status = String(row.estatus ?? '');
+      const due = row.fechaMaxima ?? row.fechaEntregaEsperada;
+      const isClosed = closed.has(status);
+      const isProgress = inProgress.has(status);
+
+      if (isClosed) {
+        completadas += 1;
+      } else if (isProgress) {
+        enProceso += 1;
+      } else {
+        abiertas += 1;
+      }
+
+      if (!isClosed && due && new Date(due).getTime() < now.getTime()) {
+        vencidas += 1;
+      }
+    }
+
+    return {
+      abiertas,
+      enProceso,
+      completadas,
+      vencidas,
+      total: rows.length,
+    };
+  }
+
+  /** Tablero de despacho — columnas por estatus + carga por técnico. */
+  async getDispatchBoard(companyId?: number | null, allowedUserIds?: number[]) {
+    const scope = companyWhere(companyId ?? null);
+    const where: Record<string, unknown> = { ...scope, deletedAt: null };
+    if (allowedUserIds?.length) {
+      where.responsableId = { in: allowedUserIds };
+    }
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const now = new Date();
+
+    const closed = new Set(['Finalizada', 'Finalizado', 'COMPLETADA', 'Cancelada', 'CANCELADA', 'Rechazada']);
+    const inProgress = new Set(['En Proceso', 'EN_PROCESO', 'EN_CURSO']);
+    const porValidar = new Set(['Por Validar', 'POR_VALIDAR']);
+
+    const rows = await this.prisma.activity.findMany({
+      where,
+      select: {
+        id: true,
+        anNumber: true,
+        titulo: true,
+        estatus: true,
+        prioridad: true,
+        fechaAsignacion: true,
+        fechaEntregaEsperada: true,
+        fechaMaxima: true,
+        fechaFinalizacion: true,
+        branchName: true,
+        branchCity: true,
+        responsable: { select: { id: true, nombre: true } },
+        client: { select: { id: true, name: true } },
+      },
+      orderBy: [{ prioridad: 'desc' }, { fechaAsignacion: 'asc' }],
+      take: 500,
+    });
+
+    type DispatchCard = {
+      id: number;
+      anNumber: string;
+      titulo: string;
+      estatus: string;
+      prioridad: string | null;
+      branchName: string | null;
+      branchCity: string | null;
+      fechaEntregaEsperada: string | null;
+      overdue: boolean;
+      responsable: { id: number; nombre: string } | null;
+      client: { id: number; name: string } | null;
+    };
+
+    const columns: Record<string, DispatchCard[]> = {
+      pendiente: [],
+      en_curso: [],
+      por_validar: [],
+      completadas_hoy: [],
+    };
+
+    const techMap = new Map<
+      number,
+      { id: number; nombre: string; activas: number; enCurso: number; completadasHoy: number }
+    >();
+
+    for (const row of rows) {
+      const status = String(row.estatus ?? '');
+      const due = row.fechaMaxima ?? row.fechaEntregaEsperada;
+      const isClosed = closed.has(status);
+      const overdue = Boolean(!isClosed && due && new Date(due).getTime() < now.getTime());
+
+      const card: DispatchCard = {
+        id: row.id,
+        anNumber: row.anNumber,
+        titulo: row.titulo,
+        estatus: status,
+        prioridad: row.prioridad,
+        branchName: row.branchName,
+        branchCity: row.branchCity,
+        fechaEntregaEsperada: row.fechaEntregaEsperada?.toISOString() ?? null,
+        overdue,
+        responsable: row.responsable,
+        client: row.client,
+      };
+
+      if (isClosed) {
+        if (row.fechaFinalizacion && row.fechaFinalizacion >= startOfToday) {
+          columns.completadas_hoy.push(card);
+        }
+      } else if (porValidar.has(status)) {
+        columns.por_validar.push(card);
+      } else if (inProgress.has(status)) {
+        columns.en_curso.push(card);
+      } else {
+        columns.pendiente.push(card);
+      }
+
+      const tech = row.responsable;
+      if (!tech) continue;
+      const cur = techMap.get(tech.id) ?? {
+        id: tech.id,
+        nombre: tech.nombre,
+        activas: 0,
+        enCurso: 0,
+        completadasHoy: 0,
+      };
+      if (!isClosed) {
+        cur.activas += 1;
+        if (inProgress.has(status) || porValidar.has(status)) cur.enCurso += 1;
+      } else if (row.fechaFinalizacion && row.fechaFinalizacion >= startOfToday) {
+        cur.completadasHoy += 1;
+      }
+      techMap.set(tech.id, cur);
+    }
+
+    const fieldRoleKeys = ['ing_campo', 'ing_soporte', 'coord_operaciones', 'senior_engineer'];
+    const tenantId = companyId != null && Number(companyId) > 0 ? Number(companyId) : null;
+    const assignableUsers = tenantId
+      ? await this.prisma.user.findMany({
+          where: {
+            isActive: true,
+            companyMemberships: { some: { companyId: tenantId } },
+            OR: [
+              { roleKey: { in: fieldRoleKeys } },
+              { role: { nombre: { contains: 'Campo', mode: 'insensitive' } } },
+              { role: { nombre: { contains: 'Soporte', mode: 'insensitive' } } },
+            ],
+          },
+          select: { id: true, nombre: true },
+          orderBy: { nombre: 'asc' },
+          take: 120,
+        })
+      : [];
+
+    return {
+      columns,
+      technicians: Array.from(techMap.values()).sort((a, b) => b.activas - a.activas),
+      assignableUsers,
+      generatedAt: now.toISOString(),
+    };
   }
 
   async generateTicketReport(activityId: number, companyId?: number | null) {
@@ -483,6 +693,20 @@ export class ActivitiesService {
           .catch(() => undefined);
       }
     }
+
+    this.domainEvents.publishEntityLifecycle('updated', {
+      entityType: 'ACTIVITY',
+      entityId: id,
+      companyId: prev?.companyId ?? updatedActivity.companyId,
+      userId: actor?.id,
+      payload: {
+        estatus: updatedActivity.estatus,
+        anNumber: updatedActivity.anNumber,
+        titulo: updatedActivity.titulo,
+        responsableId: updatedActivity.responsableId,
+        prevEstatus: prev?.estatus,
+      },
+    });
 
     return updatedActivity;
   }

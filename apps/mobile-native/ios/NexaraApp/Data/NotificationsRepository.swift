@@ -33,4 +33,11 @@ final class NotificationsRepository {
     func delete(id: Int64) async throws {
         try await api.delete("notifications/\(id)")
     }
+
+    func activityFeed(limit: Int = 40) async throws -> [[String: Any]] {
+        let data = try await api.get("activity-feed", query: ["limit": String(limit)])
+        let map = ConsoleHelpers.decodeMap(data)
+        if let items = map["items"] as? [[String: Any]] { return items }
+        return ApiClient.decodeMapList(data)
+    }
 }

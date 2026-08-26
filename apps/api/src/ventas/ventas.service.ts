@@ -21,11 +21,11 @@ import { UpdateOrderTemplateDto } from './dto/update-order-template.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { isSalesTeamLeadUser } from '../common/org-roles.js';
-import { AutoApprovalService } from '../workflow/auto-approval.service.js';
+import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { opsPatchFromSales } from '../common/project-handoff.js';
-import { WebhooksService } from '../webhooks/webhooks.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { AuditService } from '../audit/audit.service.js';
+import { ServiceClientsService } from '../service-clients/service-clients.service.js';
 
 @Injectable()
 export class VentasService {
@@ -35,8 +35,8 @@ export class VentasService {
     private readonly pdfGeneratorService: PdfGeneratorService,
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly notificationsService: NotificationsService,
-    private readonly autoApproval: AutoApprovalService,
-    @Optional() private readonly webhooks?: WebhooksService,
+    private readonly domainEvents: DomainEventBusService,
+    private readonly serviceClientsService: ServiceClientsService,
     @Optional() private readonly audit?: AuditService,
   ) {}
 
@@ -326,6 +326,19 @@ export class VentasService {
         .catch(() => undefined);
     }
 
+    this.domainEvents.publishEntityLifecycle('created', {
+      entityType: 'SALES_CLIENT',
+      entityId: created.id,
+      companyId: created.companyId,
+      userId: user?.id,
+      payload: {
+        name: created.name,
+        status: created.status,
+        ownerId: created.ownerId,
+        serviceClientId: created.serviceClientId,
+      },
+    });
+
     // P0-E: todo cliente comercial queda vinculado a operación/portal
     if (!created.serviceClientId) {
       try {
@@ -398,10 +411,56 @@ export class VentasService {
     });
   }
 
+  /** Vista 360° CRM: agrega operación, finanzas y soporte vía service client vinculado. */
+  async getClientSnapshot(id: number, user?: any, companyId?: number | null) {
+    const salesClient = await this.getClient(id, user, companyId);
+    const opportunities = salesClient.opportunities ?? [];
+    const emptyStats = {
+      branches: 0,
+      activities: 0,
+      operationalProjects: 0,
+      maintenanceContracts: 0,
+      ticketRequests: 0,
+      activitiesLast90d: 0,
+      activitiesOpen: 0,
+      opportunitiesOpen: opportunities.filter((o: any) => o.stage !== 'WON' && o.stage !== 'LOST').length,
+      pipelineValue: opportunities
+        .filter((o: any) => o.stage !== 'WON' && o.stage !== 'LOST')
+        .reduce((acc: number, o: any) => acc + Number(o.value || 0), 0),
+      activeContracts: 0,
+      monthlyContractRevenue: 0,
+      pendingInvoices: 0,
+      totalSalesProjects: 0,
+    };
+
+    if (!salesClient.serviceClientId) {
+      return {
+        salesClient,
+        linked: false,
+        client: null,
+        stats: emptyStats,
+        activities: [],
+        operationalProjects: [],
+        salesProjects: [],
+        maintenanceContracts: [],
+        ticketRequests: [],
+        quotes: [],
+        opportunities,
+        invoices: [],
+      };
+    }
+
+    const snapshot = await this.serviceClientsService.clientSnapshot(
+      salesClient.serviceClientId,
+      companyId,
+    );
+    return { salesClient, linked: true, ...snapshot };
+  }
+
   async updateClient(id: number, dto: UpdateSalesClientDto, user?: any, companyId?: number | null) {
     const existing = await this.getClient(id, user, companyId);
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user, existing.ownerId);
-    return this.prisma.salesClient.update({
+    const updated = await this.prisma.salesClient.update({
       where: { id },
       data: {
         name: dto.name,
@@ -421,6 +480,21 @@ export class VentasService {
       },
       include: { documents: true, opportunities: true, serviceClient: { select: { id: true, name: true, isActive: true, accountCode: true } } },
     });
+
+    this.domainEvents.publishEntityLifecycle('updated', {
+      entityType: 'SALES_CLIENT',
+      entityId: updated.id,
+      companyId: updated.companyId,
+      userId: user?.id,
+      payload: {
+        name: updated.name,
+        status: updated.status,
+        ownerId: updated.ownerId,
+        serviceClientId: updated.serviceClientId,
+      },
+    });
+
+    return updated;
   }
 
   async deleteClient(id: number, user?: any, companyId?: number | null) {
@@ -462,6 +536,21 @@ export class VentasService {
         documents: true,
         opportunities: true,
         serviceClient: { select: { id: true, name: true, isActive: true, accountCode: true } },
+      },
+    });
+
+    this.domainEvents.publishEntityLifecycle('updated', {
+      entityType: 'SALES_CLIENT',
+      entityId: updated.id,
+      companyId: updated.companyId,
+      userId: user?.id,
+      payload: {
+        name: updated.name,
+        status: updated.status,
+        ownerId: updated.ownerId,
+        serviceClientId: updated.serviceClientId,
+        provisioned: true,
+        serviceClientAccountCode: serviceClient.accountCode,
       },
     });
 
@@ -691,28 +780,36 @@ export class VentasService {
 
     if (updated.stage === 'WON' && existing.stage !== 'WON') {
       void this.autoEnsureSalesProjectFromWonOpportunity(updated.id, user?.id).catch(() => undefined);
-      void this.webhooks
-        ?.emit('opportunity.won', {
+      this.domainEvents.publishEntityLifecycle('updated', {
+        entityType: 'SALES_OPPORTUNITY',
+        entityId: updated.id,
+        companyId: updated.companyId,
+        userId: user?.id,
+        payload: {
+          stage: 'WON',
           opportunityId: updated.id,
           title: updated.title,
           value: Number(updated.value || 0),
           clientId: updated.clientId,
           ownerId: updated.ownerId,
-          companyId: updated.companyId,
-        }, updated.companyId)
-        .catch(() => undefined);
+        },
+      });
     }
     if (updated.stage === 'LOST' && existing.stage !== 'LOST') {
-      void this.webhooks
-        ?.emit('opportunity.lost', {
+      this.domainEvents.publishEntityLifecycle('updated', {
+        entityType: 'SALES_OPPORTUNITY',
+        entityId: updated.id,
+        companyId: updated.companyId,
+        userId: user?.id,
+        payload: {
+          stage: 'LOST',
           opportunityId: updated.id,
           title: updated.title,
           value: Number(updated.value || 0),
           clientId: updated.clientId,
           ownerId: updated.ownerId,
-          companyId: updated.companyId,
-        }, updated.companyId)
-        .catch(() => undefined);
+        },
+      });
     }
 
     return updated;
@@ -829,20 +926,18 @@ export class VentasService {
 
     if (user?.id) {
       // Workflow: proyectos > $500k requieren visto bueno Dir. Comercial + Ops + CEO.
-      this.autoApproval
-        .evaluate({
-          entityType: 'SALES_PROJECT',
-          entityId: created.id,
-          userId: user.id,
-          companyId: tenantId,
-          payload: {
-            budget: Number(created.budget ?? 0),
-            margin: Number(created.margin ?? 0),
-            projectType: created.projectType,
-            opportunityId: created.opportunityId,
-          },
-        })
-        .catch(() => undefined);
+      this.domainEvents.requestAutoApproval({
+        entityType: 'SALES_PROJECT',
+        entityId: created.id,
+        userId: user.id,
+        companyId: tenantId,
+        payload: {
+          budget: Number(created.budget ?? 0),
+          margin: Number(created.margin ?? 0),
+          projectType: created.projectType,
+          opportunityId: created.opportunityId,
+        },
+      });
     }
 
     void this.ensureProjectSalesOrder(created.id, user, tenantId).catch(() => undefined);
@@ -1021,19 +1116,17 @@ export class VentasService {
     if (requesterId) {
       // Si el budget sube y rebasa el umbral, dispara workflow. Idempotente:
       // no crea instancias duplicadas si ya existe una abierta.
-      this.autoApproval
-        .evaluate({
-          entityType: 'SALES_PROJECT',
-          entityId: updated.id,
-          userId: requesterId,
-          companyId: project.companyId ?? companyId,
-          payload: {
-            budget: Number(updated.budget ?? 0),
-            margin: Number(updated.margin ?? 0),
-            projectType: updated.projectType,
-          },
-        })
-        .catch(() => undefined);
+      this.domainEvents.requestAutoApproval({
+        entityType: 'SALES_PROJECT',
+        entityId: updated.id,
+        userId: requesterId,
+        companyId: project.companyId ?? companyId,
+        payload: {
+          budget: Number(updated.budget ?? 0),
+          margin: Number(updated.margin ?? 0),
+          projectType: updated.projectType,
+        },
+      });
     }
 
     return updated;
@@ -3031,6 +3124,102 @@ export class VentasService {
     });
 
     return pdfBuffer;
+  }
+
+  /** Workflow > $500k aprobado — activa ejecución del proyecto comercial. */
+  async onWorkflowProjectApproved(projectId: number, companyId: number, actorId?: number) {
+    const project = await this.prisma.salesProject.findFirst({
+      where: { id: projectId, ...companyWhere(companyId) },
+      include: { opportunity: { select: { ownerId: true } } },
+    });
+    if (!project) return;
+
+    if (project.status === 'PLANNED' || project.status === 'ON_HOLD') {
+      await this.prisma.salesProject.updateMany({
+        where: { id: projectId, ...companyWhere(companyId) },
+        data: { status: 'IN_PROGRESS' },
+      });
+    }
+
+    const notifyUserId = actorId ?? project.opportunity?.ownerId;
+    if (notifyUserId) {
+      void this.notificationsService
+        .createNotification({
+          userId: notifyUserId,
+          type: 'SALES_PROJECT_APPROVED',
+          category: 'sales',
+          title: '✅ Proyecto aprobado',
+          message: `El proyecto "${project.name}" fue autorizado y puede iniciar ejecución.`,
+          entityType: 'SALES_PROJECT',
+          relatedEntityId: project.id,
+          relatedUrl: `/crm/proyectos/${project.id}`,
+        } as any)
+        .catch(() => undefined);
+    }
+
+    this.domainEvents.publishEntityLifecycle('updated', {
+      entityType: 'SALES_PROJECT',
+      entityId: projectId,
+      companyId,
+      userId: actorId ?? notifyUserId ?? undefined,
+      payload: {
+        status: 'IN_PROGRESS',
+        projectApproved: true,
+        name: project.name,
+        budget: Number(project.budget ?? 0),
+      },
+    });
+  }
+
+  /** Workflow rechazado — proyecto en pausa hasta revisión. */
+  async onWorkflowProjectRejected(
+    projectId: number,
+    companyId: number,
+    actorId?: number,
+    comments?: string,
+  ) {
+    const project = await this.prisma.salesProject.findFirst({
+      where: { id: projectId, ...companyWhere(companyId) },
+      include: { opportunity: { select: { ownerId: true } } },
+    });
+    if (!project) return;
+
+    await this.prisma.salesProject.updateMany({
+      where: { id: projectId, ...companyWhere(companyId) },
+      data: { status: 'ON_HOLD' },
+    });
+
+    const notifyUserId = actorId ?? project.opportunity?.ownerId;
+    if (notifyUserId) {
+      const msg = comments?.trim()
+        ? `El proyecto "${project.name}" no fue aprobado: ${comments.trim()}`
+        : `El proyecto "${project.name}" requiere revisión.`;
+      void this.notificationsService
+        .createNotification({
+          userId: notifyUserId,
+          type: 'SALES_PROJECT_REJECTED',
+          category: 'sales',
+          title: 'Proyecto no autorizado',
+          message: msg,
+          entityType: 'SALES_PROJECT',
+          relatedEntityId: project.id,
+          relatedUrl: `/crm/proyectos/${project.id}`,
+        } as any)
+        .catch(() => undefined);
+    }
+
+    this.domainEvents.publishEntityLifecycle('updated', {
+      entityType: 'SALES_PROJECT',
+      entityId: projectId,
+      companyId,
+      userId: actorId ?? notifyUserId ?? undefined,
+      payload: {
+        status: 'ON_HOLD',
+        projectRejected: true,
+        name: project.name,
+        comments: comments?.trim() || null,
+      },
+    });
   }
 }
 

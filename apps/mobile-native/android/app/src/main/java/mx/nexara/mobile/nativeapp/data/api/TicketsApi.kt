@@ -132,10 +132,26 @@ data class PendingFeedbackTicketDto(
 data class CreateFeedbackBody(
     val activityId: Long,
     val rating: Int? = null,
-    val wasOnTime: String? = null,
-    val wasFriendly: String? = null,
-    val wasSolved: String? = null,
+    val wasOnTime: Boolean? = null,
+    val wasFriendly: Boolean? = null,
+    val wasSolved: Boolean? = null,
     val comments: String? = null,
+)
+
+data class RequestDecisionBody(
+    val decision: String,
+)
+
+data class ClientPortalProjectDto(
+    val id: Long,
+    val title: String? = null,
+    val status: String? = null,
+    val projectType: String? = null,
+    val siteCount: Int? = null,
+    val scopeSummary: String? = null,
+    val activityCount: Int? = null,
+    val completedActivities: Int? = null,
+    val progressPercent: Int? = null,
 )
 
 data class ClientPortalInventoryBranchRefDto(
@@ -284,6 +300,15 @@ interface TicketsApi {
         @Path("id") id: Long,
     ): ClientTicketRequestDto
 
+    @PUT("client-portal/requests/{id}/decision")
+    suspend fun decideRequest(
+        @Path("id") id: Long,
+        @Body body: RequestDecisionBody,
+    ): ClientTicketRequestDto
+
+    @GET("client-portal/projects")
+    suspend fun getProjects(): List<ClientPortalProjectDto>
+
     @GET("client-portal/feedback/pending")
     suspend fun getPendingFeedback(): List<PendingFeedbackTicketDto>
 
@@ -337,6 +362,7 @@ interface TicketsApi {
         @Query("start") start: String? = null,
         @Query("end") end: String? = null,
         @Query("branchId") branchId: Long? = null,
+        @Query("projectId") projectId: Long? = null,
     ): List<ClientPortalTicketDto>
 
     @GET("client-portal/tickets/{id}")
@@ -348,5 +374,23 @@ interface TicketsApi {
     suspend fun getTicketReportPdf(
         @Path("id") id: Long,
     ): okhttp3.ResponseBody
+
+    @GET("client-portal/services-summary")
+    suspend fun getServicesSummaryRaw(): okhttp3.ResponseBody
+
+    @GET("client-portal/invoices")
+    suspend fun getInvoicesRaw(): okhttp3.ResponseBody
+
+    @GET("client-portal/invoices/{id}/pdf")
+    suspend fun getInvoicePdfRaw(@Path("id") id: Long): okhttp3.ResponseBody
+
+    @GET("client-portal/invoices/{id}/xml")
+    suspend fun getInvoiceXmlRaw(@Path("id") id: Long): okhttp3.ResponseBody
+
+    @GET("client-portal/quotes")
+    suspend fun getQuotesRaw(): okhttp3.ResponseBody
+
+    @GET("client-portal/quotes/{id}/pdf")
+    suspend fun getQuotePdfRaw(@Path("id") id: Long): okhttp3.ResponseBody
 }
 

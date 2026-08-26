@@ -24,6 +24,9 @@ import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES, type RoleKey } from "@/lib/rbac";
 import { buildApiUrl } from "@/lib/api-base";
+import { CommandCenterRail } from "@/components/command-center/CommandCenterRail";
+import { buildExecutiveDynamicWidgets, buildExecutiveBiDrillLinks } from "@/lib/executive-widgets";
+import { ExecutiveBiDrillPanel } from "@/components/command-center/ExecutiveBiDrillPanel";
 
 /**
  * Vista ejecutiva — pantalla home del CEO / Dueño.
@@ -68,6 +71,14 @@ interface DashboardData {
   teamSize: number;
   alerts: DashboardAlert[];
   topSellers: Array<{ ownerId: number; ownerName: string; revenue: number; wonCount: number }>;
+  topAccounts?: Array<{
+    clientId: number;
+    clientName: string;
+    projects: number;
+    revenue: number;
+    margin: number;
+    marginPercent: number;
+  }>;
 }
 
 const ERP_EXECUTIVE_ROLES = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.DIR_OPERACIONES]);
@@ -166,6 +177,11 @@ export default function ExecutivePage() {
 
   const alerts: DashboardAlert[] = data?.alerts ?? [];
   const criticalAlerts = alerts.filter((a) => a.level === "critical");
+  const dynamicWidgets = buildExecutiveDynamicWidgets(data);
+  const biDrillLinks = buildExecutiveBiDrillLinks(data, {
+    revenueMoMChange: kpis?.revenueMoMChange,
+    pipelineValue: kpis?.pipelineValue,
+  });
 
   return (
     <DashPage>
@@ -187,6 +203,8 @@ export default function ExecutivePage() {
           </>
         }
       />
+
+      <CommandCenterRail panel="erp" extraWidgets={dynamicWidgets} />
 
       {error && !loading && (
         <DashPanel title="No se pudo cargar" subtitle={error}>
@@ -278,6 +296,31 @@ export default function ExecutivePage() {
           </DashPanel>
         </DashCol>
 
+        {/* ── Cuentas clave (Customer 360) ─────────────────────── */}
+        <DashCol span={6}>
+          <DashPanel
+            title="Cuentas clave"
+            subtitle="ROI por cliente · vista 360°"
+            action="Ver BI"
+            actionHref="/erp/analytics/bi?section=clients"
+          >
+            {loading && <DashEmpty title="Cargando…" />}
+            {!loading && (!data?.topAccounts || data.topAccounts.length === 0) && (
+              <DashEmpty title="Sin cuentas con proyectos" description="Los clientes con proyectos activos aparecerán aquí." />
+            )}
+            {!loading &&
+              data?.topAccounts?.map((c) => (
+                <ListRow
+                  key={c.clientId}
+                  href={`/crm/clients/${c.clientId}`}
+                  title={c.clientName}
+                  sub={`${c.projects} proyectos · margen ${c.marginPercent}%`}
+                  trail={<Money value={c.margin} compact bold />}
+                />
+              ))}
+          </DashPanel>
+        </DashCol>
+
         {/* ── Top vendedores ──────────────────────────────────── */}
         <DashCol span={6}>
           <DashPanel
@@ -352,6 +395,14 @@ export default function ExecutivePage() {
           </DashPanel>
         </DashCol>
       </DashGrid>
+
+      {biDrillLinks.length > 0 && (
+        <DashGrid>
+          <DashCol span={12}>
+            <ExecutiveBiDrillPanel links={biDrillLinks} />
+          </DashCol>
+        </DashGrid>
+      )}
     </DashPage>
   );
 }

@@ -11,10 +11,12 @@ import { getActivitiesSectionConfig, getActivitiesCanonicalPath } from "@/lib/se
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
 
-/** Formulario completo de OT (asignar ingeniero, cliente, AN, etc.) */
-const ActivitiesTable = dynamic(() => import("@/components/ActivitiesTable"), { ssr: false });
-/** Revisión de paquetes de evidencia (activity-evidence/review-history) */
-const EvidenceTable = dynamic(() => import("@/components/EvidenceTable"), { ssr: false });
+/** Revisión de evidencias — cola con navegación al workspace */
+const EvidenceReviewQueue = dynamic(() => import("@/components/ops/EvidenceReviewQueue"), { ssr: false });
+/** Bandeja moderna DataTable → workspace */
+const OpsActivitiesBoard = dynamic(() => import("@/components/ops/OpsActivitiesBoard"), { ssr: false });
+/** Cola de tickets cliente aprobados → nueva OT */
+const OpsTicketRequestQueue = dynamic(() => import("@/components/ops/OpsTicketRequestQueue"), { ssr: false });
 
 function useActivitiesConfig() {
   const { user } = useUser();
@@ -55,7 +57,8 @@ export default function ActivitiesPage() {
   useEffect(() => { void loadSummary(); }, [loadSummary]);
 
   useEffect(() => {
-    if (searchParams.get("tab") === "evidencias") setTab("evidencias");
+    const t = searchParams.get("tab");
+    if (t === "evidencias") setTab("evidencias");
   }, [searchParams]);
   useEffect(() => {
     if (cfg.viewMode === "execute") {
@@ -109,23 +112,23 @@ export default function ActivitiesPage() {
 
       <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--border)", marginBottom: 20 }}>
         <button style={tabStyle(tab === "actividades")} onClick={() => setTab("actividades")}>
-          Actividades / OT
+          Bandeja OT
         </button>
         <button style={tabStyle(tab === "evidencias")} onClick={() => setTab("evidencias")}>
           Evidencias
         </button>
-        {tab === "actividades" && (
-          <span style={{ marginLeft: "auto", padding: "0 12px 8px", fontSize: 11, color: "var(--text-tertiary)" }}>
-            Asigna OT desde el botón «Nueva actividad» abajo
-          </span>
-        )}
       </div>
 
-      {tab === "actividades" && <ActivitiesTable />}
-
-      {tab === "evidencias" && (
-        <EvidenceTable mode="admin" title={null} />
+      {tab === "actividades" && (
+        <>
+          <OpsTicketRequestQueue />
+          <div style={{ marginTop: 20 }}>
+            <OpsActivitiesBoard />
+          </div>
+        </>
       )}
+
+      {tab === "evidencias" && <EvidenceReviewQueue />}
     </>
   );
 }

@@ -31,6 +31,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ToolRequestDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 
 // ── State & VM ───────────────────────────────────────────────────────────────
 
@@ -196,7 +197,7 @@ fun ConsoleToolsScreen(
 
         // Loading / error
         if (state.isLoading) {
-            Text("Cargando herramientas...", color = TlSub)
+            NxLoadingBlock("Cargando herramientas…")
             return@Column
         }
         if (!state.error.isNullOrBlank()) {
@@ -239,25 +240,25 @@ fun ConsoleToolsScreen(
             ToolsTab.MiKit.key -> {
                 // Navigate to dedicated kit screen
                 LaunchedEffect(Unit) { onOpenMyKit() }
-                Text("Cargando Mi Kit...", color = TlSub)
+                NxLoadingBlock("Cargando mi kit…")
             }
 
             ToolsTab.Usuarios.key -> {
                 // Navigate to kits-users screen
                 LaunchedEffect(Unit) { onOpenKitsUsers() }
-                Text("Cargando Kits de usuarios...", color = TlSub)
+                NxLoadingBlock("Cargando kits de usuarios…")
             }
 
             ToolsTab.Inventario.key -> {
                 // Navigate to inventory screen
                 LaunchedEffect(Unit) { onOpenInventory() }
-                Text("Cargando Inventario...", color = TlSub)
+                NxLoadingBlock("Cargando inventario…")
             }
 
             ToolsTab.Renovaciones.key -> {
                 // Navigate to renewals screen
                 LaunchedEffect(Unit) { onOpenRenewals() }
-                Text("Cargando Renovaciones...", color = TlSub)
+                NxLoadingBlock("Cargando renovaciones…")
             }
 
             else -> {

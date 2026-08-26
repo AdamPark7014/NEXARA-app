@@ -10,6 +10,7 @@ struct ClientTicketRequest: Hashable, Identifiable {
     let requestType: String
     let branchName: String
     let clientName: String
+    let clientId: Int64?
     let createdAt: String
     let dueAt: String
 
@@ -48,6 +49,7 @@ struct ClientTicketRequest: Hashable, Identifiable {
             client?["name"], client?["nombre"],
             raw["clientName"], raw["client"], raw["name"]
         )
+        clientId = StockParse.int64(client?["id"])
         createdAt = StockParse.str(raw["createdAt"], raw["fecha"])
         dueAt = StockParse.str(raw["dueAt"], raw["fechaVencimiento"])
     }

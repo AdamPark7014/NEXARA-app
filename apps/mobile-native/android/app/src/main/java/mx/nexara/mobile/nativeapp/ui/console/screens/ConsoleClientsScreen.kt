@@ -22,7 +22,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -36,6 +38,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -53,6 +57,14 @@ import mx.nexara.mobile.nativeapp.data.api.ServiceClientDto
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxFormTextField
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSnackbarHost
+import mx.nexara.mobile.nativeapp.ui.enterprise.emailFieldError
+import mx.nexara.mobile.nativeapp.ui.enterprise.rememberNxSnackbarHostState
+import mx.nexara.mobile.nativeapp.ui.enterprise.requiredFieldError
 import mx.nexara.mobile.nativeapp.ui.util.downloadAuthedToCache
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 import mx.nexara.mobile.nativeapp.ui.util.openFile
@@ -173,6 +185,9 @@ class ConsoleClientsViewModel(app: Application) : AndroidViewModel(app) {
     fun setFeedbackFilter(v: String) = _state.update { it.copy(feedbackFilter = v) }
     fun setBranchFilter(v: String) = _state.update { it.copy(branchFilter = v) }
     fun setInventoryStatusFilter(v: String) = _state.update { it.copy(inventoryStatusFilter = v) }
+
+    fun clearCreateMessage() = _state.update { it.copy(createMessage = null) }
+    fun clearEditMessage() = _state.update { it.copy(editMessage = null) }
 
     fun setCreateField(key: String, value: Any?) {
         _state.update {
@@ -462,6 +477,24 @@ fun ConsoleClientsScreen(
     val context = LocalContext.current
     val vm: ConsoleClientsViewModel = viewModel()
     val state by vm.state.collectAsState()
+    val snackbarHostState = rememberNxSnackbarHostState()
+
+    LaunchedEffect(state.createMessage) {
+        state.createMessage?.let { msg ->
+            if (!msg.contains("requerido", ignoreCase = true)) {
+                snackbarHostState.showSnackbar(msg)
+                vm.clearCreateMessage()
+            }
+        }
+    }
+    LaunchedEffect(state.editMessage) {
+        state.editMessage?.let { msg ->
+            if (!msg.contains("requerido", ignoreCase = true)) {
+                snackbarHostState.showSnackbar(msg)
+                vm.clearEditMessage()
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         vm.refreshAll()
@@ -474,10 +507,15 @@ fun ConsoleClientsScreen(
         vm.setEditField("logoUri", uri)
     }
 
+    Scaffold(
+        snackbarHost = { NxSnackbarHost(snackbarHostState) },
+        modifier = Modifier.fillMaxSize(),
+    ) { scaffoldPadding ->
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(contentPadding),
+            .padding(contentPadding)
+            .padding(scaffoldPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Clientes corporativos", style = MaterialTheme.typography.titleLarge)
@@ -488,7 +526,7 @@ fun ConsoleClientsScreen(
         }
 
         if (state.isLoading) {
-            Text("Cargando...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            NxLoadingBlock("Cargando clientes…")
             return@Column
         }
         if (!state.error.isNullOrBlank()) {
@@ -496,62 +534,92 @@ fun ConsoleClientsScreen(
         }
 
         if (state.activeTab == 0) {
-            // Create
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Crear nuevo cliente", style = MaterialTheme.typography.titleMedium)
-                    OutlinedTextField(state.createName, { vm.setCreateField("name", it) }, label = { Text("Nombre *") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(state.createContactName, { vm.setCreateField("contactName", it) }, label = { Text("Contacto") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(state.createContactEmail, { vm.setCreateField("contactEmail", it) }, label = { Text("Email contacto") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(state.createContactPhone, { vm.setCreateField("contactPhone", it) }, label = { Text("Teléfono") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(state.createAddress, { vm.setCreateField("address", it) }, label = { Text("Dirección") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(state.createCity, { vm.setCreateField("city", it) }, label = { Text("Ciudad") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(state.createState, { vm.setCreateField("state", it) }, label = { Text("Estado") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(state.createCountry, { vm.setCreateField("country", it) }, label = { Text("País") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(state.createAccountCode, { vm.setCreateField("accountCode", it) }, label = { Text("Código de cuenta") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(state.createPortalEmail, { vm.setCreateField("portalEmail", it) }, label = { Text("Email portal") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(state.createPortalPassword, { vm.setCreateField("portalPassword", it) }, label = { Text("Password portal") }, modifier = Modifier.fillMaxWidth())
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(onClick = { vm.setCreateField("isActive", !state.createIsActive) }) { Text(if (state.createIsActive) "Activo" else "Inactivo") }
-                        Button(onClick = { logoPickerCreate.launch("image/*") }) { Text(state.createLogoUri?.let { "Logo ✓" } ?: "Seleccionar logo") }
-                    }
-                    Button(onClick = { vm.create(context) }, enabled = !state.createSubmitting) {
-                        Text(if (state.createSubmitting) "Creando..." else "Crear cliente")
-                    }
-                    if (!state.createMessage.isNullOrBlank()) {
-                        Text(state.createMessage!!, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+            val createNameError = requiredFieldError(state.createName, "Nombre")
+            val createContactEmailError = emailFieldError(state.createContactEmail)
+            val createPortalEmailError = emailFieldError(state.createPortalEmail)
+            val canCreateClient = createNameError == null && createContactEmailError == null &&
+                createPortalEmailError == null && !state.createSubmitting
+
+            val editNameError = requiredFieldError(state.editName, "Nombre")
+            val editContactEmailError = emailFieldError(state.editContactEmail)
+            val editPortalEmailError = emailFieldError(state.editPortalEmail)
+            val canSaveClient = editNameError == null && editContactEmailError == null &&
+                editPortalEmailError == null && !state.editSubmitting
+
+            NxPanelShell {
+                Text("Crear nuevo cliente", style = MaterialTheme.typography.titleMedium)
+                NxSectionHeader("Información general")
+                NxFormTextField(state.createName, { vm.setCreateField("name", it) }, "Nombre *", error = createNameError, imeAction = ImeAction.Next)
+                Spacer(Modifier.height(8.dp))
+                NxFormTextField(state.createContactName, { vm.setCreateField("contactName", it) }, "Contacto", imeAction = ImeAction.Next)
+                Spacer(Modifier.height(8.dp))
+                NxFormTextField(state.createContactEmail, { vm.setCreateField("contactEmail", it) }, "Email contacto", error = createContactEmailError, keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
+                Spacer(Modifier.height(8.dp))
+                NxFormTextField(state.createContactPhone, { vm.setCreateField("contactPhone", it) }, "Teléfono", keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next)
+                Spacer(Modifier.height(12.dp))
+                NxSectionHeader("Ubicación")
+                NxFormTextField(state.createAddress, { vm.setCreateField("address", it) }, "Dirección", imeAction = ImeAction.Next)
+                Spacer(Modifier.height(8.dp))
+                NxFormTextField(state.createCity, { vm.setCreateField("city", it) }, "Ciudad", imeAction = ImeAction.Next)
+                Spacer(Modifier.height(8.dp))
+                NxFormTextField(state.createState, { vm.setCreateField("state", it) }, "Estado", imeAction = ImeAction.Next)
+                Spacer(Modifier.height(8.dp))
+                NxFormTextField(state.createCountry, { vm.setCreateField("country", it) }, "País", imeAction = ImeAction.Next)
+                Spacer(Modifier.height(12.dp))
+                NxSectionHeader("Portal y cuenta")
+                NxFormTextField(state.createAccountCode, { vm.setCreateField("accountCode", it) }, "Código de cuenta", imeAction = ImeAction.Next)
+                Spacer(Modifier.height(8.dp))
+                NxFormTextField(state.createPortalEmail, { vm.setCreateField("portalEmail", it) }, "Email portal", error = createPortalEmailError, keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
+                Spacer(Modifier.height(8.dp))
+                NxFormTextField(state.createPortalPassword, { vm.setCreateField("portalPassword", it) }, "Password portal", imeAction = ImeAction.Done)
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(onClick = { vm.setCreateField("isActive", !state.createIsActive) }) { Text(if (state.createIsActive) "Activo" else "Inactivo") }
+                    Button(onClick = { logoPickerCreate.launch("image/*") }) { Text(state.createLogoUri?.let { "Logo ✓" } ?: "Seleccionar logo") }
+                }
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = { vm.create(context) }, enabled = canCreateClient, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (state.createSubmitting) "Creando..." else "Crear cliente")
                 }
             }
 
-            // Edit
             if (state.editingId != null) {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Editar cliente #${state.editingId}", style = MaterialTheme.typography.titleMedium)
-                        OutlinedTextField(state.editName, { vm.setEditField("name", it) }, label = { Text("Nombre *") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(state.editContactName, { vm.setEditField("contactName", it) }, label = { Text("Contacto") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(state.editContactEmail, { vm.setEditField("contactEmail", it) }, label = { Text("Email contacto") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(state.editContactPhone, { vm.setEditField("contactPhone", it) }, label = { Text("Teléfono") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(state.editAddress, { vm.setEditField("address", it) }, label = { Text("Dirección") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(state.editCity, { vm.setEditField("city", it) }, label = { Text("Ciudad") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(state.editState, { vm.setEditField("state", it) }, label = { Text("Estado") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(state.editCountry, { vm.setEditField("country", it) }, label = { Text("País") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(state.editAccountCode, { vm.setEditField("accountCode", it) }, label = { Text("Código de cuenta") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(state.editPortalEmail, { vm.setEditField("portalEmail", it) }, label = { Text("Email portal") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(state.editPortalPassword, { vm.setEditField("portalPassword", it) }, label = { Text("Password portal (opcional)") }, modifier = Modifier.fillMaxWidth())
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Button(onClick = { vm.setEditField("isActive", !state.editIsActive) }) { Text(if (state.editIsActive) "Activo" else "Inactivo") }
-                            Button(onClick = { logoPickerEdit.launch("image/*") }) { Text(state.editLogoUri?.let { "Logo nuevo ✓" } ?: "Cambiar logo") }
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Button(onClick = { vm.cancelEdit() }) { Text("Cancelar") }
-                            Button(onClick = { vm.saveEdit(context) }, enabled = !state.editSubmitting) {
-                                Text(if (state.editSubmitting) "Guardando..." else "Guardar")
-                            }
-                        }
-                        if (!state.editMessage.isNullOrBlank()) {
-                            Text(state.editMessage!!, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                NxPanelShell {
+                    Text("Editar cliente #${state.editingId}", style = MaterialTheme.typography.titleMedium)
+                    NxSectionHeader("Información general")
+                    NxFormTextField(state.editName, { vm.setEditField("name", it) }, "Nombre *", error = editNameError, imeAction = ImeAction.Next)
+                    Spacer(Modifier.height(8.dp))
+                    NxFormTextField(state.editContactName, { vm.setEditField("contactName", it) }, "Contacto", imeAction = ImeAction.Next)
+                    Spacer(Modifier.height(8.dp))
+                    NxFormTextField(state.editContactEmail, { vm.setEditField("contactEmail", it) }, "Email contacto", error = editContactEmailError, keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
+                    Spacer(Modifier.height(8.dp))
+                    NxFormTextField(state.editContactPhone, { vm.setEditField("contactPhone", it) }, "Teléfono", keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next)
+                    Spacer(Modifier.height(12.dp))
+                    NxSectionHeader("Ubicación")
+                    NxFormTextField(state.editAddress, { vm.setEditField("address", it) }, "Dirección", imeAction = ImeAction.Next)
+                    Spacer(Modifier.height(8.dp))
+                    NxFormTextField(state.editCity, { vm.setEditField("city", it) }, "Ciudad", imeAction = ImeAction.Next)
+                    Spacer(Modifier.height(8.dp))
+                    NxFormTextField(state.editState, { vm.setEditField("state", it) }, "Estado", imeAction = ImeAction.Next)
+                    Spacer(Modifier.height(8.dp))
+                    NxFormTextField(state.editCountry, { vm.setEditField("country", it) }, "País", imeAction = ImeAction.Next)
+                    Spacer(Modifier.height(12.dp))
+                    NxSectionHeader("Portal y cuenta")
+                    NxFormTextField(state.editAccountCode, { vm.setEditField("accountCode", it) }, "Código de cuenta", imeAction = ImeAction.Next)
+                    Spacer(Modifier.height(8.dp))
+                    NxFormTextField(state.editPortalEmail, { vm.setEditField("portalEmail", it) }, "Email portal", error = editPortalEmailError, keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
+                    Spacer(Modifier.height(8.dp))
+                    NxFormTextField(state.editPortalPassword, { vm.setEditField("portalPassword", it) }, "Password portal (opcional)", imeAction = ImeAction.Done)
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(onClick = { vm.setEditField("isActive", !state.editIsActive) }) { Text(if (state.editIsActive) "Activo" else "Inactivo") }
+                        Button(onClick = { logoPickerEdit.launch("image/*") }) { Text(state.editLogoUri?.let { "Logo nuevo ✓" } ?: "Cambiar logo") }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(onClick = { vm.cancelEdit() }, modifier = Modifier.weight(1f)) { Text("Cancelar") }
+                        Button(onClick = { vm.saveEdit(context) }, enabled = canSaveClient, modifier = Modifier.weight(1f)) {
+                            Text(if (state.editSubmitting) "Guardando..." else "Guardar")
                         }
                     }
                 }
@@ -792,6 +860,7 @@ fun ConsoleClientsScreen(
                 }
             }
         }
+    }
     }
 }
 

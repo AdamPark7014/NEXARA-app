@@ -57,6 +57,17 @@ final class ConsoleRepository {
         try await activities(scope: scope).map { ActivityItem(raw: $0) }
     }
 
+    func createActivity(body: [String: Any]) async throws -> Int64 {
+        let data = try await api.postJSON("activities", body: body)
+        let map = ConsoleHelpers.decodeMap(data)
+        return Int64(ConsoleHelpers.mapInt(map, "id"))
+    }
+
+    func nextAnNumber() async throws -> String {
+        let map = ConsoleHelpers.decodeMap(try await api.get("activities/next-an"))
+        return ConsoleHelpers.mapStr(map, "next")
+    }
+
     // MARK: Evidences
 
     func myEvidenceHistory() async throws -> [[String: Any]] {
@@ -83,6 +94,19 @@ final class ConsoleRepository {
 
     func evidenceDetailItem(activityId: Int64) async throws -> EvidenceDetail {
         EvidenceDetail(raw: ConsoleHelpers.decodeMap(try await api.get("activity-evidence/\(activityId)")))
+    }
+
+    func activityTimelineEvents(activityId: Int64) async throws -> [[String: Any]] {
+        let map = ConsoleHelpers.decodeMap(try await api.get("activities/\(activityId)/timeline"))
+        return map["events"] as? [[String: Any]] ?? []
+    }
+
+    func activityMaterials(activityId: Int64) async throws -> [[String: Any]] {
+        ApiClient.decodeMapList(try await api.get("activities/\(activityId)/materiales"))
+    }
+
+    func activityTeam(activityId: Int64) async throws -> [[String: Any]] {
+        ApiClient.decodeMapList(try await api.get("activities/\(activityId)/team"))
     }
 
     func evidenceEntryPhoto(activityId: Int64, photoUrl: String, lat: Double = 0, lng: Double = 0) async throws -> [String: Any] {

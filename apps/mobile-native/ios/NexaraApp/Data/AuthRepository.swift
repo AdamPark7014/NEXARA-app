@@ -34,13 +34,16 @@ final class AuthRepository {
     enum Kind { case user, client, branch }
 
     func login(email: String, password: String, kind: Kind) async throws -> SessionUser {
-        let path: String
         switch kind {
-        case .user:   path = "auth/login"
-        case .client: path = "auth/login-client"
-        case .branch: path = "auth/login-branch"
+        case .user:
+            return try await staffLogin(email: email, password: password)
+        case .client, .branch:
+            return try await portalLogin(email: email, password: password)
         }
-        let data = try await ApiClient.shared.postJSON(path, body: LoginBody(email: email, password: password))
+    }
+
+    private func staffLogin(email: String, password: String) async throws -> SessionUser {
+        let data = try await ApiClient.shared.postJSON("auth/login", body: LoginBody(email: email, password: password))
         let resp = try JSONDecoder().decode(LoginResponse.self, from: data)
         let token = resp.access_token ?? resp.token ?? ""
         guard !token.isEmpty else { throw ApiError.http(401, "Sin token") }
@@ -54,8 +57,8 @@ final class AuthRepository {
             token: token,
             permissions: u?.permissions ?? [],
             isSuperAdmin: u?.isSuperAdmin ?? false,
-            isClient: (u?.isClient ?? (kind == .client)),
-            isBranchUser: (u?.isBranchUser ?? (kind == .branch)),
+            isClient: u?.isClient ?? false,
+            isBranchUser: u?.isBranchUser ?? false,
             clientId: u?.clientId,
             branchId: u?.branchId
         )
@@ -64,7 +67,65 @@ final class AuthRepository {
         return user
     }
 
+    private func portalLogin(email: String, password: String) async throws -> SessionUser {
+        let data = try await ApiClient.shared.postJSON("portal/login", body: LoginBody(email: email, password: password))
+        let raw = ConsoleHelpers.decodeMap(data)
+        let token = ConsoleHelpers.mapStr(raw, "access_token")
+        guard !token.isEmpty else { throw ApiError.http(401, "Sin token") }
+
+        if let client = raw["client"] as? [String: Any] {
+            let clientId = ConsoleHelpers.mapStr(client, "id")
+            let name = ConsoleHelpers.mapStr(client, "name", "nombre")
+            let user = SessionUser(
+                id: clientId.isEmpty ? email : clientId,
+                nombre: name.isEmpty ? email : name,
+                email: email,
+                role: "CLIENT_PORTAL",
+                department: nil,
+                token: token,
+                permissions: [],
+                isSuperAdmin: false,
+                isClient: true,
+                isBranchUser: false,
+                clientId: clientId.nilIfEmpty,
+                branchId: nil
+            )
+            SessionStore.shared.save(user)
+            QuickProfileStore.remember(user)
+            return user
+        }
+
+        if let branch = raw["branch"] as? [String: Any] {
+            let branchId = ConsoleHelpers.mapStr(branch, "id")
+            let name = ConsoleHelpers.mapStr(branch, "name", "nombre")
+            let clientId = ConsoleHelpers.mapStr(branch, "clientId")
+            let user = SessionUser(
+                id: branchId.isEmpty ? email : branchId,
+                nombre: name.isEmpty ? email : name,
+                email: email,
+                role: "BRANCH_PORTAL",
+                department: nil,
+                token: token,
+                permissions: [],
+                isSuperAdmin: false,
+                isClient: false,
+                isBranchUser: true,
+                clientId: clientId.nilIfEmpty,
+                branchId: branchId.nilIfEmpty
+            )
+            SessionStore.shared.save(user)
+            QuickProfileStore.remember(user)
+            return user
+        }
+
+        throw ApiError.http(401, "Credenciales inválidas")
+    }
+
     func logout() {
         SessionStore.shared.clear()
     }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }

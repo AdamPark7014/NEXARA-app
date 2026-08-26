@@ -11,7 +11,7 @@ import {
   isSuperAdminEmail,
 } from '../common/platform-accounts.js';
 import { LEGACY_TO_V2, ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
-import { WebhooksService } from '../webhooks/webhooks.service.js';
+import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 
 type UserWithRole = {
   roleKey?: string | null;
@@ -55,7 +55,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    @Optional() private readonly webhooks?: WebhooksService,
+    @Optional() private readonly domainEvents?: DomainEventBusService,
   ) {}
 
   private isSuperAdmin(email: string) {
@@ -108,6 +108,7 @@ export class AuthService {
       PERMISSIONS.SUPPORT_VIEW,
       PERMISSIONS.PANEL_PEOPLE,
       PERMISSIONS.PEOPLE_VIEW,
+      PERMISSIONS.SEARCH_VIEW,
     ];
     if (isSuperAdmin) {
       permissions.push(
@@ -797,19 +798,20 @@ export class AuthService {
           if (primary) companyIds.push(primary.id);
         }
         for (const companyId of companyIds) {
-          void this.webhooks
-            ?.emit(
-              'user.locked',
-              {
+          if (this.domainEvents) {
+            this.domainEvents.publishEntityLifecycle('updated', {
+              entityType: 'USER',
+              entityId: user.id,
+              companyId,
+              payload: {
+                alertType: 'locked',
                 userId: user.id,
                 email: user.email,
                 failures,
                 lockedUntil: lockedUntil?.toISOString(),
-                companyId,
               },
-              companyId,
-            )
-            .catch(() => undefined);
+            });
+          }
         }
       }
       throw new UnauthorizedException('Credenciales inválidas');

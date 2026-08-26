@@ -36,14 +36,23 @@ import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.ui.common.CapturedMedia
 import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
+import mx.nexara.mobile.nativeapp.ui.common.NxAsyncImage
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 import mx.nexara.mobile.nativeapp.ui.util.savePdfToCache
 import mx.nexara.mobile.nativeapp.ui.util.openPdfFile
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 
 // ── State & VM ───────────────────────────────────────────────────────────────
 
 data class EvidencesUiState(
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val query: String = "",
     val statusFilter: String = "Todos",
@@ -58,6 +67,9 @@ data class EvidencesUiState(
     val reviewingActivityId: Long? = null,
     val reviewMessage: String? = null,
     val rejectNotesDraft: String = "",
+    val selectedReviewRow: ActivityEvidenceRowDto? = null,
+    val reviewDetail: ActivityEvidenceDetailDto? = null,
+    val reviewDetailLoading: Boolean = false,
 )
 
 class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
@@ -92,6 +104,21 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
     fun setRejectNotesDraft(v: String) = _state.update { it.copy(rejectNotesDraft = v) }
 
     fun clearReviewMessage() = _state.update { it.copy(reviewMessage = null) }
+
+    fun openReviewDetail(row: ActivityEvidenceRowDto) {
+        val activityId = row.actividad?.id ?: return
+        _state.update { it.copy(selectedReviewRow = row, reviewDetail = null, reviewDetailLoading = true) }
+        viewModelScope.launch {
+            val detail = withContext(Dispatchers.IO) {
+                runCatching { repo.evidenceByActivity(activityId) }.getOrNull()
+            }
+            _state.update { it.copy(reviewDetail = detail, reviewDetailLoading = false) }
+        }
+    }
+
+    fun closeReviewDetail() = _state.update {
+        it.copy(selectedReviewRow = null, reviewDetail = null, reviewDetailLoading = false)
+    }
 
     fun approveEvidence(activityId: Long, reviewerId: Long, notes: String? = null) {
         _state.update { it.copy(reviewingActivityId = activityId, reviewMessage = null) }
@@ -309,8 +336,14 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun loadAll(isAdmin: Boolean = false, isSuperAdmin: Boolean = false, currentUserId: Long? = null) {
-        _state.update { it.copy(isLoading = true, error = null) }
+    fun loadAll(isAdmin: Boolean = false, isSuperAdmin: Boolean = false, currentUserId: Long? = null, initial: Boolean = true) {
+        _state.update {
+            it.copy(
+                isLoading = initial && it.teamRows.isEmpty() && it.myRows.isEmpty(),
+                isRefreshing = !initial,
+                error = null,
+            )
+        }
         viewModelScope.launch {
             try {
                 val team = if (isAdmin || isSuperAdmin) {
@@ -336,6 +369,7 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         isLoading = false,
+                        isRefreshing = false,
                         teamRows = team,
                         myRows = mine,
                         myAssignedActivities = assignedMine.distinctBy { a -> a.id },
@@ -343,9 +377,19 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 }
                 _state.value.selectedActivityId?.let { loadActivityEvidence(it) }
+                _state.value.selectedReviewRow?.actividad?.id?.let { activityId ->
+                    val detail = withContext(Dispatchers.IO) {
+                        runCatching { repo.evidenceByActivity(activityId) }.getOrNull()
+                    }
+                    _state.update { s -> s.copy(reviewDetail = detail) }
+                }
             } catch (e: Exception) {
                 _state.update {
-                    it.copy(isLoading = false, error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudieron cargar evidencias")
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudieron cargar evidencias",
+                    )
                 }
             }
         }
@@ -405,7 +449,32 @@ fun ConsoleEvidencesScreen(
     }
 
     if (state.isLoading && state.error == null && state.teamRows.isEmpty() && state.myRows.isEmpty()) {
-        vm.loadAll(isAdmin = isAdmin || showTeam, isSuperAdmin = isSuperAdmin, currentUserId = user?.id)
+        vm.loadAll(isAdmin = isAdmin || showTeam, isSuperAdmin = isSuperAdmin, currentUserId = user?.id, initial = true)
+    }
+
+    val reviewRow = state.selectedReviewRow
+    if (reviewRow != null) {
+        EvidenceReviewDetailScreen(
+            row = reviewRow,
+            detail = state.reviewDetail,
+            loading = state.reviewDetailLoading,
+            canReview = evidenceNeedsReview(reviewRow.estatus),
+            acting = state.reviewingActivityId == reviewRow.actividad?.id,
+            rejectNotes = state.rejectNotesDraft,
+            reviewMessage = state.reviewMessage,
+            onRejectNotesChange = vm::setRejectNotesDraft,
+            onApprove = {
+                val activityId = reviewRow.actividad?.id
+                if (activityId != null && user != null) vm.approveEvidence(activityId, user.id)
+            },
+            onReject = {
+                val activityId = reviewRow.actividad?.id
+                if (activityId != null && user != null) vm.rejectEvidence(activityId, user.id, state.rejectNotesDraft)
+            },
+            onBack = vm::closeReviewDetail,
+            context = context,
+        )
+        return
     }
 
     val q = state.query.trim().lowercase()
@@ -447,6 +516,11 @@ fun ConsoleEvidencesScreen(
         return "data:$mime;base64,$encoded"
     }
 
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.loadAll(isAdmin || showTeam, isSuperAdmin, currentUserId = user?.id, initial = false) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(0.dp),
@@ -488,7 +562,7 @@ fun ConsoleEvidencesScreen(
         }
 
         if (state.isLoading) {
-            item { Text("Cargando evidencias...", color = EvSub) }
+            item { NxLoadingBlock("Cargando evidencias…") }
             return@LazyColumn
         }
 
@@ -795,31 +869,22 @@ fun ConsoleEvidencesScreen(
             }
             if (teamFiltered.isEmpty()) {
                 item {
-                    Text("Sin evidencias con este filtro", color = Color(0xFF94A3B8), modifier = Modifier.padding(vertical = 8.dp))
+                    NxEmptyState(
+                        title = "Sin evidencias",
+                        subtitle = "No hay evidencias del equipo con este filtro.",
+                    )
                     Spacer(Modifier.height(8.dp))
                 }
             } else {
-                items(teamFiltered.take(100)) { r ->
+                items(teamFiltered.take(100), key = { it.id }) { r ->
                     val activityId = r.actividad?.id
                     val canReview = activityId != null && evidenceNeedsReview(r.estatus)
                     EvidenceCard(
                         r = r,
                         context = context,
                         showOwner = true,
-                        canReview = canReview,
-                        acting = state.reviewingActivityId == activityId,
-                        rejectNotes = state.rejectNotesDraft,
-                        onRejectNotesChange = vm::setRejectNotesDraft,
-                        onApprove = {
-                            if (activityId != null && user != null) {
-                                vm.approveEvidence(activityId, user.id)
-                            }
-                        },
-                        onReject = {
-                            if (activityId != null && user != null) {
-                                vm.rejectEvidence(activityId, user.id, state.rejectNotesDraft)
-                            }
-                        },
+                        canReview = false,
+                        onOpen = { vm.openReviewDetail(r) },
                     )
                     Spacer(Modifier.height(8.dp))
                 }
@@ -881,17 +946,21 @@ fun ConsoleEvidencesScreen(
 
             if (myFiltered.isEmpty()) {
                 item {
-                    Text("Sin evidencias propias con este filtro", color = Color(0xFF94A3B8), modifier = Modifier.padding(vertical = 8.dp))
+                    NxEmptyState(
+                        title = "Sin evidencias propias",
+                        subtitle = "Aún no has registrado evidencias con este filtro.",
+                    )
                 }
             } else {
-                items(myFiltered.take(100)) { r ->
-                    EvidenceCard(r, context, showOwner = false)
+                items(myFiltered.take(100), key = { it.id }) { r ->
+                    EvidenceCard(r, context, showOwner = false, onOpen = { vm.openReviewDetail(r) })
                     Spacer(Modifier.height(8.dp))
                 }
             }
         }
 
         item { Spacer(Modifier.height(24.dp)) }
+    }
     }
 }
 
@@ -945,10 +1014,13 @@ private fun EvidenceCard(
     onRejectNotesChange: (String) -> Unit = {},
     onApprove: () -> Unit = {},
     onReject: () -> Unit = {},
+    onOpen: (() -> Unit)? = null,
 ) {
     val statusColor = evidenceStatusColor(r.estatus)
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(2.dp),
@@ -1056,6 +1128,152 @@ private fun EvidenceCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun EvidenceReviewDetailScreen(
+    row: ActivityEvidenceRowDto,
+    detail: ActivityEvidenceDetailDto?,
+    loading: Boolean,
+    canReview: Boolean,
+    acting: Boolean,
+    rejectNotes: String,
+    reviewMessage: String?,
+    onRejectNotesChange: (String) -> Unit,
+    onApprove: () -> Unit,
+    onReject: () -> Unit,
+    onBack: () -> Unit,
+    context: android.content.Context,
+) {
+    val photoItems = remember(row, detail) {
+        buildList {
+            row.entryPhotoUrl?.takeIf { it.isNotBlank() }?.let { add("Entrada" to it) }
+            detail?.entryPhotoUrl?.takeIf { it.isNotBlank() && none { p -> p.second == it } }?.let { add("Entrada" to it) }
+            (detail?.evidencePhotos ?: row.evidencePhotos).orEmpty().forEachIndexed { i, url ->
+                if (url.isNotBlank()) add("Evidencia ${i + 1}" to url)
+            }
+            row.exitPhotoUrl?.takeIf { it.isNotBlank() }?.let { add("Salida" to it) }
+            detail?.exitPhotoUrl?.takeIf { it.isNotBlank() && none { p -> p.second == it } }?.let { add("Salida" to it) }
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item { Button(onClick = onBack) { Text("← Evidencias") } }
+        item {
+            Text(
+                row.actividad?.anNumber ?: "Evidencia #${row.id}",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                color = EvTeal,
+            )
+            row.actividad?.titulo?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = EvSlate)
+            }
+            Text("Estatus: ${row.estatus ?: "–"}", style = MaterialTheme.typography.bodySmall, color = EvSub)
+        }
+        if (!reviewMessage.isNullOrBlank()) {
+            item {
+                Text(
+                    reviewMessage,
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = if (reviewMessage.startsWith("✅")) EvGreen else EvRed,
+                )
+            }
+        }
+        item {
+            Text("Galería de fotos", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold))
+        }
+        if (loading) {
+            item { NxLoadingBlock("Cargando fotos…") }
+        } else if (photoItems.isEmpty()) {
+            item {
+                NxEmptyState(
+                    title = "Sin fotos",
+                    subtitle = "Esta evidencia aún no tiene archivos visibles.",
+                )
+            }
+        } else {
+            item {
+                val rows = (photoItems.size + 1) / 2
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height((rows * 140).dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    userScrollEnabled = false,
+                ) {
+                    itemsIndexed(photoItems, key = { _, pair -> pair.second }) { _, (label, url) ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(130.dp)
+                                .clickable { openExternalUrl(context, toAbsoluteAssetUrl(url)) },
+                            shape = RoundedCornerShape(10.dp),
+                        ) {
+                            Column {
+                                NxAsyncImage(
+                                    model = toAbsoluteAssetUrl(url),
+                                    contentDescription = label,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                )
+                                Text(
+                                    label,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = EvSub,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        val pdfUrl = row.serviceSheetPdfUrl ?: detail?.serviceSheetPdfUrl ?: row.archivoUrl
+        if (!pdfUrl.isNullOrBlank()) {
+            item {
+                OutlinedButton(
+                    onClick = { openExternalUrl(context, toAbsoluteAssetUrl(pdfUrl)) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("📄 Abrir hoja de servicio") }
+            }
+        }
+        if (canReview) {
+            item {
+                OutlinedTextField(
+                    value = rejectNotes,
+                    onValueChange = onRejectNotesChange,
+                    label = { Text("Motivo de rechazo") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    enabled = !acting,
+                    shape = RoundedCornerShape(10.dp),
+                )
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = onApprove,
+                        enabled = !acting,
+                        colors = ButtonDefaults.buttonColors(containerColor = EvGreen),
+                        modifier = Modifier.weight(1f),
+                    ) { Text(if (acting) "…" else "Aprobar") }
+                    OutlinedButton(
+                        onClick = onReject,
+                        enabled = !acting,
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Rechazar", color = EvRed) }
+                }
+            }
+        }
+        item { Spacer(Modifier.height(24.dp)) }
     }
 }
 

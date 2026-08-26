@@ -12,6 +12,11 @@ data class OpsClientTicketRequestDto(
     val urgency: String = "",
     val requestType: String = "",
     val branchName: String = "",
+    val branchNumber: String = "",
+    val city: String = "",
+    val state: String = "",
+    val address: String = "",
+    val clientId: Long? = null,
     val clientName: String = "",
     val createdAt: String = "",
     val dueAt: String = "",
@@ -29,6 +34,11 @@ data class OpsClientTicketRequestDto(
         put("urgency", urgency)
         put("requestType", requestType)
         put("branchName", branchName)
+        put("branchNumber", branchNumber)
+        put("city", city)
+        put("state", state)
+        put("address", address)
+        put("clientId", clientId)
         put("clientName", clientName)
         put("createdAt", createdAt)
         put("dueAt", dueAt)
@@ -46,6 +56,11 @@ data class OpsClientTicketRequestDto(
                 urgency = ProcParse.str(row["urgency"], row["urgencia"]),
                 requestType = ProcParse.str(row["requestType"], row["tipo"]),
                 branchName = ProcParse.str(row["branchName"], row["sucursal"]),
+                branchNumber = ProcParse.str(row["branchNumber"]),
+                city = ProcParse.str(row["city"], row["ciudad"]),
+                state = ProcParse.str(row["state"], row["estado"]),
+                address = ProcParse.str(row["address"], row["direccion"]),
+                clientId = ProcParse.lng(client?.get("id")),
                 clientName = ProcParse.str(
                     client?.get("name"), client?.get("nombre"),
                     row["clientName"], row["client"], row["name"],

@@ -1,12 +1,14 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
 import android.app.Application
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -15,14 +17,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,6 +46,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.SystemSettingDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import retrofit2.HttpException
 
@@ -65,6 +76,7 @@ private fun categoryLabel(key: String): String = when (key) {
 
 data class SettingsUiState(
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val saving: Boolean = false,
     val error: String? = null,
     val settings: List<SystemSettingDto> = emptyList(),
@@ -107,8 +119,9 @@ class ConsoleSettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissDelete() = _state.update { it.copy(pendingDeleteKey = null) }
 
-    fun refresh() {
-        _state.update { it.copy(isLoading = true, error = null) }
+    fun refresh(initial: Boolean = true) {
+        val refreshing = !initial
+        _state.update { it.copy(isLoading = initial && it.settings.isEmpty(), isRefreshing = refreshing, error = null) }
         viewModelScope.launch {
             try {
                 val list = withContext(Dispatchers.IO) { repo.settingsList() }
@@ -116,6 +129,7 @@ class ConsoleSettingsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         isLoading = false,
+                        isRefreshing = false,
                         settings = list,
                         editValues = edits,
                         error = null,
@@ -128,6 +142,7 @@ class ConsoleSettingsViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(
                         isLoading = false,
+                        isRefreshing = false,
                         settings = emptyList(),
                         error = if (forbidden) {
                             "No tienes permiso para administrar ajustes del sistema (console.admin)."
@@ -231,6 +246,7 @@ class ConsoleSettingsViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConsoleSettingsScreen(
     onExitToPanels: () -> Unit,
@@ -259,35 +275,28 @@ fun ConsoleSettingsScreen(
         )
     }
 
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.refresh(initial = false) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
     LazyColumn(
-        modifier = Modifier.padding(contentPadding),
+        modifier = Modifier.fillMaxSize().background(NxColors.Surface).padding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text("Ajustes del sistema", style = MaterialTheme.typography.titleLarge)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Requiere permiso console.admin.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            NxSectionHeader("Ajustes del sistema", "Requiere permiso console.admin.")
         }
 
         if (onOpenOfflineQueue != null) {
             item {
-                Card(
-                    onClick = onOpenOfflineQueue,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
-                ) {
-                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("Cola offline", fontWeight = FontWeight.SemiBold)
-                        Text(
-                            "Ver y sincronizar mutaciones pendientes del dispositivo",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                NxPanelShell(onClick = onOpenOfflineQueue) {
+                    Text("Cola offline", fontWeight = FontWeight.SemiBold, color = NxColors.Slate)
+                    Text(
+                        "Ver y sincronizar mutaciones pendientes del dispositivo",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NxColors.Muted,
+                    )
                 }
             }
         }
@@ -307,25 +316,21 @@ fun ConsoleSettingsScreen(
 
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Card(colors = CardDefaults.cardColors()) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(
-                            text = "${state.settings.size}",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Text("Total", style = MaterialTheme.typography.labelMedium)
-                    }
+                NxPanelShell(contentPadding = PaddingValues(12.dp)) {
+                    Text(
+                        text = "${state.settings.size}",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = NxColors.Teal,
+                    )
+                    Text("Total", style = MaterialTheme.typography.labelMedium, color = NxColors.Muted)
                 }
-                Card(colors = CardDefaults.cardColors()) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(
-                            text = "${grouped.size}",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                        )
-                        Text("Categorías", style = MaterialTheme.typography.labelMedium)
-                    }
+                NxPanelShell(contentPadding = PaddingValues(12.dp)) {
+                    Text(
+                        text = "${grouped.size}",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = NxColors.Info,
+                    )
+                    Text("Categorías", style = MaterialTheme.typography.labelMedium, color = NxColors.Muted)
                 }
             }
         }
@@ -334,11 +339,7 @@ fun ConsoleSettingsScreen(
             item {
                 Text(
                     text = state.message!!,
-                    color = if (state.messageIsError) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
+                    color = if (state.messageIsError) NxColors.Danger else NxColors.Teal,
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 TextButton(onClick = vm::dismissMessage) { Text("Cerrar aviso") }
@@ -346,13 +347,9 @@ fun ConsoleSettingsScreen(
         }
 
         when {
-            state.isLoading -> item { Text("Cargando configuraciones…") }
+            state.isLoading -> item { NxLoadingBlock("Cargando configuraciones…") }
             !state.error.isNullOrBlank() -> {
-                item {
-                    Text(state.error!!, color = MaterialTheme.colorScheme.error)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { vm.refresh() }) { Text("Reintentar") }
-                }
+                item { NxErrorBlock(state.error!!) { vm.refresh() } }
                 item {
                     OutlinedButton(onClick = onExitToPanels, modifier = Modifier.fillMaxWidth()) {
                         Text("Salir a paneles")
@@ -364,28 +361,25 @@ fun ConsoleSettingsScreen(
                     Text(
                         categoryLabel(state.activeCategory),
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = NxColors.Teal,
                     )
                 }
 
                 if (categoryRows.isEmpty()) {
                     item {
-                        Text(
-                            "No hay configuraciones en esta categoría.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        NxEmptyState(
+                            title = "Sin configuraciones",
+                            subtitle = "No hay ajustes en esta categoría.",
                         )
                     }
                 }
 
                 items(categoryRows, key = { it.key }) { row ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    ) {
-                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(row.label?.takeIf { it.isNotBlank() } ?: row.key, style = MaterialTheme.typography.titleSmall)
+                    NxPanelShell {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(row.label?.takeIf { it.isNotBlank() } ?: row.key, style = MaterialTheme.typography.titleSmall, color = NxColors.Slate)
                             if (!row.label.isNullOrBlank() && row.label != row.key) {
-                                Text(row.key, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(row.key, style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
                             }
                             OutlinedTextField(
                                 value = state.editValues[row.key] ?: row.value,
@@ -398,6 +392,7 @@ fun ConsoleSettingsScreen(
                                 Button(
                                     onClick = { vm.save(row.key) },
                                     enabled = !state.saving,
+                                    colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
                                 ) { Text("Guardar") }
                                 OutlinedButton(
                                     onClick = { vm.requestDelete(row.key) },
@@ -409,12 +404,9 @@ fun ConsoleSettingsScreen(
                 }
 
                 item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    ) {
-                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Agregar configuración", style = MaterialTheme.typography.titleSmall)
+                    NxPanelShell {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Agregar configuración", style = MaterialTheme.typography.titleSmall, color = NxColors.Slate)
                             OutlinedTextField(
                                 value = state.newKey,
                                 onValueChange = vm::setNewKey,
@@ -439,6 +431,7 @@ fun ConsoleSettingsScreen(
                             Button(
                                 onClick = vm::addNew,
                                 enabled = !state.saving && state.newKey.trim().isNotEmpty(),
+                                colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
                             ) { Text("+ Agregar") }
                         }
                     }
@@ -451,6 +444,7 @@ fun ConsoleSettingsScreen(
                 }
             }
         }
+    }
     }
 }
 

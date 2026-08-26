@@ -6,13 +6,18 @@ struct ActivityDetailView: View {
     let activity: ActivityItem
     let onBack: () -> Void
     var onCaptureEvidence: ((Int64) -> Void)? = nil
+    var initialTabKey: String? = nil
 
     @State private var tab = 0
     @State private var detail: ActivityItem?
     @State private var evidence: EvidenceDetail?
     @State private var loading = true
     @State private var loadError: String?
-    private let tabs = ["Info", "Evidencias", "Viáticos", "Aprobaciones"]
+    private let tabs = ["Info", "Operación", "Evidencias", "Viáticos", "Equipo", "Materiales", "Historial", "Aprobaciones"]
+
+    @State private var team: [[String: Any]] = []
+    @State private var materials: [[String: Any]] = []
+    @State private var timeline: [[String: Any]] = []
 
     private var current: ActivityItem { detail ?? activity }
 
@@ -57,13 +62,22 @@ struct ActivityDetailView: View {
             } else {
                 switch tab {
                 case 0: infoTab
-                case 1: evidenciasTab
-                case 2: viaticosTab
+                case 1: operacionTab
+                case 2: evidenciasTab
+                case 3: viaticosTab
+                case 4: teamTab
+                case 5: materialsTab
+                case 6: historialTab
                 default: aprobacionesTab
                 }
             }
         }
         .navigationBarHidden(true)
+        .onAppear {
+            if let initialTabKey {
+                tab = activityDetailTabIndex(initialTabKey)
+            }
+        }
         .task { await load() }
     }
 
@@ -90,6 +104,87 @@ struct ActivityDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
+    }
+
+    private var operacionTab: some View {
+        let raw = current.raw
+        let due = ActivityParse.str(raw["fechaEntregaEsperada"], raw["fechaMaxima"])
+        let dueDate = ActivityParse.isoDate(due)
+        let closed = current.status.contains("finaliz") || current.status.contains("complet") || current.status.contains("cancel")
+        let overdue = dueDate.map { $0 < Date() } == true && !closed
+        let maxMin = ActivityParse.int(raw["tiempoMaximoMin"]) ?? ActivityParse.int(raw["tiempoEstimadoMin"])
+        let evMap = raw["activityEvidence"] as? [String: Any]
+        let reviewStatus: String = {
+            if let ev = evidence, !ev.reviewStatus.isEmpty { return ev.reviewStatus }
+            let fromMap = ActivityParse.str(evMap?["reviewStatus"])
+            return fromMap.isEmpty ? "Pendiente" : fromMap
+        }()
+        let branchLat = ActivityParse.double(raw["branchLatitude"])
+        let branchLng = ActivityParse.double(raw["branchLongitude"])
+        let entryLat = ActivityParse.double(evMap?["entryLatitude"])
+        let entryLng = ActivityParse.double(evMap?["entryLongitude"])
+        let exitLat = ActivityParse.double(evMap?["exitLatitude"])
+        let exitLng = ActivityParse.double(evMap?["exitLongitude"])
+        let addressParts = [
+            ActivityParse.str(raw["branchName"]),
+            ActivityParse.str(raw["branchAddress"]),
+            ActivityParse.str(raw["branchCity"]),
+            ActivityParse.str(raw["branchState"]),
+        ].filter { !$0.isEmpty }
+        let clientName = ActivityParse.nestedName(raw["client"])
+        let slaAlerted = ActivityParse.str(raw["slaAlertedAt"])
+
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 8)], spacing: 8) {
+                    operacionKpi(label: "SLA", value: overdue ? "Vencida" : (dueDate.map { ActivityParse.fmtDate($0) } ?? (due.isEmpty ? "Sin fecha" : String(due.prefix(10)))), tone: overdue ? .red : (dueDate != nil ? .orange : .secondary))
+                    operacionKpi(label: "Prioridad", value: current.priority.nilIfEmpty ?? "—", tone: .secondary)
+                    operacionKpi(label: "Tiempo máx.", value: maxMin.map { "\($0) min" } ?? "—", tone: .secondary)
+                    operacionKpi(label: "Evidencia", value: reviewStatus, tone: reviewStatus.uppercased() == "APPROVED" ? .green : .secondary)
+                }
+
+                Text("Ubicación y campo").font(.headline)
+                if !addressParts.isEmpty {
+                    Text("Sitio: \(addressParts.joined(separator: " · "))").font(.subheadline)
+                }
+                if !clientName.isEmpty {
+                    Text("Cliente OPS: \(clientName)").font(.subheadline)
+                }
+                HStack {
+                    if let url = ActivityParse.mapsUrl(lat: branchLat, lng: branchLng) {
+                        Link("Mapa sucursal", destination: url)
+                    }
+                    if let url = ActivityParse.mapsUrl(lat: entryLat, lng: entryLng) {
+                        Link("GPS llegada", destination: url)
+                    }
+                    if let url = ActivityParse.mapsUrl(lat: exitLat, lng: exitLng) {
+                        Link("GPS salida", destination: url)
+                    }
+                    NavigationLink("Mapa operacional OPS") { GpsMapView() }
+                }
+                .font(.caption)
+
+                if !slaAlerted.isEmpty {
+                    Label("SLA alertado", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    Text(ActivityParse.fmtIso(slaAlerted)).font(.caption2).foregroundStyle(.secondary)
+                }
+            }
+            .padding()
+        }
+    }
+
+    @ViewBuilder
+    private func operacionKpi(label: String, value: String, tone: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).font(.caption).foregroundStyle(.secondary)
+            Text(value).font(.subheadline.bold()).foregroundStyle(tone)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     private var evidenciasTab: some View {
@@ -165,6 +260,57 @@ struct ActivityDetailView: View {
         }
     }
 
+    private var teamTab: some View {
+        List {
+            Section("Equipo asignado") {
+                if team.isEmpty { Text("Sin asignaciones de equipo.").foregroundColor(.secondary) }
+                ForEach(team.indices, id: \.self) { idx in
+                    let m = team[idx]
+                    let user = m["user"] as? [String: Any] ?? [:]
+                    Text(ConsoleHelpers.mapStr(m, "nombre", "userName").isEmpty
+                         ? ConsoleHelpers.mapStr(user, "nombre") : ConsoleHelpers.mapStr(m, "nombre", "userName"))
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    private var materialsTab: some View {
+        List {
+            if materials.isEmpty {
+                Text("Sin movimientos de material.").foregroundColor(.secondary)
+            } else {
+                ForEach(materials.indices, id: \.self) { idx in
+                    let row = materials[idx]
+                    let product = row["product"] as? [String: Any] ?? [:]
+                    let name = ConsoleHelpers.mapStr(product, "name", "nombre")
+                    Text("\(name.isEmpty ? "Material" : name) · \(ConsoleHelpers.mapStr(row, "quantity", "cantidad"))")
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    private var historialTab: some View {
+        List {
+            if timeline.isEmpty {
+                Text("Sin eventos en el historial.").foregroundColor(.secondary)
+            } else {
+                ForEach(timeline.indices, id: \.self) { idx in
+                    let ev = timeline[idx]
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(ConsoleHelpers.mapStr(ev, "icon")) \(ConsoleHelpers.mapStr(ev, "title"))")
+                            .font(.subheadline.bold())
+                        if !ConsoleHelpers.mapStr(ev, "subtitle").isEmpty {
+                            Text(ConsoleHelpers.mapStr(ev, "subtitle")).font(.caption).foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
     private var aprobacionesTab: some View {
         let aprs = nestedMaps(current.raw, "approvals", "aprobaciones")
         return Group {
@@ -222,6 +368,10 @@ struct ActivityDetailView: View {
                 detail = activity
             }
             evidence = try? await evItem
+            let id = activity.id
+            team = (try? await ConsoleRepository.shared.activityTeam(activityId: id)) ?? []
+            materials = (try? await ConsoleRepository.shared.activityMaterials(activityId: id)) ?? []
+            timeline = (try? await ConsoleRepository.shared.activityTimelineEvents(activityId: id)) ?? []
         } catch {
             detail = activity
             if evidence == nil {
@@ -316,6 +466,7 @@ struct ActivitiesView: View {
     var filterForUserId: String? = nil
     @State private var selected: ActivityItem?
     @State private var evidenceFocusId: Int64?
+    @State private var showNewOt = false
 
     var body: some View {
         Group {
@@ -337,6 +488,19 @@ struct ActivitiesView: View {
             }
         }
         .navigationTitle(selected == nil && evidenceFocusId == nil ? (filterForUserId == nil ? "Actividades" : "Mis actividades") : "")
+        .toolbar {
+            if selected == nil && evidenceFocusId == nil && filterForUserId == nil {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Nueva OT") { showNewOt = true }
+                }
+            }
+        }
+        .sheet(isPresented: $showNewOt) {
+            OpsNewActivityView(onDone: { _ in
+                showNewOt = false
+                vm.load(personalOnly: filterForUserId != nil)
+            })
+        }
     }
 
     private var listBody: some View {
@@ -483,6 +647,90 @@ private struct ActivityCard: View {
     }
 }
 
+private func activityDetailTabIndex(_ key: String) -> Int {
+    switch key.lowercased() {
+    case "info": return 0
+    case "operacion": return 1
+    case "evidencias": return 2
+    case "viaticos": return 3
+    case "equipo": return 4
+    case "materiales": return 5
+    case "historial": return 6
+    case "incidencias": return 7
+    case "aprobaciones": return 8
+    default: return 0
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
+}
+
+enum ActivityParse {
+    static func str(_ values: Any?...) -> String {
+        for v in values {
+            if let s = v as? String, !s.isEmpty, s != "null" { return s }
+            if let n = v as? NSNumber { return n.stringValue }
+            if let m = v as? [String: Any] {
+                let nested = str(m["nombre"], m["name"], m["code"])
+                if !nested.isEmpty { return nested }
+            }
+        }
+        return ""
+    }
+
+    static func nestedName(_ values: Any?...) -> String {
+        for v in values {
+            let s = str(v)
+            if !s.isEmpty { return s }
+        }
+        return ""
+    }
+
+    static func int(_ value: Any?) -> Int? {
+        if let n = value as? Int { return n }
+        if let n = value as? NSNumber { return n.intValue }
+        if let s = value as? String, let n = Int(s) { return n }
+        return nil
+    }
+
+    static func double(_ value: Any?) -> Double? {
+        if let n = value as? Double { return n }
+        if let n = value as? NSNumber { return n.doubleValue }
+        if let s = value as? String, let n = Double(s) { return n }
+        return nil
+    }
+
+    static func isoDate(_ value: String) -> Date? {
+        guard !value.isEmpty else { return nil }
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = f.date(from: value) { return d }
+        f.formatOptions = [.withInternetDateTime]
+        if let d = f.date(from: value) { return d }
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "es_MX")
+        df.dateFormat = "yyyy-MM-dd"
+        return df.date(from: String(value.prefix(10)))
+    }
+
+    static func fmtDate(_ date: Date) -> String {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "es_MX")
+        df.dateStyle = .short
+        return df.string(from: date)
+    }
+
+    static func fmtIso(_ value: String) -> String {
+        isoDate(value).map(fmtDate) ?? value
+    }
+
+    static func mapsUrl(lat: Double?, lng: Double?) -> URL? {
+        guard let lat, let lng, lat.isFinite, lng.isFinite else { return nil }
+        return URL(string: "https://www.google.com/maps?q=\(lat),\(lng)")
+    }
+}
+
 private func actStatusColor(_ status: String) -> Color {
     let s = status.lowercased()
     if s.contains("complet") || s.contains("final") { return .green }
@@ -490,4 +738,53 @@ private func actStatusColor(_ status: String) -> Color {
     if s.contains("proceso") || s.contains("asign") { return .blue }
     if s.contains("pend") { return .orange }
     return .secondary
+}
+
+// MARK: – Activity detail by id (despacho / deep links)
+
+struct ActivityDetailByIdView: View {
+    let activityId: Int64
+    var initialTabKey: String? = nil
+    @Environment(\.dismiss) private var dismiss
+    @State private var activity: ActivityItem?
+    @State private var loading = true
+    @State private var error: String?
+
+    var body: some View {
+        Group {
+            if loading {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let activity {
+                ActivityDetailView(
+                    activity: activity,
+                    onBack: { dismiss() },
+                    initialTabKey: initialTabKey,
+                )
+            } else {
+                VStack(spacing: 12) {
+                    Button("← Volver") { dismiss() }
+                    Text(error ?? "Actividad no encontrada").foregroundStyle(.red)
+                }
+                .padding()
+            }
+        }
+        .task { await load() }
+    }
+
+    private func load() async {
+        loading = true
+        error = nil
+        do {
+            let data = try await ApiClient.shared.get("activities/\(activityId)")
+            let raw = ConsoleHelpers.decodeMap(data)
+            if ConsoleHelpers.mapInt64(raw, "id") ?? 0 > 0 {
+                activity = ActivityItem(raw: raw)
+            } else {
+                error = "Actividad no encontrada"
+            }
+        } catch {
+            self.error = error.localizedDescription
+        }
+        loading = false
+    }
 }

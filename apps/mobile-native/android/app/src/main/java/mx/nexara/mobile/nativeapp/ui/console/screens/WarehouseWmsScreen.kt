@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -28,6 +30,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,8 +57,13 @@ import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.ui.common.BarcodeScannerScreen
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlert
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlertBanner
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpi
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpiGrid
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 import kotlin.math.abs
@@ -84,6 +92,7 @@ private fun skuMatchScore(sku: String, name: String, q: String): Int {
 /**
  * WMS móvil enterprise: inventario, alertas, recepción, despacho y conteo físico.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WarehouseWmsScreen(initialTab: Int = 0) {
     val context = LocalContext.current
@@ -97,6 +106,7 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
 
     var tab by remember { mutableIntStateOf(initialTab.coerceIn(0, 3)) }
     var loading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var acting by remember { mutableStateOf(false) }
 
@@ -127,8 +137,8 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
     var pickToWarehouse by remember { mutableStateOf(false) }
     var scanBarcode by remember { mutableStateOf(false) }
 
-    suspend fun reload() {
-        loading = true
+    suspend fun reload(refresh: Boolean = false) {
+        if (refresh) isRefreshing = true else loading = true
         val wh = withContext(Dispatchers.IO) { repo.warehouses() }
         val levels = withContext(Dispatchers.IO) { repo.stockLevels() }
         val low = withContext(Dispatchers.IO) {
@@ -146,6 +156,7 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
         movements = moves
         products = catalog
         loading = false
+        isRefreshing = false
     }
 
     LaunchedEffect(Unit) { reload() }
@@ -672,7 +683,13 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
     val lowCount = alerts.size.coerceAtLeast(stock.count { it.isLow })
     val totalUnits = stock.sumOf { it.quantity }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().background(NxColors.Surface)) {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { scope.launch { reload(refresh = true) } },
+            modifier = Modifier.fillMaxSize(),
+        ) {
+        Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             NxSectionHeader(title = "Almacén WMS", subtitle = "Recepción · despacho · transferencia · conteo")
             Spacer(Modifier.height(8.dp))
@@ -728,23 +745,29 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
             Tab(selected = tab == 3, onClick = { tab = 3 }, text = { Text("Movimientos") })
         }
 
-        OutlinedTextField(
+        NxSearchField(
             value = query,
             onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            placeholder = { Text("Buscar SKU, producto o bodega…") },
-            singleLine = true,
+            placeholder = "Buscar SKU, producto o bodega…",
         )
 
         if (loading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = WhTeal)
+                NxLoadingBlock("Cargando inventario…")
             }
         } else {
             when (tab) {
                 0 -> LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
                     if (filteredStock.isEmpty()) {
-                        item { Text("Sin niveles de stock", color = Color(0xFF64748B), modifier = Modifier.padding(24.dp)) }
+                        item {
+                            NxEmptyState(
+                                title = "Sin niveles de stock",
+                                subtitle = "No hay inventario que coincida con tu búsqueda.",
+                                actionLabel = "Actualizar",
+                                onAction = { scope.launch { reload(refresh = true) } },
+                            )
+                        }
                     }
                     items(filteredStock.take(120), key = { "${it.id}-${it.productId}" }) { row ->
                         val qty = row.quantity
@@ -800,10 +823,9 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                 2 -> LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
                     if (alerts.isEmpty()) {
                         item {
-                            Text(
-                                "Sin alertas de stock bajo — inventario saludable",
-                                color = WhGreen,
-                                modifier = Modifier.padding(24.dp),
+                            NxEmptyState(
+                                title = "Inventario saludable",
+                                subtitle = "Sin alertas de stock bajo en este momento.",
                             )
                         }
                     }
@@ -831,10 +853,9 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                 else -> LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
                     if (movements.isEmpty()) {
                         item {
-                            Text(
-                                "Sin movimientos registrados",
-                                color = Color(0xFF64748B),
-                                modifier = Modifier.padding(24.dp),
+                            NxEmptyState(
+                                title = "Sin movimientos",
+                                subtitle = "Aún no hay movimientos de stock registrados.",
                             )
                         }
                     }
@@ -881,6 +902,8 @@ fun WarehouseWmsScreen(initialTab: Int = 0) {
                     }
                 }
             }
+        }
+        }
         }
     }
 }

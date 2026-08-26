@@ -28,6 +28,9 @@ import mx.nexara.mobile.nativeapp.R
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.security.AppLock
+import mx.nexara.mobile.nativeapp.ui.NexaraAppMeta
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxAppMetaFooter
+import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 
 /**
  * Pantalla nativa para "Mi perfil" usando la sesión guardada.
@@ -232,6 +235,12 @@ fun MyProfileScreen(
                     )
                 }
             }
+        }
+
+        item {
+            NxAppMetaFooter(
+                onOpenPrivacy = { openExternalUrl(context, NexaraAppMeta.PRIVACY_URL) },
+            )
         }
 
         item { Spacer(Modifier.height(24.dp)) }

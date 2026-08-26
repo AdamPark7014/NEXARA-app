@@ -1,19 +1,31 @@
 package mx.nexara.mobile.nativeapp.ui.tickets
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.compose.runtime.LaunchedEffect
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
+import mx.nexara.mobile.nativeapp.ui.enterprise.nxComposable
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxTealTopAppBarColors
+import androidx.compose.ui.graphics.Color
+import mx.nexara.mobile.nativeapp.access.DeepLinkNavigation
 import mx.nexara.mobile.nativeapp.access.PanelId
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.ui.tickets.screens.TicketsPortalScreen
@@ -32,6 +44,9 @@ private object TicketsRoutes {
     const val FeedbackPending = "tickets/feedback/pending"
     const val Inventories = "tickets/inventories"
     const val InventoryDetail = "tickets/inventories/{id}"
+    const val Chat = "tickets/chat"
+    const val Services = "tickets/services"
+    const val Help = "tickets/help"
 
     fun routeForModuleKey(key: String): String = when (key) {
         "profile", "my-profile", "mi-perfil" -> Profile
@@ -40,6 +55,9 @@ private object TicketsRoutes {
         "tickets" -> Tickets
         "inventories", "inventarios" -> Inventories
         "feedback-pending", "feedback" -> FeedbackPending
+        "chat" -> Chat
+        "mis-servicios", "services", "my-services" -> Services
+        "help", "ayuda", "centro-de-ayuda" -> Help
         "portal", "home", "dashboard" -> Portal
         else -> Portal
     }
@@ -51,10 +69,19 @@ fun TicketsNavHost(
     onExitToPanels: () -> Unit,
 ) {
     val navController = rememberNavController()
+    var chatChannelId by remember { mutableStateOf<Long?>(null) }
+    var chatMessageId by remember { mutableStateOf<Long?>(null) }
 
-    LaunchedEffect(Unit) {
-        val key = PendingDeepLink.consumeModuleFor(PanelId.PORTAL) ?: return@LaunchedEffect
-        navController.navigate(TicketsRoutes.routeForModuleKey(key)) { launchSingleTop = true }
+    val deepLinkSignal by PendingDeepLink.signal.collectAsState()
+    LaunchedEffect(deepLinkSignal) {
+        val link = PendingDeepLink.consumeModuleDestination(PanelId.PORTAL) ?: return@LaunchedEffect
+        if (link.key == "chat") {
+            chatChannelId = DeepLinkNavigation.chatChannelId(link)
+            chatMessageId = DeepLinkNavigation.chatMessageId(link)
+        }
+        val entityRoute = DeepLinkNavigation.ticketsRoute(link)
+        val target = entityRoute ?: TicketsRoutes.routeForModuleKey(DeepLinkNavigation.ticketsModuleKey(link))
+        navController.navigate(target) { launchSingleTop = true }
     }
 
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -70,14 +97,32 @@ fun TicketsNavHost(
             TicketsRoutes.Tickets -> "Tickets"
             TicketsRoutes.FeedbackPending -> "Feedback pendiente"
             TicketsRoutes.Inventories -> "Inventarios"
+            TicketsRoutes.Chat -> "Chat equipo"
+            TicketsRoutes.Services -> "Mis servicios"
+            TicketsRoutes.Help -> "Centro de ayuda"
             else -> "Tickets / Portal"
         }
     }
 
+    val showBack = route != TicketsRoutes.Portal
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title) },
+                title = { Text(title, color = Color.White) },
+                colors = NxTealTopAppBarColors(),
+                navigationIcon = {
+                    if (showBack) {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                        }
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onExitToPanels) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Salir a paneles")
+                    }
+                },
             )
         },
     ) { inner ->
@@ -86,7 +131,7 @@ fun TicketsNavHost(
             startDestination = TicketsRoutes.Portal,
             modifier = Modifier.padding(inner),
         ) {
-            composable(TicketsRoutes.Portal) {
+            nxComposable(TicketsRoutes.Portal) {
                 TicketsPortalScreen(
                     onExitToPanels = onExitToPanels,
                     onOpenProfile = { navController.navigate(TicketsRoutes.Profile) { launchSingleTop = true } },
@@ -95,14 +140,34 @@ fun TicketsNavHost(
                     onOpenTickets = { navController.navigate(TicketsRoutes.Tickets) { launchSingleTop = true } },
                     onOpenFeedbackPending = { navController.navigate(TicketsRoutes.FeedbackPending) { launchSingleTop = true } },
                     onOpenInventories = { navController.navigate(TicketsRoutes.Inventories) { launchSingleTop = true } },
+                    onOpenChat = { navController.navigate(TicketsRoutes.Chat) { launchSingleTop = true } },
+                    onOpenServices = { navController.navigate(TicketsRoutes.Services) { launchSingleTop = true } },
+                    onOpenHelp = { navController.navigate(TicketsRoutes.Help) { launchSingleTop = true } },
                 )
             }
-            composable(TicketsRoutes.Profile) {
+            nxComposable(TicketsRoutes.Help, style = NxNavAnimStyle.Push) {
+                mx.nexara.mobile.nativeapp.ui.tickets.screens.PortalHelpScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            nxComposable(TicketsRoutes.Services, style = NxNavAnimStyle.Push) {
+                mx.nexara.mobile.nativeapp.ui.tickets.screens.PortalServicesScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            nxComposable(TicketsRoutes.Chat, style = NxNavAnimStyle.Push) {
+                mx.nexara.mobile.nativeapp.ui.chat.ChatScreen(
+                    onBack = { navController.popBackStack() },
+                    initialChannelId = chatChannelId,
+                    initialMessageId = chatMessageId,
+                )
+            }
+            nxComposable(TicketsRoutes.Profile, style = NxNavAnimStyle.Push) {
                 TicketsProfileScreen(
                     onBack = { navController.popBackStack() },
                 )
             }
-            composable(TicketsRoutes.Branches) {
+            nxComposable(TicketsRoutes.Branches, style = NxNavAnimStyle.Push) {
                 mx.nexara.mobile.nativeapp.ui.tickets.screens.TicketsBranchesScreen(
                     onBack = { navController.popBackStack() },
                     onCreate = { navController.navigate(TicketsRoutes.BranchNew) { launchSingleTop = true } },
@@ -111,13 +176,13 @@ fun TicketsNavHost(
                     },
                 )
             }
-            composable(TicketsRoutes.BranchNew) {
+            nxComposable(TicketsRoutes.BranchNew, style = NxNavAnimStyle.Modal) {
                 mx.nexara.mobile.nativeapp.ui.tickets.screens.TicketsBranchEditScreen(
                     branchId = null,
                     onBack = { navController.popBackStack() },
                 )
             }
-            composable(TicketsRoutes.BranchEdit) { entry ->
+            nxComposable(TicketsRoutes.BranchEdit, style = NxNavAnimStyle.Push) { entry ->
                 val id = entry.arguments?.getString("id")?.toLongOrNull()
                 mx.nexara.mobile.nativeapp.ui.tickets.screens.TicketsBranchEditScreen(
                     branchId = id,
@@ -125,19 +190,19 @@ fun TicketsNavHost(
                 )
             }
 
-            composable(TicketsRoutes.Requests) {
+            nxComposable(TicketsRoutes.Requests, style = NxNavAnimStyle.Push) {
                 mx.nexara.mobile.nativeapp.ui.tickets.screens.TicketsRequestsScreen(
                     onBack = { navController.popBackStack() },
                     onCreate = { navController.navigate(TicketsRoutes.RequestNew) { launchSingleTop = true } },
                 )
             }
-            composable(TicketsRoutes.RequestNew) {
+            nxComposable(TicketsRoutes.RequestNew, style = NxNavAnimStyle.Modal) {
                 mx.nexara.mobile.nativeapp.ui.tickets.screens.TicketsRequestNewScreen(
                     onBack = { navController.popBackStack() },
                 )
             }
 
-            composable(TicketsRoutes.Tickets) {
+            nxComposable(TicketsRoutes.Tickets, style = NxNavAnimStyle.Push) {
                 mx.nexara.mobile.nativeapp.ui.tickets.screens.TicketsTicketsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenTicket = { id ->
@@ -145,7 +210,7 @@ fun TicketsNavHost(
                     },
                 )
             }
-            composable(TicketsRoutes.TicketDetail) { entry ->
+            nxComposable(TicketsRoutes.TicketDetail, style = NxNavAnimStyle.Push) { entry ->
                 val id = entry.arguments?.getString("id")?.toLongOrNull()
                 mx.nexara.mobile.nativeapp.ui.tickets.screens.TicketsTicketDetailScreen(
                     ticketId = id,
@@ -153,13 +218,13 @@ fun TicketsNavHost(
                 )
             }
 
-            composable(TicketsRoutes.FeedbackPending) {
+            nxComposable(TicketsRoutes.FeedbackPending, style = NxNavAnimStyle.Push) {
                 mx.nexara.mobile.nativeapp.ui.tickets.screens.TicketsFeedbackPendingScreen(
                     onBack = { navController.popBackStack() },
                 )
             }
 
-            composable(TicketsRoutes.Inventories) {
+            nxComposable(TicketsRoutes.Inventories, style = NxNavAnimStyle.Push) {
                 mx.nexara.mobile.nativeapp.ui.tickets.screens.TicketsInventoriesScreen(
                     onBack = { navController.popBackStack() },
                     onOpenInventory = { id ->
@@ -167,7 +232,7 @@ fun TicketsNavHost(
                     },
                 )
             }
-            composable(TicketsRoutes.InventoryDetail) { entry ->
+            nxComposable(TicketsRoutes.InventoryDetail, style = NxNavAnimStyle.Push) { entry ->
                 val id = entry.arguments?.getString("id")?.toLongOrNull()
                 mx.nexara.mobile.nativeapp.ui.tickets.screens.TicketsInventoryDetailScreen(
                     inventoryId = id,

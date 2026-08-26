@@ -21,7 +21,7 @@ export type CtPedidoFromQuoteDto = {
   envio: CtSolicitarPedidoRequest['envio'];
 };
 
-import { CT_ORDER_WAREHOUSES, preferredCatalogWarehouse } from '../ct-warehouses.js';
+import { CT_ORDER_WAREHOUSES, preferredCatalogWarehouse, stockAtApiWarehouse } from '../ct-warehouses.js';
 
 /** Almacenes CT comunes (código API → etiqueta). */
 export const CT_WAREHOUSES = CT_ORDER_WAREHOUSES;
@@ -47,6 +47,28 @@ export class CtPurchaseOrderService {
       HMO: '01A',
     };
     return map[wh.toUpperCase()] || '01A';
+  }
+
+  private almacenLabel(code: string | null | undefined): string | null {
+    if (!code) return null;
+    const hit = CT_WAREHOUSES.find((w) => w.code === code);
+    return hit ? `${hit.code} · ${hit.label}` : code;
+  }
+
+  /** Almacén sugerido desde partidas (si todas coinciden) o default. */
+  resolveAlmacenFromItems(
+    items: Array<{ productCtId?: number | null; supplierWarehouseCode?: string | null }>,
+    override?: string,
+  ): string {
+    if (override?.trim()) return override.trim().toUpperCase();
+    const codes = items
+      .filter((i) => i.productCtId && i.supplierWarehouseCode?.trim())
+      .map((i) => String(i.supplierWarehouseCode).trim().toUpperCase());
+    if (codes.length) {
+      const unique = [...new Set(codes)];
+      if (unique.length === 1) return unique[0];
+    }
+    return this.defaultAlmacen();
   }
 
   getCtConfig() {
@@ -97,9 +119,14 @@ export class CtPurchaseOrderService {
       return {
         lines: [],
         subtotalCost: 0,
+        subtotalSell: 0,
+        marginAmount: 0,
         message: 'No hay partidas de catálogo CT en esta cotización.',
         defaultEnvio: null,
         config: this.getCtConfig(),
+        suggestedAlmacen: this.defaultAlmacen(),
+        warehouseMismatch: false,
+        stockWarnings: [] as string[],
       };
     }
 
@@ -114,6 +141,12 @@ export class CtPurchaseOrderService {
         const unitCost =
           item.unitCost != null ? Number(item.unitCost) : costMxn(listPrice, currency, fx);
         const unitSell = Number(item.unitPrice);
+        const supplierWarehouseCode = item.supplierWarehouseCode?.trim()?.toUpperCase() || null;
+        const stockAtWarehouse =
+          product?.existencia != null && supplierWarehouseCode
+            ? stockAtApiWarehouse(product.existencia, supplierWarehouseCode)
+            : null;
+        const stockOk = stockAtWarehouse == null ? true : stockAtWarehouse >= item.qty;
         return {
           cotizacionItemId: item.id,
           clave: item.supplierSku || item.sku,
@@ -127,12 +160,27 @@ export class CtPurchaseOrderService {
           lineSell: Math.round(unitSell * item.qty * 100) / 100,
           supplierCode: 'CT',
           priceIncludesTax: SUPPLIER_PRICING_POLICIES.CT.listPriceIncludesTax,
+          supplierWarehouseCode,
+          almacenLabel: this.almacenLabel(supplierWarehouseCode),
+          stockAtWarehouse,
+          stockOk,
         };
       }),
     );
 
     const subtotalCost = lines.reduce((s, l) => s + l.lineCost, 0);
     const subtotalSell = lines.reduce((s, l) => s + l.lineSell, 0);
+    const warehouseCodes = [
+      ...new Set(lines.map((l) => l.supplierWarehouseCode).filter(Boolean) as string[]),
+    ];
+    const suggestedAlmacen = this.resolveAlmacenFromItems(ctItems);
+    const warehouseMismatch = warehouseCodes.length > 1;
+    const stockWarnings = lines
+      .filter((l) => l.supplierWarehouseCode && l.stockOk === false)
+      .map(
+        (l) =>
+          `${l.clave}: solo ${l.stockAtWarehouse ?? 0} u. en ${l.almacenLabel || l.supplierWarehouseCode} (pides ${l.qty})`,
+      );
     return {
       lines,
       subtotalCost,
@@ -142,7 +190,39 @@ export class CtPurchaseOrderService {
       defaultEnvio: this.buildDefaultEnvio(quote),
       config: this.getCtConfig(),
       existingOrders: await this.listForQuote(cotizacionId, companyId),
+      suggestedAlmacen,
+      warehouseMismatch,
+      stockWarnings,
     };
+  }
+
+  private async assertStockAtAlmacen(
+    cotizacionId: number,
+    companyId: number,
+    almacen: string,
+  ) {
+    const preview = await this.previewCtLines(cotizacionId, companyId);
+    const code = almacen.trim().toUpperCase();
+    const shortages: string[] = [];
+
+    for (const line of preview.lines) {
+      const product = await this.prisma.productCT.findFirst({
+        where: { clave: String(line.clave || '') },
+      });
+      if (!product?.existencia) continue;
+      const avail = stockAtApiWarehouse(product.existencia, code);
+      if (avail < line.qty) {
+        shortages.push(
+          `${line.clave}: ${avail} u. en ${this.almacenLabel(code)} (necesitas ${line.qty})`,
+        );
+      }
+    }
+
+    if (shortages.length) {
+      throw new BadRequestException(
+        `Stock insuficiente en almacén ${this.almacenLabel(code)}:\n${shortages.join('\n')}`,
+      );
+    }
   }
 
   /** Borrador local al aprobar — sin llamar API hasta que operaciones confirme envío. */
@@ -157,10 +237,11 @@ export class CtPurchaseOrderService {
 
     const quote = await this.prisma.cotizacion.findFirst({
       where: { id: cotizacionId, companyId },
+      include: { items: true },
     });
     if (!quote) return null;
 
-    const almacen = this.defaultAlmacen();
+    const almacen = this.resolveAlmacenFromItems(quote.items);
     const envio = this.buildDefaultEnvio(quote);
     const payload: CtSolicitarPedidoRequest = {
       idPedido: cotizacionId,
@@ -221,8 +302,16 @@ export class CtPurchaseOrderService {
       throw new BadRequestException('Indica al menos una dirección de envío.');
     }
 
+    const almacen = (dto.almacen || preview.suggestedAlmacen || this.defaultAlmacen()).trim().toUpperCase();
+
+    if (preview.warehouseMismatch) {
+      this.logger.warn(
+        `Cotización ${cotizacionId}: partidas con almacenes distintos (${preview.lines.map((l) => l.supplierWarehouseCode).join(', ')}). Pedido único desde ${almacen}.`,
+      );
+    }
+
+    await this.assertStockAtAlmacen(cotizacionId, companyId, almacen);
     const idPedido = cotizacionId;
-    const almacen = dto.almacen || this.defaultAlmacen();
     const payload: CtSolicitarPedidoRequest = {
       idPedido,
       almacen,

@@ -2,13 +2,15 @@ package mx.nexara.mobile.nativeapp.ui.studio
 
 import android.app.Application
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.compose.runtime.LaunchedEffect
 import mx.nexara.mobile.nativeapp.access.PanelId
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
@@ -44,8 +46,9 @@ fun StudioNavHost(
     panelTitle: String = "NEXARA STUDIO",
 ) {
     val nav = rememberNavController()
+    val deepLinkSignal by PendingDeepLink.signal.collectAsState()
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(deepLinkSignal) {
         val key = PendingDeepLink.consumeModuleFor(PanelId.STUDIO) ?: return@LaunchedEffect
         val route = when (key) {
             "dashboard" -> Dashboard
@@ -91,6 +94,7 @@ fun StudioNavHost(
                 "leads" -> StudioContactsRoute(onBack = pop, leadsOnly = true)
                 "social" -> StudioSocialScreen(onBack = pop)
                 "newsletter" -> StudioNewsletterScreen(onBack = pop)
+                "chat" -> mx.nexara.mobile.nativeapp.ui.chat.ChatScreen(onBack = pop)
                 else -> StudioDashboardScreen(onBack = pop, onOpenModule = { mod ->
                     nav.navigate(moduleRoute(mod))
                 })

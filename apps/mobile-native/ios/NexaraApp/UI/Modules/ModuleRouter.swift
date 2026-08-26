@@ -4,17 +4,26 @@ import SwiftUI
 /// Equivalente al `when(key)` de cada NavHost de Android.
 struct ModuleRouter {
     @ViewBuilder
-    static func view(for panel: PanelId, key: String) -> some View {
-        view(portal: panel.routingPortal, key: key)
+    static func view(for panel: PanelId, key: String, params: [String: String] = [:]) -> some View {
+        view(portal: panel.routingPortal, key: key, params: params)
     }
 
     @ViewBuilder
-    static func view(portal: ModuleRoutingPortal, key: String) -> some View {
+    static func view(portal: ModuleRoutingPortal, key: String, params: [String: String] = [:]) -> some View {
+        let channelId = Int64(params["channel"] ?? "") ?? 0
+        let messageId = Int64(params["msg"] ?? "") ?? 0
         switch (portal, key) {
         // ── Console ────────────────────────────────────────────────
         case (.console, "activities"),
              (.console, "my-activities"):
             ActivitiesView()
+        case (.console, "chat"), (.ventas, "chat"), (.lab, "chat"):
+            ChatView(
+                initialChannelId: channelId > 0 ? channelId : nil,
+                initialMessageId: messageId > 0 ? messageId : nil
+            )
+        case (.console, "dispatch"):
+            DispatchBoardView()
         case (.console, "evidences"):
             EvidencesView(reviewMode: true)
         case (.console, "my-evidences"):
@@ -90,6 +99,8 @@ struct ModuleRouter {
             CrmSalesTeamView()
         case (.ventas, "cotizaciones"):
             CrmCotizacionesView()
+        case (.ventas, "smart-quote"), (.ventas, "cotizar"), (.ventas, "nueva-cotizacion"):
+            SmartQuoteView()
         case (.ventas, "plantillas"), (.ventas, "templates"):
             CrmTemplatesView()
         case (.ventas, "leads"):
@@ -133,7 +144,9 @@ struct ModuleRouter {
         case (.console, "analytics"), (.console, "bi"):
             ErpBiView()
         case (.console, "executive"):
-            ExecutiveView()
+            ExecutiveView(panel: panel)
+        case (.console, "pipeline"):
+            CrmPipelineView()
         case (.console, "approvals"):
             ApprovalsView()
         case (.console, "notifications-center"):

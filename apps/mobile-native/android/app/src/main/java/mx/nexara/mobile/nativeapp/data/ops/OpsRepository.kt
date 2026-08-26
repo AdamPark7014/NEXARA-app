@@ -53,6 +53,12 @@ class OpsRepository(context: Context) {
         api.patchClientTicketStatus(id, mapOf("status" to status))
     }
 
+    suspend fun assignClientTicket(requestId: Long, activityId: Long) {
+        api.assignClientTicket(requestId, mapOf("activityId" to activityId))
+    }
+
+    suspend fun approvedTicketRequests() = clientTicketRequestDtos("APPROVED")
+
     suspend fun approveRequisition(id: Long) {
         api.approveRequisition(id)
     }

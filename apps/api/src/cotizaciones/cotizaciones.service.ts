@@ -14,7 +14,7 @@ import { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
 import { SendCotizacionDto } from './dto/send-cotizacion.dto.js';
 import { SignCotizacionDto } from './dto/sign-cotizacion.dto.js';
 import { generateCotizacionPdf } from './cotizacion-pdf.js';
-import { AutoApprovalService } from '../workflow/auto-approval.service.js';
+import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { VentasService } from '../ventas/ventas.service.js';
@@ -48,7 +48,7 @@ const normalizeStatus = (status?: string) => {
 export class CotizacionesService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly autoApproval: AutoApprovalService,
+    private readonly domainEvents: DomainEventBusService,
     private readonly notificationsService: NotificationsService,
     private readonly notificationHierarchy: NotificationHierarchyService,
     @Inject(forwardRef(() => VentasService)) private readonly ventasService: VentasService,
@@ -247,16 +247,27 @@ export class CotizacionesService {
 
     if (createdById) {
       const maxDiscount = this.maxDiscountPercent(items);
-      this.autoApproval
-        .evaluate({
+      this.domainEvents.requestAutoApproval({
           entityType: 'COTIZACION',
           entityId: created.id,
           userId: createdById,
           companyId: created.companyId,
           payload: { maxDiscountPercent: maxDiscount, total: created.total },
-        })
-        .catch(() => undefined);
+        });
     }
+
+    this.domainEvents.publishEntityLifecycle('created', {
+      entityType: 'COTIZACION',
+      entityId: created.id,
+      companyId: created.companyId,
+      userId: createdById ?? undefined,
+      payload: {
+        status: created.status,
+        quoteNumber: created.quoteNumber,
+        total: Number(created.total),
+        clientName: created.clientName,
+      },
+    });
 
     return created;
   }
@@ -396,15 +407,13 @@ export class CotizacionesService {
       // Siempre re-evaluamos en update (parcial o total). El servicio de
       // auto-approval es idempotente: no creará un workflow nuevo si ya hay
       // uno activo para la misma entidad.
-      this.autoApproval
-        .evaluate({
+      this.domainEvents.requestAutoApproval({
           entityType: 'COTIZACION',
           entityId: id,
           userId: requesterId,
           companyId: result.companyId ?? existing.companyId,
           payload: { maxDiscountPercent: maxDiscount, total: result.total },
-        })
-        .catch(() => undefined);
+        });
     }
 
     if (status === CotizacionStatus.APPROVED) {
@@ -414,6 +423,19 @@ export class CotizacionesService {
         companyId: result.companyId,
       });
     }
+
+    this.domainEvents.publishEntityLifecycle('updated', {
+      entityType: 'COTIZACION',
+      entityId: id,
+      companyId: result.companyId ?? existing.companyId,
+      userId: requesterId,
+      payload: {
+        status: result.status,
+        quoteNumber: result.quoteNumber,
+        total: Number(result.total),
+        maxDiscountPercent: maxDiscountPercent(finalItems),
+      },
+    });
 
     return result;
   }
@@ -506,6 +528,88 @@ export class CotizacionesService {
     } catch (error) {
       console.error('CT draft on approval:', error);
     }
+  }
+
+  /**
+   * Workflow de descuento completado — la cotización puede enviarse al cliente.
+   * No cambia el estatus (APPROVED = firma del cliente); publica evento de dominio.
+   */
+  async onWorkflowDiscountApproved(quoteId: number, companyId: number, actorId?: number) {
+    const quote = await this.db.cotizacion.findFirst({
+      where: { id: quoteId, ...companyWhere(companyId) },
+    });
+    if (!quote) return;
+
+    const notifyUserId = actorId ?? quote.createdById;
+    if (notifyUserId) {
+      void this.notificationsService
+        .createNotification({
+          userId: notifyUserId,
+          type: 'QUOTE_DISCOUNT_APPROVED',
+          category: 'sales',
+          title: '✅ Descuento aprobado',
+          message: `La cotización ${quote.quoteNumber} tiene descuento autorizado. Ya puedes enviarla al cliente.`,
+          entityType: 'COTIZACION',
+          relatedEntityId: quote.id,
+          relatedUrl: `/crm/cotizaciones/${quote.id}`,
+        } as any)
+        .catch(() => undefined);
+    }
+
+    this.domainEvents.publishEntityLifecycle('updated', {
+      entityType: 'COTIZACION',
+      entityId: quoteId,
+      companyId,
+      userId: actorId ?? quote.createdById ?? undefined,
+      payload: {
+        status: quote.status,
+        quoteNumber: quote.quoteNumber,
+        total: Number(quote.total),
+        discountApproved: true,
+      },
+    });
+  }
+
+  /** Descuento rechazado en workflow — notifica al vendedor. */
+  async onWorkflowDiscountRejected(
+    quoteId: number,
+    companyId: number,
+    actorId?: number,
+    comments?: string | null,
+  ) {
+    const quote = await this.db.cotizacion.findFirst({
+      where: { id: quoteId, ...companyWhere(companyId) },
+    });
+    if (!quote) return;
+
+    const notifyUserId = quote.createdById ?? actorId;
+    if (notifyUserId) {
+      void this.notificationsService
+        .createNotification({
+          userId: notifyUserId,
+          type: 'QUOTE_DISCOUNT_REJECTED',
+          category: 'sales',
+          title: '❌ Descuento no autorizado',
+          message: `La cotización ${quote.quoteNumber} no obtuvo aprobación de descuento.${comments ? ` Motivo: ${comments}` : ''}`,
+          entityType: 'COTIZACION',
+          relatedEntityId: quote.id,
+          relatedUrl: `/crm/cotizaciones/${quote.id}`,
+        } as any)
+        .catch(() => undefined);
+    }
+
+    this.domainEvents.publishEntityLifecycle('updated', {
+      entityType: 'COTIZACION',
+      entityId: quoteId,
+      companyId,
+      userId: actorId ?? quote.createdById ?? undefined,
+      payload: {
+        status: quote.status,
+        quoteNumber: quote.quoteNumber,
+        discountRejected: true,
+        comments: comments?.trim() || null,
+      },
+    });
   }
 
   /** Firma → notificar vendedor, marcar oportunidad vinculada como WON. */

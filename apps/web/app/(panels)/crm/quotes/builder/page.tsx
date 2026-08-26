@@ -26,7 +26,16 @@ import {
   type QuoteLinePayload,
   type SmartOffer,
 } from "@/lib/smart-quote-api";
-import { codesForCity, stockAtPreferred, warehouseLabel } from "@/lib/ct-warehouse-labels";
+import {
+  codesForCity,
+  fulfillmentOptionsFromStockRows,
+  leadTimeForFulfillment,
+  stockAtApiWarehouseFromRows,
+  stockAtPreferred,
+  warehouseApiLabel,
+  warehouseLabel,
+  type FulfillmentWarehouseOption,
+} from "@/lib/ct-warehouse-labels";
 import Modal from "@/components/ui/Modal";
 import styles from "./smart-quote.module.css";
 
@@ -368,18 +377,83 @@ function CtStatusBar({
 
 function CartLineMeta({ line, showCosts }: { line: QuoteLinePayload; showCosts: boolean }) {
   const warn = showCosts ? lineMarginWarning(line) : null;
+  const whCode = line.supplierWarehouseCode;
+  const whStock =
+    whCode && line.stockByWarehouse
+      ? stockAtApiWarehouseFromRows(line.stockByWarehouse, whCode)
+      : null;
+  const stockShort = whStock != null && line.qty > whStock;
   return (
     <div className={styles.sqPosLineMeta}>
       {line.leadTimeDays != null ? (
         <span className={`${styles.sqEtaChip} ${line.leadTimeDays <= 1 ? styles.sqEtaChipFast : ""}`}>
-          {formatEta(line.leadTimeDays)}
+          {line.deliveryTime || formatEta(line.leadTimeDays)}
         </span>
       ) : null}
-      {line.stockSnapshot != null && line.stockSnapshot > 0 ? (
+      {whCode ? (
+        <span className={stockShort ? styles.sqMarginWarn : undefined}>
+          {warehouseApiLabel(whCode)}
+          {whStock != null ? ` · ${whStock} u.` : ""}
+        </span>
+      ) : null}
+      {!whCode && line.stockSnapshot != null && line.stockSnapshot > 0 ? (
         <span>{line.stockSnapshot} u. CT</span>
       ) : null}
       {warn ? <span className={styles.sqMarginWarn}>{warn}</span> : null}
     </div>
+  );
+}
+
+function CartLineFulfillment({
+  line,
+  preferredCodes,
+  onChange,
+}: {
+  line: QuoteLinePayload;
+  preferredCodes: string[];
+  onChange: (patch: Partial<QuoteLinePayload>) => void;
+}) {
+  if (!line.productCtId) return null;
+  const opts = fulfillmentOptionsFromStockRows(line.stockByWarehouse, preferredCodes);
+  if (!opts.length) return null;
+
+  const selected = line.supplierWarehouseCode || opts[0].apiCode;
+  const selectedOpt = opts.find((o) => o.apiCode === selected) || opts[0];
+  const stockShort = selectedOpt.qty < line.qty;
+
+  const pick = (apiCode: string) => {
+    const opt =
+      opts.find((o) => o.apiCode === apiCode) ||
+      ({ apiCode, label: warehouseApiLabel(apiCode), qty: 0, local: false } as FulfillmentWarehouseOption);
+    const eta = leadTimeForFulfillment(opt);
+    onChange({
+      supplierWarehouseCode: apiCode,
+      leadTimeDays: eta.days,
+      deliveryTime: eta.deliveryTime,
+    });
+  };
+
+  return (
+    <label className={styles.sqFulfillment}>
+      <span>Obtener de</span>
+      <select
+        className={styles.sqFulfillmentSelect}
+        value={selected}
+        onChange={(e) => pick(e.target.value)}
+        aria-label={`Almacén de surtido para ${line.name}`}
+      >
+        {opts.map((o) => (
+          <option key={o.apiCode} value={o.apiCode}>
+            {warehouseApiLabel(o.apiCode)} — {o.qty} u.{o.local ? " · local" : ""}
+          </option>
+        ))}
+      </select>
+      {stockShort ? (
+        <span className={styles.sqFulfillmentWarn}>
+          Solo {selectedOpt.qty} u. aquí (pides {line.qty})
+        </span>
+      ) : null}
+    </label>
   );
 }
 
@@ -653,7 +727,7 @@ export default function SmartQuoteBuilderPage() {
         next[idx] = { ...next[idx], qty: next[idx].qty + n };
         return next;
       }
-      return [...prev, offerToLine(offer, n, optimize, targetMargin)];
+      return [...prev, offerToLine(offer, n, optimize, targetMargin, pickupWarehouseCodes)];
     });
     setToast(`+${n} · ${shortName(offer.nombre || offer.clave, 36)}`);
   };
@@ -818,6 +892,7 @@ export default function SmartQuoteBuilderPage() {
           leadTimeDays: l.leadTimeDays ?? undefined,
           scoreReason: l.scoreReason || undefined,
           optimizationMode: l.optimizationMode || optimize,
+          supplierWarehouseCode: l.supplierWarehouseCode || undefined,
           laborHours: l.laborHours || 0,
           laborRate: l.laborRate || 0,
           deliveryTime: l.deliveryTime || undefined,
@@ -1685,6 +1760,13 @@ export default function SmartQuoteBuilderPage() {
               {lines.map((l, idx) => (
                 <div key={`${l.sku || l.name}-${idx}`} className={styles.sqPosLine}>
                   <div className={styles.sqPosLineName}>{shortName(l.name, 36)}</div>
+                  <CartLineFulfillment
+                    line={l}
+                    preferredCodes={pickupWarehouseCodes}
+                    onChange={(patch) =>
+                      setLines((prev) => prev.map((x, i) => (i === idx ? { ...x, ...patch } : x)))
+                    }
+                  />
                   <CartLineMeta line={l} showCosts={showCosts} />
                   <div className={styles.sqPosLineControls}>
                     <button type="button" className={styles.sqQtyBtn} onClick={() => bumpLineQty(idx, -1)} aria-label="Menos">
@@ -1816,6 +1898,13 @@ export default function SmartQuoteBuilderPage() {
                         ✕
                       </button>
                     </div>
+                    <CartLineFulfillment
+                      line={l}
+                      preferredCodes={pickupWarehouseCodes}
+                      onChange={(patch) =>
+                        setLines((prev) => prev.map((x, i) => (i === idx ? { ...x, ...patch } : x)))
+                      }
+                    />
                     <CartLineMeta line={l} showCosts={showCosts} />
                     <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
                       <span style={{ color: "var(--text-tertiary)" }}>Cant.</span>

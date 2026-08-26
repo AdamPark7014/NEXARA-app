@@ -30,6 +30,17 @@ const item = (overrides: Partial<NormalizedCotizacionItem> = {}): NormalizedCoti
   deliveryTime: null,
   countryOrigin: null,
   notes: null,
+  unitCost: null,
+  supplierId: null,
+  supplierSku: null,
+  productCtId: null,
+  supplierCode: null,
+  supplierWarehouseCode: null,
+  marginPercent: null,
+  stockSnapshot: null,
+  leadTimeDays: null,
+  scoreReason: null,
+  optimizationMode: null,
   ...overrides,
 });
 

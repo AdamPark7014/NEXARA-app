@@ -52,7 +52,7 @@ export default function CtOrderPanel({ token, cotizacionId, quoteStatus, canMana
       const data = await smartQuoteCtOrderPreview(token, cotizacionId);
       setPreview(data);
       setOrders(data.existingOrders ?? []);
-      setAlmacen(data.config?.defaultAlmacen || "01A");
+      setAlmacen(data.suggestedAlmacen || data.config?.defaultAlmacen || "01A");
       if (data.defaultEnvio) {
         setEnvio({
           ...data.defaultEnvio,
@@ -73,6 +73,10 @@ export default function CtOrderPanel({ token, cotizacionId, quoteStatus, canMana
 
   const hasCtLines = (preview?.lines?.length ?? 0) > 0;
   const approved = quoteStatus === "APPROVED";
+  const almacenMismatchLines =
+    preview?.lines.filter(
+      (l) => l.supplierWarehouseCode && l.supplierWarehouseCode !== almacen,
+    ) ?? [];
 
   if (loading) return null;
   if (!hasCtLines) return null;
@@ -165,6 +169,24 @@ export default function CtOrderPanel({ token, cotizacionId, quoteStatus, canMana
         </div>
       )}
 
+      {preview?.warehouseMismatch && (
+        <div className={styles.warn}>
+          Las partidas tienen <strong>almacenes de surtido distintos</strong>. CT acepta un almacén por
+          pedido: elige desde dónde surtir todo o ajusta la cotización.
+        </div>
+      )}
+
+      {(preview?.stockWarnings?.length ?? 0) > 0 && (
+        <div className={styles.warn}>
+          <strong>Stock en almacén cotizado:</strong>
+          <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+            {preview!.stockWarnings.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {orders.length > 0 && (
         <div className={styles.orders}>
           <div className={styles.ordersTitle}>Historial de pedidos CT</div>
@@ -198,6 +220,7 @@ export default function CtOrderPanel({ token, cotizacionId, quoteStatus, canMana
               <tr>
                 <th>SKU</th>
                 <th>Producto</th>
+                <th>Obtener de</th>
                 <th>Cant.</th>
                 <th>Costo u.</th>
                 <th>Venta u.</th>
@@ -209,6 +232,18 @@ export default function CtOrderPanel({ token, cotizacionId, quoteStatus, canMana
                 <tr key={String(l.clave)}>
                   <td>{l.clave}</td>
                   <td>{l.nombre}</td>
+                  <td>
+                    {l.almacenLabel || l.supplierWarehouseCode || "—"}
+                    {l.stockAtWarehouse != null ? (
+                      <span className={styles.orderMeta}> · {l.stockAtWarehouse} u.</span>
+                    ) : null}
+                    {!l.stockOk ? (
+                      <span className={styles.orderMeta} style={{ color: "#b45309" }}>
+                        {" "}
+                        · stock bajo
+                      </span>
+                    ) : null}
+                  </td>
                   <td>{l.qty}</td>
                   <td>
                     <Money value={l.unitCost} />
@@ -226,9 +261,15 @@ export default function CtOrderPanel({ token, cotizacionId, quoteStatus, canMana
 
           {approved && canManage && (
             <>
+              {almacenMismatchLines.length > 0 && (
+                <div className={styles.info}>
+                  {almacenMismatchLines.length} partida(s) se cotizaron desde otro almacén. Al enviar desde{" "}
+                  <strong>{almacen}</strong> se validará stock en ese almacén.
+                </div>
+              )}
               <div className={styles.formGrid}>
                 <label>
-                  Almacén CT
+                  Almacén CT (pedido completo)
                   <select value={almacen} onChange={(e) => setAlmacen(e.target.value)} className={styles.input}>
                     {(preview?.config?.warehouses ?? []).map((w) => (
                       <option key={w.code} value={w.code}>

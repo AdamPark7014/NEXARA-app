@@ -1,39 +1,68 @@
 package mx.nexara.mobile.nativeapp.ui.enterprise
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import mx.nexara.mobile.nativeapp.ui.NexaraAppMeta
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -58,7 +87,21 @@ object NxColors {
     val Card = Color.White
 }
 
+object NxDimens {
+    val PanelRadius = 12.dp
+    val PanelElevation = 2.dp
+}
+
 enum class NxTone { Neutral, Success, Warning, Danger, Info, Brand }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NxTealTopAppBarColors() = TopAppBarDefaults.topAppBarColors(
+    containerColor = NxColors.Teal,
+    titleContentColor = Color.White,
+    navigationIconContentColor = Color.White,
+    actionIconContentColor = Color.White,
+)
 
 fun NxTone.fg(): Color = when (this) {
     NxTone.Neutral -> NxColors.Muted
@@ -121,6 +164,39 @@ fun NxSectionHeader(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NxPanelShell(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    contentPadding: PaddingValues = PaddingValues(14.dp),
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val shape = RoundedCornerShape(NxDimens.PanelRadius)
+    val colors = CardDefaults.cardColors(containerColor = NxColors.Card)
+    val elevation = CardDefaults.cardElevation(NxDimens.PanelElevation)
+    if (onClick != null) {
+        Card(
+            onClick = onClick,
+            modifier = modifier.fillMaxWidth(),
+            shape = shape,
+            colors = colors,
+            elevation = elevation,
+        ) {
+            Column(Modifier.padding(contentPadding), content = content)
+        }
+    } else {
+        Card(
+            modifier = modifier.fillMaxWidth(),
+            shape = shape,
+            colors = colors,
+            elevation = elevation,
+        ) {
+            Column(Modifier.padding(contentPadding), content = content)
+        }
+    }
+}
+
 @Composable
 fun NxKpiCard(
     kpi: NxKpi,
@@ -128,9 +204,9 @@ fun NxKpiCard(
 ) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(NxDimens.PanelRadius),
         colors = CardDefaults.cardColors(containerColor = NxColors.Card),
-        elevation = CardDefaults.cardElevation(2.dp),
+        elevation = CardDefaults.cardElevation(NxDimens.PanelElevation),
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(kpi.label, style = MaterialTheme.typography.labelMedium, color = NxColors.Muted)
@@ -220,7 +296,7 @@ fun NxSparkline(
 fun NxAlertBanner(alert: NxAlert, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(NxDimens.PanelRadius),
         colors = CardDefaults.cardColors(containerColor = alert.tone.bg()),
         elevation = CardDefaults.cardElevation(0.dp),
     ) {
@@ -311,7 +387,7 @@ fun NxErrorBlock(message: String, onRetry: (() -> Unit)? = null) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = NxColors.DangerSoft),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(NxDimens.PanelRadius),
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("No se pudo cargar", fontWeight = FontWeight.SemiBold, color = NxColors.Danger)
@@ -339,9 +415,9 @@ fun NxDecisionCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(NxDimens.PanelRadius),
         colors = CardDefaults.cardColors(containerColor = NxColors.Card),
-        elevation = CardDefaults.cardElevation(2.dp),
+        elevation = CardDefaults.cardElevation(NxDimens.PanelElevation),
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
@@ -385,4 +461,253 @@ fun sparklineFromCounts(counts: List<Int>, padTo: Int = 7): List<Float> {
     val padded = if (counts.size >= padTo) counts.takeLast(padTo)
     else List(padTo - counts.size) { 0 } + counts
     return padded.map { it.toFloat() }
+}
+
+// ── UI primitives (listas, búsqueda, carga, scaffold) ─────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NxSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String = "Buscar…",
+    enabled: Boolean = true,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = { Text(placeholder, color = NxColors.Muted) },
+        leadingIcon = {
+            Icon(Icons.Default.Search, contentDescription = "Buscar", tint = NxColors.Muted)
+        },
+        trailingIcon = {
+            if (value.isNotEmpty()) {
+                IconButton(onClick = { onValueChange("") }) {
+                    Icon(Icons.Default.Clear, contentDescription = "Limpiar búsqueda", tint = NxColors.Muted)
+                }
+            }
+        },
+        modifier = modifier.fillMaxWidth(),
+        singleLine = true,
+        enabled = enabled,
+        shape = RoundedCornerShape(NxDimens.PanelRadius),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = NxColors.Teal,
+            cursorColor = NxColors.Teal,
+            focusedLeadingIconColor = NxColors.Teal,
+        ),
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NxListRow(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    meta: String? = null,
+    chipText: String? = null,
+    chipTone: NxTone = NxTone.Neutral,
+    trailing: (@Composable () -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    val shape = RoundedCornerShape(NxDimens.PanelRadius)
+    val rowContent: @Composable ColumnScope.() -> Unit = {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = NxColors.Slate,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NxColors.Muted,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (!meta.isNullOrBlank()) {
+                    Text(meta, style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
+                }
+            }
+            if (!chipText.isNullOrBlank()) {
+                NxStatusChip(chipText, chipTone)
+            }
+            trailing?.invoke()
+        }
+    }
+    if (onClick != null) {
+        Card(
+            onClick = onClick,
+            modifier = modifier.fillMaxWidth(),
+            shape = shape,
+            colors = CardDefaults.cardColors(containerColor = NxColors.Card),
+            elevation = CardDefaults.cardElevation(NxDimens.PanelElevation),
+        ) {
+            Column(Modifier.padding(14.dp), content = rowContent)
+        }
+    } else {
+        Card(
+            modifier = modifier.fillMaxWidth(),
+            shape = shape,
+            colors = CardDefaults.cardColors(containerColor = NxColors.Card),
+            elevation = CardDefaults.cardElevation(NxDimens.PanelElevation),
+        ) {
+            Column(Modifier.padding(14.dp), content = rowContent)
+        }
+    }
+}
+
+@Composable
+fun NxSkeletonBlock(
+    modifier: Modifier = Modifier,
+    height: Dp = 16.dp,
+    cornerRadius: Dp = 8.dp,
+) {
+    val transition = rememberInfiniteTransition(label = "nxShimmer")
+    val shimmer by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "nxShimmerOffset",
+    )
+    val base = Color(0xFFE2E8F0)
+    val highlight = Color(0xFFF8FAFC)
+    val brush = Brush.linearGradient(
+        colors = listOf(base, highlight, base),
+        start = Offset(shimmer * 600f - 200f, 0f),
+        end = Offset(shimmer * 600f + 200f, 0f),
+    )
+    Box(
+        modifier = modifier
+            .height(height)
+            .clip(RoundedCornerShape(cornerRadius))
+            .background(brush),
+    )
+}
+
+@Composable
+fun NxSkeletonList(
+    itemCount: Int = 5,
+    itemHeight: Dp = 72.dp,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        repeat(itemCount) {
+            NxSkeletonBlock(
+                modifier = Modifier.fillMaxWidth(),
+                height = itemHeight,
+                cornerRadius = NxDimens.PanelRadius,
+            )
+        }
+    }
+}
+
+/**
+ * Surface de pantalla con fondo Nx y pull-to-refresh opcional.
+ *
+ * ```
+ * NxScreenScaffold(isRefreshing = state.isRefreshing, onRefresh = vm::refresh) {
+ *     LazyColumn(Modifier.fillMaxSize()) { ... }
+ * }
+ * ```
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NxScreenScaffold(
+    modifier: Modifier = Modifier,
+    isRefreshing: Boolean = false,
+    onRefresh: (() -> Unit)? = null,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    Surface(modifier = modifier.fillMaxSize(), color = NxColors.Surface) {
+        if (onRefresh != null) {
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = onRefresh,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                Box(Modifier.fillMaxSize(), content = content)
+            }
+        } else {
+            Box(Modifier.fillMaxSize(), content = content)
+        }
+    }
+}
+
+/**
+ * Snackbar con estilo NEXARA. Patrón recomendado:
+ *
+ * ```
+ * val snackbarHostState = rememberNxSnackbarHostState()
+ * val scope = rememberCoroutineScope()
+ *
+ * Scaffold(snackbarHost = { NxSnackbarHost(snackbarHostState) }) { padding ->
+ *     // ...
+ * }
+ *
+ * scope.launch { snackbarHostState.showSnackbar("Guardado correctamente") }
+ * ```
+ */
+@Composable
+fun rememberNxSnackbarHostState(): SnackbarHostState = remember { SnackbarHostState() }
+
+@Composable
+fun NxSnackbarHost(
+    hostState: SnackbarHostState,
+    modifier: Modifier = Modifier,
+) {
+    SnackbarHost(hostState = hostState, modifier = modifier) { data ->
+        Snackbar(
+            snackbarData = data,
+            containerColor = NxColors.Slate,
+            contentColor = Color.White,
+            actionColor = NxColors.TealSoft,
+            shape = RoundedCornerShape(NxDimens.PanelRadius),
+        )
+    }
+}
+
+/** Pie de pantalla con versión de la app (estándar en hub, perfil y login). */
+@Composable
+fun NxAppMetaFooter(
+    modifier: Modifier = Modifier,
+    onOpenPrivacy: (() -> Unit)? = null,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val label = remember(context) { NexaraAppMeta.buildLabel(context) }
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = "NEXARA · $label",
+            style = MaterialTheme.typography.labelSmall,
+            color = NxColors.Muted,
+            textAlign = TextAlign.Center,
+        )
+        if (onOpenPrivacy != null) {
+            TextButton(onClick = onOpenPrivacy) {
+                Text(
+                    "Política de privacidad",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = NxColors.Teal,
+                )
+            }
+        }
+    }
 }

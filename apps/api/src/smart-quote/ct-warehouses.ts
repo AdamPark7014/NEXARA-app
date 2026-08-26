@@ -171,6 +171,84 @@ export function stockRowsFromExistencia(existencia: unknown, max = 8): StockByWa
     .slice(0, max);
 }
 
+/** Catálogo FTP → código API CT-CONNECT (pedidos). */
+const CATALOG_TO_API: Record<string, string> = {
+  PUE: '14A',
+  PUEBLA: '14A',
+  MTY: '35A',
+  GDL: '46A',
+  CDMX: '13A',
+  DFA: '13A',
+  HMO: '01A',
+  CHI: '03A',
+  LEO: '07A',
+  '14A': '14A',
+  '35A': '35A',
+  '46A': '46A',
+  '13A': '13A',
+  '01A': '01A',
+  '03A': '03A',
+  '07A': '07A',
+};
+
+export function apiWarehouseForCatalogCode(code: string): string {
+  const key = String(code || '').trim().toUpperCase();
+  if (!key) return preferredCatalogWarehouse() === 'PUE' ? '14A' : '01A';
+  if (CATALOG_TO_API[key]) return CATALOG_TO_API[key];
+  if (/^\d{2}A$/.test(key)) return key;
+  return '14A';
+}
+
+export function stockAtApiWarehouse(existencia: unknown, apiCode: string): number {
+  const normalized = normalizeExistencia(existencia);
+  const target = String(apiCode || '').trim().toUpperCase();
+  return Object.entries(normalized).reduce((sum, [code, qty]) => {
+    return apiWarehouseForCatalogCode(code) === target ? sum + qty : sum;
+  }, 0);
+}
+
+export type FulfillmentWarehouseOption = {
+  apiCode: string;
+  label: string;
+  qty: number;
+  local: boolean;
+};
+
+export function fulfillmentOptionsFromStock(
+  existencia: unknown,
+  preferredCatalogCodes: string[] = [],
+): FulfillmentWarehouseOption[] {
+  const pref = new Set(preferredCatalogCodes.map((c) => c.toUpperCase()));
+  const rows = stockRowsFromExistencia(existencia, 24);
+  const byApi = new Map<string, FulfillmentWarehouseOption>();
+  for (const r of rows) {
+    const apiCode = apiWarehouseForCatalogCode(r.code);
+    const label = r.city || r.label || warehouseLabel(r.code);
+    const local = pref.has(r.code.toUpperCase());
+    const prev = byApi.get(apiCode);
+    if (prev) {
+      prev.qty += r.qty;
+      prev.local = prev.local || local;
+    } else {
+      byApi.set(apiCode, { apiCode, label, qty: r.qty, local });
+    }
+  }
+  return [...byApi.values()].sort(
+    (a, b) => (b.local ? 1 : 0) - (a.local ? 1 : 0) || b.qty - a.qty,
+  );
+}
+
+export function suggestApiWarehouse(
+  existencia: unknown,
+  preferredCatalogCodes: string[] = [],
+  fallback?: string,
+): string {
+  const opts = fulfillmentOptionsFromStock(existencia, preferredCatalogCodes);
+  if (!opts.length) return fallback || apiWarehouseForCatalogCode(preferredCatalogWarehouse());
+  const local = opts.find((o) => o.local && o.qty > 0);
+  return local?.apiCode || opts[0].apiCode;
+}
+
 /** Para dropdowns de pedido CT (códigos API). */
 export const CT_ORDER_WAREHOUSES: Array<{ code: string; label: string }> = [
   { code: '01A', label: 'Hermosillo' },

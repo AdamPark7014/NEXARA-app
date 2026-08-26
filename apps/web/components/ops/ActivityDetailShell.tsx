@@ -56,7 +56,10 @@ export default function ActivityDetailShell({ id, children }: { id: string; chil
   const tabs: TabItem[] = useMemo(
     () => [
       { id: "detalle", label: "Detalle", href: base },
+      { id: "operacion", label: "Operación", href: `${base}/operacion` },
       { id: "evidences", label: "Evidencias", href: `${base}/evidences` },
+      { id: "team", label: "Equipo", href: `${base}/team` },
+      { id: "materials", label: "Materiales", href: `${base}/materials` },
       {
         id: "viatics",
         label: "Viáticos",

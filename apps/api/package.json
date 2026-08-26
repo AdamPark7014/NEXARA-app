@@ -19,6 +19,7 @@
     "prisma:status": "prisma migrate status",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
+    "seed:play-reviewer": "ts-node ./prisma/seed-play-reviewer.ts",
     "audit:org-users": "node ./scripts/audit-org-users.mjs",
     "generate:vapid": "web-push generate-vapid-keys"
   },

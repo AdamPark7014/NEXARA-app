@@ -29,6 +29,12 @@ import {
 } from "@/lib/user-access";
 import { buildCrossPanelUrl } from "@/lib/cross-panel-handoff";
 import type { UserAccessInput } from "@/lib/user-access";
+import { fetchGlobalSearch, type GlobalSearchResult } from "@/lib/search-api";
+import {
+  searchResultIcon,
+  searchResultTypeLabel,
+  searchResultUrl,
+} from "@/lib/search-routes";
 
 type Action = {
   id: string;
@@ -46,6 +52,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   user: UserAccessInput | null;
+  token?: string | null;
   onToggleDark: () => void;
   onLogout: () => void;
 };
@@ -181,12 +188,16 @@ export default function CommandPalette({
   open,
   onClose,
   user,
+  token,
   onToggleDark,
   onLogout,
 }: Props) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
+  const [entityResults, setEntityResults] = useState<GlobalSearchResult[]>([]);
+  const [entityLoading, setEntityLoading] = useState(false);
+  const [entityHint, setEntityHint] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -194,9 +205,41 @@ export default function CommandPalette({
     if (open) {
       setQuery("");
       setActiveIdx(0);
+      setEntityResults([]);
+      setEntityHint(null);
       setTimeout(() => inputRef.current?.focus(), 10);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !token) {
+      setEntityResults([]);
+      setEntityHint(null);
+      return;
+    }
+    const q = query.trim();
+    if (q.length < 2) {
+      setEntityResults([]);
+      setEntityHint(null);
+      return;
+    }
+
+    setEntityLoading(true);
+    const timer = window.setTimeout(() => {
+      fetchGlobalSearch(token, q, 10)
+        .then((res) => {
+          setEntityResults(res.results);
+          setEntityHint(res.intelligence?.why ?? null);
+        })
+        .catch(() => {
+          setEntityResults([]);
+          setEntityHint(null);
+        })
+        .finally(() => setEntityLoading(false));
+    }, 280);
+
+    return () => window.clearTimeout(timer);
+  }, [open, query, token]);
 
   const modules = useMemo<Action[]>(() => {
     const list = getUserAllowedModules(user)
@@ -216,6 +259,33 @@ export default function CommandPalette({
 
   const globalActions = useMemo<Action[]>(() => {
     const acc: Action[] = [
+      {
+        id: "act:create-lead",
+        label: "Crear lead",
+        description: "Nuevo prospecto en CRM",
+        icon: "🌱",
+        group: "Crear",
+        url: "/crm/leads",
+        keywords: ["nuevo", "prospecto", "lead"],
+      },
+      {
+        id: "act:create-quote",
+        label: "Crear cotización",
+        description: "Nueva cotización comercial",
+        icon: "📄",
+        group: "Crear",
+        url: "/crm/quotes",
+        keywords: ["cotizacion", "quote", "nuevo"],
+      },
+      {
+        id: "act:create-ticket",
+        label: "Crear ticket de soporte",
+        description: "Bandeja OPS · soporte",
+        icon: "🎫",
+        group: "Crear",
+        url: "/ops/support",
+        keywords: ["ticket", "soporte", "incidencia"],
+      },
       {
         id: "act:dark",
         label: "Cambiar tema (claro / oscuro)",
@@ -251,14 +321,37 @@ export default function CommandPalette({
     return acc;
   }, [onToggleDark, onLogout, user]);
 
-  const allActions = useMemo<Action[]>(() => [...modules, ...globalActions], [modules, globalActions]);
+  const entityActions = useMemo<Action[]>(() => {
+    return entityResults.map((r) => {
+      const url = searchResultUrl(r);
+      return {
+        id: `entity:${r.type}:${r.id}`,
+        label: r.title,
+        description: r.subtitle
+          ? `${searchResultTypeLabel(r.type)} · ${r.subtitle}`
+          : searchResultTypeLabel(r.type),
+        icon: searchResultIcon(r.type),
+        group: "Entidades",
+        url: url ?? undefined,
+        keywords: [r.type, r.recommendation ?? ""],
+      };
+    });
+  }, [entityResults]);
+
+  const allActions = useMemo<Action[]>(
+    () => [...entityActions, ...modules, ...globalActions],
+    [entityActions, modules, globalActions],
+  );
 
   const results = useMemo(() => {
     const tokens = tokensFromQuery(query);
     if (!query.trim()) {
       return allActions.slice(0, 40);
     }
+
+    const entityIds = new Set(entityActions.map((a) => a.id));
     const scored = allActions
+      .filter((a) => !entityIds.has(a.id))
       .map((a) => {
         const hay = a.id.startsWith("mod:")
           ? moduleHaystack({
@@ -277,9 +370,11 @@ export default function CommandPalette({
       })
       .filter((r) => r.score > 0)
       .sort((a, b) => b.score - a.score)
-      .slice(0, 40);
-    return scored.map((r) => r.action);
-  }, [query, allActions]);
+      .slice(0, 30)
+      .map((r) => r.action);
+
+    return [...entityActions, ...scored].slice(0, 40);
+  }, [query, allActions, entityActions]);
 
   const groups = useMemo(() => {
     const map = new Map<string, Action[]>();
@@ -413,7 +508,7 @@ export default function CommandPalette({
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar módulo, acción, o palabra del negocio…"
+            placeholder="Buscar clientes, actividades, módulos…"
             style={{
               flex: 1,
               border: "none",
@@ -451,6 +546,16 @@ export default function CommandPalette({
             flex: 1,
           }}
         >
+          {entityLoading && query.trim().length >= 2 && (
+            <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text-tertiary)" }}>
+              Buscando en toda la plataforma…
+            </div>
+          )}
+          {entityHint && !entityLoading && entityResults.length > 0 && (
+            <div style={{ padding: "6px 12px 10px", fontSize: 11.5, color: "var(--text-tertiary)" }}>
+              {entityHint}
+            </div>
+          )}
           {flatResults.length === 0 && (
             <div
               style={{

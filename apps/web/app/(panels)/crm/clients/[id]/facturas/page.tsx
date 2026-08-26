@@ -6,7 +6,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
-import { Tag } from "@/components/ui/DataTable";
+import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { DetailError, DetailSection, formatDate } from "@/components/detail/DetailFrame";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
@@ -68,6 +68,38 @@ export default function ClientInvoicesPage() {
 
   const totalFacturado = invoices.reduce((s, inv) => s + Number(inv.totalAmount ?? 0), 0);
   const pagadas = invoices.filter((inv) => inv.status === "PAID" || inv.status === "SENT").length;
+
+  const invoiceCols: Column<ClientInvoiceRow>[] = [
+    {
+      key: "invoiceNumber",
+      label: "Factura",
+      render: (inv) => (
+        <Link href={`/erp/invoicing?highlight=${inv.id}`} style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>
+          {inv.invoiceNumber}
+        </Link>
+      ),
+      width: 130,
+    },
+    {
+      key: "status",
+      label: "Estado",
+      render: (inv) => <Tag variant={STATUS_VARIANT[inv.status] ?? "neutral"}>{inv.status}</Tag>,
+      width: 100,
+    },
+    { key: "issueDate", label: "Fecha", render: (inv) => formatDate(inv.issueDate), width: 110 },
+    { key: "totalAmount", label: "Total", render: (inv) => <Money value={Number(inv.totalAmount)} />, width: 120 },
+    {
+      key: "project",
+      label: "Proyecto",
+      render: (inv) => inv.salesProjectOrder?.project?.name ?? "—",
+    },
+    {
+      key: "cfdiUuid",
+      label: "UUID",
+      render: (inv) => inv.cfdiUuid ? <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{inv.cfdiUuid}</span> : "—",
+      width: 200,
+    },
+  ];
 
   return (
     <>
@@ -138,47 +170,13 @@ export default function ClientInvoicesPage() {
             {visibleInvoices.length === 0 ? (
               <EmptyState icon="🔍" title="Sin resultados" description="Ajusta los filtros." />
             ) : (
-              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
-                {visibleInvoices.map((inv) => (
-                  <li
-                    key={inv.id}
-                    style={{
-                      padding: 14,
-                      borderRadius: 10,
-                      border: "1px solid var(--border)",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: 12,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{inv.invoiceNumber}</div>
-                      <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>
-                        {formatDate(inv.issueDate)} · {money(inv.totalAmount, inv.currency ?? "MXN")}
-                        {inv.salesProjectOrder?.project?.name
-                          ? ` · Proyecto: ${inv.salesProjectOrder.project.name}`
-                          : ""}
-                      </div>
-                      {inv.cfdiUuid && (
-                        <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>
-                          UUID: {inv.cfdiUuid}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <Tag variant={STATUS_VARIANT[inv.status] ?? "neutral"}>{inv.status}</Tag>
-                      <Link
-                        href={`/erp/invoicing?highlight=${inv.id}`}
-                        style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}
-                      >
-                        Ver en ERP →
-                      </Link>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <DataTable
+                columns={invoiceCols}
+                rows={visibleInvoices}
+                rowKey={(inv) => inv.id}
+                emptyTitle="Sin facturas"
+                emptyDescription="No hay facturas en el periodo."
+              />
             )}
           </>
         ) : (

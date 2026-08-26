@@ -1,51 +1,14 @@
 package mx.nexara.mobile.nativeapp.ui.web
 
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.dp
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
-import mx.nexara.mobile.nativeapp.ui.catalog.PortalModuleListScreen
-import mx.nexara.mobile.nativeapp.ui.console.screens.PlaceholderScreen
+import mx.nexara.mobile.nativeapp.ui.studio.StudioNavHost
 
-private const val Home = "web/home"
-private const val ModulePattern = "web/m/{key}"
-private fun moduleRoute(key: String) = "web/m/$key"
-
+/**
+ * Legacy alias for the public web/studio panel. Routing lives in [StudioNavHost]
+ * to avoid divergent module maps (projects/documents were generic here only).
+ */
 @Composable
 fun WebNavHost(
     onExitToPanels: () -> Unit,
     panelTitle: String = "NEXARA STUDIO",
-) {
-    val nav = rememberNavController()
-    NavHost(navController = nav, startDestination = Home) {
-        composable(Home) {
-            PortalModuleListScreen(
-                title = panelTitle,
-                modules = ModuleCatalog.web,
-                onOpenModule = { m -> nav.navigate(moduleRoute(m.key)) },
-                onBack = onExitToPanels,
-            )
-        }
-        composable(ModulePattern) { backStack ->
-            val key = backStack.arguments?.getString("key").orEmpty()
-            val m = ModuleCatalog.web.firstOrNull { it.key == key }
-            when (key) {
-                "noticias" -> { mx.nexara.mobile.nativeapp.ui.modules.NewsModuleScreen(); return@composable }
-                "contactos" -> { mx.nexara.mobile.nativeapp.ui.modules.ContactMessagesModuleScreen(); return@composable }
-                "clientes" -> { mx.nexara.mobile.nativeapp.ui.modules.ServiceClientsModuleScreen(); return@composable }
-                "proyectos" -> { mx.nexara.mobile.nativeapp.ui.modules.ProjectsModuleScreen(); return@composable }
-                "dashboard" -> { mx.nexara.mobile.nativeapp.ui.studio.StudioDashboardScreen(onBack = { nav.popBackStack() }, onOpenModule = { mod -> nav.navigate(moduleRoute(mod)) }); return@composable }
-            }
-            PlaceholderScreen(
-                title = m?.label ?: "Módulo",
-                subtitle = (m?.webPath ?: "") + "\n\nImplementación nativa pendiente.",
-                contentPadding = PaddingValues(20.dp),
-                primaryActionText = "Volver",
-                onPrimaryAction = { nav.popBackStack() },
-            )
-        }
-    }
-}
+) = StudioNavHost(onExitToPanels = onExitToPanels, panelTitle = panelTitle)
