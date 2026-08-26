@@ -86,7 +86,7 @@ export default function QAPage() {
             data-track-conversion="qa_primary_cta"
             style={{ background: "#0f62d6", color: "#fff", textDecoration: "none", padding: "10px 14px", borderRadius: 8, fontWeight: 700 }}
           >
-            Hablar con un especialista
+            Cotiza tu proyecto
           </Link>
           <Link
             href="/servicios"

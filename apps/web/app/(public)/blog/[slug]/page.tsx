@@ -144,7 +144,7 @@ export default async function BlogPostPage({ params }: { params: Params }) {
               ← Volver al blog
             </Link>
             <Link href="/contacto" className={styles.articleCta}>
-              Hablar con Nexara →
+              Cotiza tu proyecto →
             </Link>
           </footer>
         </div>

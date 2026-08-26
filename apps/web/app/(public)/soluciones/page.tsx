@@ -5,6 +5,8 @@ import PublicPageHero from "../../components/PublicPageHero";
 import EditorialImage from "../../components/EditorialImage";
 import heroStyles from "../../components/PublicPageHero.module.css";
 import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
+import SeoInterlinkHub from "@/components/SeoInterlinkHub";
+import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 
 export const dynamic = "force-dynamic";
 
@@ -117,6 +119,18 @@ export default async function SolucionesPage() {
         </div>
       ) : null}
 
+      <section className={shared.section} data-reveal="up">
+        <div className={shared.inner}>
+          <SeoInterlinkHub
+            title="Servicios por industria"
+            subtitle="CCTV, redes y soporte con enlaces listos para Google y para cerrar."
+            currentPath="/soluciones"
+            maxIndustries={4}
+            maxServicesPerIndustry={3}
+          />
+        </div>
+      </section>
+
       <section className={shared.sectionTight} data-reveal="up">
         <div className={shared.inner}>
           <div className={shared.ctaBand}>
@@ -126,9 +140,22 @@ export default async function SolucionesPage() {
               Cuéntanos el sitio, el riesgo y la urgencia. Armamos el alcance alrededor de eso — no de un PDF genérico.
             </p>
             <div className={shared.ctaActions}>
-              <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
-                Hablar con un especialista <span className={shared.btnArrow} aria-hidden>→</span>
+              <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`} data-track-conversion="soluciones_footer_cta">
+                Cotiza tu proyecto <span className={shared.btnArrow} aria-hidden>→</span>
               </Link>
+              <a
+                href={buildWhatsAppLeadUrl({
+                  industryName: "mi empresa",
+                  serviceName: "soluciones tecnológicas",
+                  path: "/soluciones",
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${shared.btn} ${shared.btnSecondary}`}
+                data-track-conversion="soluciones_wa"
+              >
+                WhatsApp
+              </a>
             </div>
           </div>
         </div>

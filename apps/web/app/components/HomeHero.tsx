@@ -232,6 +232,9 @@ export default function HomeHero() {
             Ver capacidades
           </Link>
         </div>
+        <p className={styles.tertiaryLink}>
+          <Link href="/proyectos">Ver casos de campo →</Link>
+        </p>
       </div>
 
       {!showVideo && dynamicSlides.length > 1 && (

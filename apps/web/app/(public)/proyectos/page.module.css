@@ -101,6 +101,18 @@
   line-height: 1.45;
 }
 
+.studioCaseActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.studioCaseBtn {
+  padding: 10px 16px;
+  font-size: 0.86rem;
+}
+
 @media (max-width: 900px) {
   .studioCaseCard {
     grid-template-columns: 1fr;

@@ -336,7 +336,7 @@ export default function CoberturaCityServicePage({ params }: { params: Params })
                 className={`${shared.btn} ${shared.btnPrimary}`}
                 data-track-conversion="geo_service_footer_contact"
               >
-                Hablar con especialista <span className={shared.btnArrow}>→</span>
+                Cotiza tu proyecto <span className={shared.btnArrow}>→</span>
               </Link>
               <a
                 href={waHref}

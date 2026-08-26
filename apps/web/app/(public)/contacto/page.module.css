@@ -18,7 +18,7 @@
 
 .formAsideTitle {
   margin: 10px 0 20px;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display);
   font-size: clamp(1.4rem, 2.2vw, 1.75rem);
   font-weight: 600;
   letter-spacing: -0.03em;
@@ -134,7 +134,7 @@
 
 .formCardTitle {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display);
   font-size: clamp(1.25rem, 2vw, 1.5rem);
   font-weight: 600;
   letter-spacing: -0.025em;
@@ -210,6 +210,17 @@
   padding-right: 36px;
 }
 
+.formError {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 157, 60, 0.35);
+  background: rgba(255, 157, 60, 0.08);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #ffc98a;
+}
+
 .submitBtn {
   margin-top: 2px;
 }
@@ -233,7 +244,7 @@
 
 .successBlock h3 {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display);
   font-size: 1.35rem;
   font-weight: 600;
   color: #fff;
@@ -259,7 +270,7 @@
 
 .mapTitle {
   margin: 8px 0 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display);
   font-size: clamp(1.25rem, 2vw, 1.5rem);
   font-weight: 600;
   color: #fff;
@@ -311,7 +322,7 @@
 
 .locationAddress {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: var(--ds-font-display);
   font-size: 1.05rem;
   font-weight: 600;
   color: #f4f8ff;

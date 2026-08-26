@@ -360,7 +360,7 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
                 data-landing-path={landingPath}
                 className={`${shared.btn} ${shared.btnPrimary}`}
               >
-                Hablar con un especialista <span className={shared.btnArrow}>→</span>
+                Cotiza tu proyecto <span className={shared.btnArrow}>→</span>
               </Link>
               <a
                 href={waHref}

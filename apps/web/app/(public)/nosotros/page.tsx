@@ -10,6 +10,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { resolveUserAvatarUrl } from "@/lib/user-avatar";
 import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
+import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("nosotros");
@@ -225,6 +226,11 @@ export default async function NosotrosPage() {
               Con cobertura nacional y presencia en Puebla y Ciudad de México, integramos videovigilancia, redes empresariales, infraestructura, Wi‑Fi, cómputo y soporte TI bajo una sola responsabilidad técnica. Un solo equipo, un solo proceso y un único compromiso con la calidad de cada proyecto.
             </p>
           </div>
+          <p className={styles.storyCta}>
+            <Link href="/proyectos" data-track-conversion="nosotros_proyectos_link">
+              Ver casos de campo →
+            </Link>
+          </p>
         </div>
       </section>
 
@@ -297,6 +303,40 @@ export default async function NosotrosPage() {
               Platiquemos →
             </Link>
           </p>
+        </div>
+      </section>
+
+      <section className={shared.sectionTight} data-reveal="up">
+        <div className={shared.inner}>
+          <div className={shared.ctaBand}>
+            <p className={shared.ctaEyebrow}>Siguiente paso</p>
+            <h2 className={shared.ctaTitle}>¿Listo para trabajar juntos?</h2>
+            <p className={shared.ctaLead}>
+              Cuéntanos tu alcance y te respondemos con diagnóstico y propuesta — sin compromiso.
+            </p>
+            <div className={shared.ctaActions}>
+              <Link
+                href="/contacto"
+                className={`${shared.btn} ${shared.btnPrimary}`}
+                data-track-conversion="nosotros_footer_cta"
+              >
+                Cotiza tu proyecto <span className={shared.btnArrow}>→</span>
+              </Link>
+              <a
+                href={buildWhatsAppLeadUrl({
+                  industryName: "mi empresa",
+                  serviceName: "CCTV, redes o soporte",
+                  path: "/nosotros",
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${shared.btn} ${shared.btnSecondary}`}
+                data-track-conversion="nosotros_wa"
+              >
+                WhatsApp
+              </a>
+            </div>
+          </div>
         </div>
       </section>
     </main>

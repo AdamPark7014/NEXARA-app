@@ -4,42 +4,51 @@ import shared from "../_shared/public.module.css";
 import PublicPageHero from "../../components/PublicPageHero";
 import heroStyles from "../../components/PublicPageHero.module.css";
 import styles from "./page.module.css";
+import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { GEO_CITIES } from "@/lib/seo/geo-cities";
 
 export const revalidate = 1800;
+
+const regionCitySlugs = new Set(GEO_CITIES.map((c) => c.slug));
 
 const regiones = [
   {
     name: "Centro",
     role: "Base operativa",
     desc: "Puebla, CDMX, Estado de México y Querétaro — cuadrillas propias y tiempos de respuesta locales.",
+    citySlug: "puebla",
   },
   {
     name: "Bajío",
     role: "Campo + partners",
     desc: "Guanajuato, Aguascalientes y San Luis Potosí. Levantamiento en sitio y seguimiento remoto.",
+    citySlug: "leon",
   },
   {
     name: "Occidente",
     role: "Campo + partners",
     desc: "Jalisco, Nayarit, Colima y Michoacán. Instalación y mantenimiento con logística coordinada.",
+    citySlug: "guadalajara",
   },
   {
     name: "Norte",
     role: "Cobertura extendida",
     desc: "Nuevo León, Coahuila, Chihuahua y Sonora. Proyectos por fases con equipo móvil.",
+    citySlug: "monterrey",
   },
   {
     name: "Sureste",
     role: "Cobertura extendida",
     desc: "Yucatán, Quintana Roo, Veracruz y Tabasco. Intervenciones programadas y soporte híbrido.",
+    citySlug: "veracruz",
   },
   {
     name: "Pacífico",
     role: "Cobertura extendida",
     desc: "Sinaloa y Baja California. Enlaces, CCTV y redes con ventanas de trabajo claras.",
+    citySlug: null,
   },
-];
+] as const;
 
 const modalidades = [
   {
@@ -76,7 +85,7 @@ export default function CoberturaPage() {
         actions={
           <div className={styles.heroActions}>
             <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
-              Cotizar mi zona <span className={shared.btnArrow}>→</span>
+              Cotiza tu proyecto <span className={shared.btnArrow}>→</span>
             </Link>
             <Link href="/cobertura/puebla" className={`${shared.btn} ${shared.btnSecondary}`}>
               Ver Puebla
@@ -122,13 +131,32 @@ export default function CoberturaPage() {
             </p>
           </header>
           <div className={shared.industryBoard} data-reveal-stagger>
-            {regiones.map((r) => (
-              <div key={r.name} className={shared.industryCell} data-reveal="up">
-                <span className={shared.industryRisk}>{r.role}</span>
-                <h3 className={shared.industryCellTitle}>{r.name}</h3>
-                <p className={shared.industryCellText}>{r.desc}</p>
-              </div>
-            ))}
+            {regiones.map((r) => {
+              const href =
+                r.citySlug && regionCitySlugs.has(r.citySlug) ? `/cobertura/${r.citySlug}` : null;
+              if (href) {
+                return (
+                  <Link
+                    key={r.name}
+                    href={href}
+                    className={shared.industryCell}
+                    data-reveal="up"
+                  >
+                    <span className={shared.industryRisk}>{r.role}</span>
+                    <h3 className={shared.industryCellTitle}>{r.name}</h3>
+                    <p className={shared.industryCellText}>{r.desc}</p>
+                    <span className={shared.industryCellLink}>Ver región →</span>
+                  </Link>
+                );
+              }
+              return (
+                <div key={r.name} className={shared.industryCell} data-reveal="up">
+                  <span className={shared.industryRisk}>{r.role}</span>
+                  <h3 className={shared.industryCellTitle}>{r.name}</h3>
+                  <p className={shared.industryCellText}>{r.desc}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -155,6 +183,18 @@ export default function CoberturaPage() {
         </div>
       </section>
 
+      <section className={shared.section} data-reveal="up">
+        <div className={shared.inner}>
+          <SeoInterlinkHub
+            title="Cotiza por ciudad e industria"
+            subtitle="CCTV, redes y soporte — rutas locales listas para Google y para WhatsApp."
+            currentPath="/cobertura"
+            maxIndustries={4}
+            maxServicesPerIndustry={3}
+          />
+        </div>
+      </section>
+
       <section className={shared.sectionTight} data-reveal="up">
         <div className={shared.inner}>
           <div className={shared.ctaBand}>
@@ -165,7 +205,7 @@ export default function CoberturaPage() {
             </p>
             <div className={shared.ctaActions}>
               <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
-                Consultar mi zona <span className={shared.btnArrow}>→</span>
+                Cotiza tu proyecto <span className={shared.btnArrow}>→</span>
               </Link>
               <Link href="/cobertura/cdmx" className={`${shared.btn} ${shared.btnSecondary}`}>
                 Ver CDMX

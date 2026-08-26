@@ -172,6 +172,23 @@
   gap: 12px;
 }
 
+.tertiaryLink {
+  margin: 14px 0 0;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.tertiaryLink a {
+  color: rgba(45, 216, 242, 0.82);
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.tertiaryLink a:hover {
+  color: var(--nx-cyan);
+}
+
 .ctaPrimary,
 .ctaGhost {
   display: inline-flex;
