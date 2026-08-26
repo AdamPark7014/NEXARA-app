@@ -5,19 +5,17 @@
 - **Rama:** main
 
 ## Hecho en este turno
-- **Sitio público:** UX nav/CTAs (commit `7780788`) desplegado.
-- **Diagnóstico Studio:** API en crash-loop — `ServiceSheetsModule` registraba
-  `ActivityLifecycleService` sin `NotificationsModule` → 500 en `/api/hero-video/public`
-  y `/api/studio/page-content/*` (fotos/videos no cargaban).
-- **Fix:** importar `ActivitiesModule` en `service-sheets.module.ts` (una instancia DI).
+- **API producción:** fix `ServiceSheetsModule` → Studio/CMS vuelve a responder.
+- **Home editorial:** fotos verticales en split usan marco `portrait_featured`
+  (sin banda ancha + blur lateral). Slot industrias → layout retrato + kicker
+  «En campo».
 
 ## A medias — CUIDADO
 - nada
 
 ## Siguiente paso
-1. Push + redeploy API en Hetzner (rebuild `nexara-api`).
-2. Verificar `curl https://nexara.com.mx/api/hero-video/public` → 200.
+1. Deploy web si Adam no ve el cambio en home.
 
 ## No tocar
-- `apps/web/app/(subdomains)/tickets/layout.tsx` — el `<Suspense>` mantiene el build.
-- `NEXARA-credenciales-usuarios-v4.xlsx` — fuera de git a propósito.
+- `apps/web/app/(subdomains)/tickets/layout.tsx`
+- `NEXARA-credenciales-usuarios-v4.xlsx`

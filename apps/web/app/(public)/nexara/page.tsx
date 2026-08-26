@@ -237,13 +237,15 @@ export default async function NexaraPage() {
                 desktopUrl={slotInd.desktopUrl}
                 mobileUrl={slotInd.mobileUrl}
                 alt={slotInd.alt}
-                kicker="Sectores"
+                kicker="En campo"
                 title="Antes de hablar de verticales"
                 caption={slotInd.caption || "Cada industria con su riesgo; cada sitio con su alcance."}
                 layout={
-                  slotInd.layout === "bleed_cinema" || slotInd.layout === "bleed_landscape"
-                    ? "framed_wide"
-                    : slotInd.layout
+                  slotInd.layout === "portrait_featured"
+                    ? "portrait_featured"
+                    : slotInd.layout === "bleed_cinema" || slotInd.layout === "bleed_landscape"
+                      ? "portrait_featured"
+                      : slotInd.layout
                 }
                 objectPosition={slotInd.objectPosition}
                 compose="split"
