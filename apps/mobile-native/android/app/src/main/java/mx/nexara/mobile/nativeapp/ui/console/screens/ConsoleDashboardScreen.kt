@@ -2,7 +2,6 @@ package mx.nexara.mobile.nativeapp.ui.console.screens
 
 import android.app.Application
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -12,6 +11,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -27,6 +27,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,14 +46,23 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ActivityDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceRangeDto
+import mx.nexara.mobile.nativeapp.data.api.ExecutiveCLevelDto
 import mx.nexara.mobile.nativeapp.data.api.ViaticDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import mx.nexara.mobile.nativeapp.ui.console.isAdministrativoRole
+import mx.nexara.mobile.nativeapp.ui.commandcenter.CommandCenterRail
+import mx.nexara.mobile.nativeapp.ui.commandcenter.CommandPanelFilter
+import mx.nexara.mobile.nativeapp.ui.commandcenter.buildExecutiveDynamicWidgets
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlert
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxAlertBanner
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpi
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxKpiGrid
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSkeletonList
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 import mx.nexara.mobile.nativeapp.ui.enterprise.sparklineFromCounts
@@ -65,7 +78,7 @@ data class DashboardUiState(
     val attendance: AttendanceRangeDto? = null,
     val weekFrom: String = "",
     val weekTo: String = "",
-    val executive: Map<String, Any?> = emptyMap(),
+    val executive: ExecutiveCLevelDto = ExecutiveCLevelDto(),
     val approvals: List<mx.nexara.mobile.nativeapp.data.api.WorkflowApprovalDto> = emptyList(),
 )
 
@@ -105,7 +118,7 @@ class ConsoleDashboardViewModel(app: Application) : AndroidViewModel(app) {
                 val viatics    = withContext(Dispatchers.IO) { repo.viaticsFetch() }
                 val activities = withContext(Dispatchers.IO) { repo.activitiesFetch() }
                 val attendance = withContext(Dispatchers.IO) { runCatching { repo.attendanceRange(from, to) }.getOrNull() }
-                val executive  = withContext(Dispatchers.IO) { runCatching { extraRepo.executiveCLevel() }.getOrElse { emptyMap() } }
+                val executive  = withContext(Dispatchers.IO) { runCatching { extraRepo.executiveCLevelDto() }.getOrElse { ExecutiveCLevelDto() } }
                 val approvals  = withContext(Dispatchers.IO) { runCatching { extraRepo.workflowApprovals() }.getOrElse { emptyList() } }
                 _state.update {
                     it.copy(
@@ -140,6 +153,7 @@ private val RedColor = Color(0xFFEF4444)
 private val SlateText = Color(0xFF0F172A)
 private val SubText = Color(0xFF64748B)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConsoleDashboardScreen(
     contentPadding: PaddingValues = PaddingValues(16.dp),
@@ -167,6 +181,7 @@ fun ConsoleDashboardScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
+            .background(NxColors.Surface)
             .padding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -195,19 +210,68 @@ fun ConsoleDashboardScreen(
         }
 
         if (state.isLoading) {
-            item {
-                Text("Cargando dashboard...", color = SubText, modifier = Modifier.padding(top = 16.dp))
-            }
+            item { NxSkeletonList(itemCount = 4, itemHeight = 88.dp) }
             return@LazyColumn
         }
 
         if (!state.error.isNullOrBlank()) {
             item {
-                Text(state.error!!, color = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { vm.refresh() }) { Text("Reintentar") }
+                NxErrorBlock(state.error!!, onRetry = { vm.refresh() })
             }
             return@LazyColumn
+        }
+
+        if (onOpenModule != null) {
+            item {
+                CommandCenterRail(
+                    user = user,
+                    panel = if (isOps) CommandPanelFilter.OPS else CommandPanelFilter.ALL,
+                    extraWidgets = buildExecutiveDynamicWidgets(state.executive),
+                    onOpenModule = onOpenModule,
+                    title = "Centro de comando",
+                )
+            }
+        }
+
+        // ── Acciones rápidas ─────────────────────────────────────────────────
+        if (onOpenModule != null) {
+            val actPending = state.activities.count {
+                val s = it.estatus.lowercase()
+                s.contains("pendiente") || s.contains("proceso") || s.contains("asignad")
+            }
+            val viaticPending = state.viatics.count { (it.estatusPago ?: "").lowercase().contains("pendiente") }
+            val quickActions = buildList {
+                add(QuickAction("activities", "🗂️", "Actividades", BlueColor, actPending.takeIf { it > 0 }))
+                add(QuickAction("evidences", "📸", "Evidencias", Color(0xFF8B5CF6), null))
+                add(QuickAction("viatics", "✈️", "Viáticos", AmberColor, viaticPending.takeIf { it > 0 }))
+                add(QuickAction("chat", "💬", "Chat", TealColor, null))
+                add(QuickAction("approvals", "🛡️", "Aprobaciones", RedColor, state.approvals.size.takeIf { it > 0 }))
+                add(QuickAction("gps", "📍", "GPS", GreenColor, null))
+            }
+            item {
+                NxSectionHeader(title = "Acciones rápidas", subtitle = "Operación diaria")
+                Spacer(Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    quickActions.chunked(3).forEach { row ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            row.forEach { action ->
+                                ConsoleQuickActionCard(
+                                    modifier = Modifier.weight(1f),
+                                    icon = action.icon,
+                                    label = action.label,
+                                    accent = action.accent,
+                                    badge = action.badge,
+                                    onClick = { onOpenModule(action.key) },
+                                )
+                            }
+                            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                        }
+                    }
+                }
+            }
         }
 
         // ── Alertas operativas accionables ───────────────────────────────────
@@ -279,30 +343,33 @@ fun ConsoleDashboardScreen(
         }
 
         // ── Executive KPIs (admins + administrativo con datos ejecutivos) ───
-        if (state.executive.isNotEmpty() && (isAdministrativo || user?.isSuperAdmin == true || user?.permissions?.contains("console.admin") == true)) {
+        val exec = state.executive
+        val hasExecutiveData = exec.raw.isNotEmpty() ||
+            exec.headline.revenueMtd > 0 ||
+            exec.operations.otOpen > 0 ||
+            exec.finance.invoicedMtd > 0
+        if (hasExecutiveData && (isAdministrativo || user?.isSuperAdmin == true || user?.permissions?.contains("console.admin") == true)) {
             item {
-                SectionHeader(title = "Resumen ejecutivo", subtitle = "Este período")
+                NxSectionHeader(title = "Resumen ejecutivo", subtitle = "Este período")
             }
             item {
-                val revenue  = execDbl(state.executive, "revenue", "totalRevenue", "ingresos")
-                val projects = execInt(state.executive, "activeProjects", "proyectosActivos")
-                val engineers = execInt(state.executive, "activeEngineers", "ingenieros", "activeUsers")
-                val clients  = execInt(state.executive, "activeClients", "clientesActivos", "clients")
+                val headline = exec.headline
+                val ops = exec.operations
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    KpiCard(modifier = Modifier.weight(1f), title = "Ingresos", value = revenue?.let { formatMxn(it) } ?: "—", subtitle = "Acumulado", bgColor = GreenLight, accentColor = GreenColor, icon = "💰")
-                    KpiCard(modifier = Modifier.weight(1f), title = "Proyectos", value = projects?.toString() ?: "—", subtitle = "Activos", bgColor = BlueLight, accentColor = BlueColor, icon = "🧩")
+                    KpiCard(modifier = Modifier.weight(1f), title = "Ingresos MTD", value = formatMxn(headline.revenueMtd), subtitle = "Acumulado", bgColor = GreenLight, accentColor = GreenColor, icon = "💰")
+                    KpiCard(modifier = Modifier.weight(1f), title = "Pipeline", value = formatMxn(headline.pipelineValue), subtitle = "Ventas", bgColor = BlueLight, accentColor = BlueColor, icon = "📈")
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    KpiCard(modifier = Modifier.weight(1f), title = "Ingenieros", value = engineers?.toString() ?: "—", subtitle = "En campo", bgColor = AmberLight, accentColor = AmberColor, icon = "👷")
-                    KpiCard(modifier = Modifier.weight(1f), title = "Clientes", value = clients?.toString() ?: "—", subtitle = "Activos", bgColor = TealLight, accentColor = TealColor, icon = "🤝")
+                    KpiCard(modifier = Modifier.weight(1f), title = "OT abiertas", value = ops.otOpen.toString(), subtitle = "${ops.otOverdue} vencidas", bgColor = AmberLight, accentColor = AmberColor, icon = "🔧")
+                    KpiCard(modifier = Modifier.weight(1f), title = "Tickets", value = ops.ticketsOpen.toString(), subtitle = "Abiertos", bgColor = TealLight, accentColor = TealColor, icon = "🎫")
                 }
             }
         }
 
         // ── Aprobaciones pendientes ──────────────────────────────────────────
         if (state.approvals.isNotEmpty()) {
-            item { SectionHeader(title = "Aprobaciones pendientes", subtitle = "${state.approvals.size} esperando") }
+            item { NxSectionHeader(title = "Aprobaciones pendientes", subtitle = "${state.approvals.size} esperando") }
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(state.approvals.take(8), key = { it.rowKey }) { a ->
@@ -346,9 +413,9 @@ fun ConsoleDashboardScreen(
             }
         }
 
-        // ── Atajos administrativo ───────────────────────────────────────────
+        // ── Atajos administrativo (módulos back-office) ─────────────────────
         if (isAdministrativo && onOpenModule != null) {
-            item { SectionHeader(title = "Atajos", subtitle = "Acceso rápido") }
+            item { NxSectionHeader(title = "Atajos", subtitle = "Acceso rápido") }
             item {
                 val shortcuts = listOf(
                     Triple("approvals", "🛡️", "Aprobaciones"),
@@ -363,10 +430,9 @@ fun ConsoleDashboardScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                             row.forEach { (key, icon, label) ->
                                 Card(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable { onOpenModule(key) },
-                                    shape = RoundedCornerShape(14.dp),
+                                    onClick = { onOpenModule(key) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(NxDimens.PanelRadius),
                                     colors = CardDefaults.cardColors(containerColor = Color.White),
                                     elevation = CardDefaults.cardElevation(2.dp),
                                 ) {
@@ -450,20 +516,14 @@ fun ConsoleDashboardScreen(
         // ── Estado de actividades ────────────────────────────────────────────
         if (!isAdministrativo && state.activities.isNotEmpty()) {
             item {
-                SectionHeader(title = "Estado de actividades", subtitle = "${state.activities.size} total")
+                NxSectionHeader(title = "Estado de actividades", subtitle = "${state.activities.size} total")
             }
             item {
                 val statusGroups = state.activities
                     .groupBy { it.estatus.ifBlank { "Sin estatus" } }
                     .entries.sortedByDescending { it.value.size }
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(2.dp),
-                ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                NxPanelShell(contentPadding = PaddingValues(16.dp)) {
                         statusGroups.forEach { (status, list) ->
                             val pct = if (state.activities.isNotEmpty()) list.size.toFloat() / state.activities.size else 0f
                             val barColor = statusColor(status)
@@ -502,30 +562,29 @@ fun ConsoleDashboardScreen(
                             }
                         }
                     }
-                }
             }
         }
 
         // ── Actividades recientes ────────────────────────────────────────────
         if (!isAdministrativo) {
         item {
-            SectionHeader(title = "Actividades recientes", subtitle = "Últimas 8")
+            NxSectionHeader(title = "Actividades recientes", subtitle = "Últimas 8")
         }
-        items(state.activities.take(8)) { a ->
+        items(state.activities.take(8), key = { it.id }) { a ->
             ActivityCard(a)
         }
 
         // ── Viáticos recientes ───────────────────────────────────────────────
         if (state.viatics.isNotEmpty()) {
             item {
-                SectionHeader(title = "Viáticos recientes", subtitle = "${state.viatics.size} registros")
+                NxSectionHeader(title = "Viáticos recientes", subtitle = "${state.viatics.size} registros")
             }
             item {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    items(state.viatics.take(10)) { v ->
+                    items(state.viatics.take(10), key = { it.id }) { v ->
                         ViaticCard(v)
                     }
                 }
@@ -535,20 +594,17 @@ fun ConsoleDashboardScreen(
         // ── Asistencia semanal ───────────────────────────────────────────────
         state.attendance?.users?.takeIf { it.isNotEmpty() }?.let { attendUsers ->
             item {
-                SectionHeader(
+                NxSectionHeader(
                     title = "Asistencia semanal",
                     subtitle = "${attendUsers.size} usuarios",
                 )
             }
-            items(attendUsers.sortedByDescending { it.totalMinutes ?: 0 }.take(8)) { u ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(2.dp),
-                ) {
+            items(
+                attendUsers.sortedByDescending { it.totalMinutes ?: 0 }.take(8),
+                key = { it.userId },
+            ) { u ->
+                NxPanelShell {
                     Row(
-                        modifier = Modifier.padding(14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -581,7 +637,7 @@ fun ConsoleDashboardScreen(
 
         // ── OPS: NOC Alerts ────────────────────────────────────────────────
         if (isOps && nocAlerts.isNotEmpty()) {
-            item { SectionHeader("Alertas NOC", "${nocAlerts.size} activas") }
+            item { NxSectionHeader("Alertas NOC", "${nocAlerts.size} activas") }
             items(nocAlerts.take(5), key = { it.rowKey }) { alert ->
                 val severity = alert.severity.lowercase()
                 val alertColor = when {
@@ -593,7 +649,7 @@ fun ConsoleDashboardScreen(
                 val title = alert.displayTitle.ifBlank { alert.message.ifBlank { "Alerta" } }
                 Card(
                     modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(NxDimens.PanelRadius),
                     colors = CardDefaults.cardColors(containerColor = alertColor.copy(alpha = 0.08f)),
                     elevation = CardDefaults.cardElevation(0.dp),
                 ) {
@@ -616,6 +672,77 @@ fun ConsoleDashboardScreen(
     }
 }
 
+private data class QuickAction(
+    val key: String,
+    val icon: String,
+    val label: String,
+    val accent: Color,
+    val badge: Int?,
+)
+
+@Composable
+private fun ConsoleQuickActionCard(
+    modifier: Modifier,
+    icon: String,
+    label: String,
+    accent: Color,
+    badge: Int? = null,
+    onClick: () -> Unit,
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier
+            .heightIn(min = 48.dp)
+            .semantics {
+                contentDescription = if (badge != null && badge > 0) {
+                    "$label, $badge pendientes"
+                } else {
+                    label
+                }
+                role = Role.Button
+            },
+        shape = RoundedCornerShape(NxDimens.PanelRadius),
+        colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.12f)),
+        elevation = CardDefaults.cardElevation(0.dp),
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(icon, fontSize = 22.sp)
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = accent,
+                    maxLines = 1,
+                )
+            }
+            if (badge != null && badge > 0) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(18.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(RedColor),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        if (badge > 9) "9+" else badge.toString(),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun KpiCard(
     modifier: Modifier = Modifier,
@@ -628,7 +755,7 @@ private fun KpiCard(
 ) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(NxDimens.PanelRadius),
         colors = CardDefaults.cardColors(containerColor = bgColor),
         elevation = CardDefaults.cardElevation(0.dp),
     ) {
@@ -654,33 +781,10 @@ private fun KpiCard(
 }
 
 @Composable
-private fun SectionHeader(title: String, subtitle: String = "") {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = SlateText,
-        )
-        if (subtitle.isNotBlank()) {
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = SubText)
-        }
-    }
-}
-
-@Composable
 private fun ActivityCard(a: ActivityDto) {
     val statusColor = statusColor(a.estatus)
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp),
-    ) {
-        Row(modifier = Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    NxPanelShell {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(
                 modifier = Modifier
                     .size(42.dp)
@@ -736,7 +840,7 @@ private fun ViaticCard(v: ViaticDto) {
 
     Card(
         modifier = Modifier.width(180.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(NxDimens.PanelRadius),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(2.dp),
     ) {
@@ -776,28 +880,3 @@ private fun formatMxn(amount: Double): String {
     val rounded = kotlin.math.round(amount).toLong()
     return "$%,d".format(rounded)
 }
-
-private fun execDbl(map: Map<String, Any?>, vararg keys: String): Double? {
-    for (k in keys) {
-        val v = map[k] ?: continue
-        when (v) {
-            is Double -> return v
-            is Number -> return v.toDouble()
-            is String -> v.toDoubleOrNull()?.let { return it }
-        }
-    }
-    return null
-}
-
-private fun execInt(map: Map<String, Any?>, vararg keys: String): Int? {
-    for (k in keys) {
-        val v = map[k] ?: continue
-        when (v) {
-            is Int    -> return v
-            is Number -> return v.toInt()
-            is String -> v.toIntOrNull()?.let { return it }
-        }
-    }
-    return null
-}
-

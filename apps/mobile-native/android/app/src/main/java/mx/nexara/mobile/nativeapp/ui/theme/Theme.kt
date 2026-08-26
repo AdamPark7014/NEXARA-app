@@ -9,16 +9,28 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.theme.Typography
+
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF0D9488),
+    primary = NxColors.Teal,
+    onPrimary = Color.White,
+    primaryContainer = NxColors.TealSoft,
     secondary = Color(0xFF0F766E),
     tertiary = Color(0xFF0EA5E9),
+    surface = NxColors.Surface,
+    background = NxColors.Surface,
+    error = NxColors.Danger,
 )
 
 private val DarkColors = darkColorScheme(
     primary = Color(0xFF2DD4BF),
+    onPrimary = NxColors.Slate,
     secondary = Color(0xFF14B8A6),
     tertiary = Color(0xFF38BDF8),
+    surface = NxColors.Slate,
+    background = NxColors.Slate,
+    error = NxColors.Danger,
 )
 
 @Composable

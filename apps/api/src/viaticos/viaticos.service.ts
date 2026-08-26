@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
-import { AutoApprovalService } from '../workflow/auto-approval.service.js';
+import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import {
   appendTrail,
   buildApprovalChain,
@@ -35,7 +35,7 @@ export class ViaticosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
-    private readonly autoApproval: AutoApprovalService,
+    private readonly domainEvents: DomainEventBusService,
     private readonly accounting: AccountingService,
     private readonly audit: AuditService,
   ) {}
@@ -189,6 +189,20 @@ export class ViaticosService {
     });
 
     const amount = this.amountOf(viatico);
+    this.domainEvents.publishEntityLifecycle('created', {
+      entityType: 'VIATIC',
+      entityId: viatico.id,
+      companyId: viatico.companyId ?? resolvedCompanyId,
+      userId: viatico.usuarioId ?? undefined,
+      payload: {
+        estatus: viatico.estatus,
+        categoria: viatico.categoria,
+        montoSolicitado: amount,
+        actividadId: viatico.actividadId,
+        projectId: viatico.projectId,
+      },
+    });
+
     if (viatico.usuarioId && viatico.User) {
       await this.notificationHierarchy.notifyViaticRequested(
         viatico.usuarioId,
@@ -196,15 +210,13 @@ export class ViaticosService {
         viatico.User.nombre || 'Usuario',
         amount,
       );
-      this.autoApproval
-        .evaluate({
-          entityType: 'VIATIC',
-          entityId: viatico.id,
-          userId: viatico.usuarioId,
-          companyId: viatico.companyId ?? resolvedCompanyId,
-          payload: { amount, outOfPolicy: Boolean(dto?.outOfPolicy) },
-        })
-        .catch(() => undefined);
+      this.domainEvents.requestAutoApproval({
+        entityType: 'VIATIC',
+        entityId: viatico.id,
+        userId: viatico.usuarioId,
+        companyId: viatico.companyId ?? resolvedCompanyId,
+        payload: { amount, outOfPolicy: Boolean(dto?.outOfPolicy) },
+      });
     }
     return viatico;
   }
@@ -289,15 +301,13 @@ export class ViaticosService {
       `${beneficiary.nombre} (asignado por ${assignerName})`,
       amount,
     );
-    this.autoApproval
-      .evaluate({
-        entityType: 'VIATIC',
-        entityId: viatico.id,
-        userId: usuarioId,
-        companyId: viatico.companyId ?? resolvedCompanyId,
-        payload: { amount, outOfPolicy: false, origen: 'ASIGNACION' },
-      })
-      .catch(() => undefined);
+    this.domainEvents.requestAutoApproval({
+      entityType: 'VIATIC',
+      entityId: viatico.id,
+      userId: usuarioId,
+      companyId: viatico.companyId ?? resolvedCompanyId,
+      payload: { amount, outOfPolicy: false, origen: 'ASIGNACION' },
+    });
 
     return viatico;
   }
@@ -728,5 +738,62 @@ export class ViaticosService {
         motivo: r.motivo || '',
       })),
     });
+  }
+
+  /** Aprobación vía workflow — idempotente si ya no está pendiente. */
+  async onWorkflowApproved(id: number, companyId: number, actorId?: number) {
+    const viatico = await this.prisma['viatico'].findFirst({
+      where: { id, estatus: 'Pendiente', ...companyWhere(companyId) },
+    });
+    if (!viatico) return;
+
+    const contabilidadRef = `VIAT-${id}-${new Date().toISOString().slice(0, 10)}`;
+    const claim = await this.prisma['viatico'].updateMany({
+      where: { id, estatus: 'Pendiente' },
+      data: { estatus: 'Aprobado', contabilidadRef },
+    });
+    if (claim.count === 0) return;
+
+    const updated = await this.prisma['viatico'].findUnique({
+      where: { id },
+      include: { User: { select: { id: true, nombre: true } } },
+    });
+    if (updated?.usuarioId) {
+      const amount = this.amountOf(updated);
+      await this.notificationHierarchy.notifyViaticReview(updated.usuarioId, id, 'approved', amount);
+    }
+    await this.audit
+      .log({ entityType: 'Viatico', entityId: id, action: 'APPROVE_WORKFLOW' }, actorId)
+      .catch(() => undefined);
+  }
+
+  async onWorkflowRejected(id: number, companyId: number, actorId?: number, note?: string) {
+    const viatico = await this.findOne(id, undefined, companyId);
+    if (!viatico || ['Rechazado', 'Aprobado', 'Pagado'].includes(viatico.estatus)) return;
+
+    const trailEntry: TrailEntry = {
+      role: 'workflow',
+      userId: actorId ?? 0,
+      userName: 'Workflow',
+      action: 'reject',
+      at: new Date().toISOString(),
+      note: note?.trim() || 'Rechazado en flujo de aprobación',
+    };
+    const trail = appendTrail(viatico.approvalTrail as TrailEntry[] | null, trailEntry);
+
+    const claim = await this.prisma['viatico'].updateMany({
+      where: { id, estatus: viatico.estatus },
+      data: { estatus: 'Rechazado', approvalTrail: trail },
+    });
+    if (claim.count === 0) return;
+
+    if (viatico.usuarioId) {
+      void this.notificationHierarchy
+        .notifyViaticReview(viatico.usuarioId, id, 'rejected', 0)
+        .catch(() => undefined);
+    }
+    await this.audit
+      .log({ entityType: 'Viatico', entityId: id, action: 'REJECT', changes: { note } }, actorId)
+      .catch(() => undefined);
   }
 }

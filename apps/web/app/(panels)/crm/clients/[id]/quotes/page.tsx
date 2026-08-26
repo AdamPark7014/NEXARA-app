@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
-import { Tag } from "@/components/ui/DataTable";
+import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { buildApiUrl } from "@/lib/api-base";
 import EmptyState from "@/components/ui/EmptyState";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
@@ -70,6 +70,28 @@ export default function ClientQuotesPage() {
 
   const aprobadas = quotes.filter((q) => q.status === "APPROVED").length;
   const totalAprobado = quotes.filter((q) => q.status === "APPROVED").reduce((s, q) => s + Number(q.total ?? 0), 0);
+
+  const quoteCols: Column<SalesQuote>[] = [
+    {
+      key: "quoteNumber",
+      label: "Folio",
+      render: (q) => (
+        <Link href={`/crm/quotes/${q.id}`} style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>
+          {q.quoteNumber}
+        </Link>
+      ),
+      width: 120,
+    },
+    { key: "projectName", label: "Proyecto", render: (q) => q.projectName ?? "—" },
+    {
+      key: "status",
+      label: "Estado",
+      render: (q) => <Tag variant={STATUS_VARIANT[q.status] ?? "neutral"}>{STATUS_LABEL[q.status] ?? q.status}</Tag>,
+      width: 110,
+    },
+    { key: "issueDate", label: "Emisión", render: (q) => new Date(q.issueDate).toLocaleDateString("es-MX"), width: 110 },
+    { key: "total", label: "Total", render: (q) => <Money value={Number(q.total)} />, width: 120 },
+  ];
 
   return (
     <>
@@ -157,32 +179,13 @@ export default function ClientQuotesPage() {
           />
         )}
         {!loading && !qError && quotes.length > 0 && (
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
-            {visibleQuotes.length === 0 && <EmptyState icon="🔍" title="Sin resultados" description="Ajusta los filtros." />}
-            {visibleQuotes.map((q) => (
-              <li key={q.id} style={{ padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
-                      <Tag variant="accent" size="sm">{q.quoteNumber}</Tag>
-                      {q.projectName ?? "—"}
-                    </div>
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3 }}>
-                      {new Date(q.issueDate).toLocaleDateString("es-MX")} · ${Number(q.total).toLocaleString("es-MX")} MXN
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Tag variant={STATUS_VARIANT[q.status] ?? "neutral"}>
-                      {STATUS_LABEL[q.status] ?? q.status}
-                    </Tag>
-                    <Link href={`/crm/quotes/${q.id}`} style={{ fontSize: 12.5, fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}>
-                      Ver →
-                    </Link>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <DataTable
+            columns={quoteCols}
+            rows={visibleQuotes}
+            rowKey={(q) => q.id}
+            emptyTitle="Sin resultados"
+            emptyDescription="Ajusta los filtros de búsqueda."
+          />
         )}
       </DetailSection>
 

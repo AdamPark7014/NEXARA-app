@@ -174,6 +174,7 @@ export class ExecutiveService {
         })
       : [];
     const ownerMap = new Map(owners.map((o) => [o.id, o.nombre]));
+    const topAccounts = await this.getTopClientAccounts(tenantId, 5);
 
     return {
       generatedAt: now.toISOString(),
@@ -225,6 +226,7 @@ export class ExecutiveService {
         revenue: Number(s._sum?.value || 0),
         wonCount: s._count?._all || 0,
       })),
+      topAccounts,
       projectTypeBreakdown: topProjectTypes.map((g: any) => ({
         type: g.projectType,
         count: g._count?._all || 0,
@@ -263,5 +265,64 @@ export class ExecutiveService {
       alerts.push({ level: 'info', icon: '🛠️', title: 'Visitas próximas', message: `${s.upcomingVisits} visitas de mantenimiento en los próximos 30 días` });
     }
     return alerts;
+  }
+
+  private async getTopClientAccounts(companyId: number, limit = 5) {
+    const since = new Date();
+    since.setMonth(since.getMonth() - 12);
+
+    const projects = await this.prisma.salesProject.findMany({
+      where: {
+        createdAt: { gte: since },
+        opportunity: { companyId },
+      },
+      select: {
+        budget: true,
+        costProducts: true,
+        costViaticos: true,
+        costOperativo: true,
+        opportunity: {
+          select: {
+            clientId: true,
+            client: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    const buckets = new Map<
+      number,
+      { clientId: number; clientName: string; projects: number; revenue: number; margin: number }
+    >();
+
+    for (const p of projects) {
+      const client = p.opportunity?.client;
+      if (!client) continue;
+      const revenue = Number(p.budget);
+      const cost =
+        Number(p.costProducts) + Number(p.costViaticos) + Number(p.costOperativo);
+      const margin = revenue - cost;
+      const current = buckets.get(client.id) || {
+        clientId: client.id,
+        clientName: client.name,
+        projects: 0,
+        revenue: 0,
+        margin: 0,
+      };
+      current.projects += 1;
+      current.revenue += revenue;
+      current.margin += margin;
+      buckets.set(client.id, current);
+    }
+
+    return Array.from(buckets.values())
+      .map((v) => ({
+        ...v,
+        revenue: Math.round(v.revenue * 100) / 100,
+        margin: Math.round(v.margin * 100) / 100,
+        marginPercent: v.revenue > 0 ? +((v.margin / v.revenue) * 100).toFixed(1) : 0,
+      }))
+      .sort((a, b) => b.margin - a.margin)
+      .slice(0, limit);
   }
 }

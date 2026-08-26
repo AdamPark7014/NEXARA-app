@@ -104,4 +104,13 @@ export class ActivityReassignController {
   ) {
     return this.service.listMaterials(activityId, companyId);
   }
+
+  @Get('timeline')
+  @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.ACTIVITIES_MANAGE] })
+  timeline(
+    @Param('id', ParseIntPipe) activityId: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.buildTimeline(activityId, companyId);
+  }
 }

@@ -20,6 +20,7 @@ import {
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { filterRowsByScope, getCrmSalesSectionConfig } from "@/lib/section-views";
+import { CommandCenterRail } from "@/components/command-center/CommandCenterRail";
 import {
   PIPELINE_STAGES,
   isClosedOpportunityStage,
@@ -166,6 +167,8 @@ export default function CrmDashboardPage() {
           </>
         }
       />
+
+      <CommandCenterRail panel="crm" />
 
       {error && !loading && (
         <DashPanel title="No se pudo cargar" subtitle={error}>

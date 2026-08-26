@@ -20,9 +20,15 @@ final class DeepLinkCoordinator: ObservableObject {
 
     /// Módulo pendiente para un panel concreto (se consume al presentar).
     func consumeModule(for panel: PanelId) -> String? {
-        guard case .module(let p, let key) = pending, p == panel else { return nil }
+        guard case .module(let p, let key, _, _) = pending, p == panel else { return nil }
         pending = nil
         return key
+    }
+
+    func consumeModuleLink(for panel: PanelId) -> (key: String, entityId: Int64?, params: [String: String])? {
+        guard case .module(let p, let key, let entityId, let params) = pending, p == panel else { return nil }
+        pending = nil
+        return (key, entityId, params)
     }
 
     func consumeNotifications() -> Bool {
@@ -36,6 +42,7 @@ final class DeepLinkCoordinator: ObservableObject {
 struct DeepLinkModulePresenter: ViewModifier {
     let panel: PanelId
     @Binding var presentedKey: String?
+    var moduleParams: [String: String] = [:]
 
     func body(content: Content) -> some View {
         content
@@ -45,7 +52,7 @@ struct DeepLinkModulePresenter: ViewModifier {
             )) {
                 if let key = presentedKey {
                     NavigationStack {
-                        ModuleRouter.view(for: panel, key: key)
+                        ModuleRouter.view(for: panel, key: key, params: moduleParams)
                             .toolbar {
                                 ToolbarItem(placement: .cancellationAction) {
                                     Button("Cerrar") { presentedKey = nil }
@@ -58,7 +65,11 @@ struct DeepLinkModulePresenter: ViewModifier {
 }
 
 extension View {
-    func deepLinkModulePresenter(panel: PanelId, presentedKey: Binding<String?>) -> some View {
-        modifier(DeepLinkModulePresenter(panel: panel, presentedKey: presentedKey))
+    func deepLinkModulePresenter(
+        panel: PanelId,
+        presentedKey: Binding<String?>,
+        moduleParams: [String: String] = [:]
+    ) -> some View {
+        modifier(DeepLinkModulePresenter(panel: panel, presentedKey: presentedKey, moduleParams: moduleParams))
     }
 }

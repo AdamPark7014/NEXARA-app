@@ -70,6 +70,10 @@ export class CotizacionItemDto {
   productCtId?: number;
 
   @IsOptional()
+  @IsString()
+  supplierWarehouseCode?: string;
+
+  @IsOptional()
   @IsNumber()
   marginPercent?: number;
 

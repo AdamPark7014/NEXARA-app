@@ -37,6 +37,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ToolInventoryItemDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 
 data class ToolInventoryUiState(
     val isLoading: Boolean = true,
@@ -103,7 +104,7 @@ fun ConsoleToolInventoryScreen(
         Spacer(modifier = Modifier.height(10.dp))
 
         if (state.isLoading) {
-            Text("Cargando...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            NxLoadingBlock("Cargando inventario…")
             return@Column
         }
         if (!state.error.isNullOrBlank()) {

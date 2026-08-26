@@ -1,6 +1,7 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
 import android.app.Application
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,16 +17,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -51,11 +52,20 @@ import mx.nexara.mobile.nativeapp.data.api.OperationalProjectDto
 import mx.nexara.mobile.nativeapp.data.api.ServiceClientDto
 import mx.nexara.mobile.nativeapp.data.api.VisibleUserDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxTone
 import java.time.LocalDate
 import java.time.ZoneOffset
 
 data class ProjectsUiState(
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val saving: Boolean = false,
     val success: String? = null,
@@ -95,16 +105,27 @@ class ConsoleProjectsViewModel(app: Application) : AndroidViewModel(app) {
     fun selectEngineer(projectId: Long, engineerId: Long?) =
         _state.update { it.copy(selectedEngineerByProject = it.selectedEngineerByProject + (projectId to engineerId)) }
 
-    fun refresh() {
-        _state.update { it.copy(isLoading = true, error = null, success = null) }
+    fun refresh(initial: Boolean = true) {
+        _state.update {
+            it.copy(
+                isLoading = initial && it.projects.isEmpty(),
+                isRefreshing = !initial,
+                error = null,
+                success = null,
+            )
+        }
         viewModelScope.launch {
             try {
                 val projects = withContext(Dispatchers.IO) { repo.operationalProjects() }
                 val clients = withContext(Dispatchers.IO) { repo.serviceClients() }
                 val users = withContext(Dispatchers.IO) { repo.usersFetch(preferAssignable = true) }
-                _state.update { it.copy(isLoading = false, projects = projects, clients = clients, users = users) }
+                _state.update {
+                    it.copy(isLoading = false, isRefreshing = false, projects = projects, clients = clients, users = users)
+                }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message ?: "No se pudo cargar proyectos") }
+                _state.update {
+                    it.copy(isLoading = false, isRefreshing = false, error = e.message ?: "No se pudo cargar proyectos")
+                }
             }
         }
     }
@@ -195,6 +216,7 @@ class ConsoleProjectsViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConsoleProjectsScreen(
     contentPadding: PaddingValues = PaddingValues(16.dp),
@@ -203,7 +225,7 @@ fun ConsoleProjectsScreen(
     val state by vm.state.collectAsState()
     var selected by remember { mutableStateOf<OperationalProjectDto?>(null) }
 
-    if (state.isLoading && state.projects.isEmpty() && state.error == null) vm.refresh()
+    if (state.isLoading && state.projects.isEmpty() && state.error == null) vm.refresh(initial = true)
 
     if (selected != null) {
         OpsProjectDetailScreen(
@@ -224,80 +246,108 @@ fun ConsoleProjectsScreen(
         state.users.filter { (it.nombre.lowercase().contains("vend") || (it.email ?: "").lowercase().contains("vend")) }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.refresh(initial = false) },
+        modifier = Modifier.fillMaxSize(),
     ) {
-        Text("Proyectos", style = MaterialTheme.typography.titleLarge)
-        if (!state.error.isNullOrBlank()) Text(state.error!!, color = MaterialTheme.colorScheme.error)
-        if (!state.success.isNullOrBlank()) Text(state.success!!, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(NxColors.Surface)
+                .padding(contentPadding),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item {
+                NxSectionHeader(
+                    title = "Proyectos",
+                    subtitle = "Operaciones · asignación de ingenieros",
+                )
+            }
 
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Crear proyecto operacional", style = MaterialTheme.typography.titleMedium)
-                OutlinedTextField(state.title, { vm.setField("title", it) }, label = { Text("Título") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(state.description, { vm.setField("description", it) }, label = { Text("Descripción") }, modifier = Modifier.fillMaxWidth())
+            if (!state.success.isNullOrBlank()) {
+                item { Text(state.success!!, color = NxColors.Success, style = MaterialTheme.typography.bodySmall) }
+            }
 
-                var vendorMenu by remember { mutableStateOf(false) }
-                Button(onClick = { vendorMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text(state.vendorId?.let { "Vendedor: #$it" } ?: "Selecciona vendedor")
-                }
-                DropdownMenu(expanded = vendorMenu, onDismissRequest = { vendorMenu = false }) {
-                    vendors.take(50).forEach { v ->
-                        DropdownMenuItem(text = { Text(v.nombre) }, onClick = { vm.setVendor(v.id); vendorMenu = false })
+            if (!state.error.isNullOrBlank()) {
+                item { NxErrorBlock(state.error!!) { vm.refresh(initial = false) } }
+            }
+
+            item {
+                NxPanelShell {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Crear proyecto operacional", style = MaterialTheme.typography.titleMedium)
+                        OutlinedTextField(state.title, { vm.setField("title", it) }, label = { Text("Título") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(state.description, { vm.setField("description", it) }, label = { Text("Descripción") }, modifier = Modifier.fillMaxWidth())
+
+                        var vendorMenu by remember { mutableStateOf(false) }
+                        Button(onClick = { vendorMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text(state.vendorId?.let { "Vendedor: #$it" } ?: "Selecciona vendedor")
+                        }
+                        DropdownMenu(expanded = vendorMenu, onDismissRequest = { vendorMenu = false }) {
+                            vendors.take(50).forEach { v ->
+                                DropdownMenuItem(text = { Text(v.nombre) }, onClick = { vm.setVendor(v.id); vendorMenu = false })
+                            }
+                        }
+
+                        var clientMenu by remember { mutableStateOf(false) }
+                        Button(onClick = { clientMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text(state.clientId?.let { "Cliente: #$it" } ?: "Selecciona cliente")
+                        }
+                        DropdownMenu(expanded = clientMenu, onDismissRequest = { clientMenu = false }) {
+                            state.clients.take(80).forEach { c ->
+                                DropdownMenuItem(text = { Text(c.name ?: c.nombre ?: "Cliente #${c.id}") }, onClick = { vm.setClient(c.id); clientMenu = false })
+                            }
+                        }
+
+                        OutlinedTextField(state.startDate, { vm.setField("startDate", it) }, label = { Text("Inicio (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(state.endDate, { vm.setField("endDate", it) }, label = { Text("Fin (opcional)") }, modifier = Modifier.fillMaxWidth())
+
+                        Button(onClick = { vm.create() }, enabled = !state.saving, modifier = Modifier.fillMaxWidth()) {
+                            Text(if (state.saving) "Guardando..." else "Crear proyecto")
+                        }
                     }
-                }
-
-                var clientMenu by remember { mutableStateOf(false) }
-                Button(onClick = { clientMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text(state.clientId?.let { "Cliente: #$it" } ?: "Selecciona cliente")
-                }
-                DropdownMenu(expanded = clientMenu, onDismissRequest = { clientMenu = false }) {
-                    state.clients.take(80).forEach { c ->
-                        DropdownMenuItem(text = { Text(c.name ?: c.nombre ?: "Cliente #${c.id}") }, onClick = { vm.setClient(c.id); clientMenu = false })
-                    }
-                }
-
-                OutlinedTextField(state.startDate, { vm.setField("startDate", it) }, label = { Text("Inicio (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(state.endDate, { vm.setField("endDate", it) }, label = { Text("Fin (opcional)") }, modifier = Modifier.fillMaxWidth())
-
-                Button(onClick = { vm.create() }, enabled = !state.saving, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (state.saving) "Guardando..." else "Crear proyecto")
                 }
             }
-        }
 
-        Spacer(Modifier.height(4.dp))
-        Text("Lista de proyectos (${state.projects.size})", style = MaterialTheme.typography.titleMedium)
+            item { NxSectionHeader("Lista de proyectos", "${state.projects.size} total") }
 
-        if (state.isLoading) {
-            Box(Modifier.fillMaxWidth(), Alignment.Center) { CircularProgressIndicator() }
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            if (state.isLoading) {
+                item { NxLoadingBlock("Cargando proyectos…") }
+            } else if (state.projects.isEmpty()) {
+                item {
+                    NxEmptyState(
+                        title = "Sin proyectos",
+                        subtitle = "Crea el primer proyecto operacional con el formulario de arriba.",
+                    )
+                }
+            } else {
                 items(state.projects, key = { it.id }) { p ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth().clickable { selected = p },
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    NxPanelShell(onClick = { selected = p }) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(p.title, fontWeight = FontWeight.Bold)
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(p.status, fontSize = 11.sp, color = projectStatusColor(p.status))
-                                if (p.client != null) Text("· ${p.client.name ?: p.client.nombre ?: ""}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                NxStatusChip(projectStatusLabel(p.status), projectStatusTone(p.status))
+                                if (p.client != null) {
+                                    Text(
+                                        p.client.name ?: p.client.nombre ?: "",
+                                        fontSize = 11.sp,
+                                        color = NxColors.Muted,
+                                    )
+                                }
                             }
                             if (!p.description.isNullOrBlank()) {
-                                Text(p.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                                Text(p.description, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted, maxLines = 2)
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Text("Actividades: ${p.activities?.size ?: 0}", fontSize = 11.sp)
-                                Text("Ingenieros: ${p.engineers?.size ?: 0}", fontSize = 11.sp)
+                                Text("Actividades: ${p.activities?.size ?: 0}", fontSize = 11.sp, color = NxColors.Muted)
+                                Text("Ingenieros: ${p.engineers?.size ?: 0}", fontSize = 11.sp, color = NxColors.Muted)
                             }
                         }
                     }
                 }
             }
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 }
@@ -401,6 +451,20 @@ private fun OpsProjectDetailScreen(
             }
         }
     }
+}
+
+private fun projectStatusLabel(status: String): String = when (status.uppercase()) {
+    "ACTIVE" -> "Activo"
+    "ON_HOLD" -> "En pausa"
+    "COMPLETED" -> "Cerrado"
+    else -> status
+}
+
+private fun projectStatusTone(status: String): NxTone = when (status.uppercase()) {
+    "ACTIVE" -> NxTone.Success
+    "ON_HOLD" -> NxTone.Warning
+    "COMPLETED" -> NxTone.Info
+    else -> NxTone.Neutral
 }
 
 private fun projectStatusColor(status: String): androidx.compose.ui.graphics.Color = when (status.uppercase()) {

@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CreateExpenseDto } from './dto/create-expense.dto.js';
 import { UpdateExpenseDto } from './dto/update-expense.dto.js';
-import { AutoApprovalService } from '../workflow/auto-approval.service.js';
+import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { generateExpensesReportPdf } from './expenses-report-pdf.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -36,7 +36,7 @@ const STATUS = {
 export class ExpensesService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly autoApproval: AutoApprovalService,
+    private readonly domainEvents: DomainEventBusService,
     private readonly accounting: AccountingService,
     private readonly audit: AuditService,
   ) {}
@@ -92,16 +92,37 @@ export class ExpensesService {
       data: { ...createExpenseDto, companyId } as any,
     });
 
+    this.domainEvents.publishEntityLifecycle('created', {
+      entityType: 'EXPENSE',
+      entityId: expense.id,
+      companyId: expense.companyId ?? companyId,
+      userId: createExpenseDto.usuarioId ?? undefined,
+      payload: {
+        estatusPago: expense.estatusPago,
+        montoSolicitado: Number(createExpenseDto.montoSolicitado || 0),
+        isAdministrative: Boolean(expense.isAdministrative),
+      },
+    });
+
     if (createExpenseDto.usuarioId) {
-      this.autoApproval
-        .evaluate({
-          entityType: 'EXPENSE',
-          entityId: expense.id,
-          userId: createExpenseDto.usuarioId,
-          companyId: expense.companyId ?? companyId,
-          payload: { amount: Number(createExpenseDto.montoSolicitado || 0) },
-        })
-        .catch(() => undefined);
+      this.domainEvents.requestAutoApproval({
+        entityType: 'EXPENSE',
+        entityId: expense.id,
+        userId: createExpenseDto.usuarioId,
+        companyId: expense.companyId ?? companyId,
+        payload: { amount: Number(createExpenseDto.montoSolicitado || 0) },
+      });
+      this.domainEvents.publishEntityLifecycle('updated', {
+        entityType: 'EXPENSE',
+        entityId: expense.id,
+        companyId: expense.companyId ?? companyId,
+        userId: createExpenseDto.usuarioId,
+        payload: {
+          submittedForApproval: true,
+          estatusPago: expense.estatusPago,
+          montoSolicitado: Number(createExpenseDto.montoSolicitado || 0),
+        },
+      });
     }
 
     return expense;
@@ -154,15 +175,38 @@ export class ExpensesService {
       include: { usuario: true, actividad: true, createdBy: true },
     });
 
-    this.autoApproval
-      .evaluate({
-        entityType: 'EXPENSE',
-        entityId: expense.id,
-        userId: dto.usuarioId,
-        companyId: expense.companyId ?? companyId,
-        payload: { amount: Number(dto.monto) },
-      })
-      .catch(() => undefined);
+    this.domainEvents.publishEntityLifecycle('created', {
+      entityType: 'EXPENSE',
+      entityId: expense.id,
+      companyId: expense.companyId ?? companyId,
+      userId: dto.usuarioId,
+      payload: {
+        estatusPago: expense.estatusPago,
+        montoSolicitado: Number(dto.monto),
+        concepto: expense.concepto,
+        isAdministrative: true,
+      },
+    });
+
+    this.domainEvents.requestAutoApproval({
+      entityType: 'EXPENSE',
+      entityId: expense.id,
+      userId: dto.usuarioId,
+      companyId: expense.companyId ?? companyId,
+      payload: { amount: Number(dto.monto) },
+    });
+    this.domainEvents.publishEntityLifecycle('updated', {
+      entityType: 'EXPENSE',
+      entityId: expense.id,
+      companyId: expense.companyId ?? companyId,
+      userId: dto.usuarioId,
+      payload: {
+        submittedForApproval: true,
+        estatusPago: expense.estatusPago,
+        montoSolicitado: Number(dto.monto),
+        concepto: expense.concepto,
+      },
+    });
 
     return expense;
   }
@@ -461,5 +505,37 @@ export class ExpensesService {
       byPerson: analytics.byPerson,
       rows: analytics.rows,
     });
+  }
+
+  /** Aprobación vía workflow — idempotente si ya no está pendiente. */
+  async onWorkflowApproved(id: number, companyId: number, actorId?: number) {
+    const existing = await this.prisma.expense.findFirst({
+      where: { id, deletedAt: null, isAdministrative: true, ...companyWhere(companyId) },
+    });
+    if (!existing || existing.estatusPago !== STATUS.PENDIENTE) return;
+    try {
+      await this.approveOrReject(id, 'approve', undefined, actorId, companyId);
+    } catch {
+      // concurrent update — ignorar
+    }
+  }
+
+  /** Rechazo vía workflow de aprobación — idempotente si ya no está pendiente. */
+  async onWorkflowRejected(id: number, companyId: number, actorId?: number, note?: string) {
+    const existing = await this.prisma.expense.findFirst({
+      where: { id, deletedAt: null, isAdministrative: true, ...companyWhere(companyId) },
+    });
+    if (!existing || existing.estatusPago !== STATUS.PENDIENTE) return;
+    try {
+      await this.approveOrReject(
+        id,
+        'reject',
+        note?.trim() || 'Rechazado en flujo de aprobación',
+        actorId,
+        companyId,
+      );
+    } catch {
+      // concurrent update — ignorar
+    }
   }
 }

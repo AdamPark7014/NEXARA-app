@@ -81,6 +81,7 @@ Esta matriz es el checklist de **paridad** para poder eliminar `apps/mobile` (Ne
 | Oportunidades | `/ventas/oportunidades` | ✅ `VentasOportunidadesScreen` + FAB crear | ✅ `CrmOpportunitiesView` + FAB crear |
 | Clientes | `/ventas/clientes` | ✅ `VentasClientesScreen` | ✅ `CrmCommercialClientsView` |
 | Cotizaciones (view/pdf) | `/ventas/cotizaciones` | ✅ | ✅ KPI + filtros |
+| Cotizador inteligente (Smart Quote) | `/ventas/cotizaciones/nueva` | ✅ `SmartQuoteBuilderScreen` | ✅ |
 | Productos | `/crm/products` | ✅ `VentasProductsScreen` | ✅ `CrmProductsView` |
 | Proyectos | `/ventas/proyectos` | ✅ `VentasProyectosScreen` | ✅ `CrmProjectsView` |
 | Pipeline | `/crm/pipeline` | ✅ `VentasPipelineScreen` | ✅ `CrmPipelineView` |
@@ -155,4 +156,4 @@ Esta matriz es el checklist de **paridad** para poder eliminar `apps/mobile` (Ne
 | Offline GET cache | `install-offline-fetch.ts` | ✅ integrado en `ApiClient` | ✅ `OfflineApiCache` |
 | Offline mutation queue + replay | `offline-queue.ts` | ✅ `OfflineSyncCoordinator` | ✅ `OfflineSyncCoordinator` |
 | Camera/gallery uploads | evidences/ventas opp | ✅ `MediaPickerBar` + cámara/galería en evidencias | ✅ `MediaPickerBar` + `CameraCaptureView` |
-| Push notifications (FCM/APNs) | devices/push-token | ✅ FCM + `PushRegistration` | ✅ APNs + `PushManager` |
+| Push notifications (FCM/APNs) | devices/push-token | ✅ FCM + deep link al tocar | ✅ APNs + `PushManager` |

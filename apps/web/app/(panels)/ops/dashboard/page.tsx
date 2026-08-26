@@ -27,6 +27,7 @@ import {
 } from "@/lib/activity-status";
 import type { ActivityEvidenceSummary } from "@/lib/evidence-lock";
 import { filterRowsByScope, getActivitiesCanonicalPath, getOpsDashboardSectionConfig } from "@/lib/section-views";
+import { CommandCenterRail } from "@/components/command-center/CommandCenterRail";
 
 interface ActivityRow {
   id: number;
@@ -193,6 +194,8 @@ export default function OpsDashboardPage() {
           </>
         }
       />
+
+      <CommandCenterRail panel="ops" />
 
       {error && !loading && (
         <DashPanel title="No se pudo cargar" subtitle={error}>

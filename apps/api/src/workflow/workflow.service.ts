@@ -6,7 +6,8 @@ import {
   companyWhere,
   requireCompanyId,
 } from '../common/tenant/tenant-scope.js';
-import { ACTIVITY_CLOSURE_WORKFLOW, ActivityLifecycleService } from '../activities/activity-lifecycle.service.js';
+import { matchesAutoApproveCondition } from './workflow-auto-approve-condition.js';
+import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 
 @Injectable()
 export class WorkflowService {
@@ -14,8 +15,8 @@ export class WorkflowService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly activityLifecycle: ActivityLifecycleService,
     private readonly notifications: NotificationsService,
+    private readonly domainEvents: DomainEventBusService,
   ) {}
 
   // ── Definiciones ──────────────────────────────────────────────
@@ -129,6 +130,13 @@ export class WorkflowService {
     if (firstStep.approverUserId) {
       await this.notifyApprover(firstStep.approverUserId, instance.id, def.name, dto.entityType, dto.entityId);
     }
+
+    void this.tryAutoApproveChain(instance.id, tenantId).catch((err) =>
+      this.logger.warn(
+        `Auto-approve chain: ${err instanceof Error ? err.message : err}`,
+      ),
+    );
+
     return this.getInstance(instance.id, tenantId);
   }
 
@@ -294,6 +302,18 @@ export class WorkflowService {
         entityType: inst.entityType,
         relatedEntityId: inst.entityId,
       } as any).catch(() => null);
+      this.domainEvents.publishEntityLifecycle('updated', {
+        entityType: inst.entityType,
+        entityId: inst.entityId,
+        companyId: inst.companyId,
+        userId,
+        payload: {
+          workflowRejected: true,
+          workflowName: inst.workflow.name,
+          workflowInstanceId: inst.id,
+          comments: comments?.trim() || null,
+        },
+      });
       return { decided: true, complete: true, cancelled: true };
     }
 
@@ -313,6 +333,11 @@ export class WorkflowService {
       if (nextStep.approverUserId) {
         await this.notifyApprover(nextStep.approverUserId, approval.instanceId, approval.instance.workflow.name, approval.instance.entityType, approval.instance.entityId);
       }
+      void this.tryAutoApproveChain(approval.instanceId, tenantId).catch((err) =>
+        this.logger.warn(
+          `Auto-approve chain: ${err instanceof Error ? err.message : err}`,
+        ),
+      );
       return { decided: true, complete: false, nextStep: nextStep.stepNumber };
     }
 
@@ -322,21 +347,7 @@ export class WorkflowService {
       data: { isComplete: true, completedAt: new Date() },
     });
 
-    // Validación del Arquitecto aprobada: la actividad pasa a finalizada y se
-    // propagan los efectos que estaban esperando su visto bueno (cierre de la
-    // visita de contrato y de la solicitud del cliente).
-    if (approval.instance.entityType === ACTIVITY_CLOSURE_WORKFLOW) {
-      const result = await this.activityLifecycle.onActivityValidated({
-        activityId: approval.instance.entityId,
-        companyId: approval.instance.companyId,
-      });
-      if (result.errors.length) {
-        this.logger.warn(
-          `Validación de actividad ${approval.instance.entityId} con efectos incompletos: ` +
-            result.errors.join('; '),
-        );
-      }
-    }
+    await this.finalizeWorkflowApproval(approval.instance, userId);
     await this.notifications.createNotification({
       userId: approval.instance.startedById,
       type: 'WORKFLOW_APPROVED',
@@ -347,6 +358,189 @@ export class WorkflowService {
       relatedEntityId: approval.instance.entityId,
     } as any).catch(() => null);
     return { decided: true, complete: true };
+  }
+
+  private async buildEntityContext(
+    entityType: string,
+    entityId: number,
+    companyId: number,
+  ): Promise<Record<string, unknown>> {
+    const type = entityType.toUpperCase();
+    if (type === 'COTIZACION') {
+      const quote = await this.prisma.cotizacion.findFirst({
+        where: { id: entityId, ...companyWhere(companyId) },
+        include: { items: true },
+      });
+      if (!quote) return {};
+      const discounts = quote.items.map((it) => Number(it.discount ?? 0));
+      const maxDiscountPercent = discounts.length ? Math.max(...discounts) : 0;
+      return {
+        maxDiscountPercent,
+        total: Number(quote.total),
+        amount: Number(quote.total),
+      };
+    }
+    if (type === 'EXPENSE') {
+      const expense = await this.prisma.expense.findFirst({
+        where: { id: entityId, ...companyWhere(companyId) },
+      });
+      if (!expense) return {};
+      const amount = Number(expense.montoSolicitado ?? 0);
+      return { amount, montoSolicitado: amount };
+    }
+    if (type === 'VIATIC') {
+      const viatic = await this.prisma.viatico.findFirst({
+        where: { id: entityId, ...companyWhere(companyId) },
+      });
+      if (!viatic) return {};
+      const amount = Number(viatic.montoSolicitado ?? 0);
+      return { amount, montoSolicitado: amount };
+    }
+    if (type === 'SALES_PROJECT') {
+      const project = await this.prisma.salesProject.findFirst({
+        where: { id: entityId, ...companyWhere(companyId) },
+      });
+      if (!project) return {};
+      return { budget: Number(project.budget ?? 0) };
+    }
+    if (type === 'PURCHASE_ORDER') {
+      const po = await this.prisma.purchaseOrder.findFirst({
+        where: { id: entityId, ...companyWhere(companyId) },
+      });
+      if (!po) return {};
+      const amount = Number(po.totalAmount ?? 0);
+      return { amount, totalAmount: amount };
+    }
+    return {};
+  }
+
+  private async tryAutoApproveChain(instanceId: number, companyId: number): Promise<void> {
+    for (let guard = 0; guard < 8; guard++) {
+      const pending = await this.prisma.workflowApproval.findFirst({
+        where: { instanceId, status: 'PENDING' },
+        include: {
+          step: true,
+          instance: {
+            include: { workflow: { include: { steps: { orderBy: { stepNumber: 'asc' } } } } },
+          },
+        },
+      });
+      if (!pending?.step?.autoApproveCondition) break;
+
+      const ctx = await this.buildEntityContext(
+        pending.instance.entityType,
+        pending.instance.entityId,
+        companyId,
+      );
+      if (!matchesAutoApproveCondition(pending.step.autoApproveCondition, ctx)) break;
+
+      const result = await this.systemAdvanceApproval(
+        pending,
+        `[AUTO] ${pending.step.autoApproveCondition.trim()}`,
+      );
+      if (result.complete || result.cancelled) break;
+    }
+  }
+
+  private async systemAdvanceApproval(
+    approval: {
+      id: number;
+      instanceId: number;
+      stepId: number;
+      instance: {
+        id: number;
+        entityId: number;
+        entityType: string;
+        companyId: number;
+        startedById: number;
+        workflow: {
+          name: string;
+          steps: Array<{ id: number; stepNumber: number; approverUserId: number | null }>;
+        };
+      };
+      step: { id: number };
+    },
+    comments: string,
+  ): Promise<{ complete: boolean; cancelled: boolean }> {
+    await this.prisma.workflowApproval.update({
+      where: { id: approval.id },
+      data: {
+        status: 'APPROVED',
+        comments: comments.trim(),
+        decidedById: approval.instance.startedById,
+        decidedAt: new Date(),
+      },
+    });
+
+    const steps = approval.instance.workflow.steps;
+    const currentIdx = steps.findIndex((s) => s.id === approval.stepId);
+    const nextStep = steps[currentIdx + 1];
+
+    if (nextStep) {
+      await this.prisma.workflowInstance.update({
+        where: { id: approval.instanceId },
+        data: {
+          currentStep: nextStep.stepNumber,
+          approvals: { create: { stepId: nextStep.id, status: 'PENDING' } },
+        },
+      });
+      if (nextStep.approverUserId) {
+        await this.notifyApprover(
+          nextStep.approverUserId,
+          approval.instanceId,
+          approval.instance.workflow.name,
+          approval.instance.entityType,
+          approval.instance.entityId,
+        );
+      }
+      return { complete: false, cancelled: false };
+    }
+
+    await this.prisma.workflowInstance.update({
+      where: { id: approval.instanceId },
+      data: { isComplete: true, completedAt: new Date() },
+    });
+
+    await this.finalizeWorkflowApproval(approval.instance, approval.instance.startedById);
+
+    await this.notifications.createNotification({
+      userId: approval.instance.startedById,
+      type: 'WORKFLOW_APPROVED',
+      category: 'workflow',
+      title: '✅ Solicitud aprobada',
+      message: `Tu solicitud "${approval.instance.workflow.name}" para ${approval.instance.entityType} #${approval.instance.entityId} fue aprobada en todos los niveles.`,
+      entityType: approval.instance.entityType,
+      relatedEntityId: approval.instance.entityId,
+    } as any).catch(() => null);
+
+    return { complete: true, cancelled: false };
+  }
+
+  private async finalizeWorkflowApproval(
+    instance: {
+      id: number;
+      entityId: number;
+      entityType: string;
+      companyId: number;
+      startedById: number;
+      workflow: { name: string };
+    },
+    actorId: number,
+  ) {
+    const ctx = await this.buildEntityContext(instance.entityType, instance.entityId, instance.companyId);
+    this.domainEvents.publishEntityLifecycle('updated', {
+      entityType: instance.entityType,
+      entityId: instance.entityId,
+      companyId: instance.companyId,
+      userId: actorId,
+      payload: {
+        workflowComplete: true,
+        workflowName: instance.workflow.name,
+        workflowInstanceId: instance.id,
+        startedById: instance.startedById,
+        ...ctx,
+      },
+    });
   }
 
   private async notifyApprover(userId: number, instanceId: number, workflowName: string, entityType: string, entityId: number) {

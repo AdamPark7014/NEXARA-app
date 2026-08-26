@@ -92,6 +92,17 @@ export class VentasClientesController {
     return this.ventasService.listClientInvoices(id, user, companyId);
   }
 
+  @Get(':id/snapshot')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
+  clientSnapshot(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.ventasService.getClientSnapshot(id, user, companyId);
+  }
+
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })

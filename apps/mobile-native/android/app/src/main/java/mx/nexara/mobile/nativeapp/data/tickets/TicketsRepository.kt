@@ -187,6 +187,11 @@ class TicketsRepository(context: Context) {
 
     suspend fun closeRequest(id: Long) = api.closeRequest(id = id)
 
+    suspend fun decideRequest(id: Long, decision: String) =
+        api.decideRequest(id = id, body = mx.nexara.mobile.nativeapp.data.api.RequestDecisionBody(decision = decision))
+
+    suspend fun projects() = api.getProjects()
+
     suspend fun pendingFeedback(): List<PendingFeedbackTicketDto> = api.getPendingFeedback()
 
     suspend fun submitFeedback(
@@ -200,15 +205,31 @@ class TicketsRepository(context: Context) {
         mx.nexara.mobile.nativeapp.data.api.CreateFeedbackBody(
             activityId = activityId,
             rating = rating,
-            wasOnTime = wasOnTime,
-            wasFriendly = wasFriendly,
-            wasSolved = wasSolved,
+            wasOnTime = feedbackYesNo(wasOnTime),
+            wasFriendly = feedbackYesNo(wasFriendly),
+            wasSolved = feedbackYesNo(wasSolved),
             comments = comments?.trim().takeIf { !it.isNullOrBlank() },
         )
     )
 
-    suspend fun tickets(start: String? = null, end: String? = null, branchId: Long? = null): List<ClientPortalTicketDto> =
-        if (isBranchUser()) branchApi.tickets(start = start, end = end) else api.getTickets(start = start, end = end, branchId = branchId)
+    private fun feedbackYesNo(raw: String?): Boolean? = when (raw?.trim()?.uppercase()) {
+        "YES", "SI", "TRUE" -> true
+        "NO", "FALSE" -> false
+        else -> null
+    }
+
+    suspend fun tickets(
+        start: String? = null,
+        end: String? = null,
+        branchId: Long? = null,
+        projectId: Long? = null,
+    ): List<ClientPortalTicketDto> =
+        if (isBranchUser()) branchApi.tickets(start = start, end = end) else api.getTickets(
+            start = start,
+            end = end,
+            branchId = branchId,
+            projectId = projectId,
+        )
 
     suspend fun ticket(id: Long): ClientPortalTicketDto? =
         if (isBranchUser()) branchApi.ticket(id = id) else api.getTicket(id = id)
@@ -302,5 +323,46 @@ class TicketsRepository(context: Context) {
 
     suspend fun decideInventory(id: Long, decision: String) =
         api.decideInventory(id = id, body = DecideInventoryBody(decision = decision))
+
+    suspend fun servicesSummary(): Map<String, Any?> =
+        parseObject(api.getServicesSummaryRaw().string())
+
+    suspend fun portalInvoices(): List<Map<String, Any?>> =
+        parseJsonList(api.getInvoicesRaw().string())
+
+    suspend fun portalQuotes(): List<Map<String, Any?>> =
+        parseJsonList(api.getQuotesRaw().string())
+
+    suspend fun downloadInvoicePdf(id: Long): ByteArray = api.getInvoicePdfRaw(id).bytes()
+
+    suspend fun downloadInvoiceXml(id: Long): ByteArray = api.getInvoiceXmlRaw(id).bytes()
+
+    suspend fun downloadQuotePdf(id: Long): ByteArray = api.getQuotePdfRaw(id).bytes()
+
+    private fun parseObject(raw: String): Map<String, Any?> {
+        val trimmed = raw.trim()
+        if (!trimmed.startsWith("{")) return emptyMap()
+        val obj = org.json.JSONObject(trimmed)
+        return obj.keys().asSequence().associateWith { key -> jsonValue(obj.get(key)) }
+    }
+
+    private fun parseJsonList(raw: String): List<Map<String, Any?>> {
+        val trimmed = raw.trim()
+        if (!trimmed.startsWith("[")) return emptyList()
+        val arr = org.json.JSONArray(trimmed)
+        return (0 until arr.length()).map { idx ->
+            val item = arr.get(idx)
+            if (item is org.json.JSONObject) {
+                item.keys().asSequence().associateWith { key -> jsonValue(item.get(key)) }
+            } else emptyMap()
+        }
+    }
+
+    private fun jsonValue(value: Any?): Any? = when (value) {
+        null, org.json.JSONObject.NULL -> null
+        is org.json.JSONObject -> value.keys().asSequence().associateWith { jsonValue(value.get(it)) }
+        is org.json.JSONArray -> (0 until value.length()).map { jsonValue(value.get(it)) }
+        else -> value
+    }
 }
 

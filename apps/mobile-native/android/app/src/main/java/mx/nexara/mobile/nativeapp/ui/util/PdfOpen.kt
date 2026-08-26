@@ -23,3 +23,13 @@ fun openPdfFile(context: Context, file: File) {
     context.startActivity(intent)
 }
 
+fun sharePdfFile(context: Context, file: File, chooserTitle: String = "Compartir PDF") {
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "application/pdf"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, chooserTitle))
+}
+

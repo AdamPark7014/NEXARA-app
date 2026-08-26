@@ -3,17 +3,16 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Socket } from "socket.io-client";
-import PanelLogin from "@/components/PanelLogin";
+import { usePortalSession } from "@/components/portal/PortalShell";
+import { writeClientSession } from "@/lib/portal-session";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
 import BranchesForm from "@/components/BranchesForm";
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
-import { useTheme } from "@/components/ThemeContext";
 import { buildApiUrl, getSocketBaseUrl, getApiAssetOrigin } from "@/lib/api-base";
 import { fetchWithOfflineQueue, isQueuedResponse } from "@/lib/fetch-offline";
 import { openExternalUrl } from "@/lib/open-external-url";
 import { isCapacitorNative } from "@/lib/capacitor-env";
 import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
-import consoleStyles from "../console/console.module.css";
 import styles from "./tickets.module.css";
 import { createRealtimeSocket } from '@/lib/realtime-socket';
 
@@ -22,11 +21,6 @@ const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false }
 type ClientSession = {
   token: string;
   client: { id: number; name: string; logoUrl?: string | null };
-};
-
-type BranchSession = {
-  token: string;
-  branch: { id: number; name: string; branchNumber?: string | null; clientId: number; clientName?: string | null };
 };
 
 type Ticket = {
@@ -138,24 +132,7 @@ type ClientProject = {
 };
 
 export default function ClientTicketsPage() {
-  const { darkMode, toggleDarkMode } = useTheme();
-  // Inicializar sesión desde sessionStorage directamente
-  const [session, setSession] = useState<ClientSession | null>(() => {
-    if (typeof window !== "undefined") {
-      const saved = window.sessionStorage.getItem("clientSession");
-      if (!saved) return null;
-      try {
-        return JSON.parse(saved);
-      } catch {
-        window.sessionStorage.removeItem("clientSession");
-        return null;
-      }
-    }
-    return null;
-  });
-  const [mounted, setMounted] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { client: session, token, refresh } = usePortalSession();
   const [error, setError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
@@ -412,9 +389,6 @@ export default function ClientTicketsPage() {
 
   // Marcar como mounted después del primer render en el cliente
   useEffect(() => {
-    setMounted(true);
-    
-    // Read tab from URL params after mounting using window.location
     if (typeof window !== "undefined") {
       const searchParams = new URLSearchParams(window.location.search);
       const tabParam = searchParams.get("tab");
@@ -433,28 +407,10 @@ export default function ClientTicketsPage() {
   }, []);
 
   useEffect(() => {
-    if (session?.token) {
+    if (token) {
       window.dispatchEvent(new Event("nexara-portal-session-changed"));
     }
-  }, [session?.token]);
-
-  useEffect(() => {
-    const onResize = () => setIsMobile(isPanelDrawerViewport(window.innerWidth));
-    onResize();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  useEffect(() => {
-    if (!isMobile) {
-      setMobileMenuOpen(false);
-      return;
-    }
-    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isMobile, mobileMenuOpen]);
+  }, [token]);
 
   useEffect(() => {
     return () => {
@@ -503,7 +459,7 @@ export default function ClientTicketsPage() {
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) {
         window.sessionStorage.removeItem("clientSession");
-        setSession(null);
+        refresh();
         setBranches([]);
       }
       return;
@@ -519,7 +475,7 @@ export default function ClientTicketsPage() {
     if (!res.ok) {
       if (res.status === 401 || res.status === 403) {
         window.sessionStorage.removeItem("clientSession");
-        setSession(null);
+        refresh();
         setProfile(null);
         setBranches([]);
         setError("La sesión ha expirado. Inicia sesión nuevamente.");
@@ -532,18 +488,17 @@ export default function ClientTicketsPage() {
     if (!data) return;
     setProfile(data);
 
-    if (data.logoUrl !== undefined && session?.client) {
+    if (data.logoUrl !== undefined && session?.client && token) {
       const normalizedLogoUrl = data.logoUrl || null;
       if ((session.client.logoUrl || null) !== normalizedLogoUrl) {
-        const nextSession = {
-          ...session,
+        writeClientSession({
+          token,
           client: {
             ...session.client,
             logoUrl: normalizedLogoUrl,
           },
-        };
-        window.sessionStorage.setItem("clientSession", JSON.stringify(nextSession));
-        setSession(nextSession);
+        });
+        refresh();
       }
     }
 
@@ -562,10 +517,10 @@ export default function ClientTicketsPage() {
   };
 
   const handleBranchSaved = useCallback(() => {
-    if (!session?.token) return;
-    fetchProfile(session.token);
-    fetchBranches(session.token);
-  }, [session?.token]);
+    if (!token) return;
+    fetchProfile(token);
+    fetchBranches(token);
+  }, [token]);
 
   const fetchRequests = async (token: string) => {
     const res = await fetch(buildApiUrl("client-portal/requests"), {
@@ -592,54 +547,37 @@ export default function ClientTicketsPage() {
   };
 
   useEffect(() => {
-    if (session?.token) {
-      fetchTickets(session.token);
-      fetchProfile(session.token);
-      fetchBranches(session.token);
-      fetchRequests(session.token);
-      fetchPendingFeedback(session.token);
-      fetchClientProjects(session.token);
+    if (token) {
+      fetchTickets(token);
+      fetchProfile(token);
+      fetchBranches(token);
+      fetchRequests(token);
+      fetchPendingFeedback(token);
+      fetchClientProjects(token);
     }
-  }, [session?.token, reportRange, reportStart, reportEnd, selectedProjectFilter]);
+  }, [token, reportRange, reportStart, reportEnd, selectedProjectFilter]);
 
   useEffect(() => {
-    if (!session?.token) return undefined;
+    if (!token) return undefined;
     const socketUrl = getSocketBaseUrl();
     const socket: Socket = createRealtimeSocket(socketUrl, { transports: ["polling", "websocket"] });
     socket.on("entity:updated", (payload: { model?: string }) => {
       if (payload?.model === "Activity" || payload?.model === "Evidence" || payload?.model === "ClientTicketRequest") {
-        fetchTickets(session.token);
-        fetchRequests(session.token);
-        fetchPendingFeedback(session.token);
+        fetchTickets(token);
+        fetchRequests(token);
+        fetchPendingFeedback(token);
       }
       if (payload?.model === "ServiceClientBranch" || payload?.model === "ServiceClient") {
-        fetchProfile(session.token);
+        fetchProfile(token);
       }
       if (payload?.model === "ClientActivityFeedback") {
-        fetchPendingFeedback(session.token);
+        fetchPendingFeedback(token);
       }
     });
     return () => {
       socket.disconnect();
     };
-  }, [session?.token]);
-
-  const handleClientLogin = (data: { access_token: string; client: { id: number; name: string; logoUrl?: string | null } }) => {
-    const nextSession = { token: data.access_token, client: data.client };
-    window.sessionStorage.setItem("clientSession", JSON.stringify(nextSession));
-    setSession(nextSession);
-    setError(null);
-    window.dispatchEvent(new Event("nexara-portal-session-changed"));
-  };
-
-  const handleBranchLogin = (data: { access_token: string; branch: BranchSession["branch"] }) => {
-    const nextSession: BranchSession = { token: data.access_token, branch: data.branch };
-    window.sessionStorage.setItem("branchSession", JSON.stringify(nextSession));
-    setError(null);
-    window.dispatchEvent(new Event("nexara-portal-session-changed"));
-    const slug = data.branch.branchNumber || `branch-${data.branch.id}`;
-    window.location.replace(`/${slug}`);
-  };
+  }, [token]);
 
   const sortedTickets = useMemo(() => {
     return [...tickets].sort((a, b) => {
@@ -707,7 +645,7 @@ export default function ClientTicketsPage() {
   };
 
   const handleReportDownload = async () => {
-    if (!session?.token) return;
+    if (!token) return;
     const range = resolveReportRange();
     if (!range) {
       setError("Selecciona un rango valido para el reporte");
@@ -716,7 +654,7 @@ export default function ClientTicketsPage() {
     setReportGenerating(true);
     const query = `?start=${encodeURIComponent(range.start.toISOString())}&end=${encodeURIComponent(range.end.toISOString())}`;
     const res = await fetch(buildApiUrl(`client-portal/report${query}`), {
-      headers: { Authorization: `Bearer ${session.token}` },
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
       setError("No se pudo descargar el reporte");
@@ -735,9 +673,9 @@ export default function ClientTicketsPage() {
   };
 
   const handleTicketReport = async (ticketId: number) => {
-    if (!session?.token) return;
+    if (!token) return;
     const res = await fetch(buildApiUrl(`client-portal/tickets/${ticketId}/report`), {
-      headers: { Authorization: `Bearer ${session.token}` },
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
       setError("No se pudo previsualizar el reporte del ticket");
@@ -756,21 +694,8 @@ export default function ClientTicketsPage() {
     setShowReportModal(true);
   };
 
-  const handleLogout = () => {
-    window.sessionStorage.removeItem("clientSession");
-    window.sessionStorage.removeItem("branchSession");
-    window.dispatchEvent(new Event("nexara-portal-session-changed"));
-    setSession(null);
-    setTickets([]);
-    setProfile(null);
-    setBranches([]);
-    setRequests([]);
-    setPendingFeedback([]);
-    window.location.replace("/tickets");
-  };
-
   const handleProfileSave = async () => {
-    if (!session?.token) return;
+    if (!token) return;
     const res = await fetchWithOfflineQueue(
       buildApiUrl("client-portal/profile"),
       {
@@ -778,7 +703,7 @@ export default function ClientTicketsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(profileDraft),
       },
-      () => session?.token,
+      () => token,
     );
     if (isQueuedResponse(res)) {
       setError(null);
@@ -788,18 +713,18 @@ export default function ClientTicketsPage() {
       setError("No se pudo guardar el perfil");
       return;
     }
-    await fetchProfile(session.token);
+    await fetchProfile(token);
   };
 
   const handleLogoUpload = async (file: File) => {
-    if (!session?.token || !file) return;
+    if (!token || !file) return;
     setLogoUploading(true);
     try {
       const formData = new FormData();
       formData.append("logo", file);
       const res = await fetch(buildApiUrl("client-portal/profile/logo"), {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${session.token}` },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
       if (!res.ok) {
@@ -807,12 +732,14 @@ export default function ClientTicketsPage() {
         return;
       }
       const data = await res.json().catch(() => null);
-      if (data?.logoUrl) {
-        const nextSession = { ...session, client: { ...session.client, logoUrl: data.logoUrl } };
-        window.sessionStorage.setItem("clientSession", JSON.stringify(nextSession));
-        setSession(nextSession);
+      if (data?.logoUrl && session && token) {
+        writeClientSession({
+          token,
+          client: { ...session.client, logoUrl: data.logoUrl },
+        });
+        refresh();
       }
-      await fetchProfile(session.token);
+      await fetchProfile(token);
     } catch {
       setError("No se pudo subir el logo");
     } finally {
@@ -823,7 +750,7 @@ export default function ClientTicketsPage() {
 
 
   const handleRequestSubmit = async () => {
-    if (!session?.token) return;
+    if (!token) return;
     if (!requestDraft.description.trim()) {
       setError(requestDraft.requestType === "PREVENTIVE_INVENTORY" ? "Describe el alcance del mantenimiento e inventario" : "Describe el problema para levantar el ticket");
       return;
@@ -851,7 +778,7 @@ export default function ClientTicketsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       },
-      () => session?.token,
+      () => token,
     );
     if (isQueuedResponse(res)) {
       setError(null);
@@ -881,11 +808,11 @@ export default function ClientTicketsPage() {
       urgency: "Media",
       dueAt: "",
     });
-    await fetchRequests(session.token);
+    await fetchRequests(token);
   };
 
   const handleDecision = async (id: number, decision: "APPROVED" | "REJECTED") => {
-    if (!session?.token) return;
+    if (!token) return;
     const res = await fetchWithOfflineQueue(
       buildApiUrl(`client-portal/requests/${id}/decision`),
       {
@@ -893,7 +820,7 @@ export default function ClientTicketsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ decision }),
       },
-      () => session?.token,
+      () => token,
     );
     if (isQueuedResponse(res)) {
       setError(null);
@@ -903,15 +830,15 @@ export default function ClientTicketsPage() {
       setError("No se pudo actualizar la solicitud");
       return;
     }
-    await fetchRequests(session.token);
+    await fetchRequests(token);
   };
 
   const handleRequestClose = async (id: number) => {
-    if (!session?.token) return;
+    if (!token) return;
     const res = await fetchWithOfflineQueue(
       buildApiUrl(`client-portal/requests/${id}/close`),
       { method: "PUT" },
-      () => session?.token,
+      () => token,
     );
     if (isQueuedResponse(res)) {
       setError(null);
@@ -921,7 +848,7 @@ export default function ClientTicketsPage() {
       setError("No se pudo cerrar la solicitud");
       return;
     }
-    await fetchRequests(session.token);
+    await fetchRequests(token);
   };
 
   const updateFeedbackDraft = (id: number, changes: Partial<{ rating: string; wasOnTime: string; wasFriendly: string; wasSolved: string; comments: string }>) => {
@@ -943,7 +870,7 @@ export default function ClientTicketsPage() {
   };
 
   const handleFeedbackSubmit = async (activityId: number) => {
-    if (!session?.token) return;
+    if (!token) return;
     const draft = feedbackDrafts[activityId] || {
       rating: "",
       wasOnTime: "",
@@ -966,7 +893,7 @@ export default function ClientTicketsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       },
-      () => session?.token,
+      () => token,
     );
     if (isQueuedResponse(res)) {
       setError(null);
@@ -981,7 +908,7 @@ export default function ClientTicketsPage() {
       delete next[activityId];
       return next;
     });
-    await fetchPendingFeedback(session.token);
+    await fetchPendingFeedback(token);
   };
 
   const handleRequestBranchSelect = (id: string) => {
@@ -1027,189 +954,10 @@ export default function ClientTicketsPage() {
     return sorted[sorted.length - 1];
   };
 
-  // No renderizar nada hasta que el componente esté mounted (evita hydration mismatch)
-  if (!mounted) {
-    return null;
-  }
-
-  if (!session) {
-    return (
-      <div className={styles.authWrap}>
-        <PanelLogin
-          mode="tickets"
-          redirectTo="/"
-          onClientLogin={handleClientLogin}
-          onBranchLogin={handleBranchLogin}
-          title="Iniciar sesión"
-          subtitle="Ingresa a tu cuenta de Nexara"
-        />
-      </div>
-    );
-  }
+  if (!session) return null;
 
   return (
-    <div className={`${consoleStyles.consoleLayout} ${styles.ticketsConsole}`}>
-      <aside className={consoleStyles.sidebar} data-mobile={isMobile ? "true" : "false"} data-open={mobileMenuOpen ? "true" : "false"}>
-        <div className={consoleStyles.sidebarHeader}>
-          <div className={consoleStyles.sidebarLogo}>
-            <span className={consoleStyles.brandMark}>NEXARA</span>
-            <span className={consoleStyles.brandSub}>Portal</span>
-          </div>
-          {isMobile && (
-            <button
-              type="button"
-              className={consoleStyles.hamburgerButton}
-              onClick={() => setMobileMenuOpen((prev) => !prev)}
-              aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
-              aria-expanded={mobileMenuOpen}
-              aria-controls="tickets-sidebar-menu"
-              data-open={mobileMenuOpen ? "true" : "false"}
-            >
-              <span className={consoleStyles.hamburgerLine}></span>
-              <span className={consoleStyles.hamburgerLine}></span>
-              <span className={consoleStyles.hamburgerLine}></span>
-            </button>
-          )}
-        </div>
-
-        {isMobile && mobileMenuOpen && (
-          <div
-            className={consoleStyles.sidebarOverlay}
-            onClick={() => setMobileMenuOpen(false)}
-            role="presentation"
-          ></div>
-        )}
-
-        {(!isMobile || mobileMenuOpen) && (
-        <div
-          className={consoleStyles.sidebarContent}
-          id="tickets-sidebar-menu"
-          data-open={isMobile && mobileMenuOpen ? "true" : undefined}
-        >
-        <div className={consoleStyles.sidebarUser}>
-          <div className={consoleStyles.sidebarAvatar}>
-            {clientAvatarUrl && !avatarLoadError ? (
-              <img
-                className={consoleStyles.avatarImage}
-                src={getAssetUrl(clientAvatarUrl)}
-                alt={session.client.name}
-                width={64}
-                height={64}
-                onError={() => setAvatarLoadError(true)}
-              />
-            ) : (
-              <span className={consoleStyles.sidebarName}>{session.client.name.slice(0, 2).toUpperCase()}</span>
-            )}
-          </div>
-          <div className={consoleStyles.sidebarName}>{session.client.name}</div>
-          <div className={consoleStyles.sidebarEmail}>Seguimiento de servicio y soporte</div>
-          <div className={consoleStyles.sidebarMeta}>
-            <span className={consoleStyles.rolePill}>Cliente</span>
-          </div>
-        </div>
-        <div className={consoleStyles.menuTitle}>Cuenta corporativa</div>
-        <ul className={consoleStyles.sidebarMenu}>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "perfil" ? consoleStyles.active : ""}`}
-              onClick={() => {
-                setActiveTab("perfil");
-                setMobileMenuOpen(false);
-              }}
-            >
-              🪪 Mi perfil corporativo
-            </button>
-          </li>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "sucursales" ? consoleStyles.active : ""}`}
-              onClick={() => {
-                setActiveTab("sucursales");
-                setMobileMenuOpen(false);
-              }}
-            >
-              🏬 Gestión de sucursales
-            </button>
-          </li>
-        </ul>
-
-        <div className={consoleStyles.menuTitle}>Servicio y solicitudes</div>
-        <ul className={consoleStyles.sidebarMenu}>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "tickets" ? consoleStyles.active : ""}`}
-              onClick={() => {
-                setActiveTab("tickets");
-                setMobileMenuOpen(false);
-              }}
-            >
-              🎫 Estado de tickets
-            </button>
-          </li>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "nuevo" ? consoleStyles.active : ""}`}
-              onClick={() => {
-                setActiveTab("nuevo");
-                setMobileMenuOpen(false);
-              }}
-            >
-              ➕ Nueva solicitud
-            </button>
-          </li>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "inventarios" ? consoleStyles.active : ""}`}
-              onClick={() => {
-                setActiveTab("inventarios");
-                setMobileMenuOpen(false);
-              }}
-            >
-              🧰 Inventarios
-            </button>
-          </li>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <Link
-              href="/tickets/ayuda"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              🆘 Centro de ayuda
-            </Link>
-          </li>
-        </ul>
-
-        <div className={consoleStyles.menuTitle}>Sesión</div>
-        <ul className={consoleStyles.sidebarMenu}>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
-              onClick={toggleDarkMode}
-            >
-              {darkMode ? "☀️ Vista clara" : "🌙 Vista oscura"}
-            </button>
-          </li>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
-              onClick={handleLogout}
-            >
-              ⎋ Cerrar sesión
-            </button>
-          </li>
-        </ul>
-        </div>
-        )}
-      </aside>
-      <main className={consoleStyles.consoleMain}>
-        <div className={styles.mainStack}>
+    <div className={styles.mainStack}>
           <div className={`card ${styles.panelHero}`}>
             <p className={styles.panelHeroTitle}>Panel de tickets corporativo</p>
             <p className={styles.panelHeroMeta}>
@@ -1924,9 +1672,9 @@ export default function ClientTicketsPage() {
               </div>
             </div>
           )}
-          {activeTab === "inventarios" && session?.token && (
+          {activeTab === "inventarios" && token && (
             <TicketsInventoryManager
-              token={session.token}
+              token={token}
               mode="client"
               branches={branches.map((branch) => ({
                 id: branch.id,
@@ -1992,9 +1740,9 @@ export default function ClientTicketsPage() {
                 <p className={styles.mutedText} style={{ margin: 0 }}>
                   Administra aquí mismo tus sucursales, logos y credenciales de acceso.
                 </p>
-                {session?.token && (
+                {token && (
                   <BranchesForm
-                    token={session.token}
+                    token={token}
                     branches={branches}
                     onBranchSaved={handleBranchSaved}
                     clientLogoUrl={profile?.logoUrl || session.client.logoUrl || null}
@@ -2004,8 +1752,6 @@ export default function ClientTicketsPage() {
               </div>
             </div>
           )}
-        </div>
-      </main>
       {showReportModal && reportPdfUrl && (
         <div
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}

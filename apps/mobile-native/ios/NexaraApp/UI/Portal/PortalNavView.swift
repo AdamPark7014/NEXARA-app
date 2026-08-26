@@ -13,6 +13,8 @@ enum PortalRoute: Hashable, Identifiable {
     case feedback
     case inventories
     case inventoryDetail(Int64)
+    case services
+    case help
 
     var id: String {
         switch self {
@@ -27,6 +29,8 @@ enum PortalRoute: Hashable, Identifiable {
         case .feedback: return "feedback"
         case .inventories: return "inventories"
         case .inventoryDetail(let id): return "inventory-\(id)"
+        case .services: return "services"
+        case .help: return "help"
         }
     }
 }
@@ -56,6 +60,8 @@ struct PortalNavView: View {
                     case .feedback: PortalFeedbackView()
                     case .inventories: PortalInventoriesView(onOpen: { path.append(.inventoryDetail($0)) })
                     case .inventoryDetail(let id): PortalInventoryDetailView(inventoryId: id)
+                    case .services: PortalServicesView()
+                    case .help: PortalHelpView(onBack: { path.removeLast() })
                     }
                 }
         }
@@ -92,6 +98,8 @@ struct PortalNavView: View {
         case .feedback: PortalFeedbackView()
         case .inventories: PortalInventoriesView(onOpen: { _ in })
         case .inventoryDetail(let id): PortalInventoryDetailView(inventoryId: id)
+        case .services: PortalServicesView()
+        case .help: PortalHelpView(onBack: {})
         }
     }
 
@@ -103,6 +111,8 @@ struct PortalNavView: View {
         case "tickets": return .tickets
         case "inventories", "inventarios": return .inventories
         case "feedback-pending", "feedback": return .feedback
+        case "mis-servicios", "my-services", "services": return .services
+        case "help", "ayuda", "centro-de-ayuda": return .help
         default: return nil
         }
     }
@@ -140,6 +150,8 @@ struct PortalHomeView: View {
                         portalBtn("tray.full", "Solicitudes", .requests)
                         portalBtn("ticket", "Tickets", .tickets)
                         portalBtn("archivebox", "Inventarios", .inventories)
+                        portalBtn("briefcase", "Mis servicios", .services)
+                        portalBtn("questionmark.circle", "Centro de ayuda", .help)
                         if isClient {
                             Button {
                                 Task { portalReportData = try? await TicketsRepository.shared.portalReportPdf() }

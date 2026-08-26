@@ -28,7 +28,7 @@ struct NexaraApp: App {
             appState.route = .notifications
             return
         }
-        if case .module(let panel, _) = dl.pending {
+        if case .module(let panel, _, _, _) = dl.pending {
             appState.route = .portal(panel)
         }
     }
@@ -105,7 +105,7 @@ private func applyDeepLinkAfterLogin(app: AppState) {
         app.route = .notifications
         return
     }
-    if case .module(let panel, _) = dl.pending {
+    if case .module(let panel, _, _, _) = dl.pending {
         app.route = .portal(panel)
     }
 }

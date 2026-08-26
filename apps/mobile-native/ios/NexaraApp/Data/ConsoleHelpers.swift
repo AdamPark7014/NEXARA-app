@@ -43,6 +43,19 @@ enum ConsoleHelpers {
         return nil
     }
 
+    static func mapInt(_ m: [String: Any], _ keys: String...) -> Int {
+        Int(mapInt64(m, keys) ?? 0)
+    }
+
+    static func mapDouble(_ m: [String: Any], _ keys: String...) -> Double {
+        for k in keys {
+            if let v = m[k] as? Double { return v }
+            if let v = m[k] as? NSNumber { return v.doubleValue }
+            if let v = m[k] as? String, let d = Double(v) { return d }
+        }
+        return 0
+    }
+
     static func decodeMap(_ data: Data) -> [String: Any] {
         (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }

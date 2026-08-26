@@ -58,7 +58,8 @@ export default function ClientDetailShell({ id, children }: { id: string; childr
   const base = `/crm/clients/${id}`;
   const tabs: TabItem[] = useMemo(
     () => [
-      { id: "datos", label: "Datos", href: base },
+      { id: "resumen", label: "Resumen 360", href: base },
+      { id: "datos", label: "Datos", href: `${base}/datos` },
       { id: "sucursales", label: "Sucursales", href: `${base}/sucursales` },
       { id: "servicios", label: "Servicios", href: `${base}/servicios` },
       { id: "tickets", label: "Tickets", href: `${base}/tickets` },

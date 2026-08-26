@@ -79,6 +79,18 @@ struct ConsoleDashboardView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
                 headerSection
+                if !vm.executive.isEmpty {
+                    CommandCenterRail(
+                        user: user,
+                        panel: isOps ? .ops : .all,
+                        extraWidgets: CommandCenterAccess.buildExecutiveDynamicWidgets(
+                            ExecutiveCLevel(raw: vm.executive)
+                        ),
+                        useNavigationLinks: true,
+                        title: "Centro de comando"
+                    )
+                    .padding(.horizontal)
+                }
                 actionableAlertsSection
                 if isAdministrativo { administrativoShortcuts }
                 if isOps && !vm.nocAlerts.isEmpty { nocAlertsSection }

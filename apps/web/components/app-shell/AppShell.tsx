@@ -52,8 +52,10 @@ import { getUserHomeUrlAbsolute } from "@/lib/panel-home";
 import type { User } from "@/components/UserContext";
 import { buildCrossPanelUrl } from "@/lib/cross-panel-handoff";
 import { buildFreshLoginUrl } from "@/lib/tab-session";
+import { buildApiUrl } from "@/lib/api-base";
 import styles from "./AppShell.module.scss";
 import CommandPalette from "./CommandPalette";
+import ShellConnectionStatus from "./ShellConnectionStatus";
 
 type AppShellProps = {
   panel: PanelId;
@@ -99,8 +101,28 @@ export default function AppShell({ panel, children }: AppShellProps) {
   const [navQuery, setNavQuery] = useState("");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
   const switcherRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!user?.token) return;
+    const loadUnread = async () => {
+      try {
+        const res = await fetch(buildApiUrl("notifications/count/unread"), {
+          headers: { Authorization: `Bearer ${user.token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setUnreadNotifs(Number(data?.unreadCount ?? data?.count ?? 0));
+      } catch {
+        /* non-critical */
+      }
+    };
+    void loadUnread();
+    const id = window.setInterval(loadUnread, 45000);
+    return () => window.clearInterval(id);
+  }, [user?.token]);
 
   const panelMeta = PANEL_META[panel];
 
@@ -601,6 +623,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
             </div>
           )}
 
+          <ShellConnectionStatus />
+
           <button
             type="button"
             className={styles.paletteBtn}
@@ -624,8 +648,31 @@ export default function AppShell({ panel, children }: AppShellProps) {
           </button>
 
           {notificationsUrl && (
-            <Link href={notificationsUrl} className={styles.iconBtn} title="Notificaciones">
+            <Link href={notificationsUrl} className={styles.iconBtn} title="Notificaciones" style={{ position: "relative" }}>
               🔔
+              {unreadNotifs > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 2,
+                    right: 2,
+                    minWidth: 16,
+                    height: 16,
+                    padding: "0 4px",
+                    borderRadius: 999,
+                    background: "var(--danger)",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    lineHeight: 1,
+                  }}
+                >
+                  {unreadNotifs > 99 ? "99+" : unreadNotifs}
+                </span>
+              )}
             </Link>
           )}
         </div>
@@ -642,6 +689,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         user={user}
+        token={user.token}
         onToggleDark={toggleDarkMode}
         onLogout={handleLogout}
       />

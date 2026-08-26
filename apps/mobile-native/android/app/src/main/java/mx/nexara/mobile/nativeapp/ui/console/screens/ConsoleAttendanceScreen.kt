@@ -1,13 +1,19 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
 import android.app.Application
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -30,16 +37,32 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.AttendanceCurrentDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceRangeDto
+import mx.nexara.mobile.nativeapp.data.api.AttendanceRangeUserDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.ui.console.util.currentMonthRange
 import mx.nexara.mobile.nativeapp.ui.console.util.currentWeekRange
+import mx.nexara.mobile.nativeapp.ui.console.util.lastWeekRange
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import java.io.File
 
 // ── State ────────────────────────────────────────────────────────────────────
 
+private val ATTENDANCE_RANGE_PRESETS = listOf(
+    "week" to "Esta semana",
+    "lastWeek" to "Semana pasada",
+    "month" to "Este mes",
+)
+
 data class AttendanceUiState(
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val checkInLoading: Boolean = false,
     val checkInMessage: String? = null,
+    val exportMessage: String? = null,
+    val rangePreset: String = "week",
+    val userQuery: String = "",
     val from: String = currentWeekRange().from,
     val to: String = currentWeekRange().to,
     val current: AttendanceCurrentDto? = null,
@@ -53,9 +76,27 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(AttendanceUiState())
     val state: StateFlow<AttendanceUiState> = _state
 
-    fun refresh() {
+    fun setRangePreset(preset: String) {
+        val range = when (preset) {
+            "lastWeek" -> lastWeekRange()
+            "month" -> currentMonthRange()
+            else -> currentWeekRange()
+        }
+        _state.update { it.copy(rangePreset = preset, from = range.from, to = range.to) }
+        refresh(initial = true)
+    }
+
+    fun setUserQuery(value: String) = _state.update { it.copy(userQuery = value) }
+
+    fun refresh(initial: Boolean = true) {
         val snapshot = _state.value
-        _state.update { it.copy(isLoading = true, error = null) }
+        _state.update {
+            it.copy(
+                isLoading = initial && it.payload == null,
+                isRefreshing = !initial,
+                error = null,
+            )
+        }
         viewModelScope.launch {
             try {
                 val current = withContext(Dispatchers.IO) {
@@ -64,14 +105,50 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                 val range = withContext(Dispatchers.IO) {
                     repo.attendanceRange(from = snapshot.from, to = snapshot.to, tryHierarchyFirst = true)
                 }
-                _state.update { it.copy(isLoading = false, current = current, payload = range, error = null) }
+                _state.update {
+                    it.copy(isLoading = false, isRefreshing = false, current = current, payload = range, error = null)
+                }
             } catch (e: Exception) {
                 _state.update {
-                    it.copy(isLoading = false, error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo cargar asistencia")
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudo cargar asistencia",
+                    )
                 }
             }
         }
     }
+
+    fun exportCsv(context: Context) {
+        val users = _state.value.payload?.users.orEmpty()
+        if (users.isEmpty()) {
+            _state.update { it.copy(exportMessage = "Sin datos para exportar") }
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val snapshot = _state.value
+                val csv = buildString {
+                    appendLine("Usuario,Horas,Dias registrados")
+                    users.forEach { u ->
+                        val name = (u.userName ?: "Usuario ${u.userId}").replace("\"", "\"\"")
+                        val hours = String.format("%.2f", (u.totalMinutes ?: 0) / 60.0)
+                        appendLine("\"$name\",$hours,${u.days?.size ?: 0}")
+                    }
+                }
+                val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+                val file = File(dir, "asistencia-${snapshot.from}-${snapshot.to}.csv")
+                withContext(Dispatchers.IO) { file.writeText(csv) }
+                shareCsv(context, file)
+                _state.update { it.copy(exportMessage = "✅ CSV listo para compartir") }
+            } catch (e: Exception) {
+                _state.update { it.copy(exportMessage = "❌ ${e.message ?: "No se pudo exportar"}") }
+            }
+        }
+    }
+
+    fun clearExportMessage() = _state.update { it.copy(exportMessage = null) }
 
     fun checkIn(type: String) {
         _state.update { it.copy(checkInLoading = true, checkInMessage = null) }
@@ -93,7 +170,7 @@ class ConsoleAttendanceViewModel(app: Application) : AndroidViewModel(app) {
                     else -> " · GPS ${"%.5f".format(coords.lat)}, ${"%.5f".format(coords.lng)}"
                 }
                 _state.update { it.copy(checkInLoading = false, checkInMessage = base + geoHint) }
-                refresh()
+                refresh(initial = false)
             } catch (e: Exception) {
                 _state.update {
                     it.copy(
@@ -121,8 +198,19 @@ private val RedLight = Color(0xFFFEE2E2)
 private val SlateText = Color(0xFF0F172A)
 private val SubText = Color(0xFF64748B)
 
+private fun shareCsv(context: Context, file: File) {
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/csv"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Compartir asistencia"))
+}
+
 // ── Main composable ──────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConsoleAttendanceScreen(
     contentPadding: PaddingValues = PaddingValues(16.dp),
@@ -137,7 +225,7 @@ fun ConsoleAttendanceScreen(
     val state by vm.state.collectAsState()
     var selectedUser by remember { mutableStateOf<mx.nexara.mobile.nativeapp.data.api.AttendanceRangeUserDto?>(null) }
 
-    if (state.payload == null && state.isLoading && state.error == null) vm.refresh()
+    if (state.payload == null && state.isLoading && state.error == null) vm.refresh(initial = true)
 
     val selUser = selectedUser
     if (selUser != null) {
@@ -147,23 +235,65 @@ fun ConsoleAttendanceScreen(
 
     val current = state.current
     val isCheckedIn = current?.isOpen == true
+    val userQuery = state.userQuery.trim().lowercase()
+    val teamUsers = (state.payload?.users ?: emptyList())
+        .filter { u ->
+            if (userQuery.isBlank()) true
+            else (u.userName ?: "Usuario ${u.userId}").lowercase().contains(userQuery)
+        }
+        .sortedByDescending { it.totalMinutes ?: 0 }
 
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.refresh(initial = false) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Semana: ${state.from} → ${state.to}",
+                    "Periodo: ${state.from} → ${state.to}",
                     style = MaterialTheme.typography.bodySmall,
                     color = SubText,
                 )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ATTENDANCE_RANGE_PRESETS.forEach { (key, label) ->
+                        val sel = state.rangePreset == key
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(if (sel) TealColor else Color(0xFFF1F5F9))
+                                .clickable { vm.setRangePreset(key) }
+                                .padding(horizontal = 14.dp, vertical = 7.dp),
+                        ) {
+                            Text(
+                                label,
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = if (sel) Color.White else Color(0xFF475569),
+                            )
+                        }
+                    }
+                }
+                if (!state.exportMessage.isNullOrBlank()) {
+                    Text(
+                        state.exportMessage!!,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (state.exportMessage!!.startsWith("✅")) GreenColor else RedColor,
+                    )
+                }
             }
         }
 
         if (state.isLoading) {
-            item { Text("Cargando asistencia...", color = SubText) }
+            item { NxLoadingBlock("Cargando asistencia…") }
             return@LazyColumn
         }
 
@@ -301,7 +431,26 @@ fun ConsoleAttendanceScreen(
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = SlateText,
                     )
-                    Text("${users.size} usuarios", style = MaterialTheme.typography.bodySmall, color = SubText)
+                    Text("${teamUsers.size}/${users.size}", style = MaterialTheme.typography.bodySmall, color = SubText)
+                }
+            }
+
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = state.userQuery,
+                        onValueChange = vm::setUserQuery,
+                        label = { Text("Buscar usuario") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                    OutlinedButton(
+                        onClick = { vm.clearExportMessage(); vm.exportCsv(context) },
+                        enabled = users.isNotEmpty(),
+                    ) {
+                        Text("CSV")
+                    }
                 }
             }
 
@@ -333,8 +482,17 @@ fun ConsoleAttendanceScreen(
                 }
             }
 
+            if (teamUsers.isEmpty()) {
+                item {
+                    NxEmptyState(
+                        title = "Sin registros",
+                        subtitle = if (userQuery.isBlank()) "No hay asistencia en este periodo." else "Ningún usuario coincide con la búsqueda.",
+                    )
+                }
+            }
+
             // User rows sorted by hours desc
-            items(users.sortedByDescending { it.totalMinutes ?: 0 }.take(200)) { u ->
+            items(teamUsers.take(200)) { u ->
                 val hours = String.format("%.1f", (u.totalMinutes ?: 0) / 60.0)
                 val daysCount = u.days?.size ?: 0
                 Card(
@@ -379,6 +537,7 @@ fun ConsoleAttendanceScreen(
         }
 
         item { Spacer(Modifier.height(24.dp)) }
+    }
     }
 }
 

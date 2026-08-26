@@ -16,7 +16,10 @@ import okhttp3.MultipartBody
  */
 interface CrmApi {
     @GET("ventas/cotizaciones")
-    suspend fun listCotizacionesRaw(): okhttp3.ResponseBody
+    suspend fun listCotizacionesRaw(
+        @Query("clientName") clientName: String? = null,
+        @Query("status") status: String? = null,
+    ): okhttp3.ResponseBody
 
     @GET("ventas/oportunidades")
     suspend fun listOportunidadesRaw(): okhttp3.ResponseBody
@@ -54,11 +57,47 @@ interface CrmApi {
     @GET("ventas/clientes")
     suspend fun listClientesRaw(): okhttp3.ResponseBody
 
+    @GET("ventas/clientes/{id}")
+    suspend fun getClientRaw(@Path("id") id: Long): okhttp3.ResponseBody
+
+    @GET("ventas/clientes/{id}/snapshot")
+    suspend fun getClientSnapshotRaw(@Path("id") id: Long): okhttp3.ResponseBody
+
     @GET("ventas/leads")
     suspend fun listLeadsRaw(): okhttp3.ResponseBody
 
+    @GET("ventas/leads/{id}")
+    suspend fun getLeadRaw(@Path("id") id: Long): okhttp3.ResponseBody
+
+    @POST("ventas/leads")
+    suspend fun createLeadRaw(@Body body: Map<String, @JvmSuppressWildcards Any?>): okhttp3.ResponseBody
+
+    @PATCH("ventas/leads/{id}")
+    suspend fun updateLeadRaw(
+        @Path("id") id: Long,
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+    ): okhttp3.ResponseBody
+
+    @DELETE("ventas/leads/{id}")
+    suspend fun deleteLeadRaw(@Path("id") id: Long): okhttp3.ResponseBody
+
+    @POST("ventas/clientes")
+    suspend fun createClientRaw(@Body body: Map<String, @JvmSuppressWildcards Any?>): okhttp3.ResponseBody
+
+    @PATCH("ventas/clientes/{id}")
+    suspend fun updateClientRaw(
+        @Path("id") id: Long,
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+    ): okhttp3.ResponseBody
+
+    @POST("ventas/clientes/{id}/provision-service-client")
+    suspend fun provisionServiceClientRaw(@Path("id") id: Long): okhttp3.ResponseBody
+
     @GET("ventas/proyectos")
     suspend fun listProyectosRaw(): okhttp3.ResponseBody
+
+    @GET("ventas/proyectos/{id}/resumen")
+    suspend fun getProjectSummaryRaw(@Path("id") id: Long): okhttp3.ResponseBody
 
     @GET("catalog/products")
     suspend fun listProductsRaw(
@@ -97,4 +136,34 @@ interface CrmApi {
 
     @DELETE("ventas/order-templates/{id}")
     suspend fun deleteOrderTemplateRaw(@Path("id") id: Long): okhttp3.ResponseBody
+
+    @GET("ventas/cotizaciones/{id}")
+    suspend fun getCotizacionDetailRaw(@Path("id") id: Long): okhttp3.ResponseBody
+
+    @GET("cotizaciones/{id}/pdf")
+    suspend fun downloadCotizacionPdfRaw(@Path("id") id: Long): okhttp3.ResponseBody
+
+    @GET("cotizaciones/{id}/pdf/internal")
+    suspend fun downloadCotizacionInternalPdfRaw(@Path("id") id: Long): okhttp3.ResponseBody
+
+    @POST("cotizaciones/{id}/send")
+    suspend fun sendCotizacionRaw(
+        @Path("id") id: Long,
+        @Body body: Map<String, String>,
+    ): okhttp3.ResponseBody
+
+    @GET("crm-activities")
+    suspend fun listCrmActivitiesRaw(
+        @Query("opportunityId") opportunityId: Long? = null,
+        @Query("status") status: String? = null,
+    ): okhttp3.ResponseBody
+
+    @GET("crm-activities/my-agenda")
+    suspend fun myAgendaRaw(): okhttp3.ResponseBody
+
+    @PATCH("crm-activities/{id}/complete")
+    suspend fun completeCrmActivityRaw(
+        @Path("id") id: Long,
+        @Body body: Map<String, String?>,
+    ): okhttp3.ResponseBody
 }

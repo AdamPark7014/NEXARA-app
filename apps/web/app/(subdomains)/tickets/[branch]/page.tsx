@@ -1,24 +1,16 @@
 ﻿"use client";
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { useParams, usePathname, useRouter } from "next/navigation";
-import PanelLogin from "@/components/PanelLogin";
+import { useParams, useRouter } from "next/navigation";
+import { useBranchPortalSession } from "@/components/portal/BranchPortalShell";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
 import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
-import { useTheme } from "@/components/ThemeContext";
-import consoleStyles from "../../console/console.module.css";
 import styles from "../tickets.module.css";
 import { openExternalUrl } from "@/lib/open-external-url";
 import { isCapacitorNative } from "@/lib/capacitor-env";
-import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
-
-type BranchSession = {
-  token: string;
-  branch: { id: number; name: string; branchNumber?: string | null; clientId: number; clientName?: string | null; logoUrl?: string | null };
-};
 
 type BranchProfile = {
   id: number;
@@ -81,10 +73,7 @@ type Ticket = {
 };
 
 export default function BranchTicketsPage() {
-  const { darkMode, toggleDarkMode } = useTheme();
-  const [session, setSession] = useState<BranchSession | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { session, token, displayName, clientName } = useBranchPortalSession();
   const [profile, setProfile] = useState<BranchProfile | null>(null);
   const [requests, setRequests] = useState<BranchRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -116,7 +105,6 @@ export default function BranchTicketsPage() {
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [pdfModalTitle, setPdfModalTitle] = useState("Reporte de tickets de sucursal");
   const [pdfFileName, setPdfFileName] = useState(`reporte-sucursal-${new Date().toISOString().slice(0, 10)}.pdf`);
-  const [avatarLoadError, setAvatarLoadError] = useState(false);
   const [draft, setDraft] = useState({
     requestType: "ISSUE" as "ISSUE" | "PREVENTIVE_INVENTORY",
     description: "",
@@ -143,7 +131,6 @@ export default function BranchTicketsPage() {
     }).length,
     evidences: openRequests.reduce((acc, item) => acc + (Array.isArray(item.evidenceUrls) ? item.evidenceUrls.length : 0), 0),
   };
-  const pathname = usePathname();
   const router = useRouter();
   const params = useParams();
   const branchSlug = Array.isArray(params?.branch) ? params.branch[0] : (params?.branch as string | undefined);
@@ -289,46 +276,6 @@ export default function BranchTicketsPage() {
     if (!lat || !lng) return "";
     return `https://www.google.com/maps?q=${lat},${lng}`;
   };
-  const branchAvatarUrl = profile?.logoUrl || profile?.client?.logoUrl || session?.branch?.logoUrl || "";
-
-  useEffect(() => {
-    setAvatarLoadError(false);
-  }, [branchAvatarUrl]);
-
-  useEffect(() => {
-    const saved = typeof window !== "undefined" ? window.sessionStorage.getItem("branchSession") : null;
-    if (!saved) return;
-    try {
-      setSession(JSON.parse(saved));
-    } catch {
-      window.sessionStorage.removeItem("branchSession");
-    }
-  }, []);
-
-  useEffect(() => {
-    if (session?.token) {
-      window.dispatchEvent(new Event("nexara-portal-session-changed"));
-    }
-  }, [session?.token]);
-
-  useEffect(() => {
-    const onResize = () => setIsMobile(isPanelDrawerViewport(window.innerWidth));
-    onResize();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  useEffect(() => {
-    if (!isMobile) {
-      setMobileMenuOpen(false);
-      return;
-    }
-    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isMobile, mobileMenuOpen]);
-
   useEffect(() => {
     return () => {
       files.forEach((entry) => URL.revokeObjectURL(entry.url));
@@ -387,22 +334,22 @@ export default function BranchTicketsPage() {
   };
 
   useEffect(() => {
-    if (!session?.token) return;
-    fetchProfile(session.token);
-    fetchRequests(session.token);
-    fetchTickets(session.token);
-    fetchBranchProjects(session.token);
-  }, [session?.token, fromDate, toDate]);
+    if (!token) return;
+    fetchProfile(token);
+    fetchRequests(token);
+    fetchTickets(token);
+    fetchBranchProjects(token);
+  }, [token, fromDate, toDate]);
 
   const handleViewPdf = async () => {
-    if (!session?.token) return;
+    if (!token) return;
     setGeneratingPdf(true);
     try {
       const params = new URLSearchParams();
       if (fromDate) params.append("start", `${fromDate}T00:00:00.000Z`);
       if (toDate) params.append("end", `${toDate}T23:59:59.999Z`);
       const res = await fetch(buildApiUrl(`branch-portal/report?${params.toString()}`), {
-        headers: { Authorization: `Bearer ${session.token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
         setError("No se pudo generar el reporte PDF");
@@ -422,9 +369,9 @@ export default function BranchTicketsPage() {
   };
 
   const handleTicketReport = async (ticketId: number) => {
-    if (!session?.token) return;
+    if (!token) return;
     const res = await fetch(buildApiUrl(`branch-portal/tickets/${ticketId}/report`), {
-      headers: { Authorization: `Bearer ${session.token}` },
+      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
       setError("No se pudo previsualizar el reporte del ticket");
@@ -444,22 +391,12 @@ export default function BranchTicketsPage() {
   };
 
   useEffect(() => {
-    if (!session?.branch) return;
+    if (!session.branch) return;
     const expectedSlug = session.branch.branchNumber || `branch-${session.branch.id}`;
     if (branchSlug && branchSlug !== expectedSlug) {
       router.replace(`/${expectedSlug}`);
     }
-  }, [branchSlug, router, session?.branch]);
-
-  const handleBranchLogin = (data: { access_token: string; branch: BranchSession["branch"] }) => {
-    const next = { token: data.access_token, branch: data.branch };
-    window.sessionStorage.setItem("branchSession", JSON.stringify(next));
-    window.dispatchEvent(new Event("nexara-portal-session-changed"));
-    setSession(next);
-    setError(null);
-    const expectedSlug = data.branch.branchNumber || `branch-${data.branch.id}`;
-    router.replace(`/${expectedSlug}`);
-  };
+  }, [branchSlug, router, session.branch]);
 
   const isSupportedFile = (file: File) => file.type.startsWith("image/") || file.type === "application/pdf";
 
@@ -483,7 +420,7 @@ export default function BranchTicketsPage() {
   };
 
   const handleSubmit = async () => {
-    if (!session?.token) return;
+    if (!token) return;
     if (!draft.description.trim()) {
       setError(draft.requestType === "PREVENTIVE_INVENTORY" ? "Describe el alcance del mantenimiento e inventario" : "Describe el problema para levantar el ticket");
       return;
@@ -507,7 +444,7 @@ export default function BranchTicketsPage() {
 
     const res = await fetch(buildApiUrl("branch-portal/requests"), {
       method: "POST",
-      headers: { Authorization: `Bearer ${session.token}` },
+      headers: { Authorization: `Bearer ${token}` },
       body: formData,
     });
 
@@ -520,168 +457,16 @@ export default function BranchTicketsPage() {
     files.forEach((entry) => URL.revokeObjectURL(entry.url));
     setFiles([]);
     setDraft((prev) => ({ ...prev, requestType: "ISSUE", description: "", urgency: "Media", dueAt: "" }));
-    await fetchRequests(session.token);
+    await fetchRequests(token);
     setLoading(false);
   };
 
-  const handleLogout = () => {
-    window.sessionStorage.removeItem("branchSession");
-    window.sessionStorage.removeItem("clientSession");
-    window.dispatchEvent(new Event("nexara-portal-session-changed"));
-    setSession(null);
-    window.location.replace("/tickets");
-  };
-
-  if (!session) {
-    return (
-      <PanelLogin
-        mode="branch"
-        redirectTo={pathname || "/"}
-        onBranchLogin={handleBranchLogin}
-        title="Portal de sucursal"
-        subtitle="Acceso operativo para reportar solicitudes de servicio"
-      />
-    );
-  }
-
   return (
-    <div className={`${consoleStyles.consoleLayout} ${styles.ticketsConsole}`}>
-      <aside className={consoleStyles.sidebar} data-mobile={isMobile ? "true" : "false"} data-open={mobileMenuOpen ? "true" : "false"}>
-        <div className={consoleStyles.sidebarHeader}>
-          <div className={consoleStyles.sidebarLogo}>
-            <span className={consoleStyles.brandMark}>NEXARA</span>
-            <span className={consoleStyles.brandSub}>Sucursal</span>
-          </div>
-          {isMobile && (
-            <button
-              type="button"
-              className={consoleStyles.hamburgerButton}
-              onClick={() => setMobileMenuOpen((prev) => !prev)}
-              aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
-              aria-expanded={mobileMenuOpen}
-              aria-controls="tickets-branch-sidebar-menu"
-              data-open={mobileMenuOpen ? "true" : "false"}
-            >
-              <span className={consoleStyles.hamburgerLine}></span>
-              <span className={consoleStyles.hamburgerLine}></span>
-              <span className={consoleStyles.hamburgerLine}></span>
-            </button>
-          )}
-        </div>
-
-        {isMobile && mobileMenuOpen && (
-          <div
-            className={consoleStyles.sidebarOverlay}
-            onClick={() => setMobileMenuOpen(false)}
-            role="presentation"
-          ></div>
-        )}
-
-        {(!isMobile || mobileMenuOpen) && (
-        <div
-          className={consoleStyles.sidebarContent}
-          id="tickets-branch-sidebar-menu"
-          data-open={isMobile && mobileMenuOpen ? "true" : undefined}
-        >
-        <div className={consoleStyles.sidebarUser}>
-          <div className={consoleStyles.sidebarAvatar}>
-            {branchAvatarUrl && !avatarLoadError ? (
-              <img
-                className={consoleStyles.avatarImage}
-                src={getAssetUrl(branchAvatarUrl)}
-                alt={profile?.name || session.branch.name}
-                width={64}
-                height={64}
-                onError={() => setAvatarLoadError(true)}
-              />
-            ) : (
-              <span className={consoleStyles.sidebarName}>{(profile?.name || session.branch.name).slice(0, 2).toUpperCase()}</span>
-            )}
-          </div>
-          <div className={consoleStyles.sidebarName}>{profile?.name || session.branch.name}</div>
-          <div className={consoleStyles.sidebarEmail}>{profile?.client?.name || session.branch.clientName || "Cliente corporativo"}</div>
-          <div className={consoleStyles.sidebarMeta}>
-            <span className={consoleStyles.rolePill}>Sucursal</span>
-          </div>
-        </div>
-        <div className={consoleStyles.menuTitle}>Sucursal</div>
-        <ul className={consoleStyles.sidebarMenu}>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "profile" ? consoleStyles.active : ""}`}
-              onClick={() => {
-                setActiveTab("profile");
-                setMobileMenuOpen(false);
-              }}
-            >
-              🪪 Mi perfil
-            </button>
-          </li>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "tickets" ? consoleStyles.active : ""}`}
-              onClick={() => {
-                setActiveTab("tickets");
-                setMobileMenuOpen(false);
-              }}
-            >
-              🎫 Mis tickets
-            </button>
-          </li>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "request" ? consoleStyles.active : ""}`}
-              onClick={() => {
-                setActiveTab("request");
-                setMobileMenuOpen(false);
-              }}
-            >
-              ➕ Nueva solicitud
-            </button>
-          </li>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "inventories" ? consoleStyles.active : ""}`}
-              onClick={() => {
-                setActiveTab("inventories");
-                setMobileMenuOpen(false);
-              }}
-            >
-              🧰 Inventarios
-            </button>
-          </li>
-        </ul>
-
-        <div className={consoleStyles.menuTitle}>Sesión</div>
-        <ul className={consoleStyles.sidebarMenu}>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
-              onClick={toggleDarkMode}
-            >
-              {darkMode ? "☀️ Vista clara" : "🌙 Vista oscura"}
-            </button>
-          </li>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button type="button" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`} onClick={handleLogout}>
-              ⎋ Cerrar sesión
-            </button>
-          </li>
-        </ul>
-        </div>
-        )}
-      </aside>
-      <main className={consoleStyles.consoleMain}>
-        <div className={styles.mainStack}>
+    <div className={styles.mainStack}>
           <div className={`card ${styles.panelHero}`}>
             <p className={styles.panelHeroTitle}>Portal de tickets de sucursal</p>
             <p className={styles.panelHeroMeta}>
-              Sucursal: {profile?.name || session.branch.name} · Registra solicitudes y da seguimiento al inventario de mantenimiento.
+              Sucursal: {profile?.name || displayName} · Registra solicitudes y da seguimiento al inventario de mantenimiento.
             </p>
             <div className={styles.panelKpis}>
               <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestStats.total}</span><span className={styles.panelKpiLabel}>Solicitudes</span></div>
@@ -702,7 +487,7 @@ export default function BranchTicketsPage() {
             <div className={`card ${styles.cardSoft}`}>
               <p className={styles.sectionTitle}>Mi perfil de sucursal</p>
               <div className={styles.grid200}>
-                <input className="input" value={profile?.name || session.branch.name} readOnly />
+                <input className="input" value={profile?.name || displayName} readOnly />
                 <input className="input" value={profile?.branchNumber || session.branch.branchNumber || ""} readOnly />
                 <input className="input" value={profile?.address || ""} readOnly placeholder="Dirección" />
                 <input className="input" value={profile?.city || ""} readOnly placeholder="Ciudad" />
@@ -761,7 +546,7 @@ export default function BranchTicketsPage() {
                     <input className="input" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
                   </div>
                   <div className={styles.actionRow}>
-                    <button className="button-primary" type="button" onClick={() => session?.token && fetchTickets(session.token)}>
+                    <button className="button-primary" type="button" onClick={() => token && fetchTickets(token)}>
                       Filtrar tickets
                     </button>
                     <button className="button-secondary" type="button" onClick={handleViewPdf} disabled={generatingPdf}>
@@ -904,13 +689,13 @@ export default function BranchTicketsPage() {
             </div>
           )}
 
-          {activeTab === "inventories" && session?.token && (
+          {activeTab === "inventories" && token && (
             <TicketsInventoryManager
-              token={session.token}
+              token={token}
               mode="branch"
               fixedBranch={{
                 id: session.branch.id,
-                name: profile?.name || session.branch.name,
+                name: profile?.name || displayName,
                 branchNumber: profile?.branchNumber || session.branch.branchNumber,
               }}
             />
@@ -924,14 +709,14 @@ export default function BranchTicketsPage() {
               <p className={styles.sectionTitle}>Registrar solicitud</p>
               <p className={styles.sectionSubtitle}>Genera tickets o mantenimientos desde tu sucursal con información suficiente para acelerar el despacho.</p>
               <div className={styles.requestBadgeRow}>
-                <span className={styles.requestBadge}>Sucursal: {profile?.name || session.branch.name}</span>
+                <span className={styles.requestBadge}>Sucursal: {profile?.name || displayName}</span>
                 <span className={styles.requestBadge}>Urgencia: {draft.urgency}</span>
               </div>
             </div>
 
             <div className={styles.infoBanner}>
               <p className={styles.formSectionTitle}>Punto de origen</p>
-              <p className={styles.formSectionText}>Sucursal: {profile?.name || session.branch.name} {profile?.branchNumber ? `(${profile.branchNumber})` : ""}</p>
+              <p className={styles.formSectionText}>Sucursal: {profile?.name || displayName} {profile?.branchNumber ? `(${profile.branchNumber})` : ""}</p>
             </div>
 
             <div className={styles.formSection}>
@@ -1118,8 +903,6 @@ export default function BranchTicketsPage() {
           </div>
           </>
           )}
-        </div>
-      </main>
       {showPdfModal && pdfUrl && (
         <div
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}

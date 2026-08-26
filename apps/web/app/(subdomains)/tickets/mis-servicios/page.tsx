@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { buildApiUrl } from "@/lib/api-base";
+import { usePortalSession } from "@/components/portal/PortalShell";
 
 type ServicesSummary = {
   summary: {
@@ -136,7 +136,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function MisServiciosPage() {
-  const [token, setToken] = useState<string | null>(null);
+  const { token } = usePortalSession();
   const [data, setData] = useState<ServicesSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -144,11 +144,6 @@ export default function MisServiciosPage() {
   const [downloadingInvoice, setDownloadingInvoice] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<Quote[] | null>(null);
   const [downloadingQuoteId, setDownloadingQuoteId] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    setToken(window.localStorage.getItem("ticketsClientToken"));
-  }, []);
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -245,15 +240,7 @@ export default function MisServiciosPage() {
     }
   };
 
-  if (!token) {
-    return (
-      <div style={{ padding: 32, textAlign: "center" }}>
-        <h2>Acceso requerido</h2>
-        <p>Inicia sesión en el portal de tickets para ver tus servicios.</p>
-        <Link href="/" style={{ color: "var(--primary)" }}>Volver al portal</Link>
-      </div>
-    );
-  }
+  if (!token) return null;
 
   if (loading && !data) return <div style={{ padding: 32 }}>Cargando servicios…</div>;
   if (error && !data) return <div style={{ padding: 32, color: "#b91c1c" }}>{error}</div>;

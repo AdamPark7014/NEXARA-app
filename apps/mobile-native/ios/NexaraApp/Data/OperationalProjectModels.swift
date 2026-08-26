@@ -10,6 +10,7 @@ struct OperationalProjectItem: Hashable, Identifiable {
     let scopeSummary: String
     let siteCount: String
     let clientName: String
+    let clientId: Int64?
     let vendorName: String
     let startDate: String
     let endDate: String
@@ -38,6 +39,7 @@ struct OperationalProjectItem: Hashable, Identifiable {
             raw["clientName"],
             client?["name"], client?["nombre"], client?["razonSocial"]
         )
+        clientId = StockParse.int64(client?["id"])
         vendorName = StockParse.str(
             raw["vendorName"],
             vendor?["nombre"], vendor?["name"]

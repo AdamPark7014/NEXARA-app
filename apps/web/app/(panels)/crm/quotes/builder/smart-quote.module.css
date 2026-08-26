@@ -1646,6 +1646,30 @@
   background: color-mix(in srgb, #b45309 10%, var(--surface));
 }
 
+.sqFulfillment {
+  display: grid;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+.sqFulfillmentSelect {
+  width: 100%;
+  font-size: 11px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+.sqFulfillmentWarn {
+  font-size: 10px;
+  font-weight: 700;
+  color: #b45309;
+}
+
 .sqSubstList {
   display: grid;
   gap: 8px;

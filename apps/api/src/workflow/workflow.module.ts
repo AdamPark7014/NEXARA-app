@@ -5,12 +5,19 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
 import { WorkflowService } from './workflow.service.js';
 import { WorkflowController } from './workflow.controller.js';
 import { AutoApprovalService } from './auto-approval.service.js';
-import { ActivityLifecycleService } from '../activities/activity-lifecycle.service.js';
+import { WorkflowSeedService } from './workflow-seed.service.js';
+import { WorkflowTimeoutCronService } from './workflow-timeout.cron.js';
+import { ActivitiesModule } from '../activities/activities.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, NotificationsModule],
-  providers: [ActivityLifecycleService, WorkflowService, AutoApprovalService],
+  imports: [PrismaModule, AuthModule, NotificationsModule, ActivitiesModule],
+  providers: [
+    WorkflowService,
+    AutoApprovalService,
+    WorkflowSeedService,
+    WorkflowTimeoutCronService,
+  ],
   controllers: [WorkflowController],
-  exports: [WorkflowService, AutoApprovalService],
+  exports: [WorkflowService, AutoApprovalService, WorkflowSeedService],
 })
 export class WorkflowModule {}

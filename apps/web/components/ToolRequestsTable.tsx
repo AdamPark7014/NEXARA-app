@@ -1,114 +1,96 @@
 "use client";
-import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { getSocketBaseUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
-import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
-import React, { useEffect, useState } from 'react';
-import { Socket } from 'socket.io-client';
-import { useUser } from './UserContext';
-import FinesTable from './FinesTable';
-import KpiCard from './ui/KpiCard';
-import styles from './ToolRequestsTable.module.css';
-import { createRealtimeSocket } from '@/lib/realtime-socket';
+import { createRealtimeSocket } from "@/lib/realtime-socket";
+import { exportToExcel } from "@/lib/export-excel";
+import {
+  approveToolRequest,
+  deliverToolRequest,
+  listToolRequests,
+  rejectToolRequest,
+  returnToolRequest,
+  toolRequestStatusLabel,
+  toolRequestStatusVariant,
+  type ToolRequestRow,
+} from "@/lib/tool-requests-api";
+import FinesTable from "./FinesTable";
+import FilterToolbar from "./FilterToolbar";
+import Button from "./ui/Button";
+import KpiCard from "./ui/KpiCard";
+import Section from "./ui/Section";
+import DataTable, { Tag, type Column } from "./ui/DataTable";
+import { useUser } from "./UserContext";
 
-interface ToolRequest {
-  id: number;
-  requestedBy: { nombre: string; email: string };
-  toolName: string;
-  model: string;
-  serialNumber: string;
-  reason: string;
-  startDate: string;
-  expectedReturnDate: string;
-  status: 'PENDING' | 'APPROVED' | 'IN_USE' | 'RETURNED' | 'DAMAGED' | 'REJECTED';
-  requestDate: string;
-  approvalDate: string | null;
-  approvedBy: { nombre: string } | null;
-  deliveryDate: string | null;
-  deliveryReceivedBy: { nombre: string } | null;
-  returnDate: string | null;
-  returnReceivedBy: { nombre: string } | null;
-  damageDescription: string | null;
-  renewalCount: number;
+const STATUS_OPTIONS = [
+  { value: "PENDING", label: "Pendiente" },
+  { value: "APPROVED", label: "Aprobada" },
+  { value: "IN_USE", label: "En uso" },
+  { value: "RETURNED", label: "Devuelta" },
+  { value: "DAMAGED", label: "Dañada" },
+  { value: "REJECTED", label: "Rechazada" },
+];
+
+function fmtDate(value: string | null) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("es-MX", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 const ToolRequestsTable: React.FC = () => {
   const { user } = useUser();
+  const token = user?.token ?? "";
   const canManage = hasPermission(user, PERMISSIONS.TOOLS_MANAGE);
-  const [tools, setTools] = useState<ToolRequest[]>([]);
+
+  const [items, setItems] = useState<ToolRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [statusFilter, setStatusFilter] = useState("");
-  const [isMobile, setIsMobile] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
-  useEffect(() => {
-    const handleResize = () => setIsMobile(isPanelDrawerViewport(window.innerWidth));
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  const fetchTools = async () => {
-    if (!user) return;
+  const load = useCallback(async () => {
+    if (!token) return;
     setLoading(true);
+    setError(null);
     try {
-      const url = statusFilter
-        ? `${buildApiUrl('tool-requests')}?status=${statusFilter}`
-        : buildApiUrl('tool-requests');
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      if (!res.ok) throw new Error('Error al cargar solicitudes');
-      const data = await res.json();
-      setTools(Array.isArray(data) ? data : []);
-      setError(null);
+      const rows = await listToolRequests(token);
+      setItems(rows);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(formatApiError(err, "Error al cargar solicitudes"));
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
-    fetchTools();
-  }, [user, statusFilter]);
+    void load();
+  }, [load]);
 
   useEffect(() => {
-    if (!user?.token) return;
-    const socketUrl = getSocketBaseUrl();
-    const socket: Socket = createRealtimeSocket(socketUrl, { transports: ['polling', 'websocket'] });
-
-    socket.on('entity:updated', (payload: { model?: string }) => {
-      if (payload?.model === 'ToolRequest') {
-        fetchTools();
-      }
+    if (!token) return;
+    const socket = createRealtimeSocket(getSocketBaseUrl(), { transports: ["polling", "websocket"] });
+    socket.on("entity:updated", (payload: { model?: string }) => {
+      if (payload?.model === "ToolRequest") void load();
     });
-
     return () => {
       socket.disconnect();
     };
-  }, [user?.token]);
+  }, [token, load]);
 
-  const runAction = async (id: number, path: string, init: RequestInit = {}) => {
-    if (!user?.token || !canManage) return;
+  const runAction = async (id: number, action: () => Promise<unknown>) => {
+    if (!canManage) return;
     setBusyId(id);
     setActionError(null);
     try {
-      const res = await fetch(buildApiUrl(path), {
-        ...init,
-        headers: {
-          Authorization: `Bearer ${user.token}`,
-          "Content-Type": "application/json",
-          ...(init.headers as Record<string, string> | undefined),
-        },
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || `HTTP ${res.status}`);
-      }
-      await fetchTools();
+      await action();
+      await load();
     } catch (err) {
       setActionError(formatApiError(err, "No se pudo completar la acción"));
     } finally {
@@ -116,292 +98,232 @@ const ToolRequestsTable: React.FC = () => {
     }
   };
 
-  const approveRequest = (id: number) => void runAction(id, `tool-requests/${id}/approve`, { method: "POST" });
-
-  const rejectRequest = (id: number) => {
-    const adminNotes = window.prompt("Motivo del rechazo (obligatorio):");
-    if (!adminNotes?.trim()) return;
-    void runAction(id, `tool-requests/${id}/reject`, {
-      method: "POST",
-      body: JSON.stringify({ adminNotes: adminNotes.trim() }),
-    });
-  };
-
-  const deliverRequest = (id: number) => void runAction(id, `tool-requests/${id}/deliver`, { method: "POST" });
-
-  const returnRequest = (id: number) => {
-    const damageDescription = window.prompt("Descripción de daño (opcional, dejar vacío si está en buen estado):") ?? "";
-    void runAction(id, `tool-requests/${id}/return`, {
-      method: "POST",
-      body: JSON.stringify({ damageDescription: damageDescription.trim() || undefined }),
-    });
-  };
-
-  const renderActions = (tool: ToolRequest) => {
-    if (!canManage) return null;
-    const busy = busyId === tool.id;
-    return (
-      <div className={styles.actions}>
-        {tool.status === "PENDING" && (
-          <>
-            <button type="button" className={styles.actionBtn} disabled={busy} onClick={() => approveRequest(tool.id)}>Aprobar</button>
-            <button type="button" className={`${styles.actionBtn} ${styles.actionDanger}`} disabled={busy} onClick={() => rejectRequest(tool.id)}>Rechazar</button>
-          </>
-        )}
-        {tool.status === "APPROVED" && (
-          <button type="button" className={styles.actionBtn} disabled={busy} onClick={() => deliverRequest(tool.id)}>Entregar</button>
-        )}
-        {tool.status === "IN_USE" && (
-          <button type="button" className={styles.actionBtn} disabled={busy} onClick={() => returnRequest(tool.id)}>Registrar devolución</button>
-        )}
-      </div>
-    );
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PENDING':
-        return 'var(--warning)';
-      case 'APPROVED':
-        return 'var(--info)';
-      case 'IN_USE':
-        return 'var(--success)';
-      case 'RETURNED':
-        return 'var(--text-secondary)';
-      case 'DAMAGED':
-        return 'var(--danger)';
-      case 'REJECTED':
-        return 'var(--danger)';
-      default:
-        return 'var(--text-primary)';
+  const visibleItems = useMemo(() => {
+    let rows = items;
+    if (filterStatus) rows = rows.filter((r) => r.status === filterStatus);
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter(
+        (r) =>
+          r.toolName.toLowerCase().includes(q) ||
+          r.requestedByName.toLowerCase().includes(q) ||
+          r.model.toLowerCase().includes(q) ||
+          r.serialNumber.toLowerCase().includes(q) ||
+          r.reason.toLowerCase().includes(q),
+      );
     }
-  };
-
-  const getStatusLabel = (status: string) => {
-    const labels: { [key: string]: string } = {
-      PENDING: 'Pendiente',
-      APPROVED: 'Aprobada',
-      IN_USE: 'En Uso',
-      RETURNED: 'Devuelta',
-      DAMAGED: 'Dañada',
-      REJECTED: 'Rechazada',
-    };
-    return labels[status] || status;
-  };
-
-  const getStatusClass = (status: ToolRequest['status']) => {
-    if (status === 'PENDING') return styles.statusPending;
-    if (status === 'APPROVED') return styles.statusApproved;
-    if (status === 'IN_USE') return styles.statusInUse;
-    if (status === 'RETURNED') return styles.statusReturned;
-    if (status === 'DAMAGED') return styles.statusDamaged;
-    if (status === 'REJECTED') return styles.statusRejected;
-    return styles.statusReturned;
-  };
-
-  if (loading) return <div className={styles.loading}>Cargando solicitudes...</div>;
+    return rows;
+  }, [items, filterStatus, searchQ]);
 
   const now = Date.now();
   const counts = {
-    total: tools.length,
-    pending: tools.filter((t) => t.status === 'PENDING').length,
-    inUse: tools.filter((t) => t.status === 'IN_USE').length,
-    overdue: tools.filter((t) => t.status === 'IN_USE' && new Date(t.expectedReturnDate).getTime() < now).length,
+    total: items.length,
+    pending: items.filter((t) => t.status === "PENDING").length,
+    inUse: items.filter((t) => t.status === "IN_USE").length,
+    overdue: items.filter(
+      (t) =>
+        t.status === "IN_USE" &&
+        t.expectedReturnDate &&
+        new Date(t.expectedReturnDate).getTime() < now,
+    ).length,
   };
 
-  return (
-    <div className={styles.root}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 16 }}>
-        <KpiCard label="Total" value={counts.total} icon="🧰" />
-        <KpiCard label="Pendientes" value={counts.pending} icon="⏳" variant={counts.pending > 0 ? "warning" : "default"} />
-        <KpiCard label="En uso" value={counts.inUse} icon="👤" variant="accent" />
-        <KpiCard label="Vencidas" value={counts.overdue} icon="⚠️" variant={counts.overdue > 0 ? "danger" : "positive"} />
-      </div>
-
-      <div className={`card ${styles.panel}`}>
-        <h3 className={styles.title}>Solicitudes de Herramientas</h3>
-        
-        {error && <div className={styles.error}>{error}</div>}
-        {actionError && <div className={styles.error}>{actionError}</div>}
-
-        <div className={styles.filterRow}>
-          <select
-            className={`input ${styles.filterSelect}`}
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">Todos los estados</option>
-            <option value="PENDING">Pendiente</option>
-            <option value="APPROVED">Aprobada</option>
-            <option value="IN_USE">En Uso</option>
-            <option value="RETURNED">Devuelta</option>
-            <option value="DAMAGED">Dañada</option>
-            <option value="REJECTED">Rechazada</option>
-          </select>
-          <div className={styles.counter}>
-            {tools.length} solicitud(es)
+  const columns: Column<ToolRequestRow>[] = [
+    {
+      key: "user",
+      label: "Usuario",
+      render: (r) => (
+        <div>
+          <div>{r.requestedByName}</div>
+          {r.requestedByEmail && (
+            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{r.requestedByEmail}</div>
+          )}
+        </div>
+      ),
+      width: 160,
+    },
+    {
+      key: "tool",
+      label: "Herramienta",
+      render: (r) => (
+        <div>
+          <div style={{ fontWeight: 600 }}>{r.toolName}</div>
+          <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+            {r.reason.length > 48 ? `${r.reason.slice(0, 48)}…` : r.reason}
           </div>
         </div>
+      ),
+    },
+    {
+      key: "model",
+      label: "Modelo / Serie",
+      accessor: (r) => `${r.model} / ${r.serialNumber.slice(0, 20)}`,
+      width: 140,
+    },
+    {
+      key: "status",
+      label: "Estado",
+      render: (r) => <Tag variant={toolRequestStatusVariant(r.status)}>{toolRequestStatusLabel(r.status)}</Tag>,
+      width: 110,
+    },
+    { key: "requestDate", label: "Solicitado", accessor: (r) => fmtDate(r.requestDate), width: 110 },
+    {
+      key: "expectedReturnDate",
+      label: "Devolución",
+      accessor: (r) => fmtDate(r.expectedReturnDate),
+      width: 110,
+    },
+    {
+      key: "approvedBy",
+      label: "Aprobado por",
+      accessor: (r) => r.approvedByName ?? "—",
+      width: 120,
+    },
+  ];
 
-        {tools.length === 0 ? (
-          <div className={styles.empty}>
-            No hay solicitudes de herramientas
+  if (canManage) {
+    columns.push({
+      key: "actions",
+      label: "Acciones",
+      width: 200,
+      render: (r) => {
+        const busy = busyId === r.id;
+        return (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {r.status === "PENDING" && (
+              <>
+                <Button size="sm" disabled={busy} onClick={() => runAction(r.id, () => approveToolRequest(token, r.id))}>
+                  Aprobar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    const adminNotes = window.prompt("Motivo del rechazo (obligatorio):");
+                    if (!adminNotes?.trim()) return;
+                    void runAction(r.id, () => rejectToolRequest(token, r.id, adminNotes.trim()));
+                  }}
+                >
+                  Rechazar
+                </Button>
+              </>
+            )}
+            {r.status === "APPROVED" && (
+              <Button size="sm" disabled={busy} onClick={() => runAction(r.id, () => deliverToolRequest(token, r.id))}>
+                Entregar
+              </Button>
+            )}
+            {r.status === "IN_USE" && (
+              <Button
+                size="sm"
+                disabled={busy}
+                onClick={() => {
+                  const damageDescription =
+                    window.prompt("Descripción de daño (opcional, vacío si está en buen estado):") ?? "";
+                  void runAction(r.id, () => returnToolRequest(token, r.id, damageDescription));
+                }}
+              >
+                Devolución
+              </Button>
+            )}
           </div>
-        ) : (
-          <>
-            {!isMobile && (
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr className={styles.rowBorder}>
-                      <th className={styles.th}>
-                        Usuario
-                      </th>
-                      <th className={styles.th}>
-                        Herramienta
-                      </th>
-                      <th className={styles.th}>
-                        Modelo/Serie
-                      </th>
-                      <th className={styles.th}>
-                        Estado
-                      </th>
-                      <th className={styles.th}>
-                        Solicitado
-                      </th>
-                      <th className={styles.th}>
-                        Devolución
-                      </th>
-                      <th className={styles.th}>
-                        Aprobado Por
-                      </th>
-                      {canManage && (
-                        <th className={styles.th}>Acciones</th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tools.map((tool) => (
-                      <tr key={tool.id} className={styles.rowBorder}>
-                        <td className={styles.td}>
-                          <div className={styles.userName}>{tool.requestedBy?.nombre || 'N/A'}</div>
-                          <div className={styles.smallMuted}>
-                            {tool.requestedBy?.email || ''}
-                          </div>
-                        </td>
-                        <td className={styles.td}>
-                          <div className={styles.toolName}>{tool.toolName}</div>
-                          <div className={styles.smallMuted}>
-                            {tool.reason.substring(0, 40)}...
-                          </div>
-                        </td>
-                        <td className={`${styles.td} ${styles.metaText}`}>
-                          {tool.model} / {tool.serialNumber.substring(0, 20)}
-                        </td>
-                        <td className={styles.td}>
-                          <div className={`${styles.statusBadge} ${getStatusClass(tool.status)}`}>
-                            {getStatusLabel(tool.status)}
-                          </div>
-                        </td>
-                        <td className={`${styles.td} ${styles.metaText}`}>
-                          {new Date(tool.requestDate).toLocaleDateString('es-MX', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </td>
-                        <td className={`${styles.td} ${styles.metaText}`}>
-                          {tool.expectedReturnDate
-                            ? new Date(tool.expectedReturnDate).toLocaleDateString('es-MX', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                              })
-                            : '—'}
-                        </td>
-                        <td className={`${styles.td} ${styles.metaText}`}>
-                          {tool.approvedBy?.nombre || '—'}
-                        </td>
-                        {canManage && (
-                          <td className={styles.td}>{renderActions(tool)}</td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+        );
+      },
+    });
+  }
 
-            {isMobile && (
-              <div className={styles.mobileList}>
-                {tools.map((tool) => (
-                  <div key={tool.id} className={styles.mobileCard}>
-                    <div className={styles.mobileTop}>
-                      <div className={styles.mobileTopMain}>
-                        <div className={styles.mobileToolName}>{tool.toolName}</div>
-                        <div className={styles.mobileRequester}>{tool.requestedBy?.nombre || 'N/A'}</div>
-                      </div>
-                      <div className={`${styles.mobileStatus} ${getStatusClass(tool.status)}`}>
-                        {getStatusLabel(tool.status)}
-                      </div>
-                    </div>
-
-                    <div className={styles.mobileMetaGrid}>
-                      <div className={styles.mobileMetaItem}>
-                        <span className={styles.mobileMetaLabel}>Modelo</span>
-                        <span className={styles.mobileMetaValue}>{tool.model}</span>
-                      </div>
-                      <div className={styles.mobileMetaItem}>
-                        <span className={styles.mobileMetaLabel}>Serie</span>
-                        <span className={styles.mobileMetaValue}>{tool.serialNumber.substring(0, 15)}</span>
-                      </div>
-                      <div className={styles.mobileMetaItem}>
-                        <span className={styles.mobileMetaLabel}>Solicitado</span>
-                        <span className={styles.mobileMetaValue}>
-                          {new Date(tool.requestDate).toLocaleDateString('es-MX', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </span>
-                      </div>
-                      <div className={styles.mobileMetaItem}>
-                        <span className={styles.mobileMetaLabel}>Devolución</span>
-                        <span className={styles.mobileMetaValue}>
-                          {tool.expectedReturnDate
-                            ? new Date(tool.expectedReturnDate).toLocaleDateString('es-MX', {
-                                month: 'short',
-                                day: 'numeric',
-                              })
-                            : '—'}
-                        </span>
-                      </div>
-                      <div className={`${styles.mobileMetaItem} ${styles.mobileMetaFull}`}>
-                        <span className={styles.mobileMetaLabel}>Razón</span>
-                        <span className={`${styles.mobileMetaValue} ${styles.mobileReason}`}>
-                          {tool.reason}
-                        </span>
-                      </div>
-                      {tool.approvedBy?.nombre && (
-                        <div className={`${styles.mobileMetaItem} ${styles.mobileMetaFull}`}>
-                          <span className={styles.mobileMetaLabel}>Aprobado por</span>
-                          <span className={styles.mobileMetaValue}>{tool.approvedBy.nombre}</span>
-                        </div>
-                      )}
-                    </div>
-                    {renderActions(tool)}
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
+  return (
+    <div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+          gap: 12,
+          marginBottom: 16,
+        }}
+      >
+        <KpiCard label="Total" value={counts.total} icon="🧰" />
+        <KpiCard
+          label="Pendientes"
+          value={counts.pending}
+          icon="⏳"
+          variant={counts.pending > 0 ? "warning" : "default"}
+        />
+        <KpiCard label="En uso" value={counts.inUse} icon="👤" variant="accent" />
+        <KpiCard
+          label="Vencidas"
+          value={counts.overdue}
+          icon="⚠️"
+          variant={counts.overdue > 0 ? "danger" : "positive"}
+        />
       </div>
 
-      <FinesTable
-        tipo="herramienta"
-        showUser={true}
-      />
+      <Section title="Solicitudes de herramientas">
+        {error && (
+          <div style={{ color: "var(--danger)", marginBottom: 12, fontSize: 13 }}>{error}</div>
+        )}
+        {actionError && (
+          <div style={{ color: "var(--danger)", marginBottom: 12, fontSize: 13 }}>{actionError}</div>
+        )}
+
+        <FilterToolbar
+          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar herramienta, usuario, serie…" }}
+          selects={[
+            {
+              label: "Estado",
+              value: filterStatus,
+              onChange: setFilterStatus,
+              options: STATUS_OPTIONS,
+              allowAll: true,
+            },
+          ]}
+          onClear={() => {
+            setSearchQ("");
+            setFilterStatus("");
+          }}
+          resultCount={loading ? null : visibleItems.length}
+          rightActions={
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                exportToExcel(
+                  visibleItems,
+                  [
+                    { key: "id", label: "ID" },
+                    { key: "requestedByName", label: "Usuario" },
+                    { key: "toolName", label: "Herramienta" },
+                    { key: "status", label: "Estado", format: (v) => toolRequestStatusLabel(String(v)) },
+                    { key: "requestDate", label: "Solicitado", format: (v) => fmtDate(String(v)) },
+                    {
+                      key: "expectedReturnDate",
+                      label: "Devolución",
+                      format: (v) => fmtDate(v ? String(v) : null),
+                    },
+                  ],
+                  "solicitudes-herramientas",
+                  "Solicitudes de herramientas",
+                )
+              }
+            >
+              Excel
+            </Button>
+          }
+        />
+
+        <DataTable<ToolRequestRow>
+          columns={columns}
+          rows={loading ? [] : visibleItems}
+          rowKey={(r) => r.id}
+          emptyTitle={loading ? "Cargando…" : "Sin solicitudes"}
+          emptyDescription={
+            loading ? "Obteniendo solicitudes de herramientas" : "No hay solicitudes con los filtros actuales"
+          }
+        />
+      </Section>
+
+      <FinesTable tipo="herramienta" showUser={true} />
     </div>
   );
 };

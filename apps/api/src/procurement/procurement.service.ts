@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
-import { AutoApprovalService } from '../workflow/auto-approval.service.js';
+import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { WarehouseService } from '../warehouse/warehouse.service.js';
 import { AccountingService } from '../accounting/accounting.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -16,7 +16,7 @@ export class ProcurementService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
-    private readonly autoApproval: AutoApprovalService,
+    private readonly domainEvents: DomainEventBusService,
     private readonly warehouse: WarehouseService,
     private readonly accounting: AccountingService,
     private readonly audit: AuditService,
@@ -297,21 +297,19 @@ export class ProcurementService {
 
     // Workflow: toda OC > $0 requiere validación de Compras + autorización
     // de Dirección Administrativa. El servicio es idempotente.
-    this.autoApproval
-      .evaluate({
-        entityType: 'PURCHASE_ORDER',
-        entityId: created.id,
-        userId,
-        companyId: created.companyId ?? companyId,
-        payload: {
-          amount: subtotal + taxAmount,
-          totalAmount: subtotal + taxAmount,
-          supplierId,
-          supplierName,
-          poNumber: created.poNumber,
-        },
-      })
-      .catch(() => undefined);
+    this.domainEvents.requestAutoApproval({
+      entityType: 'PURCHASE_ORDER',
+      entityId: created.id,
+      userId,
+      companyId: created.companyId ?? companyId,
+      payload: {
+        amount: subtotal + taxAmount,
+        totalAmount: subtotal + taxAmount,
+        supplierId,
+        supplierName,
+        poNumber: created.poNumber,
+      },
+    });
     return created;
   }
 
@@ -1029,5 +1027,48 @@ export class ProcurementService {
     assertCompanyAccess(rfq, companyId ?? null, 'RFQ');
     if (rfq.status === 'AWARDED') throw new BadRequestException('No se puede cancelar una RFQ ya adjudicada');
     return this.prisma.purchaseRFQ.update({ where: { id: rfqId }, data: { status: 'CANCELLED' } });
+  }
+
+  /** Aprobación de OC en workflow — confirma borradores pendientes. */
+  async onPurchaseOrderWorkflowApproved(id: number, companyId: number, actorId?: number) {
+    const po = await this.prisma.purchaseOrder.findFirst({
+      where: { id, status: 'DRAFT', ...companyWhere(companyId) },
+    });
+    if (!po) return;
+
+    await this.prisma.purchaseOrder.updateMany({
+      where: { id, status: 'DRAFT' },
+      data: { status: 'CONFIRMED', approvedById: actorId ?? null, approvedAt: new Date() },
+    });
+  }
+
+  /** Rechazo de OC en workflow — cancela borradores pendientes de aprobación. */
+  async onPurchaseOrderWorkflowRejected(
+    id: number,
+    companyId: number,
+    actorId?: number,
+    reason?: string,
+  ) {
+    const po = await this.prisma.purchaseOrder.findFirst({
+      where: { id, ...companyWhere(companyId) },
+    });
+    if (!po || po.status !== 'DRAFT') return;
+
+    await this.prisma.purchaseOrder.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+    });
+
+    this.domainEvents.publishEntityLifecycle('updated', {
+      entityType: 'PURCHASE_ORDER',
+      entityId: id,
+      companyId,
+      userId: actorId,
+      payload: {
+        status: 'CANCELLED',
+        poNumber: po.poNumber,
+        reason: reason?.trim() || null,
+      },
+    });
   }
 }

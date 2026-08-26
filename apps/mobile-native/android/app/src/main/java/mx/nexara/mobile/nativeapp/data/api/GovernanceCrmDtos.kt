@@ -40,6 +40,26 @@ data class ExecutiveFinanceDto(
     }
 }
 
+data class ExecutiveTopAccountDto(
+    val clientId: Long = 0L,
+    val clientName: String = "",
+    val projects: Int = 0,
+    val revenue: Double = 0.0,
+    val margin: Double = 0.0,
+    val marginPercent: Double = 0.0,
+) {
+    companion object {
+        fun fromRaw(row: Map<String, Any?>): ExecutiveTopAccountDto = ExecutiveTopAccountDto(
+            clientId = ProcParse.dbl(row["clientId"])?.toLong() ?: 0L,
+            clientName = ProcParse.str(row["clientName"]),
+            projects = ProcParse.dbl(row["projects"])?.toInt() ?: 0,
+            revenue = ProcParse.dbl(row["revenue"]) ?: 0.0,
+            margin = ProcParse.dbl(row["margin"]) ?: 0.0,
+            marginPercent = ProcParse.dbl(row["marginPercent"]) ?: 0.0,
+        )
+    }
+}
+
 data class ExecutiveAlertDto(
     val title: String = "",
     val detail: String = "",
@@ -49,7 +69,7 @@ data class ExecutiveAlertDto(
     companion object {
         fun fromRaw(row: Map<String, Any?>): ExecutiveAlertDto = ExecutiveAlertDto(
             title = ProcParse.str(row["title"], row["message"]),
-            detail = ProcParse.str(row["detail"], row["description"]),
+            detail = ProcParse.str(row["message"], row["detail"], row["description"]),
         )
     }
 }
@@ -59,6 +79,7 @@ data class ExecutiveCLevelDto(
     val operations: ExecutiveOpsDto = ExecutiveOpsDto(),
     val finance: ExecutiveFinanceDto = ExecutiveFinanceDto(),
     val alerts: List<ExecutiveAlertDto> = emptyList(),
+    val topAccounts: List<ExecutiveTopAccountDto> = emptyList(),
     val raw: Map<String, Any?> = emptyMap(),
 ) {
     companion object {
@@ -71,11 +92,16 @@ data class ExecutiveCLevelDto(
                 ?.mapNotNull { it as? Map<*, *> }
                 ?.map { ExecutiveAlertDto.fromRaw(it as Map<String, Any?>) }
                 ?: emptyList()
+            val topAccounts = (row["topAccounts"] as? List<*>)
+                ?.mapNotNull { it as? Map<*, *> }
+                ?.map { ExecutiveTopAccountDto.fromRaw(it as Map<String, Any?>) }
+                ?: emptyList()
             return ExecutiveCLevelDto(
                 headline = ExecutiveHeadlineDto.fromRaw(h),
                 operations = ExecutiveOpsDto.fromRaw(ops),
                 finance = ExecutiveFinanceDto.fromRaw(fin),
                 alerts = alerts,
+                topAccounts = topAccounts,
                 raw = row,
             )
         }

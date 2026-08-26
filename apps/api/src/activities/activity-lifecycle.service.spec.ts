@@ -23,9 +23,31 @@ function build(overrides: Partial<Mocks> = {}) {
     clientTicketRequest: { updateMany: mocks.ticketUpdateMany },
     workflowDefinition: { findFirst: mocks.definitionFindFirst },
     workflowInstance: { findFirst: mocks.instanceFindFirst, create: mocks.instanceCreate },
+    activity: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      findFirst: jest.fn().mockResolvedValue({
+        id: 10,
+        responsableId: 5,
+        anNumber: 'AN-1',
+        titulo: 'Test',
+        companyId: 7,
+      }),
+    },
   };
 
-  return { service: new ActivityLifecycleService(prisma as any), mocks };
+  const domainEvents = { publishEntityLifecycle: jest.fn() };
+  const notifications = { createNotification: jest.fn().mockResolvedValue(null) };
+
+  return {
+    service: new ActivityLifecycleService(
+      prisma as any,
+      domainEvents as any,
+      notifications as any,
+    ),
+    mocks,
+    domainEvents,
+    notifications,
+  };
 }
 
 describe('ActivityLifecycleService.onActivityFinished', () => {
@@ -187,8 +209,8 @@ describe('validación del Arquitecto', () => {
 
   it('al validar, finaliza la actividad y propaga los efectos', async () => {
     const activityUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
-    const { service, mocks } = build();
-    (service as any).prisma.activity = { updateMany: activityUpdateMany };
+    const { service, mocks, domainEvents } = build();
+    (service as any).prisma.activity.updateMany = activityUpdateMany;
 
     const outcome = await service.onActivityValidated({ activityId: 10, companyId: 7 });
 
@@ -197,6 +219,26 @@ describe('validación del Arquitecto', () => {
     expect(args.data.estatus).toBe('Finalizada');
     expect(mocks.visitUpdateMany).toHaveBeenCalled();
     expect(mocks.ticketUpdateMany).toHaveBeenCalled();
+    expect(domainEvents.publishEntityLifecycle).toHaveBeenCalled();
+    expect(outcome.errors).toEqual([]);
+  });
+
+  it('al rechazar validación revierte a En Proceso y notifica', async () => {
+    const activityUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const { service, domainEvents, notifications } = build();
+    (service as any).prisma.activity.updateMany = activityUpdateMany;
+
+    const outcome = await service.onActivityValidationRejected({
+      activityId: 10,
+      companyId: 7,
+      actorId: 2,
+      comments: 'Faltan fotos',
+    });
+
+    const args = activityUpdateMany.mock.calls[0][0];
+    expect(args.data.estatus).toBe('En Proceso');
+    expect(notifications.createNotification).toHaveBeenCalled();
+    expect(domainEvents.publishEntityLifecycle).toHaveBeenCalled();
     expect(outcome.errors).toEqual([]);
   });
 });

@@ -20,6 +20,194 @@ class ConsoleRepository(context: Context) {
 
     suspend fun activitiesFetch(scope: String? = null) = api.getActivities(scope = scope)
 
+    suspend fun createActivity(body: mx.nexara.mobile.nativeapp.data.api.CreateActivityRequest): Long {
+        val res = api.createActivity(body)
+        return res.id ?: throw IllegalStateException("OT sin ID")
+    }
+
+    suspend fun nextAnNumber(): String {
+        val raw = api.getNextAnNumberRaw().string().trim()
+        if (!raw.startsWith("{")) return ""
+        val obj = org.json.JSONObject(raw)
+        return obj.optString("next", "")
+    }
+
+    suspend fun dispatchBoard(): Map<String, Any?> =
+        parseJsonObject(api.getDispatchBoardRaw().string())
+
+    suspend fun activityFeed(limit: Int = 40): List<Map<String, Any?>> {
+        val raw = api.getActivityFeedRaw(limit).string().trim()
+        if (!raw.startsWith("{")) return emptyList()
+        val obj = org.json.JSONObject(raw)
+        val arr = obj.optJSONArray("items") ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { idx ->
+            val item = arr.opt(idx)
+            if (item is org.json.JSONObject) jsonObjectToMap(item) else null
+        }
+    }
+
+    suspend fun activityById(id: Long) = api.getActivity(id)
+
+    suspend fun activityTimelineEvents(activityId: Long): List<Map<String, Any?>> {
+        val raw = api.getActivityTimeline(activityId).string().trim()
+        if (!raw.startsWith("{")) return emptyList()
+        val obj = org.json.JSONObject(raw)
+        val arr = obj.optJSONArray("events") ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { idx ->
+            val item = arr.opt(idx)
+            if (item is org.json.JSONObject) jsonObjectToMap(item) else null
+        }
+    }
+
+    suspend fun activityMaterials(activityId: Long): List<Map<String, Any?>> =
+        parseJsonArray(api.getActivityMaterials(activityId).string())
+
+    suspend fun activityTeam(activityId: Long): List<Map<String, Any?>> =
+        parseJsonArray(api.getActivityTeam(activityId).string())
+
+    suspend fun activityReassignments(activityId: Long): List<Map<String, Any?>> =
+        parseJsonArray(api.getActivityReassignments(activityId).string())
+
+    private fun parseJsonArray(raw: String): List<Map<String, Any?>> {
+        val trimmed = raw.trim()
+        if (!trimmed.startsWith("[")) return emptyList()
+        val arr = org.json.JSONArray(trimmed)
+        return (0 until arr.length()).mapNotNull { idx ->
+            val item = arr.opt(idx)
+            if (item is org.json.JSONObject) jsonObjectToMap(item) else null
+        }
+    }
+
+    private fun parseJsonObject(raw: String): Map<String, Any?> {
+        val trimmed = raw.trim()
+        if (!trimmed.startsWith("{")) return emptyMap()
+        return jsonObjectToMap(org.json.JSONObject(trimmed))
+    }
+
+    private fun jsonObjectToMap(obj: org.json.JSONObject): Map<String, Any?> =
+        obj.keys().asSequence().associateWith { key -> jsonValue(obj.get(key)) }
+
+    private fun jsonValue(value: Any?): Any? = when (value) {
+        null, org.json.JSONObject.NULL -> null
+        is org.json.JSONObject -> value.keys().asSequence().associateWith { jsonValue(value.get(it)) }
+        is org.json.JSONArray -> (0 until value.length()).map { jsonValue(value.get(it)) }
+        else -> value
+    }
+
+    suspend fun updateActivity(
+        id: Long,
+        estatus: String? = null,
+        prioridad: String? = null,
+        descripcion: String? = null,
+        indicaciones: String? = null,
+        fechaInicio: String? = null,
+        fechaEntregaEsperada: String? = null,
+        fechaFinalizacion: String? = null,
+    ) = api.patchActivity(
+        id = id,
+        body = mx.nexara.mobile.nativeapp.data.api.UpdateActivityRequest(
+            estatus = estatus,
+            prioridad = prioridad,
+            descripcion = descripcion,
+            indicaciones = indicaciones,
+            fechaInicio = fechaInicio,
+            fechaEntregaEsperada = fechaEntregaEsperada,
+            fechaFinalizacion = fechaFinalizacion,
+        ),
+    )
+
+    suspend fun executeActivity(
+        id: Long,
+        estatus: String? = null,
+        fechaInicio: String? = null,
+        fechaFinalizacion: String? = null,
+    ) = api.patchActivityExecute(
+        id = id,
+        body = mx.nexara.mobile.nativeapp.data.api.ExecuteActivityRequest(
+            estatus = estatus,
+            fechaInicio = fechaInicio,
+            fechaFinalizacion = fechaFinalizacion,
+        ),
+    )
+
+    suspend fun reassignActivity(activityId: Long, toUserId: Long, motivo: String? = null) =
+        api.reassignActivity(
+            id = activityId,
+            body = mx.nexara.mobile.nativeapp.data.api.ReassignActivityRequest(
+                aUsuarioId = toUserId,
+                motivo = motivo,
+            ),
+        )
+
+    suspend fun activityIncidents(activityId: Long) = api.getActivityIncidents(activityId)
+
+    suspend fun addActivityIncident(
+        activityId: Long,
+        tipo: String,
+        descripcion: String,
+        severidad: String? = null,
+        accionTomada: String? = null,
+        horasPerdidas: Double? = null,
+    ) = api.addActivityIncident(
+        activityId = activityId,
+        body = mx.nexara.mobile.nativeapp.data.api.AddActivityIncidentRequest(
+            tipo = tipo,
+            severidad = severidad,
+            descripcion = descripcion,
+            accionTomada = accionTomada,
+            horasPerdidas = horasPerdidas,
+        ),
+    )
+
+    suspend fun resolveActivityIncident(
+        activityId: Long,
+        incidentId: Long,
+        accionTomada: String? = null,
+    ) = api.resolveActivityIncident(
+        activityId = activityId,
+        incidentId = incidentId,
+        body = mx.nexara.mobile.nativeapp.data.api.ResolveActivityIncidentRequest(accionTomada = accionTomada),
+    )
+
+    suspend fun reopenActivityIncident(activityId: Long, incidentId: Long) =
+        api.reopenActivityIncident(activityId = activityId, incidentId = incidentId)
+
+    suspend fun activityRecommendations(activityId: Long) = api.getActivityRecommendations(activityId)
+
+    suspend fun addActivityRecommendation(
+        activityId: Long,
+        tipo: String,
+        descripcion: String,
+        prioridad: String? = null,
+        costoEstimado: Double? = null,
+    ) = api.addActivityRecommendation(
+        activityId = activityId,
+        body = mx.nexara.mobile.nativeapp.data.api.AddActivityRecommendationRequest(
+            tipo = tipo,
+            prioridad = prioridad,
+            descripcion = descripcion,
+            costoEstimado = costoEstimado,
+        ),
+    )
+
+    suspend fun updateActivityRecommendation(
+        activityId: Long,
+        recommendationId: Long,
+        estado: String? = null,
+        prioridad: String? = null,
+        cotizacionId: Long? = null,
+        costoEstimado: Double? = null,
+    ) = api.updateActivityRecommendation(
+        activityId = activityId,
+        recommendationId = recommendationId,
+        body = mx.nexara.mobile.nativeapp.data.api.UpdateActivityRecommendationRequest(
+            estado = estado,
+            prioridad = prioridad,
+            cotizacionId = cotizacionId,
+            costoEstimado = costoEstimado,
+        ),
+    )
+
     suspend fun usersFetch(preferAssignable: Boolean = true): List<mx.nexara.mobile.nativeapp.data.api.VisibleUserDto> {
         if (!preferAssignable) return api.getUsers()
         return try {
@@ -134,6 +322,26 @@ class ConsoleRepository(context: Context) {
         ),
     )
 
+    suspend fun assignViatic(
+        usuarioId: Long,
+        amount: Double,
+        motivo: String,
+        categoria: String? = null,
+        activityId: Long? = null,
+        projectId: Long? = null,
+        vehicleId: Long? = null,
+    ) = api.assignViatic(
+        mx.nexara.mobile.nativeapp.data.api.AssignViaticJsonRequest(
+            usuarioId = usuarioId,
+            montoSolicitado = amount,
+            motivo = motivo,
+            categoria = categoria,
+            actividadId = activityId,
+            projectId = projectId,
+            vehicleId = vehicleId,
+        ),
+    )
+
     suspend fun approveViatic(id: Long, approve: Boolean, note: String? = null) =
         api.approveViatic(
             id = id,
@@ -151,6 +359,9 @@ class ConsoleRepository(context: Context) {
 
     suspend fun gpsTeam() = api.getGpsTeam()
 
+    suspend fun gpsTrajectory(date: String? = null, userId: Long? = null) =
+        api.getGpsTrajectory(date = date, userId = userId)
+
     suspend fun gpsPost(lat: Double, lng: Double, speedKmh: Double?) =
         api.postGpsLocation(
             mx.nexara.mobile.nativeapp.data.api.PostGpsLocationRequest(
@@ -160,6 +371,9 @@ class ConsoleRepository(context: Context) {
                 ultimaActualizacion = java.time.Instant.now().toString(),
             )
         )
+
+    suspend fun gpsUpdateConsent(enabled: Boolean) =
+        api.patchGpsConsent(mx.nexara.mobile.nativeapp.data.api.GpsConsentRequest(enabled = enabled))
 
     suspend fun myToolRequests() = api.getMyToolRequests()
 
@@ -360,6 +574,11 @@ class ConsoleRepository(context: Context) {
 
     suspend fun removeProjectEngineer(projectId: Long, engineerId: Long) =
         api.removeOperationalProjectEngineer(projectId = projectId, engineerId = engineerId)
+
+    suspend fun myProfile() = api.getMyProfile()
+
+    suspend fun updateMyProfile(body: mx.nexara.mobile.nativeapp.data.api.UpdateUserProfileBody) =
+        api.updateMyProfile(body)
 
     suspend fun settingsList() = api.getSettings()
 

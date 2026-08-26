@@ -10,6 +10,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { ACTIVITY_STATUS, isFinishedStatus } from '../activities/activity-status.js';
 import { ActivityLifecycleService } from '../activities/activity-lifecycle.service.js';
+import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 
 @Injectable()
 export class ServiceSheetsService {
@@ -19,6 +20,7 @@ export class ServiceSheetsService {
     private readonly prisma: PrismaService,
     private readonly serviceClientsService: ServiceClientsService,
     private readonly activityLifecycle: ActivityLifecycleService,
+    private readonly domainEvents: DomainEventBusService,
   ) {}
 
   private async loadActivityForTenant(activityId: number, companyId?: number | null) {
@@ -258,6 +260,20 @@ export class ServiceSheetsService {
         data: {
           estatus: needsValidation ? ACTIVITY_STATUS.POR_VALIDAR : ACTIVITY_STATUS.FINALIZADA,
           fechaFinalizacion: new Date(),
+        },
+      });
+
+      const closedStatus = needsValidation ? ACTIVITY_STATUS.POR_VALIDAR : ACTIVITY_STATUS.FINALIZADA;
+      this.domainEvents.publishEntityLifecycle('updated', {
+        entityType: 'ACTIVITY',
+        entityId: activityId,
+        companyId,
+        userId: activity.responsableId ?? undefined,
+        payload: {
+          estatus: closedStatus,
+          anNumber: activity.anNumber,
+          titulo: activity.titulo,
+          source: 'service_sheet',
         },
       });
 

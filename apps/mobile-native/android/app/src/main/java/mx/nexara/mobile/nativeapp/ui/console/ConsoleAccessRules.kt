@@ -192,7 +192,7 @@ fun consoleSidebarGroups(user: SessionUser?, panelId: mx.nexara.mobile.nativeapp
         ),
         ConsoleSidebarGroup(
             "compliance", "Cumplimiento y BI",
-            pick("documents", "audit", "analytics", "bi", "executive", "approvals", "notifications-center", "exports"),
+            pick("documents", "audit", "analytics", "bi", "executive", "approvals", "notifications-center", "chat", "exports"),
         ),
         ConsoleSidebarGroup(
             "ops-monitoring", "Monitoreo y soporte",
@@ -282,6 +282,6 @@ fun ventasSidebarGroups(@Suppress("UNUSED_PARAMETER") user: SessionUser?): List<
         ConsoleSidebarGroup("team", "Equipo y métricas", pick(
             "gestion-vendedores", "metas", "reportes", "crecimiento", "equipo-comparativa",
         )),
-        ConsoleSidebarGroup("account", "Mi cuenta", pick("my-profile", "notificaciones")),
+        ConsoleSidebarGroup("account", "Mi cuenta", pick("my-profile", "notificaciones", "chat")),
     ).filter { it.modules.isNotEmpty() }
 }

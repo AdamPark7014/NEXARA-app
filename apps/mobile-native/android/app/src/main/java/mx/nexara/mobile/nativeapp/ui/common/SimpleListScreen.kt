@@ -14,7 +14,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -93,12 +94,7 @@ fun SimpleListScreen(
         header?.invoke()
         when {
             loading && (rows == null) -> {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    CircularProgressIndicator()
-                }
+                NxLoadingBlock("Cargando $title…")
             }
             error != null -> {
                 Card(
@@ -125,11 +121,9 @@ fun SimpleListScreen(
                 }
             }
             filteredRows.isEmpty() -> {
-                Spacer(Modifier.height(24.dp))
-                Text(
-                    if (baseRows.isEmpty()) "Sin registros." else "Sin resultados con ese filtro.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                NxEmptyState(
+                    title = if (baseRows.isEmpty()) "Sin registros" else "Sin resultados",
+                    subtitle = if (baseRows.isEmpty()) "No hay datos para mostrar." else "Prueba otro término de búsqueda.",
                 )
             }
             else -> {

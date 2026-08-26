@@ -1,5 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.studio
 
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxTealTopAppBarColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -71,9 +72,9 @@ fun StudioScaffold(
                 TopAppBar(
                     title = {
                         Column {
-                            Text(title, fontWeight = FontWeight.Bold)
+                            Text(title, fontWeight = FontWeight.Bold, color = Color.White)
                             if (!subtitle.isNullOrBlank()) {
-                                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = StudioMuted)
+                                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.85f))
                             }
                         }
                     },
@@ -85,7 +86,7 @@ fun StudioScaffold(
                         }
                     },
                     actions = { actions() },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+                    colors = NxTealTopAppBarColors(),
                 )
             }
         },

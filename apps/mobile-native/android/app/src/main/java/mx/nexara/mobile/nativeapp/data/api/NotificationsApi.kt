@@ -13,6 +13,10 @@ data class NotificationRowDto(
     val category: String? = null,
     val isRead: Boolean? = null,
     val createdAt: String? = null,
+    val entityType: String? = null,
+    val relatedEntityId: Long? = null,
+    val relatedUrl: String? = null,
+    val priority: String? = null,
 )
 
 data class UnreadCountDto(

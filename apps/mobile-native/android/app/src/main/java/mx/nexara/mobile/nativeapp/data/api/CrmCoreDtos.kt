@@ -238,6 +238,7 @@ data class CrmLeadDto(
 ) {
     val rowKey: String get() = "lead-${id.ifBlank { title }}"
     val displayTitle: String get() = title.ifBlank { description.ifBlank { "Lead" } }
+    val numericId: Long? get() = id.toLongOrNull() ?: ProcParse.lng(raw["id"])
 
     companion object {
         fun fromRaw(row: Map<String, Any?>): CrmLeadDto = CrmLeadDto(

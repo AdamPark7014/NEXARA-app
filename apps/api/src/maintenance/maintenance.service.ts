@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { FolioService } from '../common/folio/folio.service.js';
 
@@ -11,6 +12,7 @@ export class MaintenanceService {
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly folio: FolioService,
+    private readonly domainEvents: DomainEventBusService,
   ) {}
 
   // ── Assets ────────────────────────────────────────────────────────
@@ -182,6 +184,23 @@ export class MaintenanceService {
     void this.notificationHierarchy
       .notifyMaintenanceWorkOrderCreated(userId, wo.id, wo.orderNumber, wo.title, wo.assignedToId)
       .catch(() => undefined);
+
+    this.domainEvents.publishEntityLifecycle('created', {
+      entityType: 'MAINTENANCE_ORDER',
+      entityId: wo.id,
+      companyId: wo.companyId,
+      userId,
+      payload: {
+        orderNumber: wo.orderNumber,
+        title: wo.title,
+        type: wo.type,
+        priority: wo.priority,
+        status: wo.status,
+        assetId: wo.assetId,
+        assignedToId: wo.assignedToId,
+      },
+    });
+
     return wo;
   }
 

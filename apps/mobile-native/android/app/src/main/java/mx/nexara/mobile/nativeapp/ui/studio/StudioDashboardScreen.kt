@@ -1,7 +1,7 @@
 package mx.nexara.mobile.nativeapp.ui.studio
 
 import android.app.Application
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,19 +13,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -38,6 +40,19 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.SocialPostDto
 import mx.nexara.mobile.nativeapp.data.studio.StudioDashboardStats
 import mx.nexara.mobile.nativeapp.data.studio.StudioRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxDimens
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
+
+private val GreenLight = Color(0xFFD1FAE5); private val GreenColor = Color(0xFF059669)
+private val TealLight  = Color(0xFFCCFBF1); private val TealColor  = Color(0xFF0D9488)
+private val BlueLight  = Color(0xFFDBEAFE); private val BlueColor  = Color(0xFF3B82F6)
+private val AmberLight = Color(0xFFFEF3C7); private val AmberColor = Color(0xFFF59E0B)
+private val PurpleLight = Color(0xFFF3E8FF); private val PurpleColor = Color(0xFFA855F7)
+private val RedColor   = Color(0xFFEF4444)
 
 data class StudioDashboardUiState(
     val loading: Boolean = true,
@@ -49,8 +64,6 @@ class StudioDashboardViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = StudioRepository(app.applicationContext)
     private val _state = MutableStateFlow(StudioDashboardUiState())
     val state: StateFlow<StudioDashboardUiState> = _state
-
-    init { refresh() }
 
     fun refresh() {
         _state.update { it.copy(loading = true, error = null) }
@@ -72,76 +85,220 @@ fun StudioDashboardScreen(
     vm: StudioDashboardViewModel = viewModel(),
 ) {
     val ui by vm.state.collectAsState()
+
+    if (ui.stats == null && ui.loading && ui.error == null) {
+        vm.refresh()
+    }
+
     StudioScaffold(title = "STUDIO", subtitle = "Marca y marketing", onBack = onBack) { inner ->
-        when {
-            ui.loading -> StudioLoadingBox()
-            ui.error != null -> StudioErrorState(ui.error!!, onRetry = vm::refresh)
-            else -> {
-                val s = ui.stats!!
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(inner),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    item {
-                        Text("Sitio en producción", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = StudioSlate)
-                        Spacer(Modifier.height(4.dp))
-                        Text("Gestiona contenido público, leads y calendario social.", style = MaterialTheme.typography.bodySmall, color = StudioMuted)
-                    }
-                    item {
-                        androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-                            columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.fillMaxWidth().height(330.dp),
-                            userScrollEnabled = false,
-                        ) {
-                            item { StudioKpiCard("Contactos web", s.contactTotal.toString(), "Formularios recibidos", "📥") }
-                            item { StudioKpiCard("Casos de éxito", "${s.casesPublished}/${s.casesTotal}", "Publicados / total", "🏆", accent = Color(0xFF10B981)) }
-                            item { StudioKpiCard("Noticias", "${s.newsPublished}/${s.newsTotal}", "Publicadas / total", "📰", accent = Color(0xFFF59E0B)) }
-                            item { StudioKpiCard("Suscriptores", s.newsletterActive.toString(), "Newsletter activos", "📮", accent = Color(0xFF8B5CF6)) }
-                            item { StudioKpiCard("Social", s.socialDrafts.size.toString(), "Pendientes de publicar", "📱", accent = Color(0xFF0EA5E9)) }
-                        }
-                    }
-                    item { Text("Accesos rápidos", fontWeight = FontWeight.SemiBold) }
-                    val quick = listOf(
-                        "hero" to "🖼️ Carrusel inicio",
-                        "cases" to "🏆 Casos de éxito",
-                        "news" to "📰 Noticias",
-                        "pages" to "🌐 Secciones del sitio",
-                        "contacts" to "✉️ Contactos",
-                        "leads" to "✨ Leads",
-                        "social" to "📱 Redes sociales",
-                        "newsletter" to "📬 Newsletter",
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().background(NxColors.Surface).padding(inner),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                Column {
+                    Text(
+                        "Dashboard Studio",
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                        color = StudioSlate,
                     )
-                    items(quick) { (key, label) ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth().clickable { onOpenModule(key) },
-                            shape = RoundedCornerShape(14.dp),
-                        ) {
-                            Text(label, modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Medium)
-                        }
+                    Text(
+                        "Sitio web · Contenido · Social",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = StudioMuted,
+                    )
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StudioQuickActionCard(
+                            modifier = Modifier.weight(1f),
+                            icon = "🖼️",
+                            title = "Hero",
+                            subtitle = "Carrusel inicio",
+                            bg = PurpleColor,
+                            onClick = { onOpenModule("hero") },
+                        )
+                        StudioQuickActionCard(
+                            modifier = Modifier.weight(1f),
+                            icon = "🏆",
+                            title = "Casos",
+                            subtitle = "Casos de éxito",
+                            bg = GreenColor,
+                            onClick = { onOpenModule("cases") },
+                        )
                     }
-                    if (s.socialDrafts.isNotEmpty()) {
-                        item { Spacer(Modifier.height(8.dp)); Text("Próximas publicaciones", fontWeight = FontWeight.SemiBold) }
-                        items(s.socialDrafts) { post -> SocialPreviewCard(post) }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StudioQuickActionCard(
+                            modifier = Modifier.weight(1f),
+                            icon = "📰",
+                            title = "Noticias",
+                            subtitle = "Blog y novedades",
+                            bg = AmberColor,
+                            onClick = { onOpenModule("news") },
+                        )
+                        StudioQuickActionCard(
+                            modifier = Modifier.weight(1f),
+                            icon = "💬",
+                            title = "Chat",
+                            subtitle = "Equipo NEXARA",
+                            bg = BlueColor,
+                            onClick = { onOpenModule("chat") },
+                        )
                     }
                 }
             }
+
+            if (ui.loading) {
+                item { NxLoadingBlock("Cargando Studio…") }
+                return@LazyColumn
+            }
+
+            if (!ui.error.isNullOrBlank()) {
+                item {
+                    NxErrorBlock(ui.error!!, onRetry = { vm.refresh() })
+                }
+                return@LazyColumn
+            }
+
+            val s = ui.stats!!
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StudioDashKpiCard(
+                            Modifier.weight(1f),
+                            icon = "📥",
+                            title = "Contactos",
+                            value = s.contactTotal.toString(),
+                            sub = "Formularios web",
+                            bg = TealLight,
+                            accent = TealColor,
+                        )
+                        StudioDashKpiCard(
+                            Modifier.weight(1f),
+                            icon = "🏆",
+                            title = "Casos",
+                            value = "${s.casesPublished}/${s.casesTotal}",
+                            sub = "Publicados / total",
+                            bg = GreenLight,
+                            accent = GreenColor,
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StudioDashKpiCard(
+                            Modifier.weight(1f),
+                            icon = "📰",
+                            title = "Noticias",
+                            value = "${s.newsPublished}/${s.newsTotal}",
+                            sub = "Publicadas / total",
+                            bg = AmberLight,
+                            accent = AmberColor,
+                        )
+                        StudioDashKpiCard(
+                            Modifier.weight(1f),
+                            icon = "📮",
+                            title = "Newsletter",
+                            value = s.newsletterActive.toString(),
+                            sub = "Suscriptores activos",
+                            bg = PurpleLight,
+                            accent = PurpleColor,
+                        )
+                    }
+                }
+            }
+
+            if (s.socialDrafts.isNotEmpty()) {
+                item {
+                    StudioDashKpiCard(
+                        Modifier.fillMaxWidth(),
+                        icon = "📱",
+                        title = "Social pendiente",
+                        value = s.socialDrafts.size.toString(),
+                        sub = "Borradores y programados",
+                        bg = BlueLight,
+                        accent = BlueColor,
+                    )
+                }
+                item {
+                    NxSectionHeader("Próximas publicaciones", "${s.socialDrafts.size} en cola")
+                }
+                items(s.socialDrafts) { post -> SocialPreviewCard(post) }
+            }
+
+            item { Spacer(Modifier.height(24.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun StudioQuickActionCard(
+    modifier: Modifier,
+    icon: String,
+    title: String,
+    subtitle: String,
+    bg: Color,
+    onClick: () -> Unit,
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(NxDimens.PanelRadius),
+        colors = CardDefaults.cardColors(containerColor = bg),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text(icon, fontSize = 20.sp)
+            Spacer(Modifier.height(6.dp))
+            Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(subtitle, color = Color.White.copy(alpha = 0.9f), fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+private fun StudioDashKpiCard(
+    modifier: Modifier,
+    icon: String,
+    title: String,
+    value: String,
+    sub: String,
+    bg: Color,
+    accent: Color,
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(NxDimens.PanelRadius),
+        colors = CardDefaults.cardColors(containerColor = bg),
+        elevation = CardDefaults.cardElevation(0.dp),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(icon, fontSize = 18.sp)
+                Text(title, style = MaterialTheme.typography.labelMedium, color = accent)
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(value, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), color = StudioSlate)
+            Spacer(Modifier.height(2.dp))
+            Text(sub, style = MaterialTheme.typography.bodySmall, color = StudioMuted)
         }
     }
 }
 
 @Composable
 private fun SocialPreviewCard(post: SocialPostDto) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-        Column(Modifier.padding(14.dp)) {
+    NxPanelShell {
+        Column {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 StudioStatusChip(post.red ?: "Red")
                 StudioStatusChip(post.estado ?: "", StudioMuted)
             }
             Text(post.titulo ?: "Sin título", fontWeight = FontWeight.SemiBold)
-            if (!post.cuando.isNullOrBlank()) Text(post.cuando, style = MaterialTheme.typography.labelSmall, color = StudioMuted)
+            if (!post.cuando.isNullOrBlank()) {
+                Text(post.cuando, style = MaterialTheme.typography.labelSmall, color = StudioMuted)
+            }
         }
     }
 }

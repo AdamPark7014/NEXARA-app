@@ -22,6 +22,11 @@ final class OpsRepository {
         return ConsoleHelpers.decodeMap(try await api.patchJSON("client-ticket-requests/\(id)/status", body: Body(status: status)))
     }
 
+    func assignClientTicket(requestId: Int64, activityId: Int64) async throws -> [String: Any] {
+        struct Body: Encodable { let activityId: Int64 }
+        return ConsoleHelpers.decodeMap(try await api.patchJSON("client-ticket-requests/\(requestId)/assign", body: Body(activityId: activityId)))
+    }
+
     func approveRequisition(id: Int64) async throws -> [String: Any] {
         struct Empty: Encodable {}
         return ConsoleHelpers.decodeMap(try await api.patchJSON("procurement/requisitions/\(id)/approve", body: Empty()))

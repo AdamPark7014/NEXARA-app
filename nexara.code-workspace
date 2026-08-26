@@ -1,0 +1,51 @@
+{
+  "folders": [
+    {
+      "name": "🏠 NEXARA",
+      "path": "."
+    },
+    {
+      "name": "⚡ API · NestJS + Prisma",
+      "path": "apps/api"
+    },
+    {
+      "name": "🌐 Web · Next.js",
+      "path": "apps/web"
+    },
+    {
+      "name": "📱 Mobile · Android (Kotlin)",
+      "path": "apps/mobile-native/android"
+    },
+    {
+      "name": "📱 Mobile · iOS (Swift)",
+      "path": "apps/mobile-native/ios"
+    },
+    {
+      "name": "🐳 Deploy · Docker",
+      "path": "deploy"
+    },
+    {
+      "name": "📚 Docs",
+      "path": "docs"
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "apps": false
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "pkief.material-icon-theme",
+      "catppuccin.catppuccin-vsc",
+      "catppuccin.catppuccin-vsc-icons",
+      "prisma.prisma",
+      "esbenp.prettier-vscode",
+      "usernamehw.errorlens",
+      "yoavbls.pretty-ts-errors",
+      "eamodio.gitlens",
+      "fwcd.kotlin",
+      "swiftlang.swift-vscode"
+    ]
+  }
+}

@@ -4,16 +4,28 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTab
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxBottomTabBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ButtonDefaults
@@ -31,11 +44,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxNavAnimStyle
+import mx.nexara.mobile.nativeapp.ui.enterprise.nxComposable
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.ui.console.activities.ConsoleActivityDetailByIdScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleActivitiesScreen
+import mx.nexara.mobile.nativeapp.ui.console.screens.OpsNewActivityScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleAttendanceScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleClientsScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleDashboardScreen
@@ -55,9 +71,11 @@ import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleMoreScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.PlaceholderScreen
 import mx.nexara.mobile.nativeapp.access.ModulePanelMap
+import mx.nexara.mobile.nativeapp.access.DeepLinkNavigation
 import mx.nexara.mobile.nativeapp.access.PanelId
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxTealTopAppBarColors
 import mx.nexara.mobile.nativeapp.ui.contabilidad.ContabilidadNavHost
 
 private object ConsoleRoutes {
@@ -82,6 +100,8 @@ private object ConsoleRoutes {
     const val OfflineQueue = "console/offline-queue"
     const val More = "console/more"
     const val MyProfile = "console/my-profile"
+    const val ActivityDetail = "console/activity/{id}?tab={tab}"
+    const val NewActivity = "console/activities/new?requestId={requestId}"
     const val ModulePattern = "console/m/{key}"
     fun module(key: String) = "console/m/$key"
 }
@@ -89,7 +109,7 @@ private object ConsoleRoutes {
 data class ConsoleNavItem(
     val route: String,
     val label: String,
-    val iconText: String,
+    val icon: ImageVector,
 )
 
 private fun routeForModuleKey(key: String): String {
@@ -135,10 +155,20 @@ fun ConsoleNavHost(
         || roleLower.contains("contab")
     var showContabilidad by remember { mutableStateOf(false) }
     val navController = rememberNavController()
+    var chatChannelId by remember { mutableStateOf<Long?>(null) }
+    var chatMessageId by remember { mutableStateOf<Long?>(null) }
+    var viaticHighlightId by remember { mutableStateOf<Long?>(null) }
 
-    LaunchedEffect(panelId) {
-        val key = PendingDeepLink.consumeModuleFor(panelId) ?: return@LaunchedEffect
-        val target = routeForModuleKey(key)
+    val deepLinkSignal by PendingDeepLink.signal.collectAsState()
+    LaunchedEffect(panelId, deepLinkSignal) {
+        val link = PendingDeepLink.consumeModuleDestination(panelId) ?: return@LaunchedEffect
+        if (link.key == "chat") {
+            chatChannelId = DeepLinkNavigation.chatChannelId(link)
+            chatMessageId = DeepLinkNavigation.chatMessageId(link)
+        }
+        viaticHighlightId = DeepLinkNavigation.viaticHighlightId(link)
+        val entityRoute = DeepLinkNavigation.consoleRoute(link)
+        val target = entityRoute ?: routeForModuleKey(DeepLinkNavigation.consoleModuleKey(link))
         navController.navigate(target) { launchSingleTop = true }
     }
 
@@ -167,39 +197,39 @@ fun ConsoleNavHost(
 
         buildList {
             if (isVisible(ConsoleRoutes.Dashboard)) {
-                add(ConsoleNavItem(ConsoleRoutes.Dashboard, "Inicio", "📊"))
+                add(ConsoleNavItem(ConsoleRoutes.Dashboard, "Inicio", Icons.Default.Home))
             }
 
             if (isAdministrativo) {
                 if (isVisible(ConsoleRoutes.Attendance)) {
-                    add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", "🕒"))
+                    add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", Icons.Default.Schedule))
                 }
             } else if (isSuperAdmin || isAdmin) {
-                if (isVisible(ConsoleRoutes.Activities)) add(ConsoleNavItem(ConsoleRoutes.Activities, "Operación", "🗂️"))
-                if (isVisible(ConsoleRoutes.Evidences)) add(ConsoleNavItem(ConsoleRoutes.Evidences, "Evidencias", "📸"))
-                if (isVisible(ConsoleRoutes.Attendance)) add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", "🕒"))
+                if (isVisible(ConsoleRoutes.Activities)) add(ConsoleNavItem(ConsoleRoutes.Activities, "Operación", Icons.Default.Folder))
+                if (isVisible(ConsoleRoutes.Evidences)) add(ConsoleNavItem(ConsoleRoutes.Evidences, "Evidencias", Icons.Default.PhotoCamera))
+                if (isVisible(ConsoleRoutes.Attendance)) add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", Icons.Default.Schedule))
             } else if (isIngeniero) {
-                if (isVisible(ConsoleRoutes.MyActivities)) add(ConsoleNavItem(ConsoleRoutes.MyActivities, "Mis act.", "📋"))
-                if (isVisible(ConsoleRoutes.MyEvidences)) add(ConsoleNavItem(ConsoleRoutes.MyEvidences, "Mis evid.", "📸"))
+                if (isVisible(ConsoleRoutes.MyActivities)) add(ConsoleNavItem(ConsoleRoutes.MyActivities, "Mis act.", Icons.Default.Assignment))
+                if (isVisible(ConsoleRoutes.MyEvidences)) add(ConsoleNavItem(ConsoleRoutes.MyEvidences, "Mis evid.", Icons.Default.PhotoCamera))
                 if (isVisible(ConsoleRoutes.Attendance)) {
-                    add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", "🕒"))
+                    add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", Icons.Default.Schedule))
                 } else if (isVisible(ConsoleRoutes.Gps)) {
-                    add(ConsoleNavItem(ConsoleRoutes.Gps, "GPS", "🗺️"))
+                    add(ConsoleNavItem(ConsoleRoutes.Gps, "GPS", Icons.Default.Map))
                 }
             } else {
-                if (isVisible(ConsoleRoutes.MyActivities)) add(ConsoleNavItem(ConsoleRoutes.MyActivities, "Mis act.", "📋"))
-                if (isVisible(ConsoleRoutes.MyEvidences)) add(ConsoleNavItem(ConsoleRoutes.MyEvidences, "Mis evid.", "📸"))
+                if (isVisible(ConsoleRoutes.MyActivities)) add(ConsoleNavItem(ConsoleRoutes.MyActivities, "Mis act.", Icons.Default.Assignment))
+                if (isVisible(ConsoleRoutes.MyEvidences)) add(ConsoleNavItem(ConsoleRoutes.MyEvidences, "Mis evid.", Icons.Default.PhotoCamera))
                 if (isVisible(ConsoleRoutes.Attendance)) {
-                    add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", "🕒"))
+                    add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", Icons.Default.Schedule))
                 } else if (isVisible(ConsoleRoutes.Gps)) {
-                    add(ConsoleNavItem(ConsoleRoutes.Gps, "GPS", "🗺️"))
+                    add(ConsoleNavItem(ConsoleRoutes.Gps, "GPS", Icons.Default.Map))
                 }
             }
 
             if (isEmpty()) {
-                add(ConsoleNavItem(ConsoleRoutes.Dashboard, "Inicio", "📊"))
+                add(ConsoleNavItem(ConsoleRoutes.Dashboard, "Inicio", Icons.Default.Home))
             }
-            add(ConsoleNavItem(ConsoleRoutes.More, "Más", "🧭"))
+            add(ConsoleNavItem(ConsoleRoutes.More, "Más", Icons.Default.Menu))
         }
     }
     val startRoute = remember(items) {
@@ -225,6 +255,13 @@ fun ConsoleNavHost(
             ConsoleRoutes.OfflineQueue -> "Cola offline"
             ConsoleRoutes.More -> "Todos los módulos"
             ConsoleRoutes.MyProfile -> "Mi perfil"
+            ConsoleRoutes.ToolsInventory -> "Inventario de herramientas"
+            ConsoleRoutes.ToolsMyKit -> "Mi kit"
+            ConsoleRoutes.ToolsKitsUsers -> "Kits y usuarios"
+            ConsoleRoutes.ToolsRenewals -> "Renovaciones"
+            ConsoleRoutes.Clients -> "Clientes"
+            ConsoleRoutes.Projects -> "Proyectos"
+            ConsoleRoutes.ActivityDetail -> "Detalle de actividad"
             ConsoleRoutes.ModulePattern -> {
                 val key = backStackEntry?.arguments?.getString("key").orEmpty()
                 ModuleCatalog.console.firstOrNull { it.key == key }?.label ?: "Módulo"
@@ -233,10 +270,31 @@ fun ConsoleNavHost(
         }
     }
 
+    val tabRoutes = remember(items) { items.map { it.route }.toSet() }
+    val showBack = currentDestination?.route != null && currentDestination.route !in tabRoutes
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(currentTitle, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)) },
+                title = {
+                    Text(
+                        currentTitle,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = Color.White,
+                    )
+                },
+                colors = NxTealTopAppBarColors(),
+                navigationIcon = {
+                    if (showBack) {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Volver",
+                                tint = Color.White,
+                            )
+                        }
+                    }
+                },
                 actions = {
                     FilledTonalButton(
                         onClick = { showLogoutDialog = true },
@@ -245,7 +303,9 @@ fun ConsoleNavHost(
                             contentColor = Color(0xFFDC2626),
                         ),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                        modifier = androidx.compose.ui.Modifier.padding(end = 8.dp).size(width = 100.dp, height = 34.dp),
+                        modifier = androidx.compose.ui.Modifier
+                            .padding(end = 8.dp)
+                            .heightIn(min = 48.dp),
                     ) {
                         Text("Salir", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
                     }
@@ -253,23 +313,15 @@ fun ConsoleNavHost(
             )
         },
         bottomBar = {
-            NavigationBar {
-                items.forEach { item ->
-                    val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
-                    NavigationBarItem(
-                        selected = selected,
-                        onClick = {
-                            navController.navigate(item.route) {
-                                launchSingleTop = true
-                            }
-                        },
-                        icon = {
-                            Text(item.iconText, style = MaterialTheme.typography.titleMedium)
-                        },
-                        label = { Text(item.label) },
-                    )
-                }
-            }
+            NxBottomTabBar(
+                tabs = items.map { NxBottomTab(it.route, it.icon, it.label) },
+                isSelected = { route ->
+                    currentDestination?.hierarchy?.any { it.route == route } == true
+                },
+                onTabSelected = { route ->
+                    navController.navigate(route) { launchSingleTop = true }
+                },
+            )
         }
     ) { inner ->
         NavHost(
@@ -277,40 +329,52 @@ fun ConsoleNavHost(
             startDestination = startRoute,
             modifier = Modifier.padding(inner),
         ) {
-            composable(ConsoleRoutes.Dashboard) {
+            nxComposable(ConsoleRoutes.Dashboard) {
                 ConsoleDashboardScreen(
                     isOps = panelId == PanelId.OPS,
                     onOpenModule = { key ->
-                        navController.navigate(ConsoleRoutes.module(key)) { launchSingleTop = true }
+                        navController.navigate(routeForModuleKey(key)) { launchSingleTop = true }
                     },
                 )
             }
-            composable(ConsoleRoutes.Activities) {
-                // Combined view: admins see team + personal; normal users see only personal
-                ConsoleActivitiesScreen(title = "Actividades")
+            nxComposable(ConsoleRoutes.Activities) {
+                ConsoleActivitiesScreen(
+                    title = "Actividades",
+                    onNewOt = { navController.navigate("console/activities/new?requestId=-1") { launchSingleTop = true } },
+                )
             }
-            composable(ConsoleRoutes.MyActivities) {
+            nxComposable(ConsoleRoutes.NewActivity, style = NxNavAnimStyle.Modal) { entry ->
+                val rid = entry.arguments?.getString("requestId")?.toLongOrNull()
+                OpsNewActivityScreen(
+                    requestId = if (rid != null && rid > 0) rid else null,
+                    onBack = { navController.popBackStack() },
+                    onCreated = { id ->
+                        navController.navigate("console/activity/$id") { launchSingleTop = true }
+                    },
+                )
+            }
+            nxComposable(ConsoleRoutes.MyActivities) {
                 // My-activities route: shows only personal section (non-admin users)
                 ConsoleActivitiesScreen(title = "Mis actividades")
             }
-            composable(ConsoleRoutes.Evidences) {
+            nxComposable(ConsoleRoutes.Evidences) {
                 // Combined view: admins see team review + personal; normal users see only personal
                 ConsoleEvidencesScreen(mode = "combined")
             }
-            composable(ConsoleRoutes.MyEvidences) {
+            nxComposable(ConsoleRoutes.MyEvidences) {
                 // Dedicated personal evidences route
                 ConsoleEvidencesScreen(mode = "user")
             }
-            composable(ConsoleRoutes.Viatics) {
-                ConsoleViaticsScreen()
+            nxComposable(ConsoleRoutes.Viatics) {
+                ConsoleViaticsScreen(initialHighlightId = viaticHighlightId)
             }
-            composable(ConsoleRoutes.Vehicles) {
+            nxComposable(ConsoleRoutes.Vehicles) {
                 ConsoleVehiclesScreen()
             }
-            composable(ConsoleRoutes.Gps) {
+            nxComposable(ConsoleRoutes.Gps) {
                 ConsoleGpsScreen()
             }
-            composable(ConsoleRoutes.Tools) {
+            nxComposable(ConsoleRoutes.Tools) {
                 ConsoleToolsScreen(
                     onOpenInventory = { navController.navigate(ConsoleRoutes.ToolsInventory) { launchSingleTop = true } },
                     onOpenMyKit = { navController.navigate(ConsoleRoutes.ToolsMyKit) { launchSingleTop = true } },
@@ -318,31 +382,31 @@ fun ConsoleNavHost(
                     onOpenRenewals = { navController.navigate(ConsoleRoutes.ToolsRenewals) { launchSingleTop = true } },
                 )
             }
-            composable(ConsoleRoutes.ToolsInventory) {
+            nxComposable(ConsoleRoutes.ToolsInventory, style = NxNavAnimStyle.Push) {
                 ConsoleToolInventoryScreen(onBack = { navController.popBackStack() })
             }
-            composable(ConsoleRoutes.ToolsMyKit) {
+            nxComposable(ConsoleRoutes.ToolsMyKit, style = NxNavAnimStyle.Push) {
                 ConsoleToolMyKitScreen(onBack = { navController.popBackStack() })
             }
-            composable(ConsoleRoutes.ToolsRenewals) {
+            nxComposable(ConsoleRoutes.ToolsRenewals, style = NxNavAnimStyle.Push) {
                 ConsoleToolRenewalsScreen(onBack = { navController.popBackStack() })
             }
-            composable(ConsoleRoutes.ToolsKitsUsers) {
+            nxComposable(ConsoleRoutes.ToolsKitsUsers, style = NxNavAnimStyle.Push) {
                 ConsoleToolsKitsUsersScreen(onBack = { navController.popBackStack() })
             }
-            composable(ConsoleRoutes.Clients) {
+            nxComposable(ConsoleRoutes.Clients) {
                 ConsoleClientsScreen()
             }
-            composable(ConsoleRoutes.Projects) {
+            nxComposable(ConsoleRoutes.Projects) {
                 ConsoleProjectsScreen()
             }
-            composable(ConsoleRoutes.Users) {
+            nxComposable(ConsoleRoutes.Users) {
                 ConsoleUsersScreen()
             }
-            composable(ConsoleRoutes.Attendance) {
+            nxComposable(ConsoleRoutes.Attendance) {
                 ConsoleAttendanceScreen()
             }
-            composable(ConsoleRoutes.Settings) {
+            nxComposable(ConsoleRoutes.Settings) {
                 ConsoleSettingsScreen(
                     onExitToPanels = onExitToPanels,
                     onOpenOfflineQueue = {
@@ -350,10 +414,10 @@ fun ConsoleNavHost(
                     },
                 )
             }
-            composable(ConsoleRoutes.OfflineQueue) {
+            nxComposable(ConsoleRoutes.OfflineQueue) {
                 mx.nexara.mobile.nativeapp.ui.shared.OfflineQueueScreen()
             }
-            composable(ConsoleRoutes.More) {
+            nxComposable(ConsoleRoutes.More) {
                 ConsoleMoreScreen(
                     modules = visibleModules,
                     groups = sidebarGroups,
@@ -375,26 +439,118 @@ fun ConsoleNavHost(
                     onLogout = { showLogoutDialog = true },
                 )
             }
-            composable(ConsoleRoutes.MyProfile) {
+            nxComposable(ConsoleRoutes.MyProfile) {
                 MyProfileScreen(
                     onOpenOfflineQueue = {
                         navController.navigate(ConsoleRoutes.OfflineQueue) { launchSingleTop = true }
                     },
                 )
             }
-            composable(ConsoleRoutes.ModulePattern) { backStack ->
+            nxComposable(ConsoleRoutes.ActivityDetail, style = NxNavAnimStyle.Push) { entry ->
+                val id = entry.arguments?.getString("id")?.toLongOrNull() ?: return@nxComposable
+                val tab = entry.arguments?.getString("tab").orEmpty().ifBlank { null }
+                ConsoleActivityDetailByIdScreen(
+                    activityId = id,
+                    onBack = { navController.popBackStack() },
+                    initialTabKey = tab,
+                    onOpenGps = {
+                        navController.navigate(ConsoleRoutes.Gps) { launchSingleTop = true }
+                    },
+                )
+            }
+            nxComposable(ConsoleRoutes.ModulePattern, style = NxNavAnimStyle.Push) { backStack ->
                 val key = backStack.arguments?.getString("key").orEmpty()
                 val m = ModuleCatalog.console.firstOrNull { it.key == key }
                 // Despachar a pantallas nativas ya implementadas para este módulo.
                 val handled: @androidx.compose.runtime.Composable () -> Unit = when (key) {
+                    "dashboard" -> { {
+                        ConsoleDashboardScreen(
+                            isOps = panelId == PanelId.OPS,
+                            onOpenModule = { k ->
+                                navController.navigate(routeForModuleKey(k)) { launchSingleTop = true }
+                            },
+                        )
+                    } }
+                    "activities" -> { { ConsoleActivitiesScreen(title = "Actividades") } }
+                    "my-activities" -> { { ConsoleActivitiesScreen(title = "Mis actividades") } }
+                    "evidences" -> { { ConsoleEvidencesScreen(mode = "combined") } }
+                    "my-evidences" -> { { ConsoleEvidencesScreen(mode = "user") } }
+                    "viatics" -> { { ConsoleViaticsScreen(initialHighlightId = viaticHighlightId) } }
+                    "vehicles" -> { { ConsoleVehiclesScreen() } }
+                    "gps" -> { { ConsoleGpsScreen() } }
+                    "tools" -> { {
+                        ConsoleToolsScreen(
+                            onOpenInventory = { navController.navigate(ConsoleRoutes.ToolsInventory) { launchSingleTop = true } },
+                            onOpenMyKit = { navController.navigate(ConsoleRoutes.ToolsMyKit) { launchSingleTop = true } },
+                            onOpenKitsUsers = { navController.navigate(ConsoleRoutes.ToolsKitsUsers) { launchSingleTop = true } },
+                            onOpenRenewals = { navController.navigate(ConsoleRoutes.ToolsRenewals) { launchSingleTop = true } },
+                        )
+                    } }
+                    "clients" -> { { ConsoleClientsScreen() } }
+                    "projects" -> { { ConsoleProjectsScreen() } }
+                    "users" -> { { ConsoleUsersScreen() } }
+                    "attendance" -> { { ConsoleAttendanceScreen() } }
+                    "settings" -> { {
+                        ConsoleSettingsScreen(
+                            onExitToPanels = onExitToPanels,
+                            onOpenOfflineQueue = {
+                                navController.navigate(ConsoleRoutes.OfflineQueue) { launchSingleTop = true }
+                            },
+                        )
+                    } }
+                    "offline-queue", "offline" -> { { mx.nexara.mobile.nativeapp.ui.shared.OfflineQueueScreen() } }
+                    "my-profile" -> { {
+                        MyProfileScreen(
+                            onOpenOfflineQueue = {
+                                navController.navigate(ConsoleRoutes.OfflineQueue) { launchSingleTop = true }
+                            },
+                        )
+                    } }
                     "news" -> { { mx.nexara.mobile.nativeapp.ui.modules.NewsModuleScreen() } }
                     "contact-messages" -> { { mx.nexara.mobile.nativeapp.ui.modules.ContactMessagesModuleScreen() } }
                     "newsletter" -> { { mx.nexara.mobile.nativeapp.ui.modules.NewsletterModuleScreen() } }
                     "audit" -> { { mx.nexara.mobile.nativeapp.ui.modules.AuditModuleScreen() } }
                     "analytics", "bi" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ErpBiScreen() } }
-                    "executive" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ExecutiveScreen() } }
+                    "executive" -> { {
+                        mx.nexara.mobile.nativeapp.ui.console.screens.ExecutiveScreen(
+                            onOpenModule = { k ->
+                                navController.navigate(routeForModuleKey(k)) { launchSingleTop = true }
+                            },
+                        )
+                    } }
+                    "dispatch" -> { {
+                        mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleDispatchScreen(
+                            onOpenActivity = { id ->
+                                navController.navigate("console/activity/$id") { launchSingleTop = true }
+                            },
+                        )
+                    } }
                     "approvals" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ApprovalsScreen() } }
-                    "notifications-center" -> { { mx.nexara.mobile.nativeapp.ui.shared.NotificationsScreen(onBack = { navController.popBackStack() }) } }
+                    "notifications-center" -> { {
+                        mx.nexara.mobile.nativeapp.ui.shared.NotificationsScreen(
+                            onBack = { navController.popBackStack() },
+                            onOpenDestination = { dest ->
+                                when (dest) {
+                                    is mx.nexara.mobile.nativeapp.access.DeepLinkDestination.Module -> {
+                                        if (dest.panel == panelId) {
+                                            navController.navigate(routeForModuleKey(dest.key)) { launchSingleTop = true }
+                                        } else {
+                                            PendingDeepLink.destination = dest
+                                            onExitToPanels()
+                                        }
+                                    }
+                                    else -> Unit
+                                }
+                            },
+                        )
+                    } }
+                    "chat" -> { {
+                        mx.nexara.mobile.nativeapp.ui.chat.ChatScreen(
+                            onBack = { navController.popBackStack() },
+                            initialChannelId = chatChannelId,
+                            initialMessageId = chatMessageId,
+                        )
+                    } }
                     "noc" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.NocModuleScreen() } }
                     "support-sla" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.SlaModuleScreen() } }
                     "support" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ClientTicketsModuleScreen() } }
@@ -420,7 +576,13 @@ fun ConsoleNavHost(
                     "banking" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.BankingRichScreen() } }
                     "my-viatics" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyViaticsScreen() } }
                     "my-vehicles" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyVehiclesScreen() } }
-                    "my-preferences" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyPreferencesScreen() } }
+                    "my-preferences" -> { {
+                        mx.nexara.mobile.nativeapp.ui.modules.MyPreferencesScreen(
+                            onOpenOfflineQueue = {
+                                navController.navigate(ConsoleRoutes.OfflineQueue) { launchSingleTop = true }
+                            },
+                        )
+                    } }
                     "work-projects" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.WorkProjectsRichScreen() } }
                     "hr" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.HrLeavesScreen() } }
                     "warehouse" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.WarehouseHubScreen(initialTab = 1) } }
@@ -437,8 +599,11 @@ fun ConsoleNavHost(
                     else -> { {} }
                 }
                 if (key in setOf(
-                        "news","contact-messages","newsletter","audit","analytics","bi","executive","approvals",
-                        "notifications-center","noc","support-sla","support","maintenance-contracts",
+                        "dashboard", "activities", "my-activities", "evidences", "my-evidences",
+                        "viatics", "vehicles", "gps", "tools", "clients", "projects", "users",
+                        "attendance", "settings", "offline-queue", "offline", "my-profile",
+                        "news","contact-messages","newsletter","audit","analytics","bi","executive","dispatch","approvals",
+                        "notifications-center","chat","noc","support-sla","support","maintenance-contracts",
                         "companies","kb","exports","architecture","calendar","orgchart","kpis-hr",
                         "expenses",
                         "fines","employee-payments","cotizaciones","lunch-breaks","my-lunch-breaks",
@@ -449,14 +614,14 @@ fun ConsoleNavHost(
                         "gestion-vendedores",
                     )) {
                     handled()
-                    return@composable
+                    return@nxComposable
                 }
                 PlaceholderScreen(
                     title = m?.label ?: "Módulo",
-                    subtitle = (m?.webPath ?: "") + "\n\nImplementación nativa pendiente.",
-                    contentPadding = PaddingValues(20.dp),
-                    primaryActionText = "Volver",
-                    onPrimaryAction = { navController.popBackStack() },
+                    moduleKey = key,
+                    webPath = m?.webPath,
+                    icon = m?.icon,
+                    onBack = { navController.popBackStack() },
                 )
             }
         }

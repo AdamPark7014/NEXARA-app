@@ -52,8 +52,10 @@ object ModuleCatalog {
         ModuleEntry("cotizaciones", "Cotizaciones", "🧮", "/console/cotizaciones", nativeImplemented = true),
         ModuleEntry("gestion-vendedores", "Gestión vendedores", "📈", "/console/gestion-vendedores", nativeImplemented = true),
         ModuleEntry("executive", "Vista ejecutiva", "📊", "/erp/executive", nativeImplemented = true),
+        ModuleEntry("dispatch", "Despacho OT", "🗺️", "/ops/dispatch", nativeImplemented = true),
         ModuleEntry("approvals", "Aprobaciones", "🛡️", "/erp/approvals", nativeImplemented = true),
         ModuleEntry("notifications-center", "Notificaciones", "🔔", "/erp/notifications-center", nativeImplemented = true),
+        ModuleEntry("chat", "Chat", "💬", "/erp/chat", nativeImplemented = true),
         ModuleEntry("bi", "Business Intelligence", "📈", "/erp/analytics/bi", nativeImplemented = true),
         ModuleEntry("analytics", "Analítica", "📈", "/console/analytics", nativeImplemented = true),
         ModuleEntry("audit", "Auditoría", "🔍", "/console/audit", nativeImplemented = true),
@@ -94,6 +96,7 @@ object ModuleCatalog {
         ModuleEntry("leads", "Leads", "📥", "/ventas/leads", nativeImplemented = true),
         ModuleEntry("oportunidades", "Oportunidades", "🎯", "/ventas/oportunidades", nativeImplemented = true),
         ModuleEntry("cotizaciones", "Cotizaciones", "🧮", "/ventas/cotizaciones", nativeImplemented = true),
+        ModuleEntry("smart-quote", "Cotizador inteligente", "✨", "/ventas/cotizaciones/nueva", nativeImplemented = true),
         ModuleEntry("productos", "Catálogo IT/CCTV", "📦", "/ventas/productos", nativeImplemented = true),
         ModuleEntry("clientes", "Clientes", "🤝", "/ventas/clientes", nativeImplemented = true),
         ModuleEntry("proyectos", "Proyectos", "🧩", "/ventas/proyectos", nativeImplemented = true),
@@ -107,6 +110,7 @@ object ModuleCatalog {
         ModuleEntry("crecimiento", "Crecimiento", "📈", "/ventas/crecimiento", nativeImplemented = true),
         ModuleEntry("reportes", "Reportes", "📑", "/ventas/reportes", nativeImplemented = true),
         ModuleEntry("notificaciones", "Notificaciones", "🔔", "/ventas/notificaciones", nativeImplemented = true),
+        ModuleEntry("chat", "Chat equipo", "💬", "/erp/chat", nativeImplemented = true),
         ModuleEntry("my-profile", "Mi perfil", "👤", "/ventas/my-profile", nativeImplemented = true),
     )
 
@@ -124,6 +128,7 @@ object ModuleCatalog {
         ModuleEntry("proyectos", "Proyectos", "🧩", "/contabilidad/proyectos", nativeImplemented = true),
         ModuleEntry("work-projects", "Proyectos internos", "🧱", "/contabilidad/work-projects", nativeImplemented = true),
         ModuleEntry("multas", "Multas", "⚠️", "/contabilidad/multas", nativeImplemented = true),
+        ModuleEntry("chat", "Chat equipo", "💬", "/erp/chat", nativeImplemented = true),
     )
 
     /** Módulos del panel STUDIO (paridad web rutas /studio). */
@@ -137,6 +142,7 @@ object ModuleCatalog {
         ModuleEntry("newsletter", "Newsletter", "📬", "/studio/newsletter", nativeImplemented = true),
         ModuleEntry("contacts", "Contactos", "✉️", "/studio/contacts", nativeImplemented = true),
         ModuleEntry("leads", "Leads", "✨", "/studio/leads", nativeImplemented = true),
+        ModuleEntry("chat", "Chat equipo", "💬", "/erp/chat", nativeImplemented = true),
     )
 
     /** Alias legacy mobile → studio. */
@@ -147,5 +153,6 @@ object ModuleCatalog {
         ModuleEntry("health", "API Health", "❤️", "/lab/health", nativeImplemented = true),
         ModuleEntry("flags", "Feature flags", "🚩", "/lab/flags", nativeImplemented = true),
         ModuleEntry("ai", "AI Sandbox", "🤖", "/lab/ai", nativeImplemented = true),
+        ModuleEntry("chat", "Chat del equipo", "💬", "/lab/chat", nativeImplemented = true),
     )
 }

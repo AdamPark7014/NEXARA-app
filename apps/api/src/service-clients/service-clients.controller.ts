@@ -134,7 +134,18 @@ export class ServiceClientsController {
 
   /** Vista 360° del cliente: agregaciones cross-módulo + timeline. */
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.SALES_VIEW,
+      PERMISSIONS.SALES_MANAGE,
+      PERMISSIONS.PANEL_VENTAS,
+      PERMISSIONS.SUPPORT_VIEW,
+      PERMISSIONS.ACTIVITIES_MANAGE,
+      PERMISSIONS.INVOICING_VIEW,
+      PERMISSIONS.CONTABILIDAD_VIEW,
+    ],
+  })
   @Get(':id/snapshot')
   snapshot(
     @Param('id', ParseIntPipe) id: number,

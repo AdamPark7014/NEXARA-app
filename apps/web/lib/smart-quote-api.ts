@@ -1,4 +1,10 @@
 import { buildApiUrl } from "@/lib/api-base";
+import {
+  fulfillmentOptionsFromStockRows,
+  leadTimeForFulfillment,
+  suggestApiWarehouseFromRows,
+  warehouseApiLabel,
+} from "@/lib/ct-warehouse-labels";
 
 export type OptimizeMode = "PRICE" | "SPEED" | "MARGIN" | "PREMIUM" | "BALANCE";
 
@@ -69,6 +75,8 @@ export type QuoteLinePayload = {
   laborHours?: number;
   laborRate?: number;
   deliveryTime?: string | null;
+  supplierWarehouseCode?: string | null;
+  stockByWarehouse?: Array<{ code: string; qty: number; label?: string; city?: string }>;
 };
 
 async function sqRequest<T>(
@@ -304,11 +312,20 @@ export function offerToLine(
   qty = 1,
   optimize: OptimizeMode = "BALANCE",
   targetMarginPercent?: number,
+  preferredCatalogCodes: string[] = [],
 ): QuoteLinePayload {
   const margin = targetMarginPercent ?? offer.marginPercent ?? 30;
   const unitCost = offer.costMxn;
   const unitPrice =
     targetMarginPercent != null ? sellFromCost(unitCost, margin) : offer.sellPriceSuggested;
+  const stockRows = offer.stockByWarehouse;
+  const fulfillmentOpts = fulfillmentOptionsFromStockRows(stockRows, preferredCatalogCodes);
+  const apiWh = suggestApiWarehouseFromRows(stockRows, preferredCatalogCodes);
+  const selectedOpt =
+    fulfillmentOpts.find((o) => o.apiCode === apiWh) ||
+    fulfillmentOpts[0] ||
+    ({ apiCode: apiWh, label: warehouseApiLabel(apiWh), qty: offer.stockTotal, local: true } as const);
+  const { days, deliveryTime } = leadTimeForFulfillment(selectedOpt);
   return {
     productCtId: offer.id,
     category: offer.categoria || "CT",
@@ -324,14 +341,16 @@ export function offerToLine(
     unitCost,
     supplierSku: offer.clave,
     supplierCode: "CT",
+    supplierWarehouseCode: apiWh,
+    stockByWarehouse: stockRows,
     marginPercent: margin,
     stockSnapshot: offer.stockTotal,
-    leadTimeDays: offer.leadTimeDays,
+    leadTimeDays: days,
     scoreReason: offer.badges[0] || "RECOMMENDED",
     optimizationMode: optimize,
     discount: 0,
     tax: CT_IVA_PERCENT,
-    deliveryTime: offer.leadTimeDays <= 1 ? "Inmediata" : `${offer.leadTimeDays} días`,
+    deliveryTime,
   };
 }
 
@@ -358,6 +377,10 @@ export type CtOrderPreview = {
     lineCost: number;
     lineSell: number;
     marginPercent: number | null;
+    supplierWarehouseCode: string | null;
+    almacenLabel: string | null;
+    stockAtWarehouse: number | null;
+    stockOk: boolean;
   }>;
   subtotalCost: number;
   subtotalSell: number;
@@ -366,6 +389,9 @@ export type CtOrderPreview = {
   defaultEnvio: CtEnvioForm | null;
   config: { apiConfigured: boolean; defaultAlmacen: string; warehouses: Array<{ code: string; label: string }> };
   existingOrders: SupplierPurchaseOrderRow[];
+  suggestedAlmacen: string;
+  warehouseMismatch: boolean;
+  stockWarnings: string[];
 };
 
 export type SupplierPurchaseOrderRow = {

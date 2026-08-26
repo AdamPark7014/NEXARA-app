@@ -4,7 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,8 +23,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,12 +32,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +55,12 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.HeroSlideDto
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.data.studio.StudioRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 
 data class HeroEditorState(
     val altText: String = "",
@@ -69,6 +72,7 @@ data class HeroEditorState(
 
 data class StudioHeroUiState(
     val loading: Boolean = true,
+    val refreshing: Boolean = false,
     val saving: Boolean = false,
     val error: String? = null,
     val message: String? = null,
@@ -85,14 +89,17 @@ class StudioHeroViewModel(app: Application) : AndroidViewModel(app) {
 
     init { refresh() }
 
-    fun refresh() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun refresh(pullToRefresh: Boolean = false) {
+        _state.update {
+            if (pullToRefresh) it.copy(refreshing = true, error = null)
+            else it.copy(loading = true, error = null)
+        }
         viewModelScope.launch {
             try {
                 val list = withContext(Dispatchers.IO) { repo.heroSlides() }
-                _state.update { it.copy(loading = false, slides = list.sortedBy { s -> s.position ?: 0 }) }
+                _state.update { it.copy(loading = false, refreshing = false, slides = list.sortedBy { s -> s.position ?: 0 }) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message ?: "Error al cargar carrusel") }
+                _state.update { it.copy(loading = false, refreshing = false, error = e.message ?: "Error al cargar carrusel") }
             }
         }
     }
@@ -187,6 +194,7 @@ class StudioHeroViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudioHeroScreen(onBack: () -> Unit, vm: StudioHeroViewModel = viewModel()) {
     val ui by vm.state.collectAsState()
@@ -200,7 +208,11 @@ fun StudioHeroScreen(onBack: () -> Unit, vm: StudioHeroViewModel = viewModel()) 
             onBack = vm::closeEditor,
         ) { inner ->
             Column(
-                modifier = Modifier.fillMaxSize().padding(inner).padding(16.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(NxColors.Surface)
+                    .padding(inner)
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 val previewUrl = ui.editor.imageUri?.toString()
@@ -258,27 +270,67 @@ fun StudioHeroScreen(onBack: () -> Unit, vm: StudioHeroViewModel = viewModel()) 
             }
         },
     ) { inner ->
-        when {
-            ui.loading -> StudioLoadingBox()
-            ui.error != null && ui.slides.isEmpty() -> StudioErrorState(ui.error!!, onRetry = vm::refresh)
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(inner),
+        PullToRefreshBox(
+            isRefreshing = ui.refreshing,
+            onRefresh = { vm.refresh(pullToRefresh = true) },
+            modifier = Modifier
+                .fillMaxSize()
+                .background(NxColors.Surface)
+                .padding(inner),
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                ui.message?.let { item { Text(it, color = StudioAccent) } }
-                if (ui.slides.isEmpty()) {
-                    item { StudioEmptyState("Sin slides", "Toca + para agregar el primer slide del carrusel.") }
-                }
-                items(ui.slides, key = { it.id }) { slide ->
-                    HeroSlideCard(
-                        slide = slide,
-                        onEdit = { vm.openEdit(slide) },
-                        onDelete = { vm.delete(slide.id) },
-                        onUp = { vm.move(slide.id, -1) },
-                        onDown = { vm.move(slide.id, 1) },
+                item {
+                    NxSectionHeader(
+                        "Carrusel inicio",
+                        "Slides del hero público",
+                        trailing = if (ui.slides.isNotEmpty()) {
+                            { Text("${ui.slides.size} slides", style = MaterialTheme.typography.labelSmall, color = StudioMuted) }
+                        } else {
+                            null
+                        },
                     )
                 }
+
+                ui.message?.let { msg ->
+                    item { Text(msg, color = StudioAccent, style = MaterialTheme.typography.bodySmall) }
+                }
+
+                if (ui.loading && !ui.refreshing) {
+                    item { NxLoadingBlock("Cargando carrusel…") }
+                    return@LazyColumn
+                }
+
+                if (!ui.error.isNullOrBlank() && ui.slides.isEmpty()) {
+                    item { NxErrorBlock(ui.error!!, onRetry = { vm.refresh() }) }
+                    return@LazyColumn
+                }
+
+                if (ui.slides.isEmpty()) {
+                    item {
+                        NxEmptyState(
+                            title = "Sin slides",
+                            subtitle = "Toca + para agregar el primer slide del carrusel.",
+                            actionLabel = "Nuevo slide",
+                            onAction = vm::openCreate,
+                        )
+                    }
+                } else {
+                    items(ui.slides, key = { it.id }) { slide ->
+                        HeroSlideCard(
+                            slide = slide,
+                            onEdit = { vm.openEdit(slide) },
+                            onDelete = { vm.delete(slide.id) },
+                            onUp = { vm.move(slide.id, -1) },
+                            onDown = { vm.move(slide.id, 1) },
+                        )
+                    }
+                }
+
+                item { Spacer(Modifier.height(24.dp)) }
             }
         }
     }
@@ -292,12 +344,8 @@ private fun HeroSlideCard(
     onUp: () -> Unit,
     onDown: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onEdit),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    ) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+    NxPanelShell(onClick = onEdit) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
                 model = toAbsoluteAssetUrl(slide.imageUrl),
                 contentDescription = slide.altText,
@@ -305,7 +353,7 @@ private fun HeroSlideCard(
                 contentScale = ContentScale.Crop,
             )
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text(slide.caption ?: slide.altText ?: "Slide #${slide.id}", fontWeight = FontWeight.SemiBold)
+                Text(slide.caption ?: slide.altText ?: "Slide #${slide.id}", fontWeight = FontWeight.SemiBold, color = NxColors.Slate)
                 Text(
                     listOfNotNull(
                         slide.href?.takeIf { it.isNotBlank() }?.let { "→ $it" },

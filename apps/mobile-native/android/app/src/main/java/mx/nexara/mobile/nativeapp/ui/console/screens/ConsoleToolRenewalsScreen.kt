@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ToolRenewalDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 
 data class RenewalsUiState(
     val isLoading: Boolean = true,
@@ -115,7 +116,7 @@ fun ConsoleToolRenewalsScreen(
         Spacer(modifier = Modifier.height(10.dp))
 
         if (state.isLoading) {
-            Text("Cargando...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            NxLoadingBlock("Cargando renovaciones…")
             return@Column
         }
         if (!state.error.isNullOrBlank()) {

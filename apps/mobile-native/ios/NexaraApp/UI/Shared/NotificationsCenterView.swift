@@ -9,6 +9,8 @@ struct NotificationsCenterView: View {
     @State private var saving = false
     @State private var error: String?
     @State private var message: String?
+    @State private var showFeed = false
+    @State private var feedItems: [[String: Any]] = []
 
     private var unread: Int {
         rows.filter { ($0["isRead"] as? Bool) != true }.count
@@ -16,6 +18,14 @@ struct NotificationsCenterView: View {
 
     var body: some View {
         List {
+            Section {
+                Picker("Vista", selection: $showFeed) {
+                    Text("Bandeja").tag(false)
+                    Text("Feed").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .listRowInsets(EdgeInsets())
+            }
             if let message {
                 Section {
                     Text(message).foregroundColor(.green).font(.footnote)
@@ -27,8 +37,26 @@ struct NotificationsCenterView: View {
                     Button("Reintentar") { Task { await load() } }
                 }
             }
-            if isLoading && rows.isEmpty {
+            if isLoading && rows.isEmpty && !showFeed {
                 Section { ProgressView() }
+            } else if showFeed {
+                if feedItems.isEmpty && error == nil {
+                    Section {
+                        Text("Sin actividad reciente").foregroundColor(.secondary)
+                    }
+                } else {
+                    Section("Feed de actividad") {
+                        ForEach(feedItems.indices, id: \.self) { idx in
+                            let item = feedItems[idx]
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(ConsoleHelpers.mapStr(item, "title").isEmpty ? "Evento" : ConsoleHelpers.mapStr(item, "title"))
+                                    .font(.subheadline.bold())
+                                let sub = ConsoleHelpers.mapStr(item, "subtitle")
+                                if !sub.isEmpty { Text(sub).font(.caption).foregroundColor(.secondary) }
+                            }
+                        }
+                    }
+                }
             } else if rows.isEmpty && error == nil {
                 Section {
                     VStack(spacing: 8) {
@@ -79,6 +107,9 @@ struct NotificationsCenterView: View {
             await load()
             await NotificationsBadgeStore.shared.refresh()
         }
+        .onChange(of: showFeed) { _, newValue in
+            if newValue { Task { await loadFeed() } }
+        }
         .onReceive(RealtimeBus.shared.events) { event in
             let model = event.model?.lowercased() ?? ""
             guard model.isEmpty || model == "notification" else { return }
@@ -128,6 +159,17 @@ struct NotificationsCenterView: View {
         defer { isLoading = false }
         do {
             rows = try await NotificationsRepository.shared.list(limit: 50)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func loadFeed() async {
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+        do {
+            feedItems = try await NotificationsRepository.shared.activityFeed(limit: 40)
         } catch {
             self.error = error.localizedDescription
         }

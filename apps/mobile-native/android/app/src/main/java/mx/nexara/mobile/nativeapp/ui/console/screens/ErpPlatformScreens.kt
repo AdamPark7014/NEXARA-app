@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -24,7 +26,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
+import mx.nexara.mobile.nativeapp.data.api.toUserMessage
+import mx.nexara.mobile.nativeapp.ui.commandcenter.CommandCenterRail
+import mx.nexara.mobile.nativeapp.ui.commandcenter.buildExecutiveBiDrillLinks
+import mx.nexara.mobile.nativeapp.ui.commandcenter.buildExecutiveDynamicWidgets
+import mx.nexara.mobile.nativeapp.ui.commandcenter.mergeCommandWidgets
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSearchField
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -32,6 +47,7 @@ import java.util.Locale
 
 data class ErpBiState(
     val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val dashboard: mx.nexara.mobile.nativeapp.data.api.AnalyticsDashboardDto =
         mx.nexara.mobile.nativeapp.data.api.AnalyticsDashboardDto(),
@@ -46,8 +62,8 @@ class ErpBiViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(ErpBiState())
     val state: StateFlow<ErpBiState> = _state
 
-    fun load() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun load(refresh: Boolean = false) {
+        _state.update { it.copy(loading = !refresh && it.dashboard.isEmpty, isRefreshing = refresh, error = null) }
         viewModelScope.launch {
             try {
                 val dash = withContext(Dispatchers.IO) { repo.analyticsDashboardDto() }
@@ -56,104 +72,94 @@ class ErpBiViewModel(app: Application) : AndroidViewModel(app) {
                 val engineers = withContext(Dispatchers.IO) { repo.biEngineerRowDtos() }
                 val clients = withContext(Dispatchers.IO) { repo.biClientRoiDtos() }
                 _state.update {
-                    it.copy(loading = false, dashboard = dash, computedKpis = kpis, margin = margin, engineers = engineers, clientsRoi = clients)
+                    it.copy(loading = false, isRefreshing = false, dashboard = dash, computedKpis = kpis, margin = margin, engineers = engineers, clientsRoi = clients)
                 }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message ?: "Error al cargar BI") }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message ?: "Error al cargar BI") }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ErpBiScreen() {
     val vm: ErpBiViewModel = viewModel()
     val state by vm.state.collectAsState()
     LaunchedEffect(Unit) { vm.load() }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.load(refresh = true) },
+        modifier = Modifier.fillMaxSize(),
     ) {
-        item {
-            Column {
-                Text("Business Intelligence", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
-                Text("KPIs cross-módulo · margen · ingenieros · ROI clientes", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
-            }
-        }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            item { NxSectionHeader("Business Intelligence", "KPIs cross-módulo · margen · ingenieros · ROI clientes") }
 
-        if (state.loading && state.dashboard.isEmpty) {
-            item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
-            return@LazyColumn
-        }
-        if (state.error != null) {
-            item {
-                Text(state.error!!, color = MaterialTheme.colorScheme.error)
-                Button(onClick = { vm.load() }) { Text("Reintentar") }
-            }
-            return@LazyColumn
-        }
+            when {
+                state.loading -> item { NxLoadingBlock("Cargando BI…") }
+                state.error != null -> item { NxErrorBlock(state.error!!) { vm.load() } }
+                else -> {
+                    item {
+                        ErpSectionTitle("Resumen ejecutivo")
+                        val d = state.dashboard
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ErpMetricTile(Modifier.weight(1f), "Ingresos", erpFmtMxn(d.revenue), Color(0xFF059669))
+                            ErpMetricTile(Modifier.weight(1f), "Gastos", erpFmtMxn(d.expenses), Color(0xFFEF4444))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ErpMetricTile(Modifier.weight(1f), "OC abiertas", "${d.openPurchaseOrders}", Color(0xFF3B82F6))
+                            ErpMetricTile(Modifier.weight(1f), "Mant. activos", "${d.pendingMaintenanceOrders}", Color(0xFFF59E0B))
+                            ErpMetricTile(Modifier.weight(1f), "Stock bajo", "${d.lowStockAlerts}", Color(0xFF8B5CF6))
+                        }
+                    }
 
-        item {
-            ErpSectionTitle("Resumen ejecutivo")
-            val d = state.dashboard
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "Ingresos", erpFmtMxn(d.revenue), Color(0xFF059669))
-                ErpMetricTile(Modifier.weight(1f), "Gastos", erpFmtMxn(d.expenses), Color(0xFFEF4444))
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "OC abiertas", "${d.openPurchaseOrders}", Color(0xFF3B82F6))
-                ErpMetricTile(Modifier.weight(1f), "Mant. activos", "${d.pendingMaintenanceOrders}", Color(0xFFF59E0B))
-                ErpMetricTile(Modifier.weight(1f), "Stock bajo", "${d.lowStockAlerts}", Color(0xFF8B5CF6))
-            }
-        }
+                    if (state.computedKpis.isNotEmpty()) {
+                        item { ErpSectionTitle("KPIs en tiempo real") }
+                        val grouped = state.computedKpis.groupBy { it.category }
+                        grouped.forEach { (cat, items) ->
+                            item {
+                                Text(cat, fontWeight = FontWeight.SemiBold, color = NxColors.Slate)
+                                Spacer(Modifier.height(6.dp))
+                                items.forEach { kpi ->
+                                    ComputedKpiRow(kpi)
+                                    Spacer(Modifier.height(6.dp))
+                                }
+                            }
+                        }
+                    }
 
-        if (state.computedKpis.isNotEmpty()) {
-            item { ErpSectionTitle("KPIs en tiempo real") }
-            val grouped = state.computedKpis.groupBy { it.category }
-            grouped.forEach { (cat, items) ->
-                item {
-                    Text(cat, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
-                    Spacer(Modifier.height(6.dp))
-                    items.forEach { kpi ->
-                        ComputedKpiRow(kpi)
-                        Spacer(Modifier.height(6.dp))
+                    if (state.margin.isNotEmpty()) {
+                        item {
+                            val totalBudget = state.margin.sumOf { it.budget }
+                            val totalMargin = state.margin.sumOf { it.margin }
+                            ErpSectionTitle("Margen por línea", erpFmtMxn(totalMargin))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ErpMetricTile(Modifier.weight(1f), "Presupuesto", erpFmtMxn(totalBudget), Color(0xFF0D9488))
+                                ErpMetricTile(Modifier.weight(1f), "Margen total", erpFmtMxn(totalMargin), Color(0xFF059669))
+                            }
+                        }
+                        items(state.margin, key = { it.rowKey }) { row -> MarginRowCard(row) }
+                    }
+
+                    if (state.engineers.isNotEmpty()) {
+                        item { ErpSectionTitle("Ranking ingenieros (90d)") }
+                        items(state.engineers, key = { it.rowKey }) { eng -> EngineerRowCard(eng) }
+                    }
+
+                    if (state.clientsRoi.isNotEmpty()) {
+                        item { ErpSectionTitle("ROI por cliente") }
+                        items(state.clientsRoi, key = { it.rowKey }) { c -> ClientRoiCard(c) }
                     }
                 }
             }
-        }
 
-        if (state.margin.isNotEmpty()) {
-            item {
-                val totalBudget = state.margin.sumOf { it.budget }
-                val totalMargin = state.margin.sumOf { it.margin }
-                ErpSectionTitle("Margen por línea", erpFmtMxn(totalMargin))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ErpMetricTile(Modifier.weight(1f), "Presupuesto", erpFmtMxn(totalBudget), Color(0xFF0D9488))
-                    ErpMetricTile(Modifier.weight(1f), "Margen total", erpFmtMxn(totalMargin), Color(0xFF059669))
-                }
-            }
-            items(state.margin, key = { it.rowKey }) { row ->
-                MarginRowCard(row)
-            }
+            item { Spacer(Modifier.height(24.dp)) }
         }
-
-        if (state.engineers.isNotEmpty()) {
-            item { ErpSectionTitle("Ranking ingenieros (90d)") }
-            items(state.engineers, key = { it.rowKey }) { eng ->
-                EngineerRowCard(eng)
-            }
-        }
-
-        if (state.clientsRoi.isNotEmpty()) {
-            item { ErpSectionTitle("ROI por cliente") }
-            items(state.clientsRoi, key = { it.rowKey }) { c ->
-                ClientRoiCard(c)
-            }
-        }
-
-        item { Spacer(Modifier.height(24.dp)) }
     }
 }
 
@@ -207,6 +213,7 @@ private fun ClientRoiCard(row: mx.nexara.mobile.nativeapp.data.api.BiClientRoiDt
 
 data class ExecutiveState(
     val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val data: mx.nexara.mobile.nativeapp.data.api.ExecutiveCLevelDto =
         mx.nexara.mobile.nativeapp.data.api.ExecutiveCLevelDto(),
@@ -217,75 +224,142 @@ class ExecutiveViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(ExecutiveState())
     val state: StateFlow<ExecutiveState> = _state
 
-    fun load() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun load(refresh: Boolean = false) {
+        _state.update { it.copy(loading = !refresh && it.data.raw.isEmpty(), isRefreshing = refresh, error = null) }
         viewModelScope.launch {
             try {
                 val data = withContext(Dispatchers.IO) { repo.executiveCLevelDto() }
-                _state.update { it.copy(loading = false, data = data) }
+                _state.update { it.copy(loading = false, isRefreshing = false, data = data) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExecutiveScreen() {
+fun ExecutiveScreen(
+    onOpenModule: ((String) -> Unit)? = null,
+) {
     val vm: ExecutiveViewModel = viewModel()
     val state by vm.state.collectAsState()
+    val context = LocalContext.current
+    val user = remember { AuthRepository(context).loadSession() }
+    var clientDetailId by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(Unit) { vm.load() }
+
+    if (clientDetailId != null) {
+        mx.nexara.mobile.nativeapp.ui.ventas.VentasClientDetailByIdScreen(
+            clientId = clientDetailId!!,
+            onBack = { clientDetailId = null },
+        )
+        return
+    }
 
     val headline = state.data.headline
     val ops = state.data.operations
     val finance = state.data.finance
     val alerts = state.data.alerts
+    val commandWidgets = remember(state.data, user) {
+        mergeCommandWidgets(
+            buildExecutiveDynamicWidgets(state.data),
+            buildExecutiveBiDrillLinks(state.data),
+        )
+    }
 
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            Text("Vista ejecutiva", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
-            Text("KPIs cross-módulo del negocio", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
-        }
-        if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
-        if (state.error != null) { item { Text(state.error!!, color = MaterialTheme.colorScheme.error) }; return@LazyColumn }
-
-        item {
-            ErpSectionTitle("Finanzas y ventas")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "Ingresos MTD", erpFmtMxn(headline.revenueMtd), Color(0xFF059669))
-                ErpMetricTile(Modifier.weight(1f), "Pipeline", erpFmtMxn(headline.pipelineValue), Color(0xFF3B82F6))
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "Caja", erpFmtMxn(headline.cashOnHand), Color(0xFF0D9488))
-                ErpMetricTile(Modifier.weight(1f), "CxC", erpFmtMxn(headline.arOutstanding), Color(0xFFF59E0B))
-            }
-        }
-
-        item {
-            ErpSectionTitle("Operaciones")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "OT abiertas", "${ops.otOpen}", Color(0xFF6366F1))
-                ErpMetricTile(Modifier.weight(1f), "OT vencidas", "${ops.otOverdue}", Color(0xFFEF4444))
-                ErpMetricTile(Modifier.weight(1f), "Tickets", "${ops.ticketsOpen}", Color(0xFF8B5CF6))
-            }
-        }
-
-        item {
-            ErpSectionTitle("Facturación")
-            ErpMetricTile(Modifier.fillMaxWidth(), "Facturado MTD", erpFmtMxn(finance.invoicedMtd), Color(0xFF059669))
-        }
-
-        if (alerts.isNotEmpty()) {
-            item { ErpSectionTitle("Alertas", "${alerts.size}") }
-            items(alerts, key = { it.rowKey }) { alert ->
-                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF7ED))) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(alert.title, fontWeight = FontWeight.SemiBold)
-                        Text(alert.detail, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.load(refresh = true) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        LazyColumn(
+            Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item { NxSectionHeader("Vista ejecutiva", "KPIs cross-módulo del negocio") }
+            when {
+                state.loading -> item { NxLoadingBlock("Cargando vista ejecutiva…") }
+                state.error != null -> item { NxErrorBlock(state.error!!) { vm.load() } }
+                else -> {
+                    if (onOpenModule != null && commandWidgets.isNotEmpty()) {
+                        item {
+                            CommandCenterRail(
+                                widgets = commandWidgets,
+                                onWidgetClick = { onOpenModule(it.moduleKey) },
+                                title = "Acciones ejecutivas",
+                            )
+                        }
+                    }
+                    item {
+                        ErpSectionTitle("Finanzas y ventas")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ErpMetricTile(Modifier.weight(1f), "Ingresos MTD", erpFmtMxn(headline.revenueMtd), Color(0xFF059669))
+                            ErpMetricTile(Modifier.weight(1f), "Pipeline", erpFmtMxn(headline.pipelineValue), Color(0xFF3B82F6))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ErpMetricTile(Modifier.weight(1f), "Caja", erpFmtMxn(headline.cashOnHand), Color(0xFF0D9488))
+                            ErpMetricTile(Modifier.weight(1f), "CxC", erpFmtMxn(headline.arOutstanding), Color(0xFFF59E0B))
+                        }
+                    }
+                    item {
+                        ErpSectionTitle("Operaciones")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ErpMetricTile(Modifier.weight(1f), "OT abiertas", "${ops.otOpen}", Color(0xFF6366F1))
+                            ErpMetricTile(Modifier.weight(1f), "OT vencidas", "${ops.otOverdue}", Color(0xFFEF4444))
+                            ErpMetricTile(Modifier.weight(1f), "Tickets", "${ops.ticketsOpen}", Color(0xFF8B5CF6))
+                        }
+                    }
+                    item {
+                        ErpSectionTitle("Facturación")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ErpMetricTile(Modifier.weight(1f), "Facturado MTD", erpFmtMxn(finance.invoicedMtd), Color(0xFF059669))
+                            val arRatio = if (headline.revenueMtd > 0) (headline.arOutstanding / headline.revenueMtd * 100) else 0.0
+                            ErpMetricTile(Modifier.weight(1f), "CxC / Ingresos", erpFmtPct(arRatio), Color(0xFFF59E0B))
+                        }
+                    }
+                    if (state.data.topAccounts.isNotEmpty()) {
+                        item { ErpSectionTitle("Cuentas clave", "Top margen · 12 meses") }
+                        items(state.data.topAccounts, key = { "ta-${it.clientId}" }) { acc ->
+                            ErpListCard(
+                                title = acc.clientName,
+                                subtitle = "${acc.projects} proy. · ${erpFmtMxn(acc.revenue)}",
+                                trailing = erpFmtPct(acc.marginPercent),
+                                onClick = if (acc.clientId > 0) {
+                                    { clientDetailId = acc.clientId }
+                                } else {
+                                    null
+                                },
+                            )
+                        }
+                    }
+                    if (alerts.isNotEmpty()) {
+                        item { ErpSectionTitle("Alertas", "${alerts.size}") }
+                        items(alerts, key = { it.rowKey }) { alert ->
+                            NxPanelShell {
+                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("⚠️", fontSize = 18.sp)
+                                    Column(Modifier.weight(1f)) {
+                                        Text(alert.title, fontWeight = FontWeight.SemiBold, color = NxColors.Slate)
+                                        if (alert.detail.isNotBlank()) {
+                                            Text(alert.detail, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        item {
+                            NxEmptyState(
+                                title = "Sin alertas críticas",
+                                subtitle = "El negocio está estable en este momento.",
+                            )
+                        }
                     }
                 }
             }
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 }
@@ -294,6 +368,7 @@ fun ExecutiveScreen() {
 
 data class ApprovalsState(
     val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val message: String? = null,
     val items: List<mx.nexara.mobile.nativeapp.data.api.WorkflowApprovalDto> = emptyList(),
@@ -305,14 +380,14 @@ class ApprovalsViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(ApprovalsState())
     val state: StateFlow<ApprovalsState> = _state
 
-    fun load() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun load(refresh: Boolean = false) {
+        _state.update { it.copy(loading = !refresh && it.items.isEmpty(), isRefreshing = refresh, error = null) }
         viewModelScope.launch {
             try {
                 val items = withContext(Dispatchers.IO) { repo.workflowApprovals() }
-                _state.update { it.copy(loading = false, items = items, acting = null) }
+                _state.update { it.copy(loading = false, isRefreshing = false, items = items, acting = null) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.toUserMessage("No se pudieron cargar las aprobaciones")) }
             }
         }
     }
@@ -339,6 +414,7 @@ class ApprovalsViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApprovalsScreen() {
     val vm: ApprovalsViewModel = viewModel()
@@ -346,50 +422,116 @@ fun ApprovalsScreen() {
     var rejectNotes by remember { mutableStateOf<Map<Long, String>>(emptyMap()) }
     LaunchedEffect(Unit) { vm.load() }
 
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item {
-            Text("Aprobaciones", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
-            Text("Pendientes de tu decisión", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
-        }
-        if (!state.message.isNullOrBlank()) {
-            item { Text(state.message!!, color = Color(0xFF2E7D32), fontWeight = FontWeight.SemiBold) }
-        }
-        if (!state.error.isNullOrBlank()) {
-            item { Text(state.error!!, color = MaterialTheme.colorScheme.error) }
-        }
-        if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
-        if (state.items.isEmpty()) {
-            item { Text("Sin aprobaciones pendientes.", color = Color(0xFF64748B)) }
-            return@LazyColumn
-        }
-        items(state.items, key = { it.rowKey }) { item ->
-            val id = item.id
-            val note = rejectNotes[id].orEmpty()
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(item.displayTitle, fontWeight = FontWeight.SemiBold)
-                    Text(item.displaySubtitle, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
-                    OutlinedTextField(
-                        value = note,
-                        onValueChange = { rejectNotes = rejectNotes + (id to it) },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Comentario / motivo rechazo") },
-                        singleLine = true,
+    val highPriority = state.items.count {
+        val p = it.urgencyLabel.lowercase()
+        p.contains("alta") || p.contains("high") || p.contains("urgent")
+    }
+
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.load(refresh = true) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        LazyColumn(
+            Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item { NxSectionHeader("Aprobaciones", "Pendientes de tu decisión") }
+            if (!state.message.isNullOrBlank()) {
+                item { Text(state.message!!, color = NxColors.Success, fontWeight = FontWeight.SemiBold) }
+            }
+            if (!state.error.isNullOrBlank()) {
+                item { NxErrorBlock(state.error!!) { vm.load() } }
+            }
+            when {
+                state.loading -> item { NxLoadingBlock("Cargando aprobaciones…") }
+                state.items.isEmpty() -> item {
+                    NxEmptyState(
+                        title = "Sin aprobaciones pendientes",
+                        subtitle = "Estás al día con el workflow.",
+                        actionLabel = "Actualizar",
+                        onAction = { vm.load(refresh = true) },
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = { if (id > 0) vm.decide(id, true, note.ifBlank { null }) },
-                            enabled = state.acting != id,
-                            modifier = Modifier.weight(1f),
-                        ) { Text("Aprobar") }
-                        OutlinedButton(
-                            onClick = { if (id > 0) vm.decide(id, false, note) },
-                            enabled = state.acting != id,
-                            modifier = Modifier.weight(1f),
-                        ) { Text("Rechazar") }
+                }
+                else -> {
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ErpMetricTile(Modifier.weight(1f), "Pendientes", "${state.items.size}", Color(0xFF3B82F6))
+                            ErpMetricTile(
+                                Modifier.weight(1f),
+                                "Alta prioridad",
+                                "$highPriority",
+                                if (highPriority > 0) Color(0xFFEF4444) else Color(0xFF059669),
+                            )
+                        }
+                    }
+                    items(state.items, key = { it.rowKey }) { item ->
+                        val id = item.id
+                        val note = rejectNotes[id].orEmpty()
+                        val urgency = item.urgencyLabel
+                        val uColor = when (urgency.lowercase()) {
+                            "alta", "high", "urgent" -> Color(0xFFEF4444)
+                            "media", "medium" -> Color(0xFFF59E0B)
+                            else -> Color(0xFF3B82F6)
+                        }
+                        NxPanelShell {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🛡️", fontSize = 20.sp)
+                                    Box(
+                                        Modifier
+                                            .background(uColor.copy(0.12f), RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                                    ) {
+                                        Text(urgency, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = uColor)
+                                    }
+                                }
+                                Text(item.displayTitle, fontWeight = FontWeight.SemiBold, color = NxColors.Slate)
+                                if (item.displaySubtitle.isNotBlank()) {
+                                    Text(item.displaySubtitle, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
+                                }
+                                if (item.entityType.isNotBlank()) {
+                                    Text(
+                                        item.entityType,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF8B5CF6),
+                                        modifier = Modifier
+                                            .background(Color(0xFFF3E8FF), RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                                    )
+                                }
+                                OutlinedTextField(
+                                    value = note,
+                                    onValueChange = { rejectNotes = rejectNotes + (id to it) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    label = { Text("Comentario / motivo rechazo") },
+                                    singleLine = true,
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = { if (id > 0) vm.decide(id, true, note.ifBlank { null }) },
+                                        enabled = state.acting != id,
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(containerColor = NxColors.Teal),
+                                    ) {
+                                        if (state.acting == id) {
+                                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                                        } else {
+                                            Text("Aprobar")
+                                        }
+                                    }
+                                    OutlinedButton(
+                                        onClick = { if (id > 0) vm.decide(id, false, note) },
+                                        enabled = state.acting != id,
+                                        modifier = Modifier.weight(1f),
+                                    ) { Text("Rechazar") }
+                                }
+                            }
+                        }
                     }
                 }
             }
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 }
@@ -398,6 +540,7 @@ fun ApprovalsScreen() {
 
 data class NocState(
     val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val summary: Map<String, Any?> = emptyMap(),
     val alerts: List<mx.nexara.mobile.nativeapp.data.api.NocAlertDto> = emptyList(),
@@ -409,21 +552,22 @@ class NocViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(NocState())
     val state: StateFlow<NocState> = _state
 
-    fun load() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun load(refresh: Boolean = false) {
+        _state.update { it.copy(loading = !refresh && it.summary.isEmpty(), isRefreshing = refresh, error = null) }
         viewModelScope.launch {
             try {
                 val summary = withContext(Dispatchers.IO) { repo.nocSummary() }
                 val alerts = withContext(Dispatchers.IO) { repo.nocAlertDtos() }
                 val devices = withContext(Dispatchers.IO) { repo.nocDeviceDtos() }
-                _state.update { it.copy(loading = false, summary = summary, alerts = alerts, devices = devices) }
+                _state.update { it.copy(loading = false, isRefreshing = false, summary = summary, alerts = alerts, devices = devices) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NocModuleScreen() {
     val vm: NocViewModel = viewModel()
@@ -439,55 +583,65 @@ fun NocModuleScreen() {
         }
     }
 
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            Text("NOC · Monitoreo", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
-            Text("Dispositivos y alertas 24/7", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
-        }
-        if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
-
-        val s = state.summary
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "Dispositivos", "${erpInt(s, "total")}", Color(0xFF3B82F6))
-                ErpMetricTile(Modifier.weight(1f), "Críticos", "${erpInt(s, "criticalCount")}", Color(0xFFEF4444))
-                ErpMetricTile(Modifier.weight(1f), "Uptime", "${erpFmtPct(erpDbl(s, "avgUptime"))}", Color(0xFF059669))
-            }
-        }
-
-        if (state.alerts.isNotEmpty()) {
-            item { ErpSectionTitle("Alertas activas", "${filteredAlerts.size}/${state.alerts.size}") }
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("todos" to "Todas", "critical" to "Críticas", "warning" to "Warning").forEach { (key, label) ->
-                        FilterChip(
-                            selected = sevFilter == key,
-                            onClick = { sevFilter = key },
-                            label = { Text(label) },
-                        )
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.load(refresh = true) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        LazyColumn(
+            Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item { NxSectionHeader("NOC · Monitoreo", "Dispositivos y alertas 24/7") }
+            when {
+                state.loading -> item { NxLoadingBlock("Cargando NOC…") }
+                state.error != null -> item { NxErrorBlock(state.error!!) { vm.load() } }
+                else -> {
+                    val s = state.summary
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ErpMetricTile(Modifier.weight(1f), "Dispositivos", "${erpInt(s, "total")}", Color(0xFF3B82F6))
+                            ErpMetricTile(Modifier.weight(1f), "Críticos", "${erpInt(s, "criticalCount")}", Color(0xFFEF4444))
+                            ErpMetricTile(Modifier.weight(1f), "Uptime", erpFmtPct(erpDbl(s, "avgUptime")), Color(0xFF059669))
+                        }
+                    }
+                    if (state.alerts.isNotEmpty()) {
+                        item { ErpSectionTitle("Alertas activas", "${filteredAlerts.size}/${state.alerts.size}") }
+                        item {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf("todos" to "Todas", "critical" to "Críticas", "warning" to "Warning").forEach { (key, label) ->
+                                    FilterChip(
+                                        selected = sevFilter == key,
+                                        onClick = { sevFilter = key },
+                                        label = { Text(label) },
+                                    )
+                                }
+                            }
+                        }
+                        items(filteredAlerts.take(20), key = { it.rowKey }) { a ->
+                            val color = if (a.isCritical) Color(0xFFEF4444) else Color(0xFFF59E0B)
+                            ErpListCard(a.displayTitle, a.message, trailing = a.severity, accent = color)
+                        }
+                    } else {
+                        item {
+                            NxEmptyState(
+                                title = "Sin alertas activas",
+                                subtitle = "No hay incidentes reportados en este momento.",
+                            )
+                        }
+                    }
+                    if (state.devices.isNotEmpty()) {
+                        item { ErpSectionTitle("Dispositivos") }
+                        items(state.devices.take(20), key = { it.rowKey }) { d ->
+                            val color = when (d.status.uppercase()) {
+                                "ONLINE" -> Color(0xFF059669)
+                                "OFFLINE", "ALERT" -> Color(0xFFEF4444)
+                                else -> Color(0xFFF59E0B)
+                            }
+                            ErpListCard(d.displayName, "${d.type} · ${d.clientName}", trailing = d.status, accent = color)
+                        }
                     }
                 }
-            }
-            items(filteredAlerts.take(20), key = { it.rowKey }) { a ->
-                val color = if (a.isCritical) Color(0xFFEF4444) else Color(0xFFF59E0B)
-                ErpListCard(a.displayTitle, a.message, trailing = a.severity, accent = color)
-            }
-        }
-
-        if (state.devices.isNotEmpty()) {
-            item { ErpSectionTitle("Dispositivos") }
-            items(state.devices.take(20), key = { it.rowKey }) { d ->
-                val color = when (d.status.uppercase()) {
-                    "ONLINE" -> Color(0xFF059669)
-                    "OFFLINE", "ALERT" -> Color(0xFFEF4444)
-                    else -> Color(0xFFF59E0B)
-                }
-                ErpListCard(
-                    d.displayName,
-                    "${d.type} · ${d.clientName}",
-                    trailing = d.status,
-                    accent = color,
-                )
             }
         }
     }
@@ -497,6 +651,7 @@ fun NocModuleScreen() {
 
 data class SlaState(
     val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val stats: mx.nexara.mobile.nativeapp.data.api.SlaStatsDto = mx.nexara.mobile.nativeapp.data.api.SlaStatsDto(),
 )
@@ -506,19 +661,20 @@ class SlaViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(SlaState())
     val state: StateFlow<SlaState> = _state
 
-    fun load() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun load(refresh: Boolean = false) {
+        _state.update { it.copy(loading = !refresh && it.stats.total == 0, isRefreshing = refresh, error = null) }
         viewModelScope.launch {
             try {
                 val stats = withContext(Dispatchers.IO) { repo.slaStatsDto() }
-                _state.update { it.copy(loading = false, stats = stats) }
+                _state.update { it.copy(loading = false, isRefreshing = false, stats = stats) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SlaModuleScreen() {
     val vm: SlaViewModel = viewModel()
@@ -529,41 +685,57 @@ fun SlaModuleScreen() {
     val resol = state.stats.resolution
     val breaches = state.stats.recentBreaches
 
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            Text("SLA y tiempos", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
-            Text("Cumplimiento por contrato y prioridad", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
-        }
-        if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
-
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "Tickets", "${state.stats.total}", Color(0xFF3B82F6))
-                ErpMetricTile(Modifier.weight(1f), "Abiertos", "${state.stats.stillOpen}", Color(0xFFF59E0B))
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "Resp. a tiempo", "${resp.onTime}", Color(0xFF059669))
-                ErpMetricTile(Modifier.weight(1f), "Resp. tarde", "${resp.late}", Color(0xFFEF4444))
-                ErpMetricTile(Modifier.weight(1f), "% resp.", erpFmtPct(resp.compliancePercent), Color(0xFF0D9488))
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ErpMetricTile(Modifier.weight(1f), "Res. a tiempo", "${resol.onTime}", Color(0xFF059669))
-                ErpMetricTile(Modifier.weight(1f), "Res. tarde", "${resol.late}", Color(0xFFEF4444))
-                ErpMetricTile(Modifier.weight(1f), "% res.", erpFmtPct(resol.compliancePercent), Color(0xFF0D9488))
-            }
-        }
-
-        if (breaches.isNotEmpty()) {
-            item { ErpSectionTitle("Incumplimientos recientes") }
-            items(breaches.take(15), key = { it.rowKey }) { b ->
-                ErpListCard(
-                    b.displayTitle,
-                    "${b.type} · ${b.priority}",
-                    trailing = "+${b.hoursLate.toInt()}h",
-                    accent = Color(0xFFEF4444),
-                )
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.load(refresh = true) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        LazyColumn(
+            Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item { NxSectionHeader("SLA y tiempos", "Cumplimiento por contrato y prioridad") }
+            when {
+                state.loading -> item { NxLoadingBlock("Cargando SLA…") }
+                state.error != null -> item { NxErrorBlock(state.error!!) { vm.load() } }
+                else -> {
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ErpMetricTile(Modifier.weight(1f), "Tickets", "${state.stats.total}", Color(0xFF3B82F6))
+                            ErpMetricTile(Modifier.weight(1f), "Abiertos", "${state.stats.stillOpen}", Color(0xFFF59E0B))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ErpMetricTile(Modifier.weight(1f), "Resp. a tiempo", "${resp.onTime}", Color(0xFF059669))
+                            ErpMetricTile(Modifier.weight(1f), "Resp. tarde", "${resp.late}", Color(0xFFEF4444))
+                            ErpMetricTile(Modifier.weight(1f), "% resp.", erpFmtPct(resp.compliancePercent), Color(0xFF0D9488))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ErpMetricTile(Modifier.weight(1f), "Res. a tiempo", "${resol.onTime}", Color(0xFF059669))
+                            ErpMetricTile(Modifier.weight(1f), "Res. tarde", "${resol.late}", Color(0xFFEF4444))
+                            ErpMetricTile(Modifier.weight(1f), "% res.", erpFmtPct(resol.compliancePercent), Color(0xFF0D9488))
+                        }
+                    }
+                    if (breaches.isNotEmpty()) {
+                        item { ErpSectionTitle("Incumplimientos recientes") }
+                        items(breaches.take(15), key = { it.rowKey }) { b ->
+                            ErpListCard(
+                                b.displayTitle,
+                                "${b.type} · ${b.priority}",
+                                trailing = "+${b.hoursLate.toInt()}h",
+                                accent = Color(0xFFEF4444),
+                            )
+                        }
+                    } else {
+                        item {
+                            NxEmptyState(
+                                title = "Sin incumplimientos",
+                                subtitle = "Todos los tickets cumplen SLA en el periodo.",
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -573,6 +745,7 @@ fun SlaModuleScreen() {
 
 data class MaintContractsState(
     val loading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val items: List<mx.nexara.mobile.nativeapp.data.api.MaintenanceContractDto> = emptyList(),
 )
@@ -582,19 +755,20 @@ class MaintContractsViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(MaintContractsState())
     val state: StateFlow<MaintContractsState> = _state
 
-    fun load() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun load(refresh: Boolean = false) {
+        _state.update { it.copy(loading = !refresh && it.items.isEmpty(), isRefreshing = refresh, error = null) }
         viewModelScope.launch {
             try {
                 val items = withContext(Dispatchers.IO) { repo.maintenanceContractDtos() }
-                _state.update { it.copy(loading = false, items = items) }
+                _state.update { it.copy(loading = false, isRefreshing = false, items = items) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message) }
+                _state.update { it.copy(loading = false, isRefreshing = false, error = e.message) }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MaintenanceContractsScreen() {
     val vm: MaintContractsViewModel = viewModel()
@@ -690,29 +864,47 @@ fun MaintenanceContractsScreen() {
             c.contractNumber.lowercase().contains(q)
     }
 
-    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item {
-            Text("Contratos de servicio", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
-            Text("SLA, vigencias y alcance", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(value = query, onValueChange = { query = it }, placeholder = { Text("Buscar contrato o cliente…") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        }
-        if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
-        if (filtered.isEmpty()) { item { Text("Sin contratos activos.", color = Color(0xFF64748B)) }; return@LazyColumn }
-        items(filtered, key = { it.rowKey }) { c ->
-            val statusColor = mcStatusColor(c.status)
-            Card(Modifier.fillMaxWidth().clickable { selected = c }) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, androidx.compose.ui.Alignment.CenterVertically) {
-                        Text(c.displayTitle, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        if (c.status.isNotBlank()) Text(c.status, color = statusColor, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelSmall)
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.load(refresh = true) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        LazyColumn(
+            Modifier.fillMaxSize().background(NxColors.Surface).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item {
+                NxSectionHeader("Contratos de servicio", "SLA, vigencias y alcance")
+                Spacer(Modifier.height(8.dp))
+                NxSearchField(value = query, onValueChange = { query = it }, placeholder = "Buscar contrato o cliente…")
+            }
+            when {
+                state.loading -> item { NxLoadingBlock("Cargando contratos…") }
+                state.error != null -> item { NxErrorBlock(state.error!!) { vm.load() } }
+                filtered.isEmpty() -> item {
+                    NxEmptyState(
+                        title = "Sin contratos",
+                        subtitle = "No hay contratos activos que coincidan con tu búsqueda.",
+                        actionLabel = "Actualizar",
+                        onAction = { vm.load(refresh = true) },
+                    )
+                }
+                else -> items(filtered, key = { it.rowKey }) { c ->
+                    val statusColor = mcStatusColor(c.status)
+                    NxPanelShell(onClick = { selected = c }) {
+                        Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                            Text(c.displayTitle, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), color = NxColors.Slate)
+                            if (c.status.isNotBlank()) {
+                                Text(c.status, color = statusColor, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                        Text(c.clientName, style = MaterialTheme.typography.bodySmall, color = NxColors.Muted)
+                        val dates = listOfNotNull(
+                            c.startDate.take(10).takeIf { it.isNotBlank() },
+                            c.endDate.take(10).takeIf { it.isNotBlank() },
+                        ).joinToString(" → ")
+                        if (dates.isNotBlank()) Text(dates, style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
                     }
-                    Text(c.clientName, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
-                    val dates = listOfNotNull(
-                        c.startDate.take(10).takeIf { it.isNotBlank() },
-                        c.endDate.take(10).takeIf { it.isNotBlank() },
-                    ).joinToString(" → ")
-                    if (dates.isNotBlank()) Text(dates, style = MaterialTheme.typography.labelSmall, color = Color(0xFF64748B))
                 }
             }
         }
@@ -747,8 +939,14 @@ private fun ErpMetricTile(modifier: Modifier, label: String, value: String, acce
 }
 
 @Composable
-private fun ErpListCard(title: String, subtitle: String, trailing: String = "", accent: Color = Color(0xFF0D9488)) {
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(1.dp)) {
+private fun ErpListCard(
+    title: String,
+    subtitle: String,
+    trailing: String = "",
+    accent: Color = Color(0xFF0D9488),
+    onClick: (() -> Unit)? = null,
+) {
+    val content: @Composable () -> Unit = {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(title, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
@@ -757,6 +955,18 @@ private fun ErpListCard(title: String, subtitle: String, trailing: String = "", 
             if (trailing.isNotBlank()) {
                 Text(trailing, fontWeight = FontWeight.Bold, color = accent, modifier = Modifier.background(accent.copy(0.12f), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 4.dp))
             }
+        }
+    }
+    if (onClick != null) {
+        Card(
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            elevation = CardDefaults.cardElevation(1.dp),
+        ) { content() }
+    } else {
+        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(1.dp)) {
+            content()
         }
     }
 }

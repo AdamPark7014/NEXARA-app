@@ -5,6 +5,7 @@ import { NotificationHierarchyService } from '../notifications/notification-hier
 import { AccountingService } from '../accounting/accounting.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { FolioService } from '../common/folio/folio.service.js';
+import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 
 const COGS_MOVEMENT_TYPES = new Set(['DISPATCH', 'SCRAP', 'PRODUCTION_OUT']);
 
@@ -17,6 +18,7 @@ export class WarehouseService {
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly accounting: AccountingService,
     private readonly folio: FolioService,
+    private readonly domainEvents: DomainEventBusService,
   ) {}
 
   // ── Warehouses ────────────────────────────────────────────────────
@@ -295,7 +297,70 @@ export class WarehouseService {
       }
     }
 
+    const warehouseIds = [dto.fromWarehouseId, dto.toWarehouseId].filter(
+      (id): id is number => typeof id === 'number',
+    );
+    void this.emitRealtimeLowStockAlerts(dto.productId, warehouseIds, tenantId, userId).catch(
+      () => undefined,
+    );
+
     return movement;
+  }
+
+  private async emitRealtimeLowStockAlerts(
+    productId: number,
+    warehouseIds: number[],
+    tenantId: number,
+    userId: number,
+  ) {
+    if (!warehouseIds.length) return;
+    const levels = await this.prisma.stockLevel.findMany({
+      where: {
+        productId,
+        warehouseId: { in: warehouseIds },
+        locationId: null,
+        ...companyWhere(tenantId),
+      },
+      include: {
+        product: { select: { id: true, name: true, sku: true } },
+        warehouse: { select: { id: true, companyId: true } },
+      },
+    });
+    const low = levels.filter(
+      (l) => Number(l.reorderPoint) > 0 && Number(l.quantity) <= Number(l.reorderPoint),
+    );
+    if (!low.length) return;
+
+    const byCompany = new Map<number, typeof low>();
+    for (const l of low) {
+      const cid = l.warehouse?.companyId;
+      if (cid == null) continue;
+      const list = byCompany.get(cid) || [];
+      list.push(l);
+      byCompany.set(cid, list);
+    }
+
+    for (const [companyId, items] of byCompany) {
+      this.domainEvents.publishEntityLifecycle('updated', {
+        entityType: 'INVENTORY',
+        entityId: companyId,
+        companyId,
+        userId,
+        payload: {
+          alertType: 'low',
+          source: 'stock_movement',
+          count: items.length,
+          items: items.slice(0, 30).map((l) => ({
+            productId: l.productId,
+            warehouseId: l.warehouseId,
+            sku: l.product?.sku,
+            name: l.product?.name,
+            quantity: Number(l.quantity),
+            reorderPoint: Number(l.reorderPoint),
+          })),
+        },
+      });
+    }
   }
 
   /**

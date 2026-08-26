@@ -39,8 +39,27 @@ struct ExecutiveAlert: Hashable, Identifiable {
     var id: String { "ea-\(title)-\(detail)" }
 
     init(raw: [String: Any]) {
-        title = StockParse.str(raw["title"], raw["message"])
-        detail = StockParse.str(raw["detail"], raw["description"])
+        title = StockParse.str(raw["title"])
+        detail = StockParse.str(raw["message"], raw["detail"], raw["description"])
+    }
+}
+
+struct ExecutiveTopAccount: Hashable, Identifiable {
+    let clientId: Int
+    let clientName: String
+    let projects: Int
+    let revenue: Double
+    let margin: Double
+    let marginPercent: Double
+    var id: Int { clientId }
+
+    init(raw: [String: Any]) {
+        clientId = Int(StockParse.dbl(raw["clientId"]) ?? 0)
+        clientName = StockParse.str(raw["clientName"])
+        projects = Int(StockParse.dbl(raw["projects"]) ?? 0)
+        revenue = StockParse.dbl(raw["revenue"]) ?? 0
+        margin = StockParse.dbl(raw["margin"]) ?? 0
+        marginPercent = StockParse.dbl(raw["marginPercent"]) ?? 0
     }
 }
 
@@ -49,6 +68,7 @@ struct ExecutiveCLevel: Hashable {
     let operations: ExecutiveOps
     let finance: ExecutiveFinance
     let alerts: [ExecutiveAlert]
+    let topAccounts: [ExecutiveTopAccount]
     let raw: [String: Any]
 
     init(raw: [String: Any]) {
@@ -57,6 +77,7 @@ struct ExecutiveCLevel: Hashable {
         operations = ExecutiveOps(raw: raw["operations"] as? [String: Any] ?? [:])
         finance = ExecutiveFinance(raw: raw["finance"] as? [String: Any] ?? [:])
         alerts = (raw["alerts"] as? [[String: Any]] ?? []).map { ExecutiveAlert(raw: $0) }
+        topAccounts = (raw["topAccounts"] as? [[String: Any]] ?? []).map { ExecutiveTopAccount(raw: $0) }
     }
 }
 

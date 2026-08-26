@@ -40,6 +40,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ToolInventorySearchOptionDto
 import mx.nexara.mobile.nativeapp.data.api.ToolKitUserRowDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
 
 data class KitsUsersUiState(
     val isLoading: Boolean = true,
@@ -189,7 +190,7 @@ fun ConsoleToolsKitsUsersScreen(
         Spacer(modifier = Modifier.height(10.dp))
 
         if (state.isLoading) {
-            Text("Cargando...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            NxLoadingBlock("Cargando kits de usuarios…")
             return@Column
         }
         if (!state.error.isNullOrBlank()) {

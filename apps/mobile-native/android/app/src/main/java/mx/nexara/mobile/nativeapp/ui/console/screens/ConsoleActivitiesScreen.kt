@@ -1,6 +1,5 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
-import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -10,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,290 +19,29 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ActivityDto
-import mx.nexara.mobile.nativeapp.data.api.ActivityEvidenceDetailDto
-import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
-import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
+import mx.nexara.mobile.nativeapp.ui.console.activities.ActivityDetailScreen
+import mx.nexara.mobile.nativeapp.ui.console.activities.ConsoleActivitiesViewModel
+import mx.nexara.mobile.nativeapp.ui.console.activities.STATUS_FILTER_OPTIONS
+import mx.nexara.mobile.nativeapp.ui.console.activities.activStatusTone
+import mx.nexara.mobile.nativeapp.ui.console.activities.matchesFilter
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxStatusChip
 
-// ── State & ViewModel ────────────────────────────────────────────────────────
-
-data class ActivitiesUiState(
-    val isLoading: Boolean = true,
-    val teamLoading: Boolean = false,
-    val error: String? = null,
-    val query: String = "",
-    val statusFilter: String = "Todos",
-    val teamActivities: List<ActivityDto> = emptyList(),
-    val myActivities: List<ActivityDto> = emptyList(),
-)
-
-class ConsoleActivitiesViewModel(app: Application) : AndroidViewModel(app) {
-    private val authRepo = AuthRepository(app.applicationContext)
-    private val repo = ConsoleRepository(app.applicationContext)
-    private val _state = MutableStateFlow(ActivitiesUiState())
-    val state: StateFlow<ActivitiesUiState> = _state
-
-    init {
-        refreshOnModels(
-            models = setOf("Activity", "ActivityEvidence", "ServiceSheet"),
-            refresh = { loadAll(currentUserId = authRepo.loadSession()?.id) },
-        )
-    }
-
-    fun setQuery(v: String) = _state.update { it.copy(query = v) }
-    fun setStatusFilter(v: String) = _state.update { it.copy(statusFilter = v) }
-
-    fun loadAll(
-        isAdmin: Boolean = false,
-        isSuperAdmin: Boolean = false,
-        currentUserId: Long? = null,
-    ) {
-        _state.update { it.copy(isLoading = true, error = null) }
-        viewModelScope.launch {
-            try {
-                // Team activities (admin/superadmin)
-                val team = if (isAdmin || isSuperAdmin) {
-                    withContext(Dispatchers.IO) { repo.activitiesFetch(scope = null) }
-                } else emptyList()
-                // My activities (not superadmin)
-                val mine = if (!isSuperAdmin) {
-                    withContext(Dispatchers.IO) {
-                        val scopedMine = runCatching { repo.activitiesFetch(scope = "mine") }.getOrDefault(emptyList())
-                        if (scopedMine.isNotEmpty() || currentUserId == null) {
-                            scopedMine
-                        } else {
-                            // Some environments return empty for scope=mine; fallback to local filtering.
-                            repo.activitiesFetch(scope = null).filter { a ->
-                                a.responsableId == currentUserId || a.responsable?.id == currentUserId
-                            }
-                        }
-                    }
-                } else emptyList()
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        teamActivities = team,
-                        myActivities = mine,
-                        error = null,
-                    )
-                }
-            } catch (e: Exception) {
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        error = e.message?.takeIf { m -> m.isNotBlank() } ?: "No se pudieron cargar actividades",
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ── Color helpers ────────────────────────────────────────────────────────────
-
-private val ActivStatusColors = mapOf(
-    "pendiente" to Color(0xFFF59E0B),
-    "en proceso" to Color(0xFF3B82F6),
-    "proceso" to Color(0xFF3B82F6),
-    "asignada" to Color(0xFF8B5CF6),
-    "asignado" to Color(0xFF8B5CF6),
-    "finalizada" to Color(0xFF10B981),
-    "finalizado" to Color(0xFF10B981),
-    "completada" to Color(0xFF10B981),
-    "cancelada" to Color(0xFFEF4444),
-    "cancelado" to Color(0xFFEF4444),
-    "rechazado" to Color(0xFFEF4444),
-)
-
-private fun activStatusColor(estatus: String): Color {
-    val s = estatus.lowercase()
-    return ActivStatusColors.entries.firstOrNull { s.contains(it.key) }?.value ?: Color(0xFF64748B)
-}
-
-private val STATUS_FILTER_OPTIONS = listOf("Todos", "Pendiente", "En proceso", "Asignada", "Finalizada", "Cancelada")
-
-private fun matchesFilter(estatus: String, filter: String): Boolean {
-    if (filter == "Todos") return true
-    return estatus.lowercase().contains(filter.lowercase())
-}
-
-// ── Main composable ──────────────────────────────────────────────────────────
-
-// ── Activity Detail Screen ───────────────────────────────────────────────────
-
-@Composable
-fun ActivityDetailScreen(
-    activity: ActivityDto,
-    onBack: () -> Unit,
-    onCaptureEvidence: ((Long) -> Unit)? = null,
-) {
-    val context = LocalContext.current
-    val repo = remember(context) { ConsoleRepository(context) }
-    var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("Info", "Evidencias", "Viáticos", "Aprobaciones")
-    var evidence by remember { mutableStateOf<ActivityEvidenceDetailDto?>(null) }
-    var loadingEv by remember { mutableStateOf(true) }
-    val statusColor = activStatusColor(activity.estatus)
-
-    LaunchedEffect(activity.id) {
-        loadingEv = true
-        evidence = runCatching {
-            withContext(Dispatchers.IO) { repo.evidenceByActivity(activity.id) }
-        }.getOrNull()
-        loadingEv = false
-    }
-
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            TextButton(onClick = onBack) { Text("← Volver") }
-            Text(
-                activity.titulo?.takeIf { it.isNotBlank() } ?: "Actividad #${activity.id}",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                modifier = Modifier.weight(1f),
-                maxLines = 2,
-            )
-        }
-
-        if (onCaptureEvidence != null) {
-            Button(
-                onClick = { onCaptureEvidence(activity.id) },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            ) { Text("Capturar / continuar evidencias") }
-        }
-
-        TabRow(selectedTabIndex = selectedTab) {
-            tabs.forEachIndexed { i, label ->
-                Tab(selected = selectedTab == i, onClick = { selectedTab = i }, text = { Text(label, fontSize = 12.sp) })
-            }
-        }
-
-        when (selectedTab) {
-            0 -> ActivityInfoTab(activity, statusColor)
-            1 -> ActivityEvidenceTab(evidence, loadingEv, onCapture = {
-                onCaptureEvidence?.invoke(activity.id)
-            })
-            2 -> ActivityPlaceholderTab("Abre Viáticos desde Consola para vincular a esta AN")
-            else -> ActivityPlaceholderTab("Las aprobaciones aparecen en Workflow / Evidencias")
-        }
-    }
-}
-
-@Composable
-private fun ActivityInfoTab(a: ActivityDto, statusColor: Color) {
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        item {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.clip(RoundedCornerShape(20.dp)).background(statusColor.copy(alpha = 0.13f)).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                        Text(a.estatus.ifBlank { "Sin estado" }, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                    ADetailRow("Responsable",  a.responsable?.nombre ?: "—")
-                    ADetailRow("Creador",       a.creador?.nombre ?: "—")
-                    ADetailRow("Asignación",   a.fechaAsignacion?.take(10) ?: "—")
-                    ADetailRow("Inicio",       a.fechaInicio?.take(10) ?: "—")
-                    ADetailRow("Finalización", a.fechaFinalizacion?.take(10) ?: "—")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ActivityEvidenceTab(
-    ev: ActivityEvidenceDetailDto?,
-    loading: Boolean,
-    onCapture: (() -> Unit)? = null,
-) {
-    if (loading) {
-        Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
-        return
-    }
-    val photos = ev?.evidencePhotos.orEmpty()
-    val entryPhoto = ev?.entryPhotoUrl
-    val exitPhoto = ev?.exitPhotoUrl
-    val pdf = ev?.serviceSheetPdfUrl
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (onCapture != null) {
-            item {
-                OutlinedButton(onClick = onCapture, modifier = Modifier.fillMaxWidth()) {
-                    Text("Ir al flujo de evidencias")
-                }
-            }
-        }
-        if (ev != null) {
-            item {
-                Text("Estado: ${ev.status}", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-            }
-            if (!ev.reviewStatus.isNullOrBlank()) {
-                item {
-                    Text("Revisión: ${ev.reviewStatus}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-        if (!entryPhoto.isNullOrBlank()) item {
-            Text("Foto de entrada: ${entryPhoto.take(80)}", fontSize = 13.sp)
-        }
-        if (!exitPhoto.isNullOrBlank()) item {
-            Text("Foto de salida: ${exitPhoto.take(80)}", fontSize = 13.sp)
-        }
-        if (!pdf.isNullOrBlank()) item {
-            Text("PDF hoja de servicio: ${pdf.take(80)}", fontSize = 13.sp)
-        }
-        if (photos.isEmpty() && entryPhoto.isNullOrBlank() && exitPhoto.isNullOrBlank() && pdf.isNullOrBlank()) {
-            item {
-                NxEmptyState(
-                    title = "Sin evidencias",
-                    subtitle = "Aún no hay capturas para esta actividad.",
-                    actionLabel = if (onCapture != null) "Capturar" else null,
-                    onAction = onCapture,
-                )
-            }
-        } else {
-            items(photos.size) { i ->
-                Text("Foto ${i + 1}: ${photos[i].take(80)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ActivityPlaceholderTab(message: String) {
-    Box(Modifier.fillMaxSize(), Alignment.Center) {
-        Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-private fun ADetailRow(label: String, value: String) {
-    if (value == "—" || value.isBlank()) return
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-    }
-}
-
-// ── List Screen ───────────────────────────────────────────────────────────────
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConsoleActivitiesScreen(
     title: String = "Actividades",
     scope: String? = null,
     contentPadding: PaddingValues = PaddingValues(16.dp),
+    onNewOt: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val authRepo = remember(context) { AuthRepository(context) }
@@ -337,7 +76,7 @@ fun ConsoleActivitiesScreen(
 
     // Initial load — pass role flags so VM fetches right datasets
     if (state.isLoading && state.error == null && state.teamActivities.isEmpty() && state.myActivities.isEmpty()) {
-        vm.loadAll(isAdmin = isAdmin, isSuperAdmin = isSuperAdmin, currentUserId = user?.id)
+        vm.loadAll(initial = true, isAdmin = isAdmin, isSuperAdmin = isSuperAdmin, currentUserId = user?.id)
     }
 
     val q = state.query.trim().lowercase()
@@ -354,41 +93,54 @@ fun ConsoleActivitiesScreen(
     val teamFiltered = applyFilters(state.teamActivities)
     val myFiltered = applyFilters(state.myActivities)
 
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = { vm.loadAll(initial = false, isAdmin = isAdmin, isSuperAdmin = isSuperAdmin, currentUserId = user?.id) },
+        modifier = Modifier.fillMaxSize(),
+    ) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
+            .background(NxColors.Surface)
             .padding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         // ── Header: only counts (title is in TopAppBar) ─────────────────────
         item {
             Column {
-                Text(
-                    buildString {
-                        if (isSuperAdmin || isAdmin) append("${state.teamActivities.size} del equipo")
-                        if (!isSuperAdmin && (isAdmin || true)) {
-                            if (isNotEmpty()) append("  ·  ")
-                            append("${state.myActivities.size} propias")
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        buildString {
+                            if (isSuperAdmin || isAdmin) append("${state.teamActivities.size} del equipo")
+                            if (!isSuperAdmin && (isAdmin || true)) {
+                                if (isNotEmpty()) append("  ·  ")
+                                append("${state.myActivities.size} propias")
+                            }
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NxColors.Muted,
+                    )
+                    if (onNewOt != null && (isAdmin || isSuperAdmin)) {
+                        Button(onClick = onNewOt, modifier = Modifier.height(36.dp)) {
+                            Text("Nueva OT", style = MaterialTheme.typography.labelMedium)
                         }
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF64748B),
-                )
+                    }
+                }
                 Spacer(Modifier.height(12.dp))
             }
         }
 
         if (state.isLoading) {
-            item { Text("Cargando actividades...", color = Color(0xFF64748B)) }
+            item { NxLoadingBlock("Cargando actividades…") }
             return@LazyColumn
         }
 
         if (!state.error.isNullOrBlank()) {
-            item {
-                Text(state.error!!, color = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { vm.loadAll(isAdmin, isSuperAdmin, currentUserId = user?.id) }) { Text("Reintentar") }
-            }
+            item { NxErrorBlock(state.error!!) { vm.loadAll(initial = false, isAdmin = isAdmin, isSuperAdmin = isSuperAdmin, currentUserId = user?.id) } }
             return@LazyColumn
         }
 
@@ -438,10 +190,9 @@ fun ConsoleActivitiesScreen(
         // ── Team section (admin/superadmin) ──────────────────────────────────
         if (isSuperAdmin || isAdmin) {
             item {
-                ActivitySectionHeader(
-                    label = if (isSuperAdmin) "Todos los usuarios — Equipo" else "Actividades del equipo",
-                    count = teamFiltered.size,
-                    icon = "🗂️",
+                NxSectionHeader(
+                    title = if (isSuperAdmin) "Todos los usuarios — Equipo" else "Actividades del equipo",
+                    subtitle = "${teamFiltered.size} actividad(es)",
                 )
                 Spacer(Modifier.height(8.dp))
             }
@@ -451,7 +202,7 @@ fun ConsoleActivitiesScreen(
                         title = "Sin actividades",
                         subtitle = "No hay actividades del equipo con este filtro.",
                         actionLabel = "Actualizar",
-                        onAction = { vm.loadAll(isAdmin = isAdmin, isSuperAdmin = isSuperAdmin, currentUserId = user?.id) },
+                        onAction = { vm.loadAll(initial = false, isAdmin = isAdmin, isSuperAdmin = isSuperAdmin, currentUserId = user?.id) },
                     )
                     Spacer(Modifier.height(8.dp))
                 }
@@ -473,21 +224,9 @@ fun ConsoleActivitiesScreen(
         // ── My activities (not superadmin) ───────────────────────────────────
         if (!isSuperAdmin) {
             item {
-                Column {
-                    Text(
-                        "MI ESPACIO DE TRABAJO",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp,
-                        ),
-                        color = Color(0xFF64748B),
-                    )
-                    Spacer(Modifier.height(2.dp))
-                }
-                ActivitySectionHeader(
-                    label = "Mis actividades",
-                    count = myFiltered.size,
-                    icon = "📋",
+                NxSectionHeader(
+                    title = "Mis actividades",
+                    subtitle = "${myFiltered.size} asignada(s)",
                 )
                 Spacer(Modifier.height(8.dp))
             }
@@ -497,11 +236,11 @@ fun ConsoleActivitiesScreen(
                         title = "Sin actividades",
                         subtitle = "No tienes actividades asignadas con este filtro.",
                         actionLabel = "Actualizar",
-                        onAction = { vm.loadAll(isAdmin = isAdmin, isSuperAdmin = isSuperAdmin, currentUserId = user?.id) },
+                        onAction = { vm.loadAll(initial = false, isAdmin = isAdmin, isSuperAdmin = isSuperAdmin, currentUserId = user?.id) },
                     )
                 }
             } else {
-                items(myFiltered.take(100)) { a ->
+                items(myFiltered.take(100), key = { it.id }) { a ->
                     ActivityCard(a, showResponsable = false, onClick = { selectedActivity = a })
                     Spacer(Modifier.height(8.dp))
                 }
@@ -509,6 +248,7 @@ fun ConsoleActivitiesScreen(
         }
 
         item { Spacer(Modifier.height(24.dp)) }
+    }
     }
 }
 
@@ -546,81 +286,45 @@ private fun ActivitySectionHeader(label: String, count: Int, icon: String) {
 
 @Composable
 private fun ActivityCard(a: ActivityDto, showResponsable: Boolean = true, onClick: (() -> Unit)? = null) {
-    val statusColor = activStatusColor(a.estatus)
-    Card(
-        modifier = Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            // Status strip
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(statusColor),
+    val statusTone = activStatusTone(a.estatus)
+    NxPanelShell(onClick = onClick) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                a.titulo?.takeIf { it.isNotBlank() } ?: "Actividad #${a.id}",
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = NxColors.Slate,
             )
-            Column(modifier = Modifier.weight(1f)) {
+            Spacer(Modifier.height(6.dp))
+            NxStatusChip(a.estatus.ifBlank { "Sin estado" }, statusTone)
+            val assignedBy = a.creador?.nombre
+            val assignedTo = a.responsable?.nombre
+            if (!assignedBy.isNullOrBlank() || (showResponsable && !assignedTo.isNullOrBlank())) {
+                Spacer(Modifier.height(6.dp))
                 Text(
-                    a.titulo?.takeIf { it.isNotBlank() } ?: "Actividad #${a.id}",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = Color(0xFF0F172A),
+                    buildString {
+                        if (!assignedBy.isNullOrBlank()) append("Asignó: $assignedBy")
+                        if (showResponsable && !assignedTo.isNullOrBlank()) {
+                            if (isNotEmpty()) append("  ·  ")
+                            append("Asignada a: $assignedTo")
+                        }
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NxColors.Muted,
                 )
+            }
+            val dates = listOfNotNull(
+                a.fechaAsignacion?.takeIf { it.isNotBlank() }?.take(10),
+                a.fechaInicio?.takeIf { it.isNotBlank() }?.take(10),
+                a.fechaFinalizacion?.takeIf { it.isNotBlank() }?.take(10),
+            )
+            if (dates.isNotEmpty()) {
                 Spacer(Modifier.height(4.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    // Status badge
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(statusColor.copy(alpha = 0.13f))
-                            .padding(horizontal = 8.dp, vertical = 3.dp),
-                    ) {
-                        Text(
-                            a.estatus.ifBlank { "—" },
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = statusColor,
-                        )
-                    }
-                }
-                val assignedBy = a.creador?.nombre
-                val assignedTo = a.responsable?.nombre
-                if (!assignedBy.isNullOrBlank() || (showResponsable && !assignedTo.isNullOrBlank())) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        buildString {
-                            if (!assignedBy.isNullOrBlank()) append("Asigno: $assignedBy")
-                            if (showResponsable && !assignedTo.isNullOrBlank()) {
-                                if (isNotEmpty()) append("  ·  ")
-                                append("Asignada a: $assignedTo")
-                            }
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF64748B),
-                    )
-                }
-                val dates = listOfNotNull(
-                    a.fechaAsignacion?.takeIf { it.isNotBlank() },
-                    a.fechaInicio?.takeIf { it.isNotBlank() },
-                    a.fechaFinalizacion?.takeIf { it.isNotBlank() },
+                Text(
+                    dates.joinToString("  →  "),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF94A3B8),
                 )
-                if (dates.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        dates.joinToString("  →  "),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF94A3B8),
-                    )
-                }
             }
         }
     }
 }
-

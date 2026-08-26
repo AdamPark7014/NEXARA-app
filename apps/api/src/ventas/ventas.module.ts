@@ -15,6 +15,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
 import { WorkflowModule } from '../workflow/workflow.module.js';
 import { WebhooksModule } from '../webhooks/webhooks.module.js';
 import { AuditModule } from '../audit/audit.module.js';
+import { ServiceClientsModule } from '../service-clients/service-clients.module.js';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AuditModule } from '../audit/audit.module.js';
     WorkflowModule,
     WebhooksModule,
     AuditModule,
+    ServiceClientsModule,
   ],
   providers: [VentasService, PdfGeneratorService],
   exports: [VentasService],

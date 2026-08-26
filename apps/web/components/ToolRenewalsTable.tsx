@@ -1,366 +1,292 @@
 "use client";
-import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
-import React, { useEffect, useState } from 'react';
-import { Socket } from 'socket.io-client';
-import { useUser } from './UserContext';
-import KpiCard from './ui/KpiCard';
-import styles from './ToolRenewalsTable.module.css';
-import { createRealtimeSocket } from '@/lib/realtime-socket';
 
-interface ToolRenewal {
-  id: number;
-  toolRequestId: number;
-  previousReturnDate: string;
-  newReturnDate: string;
-  renewalReason: string | null;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  requestDate: string;
-  approvalDate: string | null;
-  toolRequest: {
-    id: number;
-    toolName: string;
-    usuario: {
-      id: number;
-      nombre: string;
-      email: string;
-    };
-  };
-  approver?: {
-    id: number;
-    nombre: string;
-  };
-}
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { getSocketBaseUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
+import {
+  approveToolRenewal,
+  listPendingToolRenewals,
+  rejectToolRenewal,
+  type ToolRenewalRow,
+} from "@/lib/tool-requests-api";
+import { createRealtimeSocket } from "@/lib/realtime-socket";
+import FilterToolbar from "./FilterToolbar";
+import Button from "./ui/Button";
+import KpiCard from "./ui/KpiCard";
+import Section from "./ui/Section";
+import DataTable, { Tag, type Column } from "./ui/DataTable";
+import { useUser } from "./UserContext";
 
 interface ToolRenewalsTableProps {
   refreshTrigger?: number;
 }
 
+function fmtDate(value: string) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("es-MX", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function renewalStatusVariant(status: string): "warning" | "positive" | "danger" | "default" {
+  if (status === "PENDING") return "warning";
+  if (status === "APPROVED") return "positive";
+  if (status === "REJECTED") return "danger";
+  return "default";
+}
+
 const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 0 }) => {
   const { user } = useUser();
-  const [renewals, setRenewals] = useState<ToolRenewal[]>([]);
+  const token = user?.token ?? "";
+
+  const [items, setItems] = useState<ToolRenewalRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('PENDING');
-  const [selectedRenewalId, setSelectedRenewalId] = useState<number | null>(null);
+  const [filterStatus, setFilterStatus] = useState("PENDING");
+  const [searchQ, setSearchQ] = useState("");
+  const [modal, setModal] = useState<{ id: number; type: "approve" | "reject" } | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
-  const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
-  const [rejectionReason, setRejectionReason] = useState('');
 
-  const fetchRenewals = async () => {
-    if (!user) return;
+  const load = useCallback(async () => {
+    if (!token) return;
     setLoading(true);
+    setError(null);
     try {
-      const res = await fetch(buildApiUrl(`tool-requests/renewals/pending`), {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      if (!res.ok) throw new Error('Error al cargar renovaciones');
-      const data = await res.json();
-      setRenewals(data);
-      setError(null);
+      setItems(await listPendingToolRenewals(token));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(formatApiError(err, "Error al cargar renovaciones"));
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
-    fetchRenewals();
-  }, [user, refreshTrigger]);
+    void load();
+  }, [load, refreshTrigger]);
 
   useEffect(() => {
-    if (!user?.token) return;
-
-    const socketUrl = getSocketBaseUrl();
-    const socket: Socket = createRealtimeSocket(socketUrl, { transports: ['polling', 'websocket'] });
-    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const scheduleRefresh = () => {
-      if (refreshTimer) clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(() => {
-        fetchRenewals();
-      }, 250);
+    if (!token) return;
+    const socket = createRealtimeSocket(getSocketBaseUrl(), { transports: ["polling", "websocket"] });
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void load(), 250);
     };
-
-    socket.on('entity:updated', (payload: { model?: string }) => {
-      if (!payload?.model) return;
-      if (['ToolRenewal', 'ToolRequest'].includes(payload.model)) {
-        scheduleRefresh();
-      }
+    socket.on("entity:updated", (payload: { model?: string }) => {
+      if (payload?.model === "ToolRenewal" || payload?.model === "ToolRequest") schedule();
     });
-
     return () => {
-      if (refreshTimer) clearTimeout(refreshTimer);
+      if (timer) clearTimeout(timer);
       socket.disconnect();
     };
-  }, [user?.token, refreshTrigger]);
+  }, [token, load]);
 
-  const filteredRenewals = statusFilter === 'all'
-    ? renewals
-    : renewals.filter((r) => r.status === statusFilter);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'PENDING':
-        return 'var(--warning)';
-      case 'APPROVED':
-        return 'var(--success)';
-      case 'REJECTED':
-        return 'var(--danger)';
-      default:
-        return 'var(--text-primary)';
+  const visibleItems = useMemo(() => {
+    let rows = items;
+    if (filterStatus !== "all") rows = rows.filter((r) => r.status === filterStatus);
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter(
+        (r) =>
+          r.toolName.toLowerCase().includes(q) ||
+          r.userName.toLowerCase().includes(q) ||
+          (r.renewalReason ?? "").toLowerCase().includes(q),
+      );
     }
+    return rows;
+  }, [items, filterStatus, searchQ]);
+
+  const counts = {
+    total: items.length,
+    pending: items.filter((r) => r.status === "PENDING").length,
+    urgent: items.filter((r) => r.status === "PENDING" && r.daysOverdue >= 1).length,
+    approved: items.filter((r) => r.status === "APPROVED").length,
   };
 
-  const getStatusLabel = (status: string) => {
-    const labels: { [key: string]: string } = {
-      PENDING: 'Pendiente',
-      APPROVED: 'Aprobada',
-      REJECTED: 'Rechazada',
-    };
-    return labels[status] || status;
-  };
-
-  const getStatusClass = (status: ToolRenewal['status']) => {
-    if (status === 'PENDING') return styles.statusPending;
-    if (status === 'APPROVED') return styles.statusApproved;
-    if (status === 'REJECTED') return styles.statusRejected;
-    return styles.statusPending;
-  };
-
-  const handleAction = async () => {
-    if (!user || !selectedRenewalId || !actionType) return;
-
+  const runModalAction = async () => {
+    if (!token || !modal) return;
     setActionLoading(true);
+    setError(null);
     try {
-      let endpoint = '';
-      let body = {};
-
-      if (actionType === 'approve') {
-        endpoint = buildApiUrl(`tool-requests/renewals/${selectedRenewalId}/approve`);
+      if (modal.type === "approve") {
+        await approveToolRenewal(token, modal.id);
       } else {
-        endpoint = buildApiUrl(`tool-requests/renewals/${selectedRenewalId}/reject`);
-        body = { reason: rejectionReason };
+        await rejectToolRenewal(token, modal.id, rejectReason);
       }
-
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || 'Error en la acción');
-      }
-
-      setActionType(null);
-      setSelectedRenewalId(null);
-      setRejectionReason('');
-      await fetchRenewals();
+      setModal(null);
+      setRejectReason("");
+      await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setError(formatApiError(err, "Error en la acción"));
     } finally {
       setActionLoading(false);
     }
   };
 
-  const openActionModal = (renewalId: number, type: 'approve' | 'reject') => {
-    setSelectedRenewalId(renewalId);
-    setActionType(type);
-    setRejectionReason('');
-  };
-
-  const getDaysUntilExpiry = (expiryDate: string) => {
-    const days = Math.ceil(
-      (new Date(expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-    );
-    return days;
-  };
-
-  if (loading) return <div className={styles.loading}>Cargando renovaciones...</div>;
-
-  const renewalCounts = {
-    total: renewals.length,
-    pending: renewals.filter((r) => r.status === 'PENDING').length,
-    urgent: renewals.filter((r) => r.status === 'PENDING' && getDaysUntilExpiry(r.previousReturnDate) <= 1).length,
-    approved: renewals.filter((r) => r.status === 'APPROVED').length,
-  };
-
-  return (
-    <div className={styles.root}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 16 }}>
-        <KpiCard label="Total" value={renewalCounts.total} icon="🔁" />
-        <KpiCard label="Pendientes" value={renewalCounts.pending} icon="⏳" variant={renewalCounts.pending > 0 ? "warning" : "default"} />
-        <KpiCard label="Urgentes (≤1 día)" value={renewalCounts.urgent} icon="⚠️" variant={renewalCounts.urgent > 0 ? "danger" : "positive"} />
-        <KpiCard label="Aprobadas" value={renewalCounts.approved} icon="✅" variant="positive" />
-      </div>
-
-      <div className={`card ${styles.panel}`}>
-        <div className={styles.header}>
-          <h3 className={styles.title}>Renovaciones de Herramientas</h3>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className={`input ${styles.filter}`}
-          >
-            <option value="PENDING">Pendientes</option>
-            <option value="all">Todos los estados</option>
-            <option value="APPROVED">Aprobadas</option>
-            <option value="REJECTED">Rechazadas</option>
-          </select>
+  const columns: Column<ToolRenewalRow>[] = [
+    {
+      key: "user",
+      label: "Usuario",
+      render: (r) => (
+        <div>
+          <div>{r.userName}</div>
+          {r.userEmail && (
+            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{r.userEmail}</div>
+          )}
         </div>
-
-        {error && <div className={styles.error}>{error}</div>}
-
-        {filteredRenewals.length === 0 ? (
-          <div className={styles.empty}>
-            No hay renovaciones para mostrar
+      ),
+      width: 150,
+    },
+    { key: "tool", label: "Herramienta", accessor: (r) => r.toolName },
+    { key: "prev", label: "Fecha actual", accessor: (r) => fmtDate(r.previousReturnDate), width: 110 },
+    { key: "new", label: "Nueva fecha", accessor: (r) => fmtDate(r.newReturnDate), width: 110 },
+    {
+      key: "overdue",
+      label: "Vencimiento",
+      render: (r) => (
+        <div>
+          <span style={{ fontWeight: r.daysOverdue >= 1 ? 700 : 400, color: r.daysOverdue >= 1 ? "var(--danger)" : undefined }}>
+            {r.daysOverdue >= 1 ? "⚠️ " : ""}{r.daysOverdue} días
+          </span>
+          {r.renewalReason && (
+            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{r.renewalReason}</div>
+          )}
+        </div>
+      ),
+      width: 130,
+    },
+    {
+      key: "status",
+      label: "Estado",
+      render: (r) => (
+        <Tag variant={renewalStatusVariant(r.status)}>
+          {r.status === "PENDING" ? "Pendiente" : r.status === "APPROVED" ? "Aprobada" : "Rechazada"}
+        </Tag>
+      ),
+      width: 100,
+    },
+    {
+      key: "actions",
+      label: "Acciones",
+      width: 160,
+      render: (r) =>
+        r.status === "PENDING" ? (
+          <div style={{ display: "flex", gap: 6 }}>
+            <Button size="sm" onClick={() => setModal({ id: r.id, type: "approve" })}>Aprobar</Button>
+            <Button size="sm" variant="ghost" onClick={() => setModal({ id: r.id, type: "reject" })}>
+              Rechazar
+            </Button>
           </div>
         ) : (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr className={styles.rowBorder}>
-                  <th className={styles.th}>
-                    Usuario
-                  </th>
-                  <th className={styles.th}>
-                    Herramienta
-                  </th>
-                  <th className={styles.th}>
-                    Fecha Actual
-                  </th>
-                  <th className={styles.th}>
-                    Nueva Fecha
-                  </th>
-                  <th className={styles.th}>
-                    Días vencimiento actual
-                  </th>
-                  <th className={styles.th}>
-                    Estado
-                  </th>
-                  <th className={`${styles.th} ${styles.thCenter}`}>
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRenewals.map((renewal) => {
-                  const daysUntilExpiry = getDaysUntilExpiry(renewal.previousReturnDate);
-                  const isUrgent = daysUntilExpiry <= 1;
+          <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+            {r.approverName ? `Por ${r.approverName}` : "Procesado"}
+          </span>
+        ),
+    },
+  ];
 
-                  return (
-                    <tr
-                      key={renewal.id}
-                      className={`${styles.rowBorder} ${isUrgent ? styles.rowUrgent : ''}`}
-                    >
-                      <td className={styles.td}>
-                        <div className={styles.userName}>{renewal.toolRequest.usuario.nombre}</div>
-                        <div className={styles.smallMuted}>
-                          {renewal.toolRequest.usuario.email}
-                        </div>
-                      </td>
-                      <td className={`${styles.td} ${styles.toolName}`}>
-                        {renewal.toolRequest.toolName}
-                      </td>
-                      <td className={`${styles.td} ${styles.dateMuted}`}>
-                        {new Date(renewal.previousReturnDate).toLocaleDateString()}
-                      </td>
-                      <td className={`${styles.td} ${styles.newDate}`}>
-                        {new Date(renewal.newReturnDate).toLocaleDateString()}
-                      </td>
-                      <td className={`${styles.td} ${isUrgent ? styles.expiryUrgent : styles.expiryText}`}>
-                        <div className={isUrgent ? styles.expiryWeightUrgent : styles.expiryWeight}>
-                          {isUrgent ? '⚠️ ' : ''}{daysUntilExpiry} días
-                        </div>
-                        {renewal.renewalReason && (
-                          <div className={styles.reason}>
-                            "{renewal.renewalReason}"
-                          </div>
-                        )}
-                      </td>
-                      <td className={styles.td}>
-                        <div className={`${styles.status} ${getStatusClass(renewal.status)}`}>
-                          {getStatusLabel(renewal.status)}
-                        </div>
-                      </td>
-                      <td className={styles.actionsCell}>
-                        {renewal.status === 'PENDING' && (
-                          <>
-                            <button
-                              className={`button-secondary ${styles.smallBtn} ${styles.approveBtn}`}
-                              onClick={() => openActionModal(renewal.id, 'approve')}
-                            >
-                              ✓ Aprobar
-                            </button>
-                            <button
-                              className={`button-secondary ${styles.smallBtn} ${styles.rejectBtn}`}
-                              onClick={() => openActionModal(renewal.id, 'reject')}
-                            >
-                              ✗ Rechazar
-                            </button>
-                          </>
-                        )}
-                        {renewal.status !== 'PENDING' && (
-                          <span className={styles.processedText}>
-                            {renewal.approver?.nombre ? `Por ${renewal.approver.nombre}` : 'Procesado'}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+  return (
+    <div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+          gap: 12,
+          marginBottom: 16,
+        }}
+      >
+        <KpiCard label="Total" value={counts.total} icon="🔁" />
+        <KpiCard
+          label="Pendientes"
+          value={counts.pending}
+          icon="⏳"
+          variant={counts.pending > 0 ? "warning" : "default"}
+        />
+        <KpiCard
+          label="Urgentes"
+          value={counts.urgent}
+          icon="⚠️"
+          variant={counts.urgent > 0 ? "danger" : "positive"}
+        />
+        <KpiCard label="Aprobadas" value={counts.approved} icon="✅" variant="positive" />
       </div>
 
-      {actionType && (
-        <div className={styles.modalOverlay}>
-          <div className={`card ${styles.modalCard}`}>
-            <h3 className={styles.modalTitle}>
-              {actionType === 'approve' ? 'Aprobar Renovación' : 'Rechazar Renovación'}
+      <Section title="Renovaciones de herramientas">
+        {error && <div style={{ color: "var(--danger)", marginBottom: 12, fontSize: 13 }}>{error}</div>}
+
+        <FilterToolbar
+          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar herramienta o usuario…" }}
+          selects={[
+            {
+              label: "Estado",
+              value: filterStatus,
+              onChange: setFilterStatus,
+              options: [
+                { value: "PENDING", label: "Pendientes" },
+                { value: "APPROVED", label: "Aprobadas" },
+                { value: "REJECTED", label: "Rechazadas" },
+                { value: "all", label: "Todos" },
+              ],
+              allowAll: false,
+            },
+          ]}
+          onClear={() => {
+            setSearchQ("");
+            setFilterStatus("PENDING");
+          }}
+          resultCount={loading ? null : visibleItems.length}
+        />
+
+        <DataTable<ToolRenewalRow>
+          columns={columns}
+          rows={loading ? [] : visibleItems}
+          rowKey={(r) => r.id}
+          emptyTitle={loading ? "Cargando…" : "Sin renovaciones"}
+          emptyDescription={
+            loading ? "Obteniendo renovaciones pendientes" : "No hay renovaciones con los filtros actuales"
+          }
+        />
+      </Section>
+
+      {modal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(8,24,38,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 50,
+            padding: 16,
+          }}
+          onClick={() => !actionLoading && setModal(null)}
+        >
+          <div
+            className="card"
+            style={{ maxWidth: 420, width: "100%", padding: 20 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: "0 0 12px" }}>
+              {modal.type === "approve" ? "Aprobar renovación" : "Rechazar renovación"}
             </h3>
-
-            {actionType === 'reject' && (
-              <label className={styles.rejectField}>
-                Motivo del rechazo (Opcional)
-                <textarea
-                  className={`input ${styles.rejectArea}`}
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Explica por qué se rechaza la renovación..."
-                />
-              </label>
+            {modal.type === "reject" && (
+              <textarea
+                className="input"
+                style={{ width: "100%", minHeight: 80, marginBottom: 12 }}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Motivo del rechazo (opcional)"
+              />
             )}
-
-            {error && <div className={styles.modalError}>{error}</div>}
-
-            <div className={styles.modalActions}>
-              <button
-                className="button-primary"
-                onClick={handleAction}
-                disabled={actionLoading}
-              >
-                {actionLoading ? 'Procesando...' : 'Confirmar'}
-              </button>
-              <button
-                className="button-secondary"
-                onClick={() => {
-                  setActionType(null);
-                  setSelectedRenewalId(null);
-                  setRejectionReason('');
-                  setError(null);
-                }}
-                disabled={actionLoading}
-              >
+            <div style={{ display: "flex", gap: 8 }}>
+              <Button loading={actionLoading} onClick={() => void runModalAction()}>Confirmar</Button>
+              <Button variant="secondary" disabled={actionLoading} onClick={() => setModal(null)}>
                 Cancelar
-              </button>
+              </Button>
             </div>
           </div>
         </div>

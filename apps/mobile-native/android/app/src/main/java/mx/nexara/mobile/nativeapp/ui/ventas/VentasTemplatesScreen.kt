@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,12 +32,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.OrderTemplateDto
 import mx.nexara.mobile.nativeapp.data.crm.CrmRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 
 private val CrmGreen = Color(0xFF10B981)
 
 data class TemplatesUiState(
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
     val items: List<OrderTemplateDto> = emptyList(),
     val showForm: Boolean = false,
@@ -59,14 +65,17 @@ class VentasTemplatesViewModel(app: Application) : AndroidViewModel(app) {
 
     init { refresh() }
 
-    fun refresh() {
+    fun refresh(pullToRefresh: Boolean = false) {
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null, actionError = null) }
+            _state.update {
+                if (pullToRefresh) it.copy(isRefreshing = true, actionError = null)
+                else it.copy(isLoading = true, error = null, actionError = null)
+            }
             try {
                 val list = withContext(Dispatchers.IO) { repo.orderTemplateDtos() }
-                _state.update { it.copy(isLoading = false, items = list) }
+                _state.update { it.copy(isLoading = false, isRefreshing = false, items = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message) }
+                _state.update { it.copy(isLoading = false, isRefreshing = false, error = e.message) }
             }
         }
     }
@@ -178,29 +187,51 @@ fun VentasTemplatesScreen() {
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = { vm.refresh(pullToRefresh = true) },
+                modifier = Modifier.fillMaxSize(),
+            ) {
             when {
-                state.isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+                state.isLoading && !state.isRefreshing -> NxLoadingBlock("Cargando plantillas…")
                 !state.error.isNullOrBlank() && state.items.isEmpty() -> NxEmptyState(
                     title = "No se pudieron cargar",
                     subtitle = state.error ?: "",
                     actionLabel = "Reintentar",
-                    onAction = vm::refresh,
+                    onAction = { vm.refresh() },
                 )
                 else -> LazyColumn(
+                    modifier = Modifier.fillMaxSize().background(NxColors.Surface),
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     item {
-                        Text(
+                        NxSectionHeader(
                             "Plantillas de cotización PDF",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            "Diseño corporativo reutilizable para cotizaciones",
                         )
-                        Text(
-                            "Diseño corporativo reutilizable para cotizaciones.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    }
+                    if (state.items.isNotEmpty()) {
+                        item {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                NxPanelShell(modifier = Modifier.weight(1f), contentPadding = PaddingValues(12.dp)) {
+                                    Text(
+                                        "${state.items.size}",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = NxColors.Teal,
+                                    )
+                                    Text("Plantillas", style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
+                                }
+                                NxPanelShell(modifier = Modifier.weight(1f), contentPadding = PaddingValues(12.dp)) {
+                                    Text(
+                                        "${state.items.count { it.isDefault }}",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = CrmGreen,
+                                    )
+                                    Text("Predeterminadas", style = MaterialTheme.typography.labelSmall, color = NxColors.Muted)
+                                }
+                            }
+                        }
                     }
                     if (!state.actionError.isNullOrBlank()) {
                         item {
@@ -228,6 +259,7 @@ fun VentasTemplatesScreen() {
                         }
                     }
                 }
+            }
             }
         }
     }
@@ -290,16 +322,21 @@ private fun TemplateCard(
 ) {
     val swatch = runCatching { Color(android.graphics.Color.parseColor(tpl.colorHex)) }.getOrDefault(CrmGreen)
 
-    Card(shape = RoundedCornerShape(12.dp)) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    NxPanelShell {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(Modifier.size(14.dp).clip(CircleShape).background(swatch))
-                Text(tpl.displayName, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text(
+                    tpl.displayName,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = NxColors.Slate,
+                    modifier = Modifier.weight(1f),
+                )
                 if (tpl.isDefault) {
                     AssistChip(
                         onClick = {},
                         label = { Text("Predeterminada", style = MaterialTheme.typography.labelSmall) },
-                        leadingIcon = { Icon(Icons.Default.Star, null, Modifier.size(14.dp)) },
+                        leadingIcon = { Icon(Icons.Default.Star, contentDescription = "Predeterminada", modifier = Modifier.size(14.dp)) },
                         colors = AssistChipDefaults.assistChipColors(containerColor = CrmGreen.copy(alpha = 0.12f)),
                     )
                 }
@@ -315,7 +352,7 @@ private fun TemplateCard(
                     TextButton(onClick = onSetDefault) { Text("Predeterminar") }
                 }
                 TextButton(onClick = onDelete, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
-                    Icon(Icons.Default.Delete, null, Modifier.size(16.dp))
+                    Icon(Icons.Default.Delete, contentDescription = "Eliminar", modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Eliminar")
                 }

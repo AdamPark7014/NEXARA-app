@@ -34,7 +34,21 @@ data class BranchPortalLoginResponse(
     val branch: BranchPortalLoginBranchDto,
 )
 
+data class UnifiedPortalLoginResponse(
+    val access_token: String,
+    val portalKind: String? = null,
+    val companyId: Long? = null,
+    val client: ClientPortalLoginClientDto? = null,
+    val branch: BranchPortalLoginBranchDto? = null,
+)
+
 interface PortalAuthApi {
+    @POST("portal/login")
+    suspend fun portalLogin(
+        @HeaderMap headers: Map<String, String>,
+        @Body body: PortalLoginRequest,
+    ): UnifiedPortalLoginResponse
+
     @POST("client-auth/login")
     suspend fun clientLogin(
         @HeaderMap headers: Map<String, String>,

@@ -8,7 +8,11 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.CalendarEventDto
+import mx.nexara.mobile.nativeapp.data.api.CotizacionDetailDto
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDto
+import mx.nexara.mobile.nativeapp.data.api.CrmActivityDto
+import mx.nexara.mobile.nativeapp.data.api.CrmAgendaDto
+import mx.nexara.mobile.nativeapp.data.api.ProcParse
 import mx.nexara.mobile.nativeapp.data.api.CrmApi
 import mx.nexara.mobile.nativeapp.data.api.CrmClientDto
 import mx.nexara.mobile.nativeapp.data.api.CrmLeadDto
@@ -62,12 +66,13 @@ class CrmRepository(private val context: Context) {
     private suspend inline fun <reified T> parseListResponse(body: okhttp3.ResponseBody): List<T> =
         parseList(body.string())
 
-    suspend fun cotizaciones(): List<CotizacionDto> {
-        return try {
-            parseListResponse(crmApi.listCotizacionesRaw())
+    suspend fun cotizaciones(status: String? = null, clientName: String? = null): List<CotizacionDto> {
+        val rows = try {
+            parseMaps(crmApi.listCotizacionesRaw(clientName = clientName, status = status).string())
         } catch (_: Exception) {
-            parseListResponse(extraApi.getCotizacionesRaw())
+            parseMaps(extraApi.getCotizacionesRaw().string())
         }
+        return rows.map { CotizacionDto.fromRaw(it) }
     }
 
     suspend fun oportunidades(): List<Map<String, Any?>> = opportunityDtos().map { it.toFlatMap() }
@@ -128,13 +133,78 @@ class CrmRepository(private val context: Context) {
     suspend fun clientDtos(): List<CrmClientDto> =
         parseMaps(crmApi.listClientesRaw().string()).map { CrmClientDto.fromRaw(it) }
 
+    suspend fun getClientDetail(id: Long): Map<String, Any?> =
+        parseObject(crmApi.getClientRaw(id).string())
+
+    suspend fun getClientSnapshot(id: Long): Map<String, Any?> =
+        parseObject(crmApi.getClientSnapshotRaw(id).string())
+
     suspend fun leads(): List<Map<String, Any?>> = leadDtos().map { it.raw }
     suspend fun leadDtos(): List<CrmLeadDto> =
         parseMaps(crmApi.listLeadsRaw().string()).map { CrmLeadDto.fromRaw(it) }
 
+    suspend fun getLead(id: Long): CrmLeadDto =
+        CrmLeadDto.fromRaw(parseObject(crmApi.getLeadRaw(id).string()))
+
+    suspend fun createLead(fields: Map<String, Any?>): CrmLeadDto =
+        CrmLeadDto.fromRaw(parseObject(crmApi.createLeadRaw(fields).string()))
+
+    suspend fun updateLead(id: Long, fields: Map<String, Any?>): CrmLeadDto =
+        CrmLeadDto.fromRaw(parseObject(crmApi.updateLeadRaw(id, fields).string()))
+
+    suspend fun deleteLead(id: Long) {
+        crmApi.deleteLeadRaw(id)
+    }
+
+    suspend fun createClient(fields: Map<String, Any?>): Map<String, Any?> =
+        parseObject(crmApi.createClientRaw(fields).string())
+
+    suspend fun updateClient(id: Long, fields: Map<String, Any?>): Map<String, Any?> =
+        parseObject(crmApi.updateClientRaw(id, fields).string())
+
+    suspend fun provisionServiceClient(id: Long): Map<String, Any?> {
+        val result = parseObject(crmApi.provisionServiceClientRaw(id).string())
+        @Suppress("UNCHECKED_CAST")
+        val salesClient = result["salesClient"] as? Map<String, Any?>
+        return salesClient ?: getClientDetail(id)
+    }
+
+    suspend fun convertLeadToOpportunity(
+        lead: CrmLeadDto,
+        value: Double,
+        stage: String = "DISCOVERY",
+    ): Map<String, Any?> {
+        val leadId = lead.numericId ?: throw IllegalStateException("Lead sin ID")
+        val clientLabel = lead.clientName.ifBlank { lead.displayTitle }
+        val client = createClient(
+            mapOf(
+                "legalName" to clientLabel,
+                "billingEmail" to ProcParse.str(lead.raw["email"]),
+                "billingPhone" to ProcParse.str(lead.raw["phone"]),
+                "notes" to "Cliente desde lead #$leadId",
+            ),
+        )
+        val clientId = ProcParse.lng(client["id"])
+        updateLead(leadId, mapOf("status" to "CONVERTED", "clientId" to clientId))
+        return createOpportunity(
+            mapOf(
+                "title" to clientLabel,
+                "value" to value,
+                "stage" to stage,
+                "probability" to 30,
+                "leadId" to leadId,
+                "clientId" to clientId,
+                "clientName" to clientLabel,
+            ),
+        )
+    }
+
     suspend fun proyectos(): List<Map<String, Any?>> = projectDtos().map { it.toFlatMap() }
     suspend fun projectDtos(): List<CrmSalesProjectDto> =
         parseMaps(crmApi.listProyectosRaw().string()).map { CrmSalesProjectDto.fromRaw(it) }
+
+    suspend fun getProjectSummary(id: Long): Map<String, Any?> =
+        parseObject(crmApi.getProjectSummaryRaw(id).string())
 
     suspend fun products(search: String? = null): List<Map<String, Any?>> =
         productDtos(search).map { it.toFlatMap() }
@@ -177,6 +247,48 @@ class CrmRepository(private val context: Context) {
 
     suspend fun setOrderTemplateDefault(id: Long): Map<String, Any?> =
         parseObject(crmApi.setOrderTemplateDefaultRaw(id).string())
+
+    suspend fun cotizacionDetail(id: Long): CotizacionDetailDto =
+        CotizacionDetailDto.fromRaw(parseObject(crmApi.getCotizacionDetailRaw(id).string()))
+
+    suspend fun downloadCotizacionPdf(id: Long, internal: Boolean = false): ByteArray {
+        val body = if (internal) crmApi.downloadCotizacionInternalPdfRaw(id) else crmApi.downloadCotizacionPdfRaw(id)
+        return body.bytes()
+    }
+
+    suspend fun sendCotizacion(id: Long, email: String, message: String? = null): Map<String, Any?> {
+        val payload = buildMap {
+            put("email", email)
+            if (!message.isNullOrBlank()) put("message", message)
+        }
+        return parseObject(crmApi.sendCotizacionRaw(id, payload).string())
+    }
+
+    suspend fun updateOpportunityStage(id: Long, stage: String): Map<String, Any?> =
+        updateOpportunity(id, mapOf("stage" to stage))
+
+    suspend fun crmActivitiesForOpportunity(opportunityId: Long): List<CrmActivityDto> =
+        parseMaps(crmApi.listCrmActivitiesRaw(opportunityId = opportunityId).string())
+            .map { CrmActivityDto.fromRaw(it) }
+
+    suspend fun crmAgenda(): CrmAgendaDto {
+        val raw = parseObject(crmApi.myAgendaRaw().string())
+        fun parseList(key: String): List<CrmActivityDto> {
+            @Suppress("UNCHECKED_CAST")
+            val list = raw[key] as? List<Map<String, Any?>> ?: return emptyList()
+            return list.map { CrmActivityDto.fromRaw(it) }
+        }
+        return CrmAgendaDto(
+            pendingToday = parseList("pendingToday"),
+            overdue = parseList("overdue"),
+            upcoming = parseList("upcoming"),
+            recentlyCompleted = parseList("recentlyCompleted"),
+        )
+    }
+
+    suspend fun completeCrmActivity(id: Long, outcome: String? = null) {
+        crmApi.completeCrmActivityRaw(id, mapOf("outcome" to outcome))
+    }
 
     suspend fun deleteOrderTemplate(id: Long) {
         crmApi.deleteOrderTemplateRaw(id)

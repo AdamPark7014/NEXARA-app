@@ -535,27 +535,282 @@ private func fmtMxn(_ v: Double) -> String {
     return String(format: "$%.0f", v)
 }
 
+private func statNum(_ s: [String: Any], _ key: String) -> Double {
+    let v = s[key]
+    if let n = v as? Double { return n }
+    if let n = v as? Int { return Double(n) }
+    if let n = v as? Int64 { return Double(n) }
+    if let str = v as? String, let n = Double(str) { return n }
+    return 0
+}
+
+private func statInt(_ s: [String: Any], _ key: String) -> Int { Int(statNum(s, key)) }
+
+private func computeClientHealth(stats: [String: Any]?, status: String) -> (score: Int, label: String) {
+    var score = 100
+    if status == "Inactivo" || status == "INACTIVE" { score -= 25 }
+    let s = stats ?? [:]
+    if statInt(s, "activitiesOpen") > 3 { score -= 10 }
+    if statInt(s, "pendingInvoices") > 0 { score -= 15 }
+    if statInt(s, "ticketRequests") > 2 { score -= 10 }
+    if statInt(s, "opportunitiesOpen") == 0 && statInt(s, "totalSalesProjects") == 0 { score -= 5 }
+    if score >= 75 { return (score, "Saludable") }
+    if score >= 50 { return (score, "En riesgo") }
+    return (score, "Crítico")
+}
+
+private func snapPickDate(_ raw: Any?) -> String? {
+    guard let raw else { return nil }
+    let s = String(describing: raw).trimmingCharacters(in: .whitespacesAndNewlines)
+    if s.isEmpty { return nil }
+    return String(s.prefix(19))
+}
+
+private func buildClient360Timeline(snapshot: [String: Any]) -> [(title: String, kind: String, subtitle: String)] {
+  var events: [(at: String, title: String, kind: String, subtitle: String)] = []
+
+    if let opps = snapshot["opportunities"] as? [[String: Any]] {
+        for row in opps {
+            guard let at = snapPickDate(row["updatedAt"] ?? row["createdAt"]) else { continue }
+            let title = ConsoleHelpers.mapStr(row, "title").isEmpty ? "Oportunidad" : ConsoleHelpers.mapStr(row, "title")
+            events.append((at, title, "oportunidad", ConsoleHelpers.mapStr(row, "stage")))
+        }
+    }
+    if let quotes = snapshot["quotes"] as? [[String: Any]] {
+        for row in quotes {
+            let cot = (row["cotizacion"] as? [String: Any]) ?? row
+            guard let at = snapPickDate(cot["createdAt"] ?? row["createdAt"]) else { continue }
+            let title = ConsoleHelpers.mapStr(cot, "quoteNumber", "folio")
+            events.append((at, title.isEmpty ? "Cotización" : title, "cotización", ConsoleHelpers.mapStr(cot, "status", "estatus")))
+        }
+    }
+    if let activities = snapshot["activities"] as? [[String: Any]] {
+        for row in activities {
+            guard let at = snapPickDate(row["fechaAsignacion"] ?? row["createdAt"]) else { continue }
+            let title = ConsoleHelpers.mapStr(row, "titulo", "anNumber")
+            events.append((at, title.isEmpty ? "Actividad" : title, "actividad", ConsoleHelpers.mapStr(row, "estatus", "status")))
+        }
+    }
+    if let tickets = snapshot["ticketRequests"] as? [[String: Any]] {
+        for row in tickets {
+            guard let at = snapPickDate(row["createdAt"]) else { continue }
+            let desc = ConsoleHelpers.mapStr(row, "description", "subject", "descripcion")
+            let title = desc.isEmpty ? "Ticket" : String(desc.prefix(80))
+            events.append((at, title, "ticket", ConsoleHelpers.mapStr(row, "status", "estado")))
+        }
+    }
+    if let invoices = snapshot["invoices"] as? [[String: Any]] {
+        for row in invoices {
+            guard let at = snapPickDate(row["issueDate"] ?? row["createdAt"]) else { continue }
+            let title = ConsoleHelpers.mapStr(row, "invoiceNumber", "folio")
+            events.append((at, title.isEmpty ? "Factura" : title, "factura", ConsoleHelpers.mapStr(row, "status", "estado")))
+        }
+    }
+
+    return events
+        .sorted { $0.at > $1.at }
+        .prefix(25)
+        .map { (title: $0.title, kind: $0.kind, subtitle: $0.subtitle) }
+}
+
 // MARK: - Client Detail (tabbed)
 
+private let clientIndustries = [
+    "Corporativo", "Gobierno", "PyME", "Hogar", "Retail", "Industrial", "Educación", "Salud", "Otro",
+]
+private let clientStatuses = ["Activo", "Inactivo", "Prospecto"]
+
+private func hasServiceClientLinked(_ client: [String: Any]) -> Bool {
+    guard let v = client["serviceClientId"] else { return false }
+    if let n = v as? NSNumber { return n.int64Value > 0 }
+    if let s = v as? String { return !s.isEmpty && s != "0" && s != "null" }
+    if let n = v as? Int { return n > 0 }
+    if let n = v as? Int64 { return n > 0 }
+    return false
+}
+
+private struct CrmClientDatosFormState {
+    var name = ""
+    var legalName = ""
+    var taxId = ""
+    var billingEmail = ""
+    var billingPhone = ""
+    var industry = "PyME"
+    var status = "Prospecto"
+    var fiscalAddress = ""
+    var fiscalZipCode = ""
+    var fiscalRegime = "601"
+    var website = ""
+    var notes = ""
+
+    mutating func load(from client: [String: Any]) {
+        name = ConsoleHelpers.mapStr(client, "name", "nombre")
+        legalName = ConsoleHelpers.mapStr(client, "legalName", "razonSocial")
+        taxId = ConsoleHelpers.mapStr(client, "taxId", "rfc")
+        billingEmail = ConsoleHelpers.mapStr(client, "billingEmail", "email")
+        billingPhone = ConsoleHelpers.mapStr(client, "billingPhone", "phone", "telefono")
+        industry = ConsoleHelpers.mapStr(client, "industry").ifEmptyExt("PyME")
+        status = ConsoleHelpers.mapStr(client, "status", "estatus").ifEmptyExt("Prospecto")
+        fiscalAddress = ConsoleHelpers.mapStr(client, "fiscalAddress")
+        fiscalZipCode = ConsoleHelpers.mapStr(client, "fiscalZipCode")
+        fiscalRegime = ConsoleHelpers.mapStr(client, "fiscalRegime").ifEmptyExt("601")
+        website = ConsoleHelpers.mapStr(client, "website")
+        notes = ConsoleHelpers.mapStr(client, "notes", "notas")
+    }
+
+    func toPayload() -> [String: String] {
+        [
+            "name": name.trimmingCharacters(in: .whitespaces),
+            "legalName": legalName.trimmingCharacters(in: .whitespaces),
+            "taxId": taxId.trimmingCharacters(in: .whitespaces),
+            "billingEmail": billingEmail.trimmingCharacters(in: .whitespaces),
+            "billingPhone": billingPhone.trimmingCharacters(in: .whitespaces),
+            "industry": industry,
+            "status": status,
+            "fiscalAddress": fiscalAddress.trimmingCharacters(in: .whitespaces),
+            "fiscalZipCode": fiscalZipCode.trimmingCharacters(in: .whitespaces),
+            "fiscalRegime": fiscalRegime.trimmingCharacters(in: .whitespaces),
+            "website": website.trimmingCharacters(in: .whitespaces),
+            "notes": notes.trimmingCharacters(in: .whitespaces),
+        ]
+    }
+}
+
+private struct CrmClientDatosEditSheet: View {
+    @Binding var state: CrmClientDatosFormState
+    let saving: Bool
+    let error: String?
+    let onDismiss: () -> Void
+    let onSave: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Datos generales") {
+                    TextField("Nombre comercial *", text: $state.name)
+                    TextField("Razón social", text: $state.legalName)
+                    TextField("RFC", text: $state.taxId)
+                    TextField("CP fiscal (CFDI)", text: $state.fiscalZipCode)
+                        .keyboardType(.numberPad)
+                    TextField("Régimen fiscal", text: $state.fiscalRegime)
+                    TextField("Sitio web", text: $state.website)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                    TextField("Email facturación", text: $state.billingEmail)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                    TextField("Teléfono", text: $state.billingPhone)
+                        .keyboardType(.phonePad)
+                    TextField("Dirección fiscal", text: $state.fiscalAddress, axis: .vertical)
+                        .lineLimit(2...4)
+                }
+                Section("Industria") {
+                    Picker("Industria", selection: $state.industry) {
+                        ForEach(clientIndustries, id: \.self) { Text($0).tag($0) }
+                    }
+                }
+                Section("Estado comercial") {
+                    Picker("Estado", selection: $state.status) {
+                        ForEach(clientStatuses, id: \.self) { Text($0).tag($0) }
+                    }
+                }
+                Section("Notas internas") {
+                    TextField("Notas", text: $state.notes, axis: .vertical)
+                        .lineLimit(3...6)
+                }
+                if let error, !error.isEmpty {
+                    Section { Text(error).foregroundColor(.red).font(.footnote) }
+                }
+            }
+            .navigationTitle("Editar cliente")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar", action: onDismiss)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(saving ? "Guardando…" : "Guardar", action: onSave)
+                        .disabled(saving || state.name.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+    }
+}
+
+struct CrmClientDetailByIdView: View {
+    let clientId: Int64
+    let onBack: () -> Void
+
+    @State private var client: [String: Any]?
+    @State private var loading = true
+    @State private var error: String?
+
+    var body: some View {
+        Group {
+            if loading {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let client {
+                CrmClientDetailView(client: client, onBack: onBack)
+            } else {
+                VStack(spacing: 12) {
+                    Button("← Volver", action: onBack)
+                    Text(error ?? "Cliente no encontrado").foregroundStyle(.red)
+                }
+                .padding()
+            }
+        }
+        .task { await load() }
+    }
+
+    private func load() async {
+        loading = true
+        error = nil
+        do {
+            client = try await CrmRepository.shared.clientDetail(id: clientId)
+            if (ConsoleHelpers.mapInt64(client ?? [:], "id") ?? 0) <= 0 {
+                client = nil
+                error = "Cliente no encontrado"
+            }
+        } catch {
+            self.error = error.localizedDescription
+        }
+        loading = false
+    }
+}
+
 struct CrmClientDetailView: View {
-    let client: [String: Any]
+    @State private var clientData: [String: Any]
     let onBack: () -> Void
 
     @State private var tab = 0
+    @State private var showEdit = false
+    @State private var editForm = CrmClientDatosFormState()
+    @State private var savingEdit = false
+    @State private var provisioning = false
+    @State private var actionError: String?
+    @State private var reloadKey = 0
     @State private var cotizaciones: [Cotizacion] = []
     @State private var oportunidades: [CrmOpportunity] = []
     @State private var tickets: [[String: Any]] = []
-    @State private var sucursales: [[String: Any]] = []
     @State private var servicios: [[String: Any]] = []
+    @State private var facturas: [[String: Any]] = []
+    @State private var sucursales: [[String: Any]] = []
+    @State private var snapshotStats: [String: Any]?
+    @State private var timelineEvents: [(title: String, kind: String, subtitle: String)] = []
+    @State private var healthLabel = ""
+    @State private var healthScore = 0
     @State private var loading = true
 
-    private let tabs = ["Info", "Cotizaciones", "Oportunidades", "Tickets", "Sucursales", "Servicios"]
-    private var clientName: String { ConsoleHelpers.mapStr(client, "name", "nombre", "razonSocial") }
-    private var clientId: String { ConsoleHelpers.mapStr(client, "id") }
-    private var serviceClientId: String {
-        let scId = ConsoleHelpers.mapStr(client, "serviceClientId", "scId")
-        return scId.isEmpty ? clientId : scId
+    init(client: [String: Any], onBack: @escaping () -> Void) {
+        _clientData = State(initialValue: client)
+        self.onBack = onBack
     }
+
+    private let tabs = ["360", "Cotizaciones", "Oportunidades", "Tickets", "Facturas", "Sucursales", "Servicios", "Timeline"]
+    private var client: [String: Any] { clientData }
+    private var clientName: String { ConsoleHelpers.mapStr(client, "name", "nombre", "razonSocial") }
+    private var clientId: Int64 { ConsoleHelpers.mapInt64(client, "id") ?? 0 }
+    private var hasServiceClient: Bool { hasServiceClientLinked(client) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -567,6 +822,13 @@ struct CrmClientDetailView: View {
 
             Text(clientName.isEmpty ? "Cliente" : clientName)
                 .font(.headline).padding(.horizontal).padding(.bottom, 4)
+
+            if !healthLabel.isEmpty {
+                Text("Salud: \(healthLabel) (\(healthScore)/100)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal)
+            }
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 0) {
@@ -593,44 +855,152 @@ struct CrmClientDetailView: View {
                 Spacer(); ProgressView(); Spacer()
             } else {
                 switch tab {
-                case 0: infoTab
+                case 0: client360Tab
                 case 1: cotizacionesTab
                 case 2: oportunidadesTab
                 case 3: ticketsTab
-                case 4: sucursalesTab
-                default: serviciosTab
+                case 4: facturasTab
+                case 5: sucursalesTab
+                case 6: serviciosTab
+                default: timelineTab
                 }
             }
         }
         .navigationBarHidden(true)
-        .task { await load() }
+        .sheet(isPresented: $showEdit) {
+            CrmClientDatosEditSheet(
+                state: $editForm,
+                saving: savingEdit,
+                error: actionError,
+                onDismiss: {
+                    showEdit = false
+                    actionError = nil
+                },
+                onSave: { Task { await saveEdit() } }
+            )
+        }
+        .task(id: "\(clientId)-\(reloadKey)") { await load() }
     }
 
-    private var infoTab: some View {
+    private func openEdit() {
+        editForm.load(from: client)
+        actionError = nil
+        showEdit = true
+    }
+
+    private func saveEdit() async {
+        guard clientId > 0 else { return }
+        savingEdit = true
+        actionError = nil
+        defer { savingEdit = false }
+        do {
+            let updated = try await CrmRepository.shared.updateClient(id: clientId, fields: editForm.toPayload())
+            clientData = updated
+            showEdit = false
+            reloadKey += 1
+        } catch {
+            actionError = error.localizedDescription
+        }
+    }
+
+    private func provisionServiceClient() async {
+        guard clientId > 0 else { return }
+        provisioning = true
+        actionError = nil
+        defer { provisioning = false }
+        do {
+            clientData = try await CrmRepository.shared.provisionServiceClient(id: clientId)
+            reloadKey += 1
+        } catch {
+            actionError = error.localizedDescription
+        }
+    }
+
+    private var client360Tab: some View {
         List {
+            if let stats = snapshotStats {
+                Section("KPIs") {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                        kpiCell("Pipeline", fmtMxn(statNum(stats, "pipelineValue")))
+                        kpiCell("OT abiertas", "\(statInt(stats, "activitiesOpen"))")
+                        kpiCell("Facturas pend.", "\(statInt(stats, "pendingInvoices"))")
+                        kpiCell("Contratos", "\(statInt(stats, "activeContracts"))")
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            Section {
+                HStack {
+                    if !hasServiceClient {
+                        Button(provisioning ? "Activando…" : "Activar en operación") {
+                            Task { await provisionServiceClient() }
+                        }
+                        .disabled(provisioning)
+                    }
+                    Spacer()
+                    Button("Editar datos", action: openEdit)
+                }
+                if let actionError, !actionError.isEmpty {
+                    Text(actionError).font(.footnote).foregroundColor(.red)
+                }
+            }
             Section("Datos del cliente") {
-                infoRow("Nombre", ConsoleHelpers.mapStr(client, "name", "nombre", "razonSocial"))
-                infoRow("RFC", ConsoleHelpers.mapStr(client, "rfc"))
-                infoRow("Email", ConsoleHelpers.mapStr(client, "email"))
-                infoRow("Teléfono", ConsoleHelpers.mapStr(client, "phone", "telefono"))
+                infoRow("Estado comercial", ConsoleHelpers.mapStr(client, "status", "estatus").ifEmptyExt("Prospecto"))
+                infoRow("Industria", ConsoleHelpers.mapStr(client, "industry"))
+                infoRow("Nombre comercial", ConsoleHelpers.mapStr(client, "name", "nombre"))
+                infoRow("Razón social", ConsoleHelpers.mapStr(client, "legalName", "razonSocial"))
+                infoRow("RFC", ConsoleHelpers.mapStr(client, "taxId", "rfc"))
+                infoRow("CP fiscal", ConsoleHelpers.mapStr(client, "fiscalZipCode"))
+                infoRow("Régimen fiscal", ConsoleHelpers.mapStr(client, "fiscalRegime"))
+                infoRow("Email facturación", ConsoleHelpers.mapStr(client, "billingEmail", "email"))
+                infoRow("Teléfono", ConsoleHelpers.mapStr(client, "billingPhone", "phone", "telefono"))
+                infoRow("Sitio web", ConsoleHelpers.mapStr(client, "website"))
+                infoRow("Dirección fiscal", ConsoleHelpers.mapStr(client, "fiscalAddress"))
                 infoRow("Ciudad", ConsoleHelpers.mapStr(client, "city", "ciudad"))
                 infoRow("Estado", ConsoleHelpers.mapStr(client, "state", "estado"))
                 infoRow("País", ConsoleHelpers.mapStr(client, "country", "pais"))
+                infoRow("Notas", ConsoleHelpers.mapStr(client, "notes", "notas"))
             }
         }
         .listStyle(.insetGrouped)
     }
 
-    private var cotizacionesTab: some View {
-        let prefix = clientName.lowercased().prefix(6)
-        let cots = cotizaciones.filter { cot in
-            clientName.isEmpty || cot.cliente.lowercased().contains(prefix)
+    private func kpiCell(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).font(.caption).foregroundColor(.secondary)
+            Text(value).font(.subheadline.bold())
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private var timelineTab: some View {
+        Group {
+            if timelineEvents.isEmpty {
+                VStack { Spacer(); Text("Sin eventos recientes").foregroundColor(.secondary); Spacer() }
+            } else {
+                List(timelineEvents.indices, id: \.self) { idx in
+                    let ev = timelineEvents[idx]
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ev.title).font(.subheadline.bold())
+                        Text([ev.kind, ev.subtitle].filter { !$0.isEmpty }.joined(separator: " · "))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+    }
+
+    private var cotizacionesTab: some View {
         return Group {
-            if cots.isEmpty {
+            if cotizaciones.isEmpty {
                 VStack { Spacer(); Text("Sin cotizaciones").foregroundColor(.secondary); Spacer() }
             } else {
-                List(cots) { cot in
+                List(cotizaciones) { cot in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack { Text(cot.displayFolio).font(.subheadline.bold()); Spacer(); Text(fmtMxn(cot.total)).bold() }
                         Text(cot.estatus).font(.caption).foregroundColor(.orange)
@@ -641,15 +1011,11 @@ struct CrmClientDetailView: View {
     }
 
     private var oportunidadesTab: some View {
-        let prefix = clientName.lowercased().prefix(6)
-        let opps = oportunidades.filter { o in
-            clientName.isEmpty || o.clientName.lowercased().contains(prefix)
-        }
         return Group {
-            if opps.isEmpty {
+            if oportunidades.isEmpty {
                 VStack { Spacer(); Text("Sin oportunidades").foregroundColor(.secondary); Spacer() }
             } else {
-                List(opps) { o in
+                List(oportunidades) { o in
                     VStack(alignment: .leading, spacing: 4) {
                         Text(o.displayTitle).font(.subheadline.bold())
                         HStack {
@@ -663,23 +1029,12 @@ struct CrmClientDetailView: View {
         }
     }
 
-    @ViewBuilder private func infoRow(_ label: String, _ value: String) -> some View {
-        if !value.isEmpty {
-            HStack { Text(label).foregroundColor(.secondary); Spacer(); Text(value) }
-        }
-    }
-
     private var ticketsTab: some View {
-        let prefix6 = clientName.lowercased().prefix(6)
-        let tks = tickets.filter { t in
-            let cn = (t["clientName"] as? String ?? t["branchName"] as? String ?? "").lowercased()
-            return clientName.isEmpty || cn.contains(prefix6)
-        }
         return Group {
-            if tks.isEmpty {
+            if tickets.isEmpty {
                 VStack { Spacer(); Text("Sin tickets del cliente").foregroundColor(.secondary); Spacer() }
             } else {
-                List(tks, id: \.crmKey) { t in
+                List(tickets, id: \.crmKey) { t in
                     let subject = ConsoleHelpers.mapStr(t, "subject", "descripcion", "title")
                     let status  = ConsoleHelpers.mapStr(t, "status", "estado")
                     let date    = String(ConsoleHelpers.mapStr(t, "createdAt", "fecha").prefix(10))
@@ -696,19 +1051,45 @@ struct CrmClientDetailView: View {
         }
     }
 
+    @ViewBuilder private func infoRow(_ label: String, _ value: String) -> some View {
+        if !value.isEmpty {
+            HStack { Text(label).foregroundColor(.secondary); Spacer(); Text(value) }
+        }
+    }
+
+    private var facturasTab: some View {
+        Group {
+            if facturas.isEmpty {
+                VStack { Spacer(); Text("Sin facturas").foregroundColor(.secondary); Spacer() }
+            } else {
+                List(facturas, id: \.crmKey) { inv in
+                    let num = ConsoleHelpers.mapStr(inv, "invoiceNumber", "folio")
+                    let status = ConsoleHelpers.mapStr(inv, "status", "estado")
+                    let total = ConsoleHelpers.mapDouble(inv, "totalAmount", "total")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(num.isEmpty ? "Factura" : num).font(.subheadline.bold())
+                        HStack {
+                            if !status.isEmpty { Text(status).font(.caption).foregroundColor(.orange) }
+                            Spacer()
+                            Text(fmtMxn(total)).font(.caption.bold())
+                        }
+                    }
+                }.listStyle(.plain)
+            }
+        }
+    }
+
     private var sucursalesTab: some View {
-        return Group {
+        Group {
             if sucursales.isEmpty {
-                VStack { Spacer(); Text("Sin sucursales registradas").foregroundColor(.secondary); Spacer() }
+                VStack { Spacer(); Text("Sin sucursales").foregroundColor(.secondary); Spacer() }
             } else {
                 List(sucursales, id: \.crmKey) { b in
                     let name = ConsoleHelpers.mapStr(b, "name", "nombre", "branchName")
                     let address = ConsoleHelpers.mapStr(b, "address", "direccion")
-                    let city = ConsoleHelpers.mapStr(b, "city", "ciudad")
                     VStack(alignment: .leading, spacing: 4) {
                         Text(name.isEmpty ? "Sucursal" : name).font(.subheadline.bold())
                         if !address.isEmpty { Text(address).font(.caption).foregroundColor(.secondary) }
-                        if !city.isEmpty { Text(city).font(.caption2).foregroundColor(.secondary) }
                     }
                 }.listStyle(.plain)
             }
@@ -738,16 +1119,48 @@ struct CrmClientDetailView: View {
     }
 
     private func load() async {
+        loading = true
+        let id = clientId
+        if id > 0 {
+            if let snap = try? await CrmRepository.shared.clientSnapshot(id: id) {
+                snapshotStats = snap["stats"] as? [String: Any]
+                let status = ConsoleHelpers.mapStr(client, "status", "estatus")
+                let health = computeClientHealth(stats: snapshotStats, status: status)
+                healthScore = health.score
+                healthLabel = health.label
+                timelineEvents = buildClient360Timeline(snapshot: snap)
+                if let opps = snap["opportunities"] as? [[String: Any]] {
+                    oportunidades = opps.map { CrmOpportunity(raw: $0) }
+                }
+                if let quotes = snap["quotes"] as? [[String: Any]] {
+                    cotizaciones = quotes.compactMap { row -> Cotizacion? in
+                        let cot = (row["cotizacion"] as? [String: Any]) ?? row
+                        let parsed = Cotizacion(raw: cot)
+                        return parsed.id > 0 ? parsed : nil
+                    }
+                }
+                tickets = snap["ticketRequests"] as? [[String: Any]] ?? []
+                servicios = snap["maintenanceContracts"] as? [[String: Any]] ?? []
+                facturas = snap["invoices"] as? [[String: Any]] ?? []
+                if let clientMap = snap["client"] as? [String: Any] {
+                    sucursales = clientMap["branches"] as? [[String: Any]] ?? []
+                }
+                loading = false
+                return
+            }
+        }
+        let clientIdStr = String(id)
         async let cots = ExtraRepository.shared.cotizacionItems()
         async let opps = (try? await CrmRepository.shared.opportunityItems()) ?? []
         async let tks  = ExtraRepository.shared.clientTickets()
-        async let suc  = ExtraRepository.shared.serviceClientBranches(serviceClientId: serviceClientId)
-        async let srv  = ExtraRepository.shared.maintenanceContracts(clientId: clientId)
-        let (c, o, t, s, sv) = await (cots, opps, tks, suc, srv)
-        cotizaciones = c
+        async let srv  = ExtraRepository.shared.maintenanceContracts(clientId: clientIdStr)
+        let (c, o, t, sv) = await (cots, opps, tks, srv)
+        cotizaciones = c.filter { cot in
+            let scId = StockParse.int64(cot.raw["salesClientId"]) ?? StockParse.int64(cot.raw["clientId"]) ?? 0
+            return scId == id
+        }
         oportunidades = o
         tickets = t
-        sucursales = s
         servicios = sv
         loading = false
     }

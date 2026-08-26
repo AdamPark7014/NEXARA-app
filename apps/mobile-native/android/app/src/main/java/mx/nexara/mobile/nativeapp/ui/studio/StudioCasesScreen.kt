@@ -1,7 +1,7 @@
 package mx.nexara.mobile.nativeapp.ui.studio
 
 import android.app.Application
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,7 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -50,6 +51,12 @@ import mx.nexara.mobile.nativeapp.data.api.CreateCaseStudyBody
 import mx.nexara.mobile.nativeapp.data.api.UpdateCaseStudyBody
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.data.studio.StudioRepository
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxEmptyState
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxErrorBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxLoadingBlock
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxPanelShell
+import mx.nexara.mobile.nativeapp.ui.enterprise.NxSectionHeader
 
 data class CaseEditorState(
     val titulo: String = "",
@@ -62,6 +69,7 @@ data class CaseEditorState(
 
 data class StudioCasesUiState(
     val loading: Boolean = true,
+    val refreshing: Boolean = false,
     val saving: Boolean = false,
     val error: String? = null,
     val items: List<CaseStudyDto> = emptyList(),
@@ -77,14 +85,17 @@ class StudioCasesViewModel(app: Application) : AndroidViewModel(app) {
 
     init { refresh() }
 
-    fun refresh() {
-        _state.update { it.copy(loading = true, error = null) }
+    fun refresh(pullToRefresh: Boolean = false) {
+        _state.update {
+            if (pullToRefresh) it.copy(refreshing = true, error = null)
+            else it.copy(loading = true, error = null)
+        }
         viewModelScope.launch {
             try {
                 val list = withContext(Dispatchers.IO) { repo.caseStudies() }
-                _state.update { it.copy(loading = false, items = list) }
+                _state.update { it.copy(loading = false, refreshing = false, items = list) }
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message ?: "Error") }
+                _state.update { it.copy(loading = false, refreshing = false, error = e.message ?: "Error") }
             }
         }
     }
@@ -179,6 +190,7 @@ class StudioCasesViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudioCasesScreen(onBack: () -> Unit, vm: StudioCasesViewModel = viewModel()) {
     val ui by vm.state.collectAsState()
@@ -186,7 +198,11 @@ fun StudioCasesScreen(onBack: () -> Unit, vm: StudioCasesViewModel = viewModel()
     if (ui.showEditor) {
         StudioScaffold(title = if (ui.editing == null) "Nuevo caso" else "Editar caso", onBack = vm::closeEditor) { inner ->
             Column(
-                Modifier.fillMaxSize().padding(inner).padding(16.dp),
+                Modifier
+                    .fillMaxSize()
+                    .background(NxColors.Surface)
+                    .padding(inner)
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 listOf(
@@ -240,18 +256,57 @@ fun StudioCasesScreen(onBack: () -> Unit, vm: StudioCasesViewModel = viewModel()
             }
         },
     ) { inner ->
-        when {
-            ui.loading -> StudioLoadingBox()
-            ui.error != null && ui.items.isEmpty() -> StudioErrorState(ui.error!!, vm::refresh)
-            else -> LazyColumn(
-                Modifier.fillMaxSize().padding(inner),
+        PullToRefreshBox(
+            isRefreshing = ui.refreshing,
+            onRefresh = { vm.refresh(pullToRefresh = true) },
+            modifier = Modifier
+                .fillMaxSize()
+                .background(NxColors.Surface)
+                .padding(inner),
+        ) {
+            LazyColumn(
+                Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                if (ui.items.isEmpty()) item { StudioEmptyState("Sin casos", "Publica el primer caso de éxito.") }
-                items(ui.items, key = { it.id }) { c ->
-                    CaseCard(c, onOpen = { vm.openEdit(c) }, onToggle = { vm.togglePublicado(c.id) }, onDelete = { vm.delete(c.id) })
+                item {
+                    NxSectionHeader(
+                        "Casos de éxito",
+                        "Proyectos en el sitio público",
+                        trailing = if (ui.items.isNotEmpty()) {
+                            { Text("${ui.items.size} registros", style = MaterialTheme.typography.labelSmall, color = StudioMuted) }
+                        } else {
+                            null
+                        },
+                    )
                 }
+
+                if (ui.loading && !ui.refreshing) {
+                    item { NxLoadingBlock("Cargando casos…") }
+                    return@LazyColumn
+                }
+
+                if (!ui.error.isNullOrBlank() && ui.items.isEmpty()) {
+                    item { NxErrorBlock(ui.error!!, onRetry = { vm.refresh() }) }
+                    return@LazyColumn
+                }
+
+                if (ui.items.isEmpty()) {
+                    item {
+                        NxEmptyState(
+                            title = "Sin casos",
+                            subtitle = "Publica el primer caso de éxito.",
+                            actionLabel = "Nuevo caso",
+                            onAction = vm::openCreate,
+                        )
+                    }
+                } else {
+                    items(ui.items, key = { it.id }) { c ->
+                        CaseCard(c, onOpen = { vm.openEdit(c) }, onToggle = { vm.togglePublicado(c.id) }, onDelete = { vm.delete(c.id) })
+                    }
+                }
+
+                item { Spacer(Modifier.height(24.dp)) }
             }
         }
     }
@@ -264,11 +319,8 @@ private fun CaseCard(
     onToggle: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    androidx.compose.material3.Card(
-        Modifier.fillMaxWidth().clickable(onClick = onOpen),
-        shape = RoundedCornerShape(14.dp),
-    ) {
-        Row(Modifier.padding(12.dp)) {
+    NxPanelShell(onClick = onOpen) {
+        Row {
             val img = item.imageUrl ?: item.cover
             if (!img.isNullOrBlank()) {
                 AsyncImage(
@@ -280,16 +332,16 @@ private fun CaseCard(
                 Spacer(Modifier.size(12.dp))
             }
             Column(Modifier.weight(1f)) {
-                Text(item.titulo ?: "—", fontWeight = FontWeight.Bold)
+                Text(item.titulo ?: "—", fontWeight = FontWeight.Bold, color = NxColors.Slate)
                 Text(item.cliente ?: "", style = MaterialTheme.typography.bodySmall, color = StudioMuted)
-                Text(item.impacto ?: "", style = MaterialTheme.typography.labelSmall)
+                Text(item.impacto ?: "", style = MaterialTheme.typography.labelSmall, color = StudioMuted)
                 StudioStatusChip(
                     if (item.publicado == true) "Publicado" else "Borrador",
                     if (item.publicado == true) Color(0xFF10B981) else StudioMuted,
                 )
             }
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
             TextButton(onClick = onToggle) { Text("Toggle publicado") }
             TextButton(onClick = onDelete) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
         }

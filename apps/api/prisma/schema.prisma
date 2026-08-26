@@ -1749,6 +1749,8 @@ model CotizacionItem {
   productCtId       Int?
   /// Código mayorista homologado (CT, SYSCOM, …).
   supplierCode      String?    @db.VarChar(20)
+  /// Almacén CT API de surtido (14A Puebla, 35A MTY, …).
+  supplierWarehouseCode String?  @db.VarChar(10)
   marginPercent     Decimal?   @db.Decimal(7, 2)
   stockSnapshot     Int?
   leadTimeDays      Int?

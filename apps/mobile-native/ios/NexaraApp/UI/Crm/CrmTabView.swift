@@ -6,6 +6,7 @@ struct CrmTabView: View {
     let onExit: () -> Void
     @State private var selectedTab: CrmTab = .dashboard
     @State private var deepLinkModuleKey: String?
+    @State private var deepLinkClientId: Int64?
     @EnvironmentObject var session: SessionStore
     @ObservedObject private var deepLink = DeepLinkCoordinator.shared
 
@@ -53,11 +54,36 @@ struct CrmTabView: View {
             .tag(CrmTab.more)
         }
         .deepLinkModulePresenter(panel: .crm, presentedKey: $deepLinkModuleKey)
-        .onAppear { if let k = deepLink.consumeModule(for: .crm) { deepLinkModuleKey = k } }
-        .onChange(of: deepLink.pending) { _, _ in
-            if let k = deepLink.consumeModule(for: .crm) { deepLinkModuleKey = k }
+        .fullScreenCover(item: Binding(
+            get: { deepLinkClientId.map { CrmClientDeepLink(id: $0) } },
+            set: { deepLinkClientId = $0?.id }
+        )) { link in
+            NavigationStack {
+                CrmClientDetailByIdView(clientId: link.id, onBack: { deepLinkClientId = nil })
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cerrar") { deepLinkClientId = nil }
+                        }
+                    }
+            }
+        }
+        .onAppear { consumeCrmDeepLink() }
+        .onChange(of: deepLink.pending) { _, _ in consumeCrmDeepLink() }
+    }
+
+    private func consumeCrmDeepLink() {
+        if let link = deepLink.consumeModuleLink(for: .crm) {
+            if link.key == "clients", let id = link.entityId, id > 0 {
+                deepLinkClientId = id
+            } else {
+                deepLinkModuleKey = link.key
+            }
         }
     }
+}
+
+private struct CrmClientDeepLink: Identifiable {
+    let id: Int64
 }
 
 // MARK: – Cotizaciones list screen
@@ -68,7 +94,11 @@ struct CrmCotizacionesView: View {
 
     var body: some View {
         Group {
-            if let s = selected { cotDetail(s) } else { listBody }
+            if let s = selected, s.id > 0 {
+                VentasQuoteDetailView(cotizacionId: Int(s.id), onBack: { selected = nil })
+            } else {
+                listBody
+            }
         }
         .task { vm.load() }
         .refreshable { if selected == nil { vm.load() } }
