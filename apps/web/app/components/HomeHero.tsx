@@ -39,7 +39,7 @@ export type HomeHeroBootstrap = {
   mediaType: HeroMediaConfig["mediaType"];
   video: RawVideo | null;
   slides: RawSlide[];
-  /** Poster resuelto (slide o posterUrl del video) para pintar antes del decode. */
+  /** Solo si Studio definió posterUrl en el hero video (nunca slide del carrusel). */
   posterUrl: string | null;
 };
 
@@ -61,7 +61,6 @@ export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap 
   const [posterUrl, setPosterUrl] = useState<string | null>(bootstrap?.posterUrl ?? null);
   const [isMobile, setIsMobile] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
-  const [videoReady, setVideoReady] = useState(false);
   const [index, setIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -106,11 +105,14 @@ export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap 
           setVideoFailed(false);
           if (publicVideo.posterUrl) {
             setPosterUrl(resolveHeroVideoUrl(publicVideo.posterUrl));
+          } else {
+            setPosterUrl(null);
           }
           return;
         }
 
         setPreferVideo(false);
+        setPosterUrl(null);
         const slides = await fetchPublicHeroSlides().catch(() => []);
         if (cancelled) return;
         setRawSlides(
@@ -121,10 +123,6 @@ export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap 
             altText: s.altText,
           })),
         );
-        const first = slides[0];
-        if (first?.imageUrl) {
-          setPosterUrl(resolveHeroImageUrl(first.imageUrl));
-        }
       } catch {
         /* atmósfera */
       }
@@ -149,14 +147,7 @@ export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap 
 
   const showVideo = Boolean(videoUrl) && !videoFailed;
   const hasMedia = showVideo || dynamicSlides.length > 0;
-  const activePoster =
-    posterUrl ||
-    (showVideo && dynamicSlides[0]?.src) ||
-  null;
-
-  useEffect(() => {
-    setVideoReady(false);
-  }, [videoUrl]);
+  const studioPoster = posterUrl?.trim() ? posterUrl : null;
 
   useEffect(() => {
     const el = videoRef.current;
@@ -210,28 +201,18 @@ export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap 
         if (!showVideo) startAutoPlay();
       }}
     >
-      {activePoster && showVideo ? (
-        <div
-          className={`${styles.posterLayer} ${videoReady ? styles.posterHidden : ""}`}
-          style={{ backgroundImage: `url("${activePoster}")` }}
-          aria-hidden
-        />
-      ) : null}
-
       {showVideo ? (
         <video
           key={videoUrl ?? "video"}
           ref={videoRef}
-          className={`${styles.bgVideo} ${videoReady ? styles.bgVideoReady : ""}`}
+          className={styles.bgVideo}
           src={videoUrl ?? undefined}
-          poster={activePoster ?? undefined}
+          poster={studioPoster ?? undefined}
           autoPlay
           muted
           loop
           playsInline
           preload="auto"
-          onLoadedData={() => setVideoReady(true)}
-          onCanPlay={() => setVideoReady(true)}
           onError={() => {
             setVideoFailed(true);
           }}

@@ -5,16 +5,14 @@
 - **Rama:** main
 
 ## Hecho en este turno
-- **Nosotros:** foto panorámica en slot retrato → marco `framed_wide` (sin
-  letterbox oscuro); carga eager en la imagen de historia.
-- **Home hero video:** bootstrap SSR + preload de poster y video; capa poster
-  instantánea hasta `canplay`; `preload=auto`; cache stream 24h.
+- **Home hero:** quitado poster del carrusel que tapaba el video; el `<video>`
+  vuelve a ser el fondo directo (preload SSR del MP4 se mantiene).
 
 ## A medias — CUIDADO
 - nada
 
 ## Siguiente paso
-1. Verificar home y /nosotros en prod tras deploy.
+1. Verificar video en home tras deploy.
 
 ## No tocar
 - `apps/web/app/(subdomains)/tickets/layout.tsx`
