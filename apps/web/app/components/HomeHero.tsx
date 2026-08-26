@@ -3,10 +3,6 @@
 /**
  * HomeHero — presupuesto estricto:
  * video/carrusel full-bleed + titular + una línea + CTAs.
- * Sin feature bar en el primer viewport.
- *
- * Media: usa variantes desktop / móvil desde Studio.
- * `imageUrl` / `videoUrl` = desktop; `*Mobile` = móvil (fallback a desktop).
  */
 
 import Link from "next/link";
@@ -39,7 +35,6 @@ export type HomeHeroBootstrap = {
   mediaType: HeroMediaConfig["mediaType"];
   video: RawVideo | null;
   slides: RawSlide[];
-  /** Solo si Studio definió posterUrl en el hero video (nunca slide del carrusel). */
   posterUrl: string | null;
 };
 
@@ -48,16 +43,24 @@ function pickUrl(desktop: string, mobile: string | null | undefined, isMobile: b
   return desktop;
 }
 
-export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap | null }) {
-  const bootVideo = bootstrap?.video;
-  const bootUseVideo =
-    Boolean(bootstrap) &&
-    (bootstrap!.mediaType === "video" ||
-      Boolean(bootstrap!.video?.videoUrl && bootstrap!.video?.isActive));
+function mapSlides(slides: RawSlide[]): RawSlide[] {
+  return slides.map((s) => ({
+    id: s.id,
+    imageUrl: s.imageUrl,
+    imageUrlMobile: s.imageUrlMobile ?? null,
+    altText: s.altText,
+  }));
+}
 
-  const [rawSlides, setRawSlides] = useState<RawSlide[]>(bootstrap?.slides ?? []);
-  const [rawVideo, setRawVideo] = useState<RawVideo | null>(bootVideo ?? null);
-  const [preferVideo, setPreferVideo] = useState(bootUseVideo);
+export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap | null }) {
+  const initialVideo =
+    bootstrap?.video?.videoUrl && bootstrap.video.isActive ? bootstrap.video : null;
+
+  const [rawSlides, setRawSlides] = useState<RawSlide[]>(
+    mapSlides(bootstrap?.slides ?? []),
+  );
+  const [rawVideo, setRawVideo] = useState<RawVideo | null>(initialVideo);
+  const [preferVideo, setPreferVideo] = useState(Boolean(initialVideo));
   const [posterUrl, setPosterUrl] = useState<string | null>(bootstrap?.posterUrl ?? null);
   const [isMobile, setIsMobile] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
@@ -74,57 +77,64 @@ export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap 
   }, []);
 
   useEffect(() => {
-    if (bootstrap) return;
-
     let cancelled = false;
+
+    const loadSlides = async () => {
+      const slides = await fetchPublicHeroSlides().catch(() => []);
+      if (cancelled || slides.length === 0) return;
+      setRawSlides(
+        slides.map((s) => ({
+          id: s.id,
+          imageUrl: s.imageUrl,
+          imageUrlMobile: s.imageUrlMobile ?? null,
+          altText: s.altText,
+        })),
+      );
+    };
 
     const load = async () => {
       try {
         const [mediaRes, publicVideo] = await Promise.all([
           fetch(buildApiUrl("studio/page-content/home_hero"), { cache: "no-store" }).catch(() => null),
-          fetchPublicHeroVideo().catch(() => null),
+          initialVideo ? null : fetchPublicHeroVideo().catch(() => null),
         ]);
 
-        let mediaType: HeroMediaConfig["mediaType"] = "carousel";
+        let mediaType: HeroMediaConfig["mediaType"] =
+          bootstrap?.mediaType === "video" ? "video" : "carousel";
         if (mediaRes?.ok) {
           const json = await mediaRes.json().catch(() => null);
           if (json?.content?.mediaType === "video") mediaType = "video";
         }
 
-        const hasVideo = Boolean(publicVideo?.videoUrl && publicVideo.isActive);
-        const useVideo = mediaType === "video" || hasVideo;
+        const activeVideo = initialVideo
+          ? initialVideo
+          : publicVideo?.videoUrl && publicVideo.isActive
+            ? {
+                videoUrl: publicVideo.videoUrl,
+                videoUrlMobile: publicVideo.videoUrlMobile ?? null,
+                isActive: publicVideo.isActive,
+              }
+            : null;
 
-        if (useVideo && publicVideo?.videoUrl) {
+        const useVideo = mediaType === "video" || Boolean(activeVideo);
+
+        if (useVideo && activeVideo?.videoUrl) {
           if (cancelled) return;
           setPreferVideo(true);
-          setRawVideo({
-            videoUrl: publicVideo.videoUrl,
-            videoUrlMobile: publicVideo.videoUrlMobile ?? null,
-            isActive: publicVideo.isActive,
-          });
+          setRawVideo(activeVideo);
           setVideoFailed(false);
-          if (publicVideo.posterUrl) {
+          if (publicVideo?.posterUrl) {
             setPosterUrl(resolveHeroVideoUrl(publicVideo.posterUrl));
-          } else {
-            setPosterUrl(null);
           }
           return;
         }
 
+        if (cancelled) return;
         setPreferVideo(false);
         setPosterUrl(null);
-        const slides = await fetchPublicHeroSlides().catch(() => []);
-        if (cancelled) return;
-        setRawSlides(
-          slides.map((s) => ({
-            id: s.id,
-            imageUrl: s.imageUrl,
-            imageUrlMobile: s.imageUrlMobile ?? null,
-            altText: s.altText,
-          })),
-        );
+        await loadSlides();
       } catch {
-        /* atmósfera */
+        await loadSlides();
       }
     };
 
@@ -132,7 +142,7 @@ export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap 
     return () => {
       cancelled = true;
     };
-  }, [bootstrap]);
+  }, [bootstrap?.mediaType, initialVideo]);
 
   const videoUrl =
     preferVideo && rawVideo?.videoUrl
@@ -191,6 +201,24 @@ export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap 
     if (index >= dynamicSlides.length && dynamicSlides.length > 0) setIndex(0);
   }, [dynamicSlides.length, index]);
 
+  const handleVideoError = useCallback(() => {
+    setVideoFailed(true);
+    setPreferVideo(false);
+    void fetchPublicHeroSlides()
+      .then((slides) => {
+        if (!slides.length) return;
+        setRawSlides(
+          slides.map((s) => ({
+            id: s.id,
+            imageUrl: s.imageUrl,
+            imageUrlMobile: s.imageUrlMobile ?? null,
+            altText: s.altText,
+          })),
+        );
+      })
+      .catch(() => undefined);
+  }, []);
+
   return (
     <section
       className={`${styles.hero} ${hasMedia ? styles.heroMedia : styles.heroFallback}`}
@@ -213,9 +241,7 @@ export default function HomeHero({ bootstrap }: { bootstrap?: HomeHeroBootstrap 
           loop
           playsInline
           preload="auto"
-          onError={() => {
-            setVideoFailed(true);
-          }}
+          onError={handleVideoError}
           aria-hidden
         />
       ) : dynamicSlides.length > 0 ? (

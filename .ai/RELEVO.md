@@ -5,14 +5,15 @@
 - **Rama:** main
 
 ## Hecho en este turno
-- **Home hero:** quitado poster del carrusel que tapaba el video; el `<video>`
-  vuelve a ser el fondo directo (preload SSR del MP4 se mantiene).
+- **Home hero video:** fix URL same-origin `/api/hero-video/stream/...`; no activar
+  modo video sin URL; refetch cliente si bootstrap incompleto; fallback a slides
+  si el MP4 falla.
 
 ## A medias — CUIDADO
 - nada
 
 ## Siguiente paso
-1. Verificar video en home tras deploy.
+1. Verificar video logo Nexara en home tras deploy.
 
 ## No tocar
 - `apps/web/app/(subdomains)/tickets/layout.tsx`

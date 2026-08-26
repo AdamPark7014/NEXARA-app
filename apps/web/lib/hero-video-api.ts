@@ -46,11 +46,31 @@ const apiFetch = async (path: string, token: string, init: RequestInit = {}) => 
   return text ? JSON.parse(text) : null;
 };
 
-/** Resuelve la URL final del video (ruta relativa servida por el API). */
+/** Resuelve URL del stream para el <video> — siempre same-origin /api (nunca host Docker). */
 export function resolveHeroVideoUrl(videoUrl: string): string {
   if (!videoUrl) return "";
-  if (/^https?:\/\//i.test(videoUrl)) return videoUrl;
-  return buildApiUrl(videoUrl.replace(/^\//, ""));
+  if (/^https?:\/\//i.test(videoUrl)) {
+    try {
+      const parsed = new URL(videoUrl);
+      const host = parsed.hostname.toLowerCase();
+      if (
+        host === "nexara-api" ||
+        host === "localhost" ||
+        host === "127.0.0.1" ||
+        host.endsWith(".internal")
+      ) {
+        const path = parsed.pathname.replace(/^\/api(?=\/)/, "") || "/";
+        if (path.startsWith("/uploads/") || path.startsWith("/images/")) return path;
+        return `/api${path.startsWith("/") ? path : `/${path}`}`;
+      }
+    } catch {
+      /* keep absolute */
+    }
+    return videoUrl;
+  }
+  if (videoUrl.startsWith("/images/") || videoUrl.startsWith("/uploads/")) return videoUrl;
+  const path = videoUrl.replace(/^\//, "");
+  return `/api/${path}`;
 }
 
 // ── Público (sin auth) ───────────────────────────────────────────────
