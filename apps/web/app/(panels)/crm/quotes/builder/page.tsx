@@ -227,9 +227,11 @@ function ProductThumb({ src, alt }: { src: string | null; alt: string }) {
 function OfferStockRow({
   offer,
   preferredCodes,
+  variant = "default",
 }: {
   offer: SmartOffer;
   preferredCodes: string[];
+  variant?: "default" | "strip";
 }) {
   const prefQty = stockAtPreferred(offer.stockByWarehouse, preferredCodes) || offer.stockPreferred;
   const prefCity = warehouseLabel(preferredCodes[0] ?? "PUE");
@@ -239,10 +241,11 @@ function OfferStockRow({
   }
   const eta = formatEta(offer.leadTimeDays);
   const etaFast = offer.leadTimeDays <= 1;
+  const strip = variant === "strip";
 
   if (!offer.stockTotal) {
     return (
-      <div className={styles.sqStockRow}>
+      <div className={strip ? styles.sqProductStockStrip : styles.sqStockRow}>
         <span className={`${styles.sqWhChip} ${styles.sqWhChipEmpty}`}>Sin stock CT</span>
         <span className={`${styles.sqEtaChip} ${styles.sqEtaChipWarn}`}>{eta}</span>
       </div>
@@ -250,26 +253,29 @@ function OfferStockRow({
   }
 
   return (
-    <div className={styles.sqStockRow}>
+    <div className={strip ? styles.sqProductStockStrip : styles.sqStockRow}>
+      {strip ? <div className={styles.sqStockBandLabel}>Stock por ciudad</div> : null}
       <div className={styles.sqWhChips}>
         {chips.map((c) => (
           <span
             key={c.city}
             className={`${styles.sqWhChip} ${c.preferred ? styles.sqWhChipPref : ""}`}
-            title={`Stock en ${c.city}`}
+            title={`${c.qty} u. en ${c.city}`}
           >
-            {c.city} {c.qty}
+            {c.city} · {c.qty}
           </span>
         ))}
       </div>
-      {prefQty > 0 ? (
-        <span className={styles.sqPickupBadge} title={`Recoger en ${prefCity}`}>
-          Recoger · {prefCity}
-        </span>
-      ) : (
-        <span className={styles.sqPickupBadgeRemote}>Pedir traslado</span>
-      )}
-      <span className={`${styles.sqEtaChip} ${etaFast ? styles.sqEtaChipFast : ""}`}>{eta}</span>
+      <div className={styles.sqStockMetaRow}>
+        {prefQty > 0 ? (
+          <span className={styles.sqPickupBadge} title={`Recoger en ${prefCity}`}>
+            Recoger {prefCity}
+          </span>
+        ) : (
+          <span className={styles.sqPickupBadgeRemote}>Pedir traslado</span>
+        )}
+        <span className={`${styles.sqEtaChip} ${etaFast ? styles.sqEtaChipFast : ""}`}>{eta}</span>
+      </div>
     </div>
   );
 }
@@ -1352,12 +1358,14 @@ export default function SmartQuoteBuilderPage() {
                             </span>
                           ) : null}
                         </div>
+                        <OfferStockRow offer={o} preferredCodes={pickupWarehouseCodes} variant="strip" />
                         <div className={styles.sqProductBody}>
-                          <div className={styles.sqProductName}>{o.nombre}</div>
+                          <div className={styles.sqProductName} title={o.nombre || undefined}>
+                            {o.nombre}
+                          </div>
                           <OfferMetaLine offer={o} />
                           <OfferBadges offer={o} />
-                          <OfferStockRow offer={o} preferredCodes={pickupWarehouseCodes} />
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                          <div className={styles.sqProductFoot}>
                             <div>
                               <div className={styles.sqProductPrice}>{money(o.sellPriceSuggested)}</div>
                               <div className={styles.sqProductCost}>sin IVA · clic = +1</div>
