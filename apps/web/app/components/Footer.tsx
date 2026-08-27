@@ -165,6 +165,10 @@ export default function Footer() {
             <Link href="/legal/privacidad">Privacidad</Link>
             <Link href="/legal/terminos">Términos</Link>
             <Link href="/legal/cookies">Cookies</Link>
+            {/* Google Play exige que la eliminación de cuenta sea alcanzable
+                desde la navegación, no solo por URL directa. La página existía
+                y estaba en el sitemap, pero ningún enlace llevaba a ella. */}
+            <Link href="/legal/eliminar-cuenta">Eliminar cuenta</Link>
             <button
               type="button"
               className={styles.legalButton}
