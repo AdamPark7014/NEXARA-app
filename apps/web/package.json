@@ -7,7 +7,9 @@
     "prebuild": "node ../../scripts/clear-build-cache.js web",
     "build": "node ../../scripts/next-build-resilient.js",
     "build:lowmem": "cross-env NEXT_IGNORE_TYPE_ERRORS=1 node --max-old-space-size=1536 ../../node_modules/next/dist/bin/next build",
-    "start": "next start -p 3000"
+    "start": "next start -p 3000",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -29,11 +31,17 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.6",
     "@types/node": "^20.11.30",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.7.0",
     "cross-env": "^7.0.3",
+    "jsdom": "^25.0.1",
     "sass": "^1.83.4",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9"
   }
 }

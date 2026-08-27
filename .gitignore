@@ -91,3 +91,7 @@ apps/mobile-native/ios/**/GoogleService-Info.plist
 
 # secretos: hojas de credenciales
 *credenciales*.xlsx
+
+# Scratch de scripts (p.ej. smoke-cotizacion-pdf.ts escribe aqui su PDF).
+# El directorio se recrea solo con mkdirSync; no vuelve al arbol versionado.
+apps/tmp/

@@ -77,7 +77,11 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   [/^\/panel\/actividades(\/?.*)$/, '/ops/activities'],
   [/^\/panel\/multas(\/?.*)$/, '/erp/hr/fines'],
   [/^\/panel\/ventas(\/.*)?$/, '/crm'],
-  [/^\/panel\/tickets(\/?.*)$/, '/tickets$1'],
+  // El destino NO admite `$1`: `joinRemapTarget` concatena el resto capturado,
+  // no hace sustitución de grupos. Con '/tickets$1' un bookmark de portal
+  // `/panel/tickets/9` acababa en `/tickets$1/9`, que ninguna regla de la
+  // whitelist del rol `cliente` reconoce → el cliente veía un bloqueo.
+  [/^\/panel\/tickets(\/?.*)$/, '/tickets'],
 
   // ── /core/* (RBAC v1) ──────────────────────────────────────────────────
   [/^\/core\/clientes(\/.*)?$/, '/crm/clients'],

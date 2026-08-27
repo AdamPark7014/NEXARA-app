@@ -52,6 +52,16 @@ jobs:
       - name: Tests · API
         run: npx jest --config apps/api/jest.config.js --runInBand --ci
 
+      # La web pasó mucho tiempo con `tsc --noEmit` como única red: los tipos
+      # cuadraban pero nadie comprobaba el comportamiento. Vitest + Testing
+      # Library cubren lo crítico del producto: selector de empresa
+      # (multi-tenant), guardas de ruta por rol y validación de formularios.
+      #
+      # Se ejecuta desde `apps/web` porque el runner vive ahí (vitest.config.mts
+      # resuelve los alias `@/*` relativos a esa carpeta).
+      - name: Tests · Web
+        run: npm test --workspace=apps/web
+
   fugas:
     name: Secretos en el código
     runs-on: ubuntu-latest

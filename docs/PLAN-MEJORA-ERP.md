@@ -1,8 +1,37 @@
 # Plan de mejora del ERP NEXARA
 
-Rama base: `refactor/roles-purge-v2` (commit `f1a3e58`).
+> ## ⚠️ DOCUMENTO HISTÓRICO — OBSOLETO COMO DIAGNÓSTICO (2026-08-27)
+>
+> **No lo leas como estado actual del repositorio. Ya no lo es.**
+>
+> Se escribió contra la rama `refactor/roles-purge-v2` cuando esa rama iba muy
+> por delante de `main`. Eso se acabó: **`refactor/roles-purge-v2` está hoy
+> íntegramente contenida en `main`** (`git log main..refactor/roles-purge-v2`
+> devuelve 0 commits), así que todas las premisas del apartado «Contexto y
+> método» son falsas a día de hoy:
+>
+> | Lo que afirma el documento | Realidad de `main` hoy |
+> |---|---|
+> | «`main` está 404 commits por detrás» | `main` tiene 1 065 commits e incluye toda la rama |
+> | «`main` no tiene multi-tenancy, `companyId` no existe en su schema» | `companyId` aparece 435 veces en `schema.prisma`; 149 migraciones; 26 specs solo en `common/tenant` |
+> | «conserva `GET /auth/debug/verify-user`» | El endpoint no existe: 0 coincidencias en `apps/api/src` |
+> | «48 / 48 suites, 226 tests» (mejor cifra del plan) | **API: 70 suites / 509 tests. Web: 10 ficheros / 99 tests. Total 608.** |
+>
+> **Qué sigue valiendo:** el registro fase a fase de *qué se arregló y por qué*.
+> Las secciones de vulnerabilidades (lectura de `/uploads` sin autenticar, etc.)
+> son la memoria de decisiones de seguridad ya aplicadas y merecen conservarse.
+>
+> **Qué NO sigue valiendo:** las métricas, el «estado de partida», la comparativa
+> contra `main` y cualquier lista de pendientes. Para lo pendiente, la fuente viva
+> es [`.ai/RELEVO.md`](../.ai/RELEVO.md) y [`DEUDA-TECNICA.md`](DEUDA-TECNICA.md).
+
+Rama base: `refactor/roles-purge-v2` (commit `f1a3e58`) — *fusionada en `main`;
+la rama local se retiró el 2026-08-27, `origin/refactor/roles-purge-v2` sigue ahí.*
 
 ## Contexto y método
+
+*(Histórico: describe el árbol tal como estaba cuando se escribió. Ver el aviso
+de la cabecera antes de tomar cualquiera de estas cifras como actuales.)*
 
 La revisión se hizo sobre `refactor/roles-purge-v2`, no sobre `main`: `main` está
 404 commits por detrás, no tiene multi-tenancy (`companyId` no existe en su
