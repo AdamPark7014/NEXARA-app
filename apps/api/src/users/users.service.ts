@@ -643,7 +643,13 @@ export class UsersService {
   }
 
   /** Cuentas que no deben aparecer en la página pública "Nosotros / equipo" (ej. solo panel ventas). */
-  private readonly excludedPublicTeamEmails = ['vendedor@nexara.com.mx', ...this.superAdminEmails];
+  private readonly excludedPublicTeamEmails = [
+    'vendedor@nexara.com.mx',
+    // Cuenta interna de dirección: existe en el ERP pero no forma parte del
+    // equipo que se muestra en el sitio público.
+    'claudia.bernal@nexara.com.mx',
+    ...this.superAdminEmails,
+  ];
 
   /** Public site company: PUBLIC_COMPANY_ID > explicit X-Company-Id > isPrimary. Never all tenants. */
   private async resolvePublicTeamCompanyId(explicit?: number | null): Promise<number> {
