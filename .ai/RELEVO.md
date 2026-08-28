@@ -1,113 +1,103 @@
 # RELEVO
 
 - **Último turno:** claude-code
-- **Fecha:** 2026-08-27
+- **Fecha:** 2026-08-28
 - **Rama:** mejora/calidad-y-web
 
 ## Hecho en este turno
 
-### Tests de `apps/web` — el hueco principal, cerrado
-- Runner nuevo: **Vitest 2.1 + Testing Library + jsdom**. Config en
-  `apps/web/vitest.config.mts` (alias `@/*` replicados a mano desde `tsconfig.json`)
-  y `apps/web/vitest.setup.ts` (limpia `localStorage` entre tests; stubs de
-  `matchMedia`, `IntersectionObserver`, `createObjectURL`).
-- **10 ficheros de spec, 99 tests, todos en verde.** Prioridad tal como se pidió:
-  - Multi-tenant: `lib/tenant.spec.ts` (7), `components/CompanySwitcher.spec.tsx` (10),
-    `lib/api-base.spec.ts` (11 — incluye la cabecera `X-Company-Id`).
-  - Guardas de ruta por rol: `lib/rbac/page-matrix.spec.ts` (12),
-    `lib/rbac/role-mapping.spec.ts` (12), `lib/legacy-path-remap.spec.ts` (10),
-    `components/RoleGuard.spec.tsx` (8).
-  - Formularios con validación: `components/ClientCreationForm.spec.tsx` (8),
-    `components/BranchesForm.spec.tsx` (9), `lib/ops-activity-form.spec.ts` (12).
-- Scripts: `npm test` en `apps/web`; en la raíz `test:web` y `test` = api + web.
-- **CI**: job `Tests · Web` añadido a `.github/workflows/ci.yml`, después del de API.
+### Claudia Bernal eliminada de la BD de producción — SIN cambios de código
+Encargo de Adam: quitar a Claudia de la base de datos de NEXARA. Se hizo por SSH
+contra el droplet Hetzner (`5.78.215.109:2222`), contenedor `nexara-db`, BD
+`nexara_db`. **Este turno no modifica ni un archivo del repo**; el commit existe
+solo para dejar constancia del cambio en producción.
 
-### Bug de producción encontrado por los tests
-`apps/web/lib/legacy-path-remap.ts:80` — el destino del remapeo era `'/tickets$1'`,
-pero `joinRemapTarget()` **concatena**, no sustituye grupos de regex. Un bookmark
-de portal `/panel/tickets/9` acababa en `/tickets$1/9`, ruta que la whitelist del
-rol `cliente` no reconoce: **el cliente veía un bloqueo**. Corregido, con test de
-regresión.
+**Quién era:** `User` id **35**, `Claudia Bernal`, `claudia.bernal@nexara.com.mx`,
+`employeeNumber` NX-010, `roleKey` **ceo**, alta 2026-07-22.
 
-### Otros
-- **A1-3** `apps/api/src/gps/dto/update-gps.dto.ts`: era un stub vacío. Completado
-  como `PartialType(OmitType(CreateGpsDto, ['usuarioId']))` — se omite `usuarioId`
-  a propósito (reasignar un ping falsearía recorrido y asistencia, y saltaría la
-  comprobación que `GpsController.create()` ya hace). Spec nueva con 11 casos que
-  replica el `ValidationPipe` global de `main.ts` (`whitelist` + `forbidNonWhitelisted`).
-- **A1-5** `apps/tmp/` eliminado (6 archivos versionados + 3 logs). El script
-  `apps/api/scripts/smoke-cotizacion-pdf.ts:45` escribe ahí y **recrea el directorio
-  solo** (`mkdirSync recursive`), así que no se rompe; se añadió `apps/tmp/` a
-  `.gitignore` para que no vuelva al árbol.
-- **A1-4** `docs/DEUDA-TECNICA.md` nuevo. **El conteo real de TODO/FIXME es 5, no ~31**
-  (ver el porqué en el §0 del documento).
-- **A1-9** Worktrees y ramas: ver «Higiene» abajo.
-- **A1-10** `docs/PLAN-MEJORA-ERP.md` marcado obsoleto en cabecera, con tabla de
-  contraste entre lo que afirma y la realidad de `main`. **No se borró.**
-- `apps/web/app/components/Footer.tsx`: enlace a `/legal/eliminar-cuenta` añadido.
-  La página existía y estaba en el sitemap pero **ningún enlace de la UI llevaba a
-  ella**, y Google Play exige que sea alcanzable desde la navegación.
+**Auditoría previa al borrado** (todo verificado, no asumido):
+- `lastLoginAt` **vacío** — la cuenta nunca se usó.
+- De las **130 claves foráneas** que apuntan a `"User"`, solo **2 tablas** tenían
+  filas suyas, ambas `ON DELETE CASCADE`: `chat_channel_members` (2 — alta
+  automática en `#general` y `#anuncios`) y `user_companies` (1 — empresa 1).
+- Cero actividades, tickets, cotizaciones, evidencias, viáticos, asistencias.
+- Rastreo de `ILIKE '%claudia%' OR '%bernal%'` sobre **todas** las columnas de
+  texto del esquema `public`: solo aparecía en `User.nombre` y `User.email`.
+  **No estaba en `PageContent`, `NewsPost`, `CaseStudy`, `HeroSlide` ni en
+  ninguna tabla de contenido** — nunca se mostró en el sitio público; era una
+  cuenta de acceso al ERP, no un dato editorial.
 
-### Higiene de worktrees y ramas (A1-9)
-Auditado **antes** de tocar nada. **No había trabajo sin integrar en ninguno.**
+**Borrado:** 4 filas en una sola transacción (`BEGIN`/`COMMIT`), con el `DELETE`
+del usuario acotado por `id = 35 AND email = 'claudia.bernal@nexara.com.mx'`.
+Verificado a cero después. `nexara-api` y `nexara-web` siguen arriba y sin
+errores nuevos en logs.
 
-| Qué | Commits únicos vs `main` | Acción |
-|---|---|---|
-| worktree `angry-hofstadter-3f8b2a` | 0, árbol limpio | `git worktree remove` |
-| worktree `erp-improvement-plan-f51bd7` | 0, árbol limpio | `git worktree remove` |
-| `claude/angry-hofstadter-3f8b2a` | 0 | `git branch -d` |
-| `claude/erp-improvement-plan-f51bd7` | 0 | `git branch -d` |
-| `refactor/roles-purge-v2` | 0 | `git branch -d` |
-| `seo-serp-favicon` | 0 | `git branch -d` |
+**Respaldo:** `/root/backups/claudia-user35-20260828-163758.sql` en el droplet
+(INSERT de la fila, sacado con `pg_dump --column-inserts`). Es solo la fila de
+`User`; las 3 filas cascadeadas no se respaldaron porque eran membresías
+regenerables.
 
-- Se usó `git branch -d` (rechaza ramas no fusionadas), nunca `-D`.
-- **Las ramas remotas siguen ahí**: `origin/refactor/roles-purge-v2`,
-  `origin/seo-serp-favicon`, `origin/claude/erp-improvement-plan-f51bd7`.
-  Nada se perdió; se recuperan con `git checkout -b <rama> origin/<rama>`.
-- Los worktrees duplicaban `apps/api/prisma/migrations` con copias **viejas y
-  subconjunto** de las 149 de `main` (68 y 146). Ninguna migración huérfana.
-  Recuperados ~615 MB y las búsquedas globales ya no salen duplicadas.
+> Nota al margen, no accionada: tras el borrado quedan **3 cuentas con `roleKey`
+> = `ceo`** — id 1 (Christian, real), id 2 (Adam, real) y id 36
+> (`play.review@nexara.com.mx`, «Revisor Google Play»). Esa última tiene rol de
+> dirección para pasar la revisión de la tienda. No se tocó; queda anotado por si
+> Adam quiere bajarle el privilegio.
 
 ## A medias — CUIDADO
 - nada
 
+## ⚠️ Riesgo abierto: Claudia puede resucitar
+`apps/api/prisma/seed-demo-users.ts` **sigue conteniendo su entrada** y es un
+upsert idempotente: quien corra `cd apps/api && npm run prisma:seed` la vuelve a
+crear, con rol `ceo` y contraseña conocida. Lo mismo en
+`scripts/generate-credentials-xlsx.js` (ese solo genera la hoja, no toca la BD).
+
+**No se editaron esos archivos a propósito.** `seed-demo-users.ts` está en la
+lista de «No tocar» de abajo desde el turno anterior. Se le preguntó a Adam si
+quitarla del seed y **no zanjó la decisión**, así que se dejó intacto — el criterio
+del protocolo es que un archivo vetado no se toca por iniciativa del agente.
+
+➜ **Si el siguiente turno ve a Claudia otra vez en la BD, la causa es el seed, no
+un error.** La decisión sobre el archivo sigue pendiente de Adam.
+
 ## No tocar
-- `apps/web/app/(subdomains)/tickets/layout.tsx` — heredado del turno anterior.
+- `apps/web/app/(subdomains)/tickets/layout.tsx` — heredado de turnos anteriores.
 - `NEXARA-credenciales-usuarios-v4.xlsx` — hoja de credenciales, no versionada.
 - `apps/api/prisma/seed-demo-users.ts` — **17 contraseñas en claro de cuentas VIVAS
   de producción.** No rotar, no mover, no reescribir historial. El job `fugas` de
   `.github/workflows/ci.yml` lleva `continue-on-error: true` justo por esto:
-  **dejarlo así** hasta que Adam decida.
-- `package-lock.json` — el diff es enorme (~11 k/8,6 k líneas) porque npm 11
-  renormaliza el fichero al instalar. Es ruido de formato, no de dependencias:
-  la entrada de `@nestjs/passport` quedó byte a byte idéntica a `main`.
-
-## Estado verificado al cerrar
-- `npx tsc --noEmit -p apps/api/tsconfig.json` → limpio
-- `npx tsc --noEmit -p apps/web/tsconfig.json` → limpio (las specs entran en el
-  `include`, así que también se comprueban)
-- API: **70 suites / 509 tests** en verde (antes 69 / 498)
-- Web: **10 ficheros / 99 tests** en verde (antes 0)
-
-> Aviso de entorno local: `apps/api/node_modules` estaba vacío en esta máquina y el
-> typecheck de la API fallaba con `Cannot find module '@nestjs/passport'`. **No era
-> un problema del repo** — el paquete está declarado y en el lock desde antes. Se
-> arregla con `npm install` en la raíz. CI hace `npm ci` y nunca lo vio.
+  **dejarlo así** hasta que Adam decida. (Ver «Riesgo abierto» arriba: la entrada
+  de Claudia vive aquí.)
+- `package-lock.json` — el diff es enorme porque npm 11 renormaliza el fichero al
+  instalar. Es ruido de formato, no de dependencias.
 
 ## Siguiente paso
+Los cinco puntos del turno del 2026-08-27 siguen **intactos y sin empezar**:
+
 1. **A1-2 · Playwright e2e de UI.** Vitest cubre unidades y componentes aislados;
    no hay ni un flujo de extremo a extremo. Empezar por login → selección de
    empresa → una ruta de cada panel.
 2. **A1-6 · Observabilidad.** No hay APM, ni alertas, ni uptime para ~15 subdominios
    en producción. Ya existe `apps/api/src/observability/` para extender.
 3. **A1-7 · Runbooks de incidente + manual de operador.** No existen.
-4. **A1-8 · Cerrar `docs/native-parity-matrix.md`.** OJO, **el encargo describía
-   `apps/mobile` (Next/Capacitor) y en disco no existe**: hay `apps/mobile-native`,
-   que es Android/iOS nativo (Gradle/Kotlin + Xcode). La retirada de la variante
-   Capacitor parece hecha ya. Verificar contra la matriz antes de dar por cerrado.
+4. **A1-8 · Cerrar `docs/native-parity-matrix.md`.** OJO, el encargo describía
+   `apps/mobile` (Next/Capacitor) y en disco no existe: hay `apps/mobile-native`,
+   que es Android/iOS nativo. Verificar contra la matriz antes de dar por cerrado.
 5. **Deuda de producto** en `docs/DEUDA-TECNICA.md`: NOC con datos sintéticos, PAC
-   en modo mock (bloqueado en producción por diseño), SCIM anunciado sin implementar,
-   notificaciones de comida sin WebSocket, y 3 ficheros muertos con 0 referencias.
-6. Los **2 stashes** siguen ahí sin tocar. Se revisaron y ya están integrados en
-   `main`, salvo el enlace del Footer que este turno rescató a mano. No se
-   descartaron: eso lo decide Adam (`git stash list`).
+   en modo mock, SCIM anunciado sin implementar, notificaciones de comida sin
+   WebSocket, y 3 ficheros muertos con 0 referencias.
+
+Y añadido este turno:
+
+6. **Decidir qué pasa con la entrada de Claudia en el seed** (ver «Riesgo abierto»).
+7. **Hallazgo suelto, no investigado:** `nexara-api` escupe 404 continuos de
+   `GET /api/studio/page-content/seo_nosotros` y `seo_contacto` — «no tiene
+   contenido publicado todavía». Es **anterior a este turno** y no tiene relación
+   con el borrado, pero significa que dos páginas públicas se están sirviendo sin
+   sus metadatos SEO.
+
+## Estado verificado al cerrar
+- Árbol de git **limpio** antes y después: este turno no cambia código.
+- BD producción: `SELECT count(*) … WHERE id=35 OR nombre ILIKE '%claudia%'` → **0**.
+- `chat_channel_members` y `user_companies` con `userId=35` → **0** y **0**.
+- Contenedores `nexara-api`, `nexara-web`, `nexara-db`, `nexara-redis`: arriba.
