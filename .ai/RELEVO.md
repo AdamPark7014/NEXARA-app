@@ -116,26 +116,40 @@ test que fija justamente eso.
 (exclusión de Claudia, no romper las exclusiones previas, seguir acotando por
 empresa, y que el filtro no dependa del nombre).
 
-## 🚩 PENDIENTE DE DESPLIEGUE — leer antes de tocar nada
-**El cambio de código está commiteado pero NO está vivo en producción.** Claudia
-está restaurada en la BD y **ahora mismo se sigue viendo en `/nosotros`**.
+## 🚩 Claudia: OCULTA EN PRODUCCIÓN, pero por un atajo — leer entero
+**Estado actual verificado:** `https://nexara.com.mx/nosotros` → HTTP 200 y **cero
+apariciones** de «Claudia»/«Bernal». La rejilla pinta el equipo real desde la API
+(no cayó al `expertosFallback`). Objetivo cumplido.
 
-El motivo es que el despliegue no es trivial y no se decidió por cuenta propia:
-- El servidor sirve desde `/var/www/nexara-app` y **sigue la rama `main`**
-  (`deploy/update.sh` hace `git pull --ff-only origin main`).
-- `main` está en `b4970450` — el commit del vídeo del hero, del 26-ago.
-- Nuestro trabajo vive en **`mejora/calidad-y-web`**, que va por delante e incluye
-  el turno grande del 27-ago (Vitest, CI, DTO de GPS, limpieza de worktrees).
+**Pero NO está oculta por el arreglo bueno.** Está oculta porque se le borró la
+fila de `user_companies`, y `findPublicTeam` exige
+`companyMemberships: { some: { companyId: tenantId } }`. Sin membresía, desaparece
+del endpoint al instante y sin redesplegar. Se hizo así porque Adam lo pidió con
+urgencia y el filtro por email **sigue sin desplegarse**.
 
-Así que hay dos caminos y **los dos son decisión de Adam**:
-1. **Fusionar `mejora/calidad-y-web` en `main` y desplegar.** Sube también todo el
-   turno del 27-ago. Radio de impacto grande.
-2. **Cherry-pick solo del commit del filtro sobre `main` y desplegar.** Mínimo y
-   reversible, pero deja las dos ramas más divergentes.
+**Consecuencia que hay que conocer:** el usuario 35 existe pero **no pertenece a
+ninguna empresa**. Hoy da igual en la práctica — `lastLoginAt` sigue vacío, nunca
+ha entrado —, pero si alguien le da acceso al ERP, fallará por falta de tenant.
 
-Despliegue, en cualquiera de los dos casos:
-`ssh … && cd /var/www/nexara-app && ./deploy/update.sh` (reconstruye la imagen de
-la API; el filtro es código, no configuración, así que sin rebuild no hay efecto).
+**Cómo dejarlo bien** (2 pasos, en este orden):
+1. Desplegar el filtro por email, que ya está commiteado y con tests. El servidor
+   sirve `/var/www/nexara-app` siguiendo **`main`**, y `main` va **4 commits por
+   detrás** de `mejora/calidad-y-web`. Dos caminos, decisión de Adam:
+   - Fusionar la rama en `main` y desplegar → sube también el turno del 27-ago
+     (Vitest, CI, DTO de GPS). Radio de impacto grande.
+   - Cherry-pick solo del commit del filtro sobre `main` → mínimo y reversible.
+     **Es el recomendado.**
+   Luego: `cd /var/www/nexara-app && ./deploy/update.sh` (reconstruye la imagen de
+   la API; implica reinicio breve del ERP, por eso no se hizo por cuenta propia).
+2. **Solo después**, restaurar su membresía de empresa, que entonces ya no la
+   devuelve a la página:
+   ```sql
+   INSERT INTO user_companies ("userId","companyId","isDefault","createdAt","employeeNumber")
+   VALUES (35, 1, true, '2026-07-28 20:12:05.353', 'NX-010');
+   ```
+
+> Si se restaura la membresía **antes** de desplegar, Claudia vuelve a salir en
+> `/nosotros`. Ese es exactamente el error que ya ocurrió una vez este turno.
 
 > Ojo al desplegar: en el servidor hay 3 archivos sin commitear
 > (`deploy/traefik/{arta,reading,school}.yml`). Son de otros proyectos del droplet
@@ -215,7 +229,8 @@ Y añadido este turno:
 
 ## Estado verificado al cerrar
 - Árbol de git **limpio** antes y después: este turno no cambia código.
-- BD producción, Claudia: **restaurada**, `User` id 35 con sus 3 membresías.
+- BD producción, Claudia: `User` id 35 **existe**, con sus 2 membresías de chat y
+  **sin** membresía de empresa (ver «Claudia: oculta en producción»).
 - BD producción, Ariadna e Isaías: barrido de las 130 FKs hacia `"User"` buscando
   `IN (11,14)` → **0 filas residuales**; `"User" WHERE id IN (11,14)` → **0**.
 - `"User"` queda en **16** filas (18 − Ariadna − Isaías + Claudia restaurada).
@@ -223,6 +238,7 @@ Y añadido este turno:
   apellido y **NO se tocó**: no era objetivo.
 - `npx tsc --noEmit -p apps/api/tsconfig.json` → limpio.
 - API: **71 suites / 513 tests** en verde (antes 70 / 509).
-- `GET users/public-team` en producción **todavía devuelve a Claudia**: el filtro
-  no está desplegado (ver «Pendiente de despliegue»).
+- `GET users/public-team` en producción **ya no la devuelve**; su hueco lo ocupa
+  Karen Elizalde. Comprobado también sobre el HTML servido de `/nosotros`.
+- El filtro por email **sigue sin desplegar**: `main` no tiene el commit.
 - Contenedores `nexara-api`, `nexara-web`, `nexara-db`, `nexara-redis`: arriba.
