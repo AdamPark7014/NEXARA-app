@@ -116,67 +116,73 @@ test que fija justamente eso.
 (exclusión de Claudia, no romper las exclusiones previas, seguir acotando por
 empresa, y que el filtro no dependa del nombre).
 
-## 🚩 ESTADO DE LAS EXCLUSIONES DEL EQUIPO PÚBLICO — leer entero
+## ✅ Equipo público y plantilla — TODO APLICADO Y VERIFICADO EN PRODUCCIÓN
 
-Adam pidió sacar de `/nosotros` a **Claudia Bernal** y a **Luis Joel Aguilar
-Castillo**. Están en situaciones distintas y **hay que tratarlos distinto**.
+Dos operaciones distintas, no confundirlas:
 
-### Claudia (id 35) — YA NO SE VE, pero por un atajo
-`https://nexara.com.mx/nosotros` → 200 y **cero apariciones** de «Claudia»/«Bernal».
-Verificado sobre el HTML servido, no solo sobre la API.
+### 1. Ocultos del sitio público, pero VIVOS en el ERP
+**Claudia Bernal (35)** y **Luis Joel Aguilar Castillo (7)**. Sus usuarios existen,
+activos, con su empresa y sus canales de chat. Solo dejaron de mostrarse en
+`/nosotros`.
 
-Está oculta porque **se le borró la fila de `user_companies`**, y `findPublicTeam`
-exige `companyMemberships: { some: { companyId } }`. Sin membresía desaparece del
-endpoint al instante, sin redesplegar. Se hizo así porque se pidió con urgencia.
+Se hizo con el filtro por email de `excludedPublicTeamEmails`
+(`apps/api/src/users/users.service.ts`), **desplegado**. Ojo: el email de Luis es
+`direccion.operaciones@nexara.com.mx`, **no** `luis.aguilar@`.
 
-Se pudo hacer **solo porque su cuenta nunca se ha usado** (`lastLoginAt` vacío).
-Consecuencia: el usuario 35 existe pero no pertenece a ninguna empresa; si algún
-día se le da acceso al ERP, fallará por falta de tenant.
+Luis salía en **dos** sitios: el endpoint `users/public-team` y, hardcodeado, el
+`expertosFallback` de `apps/web/app/(public)/nosotros/page.tsx` — la lista que se
+pinta si la API falla. Los dos corregidos; filtrar solo el servidor no bastaba.
 
-### Luis (id 7) — SIGUE VIÉNDOSE. El atajo NO sirve con él
-`direccion.operaciones@nexara.com.mx` (ojo: **no** es `luis.aguilar@`), NX-301,
-Coordinador de Operaciones.
+El filtro va por **email y en servidor** a propósito: el que había en la web era un
+regex sobre el nombre, y un nombre se cambia desde RRHH sin darse cuenta. Hay test.
 
-**Es un usuario vivo:** `lastLoginAt` = 2026-08-16, 6 sesiones, 13 registros de
-auditoría, 7 notificaciones y **3 personas que le reportan** (`managerId = 7`).
-Quitarle la membresía de empresa como se hizo con Claudia **le dejaría fuera del
-ERP**. No se hizo, y no debe hacerse.
+> El atajo que se usó antes con Claudia (borrarle `user_companies`) **quedó
+> revertido**: su membresía está restaurada. Con Luis nunca se usó y no debe usarse
+> — es usuario vivo con 3 personas a su cargo; le habría dejado fuera del ERP.
 
-Aparecía además en **dos** sitios, no en uno:
-1. El endpoint `users/public-team` (la tabla `User`).
-2. **Hardcodeado** en `expertosFallback` de
-   `apps/web/app/(public)/nosotros/page.tsx`, la lista que se pinta si la API
-   falla. Filtrar solo el servidor no habría bastado.
+### 2. Volados de la plantilla, por completo
+**Karen Elizalde Sarmiento (4)** y **José Iván Tapia Reyes (9)**, mismo trato que
+Ariadna e Isaías. Auditados antes: **ninguna tabla con `RESTRICT`** — nada de
+asistencia, actividades, cotizaciones ni facturas.
 
-Ambos corregidos en código y commiteados. **Para Luis no hay atajo: sin desplegar,
-sigue saliendo en la web.**
+| | Karen (4) | José Iván (9) |
+|---|---|---|
+| Email | ventas@nexara.com.mx | ivan.tapia@nexara.com.mx |
+| Último acceso | 2026-08-16 | 2026-08-16 |
+| Filas borradas | 21 | 25 |
 
-### Lo que falta: UN despliegue resuelve los dos
-El filtro por email (`excludedPublicTeamEmails`) ya cubre a Claudia y a Luis, con
-tests. Falta llevarlo a producción:
+**79 filas borradas** en total entre los dos (notificaciones, sesiones, chat,
+empresa y el propio usuario). Verificado recorriendo las 130 FKs hacia `"User"`:
+**0 filas residuales**.
 
-- El servidor sirve `/var/www/nexara-app` siguiendo **`main`**, y `main` va
-  **por detrás** de `mejora/calidad-y-web`.
-- No se desplegó por cuenta propia porque `./deploy/update.sh` **reconstruye la
-  imagen de la API y reinicia el ERP**, y eso afecta a gente trabajando (Luis
-  mismo entró hace 12 días). Es decisión de Adam.
+**Dos efectos colaterales que hay que conocer:**
+- Los **38 `audit_logs`** de ambos **no se borraron**: esa FK es `SET NULL`, así que
+  el rastro de auditoría sobrevive, solo pierde el vínculo al usuario. Es lo
+  deseable, pero significa que esas entradas ya no dicen quién las hizo.
+- **Mónica García Guzmán (5) se quedó sin jefe**: su `managerId` apuntaba a Karen y
+  ahora es NULL. Si el organigrama importa, hay que reasignarla.
+- El email **`ventas@nexara.com.mx` queda libre**. Era de Karen. No confundir con
+  `vendedor@nexara.com.mx`, que sigue existiendo y está en la lista de exclusión.
 
-Pasos, **en este orden**:
-1. Cherry-pick del commit del filtro sobre `main` (recomendado; fusionar la rama
-   entera subiría también el turno del 27-ago) y `git push origin main`.
-2. `cd /var/www/nexara-app && ./deploy/update.sh`
-3. **Solo después**, devolverle a Claudia su membresía de empresa — con el filtro
-   ya vivo, no vuelve a la web:
-   ```sql
-   INSERT INTO user_companies ("userId","companyId","isDefault","createdAt","employeeNumber")
-   VALUES (35, 1, true, '2026-07-28 20:12:05.353', 'NX-010');
-   ```
+**Respaldo doble**: esquema `backup_20260828b` dentro de `nexara_db` (7 tablas,
+incluida `reportes_huerfanos` con quién pierde jefe) y
+`/root/backups/karen-joseivan-4-9-20260828-173606.sql` (42 KB).
 
-> Si se restaura la membresía **antes** de desplegar, Claudia reaparece en
-> `/nosotros`. Ese error ya se cometió una vez.
+### Despliegue realizado
+- Los 3 archivos del arreglo se llevaron a **`main`** (difieren de `main` solo por
+  este cambio, comprobado) en el commit **`24ec58b`**, empujado a origin.
+- `cd /var/www/nexara-app && ./deploy/update.sh` → imágenes `nexara-api` y
+  `nexara-web` reconstruidas, contenedores recreados y arriba.
+- `main` ya no está 4 commits por detrás en lo que a este arreglo respecta, pero
+  **el resto de `mejora/calidad-y-web` sigue sin fusionar** (turno del 27-ago:
+  Vitest, CI, DTO de GPS). Esa decisión sigue pendiente.
 
-> Ojo al desplegar: en el servidor hay 3 archivos sin commitear
-> (`deploy/traefik/{arta,reading,school}.yml`), de otros proyectos del droplet.
+### Verificación final sobre producción
+- `https://nexara.com.mx/nosotros` → HTTP 200. Apariciones de «Claudia», «Bernal»,
+  «Luis», «Aguilar», «Karen», «Elizalde», «Tapia», «José Iván»: **0 de cada una**.
+- La rejilla pinta 8 miembros reales desde la API (no cayó al fallback).
+- `"User"` queda en **14** filas.
+- Claudia (35) y Luis (7): activos, 1 empresa y 2 canales cada uno.
 
 ## A medias — CUIDADO
 - nada
@@ -261,9 +267,8 @@ Y añadido este turno:
   apellido y **NO se tocó**: no era objetivo.
 - `npx tsc --noEmit -p apps/api/tsconfig.json` → limpio.
 - API: **71 suites / 513 tests** en verde (antes 70 / 509).
-- `GET users/public-team` en producción **ya no devuelve a Claudia**; su hueco lo
-  ocupa Karen Elizalde. Comprobado sobre el HTML servido de `/nosotros`.
-- **Luis sigue apareciendo en producción**: su exclusión es código sin desplegar.
 - API: **71 suites / 514 tests** en verde. Web: **10 ficheros / 99 tests**.
-- `npx tsc --noEmit` limpio en `apps/api` y en `apps/web`.
+- `npx tsc --noEmit` limpio en `apps/api` y en `apps/web`, y los tests se corrieron
+  también sobre `main` antes de commitear ahí.
+- Producción verificada tras desplegar (ver bloque de arriba).
 - Contenedores `nexara-api`, `nexara-web`, `nexara-db`, `nexara-redis`: arriba.
