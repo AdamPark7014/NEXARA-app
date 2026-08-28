@@ -42,6 +42,11 @@ describe('findPublicTeam · cuentas excluidas del equipo público', () => {
     expect(where.email.notIn).toContain('direccion.operaciones@nexara.com.mx');
   });
 
+  it('excluye a soluciones (Mónica) — administrativa, fuera del equipo público', async () => {
+    const where = await capturaWhere();
+    expect(where.email.notIn).toContain('soluciones@nexara.com.mx');
+  });
+
   it('mantiene excluidas las cuentas que ya lo estaban', async () => {
     const where = await capturaWhere();
     expect(where.email.notIn).toEqual(
@@ -64,5 +69,6 @@ describe('findPublicTeam · cuentas excluidas del equipo público', () => {
     expect(JSON.stringify(where)).not.toMatch(/nombre/i);
     expect(where.email.notIn).toContain('claudia.bernal@nexara.com.mx');
     expect(where.email.notIn).toContain('direccion.operaciones@nexara.com.mx');
+    expect(where.email.notIn).toContain('soluciones@nexara.com.mx');
   });
 });

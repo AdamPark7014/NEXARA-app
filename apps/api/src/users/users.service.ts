@@ -650,6 +650,7 @@ export class UsersService {
     // usuario desde RRHH no debe devolverlo a la web.
     'claudia.bernal@nexara.com.mx',
     'direccion.operaciones@nexara.com.mx',
+    'soluciones@nexara.com.mx',
     ...this.superAdminEmails,
   ];
 
