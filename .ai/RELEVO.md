@@ -85,8 +85,71 @@ Verificación posterior recorriendo **las 130 claves foráneas** hacia `"User"`:
   las 18 filas exactas. Sigue ahí: **no lo borres sin querer**.
 - `/root/backups/ariadna-isaias-11-14-20260828-164244.sql` (40 KB, `--column-inserts`).
 
+### Claudia restaurada y ocultada del equipo público — CAMBIO NO DESPLEGADO
+Tercer encargo del turno: recrear a Claudia pero que **no se vea en la sección
+«nosotros» del sitio público**.
+
+**Restaurada** desde `/root/backups/claudia-user35-20260828-163758.sql`: `User`
+id **35** idéntico al original (mismo `passwordHash`, misma `fechaCreacion`
+2026-07-22), más sus 3 membresías recreadas a mano (empresa 1 + chat `#general`
+y `#anuncios`). La secuencia `User_id_seq` sigue en 36, sin tocar.
+
+**Por qué salía en «nosotros».** No estaba en ninguna tabla de contenido — eso ya
+se había verificado. La sección se pinta desde `GET users/public-team`, que lee
+**la propia tabla `User`**. Es decir: *cualquier alta en el ERP aparece en el sitio
+público salvo que se excluya explícitamente*. Y como `findPublicTeam` ordena por
+`fechaCreacion desc`, Claudia (alta 22-jul, la más reciente del equipo) salía
+**la segunda tarjeta**, etiquetada «CEO». Verificado contra el endpoint en
+producción antes y después.
+
+**El arreglo** — `apps/api/src/users/users.service.ts`: se añade su email a
+`excludedPublicTeamEmails`, que ya existía para esto mismo (`vendedor@` y los
+super-admin). Es filtro **de servidor**, dentro del `where` de Prisma.
+
+Se eligió el servidor y no `apps/web` a propósito: el filtro que hay en
+`apps/web/app/(public)/nosotros/page.tsx:110` es un **regex sobre el nombre**
+(`/revisor google play|reviewer|cuenta de prueba/i`). Basta con que alguien
+renombre la cuenta desde el panel de RRHH para que reaparezca en el sitio. Hay un
+test que fija justamente eso.
+
+**Tests nuevos**: `apps/api/src/users/public-team-exclusions.spec.ts`, 4 casos
+(exclusión de Claudia, no romper las exclusiones previas, seguir acotando por
+empresa, y que el filtro no dependa del nombre).
+
+## 🚩 PENDIENTE DE DESPLIEGUE — leer antes de tocar nada
+**El cambio de código está commiteado pero NO está vivo en producción.** Claudia
+está restaurada en la BD y **ahora mismo se sigue viendo en `/nosotros`**.
+
+El motivo es que el despliegue no es trivial y no se decidió por cuenta propia:
+- El servidor sirve desde `/var/www/nexara-app` y **sigue la rama `main`**
+  (`deploy/update.sh` hace `git pull --ff-only origin main`).
+- `main` está en `b4970450` — el commit del vídeo del hero, del 26-ago.
+- Nuestro trabajo vive en **`mejora/calidad-y-web`**, que va por delante e incluye
+  el turno grande del 27-ago (Vitest, CI, DTO de GPS, limpieza de worktrees).
+
+Así que hay dos caminos y **los dos son decisión de Adam**:
+1. **Fusionar `mejora/calidad-y-web` en `main` y desplegar.** Sube también todo el
+   turno del 27-ago. Radio de impacto grande.
+2. **Cherry-pick solo del commit del filtro sobre `main` y desplegar.** Mínimo y
+   reversible, pero deja las dos ramas más divergentes.
+
+Despliegue, en cualquiera de los dos casos:
+`ssh … && cd /var/www/nexara-app && ./deploy/update.sh` (reconstruye la imagen de
+la API; el filtro es código, no configuración, así que sin rebuild no hay efecto).
+
+> Ojo al desplegar: en el servidor hay 3 archivos sin commitear
+> (`deploy/traefik/{arta,reading,school}.yml`). Son de otros proyectos del droplet
+> y `--ff-only` no los toca, pero conviene no barrerlos.
+
 ## A medias — CUIDADO
 - nada
+
+## Hallazgo suelto: «Revisor Google Play» solo está oculto por el nombre
+La cuenta id 36 (`play.review@nexara.com.mx`) **sí la devuelve** el endpoint
+`public-team`; lo único que evita que se pinte es el regex de nombre en la web.
+Tiene además `roleKey = ceo`. No se tocó — está fuera del encargo —, pero es la
+misma clase de fragilidad que se acaba de arreglar para Claudia: se corrige
+añadiendo su email a `excludedPublicTeamEmails`.
 
 ## ⚠️ Riesgo abierto: los tres pueden resucitar
 `apps/api/prisma/seed-demo-users.ts` **sigue conteniendo la entrada de Claudia** y es
@@ -152,9 +215,14 @@ Y añadido este turno:
 
 ## Estado verificado al cerrar
 - Árbol de git **limpio** antes y después: este turno no cambia código.
-- BD producción, Claudia: `… WHERE id=35 OR nombre ILIKE '%claudia%'` → **0**.
+- BD producción, Claudia: **restaurada**, `User` id 35 con sus 3 membresías.
 - BD producción, Ariadna e Isaías: barrido de las 130 FKs hacia `"User"` buscando
   `IN (11,14)` → **0 filas residuales**; `"User" WHERE id IN (11,14)` → **0**.
-- `"User"` pasa de 18 a **15** filas. Alejandro González **Bustamante** (id 15) salió
-  en la búsqueda inicial por el apellido y **NO se tocó**: no era objetivo.
+- `"User"` queda en **16** filas (18 − Ariadna − Isaías + Claudia restaurada).
+  Alejandro González **Bustamante** (id 15) salió en la búsqueda inicial por el
+  apellido y **NO se tocó**: no era objetivo.
+- `npx tsc --noEmit -p apps/api/tsconfig.json` → limpio.
+- API: **71 suites / 513 tests** en verde (antes 70 / 509).
+- `GET users/public-team` en producción **todavía devuelve a Claudia**: el filtro
+  no está desplegado (ver «Pendiente de despliegue»).
 - Contenedores `nexara-api`, `nexara-web`, `nexara-db`, `nexara-redis`: arriba.
