@@ -43,22 +43,72 @@ regenerables.
 > dirección para pasar la revisión de la tienda. No se tocó; queda anotado por si
 > Adam quiere bajarle el privilegio.
 
+### Ariadna Sierra Gallardo (14) e Isaías García Bustamante (11) eliminados
+Segundo encargo del mismo turno. **A diferencia de Claudia, estos dos SÍ estaban en
+el organigrama oficial** de la migración `seed_nexara_team` (puestos 11 y 14), como
+Ingenieros de Campo con `fechaIngreso` real de 2024. Se auditó antes de tocar.
+
+| | Isaías (11) | Ariadna (14) |
+|---|---|---|
+| Email | isaias.garcia@nexara.com.mx | ariadna.sierra@nexara.com.mx |
+| Nº empleado | NX-403 | NX-406 |
+| `lastLoginAt` | vacío | vacío |
+| Filas dependientes | 3 en 2 tablas | 13 en 6 tablas |
+
+**Isaías** estaba limpio: solo membresías de chat (2) y de empresa (1), todas CASCADE.
+
+**Ariadna tenía registros de asistencia con `ON DELETE RESTRICT`** — `Attendance` (2)
+y `AttendanceDay` (1) —, más `LocationTracking` (3), `notifications` (4), chat (2) y
+empresa (1). Se paró a examinarlos antes de borrar, porque RESTRICT es una protección
+deliberada del esquema sobre datos laborales. **Resultaron ser datos de prueba, no
+una jornada real:**
+- Entrada `2026-07-09 01:54:46`, salida `01:55:18` → **32 segundos**, `totalMinutes = 1`.
+- `deviceInfo`: «Escritorio (Windows Desktop)» — no un móvil de campo.
+- Coordenadas `45.9057, -92.3575` → **Wisconsin, EE. UU.**, no México.
+- Los 3 pings de `LocationTracking`: coordenadas idénticas, `actividadId` NULL,
+  `estaActivo` false, misma marca de tiempo que la salida.
+- Las 4 notificaciones son los avisos automáticos de ese mismo marcaje.
+
+Contexto: en toda la BD **solo 3 usuarios tienen asistencia** (10, 13 y 14). El único
+uso que parece real es el de id 13 (11 marcajes, junio–agosto).
+
+Se le expuso el hallazgo a Adam y **reafirmó la orden** («vuélales todo»), así que se
+borró el conjunto completo.
+
+**Borrado:** 18 filas en una transacción, con las tablas RESTRICT primero (si no, el
+`DELETE` del usuario falla) y los usuarios acotados por `id AND email`.
+Verificación posterior recorriendo **las 130 claves foráneas** hacia `"User"`:
+**0 filas residuales**. Quedan 15 usuarios.
+
+**Respaldo doble** (esto sí era borrado con datos, no como Claudia):
+- Esquema **`backup_20260828`** dentro de la propia `nexara_db`, con las 7 tablas y
+  las 18 filas exactas. Sigue ahí: **no lo borres sin querer**.
+- `/root/backups/ariadna-isaias-11-14-20260828-164244.sql` (40 KB, `--column-inserts`).
+
 ## A medias — CUIDADO
 - nada
 
-## ⚠️ Riesgo abierto: Claudia puede resucitar
-`apps/api/prisma/seed-demo-users.ts` **sigue conteniendo su entrada** y es un
-upsert idempotente: quien corra `cd apps/api && npm run prisma:seed` la vuelve a
+## ⚠️ Riesgo abierto: los tres pueden resucitar
+`apps/api/prisma/seed-demo-users.ts` **sigue conteniendo la entrada de Claudia** y es
+un upsert idempotente: quien corra `cd apps/api && npm run prisma:seed` la vuelve a
 crear, con rol `ceo` y contraseña conocida. Lo mismo en
 `scripts/generate-credentials-xlsx.js` (ese solo genera la hoja, no toca la BD).
+
+**Ariadna e Isaías tienen además una segunda vía de retorno, más difícil de ver:**
+están en la migración `apps/api/prisma/migrations/20260620120000_seed_nexara_team/`,
+que los upserta por email. Esa migración ya está aplicada, así que no se re-ejecuta
+sola en producción — pero **cualquier `prisma migrate reset`, o el levantar un entorno
+nuevo desde cero, los recrea**. La migración no se tocó: reescribir una migración ya
+aplicada rompe el historial de Prisma para todos los entornos.
 
 **No se editaron esos archivos a propósito.** `seed-demo-users.ts` está en la
 lista de «No tocar» de abajo desde el turno anterior. Se le preguntó a Adam si
 quitarla del seed y **no zanjó la decisión**, así que se dejó intacto — el criterio
 del protocolo es que un archivo vetado no se toca por iniciativa del agente.
 
-➜ **Si el siguiente turno ve a Claudia otra vez en la BD, la causa es el seed, no
-un error.** La decisión sobre el archivo sigue pendiente de Adam.
+➜ **Si el siguiente turno ve a cualquiera de los tres otra vez en la BD, la causa es
+el seed o un reset de migraciones, no un error.** La decisión sobre esos archivos
+sigue pendiente de Adam.
 
 ## No tocar
 - `apps/web/app/(subdomains)/tickets/layout.tsx` — heredado de turnos anteriores.
@@ -89,7 +139,11 @@ Los cinco puntos del turno del 2026-08-27 siguen **intactos y sin empezar**:
 
 Y añadido este turno:
 
-6. **Decidir qué pasa con la entrada de Claudia en el seed** (ver «Riesgo abierto»).
+6. **Decidir qué pasa con las entradas de Claudia, Ariadna e Isaías** en el seed y en
+   la migración `seed_nexara_team` (ver «Riesgo abierto»). Ninguno de los dos archivos
+   se tocó este turno.
+8. **Purgar el esquema `backup_20260828` de `nexara_db`** cuando Adam confirme que no
+   hace falta revertir. Mientras exista, los datos borrados siguen dentro de la BD.
 7. **Hallazgo suelto, no investigado:** `nexara-api` escupe 404 continuos de
    `GET /api/studio/page-content/seo_nosotros` y `seo_contacto` — «no tiene
    contenido publicado todavía». Es **anterior a este turno** y no tiene relación
@@ -98,6 +152,9 @@ Y añadido este turno:
 
 ## Estado verificado al cerrar
 - Árbol de git **limpio** antes y después: este turno no cambia código.
-- BD producción: `SELECT count(*) … WHERE id=35 OR nombre ILIKE '%claudia%'` → **0**.
-- `chat_channel_members` y `user_companies` con `userId=35` → **0** y **0**.
+- BD producción, Claudia: `… WHERE id=35 OR nombre ILIKE '%claudia%'` → **0**.
+- BD producción, Ariadna e Isaías: barrido de las 130 FKs hacia `"User"` buscando
+  `IN (11,14)` → **0 filas residuales**; `"User" WHERE id IN (11,14)` → **0**.
+- `"User"` pasa de 18 a **15** filas. Alejandro González **Bustamante** (id 15) salió
+  en la búsqueda inicial por el apellido y **NO se tocó**: no era objetivo.
 - Contenedores `nexara-api`, `nexara-web`, `nexara-db`, `nexara-redis`: arriba.
