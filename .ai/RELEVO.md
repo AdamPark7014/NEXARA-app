@@ -121,17 +121,43 @@ empresa, y que el filtro no dependa del nombre).
 Dos operaciones distintas, no confundirlas:
 
 ### 1. Ocultos del sitio público, pero VIVOS en el ERP
-**Claudia Bernal (35)** y **Luis Joel Aguilar Castillo (7)**. Sus usuarios existen,
-activos, con su empresa y sus canales de chat. Solo dejaron de mostrarse en
-`/nosotros`.
+**Claudia Bernal (35)**, **Luis Joel Aguilar Castillo (7)** y **Mónica García
+Guzmán (5)**. Sus usuarios existen, activos, con su empresa y sus canales de chat.
+Solo dejaron de mostrarse en `/nosotros`.
+
+| Usuario | id | Email — **no es el que parece** |
+|---|---|---|
+| Claudia Bernal | 35 | `claudia.bernal@nexara.com.mx` |
+| Luis Joel Aguilar | 7 | `direccion.operaciones@nexara.com.mx` |
+| Mónica García | 5 | `soluciones@nexara.com.mx` |
 
 Se hizo con el filtro por email de `excludedPublicTeamEmails`
-(`apps/api/src/users/users.service.ts`), **desplegado**. Ojo: el email de Luis es
-`direccion.operaciones@nexara.com.mx`, **no** `luis.aguilar@`.
+(`apps/api/src/users/users.service.ts`), **desplegado**. Ninguno de los tres tiene
+el email que uno adivinaría por su nombre — comprobar siempre contra la BD antes de
+añadir a nadie a esa lista.
 
-Luis salía en **dos** sitios: el endpoint `users/public-team` y, hardcodeado, el
-`expertosFallback` de `apps/web/app/(public)/nosotros/page.tsx` — la lista que se
-pinta si la API falla. Los dos corregidos; filtrar solo el servidor no bastaba.
+### ⚠️ La trampa: `expertosFallback`, la segunda lista
+`apps/web/app/(public)/nosotros/page.tsx` tiene una lista **hardcodeada** de
+nombres que se pinta cuando la llamada a la API falla. **No respeta
+`excludedPublicTeamEmails`** — son cadenas de texto, no usuarios.
+
+Ya mordió una vez: Luis estaba ahí y filtrar solo el servidor no bastaba. Karen
+seguía ahí después de haberla eliminado de la BD, así que la web habría mostrado a
+alguien que ya no trabaja aquí. Ambos quitados.
+
+**Esto no es teórico.** Justo después de desplegar se comprobó `/nosotros` y la
+página servía **la lista de reserva**, porque la API aún no estaba lista tras
+recrear el contenedor (se detecta por los nombres: «Gonzales», «Juarez Alvarez» sin
+acentos y prefijo «Ing.»). Es decir: **en cada despliegue hay una ventana en la que
+la web pinta esa lista.** Hoy ninguno de los excluidos está en ella, así que no se
+filtra a nadie, pero **si alguien añade ahí a una persona oculta, se verá en cada
+reinicio**.
+
+➜ Al ocultar a alguien, **revisar SIEMPRE las dos listas**.
+
+➜ Además, `expertosFallback` está **desactualizada**: contiene «Ing. Julio Cesar
+Rivera Vazquez», que **no existe como usuario en la BD**. No se tocó — no formaba
+parte del encargo—, pero alguien debería decidir si sigue ahí.
 
 El filtro va por **email y en servidor** a propósito: el que había en la web era un
 regex sobre el nombre, y un nombre se cambia desde RRHH sin darse cuenta. Hay test.
@@ -179,10 +205,19 @@ incluida `reportes_huerfanos` con quién pierde jefe) y
 
 ### Verificación final sobre producción
 - `https://nexara.com.mx/nosotros` → HTTP 200. Apariciones de «Claudia», «Bernal»,
-  «Luis», «Aguilar», «Karen», «Elizalde», «Tapia», «José Iván»: **0 de cada una**.
-- La rejilla pinta 8 miembros reales desde la API (no cayó al fallback).
+  «Luis», «Aguilar», «Mónica», «Guzmán», «Karen», «Elizalde», «Tapia» y
+  «Julio Cesar»: **0 de cada una**.
+- La rejilla pinta **8 miembros reales desde la API**. Se verificó que viene de la BD
+  y no del fallback comparando los acentos («González», «Juárez», «Zenón»).
 - `"User"` queda en **14** filas.
-- Claudia (35) y Luis (7): activos, 1 empresa y 2 canales cada uno.
+- Claudia (35), Luis (7) y Mónica (5): activos, 1 empresa y 2 canales cada uno.
+- Despliegues a `main`: `24ec58b` (Claudia + Luis) y `ff9e485` (Mónica + Karen fuera
+  del fallback). Ambos desplegados con `./deploy/update.sh`.
+
+> Ruido conocido al arrancar la API, **no es de este trabajo**: `WorkflowSeedService`
+> lanza `prisma:error … Unique constraint failed on the fields: (name)` porque
+> intenta resembrar definiciones de workflow que ya existen. Va capturado como WARN
+> y ocurre en cada reinicio.
 
 ## A medias — CUIDADO
 - nada
