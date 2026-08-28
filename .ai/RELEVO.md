@@ -116,44 +116,67 @@ test que fija justamente eso.
 (exclusión de Claudia, no romper las exclusiones previas, seguir acotando por
 empresa, y que el filtro no dependa del nombre).
 
-## 🚩 Claudia: OCULTA EN PRODUCCIÓN, pero por un atajo — leer entero
-**Estado actual verificado:** `https://nexara.com.mx/nosotros` → HTTP 200 y **cero
-apariciones** de «Claudia»/«Bernal». La rejilla pinta el equipo real desde la API
-(no cayó al `expertosFallback`). Objetivo cumplido.
+## 🚩 ESTADO DE LAS EXCLUSIONES DEL EQUIPO PÚBLICO — leer entero
 
-**Pero NO está oculta por el arreglo bueno.** Está oculta porque se le borró la
-fila de `user_companies`, y `findPublicTeam` exige
-`companyMemberships: { some: { companyId: tenantId } }`. Sin membresía, desaparece
-del endpoint al instante y sin redesplegar. Se hizo así porque Adam lo pidió con
-urgencia y el filtro por email **sigue sin desplegarse**.
+Adam pidió sacar de `/nosotros` a **Claudia Bernal** y a **Luis Joel Aguilar
+Castillo**. Están en situaciones distintas y **hay que tratarlos distinto**.
 
-**Consecuencia que hay que conocer:** el usuario 35 existe pero **no pertenece a
-ninguna empresa**. Hoy da igual en la práctica — `lastLoginAt` sigue vacío, nunca
-ha entrado —, pero si alguien le da acceso al ERP, fallará por falta de tenant.
+### Claudia (id 35) — YA NO SE VE, pero por un atajo
+`https://nexara.com.mx/nosotros` → 200 y **cero apariciones** de «Claudia»/«Bernal».
+Verificado sobre el HTML servido, no solo sobre la API.
 
-**Cómo dejarlo bien** (2 pasos, en este orden):
-1. Desplegar el filtro por email, que ya está commiteado y con tests. El servidor
-   sirve `/var/www/nexara-app` siguiendo **`main`**, y `main` va **4 commits por
-   detrás** de `mejora/calidad-y-web`. Dos caminos, decisión de Adam:
-   - Fusionar la rama en `main` y desplegar → sube también el turno del 27-ago
-     (Vitest, CI, DTO de GPS). Radio de impacto grande.
-   - Cherry-pick solo del commit del filtro sobre `main` → mínimo y reversible.
-     **Es el recomendado.**
-   Luego: `cd /var/www/nexara-app && ./deploy/update.sh` (reconstruye la imagen de
-   la API; implica reinicio breve del ERP, por eso no se hizo por cuenta propia).
-2. **Solo después**, restaurar su membresía de empresa, que entonces ya no la
-   devuelve a la página:
+Está oculta porque **se le borró la fila de `user_companies`**, y `findPublicTeam`
+exige `companyMemberships: { some: { companyId } }`. Sin membresía desaparece del
+endpoint al instante, sin redesplegar. Se hizo así porque se pidió con urgencia.
+
+Se pudo hacer **solo porque su cuenta nunca se ha usado** (`lastLoginAt` vacío).
+Consecuencia: el usuario 35 existe pero no pertenece a ninguna empresa; si algún
+día se le da acceso al ERP, fallará por falta de tenant.
+
+### Luis (id 7) — SIGUE VIÉNDOSE. El atajo NO sirve con él
+`direccion.operaciones@nexara.com.mx` (ojo: **no** es `luis.aguilar@`), NX-301,
+Coordinador de Operaciones.
+
+**Es un usuario vivo:** `lastLoginAt` = 2026-08-16, 6 sesiones, 13 registros de
+auditoría, 7 notificaciones y **3 personas que le reportan** (`managerId = 7`).
+Quitarle la membresía de empresa como se hizo con Claudia **le dejaría fuera del
+ERP**. No se hizo, y no debe hacerse.
+
+Aparecía además en **dos** sitios, no en uno:
+1. El endpoint `users/public-team` (la tabla `User`).
+2. **Hardcodeado** en `expertosFallback` de
+   `apps/web/app/(public)/nosotros/page.tsx`, la lista que se pinta si la API
+   falla. Filtrar solo el servidor no habría bastado.
+
+Ambos corregidos en código y commiteados. **Para Luis no hay atajo: sin desplegar,
+sigue saliendo en la web.**
+
+### Lo que falta: UN despliegue resuelve los dos
+El filtro por email (`excludedPublicTeamEmails`) ya cubre a Claudia y a Luis, con
+tests. Falta llevarlo a producción:
+
+- El servidor sirve `/var/www/nexara-app` siguiendo **`main`**, y `main` va
+  **por detrás** de `mejora/calidad-y-web`.
+- No se desplegó por cuenta propia porque `./deploy/update.sh` **reconstruye la
+  imagen de la API y reinicia el ERP**, y eso afecta a gente trabajando (Luis
+  mismo entró hace 12 días). Es decisión de Adam.
+
+Pasos, **en este orden**:
+1. Cherry-pick del commit del filtro sobre `main` (recomendado; fusionar la rama
+   entera subiría también el turno del 27-ago) y `git push origin main`.
+2. `cd /var/www/nexara-app && ./deploy/update.sh`
+3. **Solo después**, devolverle a Claudia su membresía de empresa — con el filtro
+   ya vivo, no vuelve a la web:
    ```sql
    INSERT INTO user_companies ("userId","companyId","isDefault","createdAt","employeeNumber")
    VALUES (35, 1, true, '2026-07-28 20:12:05.353', 'NX-010');
    ```
 
-> Si se restaura la membresía **antes** de desplegar, Claudia vuelve a salir en
-> `/nosotros`. Ese es exactamente el error que ya ocurrió una vez este turno.
+> Si se restaura la membresía **antes** de desplegar, Claudia reaparece en
+> `/nosotros`. Ese error ya se cometió una vez.
 
 > Ojo al desplegar: en el servidor hay 3 archivos sin commitear
-> (`deploy/traefik/{arta,reading,school}.yml`). Son de otros proyectos del droplet
-> y `--ff-only` no los toca, pero conviene no barrerlos.
+> (`deploy/traefik/{arta,reading,school}.yml`), de otros proyectos del droplet.
 
 ## A medias — CUIDADO
 - nada
@@ -238,7 +261,9 @@ Y añadido este turno:
   apellido y **NO se tocó**: no era objetivo.
 - `npx tsc --noEmit -p apps/api/tsconfig.json` → limpio.
 - API: **71 suites / 513 tests** en verde (antes 70 / 509).
-- `GET users/public-team` en producción **ya no la devuelve**; su hueco lo ocupa
-  Karen Elizalde. Comprobado también sobre el HTML servido de `/nosotros`.
-- El filtro por email **sigue sin desplegar**: `main` no tiene el commit.
+- `GET users/public-team` en producción **ya no devuelve a Claudia**; su hueco lo
+  ocupa Karen Elizalde. Comprobado sobre el HTML servido de `/nosotros`.
+- **Luis sigue apareciendo en producción**: su exclusión es código sin desplegar.
+- API: **71 suites / 514 tests** en verde. Web: **10 ficheros / 99 tests**.
+- `npx tsc --noEmit` limpio en `apps/api` y en `apps/web`.
 - Contenedores `nexara-api`, `nexara-web`, `nexara-db`, `nexara-redis`: arriba.
