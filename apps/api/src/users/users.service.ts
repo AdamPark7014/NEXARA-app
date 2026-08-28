@@ -645,9 +645,11 @@ export class UsersService {
   /** Cuentas que no deben aparecer en la página pública "Nosotros / equipo" (ej. solo panel ventas). */
   private readonly excludedPublicTeamEmails = [
     'vendedor@nexara.com.mx',
-    // Cuenta interna de dirección: existe en el ERP pero no forma parte del
-    // equipo que se muestra en el sitio público.
+    // Cuentas internas: existen en el ERP pero no forman parte del equipo que se
+    // muestra en el sitio público. OJO: es el email, no el nombre — renombrar al
+    // usuario desde RRHH no debe devolverlo a la web.
     'claudia.bernal@nexara.com.mx',
+    'direccion.operaciones@nexara.com.mx',
     ...this.superAdminEmails,
   ];
 
