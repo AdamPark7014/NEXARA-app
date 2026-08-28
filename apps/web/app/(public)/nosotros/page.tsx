@@ -61,7 +61,6 @@ const expertosFallback = [
   { name: "Ing. Alejandro Gonzales Bustamante", role: "Ingeniero de Sistemas" },
   { name: "Ing. Carolina Juarez Alvarez", role: "Ingeniera de soporte" },
   { name: "Lic. Karen Elizalde Sarmiento", role: "Dirección Administrativa & Comercial" },
-  { name: "Ing. Luis Joel Aguilar", role: "Coordinador de Operaciones" },
   { name: "Ing. David Morales Zenon", role: "IDC / Instalador" },
   { name: "Ing. Julio Cesar Rivera Vazquez", role: "IDC / Instalador" },
   { name: "Ing. Israel Ramos Lima", role: "IDC / Instalador" },
