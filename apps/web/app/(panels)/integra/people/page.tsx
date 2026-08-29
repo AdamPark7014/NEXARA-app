@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DashPage,
   DashHero,
@@ -9,108 +9,98 @@ import {
   DashPanel,
   ListRow,
 } from "@/components/dashboard/DashKit";
-import { buildApiUrl } from "@/lib/api-base";
+import { btnGhost, btnPrimary, inputStyle, integraApi } from "../_lib";
 
 type Person = { id: string; name: string; code?: string; orgId?: string; orgName?: string };
-type Org = { id: string; name: string };
-
-async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(buildApiUrl(path), {
-    ...init,
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(typeof body?.message === "string" ? body.message : `HTTP ${res.status}`);
-  }
-  return res.json() as Promise<T>;
-}
+type Org = { id: string; name: string; parentId?: string };
 
 export default function IntegraPeoplePage() {
   const [people, setPeople] = useState<Person[]>([]);
   const [orgs, setOrgs] = useState<Org[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Person | null>(null);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [orgId, setOrgId] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [q, setQ] = useState("");
 
   const load = useCallback(async () => {
     setError(null);
     try {
       const [p, o] = await Promise.all([
-        apiJson<{ items: Person[] }>("integra/people"),
-        apiJson<{ items: Org[] }>("integra/orgs"),
+        integraApi<{ items: Person[] }>("integra/people"),
+        integraApi<{ items: Org[] }>("integra/orgs").catch(() => ({ items: [] })),
       ]);
       setPeople(p.items);
       setOrgs(o.items);
-      if (!orgId && o.items[0]) setOrgId(o.items[0].id);
+      setOrgId((prev) => prev || o.items[0]?.id || "");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
     }
-  }, [orgId]);
+  }, []);
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once on mount
-  }, []);
+  }, [load]);
 
-  const create = async () => {
-    if (!name.trim() || !orgId) return;
-    setBusy(true);
-    setError(null);
+  const filtered = useMemo(
+    () =>
+      people.filter(
+        (p) =>
+          !q ||
+          p.name.toLowerCase().includes(q.toLowerCase()) ||
+          (p.code || "").toLowerCase().includes(q.toLowerCase()),
+      ),
+    [people, q],
+  );
+
+  const add = async () => {
+    if (!name || !orgId) return;
     try {
-      await apiJson("integra/people", {
+      await integraApi("integra/people", {
         method: "POST",
-        body: JSON.stringify({
-          personName: name.trim(),
-          personCode: code.trim() || undefined,
-          orgIndexCode: orgId,
-        }),
+        body: JSON.stringify({ personName: name, personCode: code || undefined, orgIndexCode: orgId }),
       });
       setName("");
       setCode("");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
-    } finally {
-      setBusy(false);
     }
   };
 
   const remove = async (id: string) => {
-    setBusy(true);
-    try {
-      await apiJson(`integra/people/${encodeURIComponent(id)}`, { method: "DELETE" });
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
-    } finally {
-      setBusy(false);
-    }
+    if (!confirm("¿Eliminar persona en Artemis?")) return;
+    await integraApi(`integra/people/${encodeURIComponent(id)}`, { method: "DELETE" });
+    setSelected(null);
+    await load();
   };
 
   return (
     <DashPage>
       <DashHero
         eyebrow="Personas"
-        title="Personas"
-        subtitle="IDs Artemis únicamente — sin biometría en Postgres NEXARA."
+        title="Directorio"
+        subtitle="Espejo Prisma + alta/baja Artemis · árbol de orgs."
+        actions={
+          <button type="button" style={btnGhost} onClick={() => void load()}>
+            Actualizar
+          </button>
+        }
       />
       {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
 
       <DashGrid>
-        <DashCol span={7}>
-          <DashPanel title="Directorio" subtitle={`${people.length} personas`}>
-            {people.map((p) => (
+        <DashCol span={4}>
+          <DashPanel title="Organizaciones" subtitle={`${orgs.length}`}>
+            {orgs.map((o) => (
               <ListRow
-                key={p.id}
-                title={p.name || p.id}
-                sub={[p.code, p.orgName, p.id].filter(Boolean).join(" · ")}
+                key={o.id}
+                title={o.name}
+                sub={o.parentId ? `parent ${o.parentId}` : "root"}
                 trail={
-                  <button type="button" style={btnDanger} disabled={busy} onClick={() => void remove(p.id)}>
-                    Baja
+                  <button type="button" style={btnGhost} onClick={() => setOrgId(o.id)}>
+                    Usar
                   </button>
                 }
               />
@@ -118,54 +108,60 @@ export default function IntegraPeoplePage() {
           </DashPanel>
         </DashCol>
         <DashCol span={5}>
-          <DashPanel title="Alta" subtitle="person/single/add">
-            <input style={inp} placeholder="Nombre" value={name} onChange={(e) => setName(e.target.value)} />
+          <DashPanel title="Personas" subtitle={`${filtered.length}`}>
             <input
-              style={{ ...inp, marginTop: 8 }}
-              placeholder="Código (opcional)"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
+              placeholder="Buscar…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              style={{ ...inputStyle, marginBottom: 8 }}
             />
-            <select style={{ ...inp, marginTop: 8 }} value={orgId} onChange={(e) => setOrgId(e.target.value)}>
-              <option value="">Organización…</option>
-              {orgs.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name || o.id}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              style={{ ...btn, marginTop: 8, width: "100%" }}
-              disabled={busy || !name.trim() || !orgId}
-              onClick={() => void create()}
-            >
-              Crear en Artemis
-            </button>
+            {filtered.map((p) => (
+              <ListRow
+                key={p.id}
+                title={p.name}
+                sub={[p.code, p.orgName, p.id].filter(Boolean).join(" · ")}
+                trail={
+                  <button type="button" style={btnGhost} onClick={() => setSelected(p)}>
+                    Ver
+                  </button>
+                }
+              />
+            ))}
+          </DashPanel>
+        </DashCol>
+        <DashCol span={3}>
+          <DashPanel title="Detalle / alta">
+            {selected ? (
+              <div style={{ fontSize: 13, display: "grid", gap: 6 }}>
+                <strong>{selected.name}</strong>
+                <span>{selected.code || "—"}</span>
+                <span>{selected.orgName || selected.orgId}</span>
+                <code style={{ fontSize: 11 }}>{selected.id}</code>
+                <button type="button" style={btnGhost} onClick={() => void remove(selected.id)}>
+                  Eliminar
+                </button>
+              </div>
+            ) : (
+              <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Selecciona una persona</p>
+            )}
+            <hr style={{ margin: "12px 0", borderColor: "var(--border)" }} />
+            <div style={{ display: "grid", gap: 8 }}>
+              <input placeholder="Nombre" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+              <input placeholder="Código" value={code} onChange={(e) => setCode(e.target.value)} style={inputStyle} />
+              <select value={orgId} onChange={(e) => setOrgId(e.target.value)} style={inputStyle}>
+                {orgs.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+              <button type="button" style={btnPrimary} onClick={() => void add()}>
+                Alta
+              </button>
+            </div>
           </DashPanel>
         </DashCol>
       </DashGrid>
     </DashPage>
   );
 }
-
-const inp: React.CSSProperties = {
-  width: "100%",
-  padding: "8px 10px",
-  borderRadius: 8,
-  border: "1px solid var(--border, #e2e8f0)",
-  fontSize: 13,
-};
-const btn: React.CSSProperties = {
-  border: "none",
-  background: "var(--accent, #1d4ed8)",
-  color: "#fff",
-  borderRadius: 8,
-  padding: "8px 12px",
-  fontSize: 12,
-  cursor: "pointer",
-};
-const btnDanger: React.CSSProperties = {
-  ...btn,
-  background: "var(--danger, #b91c1c)",
-};

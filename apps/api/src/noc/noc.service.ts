@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { IntegraNocAdapter } from './adapters/integra.adapter.js';
 
 export type NocDevice = {
   id: string;
@@ -27,30 +28,52 @@ export type NocAlert = {
 };
 
 /**
- * Servicio NOC (Network Operations Center).
- *
- * Por ahora devuelve datos sintéticos derivados de los proyectos/ramas
- * existentes en el sistema para tener un dashboard funcional. La integración
- * real con Hikvision iSAPI, SNMP, MQTT, etc. se conecta desde aquí en fases
- * futuras: cada device tendrá su propio adaptador en `apps/api/src/noc/adapters/`.
+ * NOC: prioriza espejo Integra para CCTV/ACS; el resto sigue sintético
+ * hasta adapters reales (SNMP, MQTT, etc.).
  */
 @Injectable()
 export class NocService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly integraAdapter: IntegraNocAdapter,
+  ) {}
 
   async listDevices(filters?: { type?: string; status?: string; clientId?: number }): Promise<NocDevice[]> {
-    // Genera devices sintéticos basados en projects y service-clients reales.
-    const projects = await this.prisma.operationalProject.findMany({
-      where: { status: 'ACTIVE' as any },
-      select: {
-        id: true,
-        title: true,
-        projectType: true,
-        siteCount: true,
-        client: { select: { id: true, name: true } },
-      },
-      take: 30,
-    }).catch(() => []);
+    const integraDevices = await this.integraAdapter.listDevices(filters?.clientId);
+    const hasIntegraMirror = integraDevices.length > 0;
+
+    const synthetic = await this.syntheticDevices(filters?.clientId);
+    const merged = hasIntegraMirror
+      ? [
+          ...integraDevices,
+          ...synthetic.filter((d) => d.type !== 'CCTV' && d.type !== 'ACCESS_CONTROL'),
+        ]
+      : synthetic;
+
+    return merged.filter((d) => {
+      if (filters?.type && d.type !== filters.type) return false;
+      if (filters?.status && d.status !== filters.status) return false;
+      return true;
+    });
+  }
+
+  private async syntheticDevices(clientId?: number): Promise<NocDevice[]> {
+    const projects = await this.prisma.operationalProject
+      .findMany({
+        where: {
+          status: 'ACTIVE' as any,
+          ...(clientId ? { clientId } : {}),
+        },
+        select: {
+          id: true,
+          title: true,
+          projectType: true,
+          siteCount: true,
+          client: { select: { id: true, name: true } },
+        },
+        take: 30,
+      })
+      .catch(() => []);
 
     const devices: NocDevice[] = [];
     const typeForProject: Record<string, NocDevice['type']> = {
@@ -69,9 +92,24 @@ export class NocService {
       const baseType = typeForProject[p.projectType as any] || 'IOT_SENSOR';
       for (let s = 0; s < siteCount; s++) {
         const seed = p.id * 7 + s * 13;
-        const statuses: NocDevice['status'][] = ['ONLINE', 'ONLINE', 'ONLINE', 'ONLINE', 'DEGRADED', 'OFFLINE', 'ALERT'];
+        const statuses: NocDevice['status'][] = [
+          'ONLINE',
+          'ONLINE',
+          'ONLINE',
+          'ONLINE',
+          'DEGRADED',
+          'OFFLINE',
+          'ALERT',
+        ];
         const status = statuses[seed % statuses.length];
-        const uptime = status === 'ONLINE' ? 99 + Math.random() : status === 'DEGRADED' ? 92 + Math.random() * 5 : status === 'OFFLINE' ? 80 + Math.random() * 10 : 95 + Math.random() * 3;
+        const uptime =
+          status === 'ONLINE'
+            ? 99 + Math.random()
+            : status === 'DEGRADED'
+              ? 92 + Math.random() * 5
+              : status === 'OFFLINE'
+                ? 80 + Math.random() * 10
+                : 95 + Math.random() * 3;
 
         devices.push({
           id: `dev-${p.id}-${s}`,
@@ -80,19 +118,18 @@ export class NocService {
           status,
           branch: `Sucursal #${s + 1}`,
           clientName: p.client?.name || 'N/A',
-          lastSeen: status === 'OFFLINE' ? new Date(Date.now() - (1 + (seed % 12)) * 3600000).toISOString() : new Date(Date.now() - (seed % 300) * 1000).toISOString(),
+          lastSeen:
+            status === 'OFFLINE'
+              ? new Date(Date.now() - (1 + (seed % 12)) * 3600000).toISOString()
+              : new Date(Date.now() - (seed % 300) * 1000).toISOString(),
           uptimePct30d: +uptime.toFixed(2),
-          ipAddress: `10.${(p.id) % 256}.${s + 1}.${(seed % 254) + 1}`,
+          ipAddress: `10.${p.id % 256}.${s + 1}.${(seed % 254) + 1}`,
           firmwareVersion: `${1 + (seed % 4)}.${seed % 10}.${(seed * 3) % 99}`,
+          metadata: { source: 'synthetic' },
         });
       }
     }
-
-    return devices.filter((d) => {
-      if (filters?.type && d.type !== filters.type) return false;
-      if (filters?.status && d.status !== filters.status) return false;
-      return true;
-    });
+    return devices;
   }
 
   async getSummary() {
@@ -105,9 +142,10 @@ export class NocService {
       acc[d.type] = (acc[d.type] || 0) + 1;
       return acc;
     }, {});
-    const avgUptime = devices.length > 0
-      ? +(devices.reduce((s, d) => s + d.uptimePct30d, 0) / devices.length).toFixed(2)
-      : 0;
+    const avgUptime =
+      devices.length > 0
+        ? +(devices.reduce((s, d) => s + d.uptimePct30d, 0) / devices.length).toFixed(2)
+        : 0;
     const offline = devices.filter((d) => d.status === 'OFFLINE');
     const alerts = devices.filter((d) => d.status === 'ALERT' || d.status === 'DEGRADED');
 
@@ -120,6 +158,7 @@ export class NocService {
       offlineDevices: offline.slice(0, 8),
       alertDevices: alerts.slice(0, 8),
       generatedAt: new Date().toISOString(),
+      integraLive: await this.integraAdapter.hasMirror(),
     };
   }
 
@@ -127,21 +166,25 @@ export class NocService {
     const devices = await this.listDevices();
     return devices
       .filter((d) => d.status !== 'ONLINE')
-      .map((d): NocAlert => ({
-        id: `alert-${d.id}`,
-        severity: (d.status === 'OFFLINE' || d.status === 'ALERT' ? 'critical' : 'warning'),
-        deviceId: d.id,
-        deviceName: d.name,
-        title: d.status === 'OFFLINE'
-          ? 'Dispositivo desconectado'
-          : d.status === 'ALERT'
-            ? 'Anomalía detectada'
-            : 'Performance degradado',
-        message: d.status === 'OFFLINE'
-          ? `Sin contacto desde ${new Date(d.lastSeen).toLocaleString('es-MX')}`
-          : `${d.type} en ${d.branch} (${d.clientName}) — Uptime 30d: ${d.uptimePct30d}%`,
-        triggeredAt: d.lastSeen,
-      }))
+      .map(
+        (d): NocAlert => ({
+          id: `alert-${d.id}`,
+          severity: d.status === 'OFFLINE' || d.status === 'ALERT' ? 'critical' : 'warning',
+          deviceId: d.id,
+          deviceName: d.name,
+          title:
+            d.status === 'OFFLINE'
+              ? 'Dispositivo desconectado'
+              : d.status === 'ALERT'
+                ? 'Anomalía detectada'
+                : 'Performance degradado',
+          message:
+            d.status === 'OFFLINE'
+              ? `Sin contacto desde ${new Date(d.lastSeen).toLocaleString('es-MX')}`
+              : `${d.type} en ${d.branch} (${d.clientName}) — Uptime 30d: ${d.uptimePct30d}%`,
+          triggeredAt: d.lastSeen,
+        }),
+      )
       .sort((a, b) => (a.severity === 'critical' ? -1 : 1));
   }
 }

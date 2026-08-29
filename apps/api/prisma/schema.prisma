@@ -5013,6 +5013,13 @@ model CompanyProfile {
   operationalMeetings       OperationalMeeting[]
   meetingAgreements         MeetingAgreement[]
   folioCounters             FolioCounter[]
+  integraSites              IntegraSite[]
+  integraCameras            IntegraCamera[]
+  integraDoors              IntegraDoor[]
+  integraPeople             IntegraPerson[]
+  integraDevices            IntegraDevice[]
+  integraVehicles           IntegraVehicle[]
+  integraSyncRuns           IntegraSyncRun[]
 
   @@map("company_profile")
 }
@@ -5660,4 +5667,168 @@ model FolioCounter {
 
   @@unique([companyId, serie])
   @@map("folio_counters")
+}
+
+// ─── NEXARA Integra (HikCentral Artemis mirror + multi-sitio) ─────────────
+
+enum IntegraDeviceKind {
+  ACS
+  ENCODE
+}
+
+enum IntegraSyncStatus {
+  RUNNING
+  OK
+  ERROR
+}
+
+/// Credenciales Artemis por empresa (cifradas). Fallback: env INTEGRA_HIK_*.
+model IntegraSite {
+  id              Int       @id @default(autoincrement())
+  companyId       Int
+  name            String    @db.VarChar(160)
+  host            String    @db.VarChar(500)
+  /// AES-GCM payload (base64)
+  appKeyEnc       String    @db.Text
+  appSecretEnc    String    @db.Text
+  isActive        Boolean   @default(true)
+  isDefault       Boolean   @default(false)
+  lastSyncAt      DateTime?
+  lastHealthOkAt  DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  company  CompanyProfile   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  cameras  IntegraCamera[]
+  doors    IntegraDoor[]
+  people   IntegraPerson[]
+  devices  IntegraDevice[]
+  vehicles IntegraVehicle[]
+  syncRuns IntegraSyncRun[]
+
+  @@index([companyId, isActive])
+  @@unique([companyId, name])
+  @@map("integra_sites")
+}
+
+model IntegraCamera {
+  id               Int      @id @default(autoincrement())
+  companyId        Int
+  siteId           Int
+  cameraIndexCode  String   @db.VarChar(120)
+  name             String   @db.VarChar(220)
+  regionName       String?  @db.VarChar(220)
+  regionIndexCode  String?  @db.VarChar(120)
+  status           String?  @db.VarChar(40)
+  encodeDevIndexCode String? @db.VarChar(120)
+  raw              Json?
+  syncedAt         DateTime @default(now())
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, cameraIndexCode])
+  @@index([companyId])
+  @@map("integra_cameras")
+}
+
+model IntegraDoor {
+  id              Int      @id @default(autoincrement())
+  companyId       Int
+  siteId          Int
+  doorIndexCode   String   @db.VarChar(120)
+  name            String   @db.VarChar(220)
+  regionName      String?  @db.VarChar(220)
+  online          Boolean  @default(true)
+  doorState       String?  @db.VarChar(40)
+  raw             Json?
+  syncedAt        DateTime @default(now())
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, doorIndexCode])
+  @@index([companyId])
+  @@map("integra_doors")
+}
+
+model IntegraPerson {
+  id            Int      @id @default(autoincrement())
+  companyId     Int
+  siteId        Int
+  personId      String   @db.VarChar(120)
+  personName    String   @db.VarChar(220)
+  personCode    String?  @db.VarChar(120)
+  orgIndexCode  String?  @db.VarChar(120)
+  orgName       String?  @db.VarChar(220)
+  raw           Json?
+  syncedAt      DateTime @default(now())
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, personId])
+  @@index([companyId])
+  @@map("integra_people")
+}
+
+model IntegraDevice {
+  id          Int               @id @default(autoincrement())
+  companyId   Int
+  siteId      Int
+  indexCode   String            @db.VarChar(120)
+  name        String            @db.VarChar(220)
+  kind        IntegraDeviceKind
+  ip          String?           @db.VarChar(80)
+  online      Boolean           @default(true)
+  deviceType  String?           @db.VarChar(80)
+  raw         Json?
+  syncedAt    DateTime          @default(now())
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, kind, indexCode])
+  @@index([companyId])
+  @@map("integra_devices")
+}
+
+model IntegraVehicle {
+  id         Int      @id @default(autoincrement())
+  companyId  Int
+  siteId     Int
+  vehicleId  String   @db.VarChar(120)
+  plateNo    String   @db.VarChar(40)
+  personId   String?  @db.VarChar(120)
+  personName String?  @db.VarChar(220)
+  raw        Json?
+  syncedAt   DateTime @default(now())
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, vehicleId])
+  @@index([companyId])
+  @@map("integra_vehicles")
+}
+
+model IntegraSyncRun {
+  id         Int               @id @default(autoincrement())
+  companyId  Int
+  siteId     Int
+  status     IntegraSyncStatus @default(RUNNING)
+  startedAt  DateTime          @default(now())
+  finishedAt DateTime?
+  cameras    Int               @default(0)
+  doors      Int               @default(0)
+  people     Int               @default(0)
+  devices    Int               @default(0)
+  vehicles   Int               @default(0)
+  error      String?           @db.Text
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, startedAt])
+  @@map("integra_sync_runs")
 }

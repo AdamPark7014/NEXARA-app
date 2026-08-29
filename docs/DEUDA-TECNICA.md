@@ -66,9 +66,9 @@ por dispositivo en `apps/api/src/noc/adapters/` para Hikvision ISAPI, SNMP y MQT
   diseño" hasta tener integración real? Hoy un cliente ve un panel que parece
   telemetría y no lo es.
 - **Nota:** ACS de oficinas NEXARA ya habla Artemis (`access-control`, ADR-0017).
-  El panel Integra es el camino de paridad CCTV; NOC debe acabar consumiendo el
-  mismo adapter, no inventar dispositivos.
-
+  Integra espeja CCTV/ACS en Prisma; **NOC ya consume** `noc/adapters/integra.adapter.ts`
+  cuando hay `IntegraSite` — deja de inventar CCTV/ACS sintéticos en ese caso.
+  Sigue pendiente ISAPI/SNMP/MQTT para el resto de tipos.
 ### 1.2 Timbrado CFDI en modo mock
 
 **`apps/api/src/pac/adapters/mock.adapter.ts`** · usado en **`apps/api/src/pac/pac.service.ts:33`**

@@ -1,71 +1,72 @@
 # NEXARA Integra · operaciones
 
-Checklist para poner en marcha `integra.nexara.com.mx` y el ACS de oficinas.
-Ver [ADR-0017](ADR-0017-nexara-integra.md).
+Checklist para `integra.nexara.com.mx`, sitios multi-tenant, go2rtc y ACS oficinas.
+Ver [ADR-0017](ADR-0017-nexara-integra.md), [ADR-0018](ADR-0018-integra-media-tenancy.md), [ADR-0019](ADR-0019-integra-hct-adapter.md).
 
 ## Frontera
 
-| Superficie | Env | API | UI |
-|------------|-----|-----|-----|
+| Superficie | Creds | API | UI |
+|------------|-------|-----|-----|
 | Oficinas NEXARA | `OFFICES_HIK_*` | `/api/access-control` | `/erp/facilities/access` |
-| Integra (sitio) | `INTEGRA_HIK_*` | `/api/integra` | `integra.nexara.com.mx` |
+| Integra (sitio) | `IntegraSite` cifrado **o** `INTEGRA_HIK_*` | `/api/integra` | `integra.nexara.com.mx` |
 
-Pueden apuntar al **mismo** HikCentral o a instancias distintas. No mezclar controllers.
+No mezclar controllers.
 
 ## DNS
 
-1. Crear registro **A** (o AAAA) `integra.nexara.com.mx` → IP del droplet NEXARA.
-2. Traefik ya tiene router `integra-frontend` + `/api` + socket (`deploy/traefik/nexara.yml`).
-3. Esperar ACME Let’s Encrypt tras el primer hit HTTPS.
+1. **A/AAAA** `integra.nexara.com.mx` → droplet.
+2. Traefik: frontend + `/api` + `/go2rtc` → go2rtc + socket.
 
-Aliases no hace falta; el canónico es `integra`.
-
-## Secretos (droplet / `.env`)
+## Secretos
 
 ```bash
 # Oficinas
 OFFICES_HIK_HOST=https://hikcentral.oficinas.local
 OFFICES_HIK_APP_KEY=...
 OFFICES_HIK_APP_SECRET=...
-OFFICES_HIK_TIMEOUT=15000
 
-# Integra (producto / sitio)
+# Fallback Integra (si no hay filas IntegraSite)
 INTEGRA_HIK_HOST=https://hikcentral.sitio.local
 INTEGRA_HIK_APP_KEY=...
 INTEGRA_HIK_APP_SECRET=...
-INTEGRA_HIK_TIMEOUT=15000
+
+# Cifrado de secrets de sitio (32 bytes vía sha256 del string)
+INTEGRA_SECRETS_KEY=...
+
+# Media
+GO2RTC_URL=http://nexara-go2rtc:1984
+GO2RTC_PUBLIC_URL=https://integra.nexara.com.mx/go2rtc
 ```
 
-Fallback oficinas: `HIKVISION_URL`, `HIK_APP_KEY`, `HIK_APP_SECRET`.
+Sitios se crean en UI `/integra/settings` (roles altos). Rotar keys = editar sitio (re-cifra).
 
-Certificados autofirmados: el cliente Node usa `fetch` sin agent custom; si TLS falla,
-terminar en HTTP interno o instalar CA en el contenedor `nexara-api`.
+## go2rtc
+
+- Compose: servicio `nexara-go2rtc` (`deploy/go2rtc/go2rtc.yaml`).
+- API `POST /api/integra/cameras/:id/stream` registra RTSP Artemis y devuelve HLS público.
+- El contenedor debe alcanzar la red donde Artemis publica RTSP (VPN/LAN).
+- Puerto interno `1984`; público solo vía Traefik path `/go2rtc`.
+
+## Sync
+
+- Cron cada 15 min por sitio activo.
+- Manual: `POST /api/integra/sync` o botón en home/settings.
+- Listados leen espejo Prisma; `?live=1` fuerza Artemis.
 
 ## Smoke
 
-Con sesión JWT (cookie o Bearer):
-
 ```bash
-curl -sS -H "Authorization: Bearer $TOKEN" https://core.nexara.com.mx/api/access-control/health
 curl -sS -H "Authorization: Bearer $TOKEN" https://integra.nexara.com.mx/api/integra/health
-curl -sS -H "Authorization: Bearer $TOKEN" https://integra.nexara.com.mx/api/integra/cameras
-curl -sS -H "Authorization: Bearer $TOKEN" https://integra.nexara.com.mx/api/integra/doors
+curl -sS -H "Authorization: Bearer $TOKEN" https://integra.nexara.com.mx/api/integra/dashboard
+curl -sS -H "Authorization: Bearer $TOKEN" -X POST https://integra.nexara.com.mx/api/integra/sync
+curl -sS -H "Authorization: Bearer $TOKEN" -X POST https://integra.nexara.com.mx/api/integra/cameras/CAM01/stream
 ```
-
-Esperado con creds OK: `connected: true`. Sin creds: `configured: false`, HTTP 200 en health;
-listados responden **503**.
-
-## Video
-
-`POST /api/integra/cameras/:id/preview` devuelve URL **RTSP** (`rtsp_s`). Abrir en VLC
-o un media gateway; no hay player HTML5 en P0.
 
 ## Deploy
 
-Tras cambiar Traefik o env:
-
 ```bash
 cd /var/www/nexara-app && ./deploy/update.sh
+# prisma migrate deploy incluye integra_sites_mirror
 ```
 
-Confirmar contenedores `nexara-api` / `nexara-web` y logs sin crash al importar `IntegraModule`.
+Confirmar contenedores `nexara-api`, `nexara-web`, `nexara-go2rtc`.

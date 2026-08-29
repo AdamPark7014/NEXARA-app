@@ -252,6 +252,53 @@ export class HikCentralArtemisClient {
       { pageNo, pageSize },
     );
   }
+
+  vehicleAdd(body: Record<string, unknown>) {
+    return this.post('/artemis/api/resource/v1/vehicle/single/add', body);
+  }
+
+  vehicleUpdate(body: Record<string, unknown>) {
+    return this.post('/artemis/api/resource/v1/vehicle/single/update', body);
+  }
+
+  vehicleDelete(vehicleId: string) {
+    return this.post('/artemis/api/resource/v1/vehicle/single/delete', { vehicleId });
+  }
+
+  /** Playback — fechas ISO con offset. */
+  playbackUrls(cameraIndexCode: string, beginTime: string, endTime: string) {
+    return this.post<ArtemisPreviewData>('/artemis/api/video/v1/cameras/playbackURLs', {
+      cameraIndexCode,
+      beginTime,
+      endTime,
+      protocol: 'rtsp_s',
+      lockType: 0,
+    });
+  }
+
+  eventPictures(picUri: string) {
+    return this.post('/artemis/api/acs/v1/event/pictures', { picUri });
+  }
+
+  eventRecordsPage(body: Record<string, unknown>) {
+    return this.post('/artemis/api/eventService/v1/eventRecords/page', body);
+  }
+
+  eventSubscription(body: Record<string, unknown>) {
+    return this.post('/artemis/api/eventService/v1/eventSubscriptionByEventTypes', body);
+  }
+
+  visitorQr(body: Record<string, unknown>) {
+    return this.post('/artemis/api/visitor/v1/visitor/qr/get', body);
+  }
+
+  visitorAppointment(body: Record<string, unknown>) {
+    return this.post('/artemis/api/visitor/v1/appointment/registration', body);
+  }
+
+  anprCrossRecords(body: Record<string, unknown>) {
+    return this.post('/artemis/api/pms/v1/crossRecords/page', body);
+  }
 }
 
 export {

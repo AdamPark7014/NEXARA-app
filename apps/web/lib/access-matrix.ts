@@ -235,7 +235,11 @@ export type ModuleId =
   | "integra-access"
   | "integra-people"
   | "integra-events"
-  | "integra-vehicles";
+  | "integra-vehicles"
+  | "integra-alarms"
+  | "integra-visitors"
+  | "integra-anpr"
+  | "integra-settings";
 
 export type ModuleEntry = {
   id: ModuleId;
@@ -898,8 +902,32 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "integra-vehicles": {
     id: "integra-vehicles", panel: PANELS.INTEGRA, path: "/vehicles",
-    label: "Vehículos", description: "ANPR y flota",
+    label: "Vehículos", description: "Flota Artemis",
     icon: "🚗", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD],
+    group: "Integra", visible: true,
+  },
+  "integra-alarms": {
+    id: "integra-alarms", panel: PANELS.INTEGRA, path: "/alarms",
+    label: "Alarmas", description: "eventService / alarmas sitio",
+    icon: "🚨", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD, R.NOC_OPERATOR],
+    group: "Integra", visible: true,
+  },
+  "integra-visitors": {
+    id: "integra-visitors", panel: PANELS.INTEGRA, path: "/visitors",
+    label: "Visitas", description: "Citas y QR visitante",
+    icon: "🎫", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD],
+    group: "Integra", visible: true,
+  },
+  "integra-anpr": {
+    id: "integra-anpr", panel: PANELS.INTEGRA, path: "/anpr",
+    label: "ANPR", description: "Cruces PMS / placas",
+    icon: "🚘", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD],
+    group: "Integra", visible: true,
+  },
+  "integra-settings": {
+    id: "integra-settings", panel: PANELS.INTEGRA, path: "/settings",
+    label: "Sitios", description: "Sitios Artemis y sync",
+    icon: "⚙️", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.DIRECTOR_ADMIN],
     group: "Integra", visible: true,
   },
 };

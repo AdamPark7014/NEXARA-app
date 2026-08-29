@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -6,33 +7,62 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString, ArrayNotEmpty } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsBoolean,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { RbacGuard } from '../common/rbac.guard';
 import { CurrentUser } from '../common/current-user.decorator';
+import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { IntegraArtemisService } from './integra-artemis.service';
+import { IntegraSiteService } from './integra-site.service';
+import { IntegraSyncService } from './integra-sync.service';
 
 class AddPersonDto {
-  @IsString()
-  personName!: string;
-
-  @IsString()
-  orgIndexCode!: string;
-
-  @IsOptional()
-  @IsString()
-  personCode?: string;
+  @IsString() personName!: string;
+  @IsString() orgIndexCode!: string;
+  @IsOptional() @IsString() personCode?: string;
 }
 
 class AssignPrivilegeDto {
-  @IsArray()
-  @ArrayNotEmpty()
-  @IsString({ each: true })
-  personIds!: string[];
+  @IsArray() @ArrayNotEmpty() @IsString({ each: true }) personIds!: string[];
+}
+
+class SiteCreateDto {
+  @IsString() name!: string;
+  @IsString() host!: string;
+  @IsString() appKey!: string;
+  @IsString() appSecret!: string;
+  @IsOptional() @IsBoolean() isDefault?: boolean;
+}
+
+class SiteUpdateDto {
+  @IsOptional() @IsString() name?: string;
+  @IsOptional() @IsString() host?: string;
+  @IsOptional() @IsString() appKey?: string;
+  @IsOptional() @IsString() appSecret?: string;
+  @IsOptional() @IsBoolean() isActive?: boolean;
+  @IsOptional() @IsBoolean() isDefault?: boolean;
+}
+
+class VehicleDto {
+  @IsString() plateNo!: string;
+  @IsOptional() @IsString() personId?: string;
+  @IsOptional() @IsString() vehicleId?: string;
+}
+
+class PlaybackDto {
+  @IsString() beginTime!: string;
+  @IsString() endTime!: string;
 }
 
 @ApiTags('Integra · Artemis')
@@ -40,104 +70,400 @@ class AssignPrivilegeDto {
 @UseGuards(RbacGuard)
 @Controller('integra')
 export class IntegraController {
-  constructor(private readonly integra: IntegraArtemisService) {}
+  constructor(
+    private readonly integra: IntegraArtemisService,
+    private readonly sites: IntegraSiteService,
+    private readonly sync: IntegraSyncService,
+  ) {}
 
   @Get('health')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Salud Artemis Integra' })
-  health() {
-    return this.integra.health();
+  health(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.health(companyId, siteId ? parseInt(siteId, 10) : null);
   }
 
+  @Get('dashboard')
+  dashboard(@CurrentCompanyId() companyId: number | null) {
+    return this.integra.dashboard(companyId);
+  }
+
+  // ── Sites ──────────────────────────────────────────────────────────
+  @Get('sites')
+  listSites(@CurrentCompanyId() companyId: number | null) {
+    if (!companyId) return [];
+    return this.sites.list(companyId);
+  }
+
+  @Post('sites')
+  @HttpCode(HttpStatus.CREATED)
+  createSite(@CurrentCompanyId() companyId: number | null, @Body() dto: SiteCreateDto) {
+    if (!companyId) throw new BadRequestException('companyId requerido');
+    return this.sites.create(companyId, dto);
+  }
+
+  @Patch('sites/:id')
+  updateSite(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() dto: SiteUpdateDto,
+  ) {
+    if (!companyId) throw new BadRequestException('companyId requerido');
+    return this.sites.update(companyId, parseInt(id, 10), dto);
+  }
+
+  @Delete('sites/:id')
+  deleteSite(@CurrentCompanyId() companyId: number | null, @Param('id') id: string) {
+    if (!companyId) throw new BadRequestException('companyId requerido');
+    return this.sites.remove(companyId, parseInt(id, 10));
+  }
+
+  @Post('sync')
+  @HttpCode(HttpStatus.OK)
+  async runSync(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('companyId requerido');
+    const sid = siteId
+      ? parseInt(siteId, 10)
+      : (await this.sites.list(companyId)).find((s) => s.isDefault)?.id ||
+        (await this.sites.list(companyId))[0]?.id;
+    if (!sid) throw new BadRequestException('Sin sitio para sincronizar');
+    return this.sync.syncSite(companyId, sid);
+  }
+
+  @Get('sync/last')
+  lastSync(@CurrentCompanyId() companyId: number | null, @Query('siteId') siteId?: string) {
+    if (!companyId) return null;
+    return this.sync.lastRun(companyId, siteId ? parseInt(siteId, 10) : undefined);
+  }
+
+  // ── Cameras / video ────────────────────────────────────────────────
   @Get('cameras')
-  @ApiOperation({ summary: 'Listar cámaras' })
-  cameras(@Query('page') page?: string, @Query('pageSize') pageSize?: string) {
+  cameras(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('live') live?: string,
+    @Query('siteId') siteId?: string,
+  ) {
     return this.integra.listCameras(
-      page ? parseInt(page, 10) : 1,
-      pageSize ? parseInt(pageSize, 10) : 100,
+      companyId,
+      live === '1',
+      siteId ? parseInt(siteId, 10) : null,
     );
   }
 
   @Post('cameras/:id/preview')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'URL live RTSP (previewURLs)' })
-  preview(@Param('id') id: string) {
-    return this.integra.preview(id);
+  preview(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.preview(companyId, id, siteId ? parseInt(siteId, 10) : null);
   }
 
+  @Post('cameras/:id/stream')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'RTSP→HLS vía go2rtc' })
+  stream(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.stream(companyId, id, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  @Post('cameras/:id/playback')
+  @HttpCode(HttpStatus.OK)
+  playback(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() dto: PlaybackDto,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.playback(
+      companyId,
+      id,
+      dto.beginTime,
+      dto.endTime,
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Post('cameras/:id/capture')
+  @HttpCode(HttpStatus.OK)
+  capture(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.capture(companyId, id, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  // ── Doors / access ─────────────────────────────────────────────────
   @Get('doors')
-  @ApiOperation({ summary: 'Listar puertas del sitio' })
-  doors(@Query('page') page?: string, @Query('pageSize') pageSize?: string) {
+  doors(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('live') live?: string,
+    @Query('siteId') siteId?: string,
+  ) {
     return this.integra.listDoors(
-      page ? parseInt(page, 10) : 1,
-      pageSize ? parseInt(pageSize, 10) : 100,
+      companyId,
+      live === '1',
+      siteId ? parseInt(siteId, 10) : null,
     );
   }
 
   @Post('doors/:id/open')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Apertura remota' })
-  openDoor(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.integra.openDoor(id, { id: user?.id, email: user?.email });
+  openDoor(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.openDoor(
+      companyId,
+      id,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Get('devices')
+  devices(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.listDevices(companyId, siteId ? parseInt(siteId, 10) : null);
   }
 
   @Get('events')
-  @ApiOperation({ summary: 'Eventos ACS últimas 24 h' })
-  events(@Query('limit') limit?: string, @Query('doorId') doorId?: string) {
-    return this.integra.listEvents(limit ? parseInt(limit, 10) : 50, doorId);
+  events(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('limit') limit?: string,
+    @Query('doorId') doorId?: string,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.listEvents(companyId, {
+      limit: limit ? parseInt(limit, 10) : 50,
+      doorId,
+      siteId: siteId ? parseInt(siteId, 10) : null,
+    });
   }
 
+  @Post('events/picture')
+  @HttpCode(HttpStatus.OK)
+  eventPicture(
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: { picUri: string },
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.eventPicture(
+      companyId,
+      body.picUri,
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  // ── People / privilege ─────────────────────────────────────────────
   @Get('orgs')
-  @ApiOperation({ summary: 'Organizaciones Artemis' })
-  orgs(@Query('page') page?: string) {
-    return this.integra.listOrgs(page ? parseInt(page, 10) : 1);
+  orgs(@CurrentCompanyId() companyId: number | null, @Query('siteId') siteId?: string) {
+    return this.integra.listOrgs(companyId, siteId ? parseInt(siteId, 10) : null);
   }
 
   @Get('people')
-  @ApiOperation({ summary: 'Personas Artemis (sin biometría local)' })
-  people(@Query('page') page?: string, @Query('pageSize') pageSize?: string) {
+  people(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('live') live?: string,
+    @Query('siteId') siteId?: string,
+  ) {
     return this.integra.listPeople(
-      page ? parseInt(page, 10) : 1,
-      pageSize ? parseInt(pageSize, 10) : 100,
+      companyId,
+      live === '1',
+      siteId ? parseInt(siteId, 10) : null,
     );
   }
 
   @Post('people')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Alta persona en Artemis' })
-  addPerson(@Body() dto: AddPersonDto) {
-    return this.integra.addPerson(dto);
+  addPerson(
+    @CurrentCompanyId() companyId: number | null,
+    @Body() dto: AddPersonDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.addPerson(
+      companyId,
+      dto,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
   }
 
   @Delete('people/:id')
-  @ApiOperation({ summary: 'Baja persona en Artemis' })
-  deletePerson(@Param('id') id: string) {
-    return this.integra.deletePerson(id);
+  deletePerson(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.deletePerson(
+      companyId,
+      id,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
   }
 
   @Get('privilege-groups')
-  @ApiOperation({ summary: 'Grupos de privilegio' })
-  privilegeGroups(@Query('page') page?: string) {
-    return this.integra.listPrivilegeGroups(page ? parseInt(page, 10) : 1);
+  privilegeGroups(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.listPrivilegeGroups(companyId, siteId ? parseInt(siteId, 10) : null);
   }
 
   @Post('privilege-groups/:id/persons')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Asignar personas a grupo' })
-  assign(@Param('id') id: string, @Body() dto: AssignPrivilegeDto) {
-    return this.integra.assignPersonsToGroup(id, dto.personIds);
+  assign(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() dto: AssignPrivilegeDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.assignPersonsToGroup(
+      companyId,
+      id,
+      dto.personIds,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
   }
 
   @Post('privilege/apply')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reaplicar privilegios (auth/reapplication)' })
-  applyAuth() {
-    return this.integra.applyAuth();
+  applyAuth(
+    @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.applyAuth(
+      companyId,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
   }
 
+  // ── Vehicles ───────────────────────────────────────────────────────
   @Get('vehicles')
-  @ApiOperation({ summary: 'Vehículos Artemis' })
-  vehicles(@Query('page') page?: string) {
-    return this.integra.listVehicles(page ? parseInt(page, 10) : 1);
+  vehicles(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('live') live?: string,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.listVehicles(
+      companyId,
+      live === '1',
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Post('vehicles')
+  @HttpCode(HttpStatus.CREATED)
+  addVehicle(
+    @CurrentCompanyId() companyId: number | null,
+    @Body() dto: VehicleDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.addVehicle(
+      companyId,
+      dto,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Patch('vehicles/:id')
+  updateVehicle(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() dto: VehicleDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.updateVehicle(
+      companyId,
+      { ...dto, vehicleId: id },
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Delete('vehicles/:id')
+  deleteVehicle(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.deleteVehicle(
+      companyId,
+      id,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  // ── P3 alarms / visitors ───────────────────────────────────────────
+  @Post('alarms/search')
+  @HttpCode(HttpStatus.OK)
+  alarms(
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: Record<string, unknown>,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.alarmRecords(companyId, body, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  @Post('visitors/register')
+  @HttpCode(HttpStatus.CREATED)
+  visitorRegister(
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: Record<string, unknown>,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.visitorRegister(
+      companyId,
+      body,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Post('visitors/qr')
+  @HttpCode(HttpStatus.OK)
+  visitorQr(
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: Record<string, unknown>,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.visitorQr(companyId, body, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  // ── P4 ANPR ────────────────────────────────────────────────────────
+  @Post('anpr/cross-records')
+  @HttpCode(HttpStatus.OK)
+  anpr(
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: Record<string, unknown>,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.anprRecords(companyId, body, siteId ? parseInt(siteId, 10) : null);
   }
 }

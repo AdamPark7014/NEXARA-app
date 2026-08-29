@@ -36,6 +36,7 @@ services:
     depends_on:
       - db
       - redis
+      - go2rtc
     environment:
       NODE_ENV: production
       PORT: 3001
@@ -78,6 +79,9 @@ services:
       INTEGRA_HIK_HOST: ${INTEGRA_HIK_HOST:-}
       INTEGRA_HIK_APP_KEY: ${INTEGRA_HIK_APP_KEY:-}
       INTEGRA_HIK_APP_SECRET: ${INTEGRA_HIK_APP_SECRET:-}
+      INTEGRA_SECRETS_KEY: ${INTEGRA_SECRETS_KEY:-}
+      GO2RTC_URL: ${GO2RTC_URL:-http://nexara-go2rtc:1984}
+      GO2RTC_PUBLIC_URL: ${GO2RTC_PUBLIC_URL:-https://integra.nexara.com.mx/go2rtc}
       GLOBAL_RATE_LIMIT_MAX: ${GLOBAL_RATE_LIMIT_MAX:-1200}
       GLOBAL_RATE_LIMIT_WINDOW_MS: ${GLOBAL_RATE_LIMIT_WINDOW_MS:-60000}
       # CFDI / SAT / PAC
@@ -155,6 +159,17 @@ services:
       - ../uploads:/app/uploads
     networks:
       - internal
+
+  # Media gateway: RTSP Artemis → HLS para player HTML5 (Integra).
+  go2rtc:
+    image: alexxit/go2rtc:1.9.7
+    container_name: nexara-go2rtc
+    restart: unless-stopped
+    volumes:
+      - ./go2rtc/go2rtc.yaml:/config/go2rtc.yaml:ro
+    networks:
+      - internal
+      - proxy
 
   web:
     build:

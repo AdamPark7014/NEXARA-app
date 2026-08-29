@@ -10,43 +10,37 @@ import {
   ListRow,
   DashPill,
 } from "@/components/dashboard/DashKit";
-import { buildApiUrl } from "@/lib/api-base";
+import { btnGhost, btnPrimary, inputStyle, integraApi } from "../_lib";
 
 type Door = { id: string; name: string; location?: string; online?: boolean; status?: string };
 type Group = { id: string; name: string; description?: string };
-
-async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(buildApiUrl(path), {
-    ...init,
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(
-      typeof body?.message === "string" ? body.message : `HTTP ${res.status}`,
-    );
-  }
-  return res.json() as Promise<T>;
-}
+type Person = { id: string; name: string; code?: string };
+type Device = { id: string; name: string; kind: string; ip?: string; online?: boolean };
 
 export default function IntegraAccessPage() {
   const [doors, setDoors] = useState<Door[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
+  const [devices, setDevices] = useState<Device[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [personIds, setPersonIds] = useState("");
+  const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [selectedGroup, setSelectedGroup] = useState("");
+  const [personFilter, setPersonFilter] = useState("");
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [d, g] = await Promise.all([
-        apiJson<{ items: Door[] }>("integra/doors"),
-        apiJson<{ items: Group[] }>("integra/privilege-groups").catch(() => ({ items: [] })),
+      const [d, g, p, dev] = await Promise.all([
+        integraApi<{ items: Door[] }>("integra/doors"),
+        integraApi<{ items: Group[] }>("integra/privilege-groups").catch(() => ({ items: [] })),
+        integraApi<{ items: Person[] }>("integra/people").catch(() => ({ items: [] })),
+        integraApi<{ items: Device[] }>("integra/devices").catch(() => ({ items: [] })),
       ]);
       setDoors(d.items);
       setGroups(g.items);
+      setPeople(p.items);
+      setDevices(dev.items);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
     }
@@ -59,7 +53,7 @@ export default function IntegraAccessPage() {
   const open = async (id: string) => {
     setBusy(id);
     try {
-      await apiJson(`integra/doors/${encodeURIComponent(id)}/open`, { method: "POST" });
+      await integraApi(`integra/doors/${encodeURIComponent(id)}/open`, { method: "POST" });
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
@@ -68,16 +62,21 @@ export default function IntegraAccessPage() {
     }
   };
 
+  const togglePerson = (id: string) => {
+    setSelectedPeople((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
   const assign = async () => {
-    if (!selectedGroup || !personIds.trim()) return;
+    if (!selectedGroup || selectedPeople.length === 0) return;
     setBusy("assign");
     try {
-      const ids = personIds.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
-      await apiJson(`integra/privilege-groups/${encodeURIComponent(selectedGroup)}/persons`, {
+      await integraApi(`integra/privilege-groups/${encodeURIComponent(selectedGroup)}/persons`, {
         method: "POST",
-        body: JSON.stringify({ personIds: ids }),
+        body: JSON.stringify({ personIds: selectedPeople }),
       });
-      setPersonIds("");
+      setSelectedPeople([]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
     } finally {
@@ -85,44 +84,55 @@ export default function IntegraAccessPage() {
     }
   };
 
-  const apply = async () => {
+  const applyAuth = async () => {
     setBusy("apply");
     try {
-      await apiJson("integra/privilege/apply", { method: "POST" });
+      await integraApi("integra/privilege/apply", { method: "POST" });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
     } finally {
       setBusy(null);
     }
   };
+
+  const filteredPeople = people.filter((p) =>
+    !personFilter ||
+    p.name.toLowerCase().includes(personFilter.toLowerCase()) ||
+    (p.code || "").toLowerCase().includes(personFilter.toLowerCase()),
+  );
 
   return (
     <DashPage>
       <DashHero
         eyebrow="Accesos"
-        title="Control de acceso · sitio"
-        subtitle="Puertas y privilege groups Artemis (no oficinas NEXARA)."
+        title="Control de acceso"
+        subtitle="Puertas, devices ACS y privilegios con picker de personas."
+        actions={
+          <button type="button" style={btnGhost} onClick={() => void load()}>
+            Actualizar
+          </button>
+        }
       />
       {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
 
       <DashGrid>
-        <DashCol span={7}>
-          <DashPanel title="Puertas" subtitle={`${doors.length} puertas`}>
+        <DashCol span={6}>
+          <DashPanel title="Puertas" subtitle={`${doors.length}`}>
             {doors.map((d) => (
               <ListRow
                 key={d.id}
                 title={d.name}
-                sub={[d.location, d.id].filter(Boolean).join(" · ")}
+                sub={[d.location, d.status, d.id].filter(Boolean).join(" · ")}
                 trail={
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <DashPill tone={d.online ? "positive" : "neutral"}>
-                      {d.online ? "online" : "offline"}
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <DashPill tone={d.online ? "positive" : "warning"}>
+                      {d.online ? "online" : "off"}
                     </DashPill>
                     <button
                       type="button"
+                      style={btnPrimary}
                       disabled={busy === d.id}
                       onClick={() => void open(d.id)}
-                      style={btn}
                     >
                       {busy === d.id ? "…" : "Abrir"}
                     </button>
@@ -131,76 +141,68 @@ export default function IntegraAccessPage() {
               />
             ))}
           </DashPanel>
+          <DashPanel title="Devices ACS / Encode" subtitle={`${devices.length}`}>
+            {devices.map((d) => (
+              <ListRow
+                key={`${d.kind}-${d.id}`}
+                title={d.name}
+                sub={[d.kind, d.ip, d.id].filter(Boolean).join(" · ")}
+                trail={
+                  <DashPill tone={d.online ? "positive" : "warning"}>
+                    {d.online ? "online" : "off"}
+                  </DashPill>
+                }
+              />
+            ))}
+          </DashPanel>
         </DashCol>
-        <DashCol span={5}>
-          <DashPanel
-            title="Privilegios"
-            subtitle="Grupos Artemis"
-            headExtra={
-              <button type="button" style={btnGhost} disabled={busy === "apply"} onClick={() => void apply()}>
-                Reaplicar
-              </button>
-            }
-          >
+        <DashCol span={6}>
+          <DashPanel title="Privilegios" subtitle="Asignar personas a grupo">
             <select
               value={selectedGroup}
               onChange={(e) => setSelectedGroup(e.target.value)}
-              style={inp}
+              style={{ ...inputStyle, marginBottom: 8 }}
             >
-              <option value="">Elegir grupo…</option>
+              <option value="">Grupo…</option>
               {groups.map((g) => (
                 <option key={g.id} value={g.id}>
-                  {g.name || g.id}
+                  {g.name}
                 </option>
               ))}
             </select>
             <input
-              style={{ ...inp, marginTop: 8 }}
-              placeholder="personIds separados por coma"
-              value={personIds}
-              onChange={(e) => setPersonIds(e.target.value)}
+              placeholder="Filtrar personas…"
+              value={personFilter}
+              onChange={(e) => setPersonFilter(e.target.value)}
+              style={{ ...inputStyle, marginBottom: 8 }}
             />
-            <button
-              type="button"
-              style={{ ...btn, marginTop: 8, width: "100%" }}
-              disabled={!selectedGroup || busy === "assign"}
-              onClick={() => void assign()}
-            >
-              Asignar personas
-            </button>
-            {groups.length === 0 && (
-              <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 8 }}>
-                Sin grupos o endpoint no disponible en esta instancia.
-              </p>
-            )}
+            <div style={{ maxHeight: 220, overflow: "auto", marginBottom: 8 }}>
+              {filteredPeople.map((p) => (
+                <label
+                  key={p.id}
+                  style={{ display: "flex", gap: 8, fontSize: 13, padding: "4px 0", cursor: "pointer" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedPeople.includes(p.id)}
+                    onChange={() => togglePerson(p.id)}
+                  />
+                  {p.name}
+                  {p.code ? ` (${p.code})` : ""}
+                </label>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" style={btnPrimary} disabled={busy === "assign"} onClick={() => void assign()}>
+                Asignar ({selectedPeople.length})
+              </button>
+              <button type="button" style={btnGhost} disabled={busy === "apply"} onClick={() => void applyAuth()}>
+                Reaplicar auth
+              </button>
+            </div>
           </DashPanel>
         </DashCol>
       </DashGrid>
     </DashPage>
   );
 }
-
-const btn: React.CSSProperties = {
-  border: "none",
-  background: "var(--accent, #1d4ed8)",
-  color: "#fff",
-  borderRadius: 8,
-  padding: "6px 12px",
-  fontSize: 12,
-  cursor: "pointer",
-};
-const btnGhost: React.CSSProperties = {
-  border: "1px solid var(--border)",
-  background: "transparent",
-  borderRadius: 8,
-  padding: "6px 10px",
-  fontSize: 12,
-  cursor: "pointer",
-};
-const inp: React.CSSProperties = {
-  width: "100%",
-  padding: "8px 10px",
-  borderRadius: 8,
-  border: "1px solid var(--border, #e2e8f0)",
-  fontSize: 13,
-};

@@ -1,0 +1,11 @@
+# NEXARA Integra · go2rtc sidecar (RTSP → HLS)
+# Docs: https://github.com/AlexxIT/go2rtc
+api:
+  listen: ":1984"
+  origin: "*"
+
+rtsp:
+  listen: ":8554"
+
+webrtc:
+  listen: ":8555"

@@ -1,28 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { DashPage, DashHero, DashPanel, ListRow } from "@/components/dashboard/DashKit";
-import { buildApiUrl } from "@/lib/api-base";
+import {
+  DashPage,
+  DashHero,
+  DashPanel,
+  ListRow,
+} from "@/components/dashboard/DashKit";
+import { btnGhost, btnPrimary, inputStyle, integraApi } from "../_lib";
 
-type Vehicle = { id: string; plate: string; personName?: string; personId?: string };
-
-async function apiJson<T>(path: string): Promise<T> {
-  const res = await fetch(buildApiUrl(path), { credentials: "include" });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(typeof body?.message === "string" ? body.message : `HTTP ${res.status}`);
-  }
-  return res.json() as Promise<T>;
-}
+type Vehicle = { id: string; plate: string; personId?: string; personName?: string };
 
 export default function IntegraVehiclesPage() {
   const [items, setItems] = useState<Vehicle[]>([]);
+  const [plate, setPlate] = useState("");
+  const [personId, setPersonId] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const data = await apiJson<{ items: Vehicle[] }>("integra/vehicles");
+      const data = await integraApi<{ items: Vehicle[] }>("integra/vehicles");
       setItems(data.items);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
@@ -33,40 +31,70 @@ export default function IntegraVehiclesPage() {
     void load();
   }, [load]);
 
+  const add = async () => {
+    if (!plate.trim()) return;
+    try {
+      await integraApi("integra/vehicles", {
+        method: "POST",
+        body: JSON.stringify({ plateNo: plate.trim(), personId: personId || undefined }),
+      });
+      setPlate("");
+      setPersonId("");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error");
+    }
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm("¿Eliminar vehículo?")) return;
+    await integraApi(`integra/vehicles/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await load();
+  };
+
   return (
     <DashPage>
       <DashHero
-        eyebrow="Vehículos"
+        eyebrow="Flota"
         title="Vehículos"
-        subtitle="Listado Artemis vehicleList (CRUD completo en fases posteriores)."
+        subtitle="CRUD Artemis · espejo Prisma."
         actions={
-          <button type="button" onClick={() => void load()} style={btn}>
+          <button type="button" style={btnGhost} onClick={() => void load()}>
             Actualizar
           </button>
         }
       />
       {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
-      <DashPanel title="Flota" subtitle={`${items.length} vehículos`}>
+
+      <DashPanel title="Alta">
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input placeholder="Placa" value={plate} onChange={(e) => setPlate(e.target.value)} style={inputStyle} />
+          <input
+            placeholder="personId (opcional)"
+            value={personId}
+            onChange={(e) => setPersonId(e.target.value)}
+            style={inputStyle}
+          />
+          <button type="button" style={btnPrimary} onClick={() => void add()}>
+            Agregar
+          </button>
+        </div>
+      </DashPanel>
+
+      <DashPanel title="Inventario" subtitle={`${items.length}`}>
         {items.map((v) => (
           <ListRow
             key={v.id}
-            title={v.plate || v.id}
-            sub={[v.personName, v.id].filter(Boolean).join(" · ")}
+            title={v.plate}
+            sub={[v.personName, v.personId, v.id].filter(Boolean).join(" · ")}
+            trail={
+              <button type="button" style={btnGhost} onClick={() => void remove(v.id)}>
+                Borrar
+              </button>
+            }
           />
         ))}
-        {items.length === 0 && !error && (
-          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Sin vehículos.</p>
-        )}
       </DashPanel>
     </DashPage>
   );
 }
-
-const btn: React.CSSProperties = {
-  border: "1px solid var(--border)",
-  background: "transparent",
-  borderRadius: 8,
-  padding: "6px 10px",
-  fontSize: 12,
-  cursor: "pointer",
-};
