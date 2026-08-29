@@ -845,7 +845,9 @@ function Breadcrumbs({
   pathname: string;
   panelHome: string | null;
 }) {
-  const homeHref = panelHome ?? `/${panel}/dashboard`;
+  const homeHref =
+    panelHome ??
+    (panel === "lab" || panel === "integra" ? `/${panel}` : `/${panel}/dashboard`);
   const segments = pathname
     .split("/")
     .filter(Boolean)

@@ -15,6 +15,7 @@
  */
 
 import type { PanelId } from '@/lib/access-matrix';
+import { PANEL_META } from '@/lib/access-matrix';
 
 export const HANDOFF_PARAM = '_nxt';
 
@@ -46,6 +47,13 @@ const SUBDOMAIN_TO_PANEL_ID: Record<string, PanelId> = {
   integra: 'integra',
 };
 
+/** Home interno del panel según PANEL_META.entryPath (lab/integra = /panel). */
+export function panelHomeInternalPath(panelId: PanelId): string {
+  const entry = PANEL_META[panelId]?.entryPath ?? '/dashboard';
+  if (entry === '/' || entry === '') return `/${panelId}`;
+  return `/${panelId}${entry.startsWith('/') ? entry : `/${entry}`}`;
+}
+
 /** Codifica el objeto usuario en base64 para la URL. */
 export function encodeHandoff(userJson: string): string {
   try {
@@ -76,39 +84,47 @@ export function resolveCanonicalSubdomain(panelOrSub: string): string {
 
 /**
  * Asegura ruta interna completa con prefijo de panel: /crm/dashboard.
- * Si la ruta pertenece a otro panel, usa el dashboard del panel destino.
+ * Si la ruta pertenece a otro panel, usa el home del panel destino.
  */
 export function normalizeInternalPanelPath(panelId: PanelId, path: string): string {
   const safe = (path || '/').trim() || '/';
   const withSlash = safe.startsWith('/') ? safe : `/${safe}`;
+  const home = panelHomeInternalPath(panelId);
 
-  if (withSlash === `/${panelId}`) return `/${panelId}/dashboard`;
+  if (withSlash === `/${panelId}` || withSlash === '/') return home;
   if (withSlash.startsWith(`/${panelId}/`)) {
     if (withSlash.endsWith('/executive') && panelId !== 'erp') {
-      return `/${panelId}/dashboard`;
+      return home;
     }
     return withSlash;
   }
 
-  const foreign = /^\/(erp|crm|ops|studio|lab)(\/.*)?$/.exec(withSlash);
+  const foreign = /^\/(erp|crm|ops|studio|lab|integra)(\/.*)?$/.exec(withSlash);
   if (foreign && foreign[1] !== panelId) {
-    return `/${panelId}/dashboard`;
+    return home;
   }
 
   if (withSlash === '/executive' && panelId !== 'erp') {
-    return `/${panelId}/dashboard`;
+    return home;
   }
 
-  if (withSlash === '/') return `/${panelId}/dashboard`;
+  if (withSlash === '/dashboard' && (PANEL_META[panelId]?.entryPath === '/' || !PANEL_META[panelId]?.entryPath)) {
+    return home;
+  }
+
   return `/${panelId}${withSlash}`;
 }
 
-/** Ruta pública en subdominio (sin prefijo /erp|/crm): /dashboard, /executive */
+/** Ruta pública en subdominio (sin prefijo /erp|/crm): /dashboard, /executive, / */
 export function toSubdomainPublicPath(panelId: PanelId, internalPath: string): string {
   const full = normalizeInternalPanelPath(panelId, internalPath);
   const prefix = `/${panelId}`;
-  const suffix = full.slice(prefix.length) || '/dashboard';
-  return suffix === '/' ? '/dashboard' : suffix;
+  const suffix = full.slice(prefix.length) || '/';
+  if (suffix === '' || suffix === '/') {
+    const entry = PANEL_META[panelId]?.entryPath ?? '/dashboard';
+    return entry === '/' ? '/' : entry;
+  }
+  return suffix;
 }
 
 function getCurrentCanonicalSub(hostname: string): string | null {

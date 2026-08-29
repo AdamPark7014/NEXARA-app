@@ -224,7 +224,7 @@ export function getUserPanelEntryPath(
     const prefix = `/${panel}`;
     const rules = PAGE_MATRIX[v2] ?? [];
     const candidates = new Set<string>([
-      `${prefix}/dashboard`,
+      panel === 'lab' || panel === 'integra' ? prefix : `${prefix}/dashboard`,
       `${prefix}/my-profile`,
       prefix,
     ]);
@@ -234,7 +234,10 @@ export function getUserPanelEntryPath(
       candidates.add(rule.replace(/\/\*\*$/, '').replace(/\/\*$/, ''));
     }
     for (const candidate of candidates) {
-      const path = candidate === prefix ? `${prefix}/dashboard` : candidate;
+      const path =
+        candidate === prefix && panel !== 'lab' && panel !== 'integra'
+          ? `${prefix}/dashboard`
+          : candidate;
       if (canOpenPage(v2, path)) return path;
     }
   }
@@ -259,8 +262,8 @@ export function getUserPanelSwitchPath(
   if (entry) return entry;
 
   const fallbacks =
-    panel === 'lab'
-      ? ['/lab', '/lab/ai', '/lab/health']
+    panel === 'lab' || panel === 'integra'
+      ? [`/${panel}`, `/${panel}/my-profile`, `/${panel}/notifications-center`]
       : [`/${panel}/dashboard`, `/${panel}/my-profile`, `/${panel}/notifications-center`];
   for (const candidate of fallbacks) {
     if (canUserAccessPath(user, candidate)) return candidate;
@@ -313,10 +316,8 @@ export function getUserHomePath(user: UserAccessInput | null | undefined): strin
     if (v2 === ROLES.LIDER_DISENO || v2 === ROLES.DISENADOR) return '/studio/dashboard';
     if (v2 === ROLES.CLIENTE) return '/tickets';
 
-    // Fallback genérico: /panel/dashboard (evita que roles como 'administrativo'
-    // aterricen en /erp/executive que solo corresponde al CEO).
-    // meta.entryPath puede ser "/executive" solo para superAdmin/CEO, ya
-    // cubiertos arriba.
+    // Fallback genérico: home del panel (dashboard salvo lab/integra = /panel).
+    if (panel === 'lab' || panel === 'integra') return `/${panel}`;
     return `/${panel}/dashboard`;
   }
 
