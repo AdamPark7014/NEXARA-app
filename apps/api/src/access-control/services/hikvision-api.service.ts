@@ -1,12 +1,12 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  ArtemisApiError,
-  ArtemisDoorRaw,
-  ArtemisEventRaw,
-  ArtemisNotConfiguredError,
   HikCentralArtemisClient,
-} from './hikcentral-artemis.client';
+  rethrowArtemis,
+  toArtemisOffsetIso,
+  type ArtemisDoorRaw,
+  type ArtemisEventRaw,
+} from '../../hikvision-artemis/index';
 import {
   HikvisionApiConfig,
   HikvisionDoor,
@@ -14,8 +14,7 @@ import {
 } from '../interfaces/hikvision-api.interface';
 
 /**
- * Puente oficinas NEXARA → HikCentral Artemis.
- * No usa el Web Client ni rutas inventadas /api/v1.
+ * Puente oficinas NEXARA → HikCentral Artemis (cliente compartido).
  */
 @Injectable()
 export class HikvisionApiService {
@@ -50,6 +49,7 @@ export class HikvisionApiService {
       appKey,
       appSecret,
       timeoutMs: timeout,
+      scope: 'oficinas',
     });
 
     this.config = {
@@ -80,10 +80,9 @@ export class HikvisionApiService {
   async getDoors(): Promise<HikvisionDoor[]> {
     try {
       const data = await this.client.doorList(1, 200);
-      const list = data?.list ?? [];
-      return list.map((d) => this.mapDoor(d));
+      return (data?.list ?? []).map((d) => this.mapDoor(d));
     } catch (error) {
-      this.rethrow(error, 'No se pudieron listar las puertas de oficinas');
+      rethrowArtemis(error, 'No se pudieron listar las puertas de oficinas');
     }
   }
 
@@ -102,7 +101,7 @@ export class HikvisionApiService {
       };
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      this.rethrow(error, `No se pudo obtener estado de puerta ${doorIndexCode}`);
+      rethrowArtemis(error, `No se pudo obtener estado de puerta ${doorIndexCode}`);
     }
   }
 
@@ -111,7 +110,7 @@ export class HikvisionApiService {
       await this.client.doorControl([doorIndexCode], '0');
       this.logger.log(`Oficinas: apertura remota puerta ${doorIndexCode}`);
     } catch (error) {
-      this.rethrow(error, `No se pudo abrir la puerta ${doorIndexCode}`);
+      rethrowArtemis(error, `No se pudo abrir la puerta ${doorIndexCode}`);
     }
   }
 
@@ -124,8 +123,8 @@ export class HikvisionApiService {
       const end = new Date();
       const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
       const data = await this.client.doorEvents(
-        this.toOffsetIso(start),
-        this.toOffsetIso(end),
+        toArtemisOffsetIso(start),
+        toArtemisOffsetIso(end),
         1,
         Math.min(limit, 200),
       );
@@ -135,7 +134,7 @@ export class HikvisionApiService {
       }
       return list.map((e) => this.mapEvent(e));
     } catch (error) {
-      this.rethrow(error, 'No se pudieron obtener eventos de acceso de oficinas');
+      rethrowArtemis(error, 'No se pudieron obtener eventos de acceso de oficinas');
     }
   }
 
@@ -167,40 +166,5 @@ export class HikvisionApiService {
       eventType: String(raw.eventTypeName || raw.eventType || 'entry'),
       status: 'success',
     };
-  }
-
-  /** ISO 8601 con offset local (Artemis rechaza Z a secas). */
-  private toOffsetIso(d: Date): string {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const off = -d.getTimezoneOffset();
-    const sign = off >= 0 ? '+' : '-';
-    const abs = Math.abs(off);
-    const hh = pad(Math.floor(abs / 60));
-    const mm = pad(abs % 60);
-    return (
-      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
-      `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` +
-      `${sign}${hh}:${mm}`
-    );
-  }
-
-  private rethrow(error: unknown, message: string): never {
-    if (error instanceof ArtemisNotConfiguredError) {
-      throw new HttpException(
-        {
-          message: 'ACS oficinas sin configurar',
-          detail: error.message,
-        },
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
-    }
-    if (error instanceof ArtemisApiError) {
-      throw new HttpException(
-        { message, code: error.code, path: error.path },
-        HttpStatus.BAD_GATEWAY,
-      );
-    }
-    this.logger.error(message, error instanceof Error ? error.stack : String(error));
-    throw new HttpException(message, HttpStatus.BAD_GATEWAY);
   }
 }

@@ -4,33 +4,29 @@
  * Solo paths documentados en docs/HikCentral-Professional.
  */
 import { createHmac } from 'crypto';
+import { ArtemisApiError, ArtemisNotConfiguredError } from './artemis.errors';
+import type {
+  ArtemisCameraRaw,
+  ArtemisDeviceRaw,
+  ArtemisDoorRaw,
+  ArtemisEventRaw,
+  ArtemisList,
+  ArtemisOrgRaw,
+  ArtemisPersonRaw,
+  ArtemisPreviewData,
+  ArtemisPrivilegeGroupRaw,
+  ArtemisVehicleRaw,
+} from './artemis.types';
 
 export type ArtemisConfig = {
   host: string;
   appKey: string;
   appSecret: string;
-  verifyTls?: boolean;
+  /** Etiqueta en errores (oficinas | integra). */
+  scope?: string;
   timeoutMs?: number;
   reqPerSecond?: number;
 };
-
-export class ArtemisNotConfiguredError extends Error {
-  constructor() {
-    super('Credenciales Artemis de oficinas no configuradas (OFFICES_HIK_*)');
-    this.name = 'ArtemisNotConfiguredError';
-  }
-}
-
-export class ArtemisApiError extends Error {
-  constructor(
-    public readonly code: string,
-    message: string,
-    public readonly path: string,
-  ) {
-    super(`[${code}] ${message} (${path})`);
-    this.name = 'ArtemisApiError';
-  }
-}
 
 /** Mensaje canónico que firma HikCentral (POST únicamente en esta OpenAPI). */
 export function buildArtemisSignMessage(
@@ -79,17 +75,23 @@ class RateLimiter {
 
 export class HikCentralArtemisClient {
   private readonly limiter: RateLimiter;
+  private readonly scope: string;
 
   constructor(private readonly config: ArtemisConfig) {
     this.limiter = new RateLimiter(config.reqPerSecond ?? 5);
+    this.scope = config.scope ?? 'Artemis';
   }
 
   get configured(): boolean {
     return Boolean(this.config.host && this.config.appKey && this.config.appSecret);
   }
 
+  get host(): string {
+    return this.config.host;
+  }
+
   async post<T = unknown>(path: string, body?: Record<string, unknown>): Promise<T> {
-    if (!this.configured) throw new ArtemisNotConfiguredError();
+    if (!this.configured) throw new ArtemisNotConfiguredError(this.scope);
 
     const withBody = body !== undefined;
     const headers: Record<string, string> = {
@@ -132,18 +134,22 @@ export class HikCentralArtemisClient {
     throw new ArtemisApiError(String(lastStatus), 'Artemis unavailable', path);
   }
 
+  version() {
+    return this.post('/artemis/api/common/v1/version');
+  }
+
   regions(pageNo = 1, pageSize = 100) {
     return this.post('/artemis/api/resource/v1/regions', { pageNo, pageSize });
   }
 
   doorList(pageNo = 1, pageSize = 100) {
-    return this.post<{ list?: ArtemisDoorRaw[]; total?: number }>(
+    return this.post<ArtemisList<ArtemisDoorRaw>>(
       '/artemis/api/resource/v1/acsDoor/acsDoorList',
       { pageNo, pageSize },
     );
   }
 
-  /** controlType "0" = open (doc HikCentral ACS). */
+  /** controlType "0" = open */
   doorControl(doorIndexCodes: string[], controlType: '0' | '1' | '2' = '0') {
     return this.post('/artemis/api/acs/v1/door/doControl', {
       doorIndexCodes,
@@ -152,36 +158,104 @@ export class HikCentralArtemisClient {
   }
 
   doorEvents(startTime: string, endTime: string, pageNo = 1, pageSize = 200) {
-    return this.post<{ list?: ArtemisEventRaw[]; total?: number }>(
-      '/artemis/api/acs/v1/door/events',
-      { startTime, endTime, pageNo, pageSize },
+    return this.post<ArtemisList<ArtemisEventRaw>>('/artemis/api/acs/v1/door/events', {
+      startTime,
+      endTime,
+      pageNo,
+      pageSize,
+    });
+  }
+
+  cameras(pageNo = 1, pageSize = 100) {
+    return this.post<ArtemisList<ArtemisCameraRaw>>('/artemis/api/resource/v1/cameras', {
+      pageNo,
+      pageSize,
+    });
+  }
+
+  /** Live preview — protocol rtsp_s (LAN). */
+  previewUrls(cameraIndexCode: string) {
+    return this.post<ArtemisPreviewData>('/artemis/api/video/v1/cameras/previewURLs', {
+      cameraIndexCode,
+      streamType: 0,
+      protocol: 'rtsp_s',
+      transmode: 1,
+      requestWebsocketProtocol: 0,
+    });
+  }
+
+  cameraCapture(cameraIndexCode: string) {
+    return this.post('/artemis/api/video/v1/camera/capture', { cameraIndexCode });
+  }
+
+  orgList(pageNo = 1, pageSize = 100) {
+    return this.post<ArtemisList<ArtemisOrgRaw>>('/artemis/api/resource/v1/org/orgList', {
+      pageNo,
+      pageSize,
+    });
+  }
+
+  personList(pageNo = 1, pageSize = 100) {
+    return this.post<ArtemisList<ArtemisPersonRaw>>(
+      '/artemis/api/resource/v1/person/personList',
+      { pageNo, pageSize },
     );
   }
 
-  version() {
-    return this.post('/artemis/api/common/v1/version');
+  personAdd(body: Record<string, unknown>) {
+    return this.post('/artemis/api/resource/v1/person/single/add', body);
+  }
+
+  personDelete(personId: string) {
+    return this.post('/artemis/api/resource/v1/person/single/delete', { personId });
+  }
+
+  personInfoById(personId: string) {
+    return this.post('/artemis/api/resource/v1/person/personId/personInfo', { personId });
+  }
+
+  privilegeGroups(pageNo = 1, pageSize = 100) {
+    return this.post<ArtemisList<ArtemisPrivilegeGroupRaw>>(
+      '/artemis/api/acs/v1/privilege/group',
+      { pageNo, pageSize },
+    );
+  }
+
+  privilegeAddPersons(privilegeGroupId: string, personIds: string[]) {
+    return this.post('/artemis/api/acs/v1/privilege/group/single/addPersons', {
+      privilegeGroupId,
+      personIds,
+    });
+  }
+
+  authReapplication() {
+    return this.post('/artemis/api/visitor/v1/auth/reapplication', {});
+  }
+
+  acsDeviceList(pageNo = 1, pageSize = 100) {
+    return this.post<ArtemisList<ArtemisDeviceRaw>>(
+      '/artemis/api/resource/v1/acsDevice/acsDeviceList',
+      { pageNo, pageSize },
+    );
+  }
+
+  encodeDeviceList(pageNo = 1, pageSize = 100) {
+    return this.post<ArtemisList<ArtemisDeviceRaw>>(
+      '/artemis/api/resource/v1/encodeDevice/encodeDeviceList',
+      { pageNo, pageSize },
+    );
+  }
+
+  vehicleList(pageNo = 1, pageSize = 100) {
+    return this.post<ArtemisList<ArtemisVehicleRaw>>(
+      '/artemis/api/resource/v1/vehicle/vehicleList',
+      { pageNo, pageSize },
+    );
   }
 }
 
-export type ArtemisDoorRaw = {
-  doorIndexCode?: string;
-  doorName?: string;
-  doorNo?: number | string;
-  regionName?: string;
-  regionIndexCode?: string;
-  channelType?: string;
-  doorState?: number | string;
-  online?: boolean;
-};
-
-export type ArtemisEventRaw = {
-  eventId?: string;
-  doorIndexCode?: string;
-  doorName?: string;
-  cardNo?: string;
-  personId?: string;
-  personName?: string;
-  eventTime?: string;
-  eventType?: number | string;
-  eventTypeName?: string;
-};
+export {
+  ArtemisApiError,
+  ArtemisNotConfiguredError,
+} from './artemis.errors';
+export type * from './artemis.types';

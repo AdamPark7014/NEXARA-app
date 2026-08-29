@@ -117,6 +117,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/social-posts/**', scope: 'write' },
     { path: '/api/internal-comunicados/**', scope: 'write' },
     { path: '/api/access-control/**', scope: 'write' },
+    { path: '/api/integra/**', scope: 'write' },
     { path: '/api/**', methods: ['GET'], scope: 'read' },
   ],
 
@@ -200,6 +201,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/erp/facilities/**', scope: 'write' },
     { path: '/integra/**', scope: 'write' },
     { path: '/api/access-control/**', scope: 'write' },
+    { path: '/api/integra/**', scope: 'write' },
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -346,6 +348,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/gps/**', scope: 'read' },
     { path: '/api/service-sheets/**', scope: 'write' },
     { path: '/api/tool-requests/**', methods: ['GET', 'POST', 'PUT', 'PATCH'], scope: 'write' },
+    { path: '/integra/**', scope: 'write' },
+    { path: '/api/integra/**', scope: 'write' },
     ...SELF_ATTENDANCE_URL_RULES,
     ...OPS_OPERATIONAL_PROJECTS_URL_RULES,
   ],
@@ -429,6 +433,8 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/gps/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/viaticos/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/viatics/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    { path: '/integra/**', scope: 'write' },
+    { path: '/api/integra/**', scope: 'write' },
   ],
 
   // ─────────────────────────────────────────────────────────────────
