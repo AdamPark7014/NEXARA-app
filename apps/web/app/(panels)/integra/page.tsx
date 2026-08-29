@@ -11,53 +11,29 @@ import {
   DashPill,
   StatStrip,
 } from "@/components/dashboard/DashKit";
-import { buildApiUrl } from "@/lib/api-base";
+import { btnGhost, btnPrimary, integraApi } from "./_lib";
 
-type Health = {
+type Dash = {
   connected: boolean;
   configured: boolean;
   host?: string | null;
+  source?: string | null;
+  cameras: number;
+  doors: number;
+  people: number;
+  devices: number;
+  lastSync?: { status: string; finishedAt?: string; startedAt?: string } | null;
 };
 
-async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(buildApiUrl(path), {
-    ...init,
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    const msg =
-      typeof body?.message === "string"
-        ? body.message
-        : body?.message?.message || body?.detail || `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-  return res.json() as Promise<T>;
-}
-
 export default function IntegraHome() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [cams, setCams] = useState(0);
-  const [doors, setDoors] = useState(0);
+  const [dash, setDash] = useState<Dash | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const refresh = useCallback(async () => {
     setError(null);
     try {
-      const h = await apiJson<Health>("integra/health");
-      setHealth(h);
-      if (h.connected) {
-        const [c, d] = await Promise.all([
-          apiJson<{ total: number }>("integra/cameras"),
-          apiJson<{ total: number }>("integra/doors"),
-        ]);
-        setCams(c.total);
-        setDoors(d.total);
-      } else {
-        setCams(0);
-        setDoors(0);
-      }
+      setDash(await integraApi<Dash>("integra/dashboard"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
     }
@@ -67,16 +43,33 @@ export default function IntegraHome() {
     void refresh();
   }, [refresh]);
 
+  const syncNow = async () => {
+    setSyncing(true);
+    try {
+      await integraApi("integra/sync", { method: "POST" });
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Sync falló");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <DashPage>
       <DashHero
         eyebrow="Seguridad física"
         title="NEXARA Integra"
-        subtitle="CCTV y accesos sobre HikCentral Professional Artemis."
+        subtitle="Consola HikCentral-class · espejo Prisma · HLS · bitácora."
         actions={
-          <button type="button" onClick={() => void refresh()} style={btnGhost}>
-            Actualizar
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" onClick={() => void refresh()} style={btnGhost}>
+              Actualizar
+            </button>
+            <button type="button" onClick={() => void syncNow()} style={btnPrimary} disabled={syncing}>
+              {syncing ? "Sincronizando…" : "Sincronizar ahora"}
+            </button>
+          </div>
         }
       />
 
@@ -84,18 +77,24 @@ export default function IntegraHome() {
         stats={[
           {
             label: "Artemis",
-            value: !health
+            value: !dash
               ? "…"
-              : health.connected
+              : dash.connected
                 ? "OK"
-                : health.configured
+                : dash.configured
                   ? "Down"
                   : "Sin config",
-            tone: health?.connected ? "positive" : "warning",
+            tone: dash?.connected ? "positive" : "warning",
           },
-          { label: "Cámaras", value: String(cams) },
-          { label: "Puertas", value: String(doors) },
-          { label: "Host", value: health?.host || "—" },
+          { label: "Cámaras", value: String(dash?.cameras ?? 0) },
+          { label: "Puertas", value: String(dash?.doors ?? 0) },
+          { label: "Personas", value: String(dash?.people ?? 0) },
+          { label: "Devices", value: String(dash?.devices ?? 0) },
+          {
+            label: "Sync",
+            value: dash?.lastSync?.status || "—",
+            tone: dash?.lastSync?.status === "OK" ? "positive" : "neutral",
+          },
         ]}
       />
 
@@ -103,47 +102,32 @@ export default function IntegraHome() {
 
       <DashGrid>
         <DashCol span={12}>
-          <DashPanel title="Módulos" subtitle="API /api/integra · ADR-0017">
+          <DashPanel
+            title="Módulos"
+            subtitle={`Host ${dash?.host || "—"} · fuente ${dash?.source || "—"}`}
+          >
             {[
-              { href: "/integra/video", title: "Video", sub: "Cámaras y URL RTSP live", tone: "positive" as const },
-              { href: "/integra/access", title: "Control de acceso", sub: "Puertas y privilegios", tone: "positive" as const },
-              { href: "/integra/people", title: "Personas", sub: "Orgs y personas Artemis", tone: "positive" as const },
-              { href: "/integra/events", title: "Eventos", sub: "ACS últimas 24 h", tone: "positive" as const },
-              { href: "/integra/vehicles", title: "Vehículos", sub: "Listado ANPR / flota", tone: "positive" as const },
-              {
-                href: "/erp/facilities/access",
-                title: "Oficinas NEXARA",
-                sub: "ACS interno (Core) — no este panel",
-                tone: "neutral" as const,
-              },
+              { href: "/integra/video", title: "Video", sub: "HLS live + playback + snapshot" },
+              { href: "/integra/access", title: "Control de acceso", sub: "Puertas, devices ACS, privilegios" },
+              { href: "/integra/people", title: "Personas", sub: "Directorio + orgs" },
+              { href: "/integra/events", title: "Eventos", sub: "ACS + fotos proxy" },
+              { href: "/integra/alarms", title: "Alarmas", sub: "eventService" },
+              { href: "/integra/visitors", title: "Visitas", sub: "Registro + QR" },
+              { href: "/integra/vehicles", title: "Vehículos", sub: "CRUD flota" },
+              { href: "/integra/anpr", title: "ANPR", sub: "Cruces PMS" },
+              { href: "/integra/settings", title: "Sitios", sub: "Multi-sitio + sync" },
             ].map((m) => (
               <ListRow
                 key={m.href}
                 title={m.title}
                 sub={m.sub}
                 href={m.href}
-                trail={<DashPill tone={m.tone}>{m.tone === "neutral" ? "oficinas" : "listo"}</DashPill>}
+                trail={<DashPill tone="positive">listo</DashPill>}
               />
             ))}
           </DashPanel>
         </DashCol>
       </DashGrid>
-
-      {!health?.configured && (
-        <p style={{ marginTop: 16, fontSize: 13, color: "var(--text-tertiary)" }}>
-          Configura <code>INTEGRA_HIK_HOST</code>, <code>INTEGRA_HIK_APP_KEY</code> y{" "}
-          <code>INTEGRA_HIK_APP_SECRET</code>. Ver <code>docs/INTEGRA-OPS.md</code>.
-        </p>
-      )}
     </DashPage>
   );
 }
-
-const btnGhost: React.CSSProperties = {
-  border: "1px solid var(--border, #e2e8f0)",
-  background: "transparent",
-  borderRadius: 8,
-  padding: "6px 10px",
-  fontSize: 12,
-  cursor: "pointer",
-};

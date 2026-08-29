@@ -6,28 +6,35 @@
 
 ## Hecho en este turno
 
-### Plan Integra Artemis P0→P1 — implementado
+### Plan Integra — mejora absoluta (P2–P4) — implementado
 
-**Cliente compartido** `apps/api/src/hikvision-artemis/`:
-HMAC, rate limit, cameras/preview/doors/events/people/orgs/privilege/vehicles.
-8 tests (firma + 503/502 + offset ISO). Oficinas e Integra lo consumen por separado.
+**A1 Prisma + sites:** `IntegraSite|Camera|Door|Person|Device|Vehicle|SyncRun` + migración
+`20260829140000_integra_sites_mirror`. Secrets AES-GCM (`INTEGRA_SECRETS_KEY`).
+`IntegraSiteService.resolveClient` (DB o env `INTEGRA_HIK_*`).
 
-**API Integra** `apps/api/src/integra/`:
-`/api/integra/health|cameras|preview|doors|open|events|orgs|people|privilege-groups|vehicles`.
-Env `INTEGRA_HIK_*`. RBAC CEO/dir_ops/coord_ops/ing_soporte.
+**A2 Sync:** `IntegraSyncService` cron `*/15` + `POST /api/integra/sync`. Listados leen espejo.
 
-**UI Integra** (ya no stubs P0): home, video (RTSP copy), access (+ privilegios),
-events, people (alta/baja), vehicles (lista).
+**A3 Audit:** mutaciones open/people/privilege/vehicle/visitor → `AuditService` (`source: integra`).
 
-**Oficinas**: refactor a cliente compartido; compose local con `INTEGRA_HIK_*`.
+**A4 Artemis surface:** playbackURLs, capture, devices, event pictures, vehicle CRUD,
+alarms/visitors/ANPR paths. Tests firma + secrets + media (12 passed).
 
-**Ops**: `docs/INTEGRA-OPS.md` (DNS, secrets, smoke).
+**B1 go2rtc:** compose `nexara-go2rtc`, Traefik `/go2rtc`, `POST .../cameras/:id/stream` → HLS.
+Player HTML5 + HLS.js CDN.
+
+**B2 UX densa:** video live/playback/snapshot, access picker+devices, events+pics,
+people detalle/orgs, vehicles CRUD, settings sitios, home KPIs+sync.
+
+**B3 NOC:** `noc/adapters/integra.adapter.ts` — si hay espejo, no inventa CCTV/ACS.
+
+**C/D:** UI alarms/visitors/ANPR; ADR-0018 media/tenancy; ADR-0019 HCT adapter (propuesto).
+Ops actualizado `docs/INTEGRA-OPS.md`.
 
 ## A medias — CUIDADO
-- DNS `integra.nexara.com.mx` + secretos en droplet **aún no** (ops humano).
-- Player HTML5 / media gateway: fuera de alcance (solo RTSP URL).
-- Espejo Prisma inventarios / sync: P2.
-- A1 Playwright / observabilidad / seed Claudia: intactos.
+- DNS `integra.nexara.com.mx` + secretos droplet + migrate deploy **ops humano**.
+- go2rtc debe alcanzar LAN/VPN del RTSP Artemis.
+- Adapter HCT / ISAPI: solo ADR, sin código cliente aún.
+- A1 Playwright / seed Claudia: intactos.
 
 ## No tocar
 - `apps/web/app/(subdomains)/tickets/layout.tsx`
@@ -36,10 +43,10 @@ events, people (alta/baja), vehicles (lista).
 - `package-lock.json`
 
 ## Siguiente paso
-1. DNS + `OFFICES_HIK_*` / `INTEGRA_HIK_*` en producción y smoke health.
-2. P2: sync local + media gateway si se quiere live in-browser.
-3. Decisión seed usuarios (turno 28-ago).
+1. Deploy: migrate + env `INTEGRA_SECRETS_KEY` / `GO2RTC_*` + smoke stream HLS.
+2. Implementar cliente HCT cuando un sitio real lo pida (ADR-0019).
+3. Observabilidad: alertas sync fallida en APM.
 
 ## Estado verificado al cerrar
-- Jest hikvision-artemis: **8/8** OK.
-- `tsc` api + web: limpio.
+- Jest integra + artemis surface: **12** OK.
+- `tsc` api (`tsconfig.build.json`): limpio.
