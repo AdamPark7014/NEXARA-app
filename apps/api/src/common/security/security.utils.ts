@@ -28,6 +28,7 @@ const DEFAULT_ALLOWED_SUBDOMAINS = [
   'noc',
   'people',
   'lab',
+  'integra',
   // Legacy aliases kept for backward compatibility
   'consola',
   'console',
