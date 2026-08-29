@@ -6,22 +6,14 @@
 
 ## Hecho en este turno
 
-### Deploy producción Integra (DNS + código)
-
-- Commit/push `main` @ `97a9c64` (mejora absoluta + fix imports `video` → `../_HlsPlayer`).
-- Droplet: `./deploy/update.sh --force-all --with-migrate` OK.
-- Env añadido: `GO2RTC_*`, `INTEGRA_SECRETS_KEY`, placeholders `INTEGRA_HIK_*` / `OFFICES_HIK_*`.
-- Contenedores: `nexara-api`, `nexara-web`, `nexara-go2rtc` Up.
-- Tablas Prisma: `integra_sites|cameras|doors|people|devices|vehicles|sync_runs`.
-- Smoke: `https://integra.nexara.com.mx/` → **200**; `/api/integra/health` → **401** (auth OK);
-  `/go2rtc/api` → **200**.
+### Fix login Integra — Invalid origin
+- Causa: `integra` no estaba en `DEFAULT_ALLOWED_SUBDOMAINS` (`security.utils.ts`).
+- También se amplió `CORS_ORIGIN` en droplet con `https://integra.nexara.com.mx` (+ paneles canónicos).
+- Deploy API OK (`8bd126d`).
 
 ## A medias — CUIDADO
-- **Credenciales Artemis vacías** en droplet (`INTEGRA_HIK_*` / sitios UI). Sin ellas health
-  autenticado dirá sin config / down.
-- go2rtc necesita reachabilidad LAN/VPN al RTSP de HikCentral.
-- Adapter HCT / ISAPI / APM sync alerts: backlog (ADR-0019).
-- Playback timeline densa + bookmarks: no hecho (playback por rango sí).
+- Credenciales Artemis (`INTEGRA_HIK_*` / sitios UI) aún vacías.
+- go2rtc necesita LAN/VPN al RTSP HikCentral.
 
 ## No tocar
 - `apps/web/app/(subdomains)/tickets/layout.tsx`
@@ -30,9 +22,8 @@
 - `package-lock.json`
 
 ## Siguiente paso
-1. Rellenar `INTEGRA_HIK_*` o crear sitio en `/integra/settings` y sync.
-2. Probar live HLS con cámara real.
-3. Oficinas: `OFFICES_HIK_*` si aún no.
+1. Reintentar login en integra.nexara.com.mx
+2. Configurar Artemis + sync
 
 ## Estado verificado al cerrar
-- Deploy exit 0; DNS A → 5.78.215.109; UI/API/go2rtc responden.
+- Código + CORS en prod; redeploy api exit 0.
