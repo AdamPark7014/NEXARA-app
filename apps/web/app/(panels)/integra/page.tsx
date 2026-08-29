@@ -93,7 +93,7 @@ export default function IntegraHome() {
           {
             label: "Sync",
             value: dash?.lastSync?.status || "—",
-            tone: dash?.lastSync?.status === "OK" ? "positive" : "neutral",
+            tone: dash?.lastSync?.status === "OK" ? "positive" : undefined,
           },
         ]}
       />

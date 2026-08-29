@@ -9,6 +9,12 @@ import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "../lib/permissions";
 import { getDeviceIdentityHeaders, getLocalDeviceLabel } from "@/lib/device-identity";
 import { getUserHomeUrl, getUserHomeUrlAbsolute } from "@/lib/panel-home";
+import { canUserAccessPanel } from "@/lib/user-access";
+import {
+  buildCrossPanelUrl,
+  panelHomeInternalPath,
+  resolvePanelId,
+} from "@/lib/cross-panel-handoff";
 import { isCapacitorNative } from "@/lib/capacitor-env";
 import { setSharedCookie, SHARED_COOKIE_KEYS } from "@/lib/shared-cookies";
 import { createRealtimeSocket } from '@/lib/realtime-socket';
@@ -113,9 +119,25 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         setUser(userData);
         window.history.replaceState({}, "", window.location.pathname);
         if (smartRedirect) {
+          const host = window.location.hostname;
+          const sub = host.split(".")[0]?.toLowerCase() || "";
+          const currentPanel =
+            sub === "integra" || sub === "lab" ? resolvePanelId(sub) : null;
+          if (currentPanel && canUserAccessPanel(userData, currentPanel)) {
+            const path = panelHomeInternalPath(currentPanel);
+            window.location.assign(
+              buildCrossPanelUrl(currentPanel, path, JSON.stringify(userData)),
+            );
+            return;
+          }
           router.replace(getUserHomeUrl(userData));
         } else {
-          router.replace(redirectTo);
+          const sub = window.location.hostname.split(".")[0]?.toLowerCase() || "";
+          router.replace(
+            redirectTo === "/dashboard" && (sub === "integra" || sub === "lab")
+              ? "/"
+              : redirectTo,
+          );
         }
       })();
     } catch {
@@ -306,12 +328,31 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
       }
 
       if (smartRedirect) {
-        // URLs absolutas con subdominio para cambios cross-panel
+        // En subdominios de panel dedicado (integra/lab), quédate ahí si el
+        // usuario tiene acceso — no mandar a ERP home.
+        const host = typeof window !== "undefined" ? window.location.hostname : "";
+        const sub = host.split(".")[0]?.toLowerCase() || "";
+        const currentPanel =
+          sub === "integra" || sub === "lab" ? resolvePanelId(sub) : null;
+        if (currentPanel && canUserAccessPanel(userData, currentPanel)) {
+          const path = panelHomeInternalPath(currentPanel);
+          window.location.assign(
+            buildCrossPanelUrl(currentPanel, path, JSON.stringify(userData)),
+          );
+          return;
+        }
         const homeUrl = getUserHomeUrlAbsolute(userData);
         window.location.assign(homeUrl);
         return;
       }
 
+      // /dashboard no existe en integra/lab — caer a /
+      const host = typeof window !== "undefined" ? window.location.hostname : "";
+      const sub = host.split(".")[0]?.toLowerCase() || "";
+      if ((sub === "integra" || sub === "lab") && redirectTo === "/dashboard") {
+        router.replace("/");
+        return;
+      }
       router.replace(redirectTo);
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
