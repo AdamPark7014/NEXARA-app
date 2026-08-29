@@ -179,6 +179,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/notifications-center',
     '/erp/my-profile',
     '/crm/quotes',
+    '/integra/**',
     ...SELF_ATTENDANCE_PATHS,
   ],
 
@@ -219,6 +220,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/kb/**',
     '/erp/documents',
     '/erp/documents/**',
+    '/integra/**',
     ...SELF_ATTENDANCE_PATHS,
   ],
 

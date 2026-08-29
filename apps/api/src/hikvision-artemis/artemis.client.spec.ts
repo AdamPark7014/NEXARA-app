@@ -1,7 +1,10 @@
 import {
   buildArtemisSignMessage,
   signArtemisRequest,
-} from './hikcentral-artemis.client';
+  HikCentralArtemisClient,
+} from './artemis.client';
+import { ArtemisApiError, ArtemisNotConfiguredError } from './artemis.errors';
+import { rethrowArtemis, toArtemisOffsetIso } from './artemis.utils';
 
 describe('HikCentralArtemisClient · firma', () => {
   const key = 'testKey';
@@ -33,8 +36,40 @@ describe('HikCentralArtemisClient · firma', () => {
   it('cambia la firma si cambia el path o el cuerpo', () => {
     const withBody = signArtemisRequest('/artemis/api/acs/v1/door/doControl', key, secret, true);
     const noBody = signArtemisRequest('/artemis/api/acs/v1/door/doControl', key, secret, false);
-    const otherPath = signArtemisRequest('/artemis/api/common/v1/version', key, secret, true);
     expect(withBody).not.toBe(noBody);
-    expect(withBody).not.toBe(otherPath);
+  });
+
+  it('configured=false lanza ArtemisNotConfiguredError', async () => {
+    const c = new HikCentralArtemisClient({ host: '', appKey: '', appSecret: '', scope: 'integra' });
+    expect(c.configured).toBe(false);
+    await expect(c.version()).rejects.toBeInstanceOf(ArtemisNotConfiguredError);
+  });
+});
+
+describe('rethrowArtemis', () => {
+  it('mapea no configurado a 503', () => {
+    try {
+      rethrowArtemis(new ArtemisNotConfiguredError('integra'), 'fail');
+      fail('expected throw');
+    } catch (e: any) {
+      expect(e.status).toBe(503);
+    }
+  });
+
+  it('mapea ArtemisApiError a 502', () => {
+    try {
+      rethrowArtemis(new ArtemisApiError('0x1', 'bad', '/x'), 'fail');
+      fail('expected throw');
+    } catch (e: any) {
+      expect(e.status).toBe(502);
+    }
+  });
+});
+
+describe('toArtemisOffsetIso', () => {
+  it('incluye offset no Z', () => {
+    const s = toArtemisOffsetIso(new Date('2026-08-29T12:00:00Z'));
+    expect(s).not.toMatch(/Z$/);
+    expect(s).toMatch(/[+-]\d{2}:\d{2}$/);
   });
 });

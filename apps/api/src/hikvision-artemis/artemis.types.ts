@@ -1,0 +1,75 @@
+/** Tipos crudos Artemis (solo campos documentados en Postman / Developer Guide). */
+
+export type ArtemisList<T> = { list?: T[]; total?: number };
+
+export type ArtemisDoorRaw = {
+  doorIndexCode?: string;
+  doorName?: string;
+  doorNo?: number | string;
+  regionName?: string;
+  regionIndexCode?: string;
+  channelType?: string;
+  doorState?: number | string;
+  online?: boolean;
+};
+
+export type ArtemisEventRaw = {
+  eventId?: string;
+  doorIndexCode?: string;
+  doorName?: string;
+  cardNo?: string;
+  personId?: string;
+  personName?: string;
+  eventTime?: string;
+  eventType?: number | string;
+  eventTypeName?: string;
+};
+
+export type ArtemisCameraRaw = {
+  cameraIndexCode?: string;
+  cameraName?: string;
+  channelNo?: string | number;
+  regionIndexCode?: string;
+  regionName?: string;
+  status?: number | string;
+  encodeDevIndexCode?: string;
+};
+
+export type ArtemisPreviewData = {
+  url?: string;
+};
+
+export type ArtemisOrgRaw = {
+  orgIndexCode?: string;
+  orgName?: string;
+  parentOrgIndexCode?: string;
+};
+
+export type ArtemisPersonRaw = {
+  personId?: string;
+  personName?: string;
+  personCode?: string;
+  orgIndexCode?: string;
+  orgName?: string;
+};
+
+export type ArtemisPrivilegeGroupRaw = {
+  privilegeGroupId?: string;
+  privilegeGroupName?: string;
+  description?: string;
+};
+
+export type ArtemisDeviceRaw = {
+  indexCode?: string;
+  name?: string;
+  ip?: string;
+  online?: boolean;
+  deviceType?: string;
+};
+
+export type ArtemisVehicleRaw = {
+  vehicleId?: string;
+  plateNo?: string;
+  personId?: string;
+  personName?: string;
+};

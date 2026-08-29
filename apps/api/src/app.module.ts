@@ -67,6 +67,7 @@ import { HrModule } from './hr/hr.module.js';
 import { SearchModule } from './search/search.module.js';
 import { CatalogModule } from './catalog/catalog.module.js';
 import { AccessControlModule } from './access-control/access-control.module.js';
+import { IntegraModule } from './integra/integra.module.js';
 import { PacModule } from './pac/pac.module.js';
 import { MaintenanceContractsModule } from './maintenance-contracts/maintenance-contracts.module.js';
 import { MeetingsModule } from './meetings/meetings.module.js';
@@ -166,6 +167,7 @@ import { DomainEventsModule } from './domain-events/domain-events.module.js';
     ActivityFeedModule,
     CatalogModule,
     AccessControlModule,
+    IntegraModule,
     PacModule,
     MaintenanceContractsModule,
     MeetingsModule,
