@@ -85,8 +85,36 @@ export class IntegraController {
   }
 
   @Get('dashboard')
-  dashboard(@CurrentCompanyId() companyId: number | null) {
-    return this.integra.dashboard(companyId);
+  dashboard(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.dashboard(companyId, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  @Get('portfolio')
+  @ApiOperation({ summary: 'Portfolio multi-cliente (super-admin ve todos)' })
+  portfolio(
+    @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
+  ) {
+    return this.integra.getPortfolio(companyId, Boolean(user?.isSuperAdmin));
+  }
+
+  @Get('capabilities')
+  capabilities(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.capabilities(companyId, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  @Get('regions')
+  regions(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.listRegions(companyId, siteId ? parseInt(siteId, 10) : null);
   }
 
   // ── Sites ──────────────────────────────────────────────────────────

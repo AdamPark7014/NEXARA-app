@@ -7,6 +7,7 @@ import { IntegraArtemisService } from './integra-artemis.service';
 import { IntegraSiteService } from './integra-site.service';
 import { IntegraSyncService } from './integra-sync.service';
 import { IntegraMediaService } from './integra-media.service';
+import { IntegraPortfolioService } from './integra-portfolio.service';
 
 @Module({
   imports: [ConfigModule, PrismaModule, AuditModule],
@@ -16,7 +17,8 @@ import { IntegraMediaService } from './integra-media.service';
     IntegraSiteService,
     IntegraSyncService,
     IntegraMediaService,
+    IntegraPortfolioService,
   ],
-  exports: [IntegraArtemisService, IntegraSiteService, IntegraSyncService],
+  exports: [IntegraArtemisService, IntegraSiteService, IntegraSyncService, IntegraPortfolioService],
 })
 export class IntegraModule {}

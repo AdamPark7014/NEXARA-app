@@ -73,3 +73,27 @@ export type ArtemisVehicleRaw = {
   personId?: string;
   personName?: string;
 };
+
+export type ArtemisRegionRaw = {
+  indexCode?: string;
+  name?: string;
+  parentIndexCode?: string;
+  treeCode?: string;
+};
+
+/** doorState documentado: 0 remain open, 1 closed, 2 open, 3 remain closed, 4 offline */
+export const ARTEMIS_DOOR_STATE: Record<string, string> = {
+  '0': 'remain_open',
+  '1': 'closed',
+  '2': 'open',
+  '3': 'remain_closed',
+  '4': 'offline',
+};
+
+/** doControl controlType: 0 remain open, 1 close, 2 open, 3 remain closed */
+export const ARTEMIS_DOOR_CONTROL = {
+  REMAIN_OPEN: '0',
+  CLOSE: '1',
+  OPEN: '2',
+  REMAIN_CLOSED: '3',
+} as const;

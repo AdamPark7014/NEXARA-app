@@ -5019,6 +5019,7 @@ model CompanyProfile {
   integraPeople             IntegraPerson[]
   integraDevices            IntegraDevice[]
   integraVehicles           IntegraVehicle[]
+  integraRegions            IntegraRegion[]
   integraSyncRuns           IntegraSyncRun[]
 
   @@map("company_profile")
@@ -5704,11 +5705,36 @@ model IntegraSite {
   people   IntegraPerson[]
   devices  IntegraDevice[]
   vehicles IntegraVehicle[]
+  regions  IntegraRegion[]
   syncRuns IntegraSyncRun[]
+  /// Cliente operativo ERP (opcional) — no confundir con CompanyProfile
+  serviceClientId Int?
+  /// Override de módulos visibles: { "video": true, "anpr": false, ... }
+  modulesOverride Json?
+  label           String?  @db.VarChar(120)
+  notes           String?  @db.Text
 
   @@index([companyId, isActive])
   @@unique([companyId, name])
   @@map("integra_sites")
+}
+
+model IntegraRegion {
+  id              Int      @id @default(autoincrement())
+  companyId       Int
+  siteId          Int
+  indexCode       String   @db.VarChar(120)
+  name            String   @db.VarChar(220)
+  parentIndexCode String?  @db.VarChar(120)
+  raw             Json?
+  syncedAt        DateTime @default(now())
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, indexCode])
+  @@index([companyId])
+  @@map("integra_regions")
 }
 
 model IntegraCamera {

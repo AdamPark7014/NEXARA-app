@@ -36,13 +36,14 @@ export class IntegraSyncService {
       const { client } = await this.sites.resolveClient({ companyId, siteId });
       const now = new Date();
 
-      const [cams, doors, people, acsDevs, encDevs, vehicles] = await Promise.all([
+      const [cams, doors, people, acsDevs, encDevs, vehicles, regions] = await Promise.all([
         client.cameras(1, 500),
         client.doorList(1, 500),
         client.personList(1, 500),
         client.acsDeviceList(1, 200).catch(() => ({ list: [] })),
         client.encodeDeviceList(1, 200).catch(() => ({ list: [] })),
         client.vehicleList(1, 500).catch(() => ({ list: [] })),
+        client.regions(1, 500).catch(() => ({ list: [] })),
       ]);
 
       let cameraCount = 0;
@@ -219,6 +220,31 @@ export class IntegraSyncService {
         });
       }
 
+      let regionCount = 0;
+      for (const r of regions?.list ?? []) {
+        const code = String(r.indexCode ?? '');
+        if (!code) continue;
+        regionCount++;
+        await this.prisma.integraRegion.upsert({
+          where: { siteId_indexCode: { siteId, indexCode: code } },
+          create: {
+            companyId,
+            siteId,
+            indexCode: code,
+            name: r.name || code,
+            parentIndexCode: r.parentIndexCode,
+            raw: r as any,
+            syncedAt: now,
+          },
+          update: {
+            name: r.name || code,
+            parentIndexCode: r.parentIndexCode,
+            raw: r as any,
+            syncedAt: now,
+          },
+        });
+      }
+
       await this.prisma.integraSite.update({
         where: { id: siteId },
         data: { lastSyncAt: now, lastHealthOkAt: now },
@@ -244,6 +270,7 @@ export class IntegraSyncService {
         people: peopleCount,
         devices: deviceCount,
         vehicles: vehicleCount,
+        regions: regionCount,
       };
     } catch (error) {
       await this.prisma.integraSyncRun.update({
