@@ -48,6 +48,12 @@ import {
   resolveDisplayOrgRoleKey,
   resolveV2RoleKey,
 } from "@/lib/user-access";
+import {
+  getCachedCapabilities,
+  moduleAllowedByCaps,
+  subscribeCapabilities,
+} from "@/app/(panels)/integra/_caps";
+import type { IntegraCapabilities } from "@/app/(panels)/integra/_lib";
 import { getUserHomeUrlAbsolute } from "@/lib/panel-home";
 import type { User } from "@/components/UserContext";
 import { buildCrossPanelUrl } from "@/lib/cross-panel-handoff";
@@ -170,10 +176,23 @@ export default function AppShell({ panel, children }: AppShellProps) {
   const isSuperAdmin = Boolean(user?.isSuperAdmin);
   const v2RoleKey = resolveV2RoleKey(user);
 
-  const sidebarGroups = useMemo(
-    () => buildUserSidebar(panel, user),
-    [panel, user],
-  );
+  const [integraCaps, setIntegraCaps] = useState<IntegraCapabilities | null>(null);
+  useEffect(() => {
+    if (panel !== "integra") return;
+    setIntegraCaps(getCachedCapabilities());
+    return subscribeCapabilities((c) => setIntegraCaps(c));
+  }, [panel]);
+
+  const sidebarGroups = useMemo(() => {
+    const groups = buildUserSidebar(panel, user);
+    if (panel !== "integra" || !integraCaps) return groups;
+    return groups
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((item) => moduleAllowedByCaps(item.id, integraCaps)),
+      }))
+      .filter((g) => g.items.length > 0);
+  }, [panel, user, integraCaps]);
 
   const allowedPanels = useMemo(
     () => getUserAllowedPanels(user),

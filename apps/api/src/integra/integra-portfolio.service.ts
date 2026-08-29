@@ -42,20 +42,32 @@ function capsFromCounts(
   return { ...base, ...override, settings: canSettings && (override.settings ?? true) };
 }
 
+/** Exported for unit tests */
+export { capsFromCounts as integraCapsFromCounts };
+
 @Injectable()
 export class IntegraPortfolioService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async capabilities(companyId: number | null, siteId?: number | null): Promise<IntegraCapabilities> {
+  async capabilities(
+    companyId: number | null,
+    siteId?: number | null,
+    opts?: { canSettings?: boolean },
+  ): Promise<IntegraCapabilities> {
+    const canSettings = opts?.canSettings !== false;
     if (!companyId) {
-      return capsFromCounts({
-        cameras: 0,
-        doors: 0,
-        people: 0,
-        devicesAcs: 0,
-        devicesEncode: 0,
-        vehicles: 0,
-      });
+      return capsFromCounts(
+        {
+          cameras: 0,
+          doors: 0,
+          people: 0,
+          devicesAcs: 0,
+          devicesEncode: 0,
+          vehicles: 0,
+        },
+        null,
+        canSettings,
+      );
     }
     const siteFilter = siteId ? { siteId } : {};
     const [cameras, doors, people, devicesAcs, devicesEncode, vehicles, site] =
@@ -82,7 +94,7 @@ export class IntegraPortfolioService {
     return capsFromCounts(
       { cameras, doors, people, devicesAcs, devicesEncode, vehicles },
       override,
-      true,
+      canSettings,
     );
   }
 
@@ -93,6 +105,8 @@ export class IntegraPortfolioService {
   async portfolio(opts: {
     companyId: number | null;
     isSuperAdmin?: boolean;
+    /** false para rol cliente — no ve módulo Sitios */
+    canSettings?: boolean;
   }) {
     const run = async () => {
       const where: Prisma.IntegraSiteWhereInput = opts.isSuperAdmin
@@ -171,14 +185,34 @@ export class IntegraPortfolioService {
 
       const companies = [...byCompany.values()].map((c) => ({
         ...c,
-        capabilities: capsFromCounts({
-          cameras: c.totals.cameras,
-          doors: c.totals.doors,
-          people: c.totals.people,
-          devicesAcs: c.totals.devices,
-          devicesEncode: 0,
-          vehicles: c.totals.vehicles,
-        }),
+        capabilities: capsFromCounts(
+          {
+            cameras: c.totals.cameras,
+            doors: c.totals.doors,
+            people: c.totals.people,
+            devicesAcs: c.totals.doors > 0 ? c.totals.devices : 0,
+            devicesEncode: c.totals.cameras > 0 ? c.totals.devices : 0,
+            vehicles: c.totals.vehicles,
+          },
+          null,
+          opts.canSettings !== false,
+        ),
+        modules: Object.entries(
+          capsFromCounts(
+            {
+              cameras: c.totals.cameras,
+              doors: c.totals.doors,
+              people: c.totals.people,
+              devicesAcs: c.totals.doors > 0 ? 1 : 0,
+              devicesEncode: c.totals.cameras > 0 ? 1 : 0,
+              vehicles: c.totals.vehicles,
+            },
+            null,
+            opts.canSettings !== false,
+          ),
+        )
+          .filter(([, on]) => on)
+          .map(([k]) => k),
       }));
 
       return {

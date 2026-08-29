@@ -309,10 +309,22 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/crm/projects/**',
   ],
 
-  // ─── CLIENTE EXTERNO — portal ─────────────────────────────────────────
+  // ─── CLIENTE EXTERNO — portal + Integra (solo módulos de su company) ──
   [ROLES.CLIENTE]: [
     '/tickets',
     '/tickets/**',
+    '/integra',
+    '/integra/video',
+    '/integra/access',
+    '/integra/people',
+    '/integra/events',
+    '/integra/alarms',
+    '/integra/visitors',
+    '/integra/vehicles',
+    '/integra/anpr',
+    '/integra/my-profile',
+    '/integra/notifications-center',
+    // sin /integra/settings — sitios los administra NEXARA
   ],
 };
 

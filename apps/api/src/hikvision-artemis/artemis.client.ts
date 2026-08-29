@@ -331,6 +331,15 @@ export class HikCentralArtemisClient {
     return this.post('/artemis/api/resource/v1/person/single/update', body);
   }
 
+  /** Postman: personId/personInfo */
+  personInfo(personId: string) {
+    return this.post('/artemis/api/resource/v1/person/personId/personInfo', { personId });
+  }
+
+  personInfoByCode(personCode: string) {
+    return this.post('/artemis/api/resource/v1/person/personCode/personInfo', { personCode });
+  }
+
   doorInfo(doorIndexCode: string) {
     return this.post('/artemis/api/resource/v1/acsDoor/indexCode/acsDoorInfo', {
       doorIndexCode,

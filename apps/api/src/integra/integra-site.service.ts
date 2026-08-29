@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { HikCentralArtemisClient } from '../hikvision-artemis/index';
 import { decryptSecret, encryptSecret } from './integra-secrets';
@@ -26,19 +27,39 @@ export class IntegraSiteService {
       select: {
         id: true,
         name: true,
+        label: true,
         host: true,
         isActive: true,
         isDefault: true,
         lastSyncAt: true,
         lastHealthOkAt: true,
+        modulesOverride: true,
         createdAt: true,
+        _count: {
+          select: {
+            cameras: true,
+            doors: true,
+            people: true,
+            devices: true,
+            vehicles: true,
+            regions: true,
+          },
+        },
       },
     });
   }
 
   async create(
     companyId: number,
-    input: { name: string; host: string; appKey: string; appSecret: string; isDefault?: boolean },
+    input: {
+      name: string;
+      host: string;
+      appKey: string;
+      appSecret: string;
+      isDefault?: boolean;
+      label?: string;
+      modulesOverride?: Record<string, boolean>;
+    },
   ) {
     if (input.isDefault) {
       await this.prisma.integraSite.updateMany({
@@ -54,13 +75,17 @@ export class IntegraSiteService {
         appKeyEnc: encryptSecret(input.appKey),
         appSecretEnc: encryptSecret(input.appSecret),
         isDefault: input.isDefault ?? false,
+        label: input.label?.trim() || null,
+        modulesOverride: input.modulesOverride ?? undefined,
       },
       select: {
         id: true,
         name: true,
+        label: true,
         host: true,
         isActive: true,
         isDefault: true,
+        modulesOverride: true,
       },
     });
   }
@@ -75,6 +100,8 @@ export class IntegraSiteService {
       appSecret: string;
       isActive: boolean;
       isDefault: boolean;
+      label: string;
+      modulesOverride: Record<string, boolean> | null;
     }>,
   ) {
     const existing = await this.prisma.integraSite.findFirst({
@@ -98,13 +125,22 @@ export class IntegraSiteService {
         appSecretEnc: input.appSecret ? encryptSecret(input.appSecret) : undefined,
         isActive: input.isActive,
         isDefault: input.isDefault,
+        label: input.label !== undefined ? input.label.trim() || null : undefined,
+        modulesOverride:
+          input.modulesOverride === undefined
+            ? undefined
+            : input.modulesOverride === null
+              ? Prisma.DbNull
+              : input.modulesOverride,
       },
       select: {
         id: true,
         name: true,
+        label: true,
         host: true,
         isActive: true,
         isDefault: true,
+        modulesOverride: true,
       },
     });
   }

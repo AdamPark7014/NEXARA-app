@@ -3,6 +3,7 @@
 import AppShell from "@/components/app-shell/AppShell";
 import { ToastViewport } from "@/components/Toast";
 import { usePathname } from "next/navigation";
+import { IntegraChrome } from "./_IntegraChrome";
 
 export default function IntegraLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -14,7 +15,9 @@ export default function IntegraLayout({ children }: { children: React.ReactNode 
   return (
     <>
       <ToastViewport />
-      <AppShell panel="integra">{children}</AppShell>
+      <AppShell panel="integra">
+        <IntegraChrome>{children}</IntegraChrome>
+      </AppShell>
     </>
   );
 }
