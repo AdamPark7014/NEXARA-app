@@ -5,6 +5,8 @@ import { rethrowArtemis, toArtemisOffsetIso } from '../hikvision-artemis/index';
 import { IntegraSiteService } from './integra-site.service';
 import { IntegraMediaService } from './integra-media.service';
 import { IntegraSyncService } from './integra-sync.service';
+import { IntegraPortfolioService } from './integra-portfolio.service';
+import { ARTEMIS_DOOR_CONTROL, ARTEMIS_DOOR_STATE } from '../hikvision-artemis/artemis.types';
 
 type Actor = { id?: number; email?: string };
 
@@ -18,6 +20,7 @@ export class IntegraArtemisService {
     private readonly audit: AuditService,
     private readonly media: IntegraMediaService,
     private readonly sync: IntegraSyncService,
+    private readonly portfolioSvc: IntegraPortfolioService,
   ) {}
 
   private async client(companyId?: number | null, siteId?: number | null) {
@@ -89,20 +92,86 @@ export class IntegraArtemisService {
     }
   }
 
-  async dashboard(companyId: number | null) {
+  async dashboard(companyId: number | null, siteId?: number | null) {
     if (!companyId) {
       const h = await this.health(null);
-      return { ...h, cameras: 0, doors: 0, people: 0, devices: 0, lastSync: null };
+      return {
+        ...h,
+        cameras: 0,
+        doors: 0,
+        people: 0,
+        devices: 0,
+        vehicles: 0,
+        regions: 0,
+        lastSync: null,
+        capabilities: await this.portfolioSvc.capabilities(null),
+      };
     }
-    const [cameras, doors, people, devices, lastSync, h] = await Promise.all([
-      this.prisma.integraCamera.count({ where: { companyId } }),
-      this.prisma.integraDoor.count({ where: { companyId } }),
-      this.prisma.integraPerson.count({ where: { companyId } }),
-      this.prisma.integraDevice.count({ where: { companyId } }),
-      this.sync.lastRun(companyId),
-      this.health(companyId),
-    ]);
-    return { ...h, cameras, doors, people, devices, lastSync };
+    const siteFilter = siteId ? { siteId } : {};
+    const [cameras, doors, people, devices, vehicles, regions, lastSync, h, capabilities] =
+      await Promise.all([
+        this.prisma.integraCamera.count({ where: { companyId, ...siteFilter } }),
+        this.prisma.integraDoor.count({ where: { companyId, ...siteFilter } }),
+        this.prisma.integraPerson.count({ where: { companyId, ...siteFilter } }),
+        this.prisma.integraDevice.count({ where: { companyId, ...siteFilter } }),
+        this.prisma.integraVehicle.count({ where: { companyId, ...siteFilter } }),
+        this.prisma.integraRegion.count({ where: { companyId, ...siteFilter } }),
+        this.sync.lastRun(companyId, siteId ?? undefined),
+        this.health(companyId, siteId),
+        this.portfolioSvc.capabilities(companyId, siteId),
+      ]);
+    return {
+      ...h,
+      cameras,
+      doors,
+      people,
+      devices,
+      vehicles,
+      regions,
+      lastSync,
+      capabilities,
+    };
+  }
+
+  getPortfolio(companyId: number | null, isSuperAdmin?: boolean) {
+    return this.portfolioSvc.portfolio({ companyId, isSuperAdmin });
+  }
+
+  capabilities(companyId: number | null, siteId?: number | null) {
+    return this.portfolioSvc.capabilities(companyId, siteId);
+  }
+
+  async listRegions(companyId: number | null, siteId?: number | null) {
+    if (companyId) {
+      const items = await this.prisma.integraRegion.findMany({
+        where: { companyId, ...(siteId ? { siteId } : {}) },
+        orderBy: { name: 'asc' },
+      });
+      return {
+        total: items.length,
+        source: 'mirror' as const,
+        items: items.map((r) => ({
+          id: r.indexCode,
+          name: r.name,
+          parentId: r.parentIndexCode,
+        })),
+      };
+    }
+    try {
+      const { client } = await this.client(companyId, siteId);
+      const data = await client.regions(1, 200);
+      return {
+        total: data?.total ?? data?.list?.length ?? 0,
+        source: 'live' as const,
+        items: (data?.list ?? []).map((r) => ({
+          id: String(r.indexCode ?? ''),
+          name: r.name || String(r.indexCode ?? ''),
+          parentId: r.parentIndexCode,
+        })),
+      };
+    } catch (error) {
+      rethrowArtemis(error, 'No se pudieron listar regiones');
+    }
   }
 
   async listCameras(companyId: number | null, live = false, siteId?: number | null) {
@@ -201,7 +270,8 @@ export class IntegraArtemisService {
           name: d.name,
           location: d.regionName,
           online: d.online,
-          status: d.doorState === '1' ? 'unlocked' : 'locked',
+          status: ARTEMIS_DOOR_STATE[String(d.doorState ?? '')] || 'unknown',
+          doorState: d.doorState,
         })),
       };
     }
@@ -216,7 +286,8 @@ export class IntegraArtemisService {
           name: d.doorName || String(d.doorIndexCode ?? ''),
           location: d.regionName,
           online: d.online !== false,
-          status: String(d.doorState ?? '') === '1' ? 'unlocked' : 'locked',
+          status: ARTEMIS_DOOR_STATE[String(d.doorState ?? '')] || 'unknown',
+          doorState: d.doorState,
         })),
       };
     } catch (error) {
@@ -232,7 +303,7 @@ export class IntegraArtemisService {
   ) {
     try {
       const resolved = await this.client(companyId, siteId);
-      await resolved.client.doorControl([doorIndexCode], '0');
+      await resolved.client.doorControl([doorIndexCode], ARTEMIS_DOOR_CONTROL.OPEN);
       await this.auditMut('integra.door.open', actor, companyId, resolved.siteId ?? 0, {
         doorIndexCode,
         email: actor?.email,

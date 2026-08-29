@@ -15,6 +15,7 @@ import type {
   ArtemisPersonRaw,
   ArtemisPreviewData,
   ArtemisPrivilegeGroupRaw,
+  ArtemisRegionRaw,
   ArtemisVehicleRaw,
 } from './artemis.types';
 
@@ -138,8 +139,26 @@ export class HikCentralArtemisClient {
     return this.post('/artemis/api/common/v1/version');
   }
 
-  regions(pageNo = 1, pageSize = 100) {
-    return this.post('/artemis/api/resource/v1/regions', { pageNo, pageSize });
+  /** Áreas / regiones (Developer Guide). */
+  regions(pageNo = 1, pageSize = 200) {
+    return this.post<ArtemisList<ArtemisRegionRaw>>('/artemis/api/resource/v1/regions', {
+      pageNo,
+      pageSize,
+    });
+  }
+
+  subRegions(parentIndexCode: string, pageNo = 1, pageSize = 200) {
+    return this.post<ArtemisList<ArtemisRegionRaw>>(
+      '/artemis/api/resource/v1/regions/subRegions',
+      { parentIndexCode, pageNo, pageSize },
+    );
+  }
+
+  regionCameras(regionIndexCode: string, pageNo = 1, pageSize = 200) {
+    return this.post<ArtemisList<ArtemisCameraRaw>>(
+      '/artemis/api/resource/v1/regions/regionIndexCode/cameras',
+      { regionIndexCode, pageNo, pageSize },
+    );
   }
 
   doorList(pageNo = 1, pageSize = 100) {
@@ -149,8 +168,8 @@ export class HikCentralArtemisClient {
     );
   }
 
-  /** controlType "0" = open */
-  doorControl(doorIndexCodes: string[], controlType: '0' | '1' | '2' = '0') {
+  /** controlType: 0 remain open, 1 close, 2 open, 3 remain closed (Developer Guide). */
+  doorControl(doorIndexCodes: string[], controlType: '0' | '1' | '2' | '3' = '2') {
     return this.post('/artemis/api/acs/v1/door/doControl', {
       doorIndexCodes,
       controlType,
@@ -298,6 +317,28 @@ export class HikCentralArtemisClient {
 
   anprCrossRecords(body: Record<string, unknown>) {
     return this.post('/artemis/api/pms/v1/crossRecords/page', body);
+  }
+
+  /** Sitios RSM multi-site HikCentral (si licencia). */
+  siteList(pageNo = 1, pageSize = 100) {
+    return this.post<ArtemisList<Record<string, unknown>>>(
+      '/artemis/api/resource/v1/site/siteList',
+      { pageNo, pageSize },
+    );
+  }
+
+  personUpdate(body: Record<string, unknown>) {
+    return this.post('/artemis/api/resource/v1/person/single/update', body);
+  }
+
+  doorInfo(doorIndexCode: string) {
+    return this.post('/artemis/api/resource/v1/acsDoor/indexCode/acsDoorInfo', {
+      doorIndexCode,
+    });
+  }
+
+  cameraInfo(cameraIndexCode: string) {
+    return this.post('/artemis/api/resource/v1/cameras/indexCode', { cameraIndexCode });
   }
 }
 
