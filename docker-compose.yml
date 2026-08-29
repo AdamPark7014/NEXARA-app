@@ -49,11 +49,13 @@ services:
       DATABASE_URL: postgresql://nexara_user:bb3030adpozoont@db:5432/nexara_db?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev-secret-key-change-in-production
-      HIKVISION_URL: http://localhost:54483
-      HIKVISION_PORT: 54483
-      HIKVISION_USERNAME: admin
-      HIKVISION_PASSWORD: password
-      HIKVISION_TIMEOUT: 10000
+      OFFICES_HIK_HOST: ${OFFICES_HIK_HOST:-}
+      OFFICES_HIK_APP_KEY: ${OFFICES_HIK_APP_KEY:-}
+      OFFICES_HIK_APP_SECRET: ${OFFICES_HIK_APP_SECRET:-}
+      OFFICES_HIK_TIMEOUT: ${OFFICES_HIK_TIMEOUT:-15000}
+      HIKVISION_URL: ${HIKVISION_URL:-}
+      HIK_APP_KEY: ${HIK_APP_KEY:-}
+      HIK_APP_SECRET: ${HIK_APP_SECRET:-}
       API_URL: http://localhost:4000
       NEXT_PUBLIC_API_URL: http://localhost:4000
     depends_on:

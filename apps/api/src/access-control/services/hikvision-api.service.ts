@@ -1,269 +1,206 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import {
+  ArtemisApiError,
+  ArtemisDoorRaw,
+  ArtemisEventRaw,
+  ArtemisNotConfiguredError,
+  HikCentralArtemisClient,
+} from './hikcentral-artemis.client';
+import {
   HikvisionApiConfig,
-  HikvisionAuthResponse,
   HikvisionDoor,
   HikvisionDoorEvent,
-  HikvisionAccessRule,
 } from '../interfaces/hikvision-api.interface';
 
+/**
+ * Puente oficinas NEXARA → HikCentral Artemis.
+ * No usa el Web Client ni rutas inventadas /api/v1.
+ */
 @Injectable()
 export class HikvisionApiService {
   private readonly logger = new Logger(HikvisionApiService.name);
-  private config: HikvisionApiConfig = {} as HikvisionApiConfig;
-  private authToken: string = '';
-  private tokenExpiresAt: number = 0;
+  private readonly client: HikCentralArtemisClient;
+  private readonly config: HikvisionApiConfig;
 
-  constructor(
-    private httpService: HttpService,
-    private configService: ConfigService,
-  ) {
-    this.initializeConfig();
-  }
+  constructor(private configService: ConfigService) {
+    const host = (
+      this.configService.get<string>('OFFICES_HIK_HOST') ||
+      this.configService.get<string>('HIKVISION_URL') ||
+      ''
+    ).replace(/\/$/, '');
 
-  private initializeConfig() {
+    const appKey =
+      this.configService.get<string>('OFFICES_HIK_APP_KEY') ||
+      this.configService.get<string>('HIK_APP_KEY') ||
+      '';
+    const appSecret =
+      this.configService.get<string>('OFFICES_HIK_APP_SECRET') ||
+      this.configService.get<string>('HIK_APP_SECRET') ||
+      '';
+
+    const timeout = Number(
+      this.configService.get('OFFICES_HIK_TIMEOUT') ||
+        this.configService.get('HIKVISION_TIMEOUT') ||
+        15000,
+    );
+
+    this.client = new HikCentralArtemisClient({
+      host,
+      appKey,
+      appSecret,
+      timeoutMs: timeout,
+    });
+
     this.config = {
-      baseUrl: this.configService.get('HIKVISION_URL', 'http://localhost:54483'),
-      port: this.configService.get('HIKVISION_PORT', 54483),
-      username: this.configService.get('HIKVISION_USERNAME', 'admin'),
-      password: this.configService.get('HIKVISION_PASSWORD', 'password'),
-      timeout: this.configService.get('HIKVISION_TIMEOUT', 10000),
+      baseUrl: host,
+      port: 443,
+      username: '(artemis-app-key)',
+      password: '',
+      timeout,
+      configured: this.client.configured,
     };
   }
 
-  /**
-   * Obtener token de autenticación con HikCentral
-   */
-  async authenticate(): Promise<string> {
-    try {
-      // Verificar si el token aún es válido
-      if (this.authToken && Date.now() < this.tokenExpiresAt) {
-        return this.authToken;
-      }
-
-      const url = `${this.config.baseUrl}/api/v1/auth/login`;
-      const credentials = Buffer.from(
-        `${this.config.username}:${this.config.password}`,
-      ).toString('base64');
-
-      const response = await this.httpService.post<HikvisionAuthResponse>(url, {}, {
-        headers: {
-          Authorization: `Basic ${credentials}`,
-        },
-        timeout: this.config.timeout,
-      }).toPromise();
-
-      const data = response!.data as any;
-      this.authToken = data.token;
-      this.tokenExpiresAt = Date.now() + data.expiresIn * 1000;
-
-      this.logger.log('Autenticación con HikCentral exitosa');
-      return this.authToken;
-    } catch (error) {
-      this.logger.error('Error autenticando con HikCentral', error);
-      throw new HttpException(
-        'No se pudo autenticar con HikCentral',
-        HttpStatus.UNAUTHORIZED,
-      );
-    }
-  }
-
-  /**
-   * Obtener lista de puertas/dispositivos
-   */
-  async getDoors(): Promise<HikvisionDoor[]> {
-    try {
-      const token = await this.authenticate();
-      const url = `${this.config.baseUrl}/api/v1/devices/doors`;
-
-      const response = await this.httpService.get<HikvisionDoor[]>(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        timeout: this.config.timeout,
-      }).toPromise();
-
-      return (response!.data as any) as HikvisionDoor[];
-    } catch (error) {
-      this.logger.error('Error obteniendo puertas de HikCentral', error);
-      throw new HttpException(
-        'No se pudieron obtener las puertas',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-  }
-
-  /**
-   * Obtener estado de una puerta específica
-   */
-  async getDoorStatus(doorNo: number) {
-    try {
-      const token = await this.authenticate();
-      const url = `${this.config.baseUrl}/api/v1/devices/doors/${doorNo}/status`;
-
-      const response = await this.httpService.get(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        timeout: this.config.timeout,
-      }).toPromise();
-
-      return (response!.data as any);
-    } catch (error) {
-      this.logger.error(`Error obteniendo estado de puerta ${doorNo}`, error);
-      throw new HttpException(
-        'No se pudo obtener el estado de la puerta',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-  }
-
-  /**
-   * Abrir puerta remota
-   */
-  async unlockDoor(doorNo: number, durationSeconds?: number): Promise<void> {
-    try {
-      const token = await this.authenticate();
-      const url = `${this.config.baseUrl}/api/v1/devices/doors/${doorNo}/unlock`;
-
-      await this.httpService.post(
-        url,
-        {
-          durationSeconds: durationSeconds || 5,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          timeout: this.config.timeout,
-        },
-      ).toPromise();
-
-      this.logger.log(`Puerta ${doorNo} desbloqueada exitosamente`);
-    } catch (error) {
-      this.logger.error(`Error desbloqueando puerta ${doorNo}`, error);
-      throw new HttpException(
-        'No se pudo desbloquear la puerta',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-  }
-
-  /**
-   * Obtener eventos de acceso
-   */
-  async getAccessEvents(
-    doorNo?: number,
-    limit: number = 50,
-    offset: number = 0,
-  ): Promise<HikvisionDoorEvent[]> {
-    try {
-      const token = await this.authenticate();
-      let url = `${this.config.baseUrl}/api/v1/events/access?limit=${limit}&offset=${offset}`;
-
-      if (doorNo) {
-        url += `&doorNo=${doorNo}`;
-      }
-
-      const response = await this.httpService.get<HikvisionDoorEvent[]>(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        timeout: this.config.timeout,
-      }).toPromise();
-
-      return (response!.data as any) as HikvisionDoorEvent[];
-    } catch (error) {
-      this.logger.error('Error obteniendo eventos de acceso', error);
-      throw new HttpException(
-        'No se pudieron obtener los eventos',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-  }
-
-  /**
-   * Crear regla de acceso
-   */
-  async createAccessRule(
-    cardNo: string,
-    doorNos: number[],
-    validFrom: string,
-    validTo: string,
-  ): Promise<HikvisionAccessRule> {
-    try {
-      const token = await this.authenticate();
-      const url = `${this.config.baseUrl}/api/v1/access-rules`;
-
-      const response = await this.httpService.post<HikvisionAccessRule>(
-        url,
-        {
-          cardNo,
-          doorNoList: doorNos,
-          validFrom,
-          validTo,
-          accessLevel: 1,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          timeout: this.config.timeout,
-        },
-      ).toPromise();
-
-      this.logger.log(`Regla de acceso creada para tarjeta ${cardNo}`);
-      return (response!.data as any) as HikvisionAccessRule;
-    } catch (error) {
-      this.logger.error('Error creando regla de acceso', error);
-      throw new HttpException(
-        'No se pudo crear la regla de acceso',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-  }
-
-  /**
-   * Eliminar regla de acceso
-   */
-  async deleteAccessRule(ruleId: string): Promise<void> {
-    try {
-      const token = await this.authenticate();
-      const url = `${this.config.baseUrl}/api/v1/access-rules/${ruleId}`;
-
-      await this.httpService.delete(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        timeout: this.config.timeout,
-      }).toPromise();
-
-      this.logger.log(`Regla de acceso ${ruleId} eliminada`);
-    } catch (error) {
-      this.logger.error('Error eliminando regla de acceso', error);
-      throw new HttpException(
-        'No se pudo eliminar la regla de acceso',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-  }
-
-  /**
-   * Obtener configuración actual
-   */
   getConfig(): HikvisionApiConfig {
     return this.config;
   }
 
   async checkConnection(): Promise<boolean> {
+    if (!this.client.configured) return false;
     try {
-      await this.authenticate();
+      await this.client.version();
       return true;
     } catch (error) {
-      this.logger.warn('HikCentral no disponible en health check');
+      this.logger.warn(`HikCentral oficinas no responde: ${String(error)}`);
       return false;
     }
+  }
+
+  async getDoors(): Promise<HikvisionDoor[]> {
+    try {
+      const data = await this.client.doorList(1, 200);
+      const list = data?.list ?? [];
+      return list.map((d) => this.mapDoor(d));
+    } catch (error) {
+      this.rethrow(error, 'No se pudieron listar las puertas de oficinas');
+    }
+  }
+
+  async getDoorStatus(doorIndexCode: string) {
+    try {
+      const doors = await this.getDoors();
+      const door = doors.find((d) => String(d.doorIndexCode) === String(doorIndexCode));
+      if (!door) {
+        throw new HttpException('Puerta no encontrada', HttpStatus.NOT_FOUND);
+      }
+      return {
+        id: door.doorIndexCode,
+        status: door.status?.locked ? 'locked' : 'unlocked',
+        online: door.status?.online ?? false,
+        name: door.doorName,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.rethrow(error, `No se pudo obtener estado de puerta ${doorIndexCode}`);
+    }
+  }
+
+  async unlockDoor(doorIndexCode: string, _durationSeconds?: number): Promise<void> {
+    try {
+      await this.client.doorControl([doorIndexCode], '0');
+      this.logger.log(`Oficinas: apertura remota puerta ${doorIndexCode}`);
+    } catch (error) {
+      this.rethrow(error, `No se pudo abrir la puerta ${doorIndexCode}`);
+    }
+  }
+
+  async getAccessEvents(
+    doorIndexCode?: string,
+    limit: number = 50,
+    _offset: number = 0,
+  ): Promise<HikvisionDoorEvent[]> {
+    try {
+      const end = new Date();
+      const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+      const data = await this.client.doorEvents(
+        this.toOffsetIso(start),
+        this.toOffsetIso(end),
+        1,
+        Math.min(limit, 200),
+      );
+      let list = data?.list ?? [];
+      if (doorIndexCode) {
+        list = list.filter((e) => String(e.doorIndexCode) === String(doorIndexCode));
+      }
+      return list.map((e) => this.mapEvent(e));
+    } catch (error) {
+      this.rethrow(error, 'No se pudieron obtener eventos de acceso de oficinas');
+    }
+  }
+
+  private mapDoor(raw: ArtemisDoorRaw): HikvisionDoor {
+    const code = String(raw.doorIndexCode ?? raw.doorNo ?? '');
+    return {
+      doorIndexCode: code,
+      doorNo: Number(raw.doorNo) || 0,
+      doorName: raw.doorName || code || 'Puerta',
+      doorType: raw.channelType || 'DOOR',
+      readerCount: 0,
+      location: raw.regionName,
+      status: {
+        online: raw.online !== false,
+        locked: String(raw.doorState ?? '') !== '1',
+      },
+    };
+  }
+
+  private mapEvent(raw: ArtemisEventRaw): HikvisionDoorEvent {
+    return {
+      eventID: String(raw.eventId ?? ''),
+      doorIndexCode: String(raw.doorIndexCode ?? ''),
+      doorNo: 0,
+      readerNo: 0,
+      cardNo: raw.cardNo || '',
+      personID: String(raw.personId ?? ''),
+      eventTime: raw.eventTime || new Date().toISOString(),
+      eventType: String(raw.eventTypeName || raw.eventType || 'entry'),
+      status: 'success',
+    };
+  }
+
+  /** ISO 8601 con offset local (Artemis rechaza Z a secas). */
+  private toOffsetIso(d: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const off = -d.getTimezoneOffset();
+    const sign = off >= 0 ? '+' : '-';
+    const abs = Math.abs(off);
+    const hh = pad(Math.floor(abs / 60));
+    const mm = pad(abs % 60);
+    return (
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+      `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` +
+      `${sign}${hh}:${mm}`
+    );
+  }
+
+  private rethrow(error: unknown, message: string): never {
+    if (error instanceof ArtemisNotConfiguredError) {
+      throw new HttpException(
+        {
+          message: 'ACS oficinas sin configurar',
+          detail: error.message,
+        },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+    if (error instanceof ArtemisApiError) {
+      throw new HttpException(
+        { message, code: error.code, path: error.path },
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+    this.logger.error(message, error instanceof Error ? error.stack : String(error));
+    throw new HttpException(message, HttpStatus.BAD_GATEWAY);
   }
 }

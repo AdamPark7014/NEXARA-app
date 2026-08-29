@@ -291,7 +291,7 @@ export function getUserHomePanel(user: UserAccessInput | null | undefined): Pane
 
   const orgKey = resolveOrgRoleKey(user.role, user.orgRoleKey);
   const url = getOrgHomeUrl(orgKey, false, resolveIsPlatformOwner(user), isTechnicalSuperAdmin(user));
-  const match = url.match(/^\/(erp|crm|ops|studio|lab)/);
+  const match = url.match(/^\/(erp|crm|ops|studio|lab|integra)/);
   return (match?.[1] as PanelId) ?? 'erp';
 }
 

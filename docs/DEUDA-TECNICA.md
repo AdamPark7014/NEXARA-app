@@ -65,8 +65,9 @@ por dispositivo en `apps/api/src/noc/adapters/` para Hikvision ISAPI, SNMP y MQT
 - **Decisión de producto:** ¿se vende NOC como módulo activo o se marca "en
   diseño" hasta tener integración real? Hoy un cliente ve un panel que parece
   telemetría y no lo es.
-- **Nota:** ya existe documentación local de ISAPI/HCT (skill `hikvision-api`);
-  el camino técnico está, falta la decisión y el alcance.
+- **Nota:** ACS de oficinas NEXARA ya habla Artemis (`access-control`, ADR-0017).
+  El panel Integra es el camino de paridad CCTV; NOC debe acabar consumiendo el
+  mismo adapter, no inventar dispositivos.
 
 ### 1.2 Timbrado CFDI en modo mock
 

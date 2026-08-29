@@ -25,6 +25,7 @@ export const PANEL_CANONICAL_SUBDOMAIN: Record<PanelId, string> = {
   ops: 'ops',
   studio: 'studio',
   lab: 'lab',
+  integra: 'integra',
 };
 
 const SUBDOMAIN_TO_PANEL_ID: Record<string, PanelId> = {
@@ -42,6 +43,7 @@ const SUBDOMAIN_TO_PANEL_ID: Record<string, PanelId> = {
   studio: 'studio',
   web: 'studio',
   lab: 'lab',
+  integra: 'integra',
 };
 
 /** Codifica el objeto usuario en base64 para la URL. */

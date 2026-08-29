@@ -139,6 +139,7 @@ const PANEL_LABEL: Record<PanelId, string> = {
   ops: "OPS",
   studio: "STUDIO",
   lab: "LAB",
+  integra: "INTEGRA",
 };
 
 function normalize(s: string): string {

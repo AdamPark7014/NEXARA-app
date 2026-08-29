@@ -110,11 +110,13 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/crm/**', scope: 'read' },
     { path: '/ops/**', scope: 'read' },
     { path: '/studio/**', scope: 'read' },
+    { path: '/integra/**', scope: 'read' },
     // Direccion: gestion de contenido y comunicados internos.
     { path: '/api/hero-slides/**', scope: 'write' },
     { path: '/api/hero-video/**', scope: 'write' },
     { path: '/api/social-posts/**', scope: 'write' },
     { path: '/api/internal-comunicados/**', scope: 'write' },
+    { path: '/api/access-control/**', scope: 'write' },
     { path: '/api/**', methods: ['GET'], scope: 'read' },
   ],
 
@@ -195,6 +197,9 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/viatics/**', scope: 'approve' },
     { path: '/api/cotizaciones/**', scope: 'approve' },
     { path: '/api/smart-quote/**', scope: 'approve' },
+    { path: '/erp/facilities/**', scope: 'write' },
+    { path: '/integra/**', scope: 'write' },
+    { path: '/api/access-control/**', scope: 'write' },
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -213,6 +218,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/hr/**', scope: 'approve' },
     { path: '/api/users/**', scope: 'admin' },
     { path: '/api/workflow/**', scope: 'approve' },
+    { path: '/api/access-control/**', scope: 'write' },
   ],
 
   // ─────────────────────────────────────────────────────────────────

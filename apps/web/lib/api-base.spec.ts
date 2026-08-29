@@ -30,6 +30,8 @@ describe('getApiBase · a qué backend apunta la web', () => {
     expect(getApiBase()).toBe('https://core.nexara.com.mx/api');
     setLocation('https://ops.nexara.com.mx/ops/activities');
     expect(getApiBase()).toBe('https://ops.nexara.com.mx/api');
+    setLocation('https://integra.nexara.com.mx/integra');
+    expect(getApiBase()).toBe('https://integra.nexara.com.mx/api');
   });
 
   it('cae al mismo origen cuando el host no es un panel conocido', () => {
