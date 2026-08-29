@@ -134,6 +134,16 @@ export const SUBDOMAIN_CONFIG: Record<string, SubdomainConfig> = {
       'Playground interno de desarrollo y experimentos AI: API playground, AI sandbox, feature flags, system health probes.',
     enabled: true,
   },
+
+  // ── Integra · seguridad física (HikCentral Artemis) ──
+  integra: {
+    name: 'Integra',
+    publicDomain: 'integra.nexara.com.mx',
+    rootPath: '/',
+    description:
+      'CCTV, accesos, personas, eventos y vehículos sobre HikCentral Professional Artemis.',
+    enabled: true,
+  },
 };
 
 /**

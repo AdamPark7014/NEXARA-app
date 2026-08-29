@@ -11,6 +11,7 @@
  *   /ops/...     → ops.nexara.com.mx         (Ingenieros de campo, soporte, NOC)
  *   /studio/...  → studio.nexara.com.mx      (Diseñadores, marketing)
  *   /lab/...     → lab.nexara.com.mx         (Sandbox técnico, super_admin)
+ *   /integra/... → integra.nexara.com.mx     (CCTV/ACS Artemis)
  *   /tickets/... → portal.nexara.com.mx      (Cliente externo)
  *
  * Aliases legacy (`/core`, `/sales`) se normalizan automáticamente vía
@@ -45,6 +46,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/ops/**',
     '/studio/**',
     '/lab/**',
+    '/integra/**',
   ],
 
   // ─── ARQUITECTO — OPS supervisor + ERP parcial ────────────────────────
@@ -87,6 +89,8 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/crm/tenders/**',
     '/crm/pipeline',
     '/crm/reports',
+    '/erp/facilities/**',
+    '/integra/**',
   ],
 
   // ─── DIR. ADMIN — finanzas, RH, gobierno + lectura OPS para facturación ──

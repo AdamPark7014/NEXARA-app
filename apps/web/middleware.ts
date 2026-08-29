@@ -55,6 +55,8 @@ const SUBDOMAIN_MAP: Record<string, string> = {
   // ── LAB (sandbox técnico) ──
   'lab': '/lab',
   'dev': '/lab',
+  // ── INTEGRA (CCTV / ACS Artemis) ──
+  'integra': '/integra',
   // ── Portal cliente externo (sigue siendo subdomain dedicado) ──
   'portal': '/tickets',
   'tickets': '/tickets',
@@ -74,6 +76,7 @@ const CANONICAL_BY_INTERNAL_PREFIX: Record<string, string> = {
   '/ops': 'ops',
   '/studio': 'studio',
   '/lab': 'lab',
+  '/integra': 'integra',
   '/tickets': 'portal',
 };
 

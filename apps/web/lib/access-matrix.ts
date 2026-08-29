@@ -7,22 +7,14 @@
  * middlewares, guards backend, paleta de comandos, switcher de paneles)
  * consume esta matriz — nunca duplica reglas en otro lado.
  *
- * Modelo de 5 paneles consolidados:
+ * Modelo de 6 paneles:
  *
  *   ERP     ·  Operación administrativa, finanzas, RH, almacén, compras, BI, gobierno.
- *              Lo habitan: CEO, Director Admin, Contador, RH, Almacén, Personal admin, Developer.
- *
  *   CRM     ·  Pipeline comercial puro (leads, oportunidades, cotizaciones, clientes).
- *              Lo habitan: Director Comercial, Sales Manager, Sales Rep, Designer (lectura).
- *
  *   OPS     ·  Operación de campo, NOC, soporte, mantenimiento, ingenieros, evidencias.
- *              Lo habitan: Director Ops, PM, Senior/Field Engineer, Support, Maintenance.
- *
  *   STUDIO  ·  Sitio público, marketing, redes, newsletter, casos de éxito, catálogo público.
- *              Lo habitan: Designer, Director Comercial (estrategia).
- *
  *   LAB     ·  Sandbox técnico, API health, feature flags, datos demo.
- *              Lo habitan: Developer, CEO (sandbox visual).
+ *   INTEGRA ·  Seguridad física del sitio (CCTV/ACS) sobre HikCentral Artemis.
  *
  * Cada usuario tiene UN panel HOME y puede saltar a otros vía el
  * switcher discreto del topbar — la sidebar solo muestra el contenido
@@ -41,6 +33,7 @@ export const PANELS = {
   OPS: "ops",
   STUDIO: "studio",
   LAB: "lab",
+  INTEGRA: "integra",
 } as const;
 
 export type PanelId = (typeof PANELS)[keyof typeof PANELS];
@@ -107,6 +100,15 @@ export const PANEL_META: Record<PanelId, PanelMeta> = {
     icon: "🧪",
     entryPath: "/",
   },
+  [PANELS.INTEGRA]: {
+    id: PANELS.INTEGRA,
+    publicSubdomain: "integra",
+    name: "NEXARA INTEGRA",
+    tagline: "CCTV y accesos sobre HikCentral Artemis",
+    accent: "#1d4ed8",
+    icon: "🔐",
+    entryPath: "/",
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────
@@ -124,6 +126,7 @@ export const LEGACY_PANEL_MAP: Record<string, PanelId> = {
   ventas: PANELS.CRM,
   web: PANELS.STUDIO,
   lab: PANELS.LAB,
+  integra: PANELS.INTEGRA,
   tickets: PANELS.OPS, // portal cliente vive lógicamente en OPS
 };
 
@@ -223,7 +226,16 @@ export type ModuleId =
   | "lab-home"
   | "lab-ai"
   | "lab-health"
-  | "lab-chat";
+  | "lab-chat"
+  // Facilities (oficinas NEXARA, vive en ERP)
+  | "facilities-access"
+  // INTEGRA
+  | "integra-home"
+  | "integra-video"
+  | "integra-access"
+  | "integra-people"
+  | "integra-events"
+  | "integra-vehicles";
 
 export type ModuleEntry = {
   id: ModuleId;
@@ -840,6 +852,56 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     icon: "❤️", allowedRoles: [R.CEO],
     group: "Lab", visible: true,
   },
+
+  // ════════════════════════════════════════════════════════════════
+  // Facilities — oficinas NEXARA (ERP)
+  // ════════════════════════════════════════════════════════════════
+  "facilities-access": {
+    id: "facilities-access", panel: PANELS.ERP, path: "/facilities/access",
+    label: "Accesos oficinas", description: "Puertas Artemis de sedes NEXARA",
+    icon: "🚪", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.ADMIN_STAFF, R.NOC_LEAD],
+    group: "Facilities", visible: true,
+  },
+
+  // ════════════════════════════════════════════════════════════════
+  // INTEGRA — CCTV / ACS sitio (HikCentral Artemis)
+  // ════════════════════════════════════════════════════════════════
+  "integra-home": {
+    id: "integra-home", panel: PANELS.INTEGRA, path: "/",
+    label: "Integra", description: "Inicio del panel de seguridad física",
+    icon: "🔐", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD, R.NOC_OPERATOR],
+    group: "Integra", visible: true,
+  },
+  "integra-video": {
+    id: "integra-video", panel: PANELS.INTEGRA, path: "/video",
+    label: "Video", description: "Live view y playback",
+    icon: "📹", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD, R.NOC_OPERATOR],
+    group: "Integra", visible: true,
+  },
+  "integra-access": {
+    id: "integra-access", panel: PANELS.INTEGRA, path: "/access",
+    label: "Accesos sitio", description: "Puertas y privilegios del sitio",
+    icon: "🚪", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD, R.NOC_OPERATOR],
+    group: "Integra", visible: true,
+  },
+  "integra-people": {
+    id: "integra-people", panel: PANELS.INTEGRA, path: "/people",
+    label: "Personas", description: "Personas y credenciales Artemis",
+    icon: "👤", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD],
+    group: "Integra", visible: true,
+  },
+  "integra-events": {
+    id: "integra-events", panel: PANELS.INTEGRA, path: "/events",
+    label: "Eventos", description: "Eventos ACS / VMS / vehículos",
+    icon: "📋", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD, R.NOC_OPERATOR],
+    group: "Integra", visible: true,
+  },
+  "integra-vehicles": {
+    id: "integra-vehicles", panel: PANELS.INTEGRA, path: "/vehicles",
+    label: "Vehículos", description: "ANPR y flota",
+    icon: "🚗", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD],
+    group: "Integra", visible: true,
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────
@@ -902,9 +964,9 @@ export function canAccessUrl(
   }
 
   // 2) Rutas personales `/[panel]/my-profile` / `/[panel]/calendar` siempre permitidas
-  if (/^\/(erp|crm|ops|studio|lab)\/(my-profile|calendar)(\/|$)/.test(normalized)) return true;
-  // Chat corporativo — mismo módulo en los 5 paneles, misma API/DB
-  if (/^\/(erp|crm|ops|studio|lab)\/chat(\/|$)/.test(normalized)) return true;
+  if (/^\/(erp|crm|ops|studio|lab|integra)\/(my-profile|calendar)(\/|$)/.test(normalized)) return true;
+  // Chat corporativo — mismo módulo en los paneles, misma API/DB
+  if (/^\/(erp|crm|ops|studio|lab|integra)\/chat(\/|$)/.test(normalized)) return true;
 
   return false;
 }

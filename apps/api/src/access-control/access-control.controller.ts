@@ -17,39 +17,31 @@ import { DoorDto, UnlockDoorDto } from './dto/door.dto';
 import { AccessEventFilterDto } from './dto/access-event.dto';
 import { CreateAccessRuleDto } from './dto/access-rule.dto';
 
-@ApiTags('Access Control - HikCentral')
+@ApiTags('Oficinas NEXARA · ACS')
 @ApiBearerAuth()
 @UseGuards(RbacGuard)
 @Controller('access-control')
 export class AccessControlController {
   constructor(private accessControlService: AccessControlService) {}
 
-  /**
-   * Obtener todas las puertas
-   */
+  /** Puertas de sedes NEXARA (Artemis). */
   @Get('doors')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Obtener todas las puertas/dispositivos de HikCentral' })
+  @ApiOperation({ summary: 'Listar puertas de oficinas NEXARA' })
   async getDoors(): Promise<DoorDto[]> {
     return this.accessControlService.getAllDoors();
   }
 
-  /**
-   * Obtener estado de una puerta específica
-   */
   @Get('doors/:id/status')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Obtener estado de una puerta específica' })
+  @ApiOperation({ summary: 'Estado de una puerta de oficina' })
   async getDoorStatus(@Param('id') doorId: string): Promise<any> {
     return this.accessControlService.getDoorStatus(doorId);
   }
 
-  /**
-   * Desbloquear puerta remotamente
-   */
   @Post('doors/:id/unlock')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Desbloquear puerta remotamente' })
+  @ApiOperation({ summary: 'Apertura remota de puerta de oficina' })
   async unlockDoor(
     @Param('id') doorId: string,
     @Body() dto: UnlockDoorDto,
@@ -60,12 +52,9 @@ export class AccessControlController {
     });
   }
 
-  /**
-   * Obtener eventos de acceso
-   */
   @Get('events')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Obtener eventos de acceso registrados' })
+  @ApiOperation({ summary: 'Eventos de acceso de oficinas (últimas 24 h)' })
   async getAccessEvents(
     @Query('doorId') doorId?: string,
     @Query('employeeId') employeeId?: string,
@@ -88,32 +77,23 @@ export class AccessControlController {
     return this.accessControlService.getAccessEvents(filter);
   }
 
-  /**
-   * Crear regla de acceso para empleado
-   */
   @Post('rules')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Crear regla de acceso para un empleado' })
+  @ApiOperation({ summary: 'No implementado — privilege/group Artemis (oficinas)' })
   async createAccessRule(@Body() dto: CreateAccessRuleDto): Promise<any> {
     return this.accessControlService.createAccessRule(dto);
   }
 
-  /**
-   * Eliminar regla de acceso
-   */
   @Delete('rules/:id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Eliminar regla de acceso' })
-  async deleteAccessRule(@Param('id') ruleId: string): Promise<{ success: boolean; message: string }> {
+  @ApiOperation({ summary: 'No implementado — privilege/group Artemis (oficinas)' })
+  async deleteAccessRule(@Param('id') ruleId: string): Promise<never> {
     return this.accessControlService.deleteAccessRule(ruleId);
   }
 
-  /**
-   * Health check - Verificar conexión con HikCentral
-   */
   @Get('health')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Verificar estado de conexión con HikCentral' })
+  @ApiOperation({ summary: 'Salud Artemis de oficinas NEXARA' })
   async healthCheck(): Promise<{ status: string; connected: boolean; config: any }> {
     const config = this.accessControlService.getHikvisionConfig();
     const connected = await this.accessControlService.checkConnection();
@@ -122,7 +102,7 @@ export class AccessControlController {
       connected,
       config: {
         baseUrl: config.baseUrl,
-        port: config.port,
+        configured: config.configured === true,
       },
     };
   }

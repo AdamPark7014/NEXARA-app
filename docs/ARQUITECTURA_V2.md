@@ -58,6 +58,7 @@ NEXARA es una empresa **tech-services** con dos vertientes:
 | `ops.nexara.com.mx` | `operacion` | Ingenieros de campo, soporte, NOC, coord. ops | |
 | `studio.nexara.com.mx` | `web` | Diseñadores, marketing | CMS del sitio público |
 | `portal.nexara.com.mx` | `tickets` | Clientes externos | Solo tickets |
+| `integra.nexara.com.mx` | `integra` | Seguridad física (CCTV/ACS Artemis) | ADR-0017 |
 
 **Eliminadas como subdominio independiente** (fusionan a `core`):
 - `finance.nexara` → módulo `core/contabilidad`
