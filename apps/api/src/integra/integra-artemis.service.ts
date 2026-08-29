@@ -92,7 +92,11 @@ export class IntegraArtemisService {
     }
   }
 
-  async dashboard(companyId: number | null, siteId?: number | null) {
+  async dashboard(
+    companyId: number | null,
+    siteId?: number | null,
+    opts?: { canSettings?: boolean },
+  ) {
     if (!companyId) {
       const h = await this.health(null);
       return {
@@ -104,7 +108,7 @@ export class IntegraArtemisService {
         vehicles: 0,
         regions: 0,
         lastSync: null,
-        capabilities: await this.portfolioSvc.capabilities(null),
+        capabilities: await this.portfolioSvc.capabilities(null, null, opts),
       };
     }
     const siteFilter = siteId ? { siteId } : {};
@@ -118,7 +122,7 @@ export class IntegraArtemisService {
         this.prisma.integraRegion.count({ where: { companyId, ...siteFilter } }),
         this.sync.lastRun(companyId, siteId ?? undefined),
         this.health(companyId, siteId),
-        this.portfolioSvc.capabilities(companyId, siteId),
+        this.portfolioSvc.capabilities(companyId, siteId, opts),
       ]);
     return {
       ...h,
@@ -133,12 +137,20 @@ export class IntegraArtemisService {
     };
   }
 
-  getPortfolio(companyId: number | null, isSuperAdmin?: boolean) {
-    return this.portfolioSvc.portfolio({ companyId, isSuperAdmin });
+  getPortfolio(
+    companyId: number | null,
+    isSuperAdmin?: boolean,
+    canSettings = true,
+  ) {
+    return this.portfolioSvc.portfolio({ companyId, isSuperAdmin, canSettings });
   }
 
-  capabilities(companyId: number | null, siteId?: number | null) {
-    return this.portfolioSvc.capabilities(companyId, siteId);
+  capabilities(
+    companyId: number | null,
+    siteId?: number | null,
+    opts?: { canSettings?: boolean },
+  ) {
+    return this.portfolioSvc.capabilities(companyId, siteId, opts);
   }
 
   async listRegions(companyId: number | null, siteId?: number | null) {

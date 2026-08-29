@@ -12,6 +12,9 @@ describe('canOpenPage · guardas de ruta por rol', () => {
   it('el cliente externo solo ve el portal de tickets', () => {
     expect(canOpenPage(ROLES.CLIENTE, '/tickets')).toBe(true);
     expect(canOpenPage(ROLES.CLIENTE, '/tickets/1234')).toBe(true);
+    expect(canOpenPage(ROLES.CLIENTE, '/integra')).toBe(true);
+    expect(canOpenPage(ROLES.CLIENTE, '/integra/video')).toBe(true);
+    expect(canOpenPage(ROLES.CLIENTE, '/integra/settings')).toBe(false);
     expect(canOpenPage(ROLES.CLIENTE, '/erp/dashboard')).toBe(false);
     expect(canOpenPage(ROLES.CLIENTE, '/crm/quotes')).toBe(false);
     expect(canOpenPage(ROLES.CLIENTE, '/ops/activities')).toBe(false);

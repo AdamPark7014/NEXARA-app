@@ -20,7 +20,7 @@ import {
   type IntegraCapabilities,
   setActiveIntegraSiteId,
 } from "./_lib";
-import { IntegraSiteSwitcher } from "./_SiteSwitcher";
+import { setCachedCapabilities } from "./_caps";
 
 type Dash = {
   connected: boolean;
@@ -54,6 +54,7 @@ type Portfolio = {
       regions: number;
     };
     capabilities: IntegraCapabilities;
+    modules?: string[];
     sites: Array<{
       id: number;
       name: string;
@@ -83,6 +84,30 @@ const EMPTY_CAPS: IntegraCapabilities = {
   settings: true,
 };
 
+function CapPills({ caps }: { caps: IntegraCapabilities }) {
+  const labels: Array<[keyof IntegraCapabilities, string]> = [
+    ["video", "Video"],
+    ["access", "ACS"],
+    ["people", "Personas"],
+    ["events", "Eventos"],
+    ["vehicles", "Flota"],
+    ["anpr", "ANPR"],
+    ["visitors", "Visitas"],
+    ["alarms", "Alarmas"],
+  ];
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+      {labels
+        .filter(([k]) => caps[k])
+        .map(([k, label]) => (
+          <DashPill key={k} tone="positive">
+            {label}
+          </DashPill>
+        ))}
+    </div>
+  );
+}
+
 export default function IntegraHome() {
   const [dash, setDash] = useState<Dash | null>(null);
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
@@ -99,6 +124,7 @@ export default function IntegraHome() {
       ]);
       setDash(d);
       setPortfolio(p);
+      if (d.capabilities) setCachedCapabilities(d.capabilities);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
     }
@@ -135,18 +161,28 @@ export default function IntegraHome() {
   return (
     <DashPage>
       <DashHero
-        eyebrow="Seguridad física · multi-cliente"
+        eyebrow={
+          portfolio?.mode === "platform"
+            ? "Plataforma NEXARA · todos los clientes"
+            : "Portal cliente · solo tu inventario"
+        }
         title="NEXARA Integra"
-        subtitle="HikCentral Artemis particionado por empresa y sitio. Cada cliente solo ve su inventario."
+        subtitle="HikCentral Artemis hiper-particionado: cada empresa y sitio con módulos derivados del espejo (cámaras→video, puertas→ACS, vehículos→ANPR)."
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <IntegraSiteSwitcher onChange={() => setTick((t) => t + 1)} />
             <button type="button" onClick={() => void refresh()} style={btnGhost}>
               Actualizar
             </button>
-            <button type="button" onClick={() => void syncNow()} style={btnPrimary} disabled={syncing}>
-              {syncing ? "Sincronizando…" : "Sincronizar ahora"}
-            </button>
+            {caps.settings && (
+              <button
+                type="button"
+                onClick={() => void syncNow()}
+                style={btnPrimary}
+                disabled={syncing}
+              >
+                {syncing ? "Sincronizando…" : "Sincronizar ahora"}
+              </button>
+            )}
           </div>
         }
       />
@@ -179,28 +215,50 @@ export default function IntegraHome() {
 
       {error && <p style={{ color: "var(--danger)", marginBottom: 12 }}>{error}</p>}
 
-      {portfolio && portfolio.mode === "platform" && (
+      {portfolio && (
         <DashPanel
-          title="Portfolio clientes"
-          subtitle={`${portfolio.companyCount} empresas · ${portfolio.siteCount} sitios Artemis`}
+          title={
+            portfolio.mode === "platform"
+              ? "Portfolio clientes"
+              : "Tus sitios Artemis"
+          }
+          subtitle={`${portfolio.companyCount} empresas · ${portfolio.siteCount} sitios · módulos por tipo de dispositivo`}
         >
           {portfolio.companies.map((c) => (
-            <div key={c.companyId} style={{ marginBottom: 12 }}>
+            <div
+              key={c.companyId}
+              style={{
+                marginBottom: 14,
+                paddingBottom: 10,
+                borderBottom: "1px solid var(--border, #e2e8f0)",
+              }}
+            >
               <ListRow
                 title={c.name}
-                sub={`cams ${c.totals.cameras} · puertas ${c.totals.doors} · personas ${c.totals.people} · vehículos ${c.totals.vehicles}`}
+                sub={`cams ${c.totals.cameras} · puertas ${c.totals.doors} · personas ${c.totals.people} · vehículos ${c.totals.vehicles} · regiones ${c.totals.regions}`}
                 trail={
-                  <button type="button" style={btnPrimary} onClick={() => openClient(c.companyId)}>
-                    Entrar
-                  </button>
+                  portfolio.mode === "platform" ? (
+                    <button
+                      type="button"
+                      style={btnPrimary}
+                      onClick={() => openClient(c.companyId)}
+                    >
+                      Entrar
+                    </button>
+                  ) : (
+                    <DashPill tone="positive">activo</DashPill>
+                  )
                 }
               />
-              <div style={{ paddingLeft: 12, marginTop: 4 }}>
+              <div style={{ paddingLeft: 8, marginTop: 6 }}>
+                <CapPills caps={c.capabilities} />
+              </div>
+              <div style={{ paddingLeft: 12, marginTop: 6 }}>
                 {c.sites.map((s) => (
                   <ListRow
                     key={s.id}
                     title={s.label || s.name}
-                    sub={`${s.host} · sync ${s.lastSyncAt ? new Date(s.lastSyncAt).toLocaleString("es-MX") : "nunca"}`}
+                    sub={`${s.host} · ${s._count.cameras} cam · ${s._count.doors} puertas · sync ${s.lastSyncAt ? new Date(s.lastSyncAt).toLocaleString("es-MX") : "nunca"}`}
                     trail={
                       <button
                         type="button"
@@ -217,7 +275,9 @@ export default function IntegraHome() {
           ))}
           {portfolio.companies.length === 0 && (
             <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
-              Sin sitios. Crea uno en Sitios o configura INTEGRA_HIK_*.
+              {portfolio.mode === "platform"
+                ? "Sin sitios. Crea uno en Sitios para cada CompanyProfile cliente."
+                : "Tu empresa aún no tiene sitio Artemis. Contacta a NEXARA."}
             </p>
           )}
         </DashPanel>
@@ -229,7 +289,7 @@ export default function IntegraHome() {
             title="Módulos del sitio activo"
             subtitle={
               hidden > 0
-                ? `Host ${dash?.host || "—"} · ${hidden} ocultos (sin dispositivos de ese tipo)`
+                ? `Host ${dash?.host || "—"} · ${hidden} ocultos (sin dispositivos de ese tipo en el espejo)`
                 : `Host ${dash?.host || "—"} · fuente ${dash?.source || "—"}`
             }
           >
@@ -244,7 +304,7 @@ export default function IntegraHome() {
             ))}
             {modules.length === 0 && (
               <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
-                Sin módulos — sincroniza el sitio o configura Artemis.
+                Sin módulos — sincroniza el sitio o configura Artemis en Sitios.
               </p>
             )}
           </DashPanel>
@@ -252,8 +312,9 @@ export default function IntegraHome() {
       </DashGrid>
 
       <p style={{ marginTop: 16, fontSize: 12, color: "var(--text-tertiary)" }}>
-        Tenancy: header <code>X-Company-Id</code> + sitio activo. Clientes no-admin solo ven su
-        empresa. Capacidades derivadas del espejo Prisma (cámaras→video, puertas→ACS, etc.).
+        Tenancy: <code>X-Company-Id</code> + sitio activo. Staff NEXARA ve el portfolio completo;
+        usuarios cliente solo su empresa. Capacidades = espejo Prisma alineado a paths Artemis
+        (resource/acs/video/visitor/pms).
       </p>
     </DashPage>
   );

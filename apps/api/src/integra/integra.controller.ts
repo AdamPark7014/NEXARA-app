@@ -17,15 +17,24 @@ import {
   ArrayNotEmpty,
   IsArray,
   IsBoolean,
+  IsInt,
+  IsObject,
   IsOptional,
   IsString,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { RbacGuard } from '../common/rbac.guard';
 import { CurrentUser } from '../common/current-user.decorator';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { IntegraArtemisService } from './integra-artemis.service';
 import { IntegraSiteService } from './integra-site.service';
 import { IntegraSyncService } from './integra-sync.service';
+
+function integraCanSettings(user: { roleKey?: string; isSuperAdmin?: boolean } | null) {
+  if (!user) return false;
+  if (user.isSuperAdmin) return true;
+  return user.roleKey !== 'cliente';
+}
 
 class AddPersonDto {
   @IsString() personName!: string;
@@ -43,6 +52,10 @@ class SiteCreateDto {
   @IsString() appKey!: string;
   @IsString() appSecret!: string;
   @IsOptional() @IsBoolean() isDefault?: boolean;
+  /** Super-admin: crear sitio para otra empresa */
+  @IsOptional() @Type(() => Number) @IsInt() companyId?: number;
+  @IsOptional() @IsString() label?: string;
+  @IsOptional() @IsObject() modulesOverride?: Record<string, boolean>;
 }
 
 class SiteUpdateDto {
@@ -52,6 +65,8 @@ class SiteUpdateDto {
   @IsOptional() @IsString() appSecret?: string;
   @IsOptional() @IsBoolean() isActive?: boolean;
   @IsOptional() @IsBoolean() isDefault?: boolean;
+  @IsOptional() @IsString() label?: string;
+  @IsOptional() @IsObject() modulesOverride?: Record<string, boolean> | null;
 }
 
 class VehicleDto {
@@ -87,9 +102,12 @@ export class IntegraController {
   @Get('dashboard')
   dashboard(
     @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
     @Query('siteId') siteId?: string,
   ) {
-    return this.integra.dashboard(companyId, siteId ? parseInt(siteId, 10) : null);
+    return this.integra.dashboard(companyId, siteId ? parseInt(siteId, 10) : null, {
+      canSettings: integraCanSettings(user),
+    });
   }
 
   @Get('portfolio')
@@ -98,15 +116,22 @@ export class IntegraController {
     @CurrentCompanyId() companyId: number | null,
     @CurrentUser() user: any,
   ) {
-    return this.integra.getPortfolio(companyId, Boolean(user?.isSuperAdmin));
+    return this.integra.getPortfolio(
+      companyId,
+      Boolean(user?.isSuperAdmin),
+      integraCanSettings(user),
+    );
   }
 
   @Get('capabilities')
   capabilities(
     @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
     @Query('siteId') siteId?: string,
   ) {
-    return this.integra.capabilities(companyId, siteId ? parseInt(siteId, 10) : null);
+    return this.integra.capabilities(companyId, siteId ? parseInt(siteId, 10) : null, {
+      canSettings: integraCanSettings(user),
+    });
   }
 
   @Get('regions')
@@ -126,24 +151,45 @@ export class IntegraController {
 
   @Post('sites')
   @HttpCode(HttpStatus.CREATED)
-  createSite(@CurrentCompanyId() companyId: number | null, @Body() dto: SiteCreateDto) {
-    if (!companyId) throw new BadRequestException('companyId requerido');
-    return this.sites.create(companyId, dto);
+  createSite(
+    @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
+    @Body() dto: SiteCreateDto,
+  ) {
+    const target =
+      user?.isSuperAdmin && dto.companyId != null ? dto.companyId : companyId;
+    if (!target) throw new BadRequestException('companyId requerido');
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para administrar sitios');
+    }
+    const { companyId: _ignore, ...rest } = dto;
+    return this.sites.create(target, rest);
   }
 
   @Patch('sites/:id')
   updateSite(
     @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
     @Param('id') id: string,
     @Body() dto: SiteUpdateDto,
   ) {
     if (!companyId) throw new BadRequestException('companyId requerido');
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para administrar sitios');
+    }
     return this.sites.update(companyId, parseInt(id, 10), dto);
   }
 
   @Delete('sites/:id')
-  deleteSite(@CurrentCompanyId() companyId: number | null, @Param('id') id: string) {
+  deleteSite(
+    @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+  ) {
     if (!companyId) throw new BadRequestException('companyId requerido');
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para administrar sitios');
+    }
     return this.sites.remove(companyId, parseInt(id, 10));
   }
 

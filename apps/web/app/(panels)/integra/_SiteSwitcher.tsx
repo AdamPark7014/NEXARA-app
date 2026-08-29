@@ -15,6 +15,7 @@ type Site = {
   host: string;
   isDefault?: boolean;
   label?: string | null;
+  _count?: { cameras?: number; doors?: number };
 };
 
 export function IntegraSiteSwitcher({ onChange }: { onChange?: (id: number | null) => void }) {
@@ -42,7 +43,21 @@ export function IntegraSiteSwitcher({ onChange }: { onChange?: (id: number | nul
     void load();
   }, [load]);
 
-  if (sites.length <= 1) return null;
+  if (sites.length === 0) {
+    return (
+      <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin sitios</span>
+    );
+  }
+
+  if (sites.length === 1) {
+    const s = sites[0];
+    return (
+      <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+        {s.label || s.name}
+        {s._count ? ` · ${s._count.cameras ?? 0}cam / ${s._count.doors ?? 0}puertas` : ""}
+      </span>
+    );
+  }
 
   return (
     <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
@@ -55,11 +70,14 @@ export function IntegraSiteSwitcher({ onChange }: { onChange?: (id: number | nul
           setActiveIntegraSiteId(id);
           onChange?.(id);
         }}
-        style={{ ...inputStyle, maxWidth: 220 }}
+        style={{ ...inputStyle, maxWidth: 260 }}
       >
         {sites.map((s) => (
           <option key={s.id} value={s.id}>
             {s.label || s.name}
+            {s._count
+              ? ` (${s._count.cameras ?? 0}cam/${s._count.doors ?? 0}p)`
+              : ""}
           </option>
         ))}
       </select>
