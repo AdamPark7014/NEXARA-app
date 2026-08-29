@@ -10,8 +10,8 @@ import {
   DashGrid,
   DashCol,
 } from "@/components/dashboard/DashKit";
-import { IntegraHlsPlayer } from "./_HlsPlayer";
-import { btnGhost, btnPrimary, integraApi } from "./_lib";
+import { IntegraHlsPlayer } from "../_HlsPlayer";
+import { btnGhost, btnPrimary, integraApi } from "../_lib";
 
 type Cam = {
   id: string;
