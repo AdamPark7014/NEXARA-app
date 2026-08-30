@@ -6,35 +6,39 @@
 
 ## Hecho en este turno
 
-### NEXARA Hexa Fortify (post-Hexa)
+### NEXARA Armor Spine (post-Hexa/Fortify)
 
-**Ola A — Trust / RBAC**
-- `PanelKey` + `ROLE_EXTRA_PANELS`: `lab`/`integra` (CEO, super_admin, cliente+integra, ops roles).
-- CEO: `/lab/**` + `/api/lab/**` en url-matrix; `PANEL_LAB`/`LAB_ACCESS` en auth v2.
-- `loading.tsx` en erp/crm/ops/studio/lab/integra.
+**Ola 1 — Sesión + RBAC**
+- `POST /api/auth/session/extend`: sliding JWT + `UserSession.expiresAt` (tope 7d desde `createdAt`).
+- `UserContext`: heartbeat ~15 min + `focus`/`visibilitychange` → extend; actualiza `expiresAt`.
+- `ROLE_EXTRA_PANELS` web alineado a API; `CLIENTE_INTEGRA_MODULE_IDS` + `getAllowedModules(..., { v2Role })`.
 
-**Ola B — HCT honesty (ADR-0019)**
-- Alarms: sin Video/playback ni histórico Artemis en HCT.
-- Video: bloque playback oculto en HCT (mensaje EZUIKit).
-- Settings: toggles people/visitors/vehicles/anpr disabled en HCT.
+**Ola 2 — Integra ↔ OPS**
+- `IntegraSite.serviceClientId` cableado en list/create/update + DTOs + settings UI (select ERP).
+- `POST /api/integra/alarms/:id/ticket` (staff): resuelve sitio → `serviceClientId` → `createTicketRequest`; 400 si sin cliente.
+- Alarmas UI: API-first Ticket; fallback deep-link `/support/new` si falta cliente.
+- Evidence close-gate: no marcar `Finalizada` sin llegada + (salida|hoja); 400 con `missingEvidence`.
 
-**Ola C — Puentes**
-- NOC empty CTA → `getIntegraUrl("/settings")`.
-- Alarm→ticket: `siteId` + `clientHint`; support/new preselección por nombre.
-- Studio promote: detecta leads CRM `source=Studio` (email / contactMessageId).
-- Portal: cards Video + Accesos además de Mi seguridad.
-- Map: EmptyState sin planos.
+**Ola 3 — Observabilidad**
+- `/api/health`: checks Redis + go2rtc (`InfraHealthIndicator`); go2rtc soft-fail.
+- Integra chrome: badge `media down` si go2rtc reporta down.
+- Exports Excel: `AuditLog` action `EXPORT` (modelo, fields, rowCount).
+- Cron SLA breach cada 5 min (`ticket-alerts:sla-breach`) + notify `SLA_BREACH`.
+
+**Ola 4 — Borde**
+- Integra home SSE: reconnect exponencial (cap 60s); poll solo mientras SSE down.
+- Specs: session-extend, ROLE_EXTRA_PANELS parity, health redis key, alarm-ticket contract, evidence gate.
 
 ## A medias
 - (nada)
 
 ## No tocar
 - tickets layout (solo cards mínimas), seed-demo-users, package-lock, xlsx
-- Oficinas ACS
+- Oficinas ACS, Meta/ESP/OFX/ISAPI, PortalShell rewrite
 
 ## Siguiente paso
-1. Hard-refresh tras deploy.
-2. Smoke: CEO Lab flags write; HCT sin Playback; NOC CTA host integra; Studio refresh «En CRM».
+1. Deploy + hard-refresh.
+2. Smoke: session extend; sitio con `serviceClientId` → Ticket alarma; OT sin evidencias → 400; `/api/health` redis/go2rtc; SSE recover.
 
 ## Estado
-- Listo para cerrar + deploy.
+- Listo para cerrar + push + deploy `--force-all --with-migrate`.

@@ -1,3 +1,4 @@
+import { ServiceClientsModule } from '../service-clients/service-clients.module.js';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module.js';
@@ -10,7 +11,7 @@ import { IntegraMediaService } from './integra-media.service';
 import { IntegraPortfolioService } from './integra-portfolio.service';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, AuditModule],
+  imports: [ConfigModule, PrismaModule, AuditModule, ServiceClientsModule],
   controllers: [IntegraController],
   providers: [
     IntegraArtemisService,

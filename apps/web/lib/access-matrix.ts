@@ -22,6 +22,7 @@
  */
 
 import { ORG_ROLE_KEYS, type OrgRoleKey } from "@/lib/org-roles";
+import { ROLES, type RoleKey } from "@/lib/rbac/roles";
 
 // ─────────────────────────────────────────────────────────────────────
 // 5 PANELES CONSOLIDADOS
@@ -983,8 +984,33 @@ function joinPath(prefix: string, path: string) {
 }
 
 /** Lista de módulos a los que un rol puede entrar. */
-export function getAllowedModules(role: OrgRoleKey | null, isSuperAdmin = false): ModuleEntry[] {
+
+/** Módulos Integra de lectura visibles para rol v2 `cliente` (no mapea a OrgRoleKey). */
+export const CLIENTE_INTEGRA_MODULE_IDS: ModuleId[] = [
+  "integra-home",
+  "integra-video",
+  "integra-access",
+  "integra-people",
+  "integra-events",
+  "integra-alarms",
+  "integra-visitors",
+  "integra-vehicles",
+  "integra-anpr",
+  "integra-map",
+  "integra-notifications",
+  "integra-my-profile",
+];
+
+export function getAllowedModules(
+  role: OrgRoleKey | null,
+  isSuperAdmin = false,
+  opts?: { v2Role?: RoleKey | null },
+): ModuleEntry[] {
   if (isSuperAdmin) return Object.values(MODULES);
+  if (opts?.v2Role === ROLES.CLIENTE) {
+    const allow = new Set(CLIENTE_INTEGRA_MODULE_IDS);
+    return Object.values(MODULES).filter((m) => allow.has(m.id));
+  }
   if (!role) return [];
   return Object.values(MODULES).filter((m) => m.allowedRoles.includes(role));
 }

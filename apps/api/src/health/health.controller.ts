@@ -2,6 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { HealthCheck, HealthCheckService, MemoryHealthIndicator, DiskHealthIndicator } from '@nestjs/terminus';
 import { PrismaHealthIndicator } from './prisma.health';
+import { InfraHealthIndicator } from './infra.health';
 
 @ApiTags('system')
 @Controller('health')
@@ -11,6 +12,7 @@ export class HealthController {
     private db: PrismaHealthIndicator,
     private memory: MemoryHealthIndicator,
     private disk: DiskHealthIndicator,
+    private infra: InfraHealthIndicator,
   ) {}
 
   @Get()
@@ -21,6 +23,15 @@ export class HealthController {
       () => this.db.isHealthy('database'),
       () => this.memory.checkHeap('memory_heap', 300 * 1024 * 1024),
       () => this.disk.checkStorage('storage', { path: '/', thresholdPercent: 0.9 }),
+      () => this.infra.checkRedis('redis'),
+      async () => {
+        try {
+          return await this.infra.checkGo2rtc('go2rtc');
+        } catch (e) {
+          // go2rtc down no tumba el health general: se reporta en details
+          return (e as any)?.causes || { go2rtc: { status: 'down' } };
+        }
+      },
     ]);
   }
 

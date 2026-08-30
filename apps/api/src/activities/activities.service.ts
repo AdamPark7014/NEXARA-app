@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
@@ -673,7 +673,38 @@ export class ActivitiesService {
     });
     assertCompanyAccess(prev, companyId, 'Actividad');
 
-    const updatedActivity = await this.prisma['activity'].update({
+    
+    // Armor: gate de evidencias mínimas antes de Finalizada
+    if (updateActivityDto.estatus !== undefined) {
+      const next = String(updateActivityDto.estatus);
+      const prevStatus = String(prev?.estatus || '');
+      if (/finalizada/i.test(next) && !/finalizada/i.test(prevStatus)) {
+        const evidences = await this.prisma['evidence'].findMany({
+          where: {
+            actividadId: id,
+            ...(companyId != null ? companyWhere(companyId) : {}),
+          },
+          select: { tipoEvidencia: true },
+        });
+        const types = new Set(evidences.map((e: any) => String(e.tipoEvidencia || '')));
+        const hasEntry = [...types].some((t) => /llegada|entrada|entry/i.test(t));
+        const hasExit = [...types].some((t) => /salida|exit/i.test(t));
+        const hasSheet = [...types].some((t) => /hoja|servicio|sheet/i.test(t));
+        const missing: string[] = [];
+        if (!hasEntry) missing.push('Foto de llegada/entrada');
+        if (!hasExit && !hasSheet) missing.push('Foto de salida o Hoja de servicio');
+        if (missing.length) {
+          throw new BadRequestException({
+            statusCode: 400,
+            message: 'No se puede finalizar: faltan evidencias mínimas',
+            missingEvidence: missing,
+            error: `Faltan: ${missing.join(', ')}`,
+          });
+        }
+      }
+    }
+
+const updatedActivity = await this.prisma['activity'].update({
       where: { id },
       data: updateActivityDto,
       include: { responsable: { select: { nombre: true, id: true } } },

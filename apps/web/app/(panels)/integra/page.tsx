@@ -254,28 +254,62 @@ export default function IntegraHome() {
     void refreshEvents();
     const t = setInterval(() => void refreshTree(), 60000);
 
-    // SSE live events with poll fallback
+    // SSE con reconnect exponencial (tope 60s); poll solo mientras SSE esté caído
     let es: EventSource | null = null;
     let poll: number | null = null;
-    try {
-      const url = buildApiUrl(withSiteQuery("integra/events/stream"));
-      es = new EventSource(url, { withCredentials: true });
-      es.onmessage = (msg) => {
-        try {
-          const data = JSON.parse(msg.data);
-          if (Array.isArray(data?.items)) setEvents(data.items);
-        } catch {
-          /* ignore */
-        }
-      };
-      es.onerror = () => {
-        es?.close();
-        es = null;
-        if (!poll) poll = window.setInterval(() => void refreshEvents(), 8000);
-      };
-    } catch {
+    let retryTimer: number | null = null;
+    let backoffMs = 1000;
+    let stopped = false;
+
+    const stopPoll = () => {
+      if (poll != null) {
+        window.clearInterval(poll);
+        poll = null;
+      }
+    };
+    const startPoll = () => {
+      if (poll != null || stopped) return;
       poll = window.setInterval(() => void refreshEvents(), 8000);
-    }
+    };
+    const openSse = () => {
+      if (stopped) return;
+      try {
+        es?.close();
+        const url = buildApiUrl(withSiteQuery("integra/events/stream"));
+        es = new EventSource(url, { withCredentials: true });
+        es.onopen = () => {
+          backoffMs = 1000;
+          stopPoll();
+        };
+        es.onmessage = (msg) => {
+          try {
+            const data = JSON.parse(msg.data);
+            if (Array.isArray(data?.items)) setEvents(data.items);
+          } catch {
+            /* ignore */
+          }
+        };
+        es.onerror = () => {
+          es?.close();
+          es = null;
+          startPoll();
+          if (stopped) return;
+          if (retryTimer != null) window.clearTimeout(retryTimer);
+          const wait = backoffMs;
+          backoffMs = Math.min(backoffMs * 2, 60_000);
+          retryTimer = window.setTimeout(() => openSse(), wait);
+        };
+      } catch {
+        startPoll();
+        if (!stopped) {
+          if (retryTimer != null) window.clearTimeout(retryTimer);
+          const wait = backoffMs;
+          backoffMs = Math.min(backoffMs * 2, 60_000);
+          retryTimer = window.setTimeout(() => openSse(), wait);
+        }
+      }
+    };
+    openSse();
 
     const alarmIv = window.setInterval(async () => {
       try {
@@ -290,8 +324,10 @@ export default function IntegraHome() {
       .catch(() => undefined);
 
     return () => {
+      stopped = true;
       clearInterval(t);
-      if (poll) clearInterval(poll);
+      stopPoll();
+      if (retryTimer != null) window.clearTimeout(retryTimer);
       clearInterval(alarmIv);
       es?.close();
     };

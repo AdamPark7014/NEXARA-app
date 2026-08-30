@@ -188,7 +188,7 @@ export default function IntegraAlarmsPage() {
                     </IgBtn>
                   )}
                   <IgBtn
-                    onClick={() => {
+                    onClick={async () => {
                       const sid = getActiveIntegraSiteId();
                       const title = `Alarma Integra: ${a.title}`;
                       const description = [
@@ -202,10 +202,23 @@ export default function IntegraAlarmsPage() {
                       ]
                         .filter(Boolean)
                         .join("\n");
-                      const qs = new URLSearchParams({ title, description });
-                      if (sid) qs.set("siteId", String(sid));
-                      if (siteLabel) qs.set("clientHint", siteLabel);
-                      window.location.href = getOperacionUrl(`/support/new?${qs.toString()}`);
+                      try {
+                        const q = sid ? `?siteId=${sid}` : "";
+                        await integraApi(`integra/alarms/${encodeURIComponent(String(a.id))}/ticket${q}`, {
+                          method: "POST",
+                          body: JSON.stringify({ title, description, severity: a.severity }),
+                        });
+                      } catch (e) {
+                        const msg = e instanceof Error ? e.message : "Error";
+                        if (/cliente operativo|sin cliente|no tiene cliente/i.test(msg)) {
+                          const qs = new URLSearchParams({ title, description });
+                          if (sid) qs.set("siteId", String(sid));
+                          if (siteLabel) qs.set("clientHint", siteLabel);
+                          window.location.href = getOperacionUrl(`/support/new?${qs.toString()}`);
+                          return;
+                        }
+                        setError(msg);
+                      }
                     }}
                   >
                     Ticket

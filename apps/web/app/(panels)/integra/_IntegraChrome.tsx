@@ -60,6 +60,7 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
   const [caps, setCaps] = useState<IntegraCapabilities | null>(null);
   const [health, setHealth] = useState<HealthBrief | null>(null);
   const [dash, setDash] = useState<DashBrief | null>(null);
+  const [mediaDown, setMediaDown] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [tick, setTick] = useState(0);
 
@@ -97,11 +98,26 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
       void refreshHealth();
     });
     const unsubCaps = subscribeCapabilities((c) => setCaps(c));
+    
+    const probeMedia = async () => {
+      try {
+        const res = await fetch('/api/health', { cache: 'no-store' });
+        const json = await res.json();
+        const g = json?.info?.go2rtc || json?.error?.go2rtc || json?.details?.go2rtc;
+        setMediaDown(Boolean(g && g.status && g.status !== 'up'));
+      } catch {
+        /* ignore */
+      }
+    };
+    void probeMedia();
+    const mediaIv = setInterval(() => void probeMedia(), 60000);
+
     const iv = setInterval(() => void refreshHealth(), 30000);
     return () => {
       unsub();
       unsubCaps();
       clearInterval(iv);
+      clearInterval(mediaIv);
     };
   }, [refreshCaps, refreshHealth, tick]);
 
@@ -158,6 +174,11 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
             <span className={styles.hudHealth} data-tone={healthTone} />
             {healthLabel}
           </span>
+          {mediaDown && (
+            <span className={styles.healthPill} data-tone="warn" title="go2rtc / media">
+              media down
+            </span>
+          )}
           <IntegraSiteSwitcher
             onChange={() => {
               setTick((t) => t + 1);
