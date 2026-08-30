@@ -58,6 +58,7 @@ export type IntegraCapabilities = {
   visitors: boolean;
   alarms: boolean;
   settings: boolean;
+  canControlDoors?: boolean;
 };
 
 export type IntegraModuleCard = {

@@ -5021,6 +5021,8 @@ model CompanyProfile {
   integraVehicles           IntegraVehicle[]
   integraRegions            IntegraRegion[]
   integraSyncRuns           IntegraSyncRun[]
+  integraAlarmAcks          IntegraAlarmAck[]
+  integraFloorplans         IntegraFloorplan[]
 
   @@map("company_profile")
 }
@@ -5705,8 +5707,10 @@ model IntegraSite {
   people   IntegraPerson[]
   devices  IntegraDevice[]
   vehicles IntegraVehicle[]
-  regions  IntegraRegion[]
-  syncRuns IntegraSyncRun[]
+  regions    IntegraRegion[]
+  syncRuns   IntegraSyncRun[]
+  alarmAcks  IntegraAlarmAck[]
+  floorplans IntegraFloorplan[]
   /// Cliente operativo ERP (opcional) — no confundir con CompanyProfile
   serviceClientId Int?
   /// Override de módulos visibles: { "video": true, "anpr": false, ... }
@@ -5767,6 +5771,7 @@ model IntegraDoor {
   doorIndexCode   String   @db.VarChar(120)
   name            String   @db.VarChar(220)
   regionName      String?  @db.VarChar(220)
+  regionIndexCode String?  @db.VarChar(120)
   online          Boolean  @default(true)
   doorState       String?  @db.VarChar(40)
   raw             Json?
@@ -5778,6 +5783,70 @@ model IntegraDoor {
   @@unique([siteId, doorIndexCode])
   @@index([companyId])
   @@map("integra_doors")
+}
+
+/// Ack/clear operativo NEXARA sobre alarmas Artemis (fuente de verdad SOC local).
+model IntegraAlarmAck {
+  id               Int       @id @default(autoincrement())
+  companyId        Int
+  siteId           Int
+  externalAlarmId  String    @db.VarChar(220)
+  /// ACK | CLEARED (OPEN = sin fila)
+  status           String    @default("ACK") @db.VarChar(16)
+  note             String?   @db.Text
+  userId           Int?
+  severity         String?   @db.VarChar(40)
+  title            String?   @db.VarChar(280)
+  raw              Json?
+  ackedAt          DateTime  @default(now())
+  clearedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, externalAlarmId])
+  @@index([companyId, status])
+  @@map("integra_alarm_acks")
+}
+
+model IntegraFloorplan {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  siteId    Int
+  name      String   @db.VarChar(160)
+  /// data URL o URL pública (MVP)
+  imageData String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company CompanyProfile  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  pins    IntegraMapPin[]
+
+  @@index([siteId])
+  @@index([companyId])
+  @@map("integra_floorplans")
+}
+
+model IntegraMapPin {
+  id          Int      @id @default(autoincrement())
+  floorplanId Int
+  /// CAMERA | DOOR
+  entityType  String   @db.VarChar(16)
+  entityId    String   @db.VarChar(120)
+  label       String?  @db.VarChar(220)
+  xPct        Float
+  yPct        Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  floorplan IntegraFloorplan @relation(fields: [floorplanId], references: [id], onDelete: Cascade)
+
+  @@unique([floorplanId, entityType, entityId])
+  @@index([floorplanId])
+  @@map("integra_map_pins")
 }
 
 model IntegraPerson {

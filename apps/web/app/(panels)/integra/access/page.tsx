@@ -13,12 +13,15 @@ import {
   IgTable,
   IgToolbar,
 } from "../_Console";
+import { DoorConfirmModal } from "../_DoorConfirmModal";
+import { getCachedCapabilities, subscribeCapabilities } from "../_caps";
 import {
   DOOR_CONTROL_OPTIONS,
   DoorControlType,
   inputStyle,
   integraApi,
   selectStyle,
+  type IntegraCapabilities,
 } from "../_lib";
 import styles from "../integra.module.css";
 
@@ -49,6 +52,15 @@ export default function IntegraAccessPage() {
   const [kindFilter, setKindFilter] = useState<"ALL" | "ACS" | "ENCODE">("ALL");
   const [liveDoors, setLiveDoors] = useState(false);
   const [selectedDoor, setSelectedDoor] = useState<Door | null>(null);
+  const [confirmDoor, setConfirmDoor] = useState<Door | null>(null);
+  const [caps, setCaps] = useState<IntegraCapabilities | null>(null);
+
+  useEffect(() => {
+    setCaps(getCachedCapabilities());
+    return subscribeCapabilities(setCaps);
+  }, []);
+
+  const canControl = caps == null ? true : Boolean(caps.canControlDoors);
 
   const load = useCallback(async () => {
     setError(null);
@@ -73,13 +85,23 @@ export default function IntegraAccessPage() {
     void load();
   }, [load]);
 
-  const control = async (id: string) => {
+  const requestControl = (d: Door) => {
+    if (!canControl) {
+      setError("Sin permiso para controlar puertas");
+      return;
+    }
+    setSelectedDoor(d);
+    setConfirmDoor(d);
+  };
+
+  const control = async (id: string, reason: string) => {
     setBusy(id);
     try {
       await integraApi(`integra/doors/${encodeURIComponent(id)}/control`, {
         method: "POST",
-        body: JSON.stringify({ controlType }),
+        body: JSON.stringify({ controlType, reason }),
       });
+      setConfirmDoor(null);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
@@ -126,33 +148,55 @@ export default function IntegraAccessPage() {
         }
       />
       <IgError>{error}</IgError>
+      {!canControl && (
+        <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 8 }}>
+          Modo consulta: no puedes abrir ni cerrar puertas con esta cuenta.
+        </p>
+      )}
 
       <IgFilters>
-        <IgField label="Acción">
-          <select
-            value={controlType}
-            onChange={(e) => setControlType(e.target.value as DoorControlType)}
-            style={selectStyle}
-          >
-            {DOOR_CONTROL_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </IgField>
+        {canControl && (
+          <IgField label="Acción">
+            <select
+              value={controlType}
+              onChange={(e) => setControlType(e.target.value as DoorControlType)}
+              style={selectStyle}
+            >
+              {DOOR_CONTROL_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </IgField>
+        )}
         <IgField label="Filtrar puertas">
-          <input value={doorQ} onChange={(e) => setDoorQ(e.target.value)} style={inputStyle} placeholder="nombre / región / id" />
+          <input
+            value={doorQ}
+            onChange={(e) => setDoorQ(e.target.value)}
+            style={inputStyle}
+            placeholder="nombre / región / id"
+          />
         </IgField>
         <IgField label="Devices">
-          <select value={kindFilter} onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)} style={selectStyle}>
+          <select
+            value={kindFilter}
+            onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}
+            style={selectStyle}
+          >
             <option value="ALL">ACS + Encode</option>
             <option value="ACS">ACS</option>
             <option value="ENCODE">Encode</option>
           </select>
         </IgField>
-        {selectedDoor && (
+        {selectedDoor && canControl && (
           <IgField label="Seleccionada">
-            <IgBtn variant="primary" disabled={busy === selectedDoor.id} onClick={() => void control(selectedDoor.id)}>
-              {busy === selectedDoor.id ? "…" : `Ejecutar → ${selectedDoor.name}`}
+            <IgBtn
+              variant="primary"
+              disabled={busy === selectedDoor.id}
+              onClick={() => setConfirmDoor(selectedDoor)}
+            >
+              Ejecutar → {selectedDoor.name}
             </IgBtn>
           </IgField>
         )}
@@ -167,7 +211,7 @@ export default function IntegraAccessPage() {
             data-online={d.online === false ? "0" : "1"}
             onClick={() => {
               setSelectedDoor(d);
-              void control(d.id);
+              if (canControl) requestControl(d);
             }}
           >
             <span className={styles.doorCellName}>{d.name}</span>
@@ -180,147 +224,105 @@ export default function IntegraAccessPage() {
       </div>
 
       <IgSplit
-        leftWidth="55%"
         left={
-          <IgPanel title="Puertas" count={`${filteredDoors.length}/${doors.length}`} flush>
+          <IgPanel title="Devices">
             <IgTable
-              selectedKey={selectedDoor?.id}
-              onRowClick={(key) => setSelectedDoor(doors.find((d) => d.id === key) || null)}
               columns={[
-                { key: "n", label: "Nombre" },
-                { key: "l", label: "Región" },
-                { key: "s", label: "Estado" },
-                { key: "o", label: "Link" },
-                { key: "id", label: "IndexCode", mono: true },
-                { key: "x", label: "", width: "88px" },
+                { key: "name", label: "Nombre" },
+                { key: "kind", label: "Tipo", width: "80px" },
+                { key: "ip", label: "IP", width: "110px", mono: true },
+                { key: "on", label: "Estado", width: "70px" },
               ]}
-              rows={filteredDoors.map((d) => ({
+              rows={filteredDevices.slice(0, 40).map((d) => ({
                 key: d.id,
-                tone: d.online === false ? "warn" : "ok",
                 cells: {
-                  n: d.name,
-                  l: d.location || "—",
-                  s: d.status || String(d.doorState ?? "—"),
-                  o: (
-                    <IgBadge tone={d.online === false ? "warn" : "ok"}>
-                      {d.online === false ? "off" : "online"}
-                    </IgBadge>
-                  ),
-                  id: d.id,
-                  x: (
-                    <IgBtn
-                      variant="primary"
-                      disabled={busy === d.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void control(d.id);
-                      }}
-                    >
-                      {busy === d.id ? "…" : "Go"}
-                    </IgBtn>
-                  ),
+                  name: d.name,
+                  kind: d.kind,
+                  ip: d.ip || "—",
+                  on: d.online === false ? "off" : "online",
                 },
               }))}
-              empty="Sin puertas"
+              empty="Sin devices"
             />
           </IgPanel>
         }
         right={
-          <>
-            <IgPanel title="Privilegios" count={`${selectedPeople.length} sel`}>
-              <select
-                value={selectedGroup}
-                onChange={(e) => setSelectedGroup(e.target.value)}
-                style={{ ...selectStyle, maxWidth: "100%", marginBottom: 8 }}
-              >
-                <option value="">Grupo…</option>
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
-                ))}
-              </select>
-              <input
-                placeholder="Filtrar personas…"
-                value={personFilter}
-                onChange={(e) => setPersonFilter(e.target.value)}
-                style={{ ...inputStyle, maxWidth: "100%", marginBottom: 8 }}
-              />
-              <div style={{ maxHeight: 200, overflow: "auto", marginBottom: 8 }}>
-                {filteredPeople.map((p) => (
-                  <label key={p.id} style={{ display: "flex", gap: 6, fontSize: 12, padding: "3px 0", cursor: "pointer" }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedPeople.includes(p.id)}
-                      onChange={() =>
-                        setSelectedPeople((prev) =>
-                          prev.includes(p.id) ? prev.filter((x) => x !== p.id) : [...prev, p.id],
-                        )
-                      }
-                    />
-                    {p.name}{p.code ? ` (${p.code})` : ""}
-                  </label>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <IgBtn
-                  variant="primary"
-                  disabled={busy === "assign" || !selectedGroup || selectedPeople.length === 0}
-                  onClick={async () => {
-                    setBusy("assign");
-                    try {
-                      await integraApi(
-                        `integra/privilege-groups/${encodeURIComponent(selectedGroup)}/persons`,
-                        { method: "POST", body: JSON.stringify({ personIds: selectedPeople }) },
-                      );
-                      setSelectedPeople([]);
-                    } catch (e) {
-                      setError(e instanceof Error ? e.message : "Error");
-                    } finally {
-                      setBusy(null);
-                    }
-                  }}
+          <IgPanel title="Privilegios">
+            <IgFilters>
+              <IgField label="Grupo">
+                <select
+                  value={selectedGroup}
+                  onChange={(e) => setSelectedGroup(e.target.value)}
+                  style={selectStyle}
                 >
-                  Asignar
-                </IgBtn>
-                <IgBtn
-                  disabled={busy === "apply"}
-                  onClick={async () => {
-                    setBusy("apply");
-                    try {
-                      await integraApi("integra/privilege/apply", { method: "POST" });
-                    } catch (e) {
-                      setError(e instanceof Error ? e.message : "Error");
-                    } finally {
-                      setBusy(null);
+                  <option value="">—</option>
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </IgField>
+              <IgField label="Personas">
+                <input
+                  value={personFilter}
+                  onChange={(e) => setPersonFilter(e.target.value)}
+                  style={inputStyle}
+                />
+              </IgField>
+            </IgFilters>
+            <div style={{ maxHeight: 200, overflow: "auto", fontSize: 12 }}>
+              {filteredPeople.slice(0, 80).map((p) => (
+                <label key={p.id} style={{ display: "flex", gap: 6, marginBottom: 4 }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedPeople.includes(p.id)}
+                    onChange={(e) =>
+                      setSelectedPeople((prev) =>
+                        e.target.checked ? [...prev, p.id] : prev.filter((x) => x !== p.id),
+                      )
                     }
-                  }}
-                >
-                  Reaplicar
-                </IgBtn>
-              </div>
-            </IgPanel>
-            <IgPanel title="Devices" count={filteredDevices.length} flush>
-              <IgTable
-                columns={[
-                  { key: "n", label: "Nombre" },
-                  { key: "k", label: "Kind" },
-                  { key: "ip", label: "IP", mono: true },
-                  { key: "o", label: "Link" },
-                ]}
-                rows={filteredDevices.map((d) => ({
-                  key: `${d.kind}-${d.id}`,
-                  tone: d.online === false ? "warn" : "ok",
-                  cells: {
-                    n: d.name,
-                    k: d.kind,
-                    ip: d.ip || "—",
-                    o: <IgBadge tone={d.online === false ? "warn" : "ok"}>{d.online === false ? "off" : "on"}</IgBadge>,
-                  },
-                }))}
-                empty="Sin devices en espejo"
-              />
-            </IgPanel>
-          </>
+                  />
+                  {p.name} {p.code ? `(${p.code})` : ""}
+                </label>
+              ))}
+            </div>
+            <IgBtn
+              variant="primary"
+              disabled={!selectedGroup || selectedPeople.length === 0}
+              onClick={async () => {
+                try {
+                  await integraApi(
+                    `integra/privilege-groups/${encodeURIComponent(selectedGroup)}/persons`,
+                    {
+                      method: "POST",
+                      body: JSON.stringify({ personIds: selectedPeople }),
+                    },
+                  );
+                  setSelectedPeople([]);
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "Error");
+                }
+              }}
+            >
+              Asignar al grupo
+            </IgBtn>
+          </IgPanel>
         }
+      />
+
+      <DoorConfirmModal
+        open={Boolean(confirmDoor)}
+        doorName={confirmDoor?.name || ""}
+        doorId={confirmDoor?.id || ""}
+        controlType={controlType}
+        busy={busy === confirmDoor?.id}
+        allowTypeSelect
+        onControlTypeChange={setControlType}
+        onCancel={() => setConfirmDoor(null)}
+        onConfirm={(reason) => {
+          if (confirmDoor) void control(confirmDoor.id, reason);
+        }}
       />
     </IgPage>
   );

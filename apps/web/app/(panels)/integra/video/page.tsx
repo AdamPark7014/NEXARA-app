@@ -13,6 +13,7 @@ import {
   IgTable,
   IgToolbar,
 } from "../_Console";
+import { IntegraEzuiKitPlayer } from "../_EzuiKitPlayer";
 import { IntegraHlsPlayer } from "../_HlsPlayer";
 import {
   defaultRangeHours,
@@ -39,7 +40,10 @@ type StreamSlot = {
   rtsp: string | null;
   note?: string | null;
   provider?: string | null;
+  stream?: Record<string, unknown> | null;
 };
+
+const LAYOUT_KEY = "nexara_integra_video_layout";
 
 export default function IntegraVideoPage() {
   const [items, setItems] = useState<Cam[]>([]);
@@ -49,6 +53,12 @@ export default function IntegraVideoPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [layout, setLayout] = useState<1 | 4 | 9>(() => {
+    if (typeof window === "undefined") return 4;
+    const raw = window.localStorage.getItem(LAYOUT_KEY);
+    const n = Number(raw);
+    return n === 1 || n === 9 ? n : 4;
+  });
   const pb0 = useMemo(() => {
     const end = new Date();
     const start = new Date(end.getTime() - 60 * 60 * 1000);
@@ -105,6 +115,7 @@ export default function IntegraVideoPage() {
         rtsp: string | null;
         note?: string;
         provider?: string;
+        stream?: Record<string, unknown>;
       }>(`integra/cameras/${encodeURIComponent(cam.id)}/stream`, { method: "POST" });
       setNote(data.note || null);
       const slot: StreamSlot = {
@@ -114,11 +125,12 @@ export default function IntegraVideoPage() {
         rtsp: data.rtsp,
         note: data.note,
         provider: data.provider,
+        stream: data.stream,
       };
       setSlots((prev) => {
         if (!multi) return [slot];
         const without = prev.filter((s) => s.id !== cam.id);
-        return [...without, slot].slice(-4);
+        return [...without, slot].slice(-layout);
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error stream");
@@ -136,9 +148,24 @@ export default function IntegraVideoPage() {
     <IgPage>
       <IgToolbar
         title="Video wall"
-        meta={`${filtered.length}/${items.length} cams · wall ${slots.length}/4`}
+        meta={`${filtered.length}/${items.length} cams · wall ${slots.length}/${layout}`}
         actions={
           <>
+            <select
+              value={layout}
+              onChange={(e) => {
+                const n = Number(e.target.value) as 1 | 4 | 9;
+                setLayout(n);
+                window.localStorage.setItem(LAYOUT_KEY, String(n));
+                setSlots((prev) => prev.slice(0, n));
+              }}
+              style={{ fontSize: 12, padding: "4px 8px" }}
+              aria-label="Layout"
+            >
+              <option value={1}>1</option>
+              <option value={4}>2×2</option>
+              <option value={9}>3×3</option>
+            </select>
             <IgBtn onClick={() => setSlots([])}>Limpiar wall</IgBtn>
             <IgBtn onClick={() => void load()}>Refresh</IgBtn>
           </>
@@ -161,7 +188,13 @@ export default function IntegraVideoPage() {
       </IgFilters>
 
       {slots.length > 0 && (
-        <div className={styles.camGrid}>
+        <div
+          className={styles.camGrid}
+          style={{
+            gridTemplateColumns:
+              layout === 1 ? "1fr" : layout === 4 ? "repeat(2, 1fr)" : "repeat(3, 1fr)",
+          }}
+        >
           {slots.map((s) => (
             <div key={s.id} className={styles.camTile}>
               <div className={styles.camTileHead}>
@@ -170,7 +203,7 @@ export default function IntegraVideoPage() {
               </div>
               <div className={styles.camTileBody}>
                 {s.provider === "HCT" ? (
-                  <div style={{ color: "#94a3b8", fontSize: 12, padding: 12 }}>{s.note || "HCT"}</div>
+                  <IntegraEzuiKitPlayer stream={s.stream} cameraId={s.id} height={layout === 1 ? 420 : 200} />
                 ) : (
                   <IntegraHlsPlayer src={s.hls} />
                 )}

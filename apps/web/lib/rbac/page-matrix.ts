@@ -322,9 +322,10 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/integra/visitors',
     '/integra/vehicles',
     '/integra/anpr',
+    '/integra/map',
     '/integra/my-profile',
     '/integra/notifications-center',
-    // sin /integra/settings — sitios los administra NEXARA
+    // sin /integra/settings ni /integra/audit — sitios/bitácora los administra NEXARA
   ],
 };
 

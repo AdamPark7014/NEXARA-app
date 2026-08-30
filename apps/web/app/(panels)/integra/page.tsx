@@ -17,13 +17,19 @@ import {
   IgWorkbench,
   type IgTreeNode,
 } from "./_Console";
+import { DoorConfirmModal } from "./_DoorConfirmModal";
+import { IntegraEzuiKitPlayer } from "./_EzuiKitPlayer";
 import { IntegraHlsPlayer } from "./_HlsPlayer";
+import { getCachedCapabilities, subscribeCapabilities } from "./_caps";
 import {
   DOOR_CONTROL_OPTIONS,
   DoorControlType,
   getActiveIntegraSiteId,
   integraApi,
+  withSiteQuery,
+  type IntegraCapabilities,
 } from "./_lib";
+import { buildApiUrl } from "@/lib/api-base";
 import styles from "./integra.module.css";
 
 type Region = { id: string; name: string; parentId?: string | null };
@@ -196,8 +202,28 @@ export default function IntegraHome() {
   const [tab, setTab] = useState("doors");
   const [controlType, setControlType] = useState<DoorControlType>("2");
   const [busyDoor, setBusyDoor] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{ id: string; name: string; hls: string | null; note?: string | null } | null>(null);
+  const [confirmDoor, setConfirmDoor] = useState<Door | null>(null);
+  const [preview, setPreview] = useState<{
+    id: string;
+    name: string;
+    hls: string | null;
+    note?: string | null;
+    stream?: Record<string, unknown> | null;
+    provider?: string | null;
+  } | null>(null);
   const [busyCam, setBusyCam] = useState(false);
+  const [liveSlots, setLiveSlots] = useState<
+    Array<{ id: string; name: string; hls: string | null; stream?: Record<string, unknown> | null; provider?: string }>
+  >([]);
+  const [openAlarms, setOpenAlarms] = useState(0);
+  const [caps, setCaps] = useState<IntegraCapabilities | null>(null);
+
+  useEffect(() => {
+    setCaps(getCachedCapabilities());
+    return subscribeCapabilities(setCaps);
+  }, []);
+
+  const canControl = caps == null ? !isClient : Boolean(caps.canControlDoors);
 
   const refreshTree = useCallback(async () => {
     try {
@@ -225,10 +251,47 @@ export default function IntegraHome() {
     void refreshTree();
     void refreshEvents();
     const t = setInterval(() => void refreshTree(), 60000);
-    const e = setInterval(() => void refreshEvents(), 8000);
+
+    // SSE live events with poll fallback
+    let es: EventSource | null = null;
+    let poll: number | null = null;
+    try {
+      const url = buildApiUrl(withSiteQuery("integra/events/stream"));
+      es = new EventSource(url, { withCredentials: true });
+      es.onmessage = (msg) => {
+        try {
+          const data = JSON.parse(msg.data);
+          if (Array.isArray(data?.items)) setEvents(data.items);
+        } catch {
+          /* ignore */
+        }
+      };
+      es.onerror = () => {
+        es?.close();
+        es = null;
+        if (!poll) poll = window.setInterval(() => void refreshEvents(), 8000);
+      };
+    } catch {
+      poll = window.setInterval(() => void refreshEvents(), 8000);
+    }
+
+    const alarmIv = window.setInterval(async () => {
+      try {
+        const q = await integraApi<{ openCount: number }>("integra/alarms/queue?hours=24");
+        setOpenAlarms(q.openCount ?? 0);
+      } catch {
+        /* ignore */
+      }
+    }, 10000);
+    void integraApi<{ openCount: number }>("integra/alarms/queue?hours=24")
+      .then((q) => setOpenAlarms(q.openCount ?? 0))
+      .catch(() => undefined);
+
     return () => {
       clearInterval(t);
-      clearInterval(e);
+      if (poll) clearInterval(poll);
+      clearInterval(alarmIv);
+      es?.close();
     };
   }, [refreshTree, refreshEvents]);
 
@@ -260,14 +323,15 @@ export default function IntegraHome() {
     }
   };
 
-  const controlDoor = async (id: string) => {
+  const controlDoor = async (id: string, reason: string) => {
     setBusyDoor(id);
     setError(null);
     try {
       await integraApi(`integra/doors/${encodeURIComponent(id)}/control`, {
         method: "POST",
-        body: JSON.stringify({ controlType }),
+        body: JSON.stringify({ controlType, reason }),
       });
+      setConfirmDoor(null);
       await refreshTree();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error puerta");
@@ -276,16 +340,33 @@ export default function IntegraHome() {
     }
   };
 
+  const requestDoorControl = (d: Door) => {
+    if (!canControl) {
+      setError("Sin permiso para controlar puertas");
+      return;
+    }
+    setConfirmDoor(d);
+  };
+
   const playCam = async (id: string) => {
     const cam = tree?.cameras.find((c) => c.id === id);
     setBusyCam(true);
     setError(null);
     try {
-      const data = await integraApi<{ hls: string | null; note?: string }>(
-        `integra/cameras/${encodeURIComponent(id)}/stream`,
-        { method: "POST" },
-      );
-      setPreview({ id, name: cam?.name || id, hls: data.hls, note: data.note });
+      const data = await integraApi<{
+        hls: string | null;
+        note?: string;
+        stream?: Record<string, unknown>;
+        provider?: string;
+      }>(`integra/cameras/${encodeURIComponent(id)}/stream`, { method: "POST" });
+      setPreview({
+        id,
+        name: cam?.name || id,
+        hls: data.hls,
+        note: data.note,
+        stream: data.stream,
+        provider: data.provider,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Stream");
       setPreview(null);
@@ -293,6 +374,39 @@ export default function IntegraHome() {
       setBusyCam(false);
     }
   };
+
+  const loadLiveWall = useCallback(async () => {
+    const cams = (tree?.cameras || []).slice(0, 4);
+    if (!cams.length) {
+      setLiveSlots([]);
+      return;
+    }
+    const slots = await Promise.all(
+      cams.map(async (c) => {
+        try {
+          const data = await integraApi<{
+            hls: string | null;
+            stream?: Record<string, unknown>;
+            provider?: string;
+          }>(`integra/cameras/${encodeURIComponent(c.id)}/stream`, { method: "POST" });
+          return {
+            id: c.id,
+            name: c.name,
+            hls: data.hls,
+            stream: data.stream,
+            provider: data.provider,
+          };
+        } catch {
+          return { id: c.id, name: c.name, hls: null };
+        }
+      }),
+    );
+    setLiveSlots(slots);
+  }, [tree?.cameras]);
+
+  useEffect(() => {
+    if (tab === "video") void loadLiveWall();
+  }, [tab, loadLiveWall]);
 
   const fmtTime = (iso?: string) => {
     if (!iso) return "—";
@@ -455,7 +569,7 @@ export default function IntegraHome() {
             active={tab}
             onTab={setTab}
             actions={
-              tab === "doors" ? (
+              tab === "doors" && canControl ? (
                 <select
                   value={controlType}
                   onChange={(e) => setControlType(e.target.value as DoorControlType)}
@@ -468,6 +582,8 @@ export default function IntegraHome() {
                     </option>
                   ))}
                 </select>
+              ) : tab === "video" ? (
+                <IgBtn onClick={() => router.push("/integra/video")}>Abrir muro</IgBtn>
               ) : undefined
             }
           >
@@ -480,7 +596,13 @@ export default function IntegraHome() {
                     className={styles.doorCell}
                     data-online={d.online === false ? "0" : "1"}
                     disabled={busyDoor === d.id}
-                    onClick={() => void controlDoor(d.id)}
+                    onClick={() => {
+                      if (canControl) requestDoorControl(d);
+                      else {
+                        setSel({ kind: "door", id: d.id });
+                        setTab("focus");
+                      }
+                    }}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       setSel({ kind: "door", id: d.id });
@@ -503,22 +625,36 @@ export default function IntegraHome() {
 
             {tab === "video" && (
               <div className={styles.camGridDense}>
-                {wallCams.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className={styles.doorCell}
-                    onClick={() => {
-                      setSel({ kind: "camera", id: c.id });
-                      setTab("focus");
-                      void playCam(c.id);
-                    }}
-                  >
-                    <span className={styles.doorCellName}>{c.name}</span>
-                    <span className={styles.doorCellMeta}>{c.region || c.id}</span>
-                    <IgBadge tone="accent">Live</IgBadge>
-                  </button>
-                ))}
+                {(liveSlots.length ? liveSlots : wallCams.slice(0, 4).map((c) => ({ id: c.id, name: c.name, hls: null }))).map(
+                  (c) => (
+                    <div key={c.id} className={styles.camTile} style={{ minHeight: 120 }}>
+                      <div className={styles.camTileHead}>
+                        <button
+                          type="button"
+                          style={{ background: "none", border: 0, color: "inherit", cursor: "pointer", padding: 0 }}
+                          onClick={() => {
+                            setSel({ kind: "camera", id: c.id });
+                            setTab("focus");
+                            void playCam(c.id);
+                          }}
+                        >
+                          {c.name}
+                        </button>
+                      </div>
+                      <div className={styles.camTileBody}>
+                        {"provider" in c && c.provider === "HCT" && "stream" in c && c.stream ? (
+                          <IntegraEzuiKitPlayer stream={c.stream as any} cameraId={c.id} height={140} />
+                        ) : c.hls ? (
+                          <IntegraHlsPlayer src={c.hls} />
+                        ) : (
+                          <p className={styles.igEmpty} style={{ fontSize: 11 }}>
+                            Cargando…
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ),
+                )}
                 {wallCams.length === 0 && (
                   <p className={styles.igEmpty}>Sin cámaras en el espejo</p>
                 )}
@@ -531,26 +667,30 @@ export default function IntegraHome() {
                   <div className={styles.doorCell} style={{ maxWidth: 360 }}>
                     <span className={styles.doorCellName}>{focusDoor.name}</span>
                     <span className={styles.doorCellMeta}>{focusDoor.location || focusDoor.id}</span>
-                    <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                      <IgBtn
-                        variant="primary"
-                        disabled={busyDoor === focusDoor.id}
-                        onClick={() => void controlDoor(focusDoor.id)}
-                      >
-                        {busyDoor === focusDoor.id ? "…" : DOOR_CONTROL_OPTIONS.find((o) => o.value === controlType)?.label || "Abrir"}
-                      </IgBtn>
-                      <select
-                        value={controlType}
-                        onChange={(e) => setControlType(e.target.value as DoorControlType)}
-                        style={{ fontSize: 11 }}
-                      >
-                        {DOOR_CONTROL_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>
-                            {o.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    {canControl && (
+                      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                        <IgBtn
+                          variant="primary"
+                          disabled={busyDoor === focusDoor.id}
+                          onClick={() => requestDoorControl(focusDoor)}
+                        >
+                          {busyDoor === focusDoor.id
+                            ? "…"
+                            : DOOR_CONTROL_OPTIONS.find((o) => o.value === controlType)?.label || "Abrir"}
+                        </IgBtn>
+                        <select
+                          value={controlType}
+                          onChange={(e) => setControlType(e.target.value as DoorControlType)}
+                          style={{ fontSize: 11 }}
+                        >
+                          {DOOR_CONTROL_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 )}
                 {(focusCam || preview) && (
@@ -560,7 +700,9 @@ export default function IntegraHome() {
                       {busyCam && <span>…</span>}
                     </div>
                     <div className={styles.camTileBody}>
-                      {preview?.hls ? (
+                      {preview?.provider === "HCT" && preview.stream ? (
+                        <IntegraEzuiKitPlayer stream={preview.stream} cameraId={preview.id} />
+                      ) : preview?.hls ? (
                         <IntegraHlsPlayer src={preview.hls} />
                       ) : (
                         <p className={styles.igEmpty}>
@@ -579,8 +721,15 @@ export default function IntegraHome() {
         }
         feed={
           <IgFeed
-            title="Eventos en vivo"
-            actions={<IgBtn onClick={() => void refreshEvents()}>↻</IgBtn>}
+            title={openAlarms > 0 ? `Eventos · ${openAlarms} alarmas` : "Eventos en vivo"}
+            actions={
+              <>
+                {openAlarms > 0 && (
+                  <IgBtn onClick={() => router.push("/integra/alarms")}>Alarmas</IgBtn>
+                )}
+                <IgBtn onClick={() => void refreshEvents()}>↻</IgBtn>
+              </>
+            }
             items={events.map((e) => ({
               id: e.id || `${e.timestamp}-${e.doorName}-${e.personName}`,
               time: fmtTime(e.timestamp),
@@ -589,7 +738,9 @@ export default function IntegraHome() {
             }))}
             empty="Sin eventos recientes"
             onItemClick={(id) => {
-              const ev = events.find((e) => (e.id || `${e.timestamp}-${e.doorName}-${e.personName}`) === id);
+              const ev = events.find(
+                (e) => (e.id || `${e.timestamp}-${e.doorName}-${e.personName}`) === id,
+              );
               if (ev?.doorId) {
                 setSel({ kind: "door", id: ev.doorId });
                 setTab("focus");
@@ -599,6 +750,20 @@ export default function IntegraHome() {
         }
       />
       </div>
+
+      <DoorConfirmModal
+        open={Boolean(confirmDoor)}
+        doorName={confirmDoor?.name || ""}
+        doorId={confirmDoor?.id || ""}
+        controlType={controlType}
+        busy={busyDoor === confirmDoor?.id}
+        allowTypeSelect
+        onControlTypeChange={setControlType}
+        onCancel={() => setConfirmDoor(null)}
+        onConfirm={(reason) => {
+          if (confirmDoor) void controlDoor(confirmDoor.id, reason);
+        }}
+      />
     </div>
   );
 }

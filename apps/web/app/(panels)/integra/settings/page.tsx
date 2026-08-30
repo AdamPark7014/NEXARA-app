@@ -48,6 +48,13 @@ export default function IntegraSettingsPage() {
   const [sites, setSites] = useState<Site[]>([]);
   const [name, setName] = useState("");
   const [label, setLabel] = useState("");
+  const [lastSyncRun, setLastSyncRun] = useState<{
+    status?: string;
+    error?: string | null;
+    finishedAt?: string | null;
+    cameras?: number;
+    doors?: number;
+  } | null>(null);
   const [host, setHost] = useState("");
   const [appKey, setAppKey] = useState("");
   const [appSecret, setAppSecret] = useState("");
@@ -71,6 +78,16 @@ export default function IntegraSettingsPage() {
     const active = getActiveCompanyId();
     if (active) setTargetCompanyId(String(active));
   }, [load]);
+
+  useEffect(() => {
+    if (!selected) {
+      setLastSyncRun(null);
+      return;
+    }
+    void integraApi<typeof lastSyncRun>(`integra/sync/last?siteId=${selected.id}`)
+      .then((r) => setLastSyncRun(r))
+      .catch(() => setLastSyncRun(null));
+  }, [selected]);
 
   const fmt = (iso?: string | null) =>
     iso ? new Date(iso).toLocaleString("es-MX", { hour12: false }) : "Nunca";
@@ -195,6 +212,7 @@ export default function IntegraSettingsPage() {
                             try {
                               await integraApi(`integra/sync?siteId=${s.id}`, { method: "POST" });
                               await load();
+                              setSelected(s);
                             } catch (err) {
                               setError(err instanceof Error ? err.message : "Sync");
                             } finally {
@@ -225,6 +243,16 @@ export default function IntegraSettingsPage() {
               }))}
               empty="Aún no hay sitios. Usa el formulario a la derecha."
             />
+            {selected && lastSyncRun && (
+              <p style={{ fontSize: 12, padding: "8px 12px", color: "var(--text-secondary)" }}>
+                Último sync run: <strong>{lastSyncRun.status || "—"}</strong>
+                {lastSyncRun.finishedAt ? ` · ${fmt(lastSyncRun.finishedAt)}` : ""}
+                {` · ${lastSyncRun.cameras ?? 0} cam / ${lastSyncRun.doors ?? 0} pta`}
+                {lastSyncRun.error ? (
+                  <span style={{ color: "#b91c1c", display: "block" }}>{lastSyncRun.error}</span>
+                ) : null}
+              </p>
+            )}
           </IgPanel>
         }
         right={

@@ -326,6 +326,10 @@ export class HikCentralArtemisClient {
     return this.post('/artemis/api/visitor/v1/appointment/registration', body);
   }
 
+  visitorAppointmentRecords(body: Record<string, unknown>) {
+    return this.post('/artemis/api/visitor/v1/appointment/records', body);
+  }
+
   anprCrossRecords(body: Record<string, unknown>) {
     return this.post('/artemis/api/pms/v1/crossRecords/page', body);
   }
