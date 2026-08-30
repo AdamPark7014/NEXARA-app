@@ -239,7 +239,9 @@ export type ModuleId =
   | "integra-alarms"
   | "integra-visitors"
   | "integra-anpr"
-  | "integra-settings";
+  | "integra-settings"
+  | "integra-my-profile"
+  | "integra-notifications";
 
 export type ModuleEntry = {
   id: ModuleId;
@@ -929,6 +931,18 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     label: "Sitios", description: "Conexiones HikCentral / Hik-Connect y sync",
     icon: "⚙️", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.DIRECTOR_ADMIN],
     group: "Administración", visible: true,
+  },
+  "integra-notifications": {
+    id: "integra-notifications", panel: PANELS.INTEGRA, path: "/notifications-center",
+    label: "Notificaciones", description: "Alertas y avisos",
+    icon: "🔔", allowedRoles: ANY_INTERNAL,
+    group: "Mi cuenta", visible: true,
+  },
+  "integra-my-profile": {
+    id: "integra-my-profile", panel: PANELS.INTEGRA, path: "/my-profile",
+    label: "Mi perfil", description: "Cuenta y preferencias",
+    icon: "👤", allowedRoles: ANY_INTERNAL,
+    group: "Mi cuenta", visible: true,
   },
 };
 

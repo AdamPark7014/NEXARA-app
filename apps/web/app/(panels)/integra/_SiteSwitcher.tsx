@@ -5,9 +5,8 @@ import {
   getActiveIntegraSiteId,
   setActiveIntegraSiteId,
   integraApi,
-  btnGhost,
-  inputStyle,
 } from "./_lib";
+import styles from "./integra.module.css";
 
 type Site = {
   id: number;
@@ -15,6 +14,7 @@ type Site = {
   host: string;
   isDefault?: boolean;
   label?: string | null;
+  provider?: string;
   _count?: { cameras?: number; doors?: number };
 };
 
@@ -44,27 +44,32 @@ export function IntegraSiteSwitcher({ onChange }: { onChange?: (id: number | nul
   }, [load]);
 
   if (sites.length === 0) {
-    return (
-      <span style={{ fontSize: 12, color: "#5b6b7c", fontWeight: 600 }}>Sin sitios</span>
-    );
+    return <span className={styles.siteMuted}>Sin sitios configurados</span>;
   }
 
-  if (sites.length === 1) {
-    const s = sites[0];
+  const current = sites.find((s) => s.id === active) || sites[0];
+  const inv =
+    current?._count != null
+      ? `${current._count.cameras ?? 0} cam · ${current._count.doors ?? 0} pta`
+      : null;
+
+  if (sites.length === 1 && current) {
     return (
-      <span style={{ fontSize: 12, color: "#243247", fontWeight: 650 }}>
-        {s.label || s.name}
-        {s._count ? ` · ${s._count.cameras ?? 0}cam / ${s._count.doors ?? 0}p` : ""}
-      </span>
+      <div className={styles.siteChip} title={current.host}>
+        <span className={styles.siteChipName}>{current.label || current.name}</span>
+        {inv && <span className={styles.siteChipMeta}>{inv}</span>}
+      </div>
     );
   }
 
   return (
-    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-      <span style={{ color: "#5b6b7c", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontSize: 10 }}>
+    <div className={styles.siteSwitcher}>
+      <label className={styles.siteSwitcherLabel} htmlFor="integra-site-select">
         Sitio
-      </span>
+      </label>
       <select
+        id="integra-site-select"
+        className={styles.siteSelect}
         value={active ?? ""}
         onChange={(e) => {
           const id = e.target.value ? Number(e.target.value) : null;
@@ -72,18 +77,23 @@ export function IntegraSiteSwitcher({ onChange }: { onChange?: (id: number | nul
           setActiveIntegraSiteId(id);
           onChange?.(id);
         }}
-        style={{ ...inputStyle, maxWidth: 260 }}
       >
         {sites.map((s) => (
           <option key={s.id} value={s.id}>
             {s.label || s.name}
-            {s._count ? ` (${s._count.cameras ?? 0}c/${s._count.doors ?? 0}p)` : ""}
+            {s._count ? ` · ${s._count.cameras ?? 0}c/${s._count.doors ?? 0}p` : ""}
           </option>
         ))}
       </select>
-      <button type="button" style={btnGhost} onClick={() => void load()} aria-label="Recargar sitios">
+      <button
+        type="button"
+        className={styles.siteReload}
+        onClick={() => void load()}
+        aria-label="Recargar sitios"
+        title="Recargar"
+      >
         ↻
       </button>
-    </label>
+    </div>
   );
 }

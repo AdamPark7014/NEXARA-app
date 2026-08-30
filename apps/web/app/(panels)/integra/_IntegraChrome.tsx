@@ -6,6 +6,7 @@ import { subscribeActiveCompany } from "@/lib/tenant";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac/roles";
+import Button from "@/components/ui/Button";
 import {
   integraApi,
   type IntegraCapabilities,
@@ -36,6 +37,14 @@ type HealthBrief = {
   connected?: boolean;
   configured?: boolean;
   provider?: string;
+  host?: string | null;
+};
+
+type DashBrief = {
+  cameras?: number;
+  doors?: number;
+  doorsOnline?: number;
+  people?: number;
 };
 
 /** Barra de contexto del sitio — la nav vive en AppShell (como CRM/ERP). */
@@ -46,6 +55,7 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
   const isClient = resolveV2RoleKey(user) === ROLES.CLIENTE;
   const [caps, setCaps] = useState<IntegraCapabilities | null>(null);
   const [health, setHealth] = useState<HealthBrief | null>(null);
+  const [dash, setDash] = useState<DashBrief | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [tick, setTick] = useState(0);
 
@@ -61,8 +71,12 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
 
   const refreshHealth = useCallback(async () => {
     try {
-      const h = await integraApi<HealthBrief>("integra/health");
+      const [h, d] = await Promise.all([
+        integraApi<HealthBrief>("integra/health"),
+        integraApi<DashBrief>("integra/dashboard").catch(() => null),
+      ]);
       setHealth(h);
+      if (d) setDash(d);
     } catch {
       setHealth(null);
     }
@@ -91,8 +105,6 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
     const clean = pathname.replace(/\/$/, "") || "/integra";
     const moduleId = PATH_TO_MODULE[clean];
     if (!moduleId || moduleId === "integra-home") return;
-    // Solo redirige si el módulo está explícitamente apagado (override / sin permiso settings).
-    // Sin inventario el menú sigue visible para que el staff explore.
     if (isClient && !moduleAllowedByCaps(moduleId, caps)) {
       router.replace("/integra");
     }
@@ -103,6 +115,7 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
     try {
       await integraApi("integra/sync", { method: "POST" });
       await refreshHealth();
+      await refreshCaps();
       setTick((t) => t + 1);
     } catch {
       /* página muestra error */
@@ -114,23 +127,27 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
   const healthTone =
     health?.connected === true ? "ok" : health?.configured ? "warn" : "off";
   const healthLabel = health?.connected
-    ? `En línea · ${health.provider === "HCT" ? "Hik-Connect" : "HikCentral"}`
+    ? health.provider === "HCT"
+      ? "Hik-Connect"
+      : "HikCentral"
     : health?.configured
-      ? "Sitio sin enlace"
+      ? "Sin enlace"
       : isClient
-        ? "Pendiente de activación"
+        ? "Pendiente"
         : "Sin sitio";
+
+  const showKpis = Boolean(
+    dash && ((dash.cameras ?? 0) > 0 || (dash.doors ?? 0) > 0 || (dash.people ?? 0) > 0),
+  );
 
   return (
     <div className={styles.shell} data-client={isClient ? "1" : undefined}>
       <div className={styles.contextBar}>
         <div className={styles.contextLeft}>
-          <span
-            className={styles.hudHealth}
-            data-tone={healthTone}
-            title={healthLabel}
-          />
-          <span className={styles.contextLabel}>{healthLabel}</span>
+          <span className={styles.healthPill} data-tone={healthTone}>
+            <span className={styles.hudHealth} data-tone={healthTone} />
+            {healthLabel}
+          </span>
           <IntegraSiteSwitcher
             onChange={() => {
               setTick((t) => t + 1);
@@ -138,17 +155,36 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
               void refreshHealth();
             }}
           />
+          {showKpis && (
+            <div className={styles.contextKpis} aria-label="Resumen del sitio">
+              <span className={styles.kpiChip}>
+                <strong>{dash?.cameras ?? 0}</strong> cam
+              </span>
+              <span className={styles.kpiChip}>
+                <strong>
+                  {dash?.doorsOnline != null
+                    ? `${dash.doorsOnline}/${dash.doors ?? 0}`
+                    : dash?.doors ?? 0}
+                </strong>{" "}
+                pta
+              </span>
+              <span className={styles.kpiChip}>
+                <strong>{dash?.people ?? 0}</strong> pers
+              </span>
+            </div>
+          )}
         </div>
         <div className={styles.contextRight}>
           {!isClient && caps?.settings !== false && (
-            <button
-              type="button"
-              className={styles.hudChip}
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={syncing}
               disabled={syncing}
               onClick={() => void syncNow()}
             >
               {syncing ? "Sincronizando…" : "Sincronizar"}
-            </button>
+            </Button>
           )}
         </div>
       </div>
