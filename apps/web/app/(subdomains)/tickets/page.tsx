@@ -15,6 +15,7 @@ import { isCapacitorNative } from "@/lib/capacitor-env";
 import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 import styles from "./tickets.module.css";
 import { createRealtimeSocket } from '@/lib/realtime-socket';
+import { getIntegraUrl } from "@/lib/panel-urls";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
@@ -981,6 +982,16 @@ export default function ClientTicketsPage() {
 
           {activeTab === "tickets" && (
             <div className={styles.sectionStack}>
+              <a
+                href={getIntegraUrl("/")}
+                className={`card ${styles.cardSoft}`}
+                style={{ textDecoration: "none", color: "inherit", display: "block" }}
+              >
+                <p className={styles.sectionTitle} style={{ marginBottom: 4 }}>Mi seguridad</p>
+                <p className={styles.mutedText} style={{ margin: 0 }}>
+                  Cámaras, accesos y estado del sitio en Integra →
+                </p>
+              </a>
               {pendingFeedback.length > 0 && (
                 <div className={`card ${styles.cardPanel}`}>
                   <div>

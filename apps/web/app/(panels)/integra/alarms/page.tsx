@@ -19,6 +19,7 @@ import {
   toDatetimeLocalValue,
 } from "../_lib";
 import { PlaybackJumpModal } from "../_PlaybackJumpModal";
+import { getOperacionUrl } from "@/lib/panel-urls";
 
 type AlarmItem = {
   id: string;
@@ -135,7 +136,7 @@ export default function IntegraAlarmsPage() {
             { key: "src", label: "Origen" },
             { key: "time", label: "Hora", width: "140px" },
             { key: "status", label: "Estado", width: "90px" },
-            { key: "act", label: "", width: "180px" },
+            { key: "act", label: "", width: "240px" },
           ]}
           rows={filtered.map((a) => ({
             key: a.id,
@@ -167,6 +168,24 @@ export default function IntegraAlarmsPage() {
                       Video
                     </IgBtn>
                   )}
+                  <IgBtn
+                    onClick={() => {
+                      const title = `Alarma Integra: ${a.title}`;
+                      const description = [
+                        `Severidad: ${a.severity}`,
+                        a.srcName ? `Origen: ${a.srcName}` : null,
+                        a.timestamp ? `Hora: ${a.timestamp}` : null,
+                        a.note ? `Nota: ${a.note}` : null,
+                        `alarmId=${a.id}`,
+                      ]
+                        .filter(Boolean)
+                        .join("\n");
+                      const qs = new URLSearchParams({ title, description });
+                      window.location.href = getOperacionUrl(`/support/new?${qs.toString()}`);
+                    }}
+                  >
+                    Ticket
+                  </IgBtn>
                 </div>
               ),
             },

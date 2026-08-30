@@ -232,7 +232,13 @@ export default function LeadsPage() {
         </div>
       ),
     },
-    { key: "source", label: "Fuente", render: (l) => <Tag variant="neutral">{l.source ?? "—"}</Tag>, width: 100 },
+    { key: "source", label: "Fuente", render: (l) => {
+      const src = (l.source ?? "").trim();
+      const fromStudio = /^studio$/i.test(src) || /origen\s*studio/i.test(src);
+      return fromStudio
+        ? <Tag variant="accent">origen Studio</Tag>
+        : <Tag variant="neutral">{src || "—"}</Tag>;
+    }, width: 120 },
     {
       key: "score",
       label: "Score",

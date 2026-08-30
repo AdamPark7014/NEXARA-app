@@ -374,6 +374,7 @@ export function shouldShowModuleInSidebar(
       return DESIGN_TEAM.has(v2) || EXECUTIVE.has(v2) || SALES_MANAGERS.has(v2);
     case 'lab-home':
     case 'lab-ai':
+    case 'lab-flags':
     case 'lab-health':
       return EXECUTIVE.has(v2) || v2 === ROLES.SUPER_ADMIN;
     default:
@@ -588,8 +589,12 @@ export function adaptModulePresentation(
     return { ...module, label: cfg.title, description: cfg.subtitle };
   }
 
-  if (module.id === 'lab-home' || module.id === 'lab-ai' || module.id === 'lab-health') {
-    const labKey = module.id === 'lab-home' ? 'home' : module.id === 'lab-ai' ? 'ai' : 'health';
+  if (module.id === 'lab-home' || module.id === 'lab-ai' || module.id === 'lab-flags' || module.id === 'lab-health') {
+    const labKey =
+      module.id === 'lab-home' ? 'home'
+      : module.id === 'lab-ai' ? 'ai'
+      : module.id === 'lab-flags' ? 'flags'
+      : 'health';
     const cfg = getLabSectionConfig(user, labKey);
     return { ...module, label: cfg.title, description: cfg.subtitle };
   }
@@ -2035,7 +2040,7 @@ export function getBiSectionConfig(user: UserAccessInput | null | undefined): Se
 
 // ─── LAB · sandbox ─────────────────────────────────────────────────────────
 
-type LabModule = 'home' | 'ai' | 'health';
+type LabModule = 'home' | 'ai' | 'flags' | 'health';
 
 const LAB_COPY: Record<LabModule, { title: string; subtitle: string }> = {
   home: {
@@ -2045,6 +2050,10 @@ const LAB_COPY: Record<LabModule, { title: string; subtitle: string }> = {
   ai: {
     title: 'Prompt Playground',
     subtitle: 'Prueba modelos de IA contra el motor de NEXARA — resultados no persistidos en DB.',
+  },
+  flags: {
+    title: 'Feature flags',
+    subtitle: 'Activa o desactiva capacidades de Lab y plataforma sin redeploy.',
   },
   health: {
     title: 'Health API',

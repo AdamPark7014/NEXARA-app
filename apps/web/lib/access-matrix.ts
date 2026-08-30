@@ -225,6 +225,7 @@ export type ModuleId =
   // LAB
   | "lab-home"
   | "lab-ai"
+  | "lab-flags"
   | "lab-health"
   | "lab-chat"
   // Facilities (oficinas NEXARA, vive en ERP)
@@ -852,6 +853,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "lab-ai", panel: PANELS.LAB, path: "/ai",
     label: "AI sandbox", description: "Pruebas de modelos y prompts",
     icon: "🤖", allowedRoles: [R.CEO],
+    group: "Lab", visible: true,
+  },
+  "lab-flags": {
+    id: "lab-flags", panel: PANELS.LAB, path: "/flags",
+    label: "Feature flags", description: "Consola ops de flags de plataforma",
+    icon: "🚩", allowedRoles: [R.CEO],
     group: "Lab", visible: true,
   },
   "lab-health": {

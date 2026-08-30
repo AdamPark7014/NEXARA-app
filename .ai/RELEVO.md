@@ -6,36 +6,34 @@
 
 ## Hecho en este turno
 
-### Integra Professional SOC (olas A+B+C)
+### NEXARA Hexa Hardening (olas 1–3)
 
-**Ola A — Trust**
-- Door control: motivo obligatorio + modal confirm (Ops + Accesos); API `reason` en audit.
-- `canControlDoors` en capabilities (cliente = false).
-- `IntegraAlarmAck` + cola `GET alarms/queue` + ack/clear; UI Alarmas SOC.
-- Página `/integra/audit`; módulos Plano + Auditoría en matrix.
-- Cliente: page-matrix sin settings/audit; mapa permitido.
+**Ola 1 — Espina**
+- `error.tsx` en crm/ops/studio/lab/integra (mismo patrón ERP).
+- Integra HCT: caps hide people/visitors/vehicles/anpr; chrome redirect + AppShell filter.
+- NOC: sin inventario sintético; EmptyState + CTA `/integra/settings`.
 
-**Ola B — Live**
-- SSE `GET integra/events/stream` (poll bridge 4s).
-- `IntegraDoor.regionIndexCode` + sync drain/prune; tree por código.
-- PlaybackJump ±30s; video wall layouts 1/4/9; tiles live en Ops.
+**Ola 2 — ROI paneles**
+- ERP `/exports`: packs facturas/clientes/leads/oportunidades/proyectos/crm-activities.
+- Studio leads → `POST ventas/leads` (source=Studio); CRM badge «origen Studio».
+- Redirects `evidencias`→`evidences`, `viaticos`→`viatics`.
+- Lab `/lab/flags` + access-matrix CEO.
 
-**Ola C — Context**
-- Floorplans + pins (`/integra/map`).
-- EZUIKit player HCT.
-- Visitors inbox (`visitors/search`).
-- Settings muestra último SyncRun + error.
+**Ola 3 — Cliente / puente**
+- Alarmas Integra → CTA Ticket → `/ops/support/new` (prefill + create ticket-request).
+- Integra CLIENTE: cards tickets/video/accesos.
+- Portal tickets: card «Mi seguridad» → Integra (`getIntegraUrl`).
 
 ## A medias
-- Deploy prod pendiente en este cierre.
+- (nada)
 
 ## No tocar
-- tickets layout, seed-demo-users, package-lock, xlsx
+- tickets layout (solo card mínima en home), seed-demo-users, package-lock, xlsx
 - Oficinas ACS
 
 ## Siguiente paso
 1. Deploy `--force-all` + hard-refresh.
-2. Validar Artemis alarm IDs estables y EZUIKit allowlist en `integra.nexara.com.mx`.
+2. Smoke: Lab flags CEO; NOC vacío; HCT sin Personas; Studio→CRM; alarm→ticket.
 
 ## Estado
 - Listo para cerrar + deploy.

@@ -31,6 +31,8 @@ import {
 } from "./_lib";
 import { buildApiUrl } from "@/lib/api-base";
 import styles from "./integra.module.css";
+import { getTicketsUrl } from "@/lib/panel-urls";
+import Link from "next/link";
 
 type Region = { id: string; name: string; parentId?: string | null };
 type Door = {
@@ -540,6 +542,66 @@ export default function IntegraHome() {
           )}
         </div>
       </header>
+
+      {isClient && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <a
+            href={getTicketsUrl("/")}
+            style={{
+              textDecoration: "none",
+              padding: "14px 16px",
+              borderRadius: 12,
+              border: "1px solid var(--border)",
+              background: "var(--surface)",
+              color: "inherit",
+            }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 13.5 }}>Mis tickets</div>
+            <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4 }}>
+              Solicitudes y seguimiento de servicio
+            </div>
+          </a>
+          <Link
+            href="/integra/video"
+            style={{
+              textDecoration: "none",
+              padding: "14px 16px",
+              borderRadius: 12,
+              border: "1px solid var(--border)",
+              background: "var(--surface)",
+              color: "inherit",
+            }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 13.5 }}>Video</div>
+            <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4 }}>
+              Cámaras y muro en vivo
+            </div>
+          </Link>
+          <Link
+            href="/integra/access"
+            style={{
+              textDecoration: "none",
+              padding: "14px 16px",
+              borderRadius: 12,
+              border: "1px solid var(--border)",
+              background: "var(--surface)",
+              color: "inherit",
+            }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 13.5 }}>Accesos</div>
+            <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4 }}>
+              Puertas y control de acceso
+            </div>
+          </Link>
+        </div>
+      )}
 
       <IgError>{error}</IgError>
 

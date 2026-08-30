@@ -13,6 +13,8 @@ import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { toast } from "@/components/Toast";
+
 
 interface ContactMessage {
   id: number;
@@ -27,10 +29,19 @@ interface ContactMessage {
 
 interface SourceRow { source: string; total: number; responded: number; conversionPct: number }
 
-async function apiFetch(path: string, token: string) {
-  const res = await fetch(buildApiUrl(path), { headers: { Authorization: `Bearer ${token}` } });
+async function apiFetch(path: string, token: string, init: RequestInit = {}) {
+  const res = await fetch(buildApiUrl(path), {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...(init.headers as Record<string, string> ?? {}),
+    },
+  });
   if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
-  return res.json();
+  if (res.status === 204) return null;
+  const t = await res.text();
+  return t ? JSON.parse(t) : null;
 }
 
 function fmtAge(iso: string): string {
@@ -64,6 +75,39 @@ export default function StudioLeadsPage() {
   const [searchQ, setSearchQ] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterSource, setFilterSource] = useState("");
+  const [promotingId, setPromotingId] = useState<number | null>(null);
+  const [promotedIds, setPromotedIds] = useState<Set<number>>(() => new Set());
+
+  const promoteToCrm = async (m: ContactMessage) => {
+    if (!token) return;
+    setPromotingId(m.id);
+    try {
+      await apiFetch("ventas/leads", token, {
+        method: "POST",
+        body: JSON.stringify({
+          name: m.name,
+          email: m.email,
+          company: m.company ?? undefined,
+          source: "Studio",
+          notes: [
+            m.message?.trim() || null,
+            m.source ? `Captación web: ${m.source}` : null,
+            `contactMessageId=${m.id}`,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          status: "NEW",
+          score: 40,
+        }),
+      });
+      setPromotedIds((prev) => new Set(prev).add(m.id));
+      toast.success("Lead enviado a CRM");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo enviar a CRM");
+    } finally {
+      setPromotingId(null);
+    }
+  };
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -233,8 +277,16 @@ export default function StudioLeadsPage() {
                       <div style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>{m.email}</div>
                       {m.message && <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 6, lineHeight: 1.45 }}>{m.message.slice(0, 160)}{m.message.length > 160 ? "…" : ""}</div>}
                     </div>
-                    <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    <div style={{ textAlign: "right", whiteSpace: "nowrap", display: "grid", gap: 8, justifyItems: "end" }}>
                       <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{fmtAge(m.createdAt)}</div>
+                      <Button
+                        size="sm"
+                        variant={promotedIds.has(m.id) ? "secondary" : "primary"}
+                        disabled={promotingId === m.id || promotedIds.has(m.id)}
+                        onClick={() => void promoteToCrm(m)}
+                      >
+                        {promotedIds.has(m.id) ? "En CRM" : promotingId === m.id ? "Enviando…" : "Enviar a CRM"}
+                      </Button>
                     </div>
                   </article>
                 ))}
