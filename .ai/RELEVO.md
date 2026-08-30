@@ -40,5 +40,9 @@
 1. Deploy + hard-refresh.
 2. Smoke: session extend; sitio con `serviceClientId` → Ticket alarma; OT sin evidencias → 400; `/api/health` redis/go2rtc; SSE recover.
 
+## Hotfix post-deploy
+- `infra.health.ts`: Redis solo TCP (sin paquete `redis`).
+- `integra.controller.ts`: coma doble en constructor (ServiceClients inject).
+
 ## Estado
-- Listo para cerrar + push + deploy `--force-all --with-migrate`.
+- Hotfix build; re-deploy pendiente.
