@@ -6,34 +6,35 @@
 
 ## Hecho en este turno
 
-### NEXARA Hexa Hardening (olas 1–3)
+### NEXARA Hexa Fortify (post-Hexa)
 
-**Ola 1 — Espina**
-- `error.tsx` en crm/ops/studio/lab/integra (mismo patrón ERP).
-- Integra HCT: caps hide people/visitors/vehicles/anpr; chrome redirect + AppShell filter.
-- NOC: sin inventario sintético; EmptyState + CTA `/integra/settings`.
+**Ola A — Trust / RBAC**
+- `PanelKey` + `ROLE_EXTRA_PANELS`: `lab`/`integra` (CEO, super_admin, cliente+integra, ops roles).
+- CEO: `/lab/**` + `/api/lab/**` en url-matrix; `PANEL_LAB`/`LAB_ACCESS` en auth v2.
+- `loading.tsx` en erp/crm/ops/studio/lab/integra.
 
-**Ola 2 — ROI paneles**
-- ERP `/exports`: packs facturas/clientes/leads/oportunidades/proyectos/crm-activities.
-- Studio leads → `POST ventas/leads` (source=Studio); CRM badge «origen Studio».
-- Redirects `evidencias`→`evidences`, `viaticos`→`viatics`.
-- Lab `/lab/flags` + access-matrix CEO.
+**Ola B — HCT honesty (ADR-0019)**
+- Alarms: sin Video/playback ni histórico Artemis en HCT.
+- Video: bloque playback oculto en HCT (mensaje EZUIKit).
+- Settings: toggles people/visitors/vehicles/anpr disabled en HCT.
 
-**Ola 3 — Cliente / puente**
-- Alarmas Integra → CTA Ticket → `/ops/support/new` (prefill + create ticket-request).
-- Integra CLIENTE: cards tickets/video/accesos.
-- Portal tickets: card «Mi seguridad» → Integra (`getIntegraUrl`).
+**Ola C — Puentes**
+- NOC empty CTA → `getIntegraUrl("/settings")`.
+- Alarm→ticket: `siteId` + `clientHint`; support/new preselección por nombre.
+- Studio promote: detecta leads CRM `source=Studio` (email / contactMessageId).
+- Portal: cards Video + Accesos además de Mi seguridad.
+- Map: EmptyState sin planos.
 
 ## A medias
 - (nada)
 
 ## No tocar
-- tickets layout (solo card mínima en home), seed-demo-users, package-lock, xlsx
+- tickets layout (solo cards mínimas), seed-demo-users, package-lock, xlsx
 - Oficinas ACS
 
 ## Siguiente paso
-1. Deploy `--force-all` + hard-refresh.
-2. Smoke: Lab flags CEO; NOC vacío; HCT sin Personas; Studio→CRM; alarm→ticket.
+1. Hard-refresh tras deploy.
+2. Smoke: CEO Lab flags write; HCT sin Playback; NOC CTA host integra; Studio refresh «En CRM».
 
 ## Estado
 - Listo para cerrar + deploy.

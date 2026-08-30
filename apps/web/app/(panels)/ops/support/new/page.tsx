@@ -39,6 +39,8 @@ function SupportNewForm() {
     params.get("description")?.trim() ||
     params.get("note")?.trim() ||
     "";
+  const siteId = params.get("siteId")?.trim() || "";
+  const clientHint = params.get("clientHint")?.trim() || "";
 
   const [clients, setClients] = useState<ServiceClient[]>([]);
   const [clientId, setClientId] = useState("");
@@ -56,11 +58,19 @@ function SupportNewForm() {
     void apiFetch("service-clients?limit=200", token)
       .then((data) => {
         const rows = Array.isArray(data) ? data : (data?.data ?? []);
-        setClients(rows.map((c: ServiceClient) => ({ id: c.id, name: c.name })));
+        const mapped = rows.map((c: ServiceClient) => ({ id: c.id, name: c.name }));
+        setClients(mapped);
+        if (clientHint) {
+          const hint = clientHint.toLowerCase();
+          const match = mapped.find(
+            (c) => c.name.toLowerCase() === hint || c.name.toLowerCase().includes(hint),
+          );
+          if (match) setClientId(String(match.id));
+        }
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Error clientes"))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, clientHint]);
 
   const canSubmit = useMemo(
     () => Boolean(token && clientId && description.trim()),
@@ -128,6 +138,23 @@ function SupportNewForm() {
               }}
             >
               {error}
+            </div>
+          )}
+          {(siteId || clientHint) && (
+            <div
+              style={{
+                marginBottom: 12,
+                padding: "10px 12px",
+                borderRadius: 8,
+                background: "var(--surface-2, #f1f5f9)",
+                fontSize: 12.5,
+                color: "var(--text-secondary)",
+              }}
+            >
+              Origen Integra
+              {clientHint ? ` · ${clientHint}` : ""}
+              {siteId ? ` · siteId=${siteId}` : ""}
+              {clientId ? " · cliente preseleccionado por coincidencia de nombre" : ""}
             </div>
           )}
           <div style={{ display: "grid", gap: 12, maxWidth: 560 }}>

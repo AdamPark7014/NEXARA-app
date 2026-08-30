@@ -23,6 +23,7 @@ import {
   selectStyle,
   toDatetimeLocalValue,
 } from "../_lib";
+import { getCachedProvider, subscribeProvider } from "../_caps";
 import styles from "../integra.module.css";
 
 type Cam = {
@@ -68,6 +69,10 @@ export default function IntegraVideoPage() {
   const [end, setEnd] = useState(pb0.end);
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [provider, setProvider] = useState<string | null>(() => getCachedProvider());
+  const isHct = provider === "HCT" || slots.some((s) => s.provider === "HCT");
+
+  useEffect(() => subscribeProvider(setProvider), []);
 
   const load = useCallback(async () => {
     setError(null);
@@ -302,6 +307,8 @@ export default function IntegraVideoPage() {
               )}
             </div>
             <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+              {!isHct ? (
+                <>
               <strong style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ig-muted)" }}>
                 Playback
               </strong>
@@ -349,6 +356,12 @@ export default function IntegraVideoPage() {
               </div>
               {playbackUrl && (
                 <code style={{ fontSize: 10, wordBreak: "break-all" }}>{playbackUrl}</code>
+              )}
+                </>
+              ) : (
+                <p className={styles.doorCellMeta}>
+                  Playback Artemis no aplica en Hik-Connect (ADR-0019). Usa live EZUIKit.
+                </p>
               )}
             </div>
           </IgPanel>

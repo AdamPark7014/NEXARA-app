@@ -110,6 +110,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/crm/**', scope: 'read' },
     { path: '/ops/**', scope: 'read' },
     { path: '/studio/**', scope: 'read' },
+    { path: '/lab/**', scope: 'write' },
     { path: '/integra/**', scope: 'read' },
     // Direccion: gestion de contenido y comunicados internos.
     { path: '/api/hero-slides/**', scope: 'write' },
@@ -118,6 +119,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/internal-comunicados/**', scope: 'write' },
     { path: '/api/access-control/**', scope: 'write' },
     { path: '/api/integra/**', scope: 'write' },
+    { path: '/api/lab/**', scope: 'write' },
     { path: '/api/**', methods: ['GET'], scope: 'read' },
   ],
 

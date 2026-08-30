@@ -992,6 +992,24 @@ export default function ClientTicketsPage() {
                   Cámaras, accesos y estado del sitio en Integra →
                 </p>
               </a>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <a
+                  href={getIntegraUrl("/video")}
+                  className={`card ${styles.cardSoft}`}
+                  style={{ textDecoration: "none", color: "inherit", display: "block" }}
+                >
+                  <p className={styles.sectionTitle} style={{ marginBottom: 4 }}>Video</p>
+                  <p className={styles.mutedText} style={{ margin: 0 }}>Cámaras en vivo</p>
+                </a>
+                <a
+                  href={getIntegraUrl("/access")}
+                  className={`card ${styles.cardSoft}`}
+                  style={{ textDecoration: "none", color: "inherit", display: "block" }}
+                >
+                  <p className={styles.sectionTitle} style={{ marginBottom: 4 }}>Accesos</p>
+                  <p className={styles.mutedText} style={{ margin: 0 }}>Puertas y control</p>
+                </a>
+              </div>
               {pendingFeedback.length > 0 && (
                 <div className={`card ${styles.cardPanel}`}>
                   <div>

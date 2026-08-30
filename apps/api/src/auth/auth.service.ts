@@ -435,6 +435,12 @@ export class AuthService {
       set.add(PERMISSIONS.SALES_VIEW);
       set.add(PERMISSIONS.CATALOG_VIEW);
     }
+
+    // Lab sandbox — CEO (page-matrix /lab/** + Hexa /lab/flags)
+    if (roleKey === 'ceo') {
+      set.add(PERMISSIONS.PANEL_LAB);
+      set.add(PERMISSIONS.LAB_ACCESS);
+    }
     if (roleKey === 'coord_ventas') {
       set.add(PERMISSIONS.SALES_REPORTS_VIEW);
       set.add(PERMISSIONS.SALES_TARGETS_VIEW);

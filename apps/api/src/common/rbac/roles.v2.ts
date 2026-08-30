@@ -63,7 +63,7 @@ export const ROLE_TIER: Record<RoleKey, number> = {
 };
 
 /** Panel/subdominio "HOME" donde aterriza el usuario al entrar. */
-export type PanelKey = 'core' | 'sales' | 'ops' | 'studio' | 'portal';
+export type PanelKey = 'core' | 'sales' | 'ops' | 'studio' | 'portal' | 'lab' | 'integra';
 
 export const ROLE_HOME_PANEL: Record<RoleKey, PanelKey> = {
   super_admin:        'core',
@@ -87,23 +87,23 @@ export const ROLE_HOME_PANEL: Record<RoleKey, PanelKey> = {
 
 /** Paneles adicionales accesibles (además del HOME). */
 export const ROLE_EXTRA_PANELS: Record<RoleKey, PanelKey[]> = {
-  super_admin:        ['core', 'sales', 'ops', 'studio', 'portal'],
-  ceo:                ['core', 'sales', 'ops', 'studio'], // ve todo (lectura)
-  arquitecto:         ['ops', 'core', 'sales'], // OPS supervisor + planea proyectos CRM
-  dir_operaciones:    ['core', 'ops', 'sales'],
+  super_admin:        ['core', 'sales', 'ops', 'studio', 'portal', 'lab', 'integra'],
+  ceo:                ['core', 'sales', 'ops', 'studio', 'lab', 'integra'], // ve todo (lectura)
+  arquitecto:         ['ops', 'core', 'sales', 'integra'], // OPS supervisor + planea proyectos CRM
+  dir_operaciones:    ['core', 'ops', 'sales', 'integra'],
   dir_admin:          ['core', 'sales'], // Admin + CRM: cotizaciones, clientes
   coord_admin:        ['core', 'sales'], // Coord Admin: cotizaciones + seguimiento clientes
   administrativo:     ['core'],
   rh:                 ['core'],
   contabilidad:       ['core'],
-  coord_operaciones:  ['ops', 'core'],
+  coord_operaciones:  ['ops', 'core', 'integra'],
   ing_campo:          ['ops'],
-  ing_soporte:        ['ops', 'core'],
+  ing_soporte:        ['ops', 'core', 'integra'],
   coord_ventas:       ['sales', 'core'],
   vendedor:           ['sales'],
   lider_diseno:       ['studio', 'core'],
   disenador:          ['studio'],
-  cliente:            ['portal'],
+  cliente:            ['portal', 'integra'],
 };
 
 /** Labels para UI. */
