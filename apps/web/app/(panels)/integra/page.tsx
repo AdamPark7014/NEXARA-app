@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { setActiveCompanyId } from "@/lib/tenant";
 import {
@@ -16,7 +15,6 @@ import {
   DOOR_CONTROL_OPTIONS,
   DoorControlType,
   integraApi,
-  INTEGRA_MODULE_CARDS,
   setActiveIntegraSiteId,
   type IntegraCapabilities,
 } from "./_lib";
@@ -89,18 +87,6 @@ type AuditRow = {
   createdAt: string;
   userEmail?: string | null;
   entityId?: number;
-};
-
-const MODULE_MARK: Record<string, string> = {
-  "/integra/video": "VID",
-  "/integra/access": "ACS",
-  "/integra/people": "PER",
-  "/integra/events": "EVT",
-  "/integra/alarms": "ALM",
-  "/integra/visitors": "VIS",
-  "/integra/vehicles": "VEH",
-  "/integra/anpr": "ANPR",
-  "/integra/settings": "CFG",
 };
 
 export default function IntegraHome() {
@@ -176,9 +162,6 @@ export default function IntegraHome() {
   };
 
   const caps = dash?.capabilities;
-  const modules = INTEGRA_MODULE_CARDS.filter(
-    (m) => m.capability === "always" || (caps ? caps[m.capability] : true),
-  );
 
   const fmt = (iso?: string) =>
     iso ? new Date(iso).toLocaleString("es-MX", { hour12: false }) : "—";
@@ -245,15 +228,6 @@ export default function IntegraHome() {
           <span className={styles.statValue}>{dash?.devices ?? 0}</span>
         </div>
       </div>
-
-      <nav className={styles.modRail} aria-label="Módulos">
-        {modules.map((m) => (
-          <Link key={m.href} href={m.href} className={styles.modChip}>
-            <span className={styles.modChipMark}>{MODULE_MARK[m.href] || "·"}</span>
-            {m.title}
-          </Link>
-        ))}
-      </nav>
 
       <div className={styles.opsGrid}>
         <IgPanel

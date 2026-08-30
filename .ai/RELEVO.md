@@ -6,24 +6,22 @@
 
 ## Hecho en este turno
 
-### Integra consola densa (no DashKit)
-- Kit `_Console.tsx`: toolbar compacta, tablas sticky, split panes, badges, door matrix.
-- Home = **ops workbench**: KPIs (puertas online/off), matriz doControl, feed eventos, bitácora `GET /integra/audit`, rail de módulos.
-- Events / Access / Video / People reescritos con tablas densas + detalle lateral.
-- Dashboard: `doorsOnline` / `doorsOffline`. HUD chips con `data-active`.
+### Integra: matar chrome ineficiente
+- AppShell `data-console`: **sin sidebar ERP**, topbar 40px, **main full-bleed** (como chat).
+- IntegraChrome HUD fino + Salir; sin rail de módulos duplicado en home.
+- Todas las rutas Ig* (alarms/vehicles/anpr/visitors/settings migradas).
+- Tablas con `max-height: calc(100dvh - …)` en vez de 62vh.
 
 ## A medias
-- Alarms / ANPR / Visitors / Vehicles aún en DashKit (siguiente pase).
 - EZUIKit player HCT.
 
 ## No tocar
-- tickets layout, seed-demo-users, package-lock, xlsx credenciales
+- tickets layout, seed-demo-users, package-lock, xlsx
 - Oficinas ACS
 
 ## Siguiente paso
-1. Deploy + hard-refresh home Integra (debe verse matriz + tablas, no tiles grandes).
-2. Migrar alarms/vehicles al kit Ig*.
-3. (Opcional) EZUIKit.
+1. Hard-refresh Integra — debe ocupar casi todo el viewport (sin menú izquierdo NEXARA).
+2. Verificar logout vía HUD «Salir» / ⌘K.
 
 ## Estado
 - Listo para cerrar / deploy.

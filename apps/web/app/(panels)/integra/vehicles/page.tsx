@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  DashPage,
-  DashHero,
-  DashPanel,
-  ListRow,
-  DashGrid,
-  DashCol,
-} from "@/components/dashboard/DashKit";
-import styles from "../integra.module.css";
-import { btnGhost, btnPrimary, inputStyle, integraApi, selectStyle } from "../_lib";
+  IgBtn,
+  IgError,
+  IgField,
+  IgFilters,
+  IgPage,
+  IgPanel,
+  IgSplit,
+  IgTable,
+  IgToolbar,
+} from "../_Console";
+import { inputStyle, integraApi, selectStyle } from "../_lib";
 
 type Vehicle = { id: string; plate: string; personId?: string; personName?: string };
 type Person = { id: string; name: string; code?: string };
@@ -57,140 +59,142 @@ export default function IntegraVehiclesPage() {
     [items, q],
   );
 
-  const add = async () => {
-    if (!plate.trim()) return;
-    try {
-      await integraApi("integra/vehicles", {
-        method: "POST",
-        body: JSON.stringify({ plateNo: plate.trim(), personId: personId || undefined }),
-      });
-      setPlate("");
-      setPersonId("");
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
-    }
-  };
-
-  const saveEdit = async () => {
-    if (!editId || !editPlate.trim()) return;
-    try {
-      await integraApi(`integra/vehicles/${encodeURIComponent(editId)}`, {
-        method: "PATCH",
-        body: JSON.stringify({ plateNo: editPlate.trim() }),
-      });
-      setEditId(null);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
-    }
-  };
-
-  const remove = async (id: string) => {
-    if (!confirm("¿Eliminar vehículo?")) return;
-    await integraApi(`integra/vehicles/${encodeURIComponent(id)}`, { method: "DELETE" });
-    await load();
-  };
-
   return (
-    <DashPage>
-      <DashHero
-        eyebrow="Flota"
+    <IgPage>
+      <IgToolbar
         title="Vehículos"
-        subtitle="CRUD Artemis · vínculo a persona del directorio · búsqueda placa."
-        actions={
-          <button type="button" style={btnGhost} onClick={() => void load()}>
-            Actualizar
-          </button>
-        }
+        meta={`${filtered.length}/${items.length}`}
+        actions={<IgBtn onClick={() => void load()}>Refresh</IgBtn>}
       />
-      {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
-
-      <DashGrid>
-        <DashCol span={4}>
-          <DashPanel title="Alta">
+      <IgError>{error}</IgError>
+      <IgSplit
+        leftWidth="32%"
+        left={
+          <IgPanel title="Alta">
             <div style={{ display: "grid", gap: 8 }}>
-              <input
-                placeholder="Placa *"
-                value={plate}
-                onChange={(e) => setPlate(e.target.value.toUpperCase())}
-                style={{ ...inputStyle, maxWidth: "100%" }}
-              />
-              <select
-                value={personId}
-                onChange={(e) => setPersonId(e.target.value)}
-                style={{ ...selectStyle, maxWidth: "100%" }}
+              <IgField label="Placa">
+                <input
+                  value={plate}
+                  onChange={(e) => setPlate(e.target.value.toUpperCase())}
+                  style={{ ...inputStyle, maxWidth: "100%" }}
+                />
+              </IgField>
+              <IgField label="Persona">
+                <select
+                  value={personId}
+                  onChange={(e) => setPersonId(e.target.value)}
+                  style={{ ...selectStyle, maxWidth: "100%" }}
+                >
+                  <option value="">—</option>
+                  {people.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </IgField>
+              <IgBtn
+                variant="primary"
+                disabled={!plate.trim()}
+                onClick={async () => {
+                  try {
+                    await integraApi("integra/vehicles", {
+                      method: "POST",
+                      body: JSON.stringify({
+                        plateNo: plate.trim(),
+                        personId: personId || undefined,
+                      }),
+                    });
+                    setPlate("");
+                    setPersonId("");
+                    await load();
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : "Error");
+                  }
+                }}
               >
-                <option value="">Sin persona vinculada</option>
-                {people.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                    {p.code ? ` (${p.code})` : ""}
-                  </option>
-                ))}
-              </select>
-              <button type="button" style={btnPrimary} onClick={() => void add()}>
                 Agregar
-              </button>
+              </IgBtn>
             </div>
-          </DashPanel>
-        </DashCol>
-        <DashCol span={8}>
-          <DashPanel title="Inventario" subtitle={`${filtered.length} / ${items.length}`}>
-            <input
-              placeholder="Buscar placa / persona…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              style={{ ...inputStyle, marginBottom: 8, maxWidth: 320 }}
-            />
-            <div className={styles.tableScroll}>
-              {filtered.map((v) => (
-                <ListRow
-                  key={v.id}
-                  title={
+          </IgPanel>
+        }
+        right={
+          <IgPanel title="Inventario" count={filtered.length} flush>
+            <IgFilters>
+              <IgField label="Buscar">
+                <input value={q} onChange={(e) => setQ(e.target.value)} style={inputStyle} />
+              </IgField>
+            </IgFilters>
+            <IgTable
+              columns={[
+                { key: "p", label: "Placa" },
+                { key: "n", label: "Persona" },
+                { key: "id", label: "Id", mono: true },
+                { key: "x", label: "", width: "140px" },
+              ]}
+              rows={filtered.map((v) => ({
+                key: v.id,
+                cells: {
+                  p:
                     editId === v.id ? (
-                      <input value={editPlate} onChange={(e) => setEditPlate(e.target.value)} style={inputStyle} />
+                      <input
+                        value={editPlate}
+                        onChange={(e) => setEditPlate(e.target.value)}
+                        style={inputStyle}
+                      />
                     ) : (
                       v.plate
-                    )
-                  }
-                  sub={[v.personName, v.personId, v.id].filter(Boolean).join(" · ")}
-                  trail={
-                    <div style={{ display: "flex", gap: 6 }}>
-                      {editId === v.id ? (
-                        <>
-                          <button type="button" style={btnPrimary} onClick={() => void saveEdit()}>
-                            Guardar
-                          </button>
-                          <button type="button" style={btnGhost} onClick={() => setEditId(null)}>
-                            Cancelar
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            style={btnGhost}
-                            onClick={() => {
-                              setEditId(v.id);
-                              setEditPlate(v.plate);
-                            }}
-                          >
-                            Editar
-                          </button>
-                          <button type="button" style={btnGhost} onClick={() => void remove(v.id)}>
-                            Borrar
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  }
-                />
-              ))}
-            </div>
-          </DashPanel>
-        </DashCol>
-      </DashGrid>
-    </DashPage>
+                    ),
+                  n: v.personName || v.personId || "—",
+                  id: v.id,
+                  x:
+                    editId === v.id ? (
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <IgBtn
+                          variant="primary"
+                          onClick={async () => {
+                            await integraApi(`integra/vehicles/${encodeURIComponent(v.id)}`, {
+                              method: "PATCH",
+                              body: JSON.stringify({ plateNo: editPlate.trim() }),
+                            });
+                            setEditId(null);
+                            await load();
+                          }}
+                        >
+                          OK
+                        </IgBtn>
+                        <IgBtn onClick={() => setEditId(null)}>✕</IgBtn>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <IgBtn
+                          onClick={() => {
+                            setEditId(v.id);
+                            setEditPlate(v.plate);
+                          }}
+                        >
+                          Edit
+                        </IgBtn>
+                        <IgBtn
+                          onClick={async () => {
+                            if (!confirm("¿Borrar?")) return;
+                            await integraApi(`integra/vehicles/${encodeURIComponent(v.id)}`, {
+                              method: "DELETE",
+                            });
+                            await load();
+                          }}
+                        >
+                          Del
+                        </IgBtn>
+                      </div>
+                    ),
+                },
+              }))}
+              empty="Sin vehículos"
+            />
+          </IgPanel>
+        }
+      />
+    </IgPage>
   );
 }

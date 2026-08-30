@@ -53,6 +53,37 @@
   --shell-sidebar-w: 76px;
 }
 
+/* Integra consola: sin sidebar ERP, topbar fino, main full-bleed */
+.shell[data-console="true"] {
+  --shell-sidebar-w: 0px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "topbar"
+    "main";
+}
+
+.shell[data-console="true"] .sidebar {
+  display: none;
+}
+
+.shell[data-console="true"] .topbar {
+  padding: 4px 12px;
+  min-height: 40px;
+  border-bottom: 1px solid color-mix(in srgb, var(--panel-accent, #0e7490) 25%, var(--nx-panel-hairline, #e2e8f0));
+}
+
+.shell[data-console="true"] .overlay {
+  display: none;
+}
+
+.consoleTitle {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--panel-accent, #0e7490);
+}
+
 @media (max-width: 1024px) {
   .shell {
     grid-template-columns: minmax(0, 1fr);
@@ -972,6 +1003,11 @@
   width: 100% !important;
   flex: 1 1 auto;
   min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
   height: 100% !important;
   display: flex;
   flex-direction: column;
@@ -979,6 +1015,12 @@
 }
 
 .shell[data-chat="true"] {
+  overflow: hidden;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.shell[data-console="true"] {
   overflow: hidden;
   height: 100vh;
   height: 100dvh;
