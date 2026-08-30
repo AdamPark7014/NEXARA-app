@@ -477,6 +477,43 @@ export function adaptModulePresentation(
     'crm-dashboard': SALES_REP.has(v2)
       ? { label: 'Mi dashboard', description: 'Resumen de tu pipeline y metas' }
       : { label: 'Dashboard comercial', description: 'KPIs del equipo y embudo de ventas' },
+    // Integra — copy amigable para cliente externo
+    'integra-home':
+      v2 === ROLES.CLIENTE
+        ? { label: 'Mi sitio', description: 'Estado de cámaras, puertas y eventos' }
+        : { label: 'Consola Ops', description: 'Árbol, puertas, video y eventos en vivo' },
+    'integra-video':
+      v2 === ROLES.CLIENTE
+        ? { label: 'Cámaras', description: 'Ver video de tu sede' }
+        : { label: 'Video en vivo', description: 'Cámaras, HLS y playback' },
+    'integra-access':
+      v2 === ROLES.CLIENTE
+        ? { label: 'Puertas', description: 'Estado y apertura de accesos' }
+        : { label: 'Puertas', description: 'Control de accesos y privilegios' },
+    'integra-people':
+      v2 === ROLES.CLIENTE
+        ? { label: 'Personas', description: 'Quién tiene acceso a tu sitio' }
+        : { label: 'Personas', description: 'Directorio y credenciales' },
+    'integra-events':
+      v2 === ROLES.CLIENTE
+        ? { label: 'Actividad', description: 'Entradas y salidas recientes' }
+        : { label: 'Eventos', description: 'Timeline ACS de las últimas horas' },
+    'integra-alarms':
+      v2 === ROLES.CLIENTE
+        ? { label: 'Alarmas', description: 'Alertas de tu sede' }
+        : { label: 'Alarmas', description: 'Búsqueda de alarmas del sitio' },
+    'integra-visitors':
+      v2 === ROLES.CLIENTE
+        ? { label: 'Visitas', description: 'Citas y accesos de visitantes' }
+        : { label: 'Visitas', description: 'Citas y códigos QR' },
+    'integra-vehicles':
+      v2 === ROLES.CLIENTE
+        ? { label: 'Vehículos', description: 'Flota autorizada' }
+        : { label: 'Vehículos', description: 'Flota registrada en el sitio' },
+    'integra-anpr':
+      v2 === ROLES.CLIENTE
+        ? { label: 'Placas', description: 'Cruces de vehículos detectados' }
+        : { label: 'ANPR / placas', description: 'Cruces de reconocimiento vehicular' },
   };
 
   const hit = copy[module.id as ModuleId];

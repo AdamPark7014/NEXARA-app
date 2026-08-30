@@ -91,10 +91,12 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
     const clean = pathname.replace(/\/$/, "") || "/integra";
     const moduleId = PATH_TO_MODULE[clean];
     if (!moduleId || moduleId === "integra-home") return;
-    if (!moduleAllowedByCaps(moduleId, caps)) {
+    // Solo redirige si el módulo está explícitamente apagado (override / sin permiso settings).
+    // Sin inventario el menú sigue visible para que el staff explore.
+    if (isClient && !moduleAllowedByCaps(moduleId, caps)) {
       router.replace("/integra");
     }
-  }, [caps, pathname, router]);
+  }, [caps, pathname, router, isClient]);
 
   const syncNow = async () => {
     setSyncing(true);

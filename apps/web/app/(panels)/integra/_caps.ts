@@ -55,3 +55,36 @@ export function moduleAllowedByCaps(
   if (!key || key === "always") return true;
   return Boolean(caps[key]);
 }
+
+/** ¿Hay inventario espejo? Si no, el staff ve el menú completo (como CRM). */
+export function integraHasInventory(caps: IntegraCapabilities | null): boolean {
+  if (!caps) return false;
+  return Boolean(
+    caps.video ||
+      caps.access ||
+      caps.people ||
+      caps.events ||
+      caps.vehicles ||
+      caps.alarms ||
+      caps.visitors ||
+      caps.anpr,
+  );
+}
+
+/**
+ * Visibilidad en sidebar.
+ * - Staff sin inventario: muestra todo el catálogo (menos settings si no aplica).
+ * - Con inventario / cliente: respeta caps (incl. override de sitio).
+ */
+export function moduleShownInIntegraSidebar(
+  moduleId: string,
+  caps: IntegraCapabilities | null,
+  opts?: { isClient?: boolean },
+): boolean {
+  if (!caps) return true;
+  const key = MODULE_CAPABILITY[moduleId];
+  if (!key || key === "always") return true;
+  if (key === "settings") return Boolean(caps.settings);
+  if (!opts?.isClient && !integraHasInventory(caps)) return true;
+  return Boolean(caps[key]);
+}
