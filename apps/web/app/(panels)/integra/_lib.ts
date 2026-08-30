@@ -80,10 +80,11 @@ export const INTEGRA_MODULE_CARDS: IntegraModuleCard[] = [
 ];
 
 export const btnPrimary: React.CSSProperties = {
-  border: "1px solid #155e75",
-  background: "#0e7490",
+  border: "1px solid color-mix(in srgb, #155e75 70%, transparent)",
+  background:
+    "linear-gradient(180deg, color-mix(in srgb, #0e7490 88%, white) 0%, #0e7490 55%, #155e75 100%)",
   color: "#fff",
-  borderRadius: 0,
+  borderRadius: 8,
   padding: "9px 14px",
   fontSize: 12,
   fontWeight: 650,
@@ -92,9 +93,9 @@ export const btnPrimary: React.CSSProperties = {
 
 export const btnGhost: React.CSSProperties = {
   border: "1px solid color-mix(in srgb, #0b1524 12%, transparent)",
-  background: "#fff",
+  background: "var(--surface, #fff)",
   color: "#243247",
-  borderRadius: 0,
+  borderRadius: 8,
   padding: "9px 12px",
   fontSize: 12,
   fontWeight: 650,
@@ -103,13 +104,13 @@ export const btnGhost: React.CSSProperties = {
 
 export const inputStyle: React.CSSProperties = {
   border: "1px solid color-mix(in srgb, #0b1524 14%, transparent)",
-  borderRadius: 0,
+  borderRadius: 8,
   padding: "8px 10px",
   fontSize: 13,
   width: "100%",
   maxWidth: 280,
-  background: "#fff",
-  color: "#0b1524",
+  background: "var(--surface, #fff)",
+  color: "var(--text-primary, #0b1524)",
 };
 
 export const selectStyle: React.CSSProperties = {

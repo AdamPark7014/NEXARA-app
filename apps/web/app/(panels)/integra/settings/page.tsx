@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import EmptyState from "@/components/ui/EmptyState";
+import Button from "@/components/ui/Button";
 import {
   IgBadge,
   IgBtn,
@@ -115,14 +117,38 @@ export default function IntegraSettingsPage() {
       <IgError>{error}</IgError>
 
       {sites.length === 0 ? (
-        <div className={styles.igEmptyCta}>
-          <h2>Agrega tu primer sitio</h2>
-          <p>Un sitio es la conexión a HikCentral (en sitio) o Hik-Connect (nube).</p>
-          <ol className={styles.igEmptySteps}>
-            <li>1. Elige el tipo de conexión</li>
-            <li>2. Pega la dirección del servidor y las claves</li>
-            <li>3. Guarda y sincroniza el inventario</li>
-          </ol>
+        <div className={styles.igOnboard} style={{ minHeight: 280, flex: "0 0 auto", marginBottom: 8 }}>
+          <div className={styles.igOnboardCard}>
+            <EmptyState
+              title="Agrega tu primer sitio"
+              description="Un sitio es la conexión a HikCentral (en sitio) o Hik-Connect (nube). Después sincronizas el inventario y Ops cobra vida."
+              action={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    document.getElementById("integra-new-site")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                >
+                  Completar formulario
+                </Button>
+              }
+            />
+            <ol className={styles.igOnboardSteps}>
+              <li>
+                <span className={styles.igOnboardStepNum}>1</span>
+                <span>Elige el tipo de conexión</span>
+              </li>
+              <li>
+                <span className={styles.igOnboardStepNum}>2</span>
+                <span>Pega la dirección del servidor y las claves</span>
+              </li>
+              <li>
+                <span className={styles.igOnboardStepNum}>3</span>
+                <span>Guarda y sincroniza el inventario</span>
+              </li>
+            </ol>
+          </div>
         </div>
       ) : null}
 
@@ -204,7 +230,7 @@ export default function IntegraSettingsPage() {
         right={
           <>
             <IgPanel title="Nuevo sitio">
-              <div style={{ display: "grid", gap: 8 }}>
+              <div id="integra-new-site" style={{ display: "grid", gap: 8 }}>
                 <IgField label="Tipo de conexión">
                   <select
                     value={provider}

@@ -1,18 +1,18 @@
-/* NEXARA Integra — consola de seguridad física (HikCentral Artemis)
-   Dirección: acero / tinta / cian industrial. Contraste alto. Sin purple. */
-
+/* NEXARA Integra — consola ops; tokens alineados al shell global */
 .shell {
-  --ig-ink: #0b1524;
-  --ig-ink-soft: #243247;
-  --ig-muted: #5b6b7c;
-  --ig-line: color-mix(in srgb, #0b1524 12%, transparent);
-  --ig-surface: #f3f6fa;
-  --ig-panel: #ffffff;
-  --ig-accent: #0e7490;
-  --ig-accent-deep: #155e75;
-  --ig-ok: #0f766e;
-  --ig-warn: #b45309;
-  --ig-danger: #b91c1c;
+  --ig-ink: var(--text-primary, #0f1c2e);
+  --ig-ink-soft: var(--text-secondary, #243247);
+  --ig-muted: var(--text-tertiary, #6b7a8f);
+  --ig-line: var(--nx-panel-hairline, color-mix(in srgb, #0f1c2e 12%, transparent));
+  --ig-surface: var(--background, #f8f9fc);
+  --ig-panel: var(--surface, #ffffff);
+  --ig-accent: var(--panel-accent, #0e7490);
+  --ig-accent-deep: color-mix(in srgb, var(--panel-accent, #0e7490) 82%, #000);
+  --ig-ok: var(--success, #0f766e);
+  --ig-warn: var(--warning, #b45309);
+  --ig-danger: var(--danger, #b91c1c);
+  --ig-radius: 8px;
+  --ig-radius-sm: 6px;
   --ig-font-display: var(--nx-font-display, "Space Grotesk", "Segoe UI", sans-serif);
   --ig-font-mono: var(--nx-font-mono, "IBM Plex Mono", ui-monospace, monospace);
   --ig-font-body: var(--nx-font-body, "Manrope", system-ui, sans-serif);
@@ -54,9 +54,11 @@
   grid-template-columns: 1fr auto;
   gap: 6px 12px;
   align-items: center;
-  padding: 5px 8px;
-  background: var(--ig-panel);
+  padding: 6px 12px;
+  min-height: 48px;
+  background: color-mix(in srgb, var(--ig-panel) 92%, transparent);
   border-bottom: 1px solid var(--ig-line);
+  backdrop-filter: blur(10px);
   flex-shrink: 0;
   z-index: 2;
 }
@@ -69,11 +71,35 @@
   min-width: 0;
 }
 
+.hudBrandBlock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+}
+
+.hudMark {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.hudBrandText {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  line-height: 1.15;
+  min-width: 0;
+}
+
 .hudBrand {
   font-family: var(--ig-font-display);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ig-accent-deep);
   text-decoration: none;
@@ -81,6 +107,14 @@
 
 .hudBrand:hover {
   color: var(--ig-accent);
+}
+
+.hudBrandSub {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
 }
 
 .hudHealth {
@@ -127,31 +161,40 @@
   flex-wrap: wrap;
   gap: 6px;
   justify-content: flex-end;
+  align-items: center;
 }
 
 .hudChip {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  padding: 6px 11px;
   border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-sm);
   background: var(--ig-panel);
   color: var(--ig-ink-soft);
   text-decoration: none;
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .hudChip:hover {
-  border-color: var(--ig-accent);
+  border-color: color-mix(in srgb, var(--ig-accent) 45%, var(--ig-line));
   color: var(--ig-accent-deep);
-  background: color-mix(in srgb, var(--ig-accent) 8%, white);
+  background: color-mix(in srgb, var(--ig-accent) 8%, var(--ig-panel));
 }
 
 .hudChip[data-active="1"] {
-  border-color: var(--ig-accent);
+  border-color: color-mix(in srgb, var(--ig-accent) 55%, var(--ig-line));
   color: var(--ig-accent-deep);
-  background: color-mix(in srgb, var(--ig-accent) 12%, white);
+  background: color-mix(in srgb, var(--ig-accent) 12%, var(--ig-panel));
   font-weight: 700;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ig-ink) 6%, transparent);
+}
+
+.hudChip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 /* ── Buttons ──────────────────────────────────────────────── */
@@ -164,33 +207,46 @@
   letter-spacing: 0.02em;
   padding: 9px 14px;
   border: 1px solid transparent;
+  border-radius: var(--ig-radius);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
 }
 
 .btnPrimary {
-  background: var(--ig-accent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ig-accent) 88%, white) 0%,
+    var(--ig-accent) 55%,
+    var(--ig-accent-deep) 100%
+  );
   color: #fff;
-  border-color: var(--ig-accent-deep);
+  border-color: color-mix(in srgb, var(--ig-accent-deep) 70%, transparent);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.16) inset,
+    0 6px 14px color-mix(in srgb, var(--ig-accent) 28%, transparent);
 }
 
 .btnPrimary:hover:not(:disabled) {
-  background: var(--ig-accent-deep);
+  transform: translateY(-1px);
+  filter: brightness(1.03);
 }
 
 .btnPrimary:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+  transform: none;
+  filter: none;
 }
 
 .btnGhost {
   background: var(--ig-panel);
   color: var(--ig-ink-soft);
   border-color: var(--ig-line);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ig-ink) 4%, transparent);
 }
 
 .btnGhost:hover:not(:disabled) {
-  border-color: var(--ig-accent);
+  border-color: color-mix(in srgb, var(--ig-accent) 45%, var(--ig-line));
   color: var(--ig-accent-deep);
 }
 
@@ -299,9 +355,10 @@
   flex-wrap: wrap;
   gap: 6px;
   align-items: flex-end;
-  padding: 6px 8px;
+  padding: 8px 10px;
   background: var(--ig-panel);
   border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius);
   flex-shrink: 0;
 }
 
@@ -328,6 +385,7 @@
 
 .camTile {
   border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-sm);
   background: #0b1524;
   overflow: hidden;
   display: flex;
@@ -373,9 +431,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 6px 12px;
-  padding: 4px 8px;
+  padding: 8px 12px;
   background: var(--ig-panel);
   border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius);
   flex-shrink: 0;
 }
 
@@ -433,10 +492,12 @@
 .igPanel {
   background: var(--ig-panel);
   border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius);
   display: flex;
   flex-direction: column;
   min-height: 0;
   flex: 1;
+  overflow: hidden;
 }
 
 .igPanelHead {
@@ -566,39 +627,40 @@
 .igBadge {
   display: inline-flex;
   align-items: center;
-  padding: 1px 6px;
+  padding: 2px 7px;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   border: 1px solid var(--ig-line);
+  border-radius: 999px;
   color: var(--ig-ink-soft);
-  background: white;
+  background: var(--ig-panel);
   white-space: nowrap;
 }
 
 .igBadge[data-tone="ok"] {
   color: var(--ig-ok);
   border-color: color-mix(in srgb, var(--ig-ok) 35%, var(--ig-line));
-  background: color-mix(in srgb, var(--ig-ok) 8%, white);
+  background: color-mix(in srgb, var(--ig-ok) 8%, var(--ig-panel));
 }
 
 .igBadge[data-tone="warn"] {
   color: var(--ig-warn);
   border-color: color-mix(in srgb, var(--ig-warn) 35%, var(--ig-line));
-  background: color-mix(in srgb, var(--ig-warn) 8%, white);
+  background: color-mix(in srgb, var(--ig-warn) 8%, var(--ig-panel));
 }
 
 .igBadge[data-tone="danger"] {
   color: var(--ig-danger);
   border-color: color-mix(in srgb, var(--ig-danger) 35%, var(--ig-line));
-  background: color-mix(in srgb, var(--ig-danger) 8%, white);
+  background: color-mix(in srgb, var(--ig-danger) 8%, var(--ig-panel));
 }
 
 .igBadge[data-tone="accent"] {
   color: var(--ig-accent-deep);
   border-color: color-mix(in srgb, var(--ig-accent) 40%, var(--ig-line));
-  background: color-mix(in srgb, var(--ig-accent) 10%, white);
+  background: color-mix(in srgb, var(--ig-accent) 10%, var(--ig-panel));
 }
 
 .igBtnDanger {
@@ -617,7 +679,8 @@
   gap: 4px;
   padding: 8px;
   border: 1px solid var(--ig-line);
-  background: white;
+  border-radius: var(--ig-radius-sm);
+  background: var(--ig-panel);
   text-align: left;
   cursor: pointer;
   font: inherit;
@@ -697,6 +760,7 @@
   height: 100%;
   border-top: 1px solid var(--ig-line);
   background: var(--ig-surface);
+  gap: 0;
 }
 
 @media (max-width: 1100px) {
@@ -981,47 +1045,72 @@
   white-space: nowrap;
 }
 
-.igEmptyCta {
+.igOnboard {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  flex: 1;
-  padding: 32px 16px;
-  text-align: center;
+  padding: clamp(24px, 6vh, 56px) 24px;
+  background:
+    radial-gradient(
+      ellipse 70% 50% at 50% 20%,
+      color-mix(in srgb, var(--ig-accent) 8%, transparent),
+      transparent 70%
+    ),
+    var(--ig-surface);
 }
 
-.igEmptyCta h2 {
-  margin: 0;
-  font-family: var(--ig-font-display);
-  font-size: 1.25rem;
+.igOnboardCard {
+  width: min(540px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.igEmptyCta p {
-  margin: 0;
-  max-width: 36ch;
-  font-size: 13px;
-  color: var(--ig-muted);
-  line-height: 1.45;
-}
-
-.igEmptySteps {
+.igOnboardSteps {
   margin: 0;
   padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--ig-ink-soft);
+  gap: 8px;
   text-align: left;
 }
 
-.igEmptySteps li {
-  padding: 6px 10px;
+.igOnboardSteps li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
   border: 1px solid var(--ig-line);
-  background: white;
+  border-radius: var(--ig-radius-sm);
+  background: var(--ig-panel);
+  font-size: 13px;
+  color: var(--ig-ink-soft);
+  line-height: 1.4;
+}
+
+.igOnboardStepNum {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ig-accent-deep);
+  background: color-mix(in srgb, var(--ig-accent) 14%, var(--ig-panel));
+  border: 1px solid color-mix(in srgb, var(--ig-accent) 30%, var(--ig-line));
+}
+
+.igEmptyCta {
+  display: none;
+}
+
+.igEmptySteps {
+  display: none;
 }
 
 .igAdvanced {

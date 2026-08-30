@@ -1,7 +1,9 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import EmptyState from "@/components/ui/EmptyState";
+import Button from "@/components/ui/Button";
 import {
   IgBadge,
   IgBtn,
@@ -178,6 +180,7 @@ function buildTree(regions: Region[], doors: Door[], cameras: Cam[]): IgTreeNode
 }
 
 export default function IntegraHome() {
+  const router = useRouter();
   const [tree, setTree] = useState<TreePayload | null>(null);
   const [dash, setDash] = useState<Dash | null>(null);
   const [events, setEvents] = useState<Ev[]>([]);
@@ -296,17 +299,42 @@ export default function IntegraHome() {
 
   if (noSite || (emptyInventory && dash && !dash.configured)) {
     return (
-      <div className={styles.igEmptyCta}>
-        <h2>Sin sitio activo</h2>
-        <p>Conecta un HikCentral o Hik-Connect para operar video, puertas y eventos.</p>
-        <ol className={styles.igEmptySteps}>
-          <li>1. Abre Sitios y crea una conexión</li>
-          <li>2. Sincroniza el inventario</li>
-          <li>3. Vuelve aquí a la consola Ops</li>
-        </ol>
-        <Link href="/integra/settings" className={styles.btnPrimary} style={{ textDecoration: "none" }}>
-          Ir a Sitios
-        </Link>
+      <div className={styles.igOnboard}>
+        <div className={styles.igOnboardCard}>
+          <EmptyState
+            title="Sin sitio activo"
+            description="Conecta un HikCentral o Hik-Connect para operar video, puertas y eventos en esta consola."
+            action={
+              <Button variant="primary" size="md" onClick={() => router.push("/integra/settings")}>
+                Ir a Sitios
+              </Button>
+            }
+            icon={
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            }
+          />
+          <ol className={styles.igOnboardSteps}>
+            <li>
+              <span className={styles.igOnboardStepNum}>1</span>
+              <span>Abre Sitios y crea una conexión al servidor</span>
+            </li>
+            <li>
+              <span className={styles.igOnboardStepNum}>2</span>
+              <span>Sincroniza el inventario (cámaras, puertas, personas)</span>
+            </li>
+            <li>
+              <span className={styles.igOnboardStepNum}>3</span>
+              <span>Vuelve a Ops para monitorear y controlar</span>
+            </li>
+          </ol>
+        </div>
       </div>
     );
   }
