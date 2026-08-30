@@ -47,8 +47,17 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [ssoEnabled, setSsoEnabled] = useState(false);
+  const [panelSkin, setPanelSkin] = useState<"default" | "integra">("default");
   const { setUser } = useUser();
   const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const host = window.location.hostname;
+    if (host.startsWith("integra.") || host.includes(".integra.")) {
+      setPanelSkin("integra");
+    }
+  }, []);
 
   useEffect(() => {
     void fetch(buildApiUrl("auth/oidc/status"))
@@ -363,7 +372,10 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
   };
 
   return (
-    <div className={styles.stage}>
+    <div
+      className={`${styles.stage}${panelSkin === "integra" ? ` ${styles.stageIntegra}` : ""}`}
+      data-panel={panelSkin}
+    >
       <div className={styles.wrap}>
         <div className={styles.brand}>
           <Image
@@ -374,7 +386,9 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
             className={styles.brandMark}
             priority
           />
-          <p className={styles.brandName}>Nexara</p>
+          <p className={styles.brandName}>
+            {panelSkin === "integra" ? "NEXARA Integra" : "Nexara"}
+          </p>
         </div>
 
         {accessNotice ? (
@@ -383,8 +397,16 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           </div>
         ) : null}
 
-        <h1 className={styles.heading}>{title || "Iniciar sesión"}</h1>
-        <p className={styles.subheading}>{subtitle || "Ingresa a tu cuenta de Nexara"}</p>
+        <h1 className={styles.heading}>
+          {panelSkin === "integra"
+            ? title || "Consola de seguridad"
+            : title || "Iniciar sesión"}
+        </h1>
+        <p className={styles.subheading}>
+          {panelSkin === "integra"
+            ? subtitle || "CCTV, accesos y sitios HikCentral Artemis"
+            : subtitle || "Ingresa a tu cuenta de Nexara"}
+        </p>
 
         <form className={styles.form} onSubmit={handleLogin}>
           <div className={styles.fieldGroup}>

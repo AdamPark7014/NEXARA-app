@@ -45,23 +45,25 @@ export function IntegraSiteSwitcher({ onChange }: { onChange?: (id: number | nul
 
   if (sites.length === 0) {
     return (
-      <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin sitios</span>
+      <span style={{ fontSize: 12, color: "#5b6b7c", fontWeight: 600 }}>Sin sitios</span>
     );
   }
 
   if (sites.length === 1) {
     const s = sites[0];
     return (
-      <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+      <span style={{ fontSize: 12, color: "#243247", fontWeight: 650 }}>
         {s.label || s.name}
-        {s._count ? ` · ${s._count.cameras ?? 0}cam / ${s._count.doors ?? 0}puertas` : ""}
+        {s._count ? ` · ${s._count.cameras ?? 0}cam / ${s._count.doors ?? 0}p` : ""}
       </span>
     );
   }
 
   return (
     <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-      <span style={{ color: "var(--text-tertiary)" }}>Sitio</span>
+      <span style={{ color: "#5b6b7c", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", fontSize: 10 }}>
+        Sitio
+      </span>
       <select
         value={active ?? ""}
         onChange={(e) => {
@@ -75,13 +77,11 @@ export function IntegraSiteSwitcher({ onChange }: { onChange?: (id: number | nul
         {sites.map((s) => (
           <option key={s.id} value={s.id}>
             {s.label || s.name}
-            {s._count
-              ? ` (${s._count.cameras ?? 0}cam/${s._count.doors ?? 0}p)`
-              : ""}
+            {s._count ? ` (${s._count.cameras ?? 0}c/${s._count.doors ?? 0}p)` : ""}
           </option>
         ))}
       </select>
-      <button type="button" style={btnGhost} onClick={() => void load()}>
+      <button type="button" style={btnGhost} onClick={() => void load()} aria-label="Recargar sitios">
         ↻
       </button>
     </label>

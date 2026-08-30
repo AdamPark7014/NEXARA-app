@@ -1,26 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import {
-  DashPage,
-  DashHero,
-  DashGrid,
-  DashCol,
-  DashPanel,
-  ListRow,
-  DashPill,
-  StatStrip,
-} from "@/components/dashboard/DashKit";
 import { setActiveCompanyId } from "@/lib/tenant";
 import {
-  btnGhost,
-  btnPrimary,
   integraApi,
   INTEGRA_MODULE_CARDS,
   type IntegraCapabilities,
   setActiveIntegraSiteId,
 } from "./_lib";
 import { setCachedCapabilities } from "./_caps";
+import styles from "./integra.module.css";
 
 type Dash = {
   connected: boolean;
@@ -54,7 +44,6 @@ type Portfolio = {
       regions: number;
     };
     capabilities: IntegraCapabilities;
-    modules?: string[];
     sites: Array<{
       id: number;
       name: string;
@@ -72,41 +61,28 @@ type Portfolio = {
   }>;
 };
 
-const EMPTY_CAPS: IntegraCapabilities = {
-  video: true,
-  access: true,
-  people: true,
-  events: true,
-  vehicles: true,
-  anpr: true,
-  visitors: true,
-  alarms: true,
-  settings: true,
+const MODULE_MARK: Record<string, string> = {
+  "/integra/video": "VID",
+  "/integra/access": "ACS",
+  "/integra/people": "PER",
+  "/integra/events": "EVT",
+  "/integra/alarms": "ALM",
+  "/integra/visitors": "VIS",
+  "/integra/vehicles": "VEH",
+  "/integra/anpr": "ANPR",
+  "/integra/settings": "CFG",
 };
 
-function CapPills({ caps }: { caps: IntegraCapabilities }) {
-  const labels: Array<[keyof IntegraCapabilities, string]> = [
-    ["video", "Video"],
-    ["access", "ACS"],
-    ["people", "Personas"],
-    ["events", "Eventos"],
-    ["vehicles", "Flota"],
-    ["anpr", "ANPR"],
-    ["visitors", "Visitas"],
-    ["alarms", "Alarmas"],
-  ];
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-      {labels
-        .filter(([k]) => caps[k])
-        .map(([k, label]) => (
-          <DashPill key={k} tone="positive">
-            {label}
-          </DashPill>
-        ))}
-    </div>
-  );
-}
+const CAP_LABELS: Array<[keyof IntegraCapabilities, string]> = [
+  ["video", "Video"],
+  ["access", "ACS"],
+  ["people", "Personas"],
+  ["events", "Eventos"],
+  ["vehicles", "Flota"],
+  ["anpr", "ANPR"],
+  ["visitors", "Visitas"],
+  ["alarms", "Alarmas"],
+];
 
 export default function IntegraHome() {
   const [dash, setDash] = useState<Dash | null>(null);
@@ -152,170 +128,202 @@ export default function IntegraHome() {
     setTick((t) => t + 1);
   };
 
-  const caps = dash?.capabilities || EMPTY_CAPS;
+  const caps = dash?.capabilities;
   const modules = INTEGRA_MODULE_CARDS.filter(
-    (m) => m.capability === "always" || caps[m.capability],
+    (m) => m.capability === "always" || (caps ? caps[m.capability] : true),
   );
-  const hidden = INTEGRA_MODULE_CARDS.length - modules.length;
+
+  const artemisTone = !dash
+    ? undefined
+    : dash.connected
+      ? styles.statOk
+      : dash.configured
+        ? styles.statWarn
+        : styles.statDanger;
 
   return (
-    <DashPage>
-      <DashHero
-        eyebrow={
-          portfolio?.mode === "platform"
-            ? "Plataforma NEXARA · todos los clientes"
-            : "Portal cliente · solo tu inventario"
-        }
-        title="NEXARA Integra"
-        subtitle="HikCentral Artemis hiper-particionado: cada empresa y sitio con módulos derivados del espejo (cámaras→video, puertas→ACS, vehículos→ANPR)."
-        actions={
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <button type="button" onClick={() => void refresh()} style={btnGhost}>
+    <div className={styles.inner}>
+      <header className={styles.hero}>
+        <div className={styles.heroRow}>
+          <div>
+            <span className={styles.eyebrow}>
+              <span className={styles.eyebrowDot} aria-hidden />
+              {portfolio?.mode === "platform"
+                ? "Plataforma · todos los clientes"
+                : "Portal · tu inventario Artemis"}
+            </span>
+            <h1 className={styles.title}>NEXARA Integra</h1>
+            <p className={styles.sub}>
+              Seguridad física sobre HikCentral Artemis: video, ACS, personas, visitas y ANPR
+              particionados por empresa y sitio.
+            </p>
+          </div>
+          <div className={styles.actions}>
+            <button type="button" className={styles.btnGhost} onClick={() => void refresh()}>
               Actualizar
             </button>
-            {caps.settings && (
+            {caps?.settings !== false && (
               <button
                 type="button"
-                onClick={() => void syncNow()}
-                style={btnPrimary}
+                className={styles.btnPrimary}
                 disabled={syncing}
+                onClick={() => void syncNow()}
               >
-                {syncing ? "Sincronizando…" : "Sincronizar ahora"}
+                {syncing ? "Sincronizando…" : "Sincronizar"}
               </button>
             )}
           </div>
-        }
-      />
+        </div>
+      </header>
 
-      <StatStrip
-        stats={[
-          {
-            label: "Artemis",
-            value: !dash
-              ? "…"
-              : dash.connected
-                ? "OK"
-                : dash.configured
-                  ? "Down"
-                  : "Sin config",
-            tone: dash?.connected ? "positive" : "warning",
-          },
-          { label: "Cámaras", value: String(dash?.cameras ?? 0) },
-          { label: "Puertas", value: String(dash?.doors ?? 0) },
-          { label: "Personas", value: String(dash?.people ?? 0) },
-          { label: "Vehículos", value: String(dash?.vehicles ?? 0) },
-          { label: "Regiones", value: String(dash?.regions ?? 0) },
-          {
-            label: "Sync",
-            value: dash?.lastSync?.status || "—",
-            tone: dash?.lastSync?.status === "OK" ? "positive" : undefined,
-          },
-        ]}
-      />
+      <div className={styles.stats} role="group" aria-label="Estado del sitio">
+        <div className={styles.stat}>
+          <span className={styles.statLabel}>Artemis</span>
+          <span className={`${styles.statValue} ${artemisTone || ""}`}>
+            {!dash ? "…" : dash.connected ? "OK" : dash.configured ? "Down" : "—"}
+          </span>
+        </div>
+        <div className={styles.stat}>
+          <span className={styles.statLabel}>Cámaras</span>
+          <span className={styles.statValue}>{dash?.cameras ?? 0}</span>
+        </div>
+        <div className={styles.stat}>
+          <span className={styles.statLabel}>Puertas</span>
+          <span className={styles.statValue}>{dash?.doors ?? 0}</span>
+        </div>
+        <div className={styles.stat}>
+          <span className={styles.statLabel}>Personas</span>
+          <span className={styles.statValue}>{dash?.people ?? 0}</span>
+        </div>
+        <div className={styles.stat}>
+          <span className={styles.statLabel}>Vehículos</span>
+          <span className={styles.statValue}>{dash?.vehicles ?? 0}</span>
+        </div>
+        <div className={styles.stat}>
+          <span className={styles.statLabel}>Regiones</span>
+          <span className={styles.statValue}>{dash?.regions ?? 0}</span>
+        </div>
+        <div className={styles.stat}>
+          <span className={styles.statLabel}>Sync</span>
+          <span
+            className={`${styles.statValue} ${
+              dash?.lastSync?.status === "OK" ? styles.statOk : ""
+            }`}
+          >
+            {dash?.lastSync?.status || "—"}
+          </span>
+        </div>
+      </div>
 
-      {error && <p style={{ color: "var(--danger)", marginBottom: 12 }}>{error}</p>}
+      {error && <p className={styles.error}>{error}</p>}
 
       {portfolio && (
-        <DashPanel
-          title={
-            portfolio.mode === "platform"
-              ? "Portfolio clientes"
-              : "Tus sitios Artemis"
-          }
-          subtitle={`${portfolio.companyCount} empresas · ${portfolio.siteCount} sitios · módulos por tipo de dispositivo`}
-        >
-          {portfolio.companies.map((c) => (
-            <div
-              key={c.companyId}
-              style={{
-                marginBottom: 14,
-                paddingBottom: 10,
-                borderBottom: "1px solid var(--border, #e2e8f0)",
-              }}
-            >
-              <ListRow
-                title={c.name}
-                sub={`cams ${c.totals.cameras} · puertas ${c.totals.doors} · personas ${c.totals.people} · vehículos ${c.totals.vehicles} · regiones ${c.totals.regions}`}
-                trail={
-                  portfolio.mode === "platform" ? (
+        <section className={styles.section}>
+          <div className={styles.sectionHead}>
+            <h2 className={styles.sectionTitle}>
+              {portfolio.mode === "platform" ? "Clientes" : "Tus sitios"}
+            </h2>
+            <p className={styles.sectionSub}>
+              {portfolio.companyCount} empresas · {portfolio.siteCount} sitios Artemis
+            </p>
+          </div>
+          <div className={styles.portfolioList}>
+            {portfolio.companies.map((c) => (
+              <article key={c.companyId} className={styles.companyCard}>
+                <div className={styles.companyTop}>
+                  <div>
+                    <h3 className={styles.companyName}>{c.name}</h3>
+                    <p className={styles.companyMeta}>
+                      {c.totals.cameras} cam · {c.totals.doors} puertas · {c.totals.people}{" "}
+                      personas · {c.totals.vehicles} veh · {c.totals.regions} regiones
+                    </p>
+                  </div>
+                  {portfolio.mode === "platform" ? (
                     <button
                       type="button"
-                      style={btnPrimary}
+                      className={styles.btnPrimary}
                       onClick={() => openClient(c.companyId)}
                     >
                       Entrar
                     </button>
                   ) : (
-                    <DashPill tone="positive">activo</DashPill>
-                  )
-                }
-              />
-              <div style={{ paddingLeft: 8, marginTop: 6 }}>
-                <CapPills caps={c.capabilities} />
-              </div>
-              <div style={{ paddingLeft: 12, marginTop: 6 }}>
-                {c.sites.map((s) => (
-                  <ListRow
-                    key={s.id}
-                    title={s.label || s.name}
-                    sub={`${s.host} · ${s._count.cameras} cam · ${s._count.doors} puertas · sync ${s.lastSyncAt ? new Date(s.lastSyncAt).toLocaleString("es-MX") : "nunca"}`}
-                    trail={
+                    <span className={styles.moduleFoot}>Activo</span>
+                  )}
+                </div>
+                <div className={styles.capRow}>
+                  {CAP_LABELS.map(([k, label]) => (
+                    <span
+                      key={k}
+                      className={c.capabilities[k] ? styles.capOn : styles.capOff}
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
+                <div className={styles.siteList}>
+                  {c.sites.map((s) => (
+                    <div key={s.id} className={styles.siteRow}>
+                      <div>
+                        <div className={styles.siteName}>{s.label || s.name}</div>
+                        <div className={styles.siteHost}>
+                          {s.host} · {s._count.cameras}c/{s._count.doors}p · sync{" "}
+                          {s.lastSyncAt
+                            ? new Date(s.lastSyncAt).toLocaleString("es-MX")
+                            : "nunca"}
+                        </div>
+                      </div>
                       <button
                         type="button"
-                        style={btnGhost}
+                        className={styles.btnGhost}
                         onClick={() => openClient(c.companyId, s.id)}
                       >
                         Sitio
                       </button>
-                    }
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-          {portfolio.companies.length === 0 && (
-            <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
-              {portfolio.mode === "platform"
-                ? "Sin sitios. Crea uno en Sitios para cada CompanyProfile cliente."
-                : "Tu empresa aún no tiene sitio Artemis. Contacta a NEXARA."}
-            </p>
-          )}
-        </DashPanel>
-      )}
-
-      <DashGrid>
-        <DashCol span={12}>
-          <DashPanel
-            title="Módulos del sitio activo"
-            subtitle={
-              hidden > 0
-                ? `Host ${dash?.host || "—"} · ${hidden} ocultos (sin dispositivos de ese tipo en el espejo)`
-                : `Host ${dash?.host || "—"} · fuente ${dash?.source || "—"}`
-            }
-          >
-            {modules.map((m) => (
-              <ListRow
-                key={m.href}
-                title={m.title}
-                sub={m.sub}
-                href={m.href}
-                trail={<DashPill tone="positive">activo</DashPill>}
-              />
+                    </div>
+                  ))}
+                </div>
+              </article>
             ))}
-            {modules.length === 0 && (
-              <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
-                Sin módulos — sincroniza el sitio o configura Artemis en Sitios.
+            {portfolio.companies.length === 0 && (
+              <p className={styles.empty}>
+                {portfolio.mode === "platform"
+                  ? "Sin sitios. Crea uno en Configuración → Sitios para cada cliente."
+                  : "Tu empresa aún no tiene sitio Artemis. Contacta a NEXARA."}
               </p>
             )}
-          </DashPanel>
-        </DashCol>
-      </DashGrid>
+          </div>
+        </section>
+      )}
 
-      <p style={{ marginTop: 16, fontSize: 12, color: "var(--text-tertiary)" }}>
-        Tenancy: <code>X-Company-Id</code> + sitio activo. Staff NEXARA ve el portfolio completo;
-        usuarios cliente solo su empresa. Capacidades = espejo Prisma alineado a paths Artemis
-        (resource/acs/video/visitor/pms).
+      <section className={styles.section}>
+        <div className={styles.sectionHead}>
+          <h2 className={styles.sectionTitle}>Módulos del sitio</h2>
+          <p className={styles.sectionSub}>
+            Host {dash?.host || "—"} · fuente {dash?.source || "—"} · visibles según inventario
+          </p>
+        </div>
+        {modules.length === 0 ? (
+          <p className={styles.empty}>
+            Sin módulos — sincroniza el sitio o configura Artemis.
+          </p>
+        ) : (
+          <div className={styles.moduleGrid}>
+            {modules.map((m) => (
+              <Link key={m.href} href={m.href} className={styles.moduleTile}>
+                <span className={styles.moduleMark}>{MODULE_MARK[m.href] || "·"}</span>
+                <h3 className={styles.moduleTitle}>{m.title}</h3>
+                <p className={styles.moduleSub}>{m.sub}</p>
+                <span className={styles.moduleFoot}>Abrir</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <p className={styles.footNote}>
+        Tenancy: header <code>X-Company-Id</code> + sitio activo. Capacidades derivadas del espejo
+        Prisma alineado a Artemis (resource / acs / video / visitor / pms).
       </p>
-    </DashPage>
+    </div>
   );
 }
