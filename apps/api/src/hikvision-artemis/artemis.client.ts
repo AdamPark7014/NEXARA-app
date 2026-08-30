@@ -176,13 +176,24 @@ export class HikCentralArtemisClient {
     });
   }
 
-  doorEvents(startTime: string, endTime: string, pageNo = 1, pageSize = 200) {
-    return this.post<ArtemisList<ArtemisEventRaw>>('/artemis/api/acs/v1/door/events', {
+  doorEvents(
+    startTime: string,
+    endTime: string,
+    pageNo = 1,
+    pageSize = 200,
+    opts?: { doorIndexCodes?: string[]; eventType?: number },
+  ) {
+    const body: Record<string, unknown> = {
       startTime,
       endTime,
       pageNo,
       pageSize,
-    });
+    };
+    if (opts?.doorIndexCodes?.length) body.doorIndexCodes = opts.doorIndexCodes;
+    if (opts?.eventType != null && Number.isFinite(opts.eventType)) {
+      body.eventType = opts.eventType;
+    }
+    return this.post<ArtemisList<ArtemisEventRaw>>('/artemis/api/acs/v1/door/events', body);
   }
 
   cameras(pageNo = 1, pageSize = 100) {
