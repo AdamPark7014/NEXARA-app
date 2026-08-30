@@ -17,6 +17,7 @@ import {
   ArrayNotEmpty,
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsObject,
   IsOptional,
@@ -56,6 +57,8 @@ class SiteCreateDto {
   @IsOptional() @Type(() => Number) @IsInt() companyId?: number;
   @IsOptional() @IsString() label?: string;
   @IsOptional() @IsObject() modulesOverride?: Record<string, boolean>;
+  /** ARTEMIS (HikCentral) | HCT (Hik-Connect for Teams) — ADR-0019 */
+  @IsOptional() @IsIn(['ARTEMIS', 'HCT']) provider?: 'ARTEMIS' | 'HCT';
 }
 
 class SiteUpdateDto {
@@ -67,6 +70,7 @@ class SiteUpdateDto {
   @IsOptional() @IsBoolean() isDefault?: boolean;
   @IsOptional() @IsString() label?: string;
   @IsOptional() @IsObject() modulesOverride?: Record<string, boolean> | null;
+  @IsOptional() @IsIn(['ARTEMIS', 'HCT']) provider?: 'ARTEMIS' | 'HCT';
 }
 
 class VehicleDto {

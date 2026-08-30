@@ -1,7 +1,7 @@
 # ADR-0019 · Adapter Hik-Connect for Teams (HCT) bajo contrato Integra
 
 ## Status
-Proposed / backlog P4 — 2026-08-29
+Accepted / implemented — 2026-08-29
 
 ## Context
 El contrato de producto Integra (cámaras, puertas, personas, eventos, vehículos, stream) hoy está implementado sobre **HikCentral Professional Artemis**.
@@ -9,21 +9,19 @@ Algunos sitios de cliente solo tienen **Hik-Connect for Teams (HCT OpenAPI)** �
 
 ## Decision
 1. Mantener la **API Nest `/api/integra/*` y la UI** como contrato estable.
-2. Introducir un **adapter HCT** detrás de `IntegraSite` (campo futuro `provider: ARTEMIS | HCT`) que implemente el mismo surface:
-   - list cameras/doors/people (mapeo a OpenAPI HCT)
-   - stream: URL EZUIKit/HLS cloud (no go2rtc RTSP)
-   - open door / events según endpoints HCT documentados
-3. **No** mezclar credenciales HCT con Artemis en el mismo site row.
-4. ISAPI / DeviceGateway queda como tercer provider para sitios sin HikCentral ni HCT.
-
-## Non-goals (ahora)
-- Implementar el cliente HCT en este PR (solo contrato + ADR).
-- Skin / redistribuir Web Client Hikvision.
+2. `IntegraSite.provider` = `ARTEMIS` | `HCT` (default `ARTEMIS`). Credenciales cifradas en la misma fila; **no** mezclar providers en un site.
+3. Adapter HCT (`apps/api/src/hikvision-hct/`):
+   - health / token
+   - sync espejo: cameras, doors, devices
+   - stream: `streamtoken` → payload EZUIKit (sin go2rtc)
+   - open door remoto documentado
+4. Operaciones Artemis-only (people CRUD, privilege, vehicles, ANPR, visitas, playback Artemis) responden 400 claro en sitios HCT.
+5. ISAPI / DeviceGateway queda como tercer provider futuro para sitios sin HikCentral ni HCT.
 
 ## Consequences
-- UI Video debe tolerar `hls` cloud sin asumir go2rtc.
-- Sync mirror sigue válido; IDs externos viven en `*IndexCode` / `personId` igual que Artemis.
-- Licenciamiento y rate limits HCT son distintos — documentar en INTEGRA-OPS al implementar.
+- UI Video tolera `provider: HCT` (note + token; no asume HLS go2rtc).
+- Sync mirror válido para ambos providers; IDs externos viven en `*IndexCode` / ids HCT mapeados.
+- Rate limits y licenciamiento HCT: ver [INTEGRA-OPS](INTEGRA-OPS.md).
 
 ## Refs
-- Skill `hikvision-api`, ADR-0017/0018, plan P4.
+- Skill `hikvision-api`, ADR-0017/0018, plan Absolute Upgrade P4.
