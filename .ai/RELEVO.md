@@ -6,14 +6,14 @@
 
 ## Hecho en este turno
 
-### Integra = mismo AppShell que CRM/ERP
-- Quitado `data-console` / full-bleed: vuelve **sidebar + topbar** NEXARA (breadcrumbs, company, rol, paneles, ⌘K, notifs).
-- `IntegraChrome` reducido a **barra de contexto** (health + SiteSwitcher + Sync); sin HUD paralelo.
-- Sidebar: grupos Consola / Administración; home label "Ops".
-- **Cliente** (`role=cliente`): empty state distinto (sin CTA Sitios/admin); sin botón Sync.
+### Sidebar Integra más rica (match CRM)
+- Grupos: **Monitoreo / Acceso / Flota / Administración** con labels claros.
+- Staff **sin inventario** ve el menú completo (ya no solo Ops+Sitios).
+- Cliente: copy amigable vía `adaptModulePresentation` (Mi sitio, Cámaras…).
+- Iconos en pastilla con acento Integra (`data-panel="integra"`).
 
 ## A medias
-- Deploy `--force-all` tras cierre.
+- Deploy pendiente tras cierre.
 
 ## No tocar
 - tickets layout, seed-demo-users, package-lock, xlsx
@@ -21,7 +21,7 @@
 
 ## Siguiente paso
 1. Deploy + hard-refresh.
-2. Comparar visual Integra vs CRM/ERP lado a lado.
+2. Verificar menú denso sin sitio y con caps reales tras sync.
 
 ## Estado
-- Shell homologado listo para cerrar + deploy.
+- Listo para cerrar + deploy.

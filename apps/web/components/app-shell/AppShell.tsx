@@ -50,7 +50,7 @@ import {
 } from "@/lib/user-access";
 import {
   getCachedCapabilities,
-  moduleAllowedByCaps,
+  moduleShownInIntegraSidebar,
   subscribeCapabilities,
 } from "@/app/(panels)/integra/_caps";
 import type { IntegraCapabilities } from "@/app/(panels)/integra/_lib";
@@ -186,13 +186,16 @@ export default function AppShell({ panel, children }: AppShellProps) {
   const sidebarGroups = useMemo(() => {
     const groups = buildUserSidebar(panel, user);
     if (panel !== "integra" || !integraCaps) return groups;
+    const isClient = v2RoleKey === "cliente";
     return groups
       .map((g) => ({
         ...g,
-        items: g.items.filter((item) => moduleAllowedByCaps(item.id, integraCaps)),
+        items: g.items.filter((item) =>
+          moduleShownInIntegraSidebar(item.id, integraCaps, { isClient }),
+        ),
       }))
       .filter((g) => g.items.length > 0);
-  }, [panel, user, integraCaps]);
+  }, [panel, user, integraCaps, v2RoleKey]);
 
   const allowedPanels = useMemo(
     () => getUserAllowedPanels(user),
@@ -383,6 +386,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
       data-mobile-open={mobileOpen ? "true" : "false"}
       data-collapsed={collapsed ? "true" : "false"}
       data-chat={isChatRoute ? "true" : "false"}
+      data-panel={panel}
       style={{ "--panel-accent": panelMeta.accent } as React.CSSProperties}
     >
       {/* ───────── SIDEBAR ───────── */}

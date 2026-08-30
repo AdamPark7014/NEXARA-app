@@ -389,7 +389,46 @@
   width: 22px;
   text-align: center;
   color: var(--text-tertiary);
-  transition: color 180ms var(--nx-ease-out), transform 180ms var(--nx-ease-out);
+  transition: color 180ms var(--nx-ease-out), transform 180ms var(--nx-ease-out), background 180ms var(--nx-ease-out);
+}
+
+/* Integra: iconos en pastilla (densidad visual tipo CRM) */
+.shell[data-panel="integra"] .menuItemIcon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 14px;
+  background: color-mix(in srgb, var(--panel-accent, #0e7490) 12%, var(--surface-2, #f1f5f9));
+  border: 1px solid color-mix(in srgb, var(--panel-accent, #0e7490) 18%, transparent);
+  color: var(--panel-accent, #0e7490);
+}
+
+.shell[data-panel="integra"] .menuItem:hover .menuItemIcon {
+  background: color-mix(in srgb, var(--panel-accent, #0e7490) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--panel-accent, #0e7490) 35%, transparent);
+}
+
+.shell[data-panel="integra"] .menuItem.active .menuItemIcon {
+  background: color-mix(in srgb, var(--panel-accent, #0e7490) 22%, var(--surface));
+  border-color: color-mix(in srgb, var(--panel-accent, #0e7490) 40%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--panel-accent, #0e7490) 22%, transparent);
+}
+
+.shell[data-panel="integra"] .groupTitle {
+  padding-top: 6px;
+}
+
+.shell[data-panel="integra"] .menu {
+  gap: 14px;
+  padding-top: 10px;
+}
+
+.shell[data-panel="integra"] .menuItem {
+  padding: 8px 10px;
+  border-radius: 10px;
 }
 
 .menuItemLabel {
