@@ -111,3 +111,35 @@ export function getVentasUrl(path = "/") {
 export function getConsoleUrl(path = "/") {
   return getPanelUrl("console", path);
 }
+
+/** URL del portal cliente (tickets). */
+export function getTicketsUrl(path = "/") {
+  return getPanelUrl("tickets", path);
+}
+
+/**
+ * URL de Integra (no está en PanelSlug histórico; vive en subdomain-config).
+ */
+export function getIntegraUrl(path = "/") {
+  const normalizedPath = normalizePanelPath(path);
+  if (typeof window === "undefined") {
+    return `/integra${normalizedPath === "/" ? "" : normalizedPath}`;
+  }
+  const { protocol, hostname, port } = window.location;
+  const hostLower = hostname.toLowerCase();
+  const isLocal =
+    hostLower.includes("localhost") ||
+    hostLower === "127.0.0.1" ||
+    hostLower.endsWith(".local");
+  if (isLocal) {
+    const hasSubdomain = hostLower.split(".").length > 1 && !hostLower.startsWith("127.");
+    if (hasSubdomain) {
+      const baseHost = hostLower.includes("localhost") ? "localhost" : hostLower.split(".").slice(-2).join(".");
+      const portSuffix = port ? `:${port}` : "";
+      return `${protocol}//integra.${baseHost}${portSuffix}${normalizedPath}`;
+    }
+    return `/integra${normalizedPath === "/" ? "" : normalizedPath}`;
+  }
+  const domain = SUBDOMAIN_CONFIG.integra?.publicDomain || "integra.nexara.com.mx";
+  return `${protocol}//${domain}${normalizedPath}`;
+}

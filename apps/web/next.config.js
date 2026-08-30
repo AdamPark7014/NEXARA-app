@@ -128,6 +128,15 @@ const nextConfig = {
   
   async redirects() {
     return [
+      // OPS: canónicas EN (evidences / viatics); aliases ES históricos
+      { source: "/ops/evidencias", destination: "/ops/evidences", permanent: true },
+      { source: "/ops/evidencias/:path*", destination: "/ops/evidences/:path*", permanent: true },
+      { source: "/ops/viaticos", destination: "/ops/viatics", permanent: true },
+      { source: "/ops/viaticos/:path*", destination: "/ops/viatics/:path*", permanent: true },
+      { source: "/evidencias", destination: "/evidences", permanent: true },
+      { source: "/evidencias/:path*", destination: "/evidences/:path*", permanent: true },
+      { source: "/viaticos", destination: "/viatics", permanent: true },
+      { source: "/viaticos/:path*", destination: "/viatics/:path*", permanent: true },
       // Studio / copy histórico decía /noticias; canónica SEO = /blog
       { source: "/noticias", destination: "/blog", permanent: true },
       { source: "/noticias/:slug", destination: "/blog/:slug", permanent: true },

@@ -22,6 +22,48 @@ type ExportCard = {
 
 const ENTITIES: ExportCard[] = [
   {
+    key: "invoices",
+    label: "Facturas",
+    icon: "🧾",
+    desc: "Facturación emitida por periodo (issueDate)",
+    xlsxPath: (from, to) => `exports/invoices?from=${from}&to=${to}&format=xlsx`,
+  },
+  {
+    key: "clients",
+    label: "Clientes CRM",
+    icon: "🏢",
+    desc: "Cuentas comerciales y datos de contacto",
+    xlsxPath: (from, to) => `exports/clients?from=${from}&to=${to}&format=xlsx`,
+  },
+  {
+    key: "leads",
+    label: "Leads",
+    icon: "🎯",
+    desc: "Pipeline de captación comercial",
+    xlsxPath: (from, to) => `exports/leads?from=${from}&to=${to}&format=xlsx`,
+  },
+  {
+    key: "opportunities",
+    label: "Oportunidades",
+    icon: "📈",
+    desc: "Oportunidades abiertas y cerradas",
+    xlsxPath: (from, to) => `exports/opportunities?from=${from}&to=${to}&format=xlsx`,
+  },
+  {
+    key: "projects",
+    label: "Proyectos",
+    icon: "🗂️",
+    desc: "Proyectos de venta e implementación",
+    xlsxPath: (from, to) => `exports/projects?from=${from}&to=${to}&format=xlsx`,
+  },
+  {
+    key: "crm-activities",
+    label: "Actividades CRM",
+    icon: "📞",
+    desc: "Llamadas, visitas y seguimiento comercial",
+    xlsxPath: (from, to) => `exports/crm-activities?from=${from}&to=${to}&format=xlsx`,
+  },
+  {
     key: "activities",
     label: "Actividades / OT",
     icon: "🧰",
@@ -235,7 +277,7 @@ export default function ExportsPage() {
         </div>
       )}
 
-      <Section title="Rango de fechas" subtitle="Aplica a PDF de viáticos y a usuarios (Excel)">
+      <Section title="Rango de fechas" subtitle="Aplica a packs contables/CRM, PDF de viáticos y usuarios">
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
           {PRESETS.map((p) => {
             const r = p.range();
