@@ -3,15 +3,26 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { HikCentralArtemisClient } from '../hikvision-artemis/index';
+import { HikConnectTeamsClient } from '../hikvision-hct/index';
 import { decryptSecret, encryptSecret } from './integra-secrets';
 
+export type IntegraProviderKind = 'ARTEMIS' | 'HCT';
+
 export type ResolvedIntegraClient = {
-  client: HikCentralArtemisClient;
+  provider: IntegraProviderKind;
+  /** Artemis client — null si provider=HCT */
+  client: HikCentralArtemisClient | null;
+  /** HCT client — null si provider=ARTEMIS */
+  hct: HikConnectTeamsClient | null;
   siteId: number | null;
   companyId: number | null;
   host: string;
   source: 'site' | 'env';
 };
+
+function normalizeProvider(raw?: string | null): IntegraProviderKind {
+  return String(raw || 'ARTEMIS').toUpperCase() === 'HCT' ? 'HCT' : 'ARTEMIS';
+}
 
 @Injectable()
 export class IntegraSiteService {
@@ -29,6 +40,7 @@ export class IntegraSiteService {
         name: true,
         label: true,
         host: true,
+        provider: true,
         isActive: true,
         isDefault: true,
         lastSyncAt: true,
@@ -59,6 +71,7 @@ export class IntegraSiteService {
       isDefault?: boolean;
       label?: string;
       modulesOverride?: Record<string, boolean>;
+      provider?: IntegraProviderKind;
     },
   ) {
     if (input.isDefault) {
@@ -67,6 +80,7 @@ export class IntegraSiteService {
         data: { isDefault: false },
       });
     }
+    const provider = normalizeProvider(input.provider);
     return this.prisma.integraSite.create({
       data: {
         companyId,
@@ -77,12 +91,14 @@ export class IntegraSiteService {
         isDefault: input.isDefault ?? false,
         label: input.label?.trim() || null,
         modulesOverride: input.modulesOverride ?? undefined,
+        provider,
       },
       select: {
         id: true,
         name: true,
         label: true,
         host: true,
+        provider: true,
         isActive: true,
         isDefault: true,
         modulesOverride: true,
@@ -102,6 +118,7 @@ export class IntegraSiteService {
       isDefault: boolean;
       label: string;
       modulesOverride: Record<string, boolean> | null;
+      provider: IntegraProviderKind;
     }>,
   ) {
     const existing = await this.prisma.integraSite.findFirst({
@@ -132,12 +149,14 @@ export class IntegraSiteService {
             : input.modulesOverride === null
               ? Prisma.DbNull
               : input.modulesOverride,
+        provider: input.provider ? normalizeProvider(input.provider) : undefined,
       },
       select: {
         id: true,
         name: true,
         label: true,
         host: true,
+        provider: true,
         isActive: true,
         isDefault: true,
         modulesOverride: true,
@@ -155,7 +174,7 @@ export class IntegraSiteService {
   }
 
   /**
-   * Resuelve cliente Artemis: sitio DB (default o siteId) o env INTEGRA_HIK_*.
+   * Resuelve cliente Artemis o HCT: sitio DB (default o siteId) o env INTEGRA_HIK_*.
    */
   async resolveClient(opts: {
     companyId?: number | null;
@@ -191,6 +210,7 @@ export class IntegraSiteService {
     }
 
     return {
+      provider: 'ARTEMIS',
       client: new HikCentralArtemisClient({
         host,
         appKey,
@@ -198,6 +218,7 @@ export class IntegraSiteService {
         timeoutMs: timeout,
         scope: 'integra',
       }),
+      hct: null,
       siteId: null,
       companyId,
       host,
@@ -206,18 +227,48 @@ export class IntegraSiteService {
   }
 
   private fromSite(
-    site: { id: number; host: string; appKeyEnc: string; appSecretEnc: string },
+    site: {
+      id: number;
+      host: string;
+      appKeyEnc: string;
+      appSecretEnc: string;
+      provider?: string | null;
+    },
     companyId: number,
   ): ResolvedIntegraClient {
     const timeout = Number(this.config.get('INTEGRA_HIK_TIMEOUT') || 15000);
+    const provider = normalizeProvider(site.provider);
+    const appKey = decryptSecret(site.appKeyEnc);
+    const appSecret = decryptSecret(site.appSecretEnc);
+
+    if (provider === 'HCT') {
+      return {
+        provider: 'HCT',
+        client: null,
+        hct: new HikConnectTeamsClient({
+          host: site.host,
+          appKey,
+          secretKey: appSecret,
+          timeoutMs: timeout,
+          scope: `integra-hct-${site.id}`,
+        }),
+        siteId: site.id,
+        companyId,
+        host: site.host,
+        source: 'site',
+      };
+    }
+
     return {
+      provider: 'ARTEMIS',
       client: new HikCentralArtemisClient({
         host: site.host,
-        appKey: decryptSecret(site.appKeyEnc),
-        appSecret: decryptSecret(site.appSecretEnc),
+        appKey,
+        appSecret,
         timeoutMs: timeout,
         scope: `integra-site-${site.id}`,
       }),
+      hct: null,
       siteId: site.id,
       companyId,
       host: site.host,

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { HikConnectTeamsClient } from '../hikvision-hct/index';
 import { IntegraSiteService } from './integra-site.service';
 
 @Injectable()
@@ -33,8 +34,15 @@ export class IntegraSyncService {
     });
 
     try {
-      const { client } = await this.sites.resolveClient({ companyId, siteId });
+      const resolved = await this.sites.resolveClient({ companyId, siteId });
       const now = new Date();
+
+      if (resolved.provider === 'HCT' && resolved.hct) {
+        return await this.syncHctSite(companyId, siteId, run.id, resolved.hct, now);
+      }
+
+      const client = resolved.client;
+      if (!client) throw new Error('Sin cliente Artemis para sync');
 
       const [cams, doors, people, acsDevs, encDevs, vehicles, regions] = await Promise.all([
         client.cameras(1, 500),
@@ -290,5 +298,138 @@ export class IntegraSyncService {
       where: { companyId, ...(siteId ? { siteId } : {}) },
       orderBy: { startedAt: 'desc' },
     });
+  }
+
+  /** Sync espejo desde HCT (cameras/doors/devices documentados). */
+  private async syncHctSite(
+    companyId: number,
+    siteId: number,
+    runId: number,
+    hct: HikConnectTeamsClient,
+    now: Date,
+  ) {
+    const [cams, doors, devices] = await Promise.all([
+      hct.cameras(1, 500),
+      hct.doors(1, 500),
+      hct.devices(1, 200).catch(() => ({ deviceList: [] })),
+    ]);
+
+    let cameraCount = 0;
+    for (const c of cams?.cameraList ?? []) {
+      const code = String(c.cameraID ?? c.cameraId ?? '');
+      if (!code) continue;
+      cameraCount++;
+      const name = String(c.cameraName ?? c.name ?? code);
+      await this.prisma.integraCamera.upsert({
+        where: { siteId_cameraIndexCode: { siteId, cameraIndexCode: code } },
+        create: {
+          companyId,
+          siteId,
+          cameraIndexCode: code,
+          name,
+          regionName: c.areaName != null ? String(c.areaName) : null,
+          regionIndexCode: c.areaID != null ? String(c.areaID) : null,
+          status: null,
+          encodeDevIndexCode: c.deviceSerial != null ? String(c.deviceSerial) : null,
+          raw: c as any,
+          syncedAt: now,
+        },
+        update: {
+          name,
+          regionName: c.areaName != null ? String(c.areaName) : null,
+          regionIndexCode: c.areaID != null ? String(c.areaID) : null,
+          encodeDevIndexCode: c.deviceSerial != null ? String(c.deviceSerial) : null,
+          raw: c as any,
+          syncedAt: now,
+        },
+      });
+    }
+
+    let doorCount = 0;
+    for (const d of doors?.doorList ?? []) {
+      const code = String(d.doorID ?? d.doorId ?? d.elementId ?? '');
+      if (!code) continue;
+      doorCount++;
+      const name = String(d.doorName ?? d.name ?? code);
+      await this.prisma.integraDoor.upsert({
+        where: { siteId_doorIndexCode: { siteId, doorIndexCode: code } },
+        create: {
+          companyId,
+          siteId,
+          doorIndexCode: code,
+          name,
+          regionName: d.areaName != null ? String(d.areaName) : null,
+          online: true,
+          doorState: null,
+          raw: d as any,
+          syncedAt: now,
+        },
+        update: {
+          name,
+          regionName: d.areaName != null ? String(d.areaName) : null,
+          raw: d as any,
+          syncedAt: now,
+        },
+      });
+    }
+
+    let deviceCount = 0;
+    for (const d of devices?.deviceList ?? []) {
+      const code = String(d.deviceSerial ?? d.deviceID ?? d.id ?? '');
+      if (!code) continue;
+      deviceCount++;
+      const kind =
+        String(d.deviceCategory || d.category || '').toLowerCase().includes('access')
+          ? 'ACS'
+          : 'ENCODE';
+      await this.prisma.integraDevice.upsert({
+        where: { siteId_kind_indexCode: { siteId, kind, indexCode: code } },
+        create: {
+          companyId,
+          siteId,
+          kind,
+          indexCode: code,
+          name: String(d.deviceName ?? d.name ?? code),
+          ip: d.deviceIP != null ? String(d.deviceIP) : null,
+          online: true,
+          raw: d as any,
+          syncedAt: now,
+        },
+        update: {
+          name: String(d.deviceName ?? d.name ?? code),
+          ip: d.deviceIP != null ? String(d.deviceIP) : null,
+          raw: d as any,
+          syncedAt: now,
+        },
+      });
+    }
+
+    await this.prisma.integraSite.update({
+      where: { id: siteId },
+      data: { lastSyncAt: now, lastHealthOkAt: now },
+    });
+    await this.prisma.integraSyncRun.update({
+      where: { id: runId },
+      data: {
+        status: 'OK',
+        finishedAt: new Date(),
+        cameras: cameraCount,
+        doors: doorCount,
+        people: 0,
+        devices: deviceCount,
+        vehicles: 0,
+      },
+    });
+
+    return {
+      runId,
+      provider: 'HCT' as const,
+      cameras: cameraCount,
+      doors: doorCount,
+      people: 0,
+      devices: deviceCount,
+      vehicles: 0,
+      regions: 0,
+    };
   }
 }

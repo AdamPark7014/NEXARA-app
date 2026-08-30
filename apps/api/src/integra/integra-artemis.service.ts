@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { rethrowArtemis, toArtemisOffsetIso } from '../hikvision-artemis/index';
@@ -23,8 +23,15 @@ export class IntegraArtemisService {
     private readonly portfolioSvc: IntegraPortfolioService,
   ) {}
 
+  /** Artemis-only; sitios HCT → 400 con mensaje claro (ADR-0019). */
   private async client(companyId?: number | null, siteId?: number | null) {
-    return this.sites.resolveClient({ companyId, siteId });
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
+    if (!resolved.client) {
+      throw new BadRequestException(
+        'Operación Artemis no disponible en sitio HCT. Usa sync/stream/open adaptados o cambia provider a ARTEMIS.',
+      );
+    }
+    return { ...resolved, client: resolved.client };
   }
 
   private async auditMut(
@@ -53,18 +60,49 @@ export class IntegraArtemisService {
 
   async health(companyId?: number | null, siteId?: number | null) {
     try {
-      const resolved = await this.client(companyId, siteId);
-      if (!resolved.client.configured) {
+      const resolved = await this.sites.resolveClient({ companyId, siteId });
+      if (resolved.provider === 'HCT' && resolved.hct) {
+        if (!resolved.hct.configured) {
+          return {
+            connected: false,
+            configured: false,
+            host: resolved.host || null,
+            source: resolved.source,
+            siteId: resolved.siteId,
+            provider: 'HCT',
+            version: null,
+          };
+        }
+        await resolved.hct.streamToken();
+        if (resolved.siteId) {
+          await this.prisma.integraSite.update({
+            where: { id: resolved.siteId },
+            data: { lastHealthOkAt: new Date() },
+          });
+        }
+        return {
+          connected: true,
+          configured: true,
+          host: resolved.host,
+          source: resolved.source,
+          siteId: resolved.siteId,
+          provider: 'HCT',
+          version: { provider: 'HCT' },
+        };
+      }
+      const client = resolved.client;
+      if (!client?.configured) {
         return {
           connected: false,
           configured: false,
           host: resolved.host || null,
           source: resolved.source,
           siteId: resolved.siteId,
+          provider: 'ARTEMIS',
           version: null,
         };
       }
-      const version = await resolved.client.version();
+      const version = await client.version();
       if (resolved.siteId) {
         await this.prisma.integraSite.update({
           where: { id: resolved.siteId },
@@ -77,6 +115,7 @@ export class IntegraArtemisService {
         host: resolved.host,
         source: resolved.source,
         siteId: resolved.siteId,
+        provider: 'ARTEMIS',
         version,
       };
     } catch (error) {
@@ -314,7 +353,19 @@ export class IntegraArtemisService {
     siteId?: number | null,
   ) {
     try {
-      const resolved = await this.client(companyId, siteId);
+      const resolved = await this.sites.resolveClient({ companyId, siteId });
+      if (resolved.provider === 'HCT' && resolved.hct) {
+        await resolved.hct.remoteDoorControl([doorIndexCode]);
+        await this.auditMut('integra.door.open', actor, companyId, resolved.siteId ?? 0, {
+          doorIndexCode,
+          provider: 'HCT',
+          email: actor?.email,
+        });
+        return { success: true, message: `Puerta ${doorIndexCode} abierta (HCT)` };
+      }
+      if (!resolved.client) {
+        throw new BadRequestException('Sin cliente Artemis/HCT');
+      }
       await resolved.client.doorControl([doorIndexCode], ARTEMIS_DOOR_CONTROL.OPEN);
       await this.auditMut('integra.door.open', actor, companyId, resolved.siteId ?? 0, {
         doorIndexCode,

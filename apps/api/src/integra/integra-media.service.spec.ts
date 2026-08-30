@@ -7,6 +7,8 @@ describe('IntegraMediaService', () => {
   it('sin GO2RTC_URL devuelve solo RTSP', async () => {
     const sites = {
       resolveClient: jest.fn().mockResolvedValue({
+        provider: 'ARTEMIS',
+        hct: null,
         client: {
           previewUrls: jest.fn().mockResolvedValue({ url: 'rtsp://cam/stream' }),
         },

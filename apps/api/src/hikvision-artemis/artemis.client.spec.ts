@@ -81,27 +81,33 @@ describe('HikCentralArtemisClient · surface P2', () => {
     global.fetch = originalFetch;
   });
 
-  it('playbackUrls / capture / eventPictures / vehicleAdd firman POST', async () => {
+  it('playbackUrls / capture / eventPictures / vehicle CRUD / device lists firman POST', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ code: '0', msg: 'success', data: { url: 'rtsp://x' } }),
+      json: async () => ({ code: '0', msg: 'success', data: { url: 'rtsp://x', list: [] } }),
     }) as any;
     const c = new HikCentralArtemisClient({
       host: 'https://hik.test',
       appKey: 'k',
       appSecret: 's',
       scope: 'integra',
-      // avoid rate-limit delay between calls in unit test
     });
     await c.playbackUrls('cam1', '2026-01-01T00:00:00-06:00', '2026-01-01T01:00:00-06:00');
     await c.cameraCapture('cam1');
     await c.eventPictures('/pic/1');
     await c.vehicleAdd({ plateNo: 'ABC123' });
+    await c.vehicleUpdate({ vehicleId: '1', plateNo: 'ABC124' });
+    await c.vehicleDelete('1');
+    await c.acsDeviceList(1, 10);
+    await c.encodeDeviceList(1, 10);
     const urls = (global.fetch as jest.Mock).mock.calls.map((call) => String(call[0]));
-    expect(urls.length).toBe(4);
     expect(urls.some((u) => u.includes('playbackURLs'))).toBe(true);
     expect(urls.some((u) => u.includes('capture'))).toBe(true);
     expect(urls.some((u) => u.includes('pictures'))).toBe(true);
-    expect(urls.some((u) => u.includes('vehicle'))).toBe(true);
+    expect(urls.some((u) => u.includes('vehicle/single/add'))).toBe(true);
+    expect(urls.some((u) => u.includes('vehicle/single/update'))).toBe(true);
+    expect(urls.some((u) => u.includes('vehicle/single/delete'))).toBe(true);
+    expect(urls.some((u) => u.includes('acsDeviceList'))).toBe(true);
+    expect(urls.some((u) => u.includes('encodeDeviceList'))).toBe(true);
   });
 });

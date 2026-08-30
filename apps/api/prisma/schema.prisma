@@ -5683,7 +5683,7 @@ enum IntegraSyncStatus {
   ERROR
 }
 
-/// Credenciales Artemis por empresa (cifradas). Fallback: env INTEGRA_HIK_*.
+/// Credenciales Artemis/HCT por empresa (cifradas). Fallback: env INTEGRA_HIK_*.
 model IntegraSite {
   id              Int       @id @default(autoincrement())
   companyId       Int
@@ -5713,6 +5713,8 @@ model IntegraSite {
   modulesOverride Json?
   label           String?  @db.VarChar(120)
   notes           String?  @db.Text
+  /// ARTEMIS (HikCentral on-prem) | HCT (Hik-Connect for Teams cloud) — ADR-0019
+  provider        String   @default("ARTEMIS") @db.VarChar(16)
 
   @@index([companyId, isActive])
   @@unique([companyId, name])
