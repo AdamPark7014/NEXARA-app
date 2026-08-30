@@ -120,6 +120,13 @@
   background: color-mix(in srgb, var(--ig-accent) 8%, white);
 }
 
+.hudChip[data-active="1"] {
+  border-color: var(--ig-accent);
+  color: var(--ig-accent-deep);
+  background: color-mix(in srgb, var(--ig-accent) 12%, white);
+  font-weight: 700;
+}
+
 /* ── Hero ─────────────────────────────────────────────────── */
 .hero {
   display: grid;
@@ -586,4 +593,326 @@
 .tableScroll {
   max-height: min(62vh, 640px);
   overflow: auto;
+}
+
+/* ── Console kit (dense ops) ─────────────────────────────── */
+.igPage {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.igToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--ig-panel) 92%, var(--ig-ink));
+  border: 1px solid var(--ig-line);
+}
+
+.igToolbarLeft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  min-width: 0;
+}
+
+.igToolbarTitle {
+  margin: 0;
+  font-family: var(--ig-font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ig-ink);
+}
+
+.igToolbarMeta {
+  font-family: var(--ig-font-mono);
+  font-size: 11px;
+  color: var(--ig-muted);
+}
+
+.igToolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.igSplit {
+  display: grid;
+  grid-template-columns: var(--ig-split-left, 42%) 1fr;
+  gap: 10px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+@media (max-width: 960px) {
+  .igSplit {
+    grid-template-columns: 1fr;
+  }
+}
+
+.igSplitPane {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.igPanel {
+  background: var(--ig-panel);
+  border: 1px solid var(--ig-line);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.igPanelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ig-line);
+  background: color-mix(in srgb, var(--ig-surface) 70%, white);
+}
+
+.igPanelTitle {
+  margin: 0;
+  display: inline;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ig-ink-soft);
+}
+
+.igPanelCount {
+  margin-left: 8px;
+  font-family: var(--ig-font-mono);
+  font-size: 11px;
+  color: var(--ig-muted);
+}
+
+.igPanelBody {
+  padding: 8px 10px 10px;
+  overflow: auto;
+}
+
+.igPanelBodyFlush {
+  padding: 0;
+  overflow: auto;
+  max-height: min(70vh, 720px);
+}
+
+.igTableWrap {
+  width: 100%;
+  overflow: auto;
+}
+
+.igTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.igTable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+  background: #eef2f6;
+  border-bottom: 1px solid var(--ig-line);
+  white-space: nowrap;
+}
+
+.igTable tbody td {
+  padding: 5px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ig-line) 70%, transparent);
+  color: var(--ig-ink);
+  vertical-align: middle;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.igTable tbody td[data-mono="1"] {
+  font-family: var(--ig-font-mono);
+  font-size: 11px;
+  color: var(--ig-ink-soft);
+}
+
+.igTable tbody tr[data-click="1"] {
+  cursor: pointer;
+}
+
+.igTable tbody tr[data-click="1"]:hover {
+  background: color-mix(in srgb, var(--ig-accent) 7%, white);
+}
+
+.igTable tbody tr[data-selected="1"] {
+  background: color-mix(in srgb, var(--ig-accent) 12%, white);
+}
+
+.igTable tbody tr[data-tone="ok"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--ig-ok);
+}
+
+.igTable tbody tr[data-tone="warn"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--ig-warn);
+}
+
+.igTable tbody tr[data-tone="danger"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--ig-danger);
+}
+
+.igTable tbody tr[data-tone="muted"] {
+  opacity: 0.55;
+}
+
+.igEmpty {
+  margin: 0;
+  padding: 18px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ig-muted);
+}
+
+.igBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--ig-line);
+  color: var(--ig-ink-soft);
+  background: white;
+  white-space: nowrap;
+}
+
+.igBadge[data-tone="ok"] {
+  color: var(--ig-ok);
+  border-color: color-mix(in srgb, var(--ig-ok) 35%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-ok) 8%, white);
+}
+
+.igBadge[data-tone="warn"] {
+  color: var(--ig-warn);
+  border-color: color-mix(in srgb, var(--ig-warn) 35%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-warn) 8%, white);
+}
+
+.igBadge[data-tone="danger"] {
+  color: var(--ig-danger);
+  border-color: color-mix(in srgb, var(--ig-danger) 35%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-danger) 8%, white);
+}
+
+.igBadge[data-tone="accent"] {
+  color: var(--ig-accent-deep);
+  border-color: color-mix(in srgb, var(--ig-accent) 40%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-accent) 10%, white);
+}
+
+.igBtnDanger {
+  color: var(--ig-danger) !important;
+}
+
+.doorMatrix {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px;
+}
+
+.doorCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--ig-line);
+  background: white;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  min-height: 72px;
+}
+
+.doorCell:hover {
+  border-color: var(--ig-accent);
+}
+
+.doorCell[data-online="0"] {
+  opacity: 0.55;
+}
+
+.doorCellName {
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.doorCellMeta {
+  font-family: var(--ig-font-mono);
+  font-size: 10px;
+  color: var(--ig-muted);
+}
+
+.opsGrid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 960px) {
+  .opsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.modRail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.modChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 650;
+  text-decoration: none;
+  color: var(--ig-ink);
+  border: 1px solid var(--ig-line);
+  background: white;
+}
+
+.modChip:hover {
+  border-color: var(--ig-accent);
+  color: var(--ig-accent-deep);
+}
+
+.modChipMark {
+  font-family: var(--ig-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--ig-accent-deep);
 }

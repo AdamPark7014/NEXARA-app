@@ -2,24 +2,25 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  DashPage,
-  DashHero,
-  DashGrid,
-  DashCol,
-  DashPanel,
-  ListRow,
-  DashPill,
-} from "@/components/dashboard/DashKit";
-import styles from "../integra.module.css";
+  IgBadge,
+  IgBtn,
+  IgError,
+  IgField,
+  IgFilters,
+  IgPage,
+  IgPanel,
+  IgSplit,
+  IgTable,
+  IgToolbar,
+} from "../_Console";
 import {
-  btnGhost,
-  btnPrimary,
   DOOR_CONTROL_OPTIONS,
   DoorControlType,
   inputStyle,
   integraApi,
   selectStyle,
 } from "../_lib";
+import styles from "../integra.module.css";
 
 type Door = {
   id: string;
@@ -29,7 +30,7 @@ type Door = {
   status?: string;
   doorState?: string | number | null;
 };
-type Group = { id: string; name: string; description?: string };
+type Group = { id: string; name: string };
 type Person = { id: string; name: string; code?: string };
 type Device = { id: string; name: string; kind: string; ip?: string; online?: boolean };
 
@@ -47,6 +48,7 @@ export default function IntegraAccessPage() {
   const [controlType, setControlType] = useState<DoorControlType>("2");
   const [kindFilter, setKindFilter] = useState<"ALL" | "ACS" | "ENCODE">("ALL");
   const [liveDoors, setLiveDoors] = useState(false);
+  const [selectedDoor, setSelectedDoor] = useState<Door | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -86,39 +88,6 @@ export default function IntegraAccessPage() {
     }
   };
 
-  const togglePerson = (id: string) => {
-    setSelectedPeople((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
-  };
-
-  const assign = async () => {
-    if (!selectedGroup || selectedPeople.length === 0) return;
-    setBusy("assign");
-    try {
-      await integraApi(`integra/privilege-groups/${encodeURIComponent(selectedGroup)}/persons`, {
-        method: "POST",
-        body: JSON.stringify({ personIds: selectedPeople }),
-      });
-      setSelectedPeople([]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const applyAuth = async () => {
-    setBusy("apply");
-    try {
-      await integraApi("integra/privilege/apply", { method: "POST" });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
-    } finally {
-      setBusy(null);
-    }
-  };
-
   const filteredDoors = useMemo(
     () =>
       doors.filter(
@@ -142,173 +111,217 @@ export default function IntegraAccessPage() {
     (d) => kindFilter === "ALL" || d.kind === kindFilter,
   );
 
+  const onlineN = doors.filter((d) => d.online !== false).length;
+
   return (
-    <DashPage>
-      <DashHero
-        eyebrow="Accesos"
-        title="Control de puertas"
-        subtitle="doControl Artemis (abrir/cerrar/remain) · devices · privilegios con picker."
+    <IgPage>
+      <IgToolbar
+        title="Control de acceso"
+        meta={`${onlineN}/${doors.length} puertas online · ${devices.length} devices · ${groups.length} grupos`}
         actions={
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" style={btnGhost} onClick={() => setLiveDoors((v) => !v)}>
-              {liveDoors ? "Live ON" : "Espejo"}
-            </button>
-            <button type="button" style={btnGhost} onClick={() => void load()}>
-              Actualizar
-            </button>
-          </div>
+          <>
+            <IgBtn onClick={() => setLiveDoors((v) => !v)}>{liveDoors ? "Live ON" : "Espejo"}</IgBtn>
+            <IgBtn onClick={() => void load()}>Refresh</IgBtn>
+          </>
         }
       />
-      {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
+      <IgError>{error}</IgError>
 
-      <div className={styles.filterBar}>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Acción doControl</span>
+      <IgFilters>
+        <IgField label="doControl">
           <select
             value={controlType}
             onChange={(e) => setControlType(e.target.value as DoorControlType)}
             style={selectStyle}
           >
             {DOOR_CONTROL_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Filtrar puertas</span>
-          <input
-            placeholder="Nombre / región / id…"
-            value={doorQ}
-            onChange={(e) => setDoorQ(e.target.value)}
-            style={inputStyle}
-          />
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Devices</span>
-          <select
-            value={kindFilter}
-            onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}
-            style={selectStyle}
-          >
+        </IgField>
+        <IgField label="Filtrar puertas">
+          <input value={doorQ} onChange={(e) => setDoorQ(e.target.value)} style={inputStyle} placeholder="nombre / región / id" />
+        </IgField>
+        <IgField label="Devices">
+          <select value={kindFilter} onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)} style={selectStyle}>
             <option value="ALL">ACS + Encode</option>
-            <option value="ACS">Solo ACS</option>
-            <option value="ENCODE">Solo Encode</option>
+            <option value="ACS">ACS</option>
+            <option value="ENCODE">Encode</option>
           </select>
-        </div>
+        </IgField>
+        {selectedDoor && (
+          <IgField label="Seleccionada">
+            <IgBtn variant="primary" disabled={busy === selectedDoor.id} onClick={() => void control(selectedDoor.id)}>
+              {busy === selectedDoor.id ? "…" : `Ejecutar → ${selectedDoor.name}`}
+            </IgBtn>
+          </IgField>
+        )}
+      </IgFilters>
+
+      <div className={styles.doorMatrix}>
+        {filteredDoors.slice(0, 24).map((d) => (
+          <button
+            key={d.id}
+            type="button"
+            className={styles.doorCell}
+            data-online={d.online === false ? "0" : "1"}
+            onClick={() => {
+              setSelectedDoor(d);
+              void control(d.id);
+            }}
+          >
+            <span className={styles.doorCellName}>{d.name}</span>
+            <span className={styles.doorCellMeta}>{d.location || d.id}</span>
+            <IgBadge tone={d.online === false ? "warn" : "ok"}>
+              {d.status || (d.online === false ? "off" : "online")}
+            </IgBadge>
+          </button>
+        ))}
       </div>
 
-      <DashGrid>
-        <DashCol span={6}>
-          <DashPanel title="Puertas" subtitle={`${filteredDoors.length} / ${doors.length}`}>
-            <div className={styles.tableScroll}>
-              {filteredDoors.map((d) => (
-                <ListRow
-                  key={d.id}
-                  title={d.name}
-                  sub={[d.location, d.status, d.doorState != null ? `state ${d.doorState}` : null, d.id]
-                    .filter(Boolean)
-                    .join(" · ")}
-                  trail={
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                      <DashPill tone={d.online ? "positive" : "warning"}>
-                        {d.online ? "online" : "off"}
-                      </DashPill>
-                      <button
-                        type="button"
-                        style={btnPrimary}
-                        disabled={busy === d.id}
-                        onClick={() => void control(d.id)}
-                      >
-                        {busy === d.id ? "…" : "Ejecutar"}
-                      </button>
-                    </div>
-                  }
-                />
-              ))}
-            </div>
-          </DashPanel>
-          <DashPanel title="Devices" subtitle={`${filteredDevices.length}`}>
-            <div className={styles.tableScroll}>
-              {filteredDevices.map((d) => (
-                <ListRow
-                  key={`${d.kind}-${d.id}`}
-                  title={d.name}
-                  sub={[d.kind, d.ip, d.id].filter(Boolean).join(" · ")}
-                  trail={
-                    <DashPill tone={d.online ? "positive" : "warning"}>
-                      {d.online ? "online" : "off"}
-                    </DashPill>
-                  }
-                />
-              ))}
-            </div>
-          </DashPanel>
-        </DashCol>
-        <DashCol span={6}>
-          <DashPanel title="Privilegios" subtitle="Asignar personas a grupo + reaplicar auth">
-            <select
-              value={selectedGroup}
-              onChange={(e) => setSelectedGroup(e.target.value)}
-              style={{ ...selectStyle, marginBottom: 8, maxWidth: "100%" }}
-            >
-              <option value="">Grupo…</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-            <input
-              placeholder="Filtrar personas…"
-              value={personFilter}
-              onChange={(e) => setPersonFilter(e.target.value)}
-              style={{ ...inputStyle, marginBottom: 8, maxWidth: "100%" }}
+      <IgSplit
+        leftWidth="55%"
+        left={
+          <IgPanel title="Puertas" count={`${filteredDoors.length}/${doors.length}`} flush>
+            <IgTable
+              selectedKey={selectedDoor?.id}
+              onRowClick={(key) => setSelectedDoor(doors.find((d) => d.id === key) || null)}
+              columns={[
+                { key: "n", label: "Nombre" },
+                { key: "l", label: "Región" },
+                { key: "s", label: "Estado" },
+                { key: "o", label: "Link" },
+                { key: "id", label: "IndexCode", mono: true },
+                { key: "x", label: "", width: "88px" },
+              ]}
+              rows={filteredDoors.map((d) => ({
+                key: d.id,
+                tone: d.online === false ? "warn" : "ok",
+                cells: {
+                  n: d.name,
+                  l: d.location || "—",
+                  s: d.status || String(d.doorState ?? "—"),
+                  o: (
+                    <IgBadge tone={d.online === false ? "warn" : "ok"}>
+                      {d.online === false ? "off" : "online"}
+                    </IgBadge>
+                  ),
+                  id: d.id,
+                  x: (
+                    <IgBtn
+                      variant="primary"
+                      disabled={busy === d.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void control(d.id);
+                      }}
+                    >
+                      {busy === d.id ? "…" : "Go"}
+                    </IgBtn>
+                  ),
+                },
+              }))}
+              empty="Sin puertas"
             />
-            <div style={{ maxHeight: 280, overflow: "auto", marginBottom: 8 }}>
-              {filteredPeople.map((p) => (
-                <label
-                  key={p.id}
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    fontSize: 13,
-                    padding: "4px 0",
-                    cursor: "pointer",
+          </IgPanel>
+        }
+        right={
+          <>
+            <IgPanel title="Privilegios" count={`${selectedPeople.length} sel`}>
+              <select
+                value={selectedGroup}
+                onChange={(e) => setSelectedGroup(e.target.value)}
+                style={{ ...selectStyle, maxWidth: "100%", marginBottom: 8 }}
+              >
+                <option value="">Grupo…</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+              <input
+                placeholder="Filtrar personas…"
+                value={personFilter}
+                onChange={(e) => setPersonFilter(e.target.value)}
+                style={{ ...inputStyle, maxWidth: "100%", marginBottom: 8 }}
+              />
+              <div style={{ maxHeight: 200, overflow: "auto", marginBottom: 8 }}>
+                {filteredPeople.map((p) => (
+                  <label key={p.id} style={{ display: "flex", gap: 6, fontSize: 12, padding: "3px 0", cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedPeople.includes(p.id)}
+                      onChange={() =>
+                        setSelectedPeople((prev) =>
+                          prev.includes(p.id) ? prev.filter((x) => x !== p.id) : [...prev, p.id],
+                        )
+                      }
+                    />
+                    {p.name}{p.code ? ` (${p.code})` : ""}
+                  </label>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <IgBtn
+                  variant="primary"
+                  disabled={busy === "assign" || !selectedGroup || selectedPeople.length === 0}
+                  onClick={async () => {
+                    setBusy("assign");
+                    try {
+                      await integraApi(
+                        `integra/privilege-groups/${encodeURIComponent(selectedGroup)}/persons`,
+                        { method: "POST", body: JSON.stringify({ personIds: selectedPeople }) },
+                      );
+                      setSelectedPeople([]);
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "Error");
+                    } finally {
+                      setBusy(null);
+                    }
                   }}
                 >
-                  <input
-                    type="checkbox"
-                    checked={selectedPeople.includes(p.id)}
-                    onChange={() => togglePerson(p.id)}
-                  />
-                  {p.name}
-                  {p.code ? ` (${p.code})` : ""}
-                </label>
-              ))}
-            </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                style={btnPrimary}
-                disabled={busy === "assign"}
-                onClick={() => void assign()}
-              >
-                Asignar ({selectedPeople.length})
-              </button>
-              <button
-                type="button"
-                style={btnGhost}
-                disabled={busy === "apply"}
-                onClick={() => void applyAuth()}
-              >
-                Reaplicar auth
-              </button>
-            </div>
-          </DashPanel>
-        </DashCol>
-      </DashGrid>
-    </DashPage>
+                  Asignar
+                </IgBtn>
+                <IgBtn
+                  disabled={busy === "apply"}
+                  onClick={async () => {
+                    setBusy("apply");
+                    try {
+                      await integraApi("integra/privilege/apply", { method: "POST" });
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "Error");
+                    } finally {
+                      setBusy(null);
+                    }
+                  }}
+                >
+                  Reaplicar
+                </IgBtn>
+              </div>
+            </IgPanel>
+            <IgPanel title="Devices" count={filteredDevices.length} flush>
+              <IgTable
+                columns={[
+                  { key: "n", label: "Nombre" },
+                  { key: "k", label: "Kind" },
+                  { key: "ip", label: "IP", mono: true },
+                  { key: "o", label: "Link" },
+                ]}
+                rows={filteredDevices.map((d) => ({
+                  key: `${d.kind}-${d.id}`,
+                  tone: d.online === false ? "warn" : "ok",
+                  cells: {
+                    n: d.name,
+                    k: d.kind,
+                    ip: d.ip || "—",
+                    o: <IgBadge tone={d.online === false ? "warn" : "ok"}>{d.online === false ? "off" : "on"}</IgBadge>,
+                  },
+                }))}
+                empty="Sin devices en espejo"
+              />
+            </IgPanel>
+          </>
+        }
+      />
+    </IgPage>
   );
 }

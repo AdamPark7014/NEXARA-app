@@ -142,6 +142,8 @@ export class IntegraArtemisService {
         ...h,
         cameras: 0,
         doors: 0,
+        doorsOnline: 0,
+        doorsOffline: 0,
         people: 0,
         devices: 0,
         vehicles: 0,
@@ -151,7 +153,7 @@ export class IntegraArtemisService {
       };
     }
     const siteFilter = siteId ? { siteId } : {};
-    const [cameras, doors, people, devices, vehicles, regions, lastSync, h, capabilities] =
+    const [cameras, doors, people, devices, vehicles, regions, lastSync, h, capabilities, doorsOnline, doorsOffline] =
       await Promise.all([
         this.prisma.integraCamera.count({ where: { companyId, ...siteFilter } }),
         this.prisma.integraDoor.count({ where: { companyId, ...siteFilter } }),
@@ -162,17 +164,53 @@ export class IntegraArtemisService {
         this.sync.lastRun(companyId, siteId ?? undefined),
         this.health(companyId, siteId),
         this.portfolioSvc.capabilities(companyId, siteId, opts),
+        this.prisma.integraDoor.count({ where: { companyId, ...siteFilter, online: true } }),
+        this.prisma.integraDoor.count({ where: { companyId, ...siteFilter, online: false } }),
       ]);
     return {
       ...h,
       cameras,
       doors,
+      doorsOnline,
+      doorsOffline,
       people,
       devices,
       vehicles,
       regions,
       lastSync,
       capabilities,
+    };
+  }
+
+  async listAudit(
+    companyId: number | null,
+    opts: { limit?: number; siteId?: number | null } = {},
+  ) {
+    const limit = Math.min(Math.max(opts.limit ?? 40, 1), 200);
+    const rows = await this.prisma.auditLog.findMany({
+      where: {
+        ...(companyId != null ? { companyId } : {}),
+        OR: [
+          { entityType: 'Integra' },
+          { source: 'integra' },
+          { action: { startsWith: 'integra.' } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: { user: { select: { id: true, email: true, nombre: true } } },
+    });
+    return {
+      total: rows.length,
+      items: rows.map((r) => ({
+        id: r.id,
+        action: r.action,
+        entityId: r.entityId,
+        createdAt: r.createdAt.toISOString(),
+        userEmail: r.user?.email || null,
+        userName: r.user?.nombre || null,
+        changes: r.changes,
+      })),
     };
   }
 

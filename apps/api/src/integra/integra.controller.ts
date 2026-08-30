@@ -120,6 +120,17 @@ export class IntegraController {
     });
   }
 
+  @Get('audit')
+  @ApiOperation({ summary: 'Bitácora mutaciones Integra (AuditService)' })
+  auditLog(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('limit') limit?: string,
+  ) {
+    return this.integra.listAudit(companyId, {
+      limit: limit ? parseInt(limit, 10) : 40,
+    });
+  }
+
   @Get('portfolio')
   @ApiOperation({ summary: 'Portfolio multi-cliente (super-admin ve todos)' })
   portfolio(

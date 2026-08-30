@@ -2,19 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  DashPage,
-  DashHero,
-  DashPanel,
-  ListRow,
-  DashPill,
-  DashGrid,
-  DashCol,
-} from "@/components/dashboard/DashKit";
+  IgBadge,
+  IgBtn,
+  IgError,
+  IgField,
+  IgFilters,
+  IgPage,
+  IgPanel,
+  IgSplit,
+  IgTable,
+  IgToolbar,
+} from "../_Console";
 import { IntegraHlsPlayer } from "../_HlsPlayer";
-import styles from "../integra.module.css";
 import {
-  btnGhost,
-  btnPrimary,
   defaultRangeHours,
   fromDatetimeLocalValue,
   inputStyle,
@@ -22,6 +22,7 @@ import {
   selectStyle,
   toDatetimeLocalValue,
 } from "../_lib";
+import styles from "../integra.module.css";
 
 type Cam = {
   id: string;
@@ -117,8 +118,7 @@ export default function IntegraVideoPage() {
       setSlots((prev) => {
         if (!multi) return [slot];
         const without = prev.filter((s) => s.id !== cam.id);
-        const next = [...without, slot];
-        return next.slice(-4);
+        return [...without, slot].slice(-4);
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error stream");
@@ -127,90 +127,38 @@ export default function IntegraVideoPage() {
     }
   };
 
-  const capture = async () => {
-    if (!selected) return;
-    setBusy("cap");
-    try {
-      await integraApi(`integra/cameras/${encodeURIComponent(selected)}/capture`, {
-        method: "POST",
-      });
-      setNote("Snapshot solicitado a Artemis");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error capture");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const loadPlayback = async () => {
-    if (!selected) return;
-    const beginTime = fromDatetimeLocalValue(begin);
-    const endTime = fromDatetimeLocalValue(end);
-    if (!beginTime || !endTime) return;
-    setBusy("pb");
-    try {
-      const data = await integraApi<{ url: string | null }>(
-        `integra/cameras/${encodeURIComponent(selected)}/playback`,
-        { method: "POST", body: JSON.stringify({ beginTime, endTime }) },
-      );
-      setPlaybackUrl(data.url);
-      setNote(data.url ? "Playback RTSP listo" : "Sin URL playback");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error playback");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const statusTone = (status?: string | number) => {
+  const onlineish = (status?: string | number) => {
     const s = String(status ?? "");
-    if (s === "1" || s === "online") return "positive" as const;
-    if (!s) return "neutral" as const;
-    return "warning" as const;
+    return s === "1" || s === "online" || s === "";
   };
 
   return (
-    <DashPage>
-      <DashHero
-        eyebrow="Video"
-        title="Wall de cámaras"
-        subtitle="Hasta 4 lives HLS · filtro región/encode · snapshot · playback con rango real."
+    <IgPage>
+      <IgToolbar
+        title="Video wall"
+        meta={`${filtered.length}/${items.length} cams · wall ${slots.length}/4`}
         actions={
-          <button type="button" style={btnGhost} onClick={() => void load()}>
-            Actualizar
-          </button>
+          <>
+            <IgBtn onClick={() => setSlots([])}>Limpiar wall</IgBtn>
+            <IgBtn onClick={() => void load()}>Refresh</IgBtn>
+          </>
         }
       />
-      {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
+      <IgError>{error}</IgError>
 
-      <div className={styles.filterBar}>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Región</span>
+      <IgFilters>
+        <IgField label="Región">
           <select value={region} onChange={(e) => setRegion(e.target.value)} style={selectStyle}>
             <option value="">Todas</option>
             {regions.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
+              <option key={r} value={r}>{r}</option>
             ))}
           </select>
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Buscar</span>
-          <input
-            placeholder="Nombre / id / encode…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            style={inputStyle}
-          />
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Wall</span>
-          <button type="button" style={btnGhost} onClick={() => setSlots([])}>
-            Limpiar wall ({slots.length}/4)
-          </button>
-        </div>
-      </div>
+        </IgField>
+        <IgField label="Buscar">
+          <input value={q} onChange={(e) => setQ(e.target.value)} style={inputStyle} placeholder="nombre / id / encode" />
+        </IgField>
+      </IgFilters>
 
       {slots.length > 0 && (
         <div className={styles.camGrid}>
@@ -218,13 +166,11 @@ export default function IntegraVideoPage() {
             <div key={s.id} className={styles.camTile}>
               <div className={styles.camTileHead}>
                 <span>{s.name}</span>
-                <button type="button" style={btnGhost} onClick={() => setSlots((p) => p.filter((x) => x.id !== s.id))}>
-                  ✕
-                </button>
+                <IgBtn onClick={() => setSlots((p) => p.filter((x) => x.id !== s.id))}>✕</IgBtn>
               </div>
               <div className={styles.camTileBody}>
                 {s.provider === "HCT" ? (
-                  <div style={{ color: "#94a3b8", fontSize: 12, padding: 12 }}>{s.note || "HCT token"}</div>
+                  <div style={{ color: "#94a3b8", fontSize: 12, padding: 12 }}>{s.note || "HCT"}</div>
                 ) : (
                   <IntegraHlsPlayer src={s.hls} />
                 )}
@@ -234,95 +180,147 @@ export default function IntegraVideoPage() {
         </div>
       )}
 
-      <DashGrid>
-        <DashCol span={5}>
-          <DashPanel title="Inventario" subtitle={`${filtered.length} / ${items.length}`}>
-            <div className={styles.tableScroll}>
-              {filtered.map((c) => (
-                <ListRow
-                  key={c.id}
-                  title={c.name}
-                  sub={[c.region, c.encodeDevIndexCode ? `enc ${c.encodeDevIndexCode}` : null, c.id]
-                    .filter(Boolean)
-                    .join(" · ")}
-                  trail={
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                      <DashPill tone={statusTone(c.status)}>{String(c.status ?? "—")}</DashPill>
-                      <button
-                        type="button"
-                        style={btnGhost}
+      <IgSplit
+        leftWidth="48%"
+        left={
+          <IgPanel title="Inventario" count={filtered.length} flush>
+            <IgTable
+              selectedKey={selected}
+              onRowClick={(key) => {
+                const cam = items.find((c) => c.id === key);
+                if (cam) void playLive(cam, true);
+              }}
+              columns={[
+                { key: "n", label: "Cámara" },
+                { key: "r", label: "Región" },
+                { key: "e", label: "Encode", mono: true },
+                { key: "s", label: "Status" },
+                { key: "x", label: "", width: "120px" },
+              ]}
+              rows={filtered.map((c) => ({
+                key: c.id,
+                tone: onlineish(c.status) ? "ok" : "warn",
+                cells: {
+                  n: c.name,
+                  r: c.region || "—",
+                  e: c.encodeDevIndexCode || "—",
+                  s: (
+                    <IgBadge tone={onlineish(c.status) ? "ok" : "warn"}>
+                      {String(c.status ?? "—")}
+                    </IgBadge>
+                  ),
+                  x: (
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <IgBtn
                         disabled={busy === c.id}
-                        onClick={() => void playLive(c, true)}
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          void playLive(c, true);
+                        }}
                       >
-                        +Wall
-                      </button>
-                      <button
-                        type="button"
-                        style={btnPrimary}
+                        +
+                      </IgBtn>
+                      <IgBtn
+                        variant="primary"
                         disabled={busy === c.id}
-                        onClick={() => void playLive(c, false)}
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          void playLive(c, false);
+                        }}
                       >
-                        {busy === c.id ? "…" : "Live"}
-                      </button>
+                        Live
+                      </IgBtn>
                     </div>
+                  ),
+                },
+              }))}
+              empty="Sin cámaras"
+            />
+          </IgPanel>
+        }
+        right={
+          <IgPanel title="Foco / playback" count={selected || "—"}>
+            {note && <p className={styles.doorCellMeta}>{note}</p>}
+            {slots.length === 1 && slots[0].provider !== "HCT" && <IntegraHlsPlayer src={slots[0].hls} />}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+              <IgBtn
+                disabled={!selected}
+                onClick={async () => {
+                  if (!selected) return;
+                  setBusy("cap");
+                  try {
+                    await integraApi(`integra/cameras/${encodeURIComponent(selected)}/capture`, {
+                      method: "POST",
+                    });
+                    setNote("Snapshot OK");
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : "Error capture");
+                  } finally {
+                    setBusy(null);
                   }
-                />
-              ))}
-            </div>
-          </DashPanel>
-        </DashCol>
-        <DashCol span={7}>
-          <DashPanel title={selected ? `Foco · ${selected}` : "Foco / playback"} subtitle={note || "—"}>
-            {slots.length === 1 && slots[0].provider !== "HCT" && (
-              <IntegraHlsPlayer src={slots[0].hls} />
-            )}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-              <button type="button" style={btnGhost} disabled={!selected} onClick={() => void capture()}>
+                }}
+              >
                 Snapshot
-              </button>
+              </IgBtn>
               {slots[0]?.rtsp && (
-                <button
-                  type="button"
-                  style={btnGhost}
-                  onClick={() => void navigator.clipboard.writeText(slots[0].rtsp!)}
-                >
+                <IgBtn onClick={() => void navigator.clipboard.writeText(slots[0].rtsp!)}>
                   Copiar RTSP
-                </button>
+                </IgBtn>
               )}
             </div>
-            <div style={{ marginTop: 16, display: "grid", gap: 8, maxWidth: 360 }}>
-              <strong style={{ fontSize: 13 }}>Playback</strong>
-              <div className={styles.filterField}>
-                <span className={styles.filterLabel}>Inicio</span>
+            <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+              <strong style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ig-muted)" }}>
+                Playback
+              </strong>
+              <IgField label="Inicio">
                 <input type="datetime-local" value={begin} onChange={(e) => setBegin(e.target.value)} style={inputStyle} />
-              </div>
-              <div className={styles.filterField}>
-                <span className={styles.filterLabel}>Fin</span>
+              </IgField>
+              <IgField label="Fin">
                 <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} style={inputStyle} />
-              </div>
+              </IgField>
               <div style={{ display: "flex", gap: 6 }}>
-                <button
-                  type="button"
-                  style={btnGhost}
+                <IgBtn
                   onClick={() => {
                     const r = defaultRangeHours(1);
                     setBegin(r.start);
                     setEnd(r.end);
                   }}
                 >
-                  Última 1h
-                </button>
-                <button type="button" style={btnPrimary} disabled={!selected} onClick={() => void loadPlayback()}>
-                  {busy === "pb" ? "…" : "Obtener playback"}
-                </button>
+                  1h
+                </IgBtn>
+                <IgBtn
+                  variant="primary"
+                  disabled={!selected || busy === "pb"}
+                  onClick={async () => {
+                    if (!selected) return;
+                    const beginTime = fromDatetimeLocalValue(begin);
+                    const endTime = fromDatetimeLocalValue(end);
+                    if (!beginTime || !endTime) return;
+                    setBusy("pb");
+                    try {
+                      const data = await integraApi<{ url: string | null }>(
+                        `integra/cameras/${encodeURIComponent(selected)}/playback`,
+                        { method: "POST", body: JSON.stringify({ beginTime, endTime }) },
+                      );
+                      setPlaybackUrl(data.url);
+                      setNote(data.url ? "Playback listo" : "Sin URL");
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "Error playback");
+                    } finally {
+                      setBusy(null);
+                    }
+                  }}
+                >
+                  Obtener
+                </IgBtn>
               </div>
               {playbackUrl && (
-                <code style={{ fontSize: 11, wordBreak: "break-all" }}>{playbackUrl}</code>
+                <code style={{ fontSize: 10, wordBreak: "break-all" }}>{playbackUrl}</code>
               )}
             </div>
-          </DashPanel>
-        </DashCol>
-      </DashGrid>
-    </DashPage>
+          </IgPanel>
+        }
+      />
+    </IgPage>
   );
 }
