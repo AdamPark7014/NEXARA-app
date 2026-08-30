@@ -6,23 +6,21 @@
 
 ## Hecho en este turno
 
-### Redesign visual Integra
-- `integra.module.css`: consola acero/cian, contraste alto, tiles de módulos, portfolio cards, HUD.
-- Home + Chrome reescritos (sin ListRow genéricos / pills flojos).
-- Login en `integra.*`: skin `stageIntegra` (tarjeta blanca, tipografía tinta, CTA #0e7490).
-- Acento panel Integra → `#0e7490`.
+### Redesign visual Integra (+ login contraste)
+- Consola acero/cian: `integra.module.css`, home tiles, HUD, portfolio cards.
+- Login Integra: fondo acero visible, tarjeta blanca con sombra, copy «Consola de seguridad», CTA cian.
+- Deploy web/api en curso o hecho (`37c9819` + este commit).
 
 ## A medias
-- Credenciales Artemis reales.
-- Homogeneizar páginas módulo (video/access/…) al mismo CSS (aún usan DashKit + botones nuevos).
+- Homogeneizar video/access/settings al mismo CSS.
+- Artemis creds reales.
 
 ## No tocar
 - tickets layout, seed-demo-users, package-lock, xlsx credenciales
 
 ## Siguiente paso
-1. Deploy web y recargar https://integra.nexara.com.mx/login
-2. Tras login, validar home + HUD
-3. Opcional: migrar video/access/settings al mismo shell visual
+1. Hard-refresh https://integra.nexara.com.mx/login
+2. Login y validar home
 
 ## Estado
-- UI lista para commit/deploy.
+- Push/deploy inmediato tras cerrar.
