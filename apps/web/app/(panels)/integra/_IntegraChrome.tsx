@@ -95,11 +95,21 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
           />
         </div>
         <nav className={styles.hudMods} aria-label="Módulos activos">
-          {activeMods.map((m) => (
-            <Link key={m.href} href={m.href} className={styles.hudChip}>
-              {m.title}
-            </Link>
-          ))}
+          {activeMods.map((m) => {
+            const active =
+              pathname === m.href ||
+              (m.href !== "/integra" && pathname?.startsWith(m.href));
+            return (
+              <Link
+                key={m.href}
+                href={m.href}
+                className={styles.hudChip}
+                data-active={active ? "1" : undefined}
+              >
+                {m.title}
+              </Link>
+            );
+          })}
           {!caps && <span className={styles.hudChip}>Cargando…</span>}
         </nav>
       </div>

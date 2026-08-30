@@ -2,24 +2,25 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  DashPage,
-  DashHero,
-  DashPanel,
-  ListRow,
-  DashPill,
-  DashGrid,
-  DashCol,
-} from "@/components/dashboard/DashKit";
-import styles from "../integra.module.css";
+  IgBadge,
+  IgBtn,
+  IgError,
+  IgField,
+  IgFilters,
+  IgPage,
+  IgPanel,
+  IgSplit,
+  IgTable,
+  IgToolbar,
+} from "../_Console";
 import {
-  btnGhost,
-  btnPrimary,
   defaultRangeHours,
   fromDatetimeLocalValue,
   inputStyle,
   integraApi,
   selectStyle,
 } from "../_lib";
+import styles from "../integra.module.css";
 
 type Ev = {
   id: string;
@@ -48,10 +49,11 @@ export default function IntegraEventsPage() {
   const [eventType, setEventType] = useState("");
   const [start, setStart] = useState(range0.start);
   const [end, setEnd] = useState(range0.end);
-  const [limit, setLimit] = useState(80);
+  const [limit, setLimit] = useState(100);
   const [pageNo, setPageNo] = useState(1);
+  const [selected, setSelected] = useState<Ev | null>(null);
   const [thumb, setThumb] = useState<string | null>(null);
-  const [auto, setAuto] = useState(false);
+  const [auto, setAuto] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -92,7 +94,7 @@ export default function IntegraEventsPage() {
 
   useEffect(() => {
     if (!auto) return;
-    const t = setInterval(() => void load(), 30000);
+    const t = setInterval(() => void load(), 20000);
     return () => clearInterval(t);
   }, [auto, load]);
 
@@ -121,132 +123,157 @@ export default function IntegraEventsPage() {
     setPageNo(1);
   };
 
+  const fmt = (iso?: string) =>
+    iso ? new Date(iso).toLocaleString("es-MX", { hour12: false }) : "—";
+
   return (
-    <DashPage>
-      <DashHero
-        eyebrow="Eventos ACS"
-        title="Timeline de accesos"
-        subtitle="Filtros Artemis: rango, puerta (doorIndexCodes), eventType, persona · fotos vía proxy."
+    <IgPage>
+      <IgToolbar
+        title="Eventos ACS"
+        meta={`pág ${pageNo} · ${items.length}/${total} · auto ${auto ? "20s" : "off"}`}
         actions={
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" style={btnGhost} onClick={() => setAuto((v) => !v)}>
-              Auto {auto ? "ON" : "OFF"}
-            </button>
-            <button type="button" style={btnPrimary} disabled={busy} onClick={() => void load()}>
+          <>
+            <IgBtn onClick={() => setAuto((v) => !v)}>Auto {auto ? "ON" : "OFF"}</IgBtn>
+            <IgBtn variant="primary" disabled={busy} onClick={() => void load()}>
               {busy ? "…" : "Buscar"}
-            </button>
-          </div>
+            </IgBtn>
+          </>
         }
       />
-      {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
+      <IgError>{error}</IgError>
 
-      <div className={styles.filterBar}>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Desde</span>
+      <IgFilters>
+        <IgField label="Desde">
           <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} style={inputStyle} />
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Hasta</span>
+        </IgField>
+        <IgField label="Hasta">
           <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} style={inputStyle} />
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Puerta</span>
+        </IgField>
+        <IgField label="Puerta">
           <select value={doorId} onChange={(e) => { setDoorId(e.target.value); setPageNo(1); }} style={selectStyle}>
             <option value="">Todas</option>
             {doors.map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </select>
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Persona</span>
-          <input placeholder="Nombre contiene…" value={personName} onChange={(e) => setPersonName(e.target.value)} style={inputStyle} />
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>personId</span>
-          <input placeholder="Opcional" value={personId} onChange={(e) => setPersonId(e.target.value)} style={inputStyle} />
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>eventType</span>
-          <input placeholder="ej. 196893" value={eventType} onChange={(e) => setEventType(e.target.value)} style={{ ...inputStyle, maxWidth: 120 }} />
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>pageSize</span>
-          <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 90 }}>
-            {[40, 80, 100, 200].map((n) => (
+        </IgField>
+        <IgField label="Persona">
+          <input value={personName} onChange={(e) => setPersonName(e.target.value)} placeholder="contiene…" style={inputStyle} />
+        </IgField>
+        <IgField label="personId">
+          <input value={personId} onChange={(e) => setPersonId(e.target.value)} style={inputStyle} />
+        </IgField>
+        <IgField label="eventType">
+          <input value={eventType} onChange={(e) => setEventType(e.target.value)} placeholder="196893" style={{ ...inputStyle, maxWidth: 110 }} />
+        </IgField>
+        <IgField label="pageSize">
+          <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 80 }}>
+            {[50, 100, 200].map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
           </select>
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Presets</span>
-          <div style={{ display: "flex", gap: 6 }}>
-            <button type="button" style={btnGhost} onClick={() => preset(1)}>1h</button>
-            <button type="button" style={btnGhost} onClick={() => preset(24)}>24h</button>
-            <button type="button" style={btnGhost} onClick={() => preset(168)}>7d</button>
+        </IgField>
+        <IgField label="Rango">
+          <div style={{ display: "flex", gap: 4 }}>
+            <IgBtn onClick={() => preset(1)}>1h</IgBtn>
+            <IgBtn onClick={() => preset(24)}>24h</IgBtn>
+            <IgBtn onClick={() => preset(168)}>7d</IgBtn>
           </div>
-        </div>
-      </div>
+        </IgField>
+      </IgFilters>
 
-      <DashGrid>
-        <DashCol span={thumb ? 8 : 12}>
-          <DashPanel title="Resultados" subtitle={`página ${pageNo} · ${items.length} / total Artemis ${total}`}>
-            <div className={styles.tableScroll}>
-              {items.map((e) => (
-                <ListRow
-                  key={e.id || `${e.timestamp}-${e.doorId}-${e.personId}`}
-                  title={e.personName || e.eventType || "Evento"}
-                  sub={[
-                    e.doorName || e.doorId,
-                    e.eventType,
-                    e.eventTypeCode != null ? `#${e.eventTypeCode}` : null,
-                    e.cardNo ? `card ${e.cardNo}` : null,
-                    e.readerName,
-                    e.timestamp,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                  trail={
-                    e.picUri ? (
-                      <button type="button" style={btnGhost} onClick={() => void loadPic(e.picUri!)}>
-                        Foto
-                      </button>
-                    ) : (
-                      <DashPill tone="neutral">sin foto</DashPill>
-                    )
-                  }
-                />
-              ))}
-              {items.length === 0 && (
-                <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Sin eventos en el rango.</p>
-              )}
+      <IgSplit
+        leftWidth="68%"
+        left={
+          <IgPanel title="Timeline" count={`${items.length}`} flush>
+            <IgTable
+              selectedKey={selected?.id}
+              onRowClick={(key) => {
+                const row = items.find((e) => (e.id || `${e.timestamp}`) === key) || null;
+                setSelected(row);
+                setThumb(null);
+              }}
+              columns={[
+                { key: "t", label: "Hora", width: "18%", mono: true },
+                { key: "p", label: "Persona" },
+                { key: "d", label: "Puerta" },
+                { key: "ty", label: "Tipo" },
+                { key: "c", label: "Card", mono: true },
+                { key: "r", label: "Reader" },
+                { key: "f", label: "Foto", width: "70px" },
+              ]}
+              rows={items.map((e) => ({
+                key: e.id || `${e.timestamp}-${e.doorId}-${e.personId}`,
+                cells: {
+                  t: fmt(e.timestamp),
+                  p: e.personName || e.personId || "—",
+                  d: e.doorName || e.doorId || "—",
+                  ty: (
+                    <>
+                      {e.eventType || "—"}{" "}
+                      {e.eventTypeCode != null && (
+                        <IgBadge tone="neutral">#{e.eventTypeCode}</IgBadge>
+                      )}
+                    </>
+                  ),
+                  c: e.cardNo || "—",
+                  r: e.readerName || "—",
+                  f: e.picUri ? (
+                    <IgBtn
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        void loadPic(e.picUri!);
+                        setSelected(e);
+                      }}
+                    >
+                      Ver
+                    </IgBtn>
+                  ) : (
+                    "—"
+                  ),
+                },
+              }))}
+              empty="Sin eventos en el rango"
+            />
+            <div style={{ display: "flex", gap: 6, padding: 8 }}>
+              <IgBtn disabled={pageNo <= 1} onClick={() => setPageNo((p) => Math.max(1, p - 1))}>
+                ←
+              </IgBtn>
+              <IgBtn onClick={() => setPageNo((p) => p + 1)}>→</IgBtn>
             </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-              <button type="button" style={btnGhost} disabled={pageNo <= 1} onClick={() => setPageNo((p) => Math.max(1, p - 1))}>
-                ← Página
-              </button>
-              <button type="button" style={btnGhost} onClick={() => setPageNo((p) => p + 1)}>
-                Página →
-              </button>
-            </div>
-          </DashPanel>
-        </DashCol>
-        {thumb && (
-          <DashCol span={4}>
-            <DashPanel title="Foto evento" subtitle="proxy API">
-              {thumb.startsWith("http") || thumb.startsWith("data:") ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={thumb} alt="evento" style={{ maxWidth: "100%" }} />
-              ) : (
-                <code style={{ fontSize: 11, wordBreak: "break-all" }}>{thumb}</code>
-              )}
-              <button type="button" style={{ ...btnGhost, marginTop: 8 }} onClick={() => setThumb(null)}>
-                Cerrar
-              </button>
-            </DashPanel>
-          </DashCol>
-        )}
-      </DashGrid>
-    </DashPage>
+          </IgPanel>
+        }
+        right={
+          <IgPanel title="Detalle" count={selected ? selected.id.slice(0, 12) : "—"}>
+            {!selected ? (
+              <p className={styles.igEmpty}>Selecciona una fila</p>
+            ) : (
+              <div style={{ display: "grid", gap: 8, fontSize: 12 }}>
+                <div><strong>{selected.personName || "Sin persona"}</strong></div>
+                <div className={styles.doorCellMeta}>{fmt(selected.timestamp)}</div>
+                <div>Puerta: {selected.doorName || selected.doorId}</div>
+                <div>Tipo: {selected.eventType} {selected.eventTypeCode != null ? `(${selected.eventTypeCode})` : ""}</div>
+                <div>Card: {selected.cardNo || "—"}</div>
+                <div>Reader: {selected.readerName || "—"}</div>
+                <div className={styles.doorCellMeta}>personId {selected.personId || "—"}</div>
+                {selected.picUri && (
+                  <IgBtn variant="primary" onClick={() => void loadPic(selected.picUri!)}>
+                    Cargar foto
+                  </IgBtn>
+                )}
+                {thumb && (
+                  thumb.startsWith("http") || thumb.startsWith("data:") ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={thumb} alt="evento" style={{ maxWidth: "100%", border: "1px solid var(--ig-line)" }} />
+                  ) : (
+                    <code style={{ fontSize: 10, wordBreak: "break-all" }}>{thumb}</code>
+                  )
+                )}
+              </div>
+            )}
+          </IgPanel>
+        }
+      />
+    </IgPage>
   );
 }

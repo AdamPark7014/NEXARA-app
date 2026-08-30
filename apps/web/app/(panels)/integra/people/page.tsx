@@ -2,16 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  DashPage,
-  DashHero,
-  DashGrid,
-  DashCol,
-  DashPanel,
-  ListRow,
-  DashPill,
-} from "@/components/dashboard/DashKit";
-import styles from "../integra.module.css";
-import { btnGhost, btnPrimary, inputStyle, integraApi, selectStyle } from "../_lib";
+  IgBadge,
+  IgBtn,
+  IgError,
+  IgField,
+  IgFilters,
+  IgPage,
+  IgPanel,
+  IgSplit,
+  IgTable,
+  IgToolbar,
+} from "../_Console";
+import { inputStyle, integraApi, selectStyle } from "../_lib";
 
 type Person = { id: string; name: string; code?: string; orgId?: string; orgName?: string };
 type Org = { id: string; name: string; parentId?: string };
@@ -69,162 +71,143 @@ export default function IntegraPeoplePage() {
     setDetail(null);
     setBusy(true);
     try {
-      const data = await integraApi(`integra/people/${encodeURIComponent(p.id)}`);
-      setDetail(data);
+      setDetail(await integraApi(`integra/people/${encodeURIComponent(p.id)}`));
     } catch (e) {
-      setDetail({ error: e instanceof Error ? e.message : "Sin detalle live" });
+      setDetail({ error: e instanceof Error ? e.message : "Sin detalle" });
     } finally {
       setBusy(false);
     }
   };
 
-  const add = async () => {
-    if (!name || !orgId) return;
-    try {
-      await integraApi("integra/people", {
-        method: "POST",
-        body: JSON.stringify({
-          personName: name,
-          personCode: code || undefined,
-          orgIndexCode: orgId,
-        }),
-      });
-      setName("");
-      setCode("");
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
-    }
-  };
-
-  const remove = async (id: string) => {
-    if (!confirm("¿Eliminar persona en Artemis?")) return;
-    await integraApi(`integra/people/${encodeURIComponent(id)}`, { method: "DELETE" });
-    setSelected(null);
-    setDetail(null);
-    await load();
-  };
-
   return (
-    <DashPage>
-      <DashHero
-        eyebrow="Personas"
-        title="Directorio"
-        subtitle="Espejo / live · filtro org · detalle personInfo Artemis · alta con orgIndexCode."
+    <IgPage>
+      <IgToolbar
+        title="Personas"
+        meta={`${filtered.length}/${people.length} · ${orgs.length} orgs · ${live ? "live" : "espejo"}`}
         actions={
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" style={btnGhost} onClick={() => setLive((v) => !v)}>
-              {live ? "Live Artemis" : "Espejo"}
-            </button>
-            <button type="button" style={btnGhost} onClick={() => void load()}>
-              Actualizar
-            </button>
-          </div>
+          <>
+            <IgBtn onClick={() => setLive((v) => !v)}>{live ? "Live" : "Espejo"}</IgBtn>
+            <IgBtn onClick={() => void load()}>Refresh</IgBtn>
+          </>
         }
       />
-      {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
+      <IgError>{error}</IgError>
 
-      <div className={styles.filterBar}>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Org</span>
+      <IgFilters>
+        <IgField label="Org">
           <select value={orgFilter} onChange={(e) => setOrgFilter(e.target.value)} style={selectStyle}>
             <option value="">Todas</option>
             {orgs.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
+              <option key={o.id} value={o.id}>{o.name}</option>
             ))}
           </select>
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Buscar</span>
-          <input placeholder="Nombre / código / id" value={q} onChange={(e) => setQ(e.target.value)} style={inputStyle} />
-        </div>
-      </div>
+        </IgField>
+        <IgField label="Buscar">
+          <input value={q} onChange={(e) => setQ(e.target.value)} style={inputStyle} placeholder="nombre / código / id" />
+        </IgField>
+      </IgFilters>
 
-      <DashGrid>
-        <DashCol span={3}>
-          <DashPanel title="Organizaciones" subtitle={`${orgs.length}`}>
-            <div className={styles.tableScroll}>
-              {orgs.map((o) => (
-                <ListRow
-                  key={o.id}
-                  title={o.name}
-                  sub={o.parentId ? `parent ${o.parentId}` : "root"}
-                  trail={
-                    <button
-                      type="button"
-                      style={btnGhost}
-                      onClick={() => {
-                        setOrgId(o.id);
-                        setOrgFilter(o.id);
-                      }}
-                    >
-                      Filtrar
-                    </button>
-                  }
-                />
-              ))}
-            </div>
-          </DashPanel>
-        </DashCol>
-        <DashCol span={5}>
-          <DashPanel title="Personas" subtitle={`${filtered.length} / ${people.length}`}>
-            <div className={styles.tableScroll}>
-              {filtered.map((p) => (
-                <ListRow
-                  key={p.id}
-                  title={p.name}
-                  sub={[p.code, p.orgName, p.id].filter(Boolean).join(" · ")}
-                  trail={
-                    <button type="button" style={btnGhost} onClick={() => void openDetail(p)}>
-                      Ver
-                    </button>
-                  }
-                />
-              ))}
-            </div>
-          </DashPanel>
-        </DashCol>
-        <DashCol span={4}>
-          <DashPanel title="Detalle / alta">
+      <IgSplit
+        leftWidth="58%"
+        left={
+          <IgPanel title="Directorio" count={filtered.length} flush>
+            <IgTable
+              selectedKey={selected?.id}
+              onRowClick={(key) => {
+                const p = people.find((x) => x.id === key);
+                if (p) void openDetail(p);
+              }}
+              columns={[
+                { key: "n", label: "Nombre" },
+                { key: "c", label: "Código", mono: true },
+                { key: "o", label: "Org" },
+                { key: "id", label: "personId", mono: true },
+              ]}
+              rows={filtered.map((p) => ({
+                key: p.id,
+                cells: {
+                  n: p.name,
+                  c: p.code || "—",
+                  o: p.orgName || p.orgId || "—",
+                  id: p.id,
+                },
+              }))}
+              empty="Sin personas"
+            />
+          </IgPanel>
+        }
+        right={
+          <IgPanel title="Detalle / alta" count={selected?.name || "—"}>
             {selected ? (
-              <div style={{ fontSize: 13, display: "grid", gap: 6, marginBottom: 10 }}>
+              <div style={{ display: "grid", gap: 6, fontSize: 12, marginBottom: 12 }}>
                 <strong>{selected.name}</strong>
-                <span>{selected.code || "—"}</span>
+                <span>{selected.code || "sin código"}</span>
                 <span>{selected.orgName || selected.orgId}</span>
-                <code style={{ fontSize: 11 }}>{selected.id}</code>
-                {busy && <DashPill tone="neutral">cargando personInfo…</DashPill>}
+                {busy && <IgBadge>personInfo…</IgBadge>}
                 {detail != null && (
-                  <pre style={{ fontSize: 10, maxHeight: 180, overflow: "auto", margin: 0 }}>
+                  <pre style={{ fontSize: 10, maxHeight: 200, overflow: "auto", margin: 0 }}>
                     {JSON.stringify(detail, null, 2)}
                   </pre>
                 )}
-                <button type="button" style={btnGhost} onClick={() => void remove(selected.id)}>
+                <IgBtn
+                  onClick={async () => {
+                    if (!confirm("¿Eliminar en Artemis?")) return;
+                    await integraApi(`integra/people/${encodeURIComponent(selected.id)}`, {
+                      method: "DELETE",
+                    });
+                    setSelected(null);
+                    setDetail(null);
+                    await load();
+                  }}
+                >
                   Eliminar
-                </button>
+                </IgBtn>
               </div>
             ) : (
-              <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Selecciona una persona</p>
+              <p style={{ fontSize: 12, color: "var(--ig-muted)" }}>Click en una fila</p>
             )}
-            <hr style={{ margin: "12px 0", borderColor: "var(--border)" }} />
+            <hr style={{ borderColor: "var(--ig-line)", margin: "10px 0" }} />
             <div style={{ display: "grid", gap: 8 }}>
-              <input placeholder="Nombre *" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
-              <input placeholder="Código" value={code} onChange={(e) => setCode(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
-              <select value={orgId} onChange={(e) => setOrgId(e.target.value)} style={{ ...selectStyle, maxWidth: "100%" }}>
-                {orgs.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name}
-                  </option>
-                ))}
-              </select>
-              <button type="button" style={btnPrimary} onClick={() => void add()}>
+              <IgField label="Nombre">
+                <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
+              </IgField>
+              <IgField label="Código">
+                <input value={code} onChange={(e) => setCode(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
+              </IgField>
+              <IgField label="Org">
+                <select value={orgId} onChange={(e) => setOrgId(e.target.value)} style={{ ...selectStyle, maxWidth: "100%" }}>
+                  {orgs.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+              </IgField>
+              <IgBtn
+                variant="primary"
+                disabled={!name || !orgId}
+                onClick={async () => {
+                  try {
+                    await integraApi("integra/people", {
+                      method: "POST",
+                      body: JSON.stringify({
+                        personName: name,
+                        personCode: code || undefined,
+                        orgIndexCode: orgId,
+                      }),
+                    });
+                    setName("");
+                    setCode("");
+                    await load();
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : "Error");
+                  }
+                }}
+              >
                 Alta Artemis
-              </button>
+              </IgBtn>
             </div>
-          </DashPanel>
-        </DashCol>
-      </DashGrid>
-    </DashPage>
+          </IgPanel>
+        }
+      />
+    </IgPage>
   );
 }

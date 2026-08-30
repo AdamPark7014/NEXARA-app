@@ -4,10 +4,21 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { setActiveCompanyId } from "@/lib/tenant";
 import {
+  IgBadge,
+  IgBtn,
+  IgError,
+  IgPage,
+  IgPanel,
+  IgTable,
+  IgToolbar,
+} from "./_Console";
+import {
+  DOOR_CONTROL_OPTIONS,
+  DoorControlType,
   integraApi,
   INTEGRA_MODULE_CARDS,
-  type IntegraCapabilities,
   setActiveIntegraSiteId,
+  type IntegraCapabilities,
 } from "./_lib";
 import { setCachedCapabilities } from "./_caps";
 import styles from "./integra.module.css";
@@ -17,8 +28,11 @@ type Dash = {
   configured: boolean;
   host?: string | null;
   source?: string | null;
+  provider?: string;
   cameras: number;
   doors: number;
+  doorsOnline?: number;
+  doorsOffline?: number;
   people: number;
   devices: number;
   vehicles?: number;
@@ -34,12 +48,10 @@ type Portfolio = {
   companies: Array<{
     companyId: number;
     name: string;
-    slug: string | null;
     totals: {
       cameras: number;
       doors: number;
       people: number;
-      devices: number;
       vehicles: number;
       regions: number;
     };
@@ -50,15 +62,33 @@ type Portfolio = {
       label?: string | null;
       host: string;
       lastSyncAt?: string | null;
-      _count: {
-        cameras: number;
-        doors: number;
-        people: number;
-        devices: number;
-        vehicles: number;
-      };
+      _count: { cameras: number; doors: number; people: number; vehicles: number };
     }>;
   }>;
+};
+
+type Door = {
+  id: string;
+  name: string;
+  location?: string;
+  online?: boolean;
+  status?: string;
+};
+
+type Ev = {
+  id: string;
+  doorName?: string;
+  personName?: string;
+  eventType?: string;
+  timestamp?: string;
+};
+
+type AuditRow = {
+  id: number;
+  action: string;
+  createdAt: string;
+  userEmail?: string | null;
+  entityId?: number;
 };
 
 const MODULE_MARK: Record<string, string> = {
@@ -73,33 +103,33 @@ const MODULE_MARK: Record<string, string> = {
   "/integra/settings": "CFG",
 };
 
-const CAP_LABELS: Array<[keyof IntegraCapabilities, string]> = [
-  ["video", "Video"],
-  ["access", "ACS"],
-  ["people", "Personas"],
-  ["events", "Eventos"],
-  ["vehicles", "Flota"],
-  ["anpr", "ANPR"],
-  ["visitors", "Visitas"],
-  ["alarms", "Alarmas"],
-];
-
 export default function IntegraHome() {
   const [dash, setDash] = useState<Dash | null>(null);
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [doors, setDoors] = useState<Door[]>([]);
+  const [events, setEvents] = useState<Ev[]>([]);
+  const [audit, setAudit] = useState<AuditRow[]>([]);
+  const [controlType, setControlType] = useState<DoorControlType>("2");
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [busyDoor, setBusyDoor] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
   const refresh = useCallback(async () => {
     setError(null);
     try {
-      const [d, p] = await Promise.all([
+      const [d, p, doorRes, evRes, auRes] = await Promise.all([
         integraApi<Dash>("integra/dashboard"),
         integraApi<Portfolio>("integra/portfolio").catch(() => null),
+        integraApi<{ items: Door[] }>("integra/doors").catch(() => ({ items: [] })),
+        integraApi<{ items: Ev[] }>("integra/events?limit=30").catch(() => ({ items: [] })),
+        integraApi<{ items: AuditRow[] }>("integra/audit?limit=25").catch(() => ({ items: [] })),
       ]);
       setDash(d);
       setPortfolio(p);
+      setDoors(doorRes.items);
+      setEvents(evRes.items);
+      setAudit(auRes.items);
       if (d.capabilities) setCachedCapabilities(d.capabilities);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
@@ -108,6 +138,8 @@ export default function IntegraHome() {
 
   useEffect(() => {
     void refresh();
+    const t = setInterval(() => void refresh(), 45000);
+    return () => clearInterval(t);
   }, [refresh]);
 
   const syncNow = async () => {
@@ -122,6 +154,21 @@ export default function IntegraHome() {
     }
   };
 
+  const controlDoor = async (id: string) => {
+    setBusyDoor(id);
+    try {
+      await integraApi(`integra/doors/${encodeURIComponent(id)}/control`, {
+        method: "POST",
+        body: JSON.stringify({ controlType }),
+      });
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error puerta");
+    } finally {
+      setBusyDoor(null);
+    }
+  };
+
   const openClient = (companyId: number, siteId?: number) => {
     setActiveCompanyId(companyId);
     if (siteId) setActiveIntegraSiteId(siteId);
@@ -133,54 +180,42 @@ export default function IntegraHome() {
     (m) => m.capability === "always" || (caps ? caps[m.capability] : true),
   );
 
-  const artemisTone = !dash
-    ? undefined
-    : dash.connected
-      ? styles.statOk
-      : dash.configured
-        ? styles.statWarn
-        : styles.statDanger;
+  const fmt = (iso?: string) =>
+    iso ? new Date(iso).toLocaleString("es-MX", { hour12: false }) : "—";
 
   return (
-    <div className={styles.inner}>
-      <header className={styles.hero}>
-        <div className={styles.heroRow}>
-          <div>
-            <span className={styles.eyebrow}>
-              <span className={styles.eyebrowDot} aria-hidden />
-              {portfolio?.mode === "platform"
-                ? "Plataforma · todos los clientes"
-                : "Portal · tu inventario Artemis"}
-            </span>
-            <h1 className={styles.title}>NEXARA Integra</h1>
-            <p className={styles.sub}>
-              Seguridad física sobre HikCentral Artemis: video, ACS, personas, visitas y ANPR
-              particionados por empresa y sitio.
-            </p>
-          </div>
-          <div className={styles.actions}>
-            <button type="button" className={styles.btnGhost} onClick={() => void refresh()}>
-              Actualizar
-            </button>
+    <IgPage>
+      <IgToolbar
+        title="Consola operativa"
+        meta={
+          <>
+            {dash?.provider || "ARTEMIS"} · {dash?.host || "—"} · {dash?.source || "—"} · sync{" "}
+            {dash?.lastSync?.status || "—"}
+          </>
+        }
+        actions={
+          <>
+            <IgBtn onClick={() => void refresh()}>Refresh</IgBtn>
             {caps?.settings !== false && (
-              <button
-                type="button"
-                className={styles.btnPrimary}
-                disabled={syncing}
-                onClick={() => void syncNow()}
-              >
-                {syncing ? "Sincronizando…" : "Sincronizar"}
-              </button>
+              <IgBtn variant="primary" disabled={syncing} onClick={() => void syncNow()}>
+                {syncing ? "Sync…" : "Sincronizar"}
+              </IgBtn>
             )}
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
-      <div className={styles.stats} role="group" aria-label="Estado del sitio">
+      <IgError>{error}</IgError>
+
+      <div className={styles.stats} role="group" aria-label="KPIs">
         <div className={styles.stat}>
-          <span className={styles.statLabel}>Artemis</span>
-          <span className={`${styles.statValue} ${artemisTone || ""}`}>
-            {!dash ? "…" : dash.connected ? "OK" : dash.configured ? "Down" : "—"}
+          <span className={styles.statLabel}>Link</span>
+          <span
+            className={`${styles.statValue} ${
+              dash?.connected ? styles.statOk : dash?.configured ? styles.statWarn : styles.statDanger
+            }`}
+          >
+            {!dash ? "…" : dash.connected ? "OK" : dash.configured ? "DOWN" : "—"}
           </span>
         </div>
         <div className={styles.stat}>
@@ -189,141 +224,165 @@ export default function IntegraHome() {
         </div>
         <div className={styles.stat}>
           <span className={styles.statLabel}>Puertas</span>
-          <span className={styles.statValue}>{dash?.doors ?? 0}</span>
+          <span className={styles.statValue}>
+            {dash?.doorsOnline ?? "—"}/{dash?.doors ?? 0}
+          </span>
+        </div>
+        <div className={styles.stat}>
+          <span className={styles.statLabel}>Off</span>
+          <span className={`${styles.statValue} ${styles.statWarn}`}>{dash?.doorsOffline ?? 0}</span>
         </div>
         <div className={styles.stat}>
           <span className={styles.statLabel}>Personas</span>
           <span className={styles.statValue}>{dash?.people ?? 0}</span>
         </div>
         <div className={styles.stat}>
-          <span className={styles.statLabel}>Vehículos</span>
+          <span className={styles.statLabel}>Flota</span>
           <span className={styles.statValue}>{dash?.vehicles ?? 0}</span>
         </div>
         <div className={styles.stat}>
-          <span className={styles.statLabel}>Regiones</span>
-          <span className={styles.statValue}>{dash?.regions ?? 0}</span>
-        </div>
-        <div className={styles.stat}>
-          <span className={styles.statLabel}>Sync</span>
-          <span
-            className={`${styles.statValue} ${
-              dash?.lastSync?.status === "OK" ? styles.statOk : ""
-            }`}
-          >
-            {dash?.lastSync?.status || "—"}
-          </span>
+          <span className={styles.statLabel}>Devices</span>
+          <span className={styles.statValue}>{dash?.devices ?? 0}</span>
         </div>
       </div>
 
-      {error && <p className={styles.error}>{error}</p>}
+      <nav className={styles.modRail} aria-label="Módulos">
+        {modules.map((m) => (
+          <Link key={m.href} href={m.href} className={styles.modChip}>
+            <span className={styles.modChipMark}>{MODULE_MARK[m.href] || "·"}</span>
+            {m.title}
+          </Link>
+        ))}
+      </nav>
+
+      <div className={styles.opsGrid}>
+        <IgPanel
+          title="Matriz de puertas"
+          count={`${doors.length}`}
+          flush
+          actions={
+            <select
+              value={controlType}
+              onChange={(e) => setControlType(e.target.value as DoorControlType)}
+              style={{ fontSize: 11, padding: "2px 6px" }}
+              aria-label="doControl"
+            >
+              {DOOR_CONTROL_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          }
+        >
+          <div className={styles.doorMatrix} style={{ padding: 8 }}>
+            {doors.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                className={styles.doorCell}
+                data-online={d.online === false ? "0" : "1"}
+                disabled={busyDoor === d.id}
+                onClick={() => void controlDoor(d.id)}
+                title={`${d.name} · ${d.status || ""} · click = doControl`}
+              >
+                <span className={styles.doorCellName}>{d.name}</span>
+                <span className={styles.doorCellMeta}>
+                  {d.location || d.id}
+                </span>
+                <IgBadge tone={d.online === false ? "warn" : "ok"}>
+                  {busyDoor === d.id ? "…" : d.status || (d.online === false ? "off" : "online")}
+                </IgBadge>
+              </button>
+            ))}
+            {doors.length === 0 && <p className={styles.igEmpty}>Sin puertas — sincroniza el sitio</p>}
+          </div>
+        </IgPanel>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <IgPanel title="Eventos ACS · recientes" count={events.length} flush>
+            <IgTable
+              columns={[
+                { key: "t", label: "Hora", width: "28%", mono: true },
+                { key: "p", label: "Persona" },
+                { key: "d", label: "Puerta" },
+                { key: "e", label: "Tipo" },
+              ]}
+              rows={events.map((e) => ({
+                key: e.id || `${e.timestamp}-${e.personName}`,
+                cells: {
+                  t: fmt(e.timestamp),
+                  p: e.personName || "—",
+                  d: e.doorName || "—",
+                  e: e.eventType || "—",
+                },
+              }))}
+              empty="Sin eventos 24 h"
+            />
+          </IgPanel>
+
+          <IgPanel title="Bitácora Integra" count={audit.length} flush>
+            <IgTable
+              columns={[
+                { key: "t", label: "Hora", width: "30%", mono: true },
+                { key: "a", label: "Acción" },
+                { key: "u", label: "Usuario" },
+              ]}
+              rows={audit.map((a) => ({
+                key: String(a.id),
+                cells: {
+                  t: fmt(a.createdAt),
+                  a: a.action.replace(/^integra\./, ""),
+                  u: a.userEmail || "—",
+                },
+              }))}
+              empty="Sin mutaciones auditadas"
+            />
+          </IgPanel>
+        </div>
+      </div>
 
       {portfolio && (
-        <section className={styles.section}>
-          <div className={styles.sectionHead}>
-            <h2 className={styles.sectionTitle}>
-              {portfolio.mode === "platform" ? "Clientes" : "Tus sitios"}
-            </h2>
-            <p className={styles.sectionSub}>
-              {portfolio.companyCount} empresas · {portfolio.siteCount} sitios Artemis
-            </p>
-          </div>
-          <div className={styles.portfolioList}>
-            {portfolio.companies.map((c) => (
-              <article key={c.companyId} className={styles.companyCard}>
-                <div className={styles.companyTop}>
-                  <div>
-                    <h3 className={styles.companyName}>{c.name}</h3>
-                    <p className={styles.companyMeta}>
-                      {c.totals.cameras} cam · {c.totals.doors} puertas · {c.totals.people}{" "}
-                      personas · {c.totals.vehicles} veh · {c.totals.regions} regiones
-                    </p>
-                  </div>
-                  {portfolio.mode === "platform" ? (
-                    <button
-                      type="button"
-                      className={styles.btnPrimary}
-                      onClick={() => openClient(c.companyId)}
-                    >
-                      Entrar
-                    </button>
-                  ) : (
-                    <span className={styles.moduleFoot}>Activo</span>
-                  )}
-                </div>
-                <div className={styles.capRow}>
-                  {CAP_LABELS.map(([k, label]) => (
-                    <span
-                      key={k}
-                      className={c.capabilities[k] ? styles.capOn : styles.capOff}
-                    >
-                      {label}
-                    </span>
-                  ))}
-                </div>
-                <div className={styles.siteList}>
-                  {c.sites.map((s) => (
-                    <div key={s.id} className={styles.siteRow}>
-                      <div>
-                        <div className={styles.siteName}>{s.label || s.name}</div>
-                        <div className={styles.siteHost}>
-                          {s.host} · {s._count.cameras}c/{s._count.doors}p · sync{" "}
-                          {s.lastSyncAt
-                            ? new Date(s.lastSyncAt).toLocaleString("es-MX")
-                            : "nunca"}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className={styles.btnGhost}
-                        onClick={() => openClient(c.companyId, s.id)}
-                      >
-                        Sitio
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </article>
-            ))}
-            {portfolio.companies.length === 0 && (
-              <p className={styles.empty}>
-                {portfolio.mode === "platform"
-                  ? "Sin sitios. Crea uno en Configuración → Sitios para cada cliente."
-                  : "Tu empresa aún no tiene sitio Artemis. Contacta a NEXARA."}
-              </p>
+        <IgPanel
+          title={portfolio.mode === "platform" ? "Clientes / sitios" : "Tus sitios"}
+          count={`${portfolio.companyCount} emp · ${portfolio.siteCount} sitios`}
+          flush
+        >
+          <IgTable
+            columns={[
+              { key: "c", label: "Empresa" },
+              { key: "inv", label: "Inventario", mono: true },
+              { key: "s", label: "Sitio" },
+              { key: "h", label: "Host", mono: true },
+              { key: "x", label: "", width: "90px" },
+            ]}
+            rows={portfolio.companies.flatMap((c) =>
+              (c.sites.length ? c.sites : [{ id: 0, name: "—", host: "—", lastSyncAt: null, _count: { cameras: 0, doors: 0, people: 0, vehicles: 0 } }]).map(
+                (s) => ({
+                  key: `${c.companyId}-${s.id}`,
+                  cells: {
+                    c: c.name,
+                    inv: `${c.totals.cameras}c/${c.totals.doors}p/${c.totals.people}per`,
+                    s: s.label || s.name,
+                    h: s.host,
+                    x:
+                      s.id > 0 ? (
+                        <IgBtn onClick={() => openClient(c.companyId, s.id)}>Sitio</IgBtn>
+                      ) : portfolio.mode === "platform" ? (
+                        <IgBtn variant="primary" onClick={() => openClient(c.companyId)}>
+                          Entrar
+                        </IgBtn>
+                      ) : (
+                        "—"
+                      ),
+                  },
+                }),
+              ),
             )}
-          </div>
-        </section>
+            empty="Sin sitios configurados"
+          />
+        </IgPanel>
       )}
-
-      <section className={styles.section}>
-        <div className={styles.sectionHead}>
-          <h2 className={styles.sectionTitle}>Módulos del sitio</h2>
-          <p className={styles.sectionSub}>
-            Host {dash?.host || "—"} · fuente {dash?.source || "—"} · visibles según inventario
-          </p>
-        </div>
-        {modules.length === 0 ? (
-          <p className={styles.empty}>
-            Sin módulos — sincroniza el sitio o configura Artemis.
-          </p>
-        ) : (
-          <div className={styles.moduleGrid}>
-            {modules.map((m) => (
-              <Link key={m.href} href={m.href} className={styles.moduleTile}>
-                <span className={styles.moduleMark}>{MODULE_MARK[m.href] || "·"}</span>
-                <h3 className={styles.moduleTitle}>{m.title}</h3>
-                <p className={styles.moduleSub}>{m.sub}</p>
-                <span className={styles.moduleFoot}>Abrir</span>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <p className={styles.footNote}>
-        Tenancy: header <code>X-Company-Id</code> + sitio activo. Capacidades derivadas del espejo
-        Prisma alineado a Artemis (resource / acs / video / visitor / pms).
-      </p>
-    </div>
+    </IgPage>
   );
 }
