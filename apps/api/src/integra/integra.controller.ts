@@ -132,7 +132,7 @@ export class IntegraController {
   constructor(
     private readonly integra: IntegraArtemisService,
     private readonly sites: IntegraSiteService,
-    private readonly sync: IntegraSyncService,,
+    private readonly sync: IntegraSyncService,
     private readonly serviceClients: ServiceClientsService,
   ) {}
 
