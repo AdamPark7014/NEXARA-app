@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "integra_sites" ADD COLUMN IF NOT EXISTS "provider" VARCHAR(16) NOT NULL DEFAULT 'ARTEMIS';
