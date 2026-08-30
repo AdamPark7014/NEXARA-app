@@ -42,13 +42,16 @@ export class NocService {
     const integraDevices = await this.integraAdapter.listDevices(filters?.clientId);
     const hasIntegraMirror = integraDevices.length > 0;
 
+    // Sin espejo Integra no inventamos routers/POS: la UI muestra EmptyState + CTA.
+    if (!hasIntegraMirror) {
+      return [];
+    }
+
     const synthetic = await this.syntheticDevices(filters?.clientId);
-    const merged = hasIntegraMirror
-      ? [
-          ...integraDevices,
-          ...synthetic.filter((d) => d.type !== 'CCTV' && d.type !== 'ACCESS_CONTROL'),
-        ]
-      : synthetic;
+    const merged = [
+      ...integraDevices,
+      ...synthetic.filter((d) => d.type !== 'CCTV' && d.type !== 'ACCESS_CONTROL'),
+    ];
 
     return merged.filter((d) => {
       if (filters?.type && d.type !== filters.type) return false;

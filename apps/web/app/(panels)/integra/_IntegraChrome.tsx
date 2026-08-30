@@ -16,6 +16,8 @@ import {
   getCachedCapabilities,
   moduleAllowedByCaps,
   setCachedCapabilities,
+  setCachedProvider,
+  getCachedProvider,
   subscribeCapabilities,
 } from "./_caps";
 import styles from "./integra.module.css";
@@ -78,6 +80,7 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
         integraApi<DashBrief>("integra/dashboard").catch(() => null),
       ]);
       setHealth(h);
+      if (h?.provider) setCachedProvider(h.provider);
       if (d) setDash(d);
     } catch {
       setHealth(null);
@@ -107,10 +110,15 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
     const clean = pathname.replace(/\/$/, "") || "/integra";
     const moduleId = PATH_TO_MODULE[clean];
     if (!moduleId || moduleId === "integra-home") return;
+    const provider = health?.provider || getCachedProvider();
+    if (provider === "HCT" && ["integra-people", "integra-visitors", "integra-vehicles", "integra-anpr"].includes(moduleId)) {
+      router.replace("/integra");
+      return;
+    }
     if (isClient && !moduleAllowedByCaps(moduleId, caps)) {
       router.replace("/integra");
     }
-  }, [caps, pathname, router, isClient]);
+  }, [caps, pathname, router, isClient, health?.provider]);
 
   const syncNow = async () => {
     setSyncing(true);

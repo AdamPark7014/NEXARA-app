@@ -75,16 +75,51 @@ export function integraHasInventory(caps: IntegraCapabilities | null): boolean {
   );
 }
 
+const PROVIDER_KEY = "nexara_integra_provider";
+const PROVIDER_EVENT = "nexara-integra-provider";
+
+/** Módulos Artemis-only (ADR-0019) — ocultos en sitios HCT. */
+export const HCT_HIDDEN_MODULES = new Set([
+  "integra-people",
+  "integra-visitors",
+  "integra-vehicles",
+  "integra-anpr",
+]);
+
+export function setCachedProvider(provider: string | null) {
+  if (typeof window === "undefined") return;
+  if (!provider) window.sessionStorage.removeItem(PROVIDER_KEY);
+  else window.sessionStorage.setItem(PROVIDER_KEY, provider);
+  window.dispatchEvent(new CustomEvent(PROVIDER_EVENT, { detail: provider }));
+}
+
+export function getCachedProvider(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.sessionStorage.getItem(PROVIDER_KEY);
+}
+
+export function subscribeProvider(cb: (p: string | null) => void) {
+  if (typeof window === "undefined") return () => undefined;
+  const handler = (e: Event) => {
+    cb((e as CustomEvent<string | null>).detail ?? getCachedProvider());
+  };
+  window.addEventListener(PROVIDER_EVENT, handler);
+  return () => window.removeEventListener(PROVIDER_EVENT, handler);
+}
+
 /**
  * Visibilidad en sidebar.
  * - Staff sin inventario: muestra todo el catálogo (menos settings si no aplica).
  * - Con inventario / cliente: respeta caps (incl. override de sitio).
+ * - HCT: oculta módulos Artemis-only.
  */
 export function moduleShownInIntegraSidebar(
   moduleId: string,
   caps: IntegraCapabilities | null,
-  opts?: { isClient?: boolean },
+  opts?: { isClient?: boolean; provider?: string | null },
 ): boolean {
+  const provider = opts?.provider ?? getCachedProvider();
+  if (provider === "HCT" && HCT_HIDDEN_MODULES.has(moduleId)) return false;
   if (!caps) return true;
   const key = MODULE_CAPABILITY[moduleId];
   if (!key || key === "always") return true;
