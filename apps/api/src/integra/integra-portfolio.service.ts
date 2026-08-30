@@ -13,6 +13,8 @@ export type IntegraCapabilities = {
   visitors: boolean;
   alarms: boolean;
   settings: boolean;
+  /** Staff: true. Cliente: false salvo override explícito. */
+  canControlDoors: boolean;
 };
 
 function capsFromCounts(
@@ -26,6 +28,7 @@ function capsFromCounts(
   },
   override?: Record<string, boolean> | null,
   canSettings = true,
+  canControlDoors = true,
 ): IntegraCapabilities {
   const base: IntegraCapabilities = {
     video: c.cameras > 0 || c.devicesEncode > 0,
@@ -37,9 +40,17 @@ function capsFromCounts(
     visitors: c.doors > 0 || c.devicesAcs > 0,
     alarms: c.cameras > 0 || c.doors > 0,
     settings: canSettings,
+    canControlDoors: canControlDoors && (c.doors > 0 || c.devicesAcs > 0),
   };
   if (!override) return base;
-  return { ...base, ...override, settings: canSettings && (override.settings ?? true) };
+  return {
+    ...base,
+    ...override,
+    settings: canSettings && (override.settings ?? true),
+    canControlDoors:
+      canControlDoors &&
+      (override.canControlDoors ?? base.canControlDoors),
+  };
 }
 
 /** Exported for unit tests */
@@ -52,9 +63,10 @@ export class IntegraPortfolioService {
   async capabilities(
     companyId: number | null,
     siteId?: number | null,
-    opts?: { canSettings?: boolean },
+    opts?: { canSettings?: boolean; canControlDoors?: boolean },
   ): Promise<IntegraCapabilities> {
     const canSettings = opts?.canSettings !== false;
+    const canControlDoors = opts?.canControlDoors !== false;
     if (!companyId) {
       return capsFromCounts(
         {
@@ -67,6 +79,7 @@ export class IntegraPortfolioService {
         },
         null,
         canSettings,
+        canControlDoors,
       );
     }
     const siteFilter = siteId ? { siteId } : {};
@@ -95,6 +108,7 @@ export class IntegraPortfolioService {
       { cameras, doors, people, devicesAcs, devicesEncode, vehicles },
       override,
       canSettings,
+      canControlDoors,
     );
   }
 

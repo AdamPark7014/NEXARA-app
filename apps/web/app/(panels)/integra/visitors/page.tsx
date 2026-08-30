@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   IgBtn,
   IgError,
@@ -9,6 +9,7 @@ import {
   IgPage,
   IgPanel,
   IgSplit,
+  IgTable,
   IgToolbar,
 } from "../_Console";
 import {
@@ -32,20 +33,94 @@ export default function IntegraVisitorsPage() {
   const [orderId, setOrderId] = useState("");
   const [qrOut, setQrOut] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [inbox, setInbox] = useState<any[]>([]);
+  const [inboxNote, setInboxNote] = useState<string | null>(null);
+
+  const loadInbox = useCallback(async () => {
+    setInboxNote(null);
+    try {
+      const data = await integraApi<any>("integra/visitors/search", {
+        method: "POST",
+        body: JSON.stringify({
+          pageNo: 1,
+          pageSize: 40,
+          visitStartTime: fromDatetimeLocalValue(range0.start),
+          visitEndTime: fromDatetimeLocalValue(range0.end),
+        }),
+      });
+      const list = data?.list || data?.data?.list || (Array.isArray(data) ? data : []);
+      setInbox(list);
+      if (!list.length) setInboxNote("Sin citas en el rango (o sitio HCT sin visitas Artemis).");
+    } catch (e) {
+      setInbox([]);
+      setInboxNote(e instanceof Error ? e.message : "Inbox no disponible");
+    }
+  }, [range0.end, range0.start]);
+
+  useEffect(() => {
+    void loadInbox();
+  }, [loadInbox]);
 
   return (
     <IgPage>
-      <IgToolbar title="Visitas" meta="appointment + QR" />
+      <IgToolbar
+        title="Visitas"
+        meta="inbox · appointment · QR"
+        actions={<IgBtn onClick={() => void loadInbox()}>Actualizar inbox</IgBtn>}
+      />
       <IgError>{error}</IgError>
+
+      <IgPanel title={`Inbox (${inbox.length})`}>
+        {inboxNote && (
+          <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>{inboxNote}</p>
+        )}
+        {inbox.length > 0 && (
+          <IgTable
+            columns={[
+              { key: "n", label: "Visitante" },
+              { key: "t", label: "Ventana" },
+              { key: "id", label: "ID", mono: true },
+            ]}
+            rows={inbox.slice(0, 40).map((row, i) => {
+              const name =
+                row.visitorName ||
+                row.visitorInfoList?.[0]?.visitorName ||
+                row.personName ||
+                "—";
+              const id = String(
+                row.orderId || row.appointRecordId || row.id || i,
+              );
+              return {
+                key: id,
+                cells: {
+                  n: String(name),
+                  t: [row.visitStartTime, row.visitEndTime].filter(Boolean).join(" → ") || "—",
+                  id,
+                },
+              };
+            })}
+            onRowClick={(key) => setOrderId(key)}
+          />
+        )}
+      </IgPanel>
+
       <IgSplit
         left={
           <IgPanel title="Registrar">
             <IgFilters>
               <IgField label="Nombre *">
-                <input value={visitorName} onChange={(e) => setVisitorName(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
+                <input
+                  value={visitorName}
+                  onChange={(e) => setVisitorName(e.target.value)}
+                  style={{ ...inputStyle, maxWidth: "100%" }}
+                />
               </IgField>
               <IgField label="Teléfono">
-                <input value={phoneNo} onChange={(e) => setPhoneNo(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
+                <input
+                  value={phoneNo}
+                  onChange={(e) => setPhoneNo(e.target.value)}
+                  style={{ ...inputStyle, maxWidth: "100%" }}
+                />
               </IgField>
               <IgField label="Género">
                 <select value={gender} onChange={(e) => setGender(e.target.value)} style={selectStyle}>
@@ -55,16 +130,35 @@ export default function IntegraVisitorsPage() {
                 </select>
               </IgField>
               <IgField label="Inicio">
-                <input type="datetime-local" value={visitStart} onChange={(e) => setVisitStart(e.target.value)} style={inputStyle} />
+                <input
+                  type="datetime-local"
+                  value={visitStart}
+                  onChange={(e) => setVisitStart(e.target.value)}
+                  style={inputStyle}
+                />
               </IgField>
               <IgField label="Fin">
-                <input type="datetime-local" value={visitEnd} onChange={(e) => setVisitEnd(e.target.value)} style={inputStyle} />
+                <input
+                  type="datetime-local"
+                  value={visitEnd}
+                  onChange={(e) => setVisitEnd(e.target.value)}
+                  style={inputStyle}
+                />
               </IgField>
               <IgField label="Recepcionista (ID)">
-                <input value={receptionistId} onChange={(e) => setReceptionistId(e.target.value)} placeholder="opcional" style={{ ...inputStyle, maxWidth: "100%" }} title="receptionistId" />
+                <input
+                  value={receptionistId}
+                  onChange={(e) => setReceptionistId(e.target.value)}
+                  placeholder="opcional"
+                  style={{ ...inputStyle, maxWidth: "100%" }}
+                />
               </IgField>
               <IgField label="Propósito">
-                <input value={purpose} onChange={(e) => setPurpose(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
+                <input
+                  value={purpose}
+                  onChange={(e) => setPurpose(e.target.value)}
+                  style={{ ...inputStyle, maxWidth: "100%" }}
+                />
               </IgField>
             </IgFilters>
             <IgBtn
@@ -95,6 +189,7 @@ export default function IntegraVisitorsPage() {
                     data?.appointRecordId ||
                     data?.data?.appointRecordId;
                   if (oid) setOrderId(String(oid));
+                  void loadInbox();
                 } catch (e) {
                   setError(e instanceof Error ? e.message : "Error");
                 }
@@ -103,14 +198,20 @@ export default function IntegraVisitorsPage() {
               Registrar
             </IgBtn>
             {result && (
-              <pre style={{ fontSize: 10, marginTop: 8, maxHeight: 180, overflow: "auto" }}>{result}</pre>
+              <pre style={{ fontSize: 10, marginTop: 8, maxHeight: 180, overflow: "auto" }}>
+                {result}
+              </pre>
             )}
           </IgPanel>
         }
         right={
           <IgPanel title="QR">
             <IgField label="ID de cita">
-              <input value={orderId} onChange={(e) => setOrderId(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} title="orderId" />
+              <input
+                value={orderId}
+                onChange={(e) => setOrderId(e.target.value)}
+                style={{ ...inputStyle, maxWidth: "100%" }}
+              />
             </IgField>
             <IgBtn
               onClick={async () => {
@@ -129,7 +230,9 @@ export default function IntegraVisitorsPage() {
               Obtener QR
             </IgBtn>
             {qrOut && (
-              <pre style={{ fontSize: 10, marginTop: 8, maxHeight: 280, overflow: "auto" }}>{qrOut}</pre>
+              <pre style={{ fontSize: 10, marginTop: 8, maxHeight: 280, overflow: "auto" }}>
+                {qrOut}
+              </pre>
             )}
           </IgPanel>
         }

@@ -28,6 +28,23 @@ export class IntegraSyncService {
     }
   }
 
+  private async drainPages<T>(
+    fetchPage: (pageNo: number, pageSize: number) => Promise<{ list?: T[]; total?: number } | null | undefined>,
+    pageSize = 200,
+    maxPages = 50,
+  ): Promise<T[]> {
+    const all: T[] = [];
+    for (let pageNo = 1; pageNo <= maxPages; pageNo++) {
+      const data = await fetchPage(pageNo, pageSize);
+      const list = data?.list ?? [];
+      all.push(...list);
+      if (list.length < pageSize) break;
+      const total = data?.total;
+      if (typeof total === 'number' && all.length >= total) break;
+    }
+    return all;
+  }
+
   async syncSite(companyId: number, siteId: number) {
     const run = await this.prisma.integraSyncRun.create({
       data: { companyId, siteId, status: 'RUNNING' },
@@ -45,20 +62,22 @@ export class IntegraSyncService {
       if (!client) throw new Error('Sin cliente Artemis para sync');
 
       const [cams, doors, people, acsDevs, encDevs, vehicles, regions] = await Promise.all([
-        client.cameras(1, 500),
-        client.doorList(1, 500),
-        client.personList(1, 500),
-        client.acsDeviceList(1, 200).catch(() => ({ list: [] })),
-        client.encodeDeviceList(1, 200).catch(() => ({ list: [] })),
-        client.vehicleList(1, 500).catch(() => ({ list: [] })),
-        client.regions(1, 500).catch(() => ({ list: [] })),
+        this.drainPages((p, s) => client.cameras(p, s), 200),
+        this.drainPages((p, s) => client.doorList(p, s), 200),
+        this.drainPages((p, s) => client.personList(p, s), 200),
+        this.drainPages((p, s) => client.acsDeviceList(p, s).catch(() => ({ list: [] })), 200),
+        this.drainPages((p, s) => client.encodeDeviceList(p, s).catch(() => ({ list: [] })), 200),
+        this.drainPages((p, s) => client.vehicleList(p, s).catch(() => ({ list: [] })), 200),
+        this.drainPages((p, s) => client.regions(p, s).catch(() => ({ list: [] })), 200),
       ]);
 
       let cameraCount = 0;
-      for (const c of cams?.list ?? []) {
+      const seenCams = new Set<string>();
+      for (const c of cams) {
         const code = String(c.cameraIndexCode ?? '');
         if (!code) continue;
         cameraCount++;
+        seenCams.add(code);
         await this.prisma.integraCamera.upsert({
           where: { siteId_cameraIndexCode: { siteId, cameraIndexCode: code } },
           create: {
@@ -86,10 +105,14 @@ export class IntegraSyncService {
       }
 
       let doorCount = 0;
-      for (const d of doors?.list ?? []) {
+      const seenDoors = new Set<string>();
+      for (const d of doors) {
         const code = String(d.doorIndexCode ?? d.doorNo ?? '');
         if (!code) continue;
         doorCount++;
+        seenDoors.add(code);
+        const regionIndexCode =
+          d.regionIndexCode != null ? String(d.regionIndexCode) : null;
         await this.prisma.integraDoor.upsert({
           where: { siteId_doorIndexCode: { siteId, doorIndexCode: code } },
           create: {
@@ -98,6 +121,7 @@ export class IntegraSyncService {
             doorIndexCode: code,
             name: d.doorName || code,
             regionName: d.regionName,
+            regionIndexCode,
             online: d.online !== false,
             doorState: d.doorState != null ? String(d.doorState) : null,
             raw: d as any,
@@ -106,6 +130,7 @@ export class IntegraSyncService {
           update: {
             name: d.doorName || code,
             regionName: d.regionName,
+            regionIndexCode,
             online: d.online !== false,
             doorState: d.doorState != null ? String(d.doorState) : null,
             raw: d as any,
@@ -115,10 +140,12 @@ export class IntegraSyncService {
       }
 
       let peopleCount = 0;
-      for (const p of people?.list ?? []) {
+      const seenPeople = new Set<string>();
+      for (const p of people) {
         const pid = String(p.personId ?? '');
         if (!pid) continue;
         peopleCount++;
+        seenPeople.add(pid);
         await this.prisma.integraPerson.upsert({
           where: { siteId_personId: { siteId, personId: pid } },
           create: {
@@ -144,7 +171,7 @@ export class IntegraSyncService {
       }
 
       let deviceCount = 0;
-      for (const d of acsDevs?.list ?? []) {
+      for (const d of acsDevs) {
         const code = String(d.indexCode ?? '');
         if (!code) continue;
         deviceCount++;
@@ -153,26 +180,26 @@ export class IntegraSyncService {
           create: {
             companyId,
             siteId,
-            indexCode: code,
-            name: d.name || code,
             kind: 'ACS',
-            ip: d.ip,
-            online: d.online !== false,
-            deviceType: d.deviceType,
+            indexCode: code,
+            name: (d as any).name || code,
+            ip: (d as any).ip || null,
+            online: (d as any).online !== false,
+            deviceType: (d as any).deviceType != null ? String((d as any).deviceType) : null,
             raw: d as any,
             syncedAt: now,
           },
           update: {
-            name: d.name || code,
-            ip: d.ip,
-            online: d.online !== false,
-            deviceType: d.deviceType,
+            name: (d as any).name || code,
+            ip: (d as any).ip || null,
+            online: (d as any).online !== false,
+            deviceType: (d as any).deviceType != null ? String((d as any).deviceType) : null,
             raw: d as any,
             syncedAt: now,
           },
         });
       }
-      for (const d of encDevs?.list ?? []) {
+      for (const d of encDevs) {
         const code = String(d.indexCode ?? '');
         if (!code) continue;
         deviceCount++;
@@ -181,20 +208,20 @@ export class IntegraSyncService {
           create: {
             companyId,
             siteId,
-            indexCode: code,
-            name: d.name || code,
             kind: 'ENCODE',
-            ip: d.ip,
-            online: d.online !== false,
-            deviceType: d.deviceType,
+            indexCode: code,
+            name: (d as any).name || code,
+            ip: (d as any).ip || null,
+            online: (d as any).online !== false,
+            deviceType: (d as any).deviceType != null ? String((d as any).deviceType) : null,
             raw: d as any,
             syncedAt: now,
           },
           update: {
-            name: d.name || code,
-            ip: d.ip,
-            online: d.online !== false,
-            deviceType: d.deviceType,
+            name: (d as any).name || code,
+            ip: (d as any).ip || null,
+            online: (d as any).online !== false,
+            deviceType: (d as any).deviceType != null ? String((d as any).deviceType) : null,
             raw: d as any,
             syncedAt: now,
           },
@@ -202,8 +229,8 @@ export class IntegraSyncService {
       }
 
       let vehicleCount = 0;
-      for (const v of vehicles?.list ?? []) {
-        const vid = String(v.vehicleId ?? '');
+      for (const v of vehicles) {
+        const vid = String((v as any).vehicleId ?? (v as any).plateNo ?? '');
         if (!vid) continue;
         vehicleCount++;
         await this.prisma.integraVehicle.upsert({
@@ -212,16 +239,16 @@ export class IntegraSyncService {
             companyId,
             siteId,
             vehicleId: vid,
-            plateNo: v.plateNo || vid,
-            personId: v.personId,
-            personName: v.personName,
+            plateNo: String((v as any).plateNo ?? vid),
+            personId: (v as any).personId != null ? String((v as any).personId) : null,
+            personName: (v as any).personName != null ? String((v as any).personName) : null,
             raw: v as any,
             syncedAt: now,
           },
           update: {
-            plateNo: v.plateNo || vid,
-            personId: v.personId,
-            personName: v.personName,
+            plateNo: String((v as any).plateNo ?? vid),
+            personId: (v as any).personId != null ? String((v as any).personId) : null,
+            personName: (v as any).personName != null ? String((v as any).personName) : null,
             raw: v as any,
             syncedAt: now,
           },
@@ -229,27 +256,51 @@ export class IntegraSyncService {
       }
 
       let regionCount = 0;
-      for (const r of regions?.list ?? []) {
-        const code = String(r.indexCode ?? '');
+      const seenRegions = new Set<string>();
+      for (const r of regions) {
+        const code = String((r as any).indexCode ?? '');
         if (!code) continue;
         regionCount++;
+        seenRegions.add(code);
         await this.prisma.integraRegion.upsert({
           where: { siteId_indexCode: { siteId, indexCode: code } },
           create: {
             companyId,
             siteId,
             indexCode: code,
-            name: r.name || code,
-            parentIndexCode: r.parentIndexCode,
+            name: (r as any).name || code,
+            parentIndexCode: (r as any).parentIndexCode != null ? String((r as any).parentIndexCode) : null,
             raw: r as any,
             syncedAt: now,
           },
           update: {
-            name: r.name || code,
-            parentIndexCode: r.parentIndexCode,
+            name: (r as any).name || code,
+            parentIndexCode: (r as any).parentIndexCode != null ? String((r as any).parentIndexCode) : null,
             raw: r as any,
             syncedAt: now,
           },
+        });
+      }
+
+      // Prune stale mirror rows not seen in this sync
+      if (seenCams.size > 0) {
+        await this.prisma.integraCamera.deleteMany({
+          where: { siteId, cameraIndexCode: { notIn: [...seenCams] } },
+        });
+      }
+      if (seenDoors.size > 0) {
+        await this.prisma.integraDoor.deleteMany({
+          where: { siteId, doorIndexCode: { notIn: [...seenDoors] } },
+        });
+      }
+      if (seenPeople.size > 0) {
+        await this.prisma.integraPerson.deleteMany({
+          where: { siteId, personId: { notIn: [...seenPeople] } },
+        });
+      }
+      if (seenRegions.size > 0) {
+        await this.prisma.integraRegion.deleteMany({
+          where: { siteId, indexCode: { notIn: [...seenRegions] } },
         });
       }
 
@@ -359,6 +410,7 @@ export class IntegraSyncService {
           doorIndexCode: code,
           name,
           regionName: d.areaName != null ? String(d.areaName) : null,
+          regionIndexCode: d.areaID != null ? String(d.areaID) : null,
           online: true,
           doorState: null,
           raw: d as any,
@@ -367,6 +419,7 @@ export class IntegraSyncService {
         update: {
           name,
           regionName: d.areaName != null ? String(d.areaName) : null,
+          regionIndexCode: d.areaID != null ? String(d.areaID) : null,
           raw: d as any,
           syncedAt: now,
         },

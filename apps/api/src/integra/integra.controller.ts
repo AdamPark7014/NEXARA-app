@@ -6,10 +6,12 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  MessageEvent,
   Param,
   Patch,
   Post,
   Query,
+  Sse,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -24,6 +26,7 @@ import {
   IsString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { Observable, interval, switchMap, startWith, catchError, of } from 'rxjs';
 import { RbacGuard } from '../common/rbac.guard';
 import { CurrentUser } from '../common/current-user.decorator';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
@@ -32,6 +35,12 @@ import { IntegraSiteService } from './integra-site.service';
 import { IntegraSyncService } from './integra-sync.service';
 
 function integraCanSettings(user: { roleKey?: string; isSuperAdmin?: boolean } | null) {
+  if (!user) return false;
+  if (user.isSuperAdmin) return true;
+  return user.roleKey !== 'cliente';
+}
+
+function integraCanControlDoors(user: { roleKey?: string; isSuperAdmin?: boolean } | null) {
   if (!user) return false;
   if (user.isSuperAdmin) return true;
   return user.roleKey !== 'cliente';
@@ -77,6 +86,28 @@ class DoorControlDto {
   /** 0 remain open · 1 close · 2 open · 3 remain closed */
   @IsIn(['0', '1', '2', '3'])
   controlType!: '0' | '1' | '2' | '3';
+
+  @IsString()
+  reason!: string;
+}
+
+class AlarmAckDto {
+  @IsOptional() @IsString() note?: string;
+  @IsOptional() @IsString() title?: string;
+  @IsOptional() @IsString() severity?: string;
+}
+
+class FloorplanCreateDto {
+  @IsString() name!: string;
+  @IsString() imageData!: string;
+}
+
+class MapPinDto {
+  @IsIn(['CAMERA', 'DOOR']) entityType!: 'CAMERA' | 'DOOR';
+  @IsString() entityId!: string;
+  @IsOptional() @IsString() label?: string;
+  @Type(() => Number) xPct!: number;
+  @Type(() => Number) yPct!: number;
 }
 
 class VehicleDto {
@@ -117,6 +148,7 @@ export class IntegraController {
   ) {
     return this.integra.dashboard(companyId, siteId ? parseInt(siteId, 10) : null, {
       canSettings: integraCanSettings(user),
+      canControlDoors: integraCanControlDoors(user),
     });
   }
 
@@ -152,6 +184,7 @@ export class IntegraController {
   ) {
     return this.integra.capabilities(companyId, siteId ? parseInt(siteId, 10) : null, {
       canSettings: integraCanSettings(user),
+      canControlDoors: integraCanControlDoors(user),
     });
   }
 
@@ -325,14 +358,19 @@ export class IntegraController {
   openDoor(
     @CurrentCompanyId() companyId: number | null,
     @Param('id') id: string,
+    @Body() body: { reason?: string },
     @CurrentUser() user: any,
     @Query('siteId') siteId?: string,
   ) {
+    if (!integraCanControlDoors(user)) {
+      throw new BadRequestException('Sin permiso para controlar puertas');
+    }
     return this.integra.openDoor(
       companyId,
       id,
       { id: user?.id, email: user?.email },
       siteId ? parseInt(siteId, 10) : null,
+      body?.reason,
     );
   }
 
@@ -346,12 +384,16 @@ export class IntegraController {
     @CurrentUser() user: any,
     @Query('siteId') siteId?: string,
   ) {
+    if (!integraCanControlDoors(user)) {
+      throw new BadRequestException('Sin permiso para controlar puertas');
+    }
     return this.integra.controlDoor(
       companyId,
       id,
       dto.controlType,
       { id: user?.id, email: user?.email },
       siteId ? parseInt(siteId, 10) : null,
+      dto.reason,
     );
   }
 
@@ -564,6 +606,56 @@ export class IntegraController {
   }
 
   // ── P3 alarms / visitors ───────────────────────────────────────────
+  @Get('alarms/queue')
+  @ApiOperation({ summary: 'Cola SOC: alarmas recientes + ack local' })
+  alarmQueue(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+    @Query('hours') hours?: string,
+  ) {
+    return this.integra.alarmQueue(companyId, siteId ? parseInt(siteId, 10) : null, {
+      hours: hours ? parseInt(hours, 10) : 24,
+    });
+  }
+
+  @Post('alarms/:id/ack')
+  @HttpCode(HttpStatus.OK)
+  ackAlarm(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() dto: AlarmAckDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.ackAlarm(companyId, decodeURIComponent(id), {
+      note: dto.note,
+      title: dto.title,
+      severity: dto.severity,
+      status: 'ACK',
+      actor: { id: user?.id, email: user?.email },
+      siteId: siteId ? parseInt(siteId, 10) : null,
+    });
+  }
+
+  @Post('alarms/:id/clear')
+  @HttpCode(HttpStatus.OK)
+  clearAlarm(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() dto: AlarmAckDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.ackAlarm(companyId, decodeURIComponent(id), {
+      note: dto.note,
+      title: dto.title,
+      severity: dto.severity,
+      status: 'CLEARED',
+      actor: { id: user?.id, email: user?.email },
+      siteId: siteId ? parseInt(siteId, 10) : null,
+    });
+  }
+
   @Post('alarms/search')
   @HttpCode(HttpStatus.OK)
   alarms(
@@ -572,6 +664,75 @@ export class IntegraController {
     @Query('siteId') siteId?: string,
   ) {
     return this.integra.alarmRecords(companyId, body, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  @Sse('events/stream')
+  @ApiOperation({ summary: 'SSE live events (poll bridge server-side)' })
+  eventsStream(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ): Observable<MessageEvent> {
+    const sid = siteId ? parseInt(siteId, 10) : null;
+    return interval(4000).pipe(
+      startWith(0),
+      switchMap(async () => {
+        const data = await this.integra.pollLiveEvents(companyId, sid, 40);
+        return { data } as MessageEvent;
+      }),
+      catchError(() => of({ data: { items: [], error: true } } as MessageEvent)),
+    );
+  }
+
+  @Get('floorplans')
+  floorplans(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.listFloorplans(companyId, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  @Post('floorplans')
+  @HttpCode(HttpStatus.CREATED)
+  createFloorplan(
+    @CurrentCompanyId() companyId: number | null,
+    @Body() dto: FloorplanCreateDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para planos');
+    }
+    return this.integra.createFloorplan(
+      companyId,
+      dto,
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Post('floorplans/:id/pins')
+  @HttpCode(HttpStatus.OK)
+  upsertPin(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() dto: MapPinDto,
+    @CurrentUser() user: any,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para pines');
+    }
+    return this.integra.upsertMapPin(companyId, parseInt(id, 10), dto);
+  }
+
+  @Delete('map-pins/:id')
+  deletePin(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso');
+    }
+    return this.integra.deleteMapPin(companyId, parseInt(id, 10));
   }
 
   @Post('visitors/register')
@@ -588,6 +749,16 @@ export class IntegraController {
       { id: user?.id, email: user?.email },
       siteId ? parseInt(siteId, 10) : null,
     );
+  }
+
+  @Post('visitors/search')
+  @HttpCode(HttpStatus.OK)
+  visitorSearch(
+    @CurrentCompanyId() companyId: number | null,
+    @Body() body: Record<string, unknown>,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.visitorRecords(companyId, body, siteId ? parseInt(siteId, 10) : null);
   }
 
   @Post('visitors/qr')

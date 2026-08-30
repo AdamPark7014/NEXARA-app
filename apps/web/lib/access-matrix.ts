@@ -240,6 +240,8 @@ export type ModuleId =
   | "integra-visitors"
   | "integra-anpr"
   | "integra-settings"
+  | "integra-audit"
+  | "integra-map"
   | "integra-my-profile"
   | "integra-notifications";
 
@@ -931,6 +933,18 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     label: "Sitios", description: "Conexiones HikCentral / Hik-Connect y sync",
     icon: "⚙️", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.DIRECTOR_ADMIN],
     group: "Administración", visible: true,
+  },
+  "integra-audit": {
+    id: "integra-audit", panel: PANELS.INTEGRA, path: "/audit",
+    label: "Auditoría", description: "Bitácora de controles y mutaciones",
+    icon: "📜", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD],
+    group: "Administración", visible: true,
+  },
+  "integra-map": {
+    id: "integra-map", panel: PANELS.INTEGRA, path: "/map",
+    label: "Plano", description: "Planta con pines de puertas y cámaras",
+    icon: "🗺️", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD, R.NOC_OPERATOR],
+    group: "Monitoreo", visible: true,
   },
   "integra-notifications": {
     id: "integra-notifications", panel: PANELS.INTEGRA, path: "/notifications-center",

@@ -31,6 +31,8 @@ const PATH_TO_MODULE: Record<string, string> = {
   "/integra/visitors": "integra-visitors",
   "/integra/anpr": "integra-anpr",
   "/integra/settings": "integra-settings",
+  "/integra/audit": "integra-audit",
+  "/integra/map": "integra-map",
 };
 
 type HealthBrief = {

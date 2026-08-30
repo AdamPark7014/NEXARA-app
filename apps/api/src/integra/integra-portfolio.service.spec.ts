@@ -14,6 +14,7 @@ describe('integraCapsFromCounts', () => {
     expect(onlyVideo.access).toBe(false);
     expect(onlyVideo.anpr).toBe(false);
     expect(onlyVideo.alarms).toBe(true);
+    expect(onlyVideo.canControlDoors).toBe(false);
 
     const acs = integraCapsFromCounts({
       cameras: 0,
@@ -27,6 +28,7 @@ describe('integraCapsFromCounts', () => {
     expect(acs.events).toBe(true);
     expect(acs.visitors).toBe(true);
     expect(acs.video).toBe(false);
+    expect(acs.canControlDoors).toBe(true);
   });
 
   it('oculta settings para rol cliente', () => {

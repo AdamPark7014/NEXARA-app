@@ -134,7 +134,7 @@ export class IntegraArtemisService {
   async dashboard(
     companyId: number | null,
     siteId?: number | null,
-    opts?: { canSettings?: boolean },
+    opts?: { canSettings?: boolean; canControlDoors?: boolean },
   ) {
     if (!companyId) {
       const h = await this.health(null);
@@ -225,7 +225,7 @@ export class IntegraArtemisService {
   capabilities(
     companyId: number | null,
     siteId?: number | null,
-    opts?: { canSettings?: boolean },
+    opts?: { canSettings?: boolean; canControlDoors?: boolean },
   ) {
     return this.portfolioSvc.capabilities(companyId, siteId, opts);
   }
@@ -349,17 +349,10 @@ export class IntegraArtemisService {
 
   async listDoors(companyId: number | null, live = false, siteId?: number | null) {
     if (!live && companyId) {
-      const [items, regions] = await Promise.all([
-        this.prisma.integraDoor.findMany({
-          where: { companyId, ...(siteId ? { siteId } : {}) },
-          orderBy: { name: 'asc' },
-        }),
-        this.prisma.integraRegion.findMany({
-          where: { companyId, ...(siteId ? { siteId } : {}) },
-          select: { indexCode: true, name: true },
-        }),
-      ]);
-      const regionByName = new Map(regions.map((r) => [r.name, r.indexCode]));
+      const items = await this.prisma.integraDoor.findMany({
+        where: { companyId, ...(siteId ? { siteId } : {}) },
+        orderBy: { name: 'asc' },
+      });
       return {
         total: items.length,
         source: 'mirror' as const,
@@ -367,7 +360,7 @@ export class IntegraArtemisService {
           id: d.doorIndexCode,
           name: d.name,
           location: d.regionName,
-          regionId: d.regionName ? regionByName.get(d.regionName) ?? null : null,
+          regionId: d.regionIndexCode,
           online: d.online,
           status: ARTEMIS_DOOR_STATE[String(d.doorState ?? '')] || 'unknown',
           doorState: d.doorState,
@@ -419,8 +412,16 @@ export class IntegraArtemisService {
     doorIndexCode: string,
     actor?: Actor,
     siteId?: number | null,
+    reason?: string,
   ) {
-    return this.controlDoor(companyId, doorIndexCode, ARTEMIS_DOOR_CONTROL.OPEN, actor, siteId);
+    return this.controlDoor(
+      companyId,
+      doorIndexCode,
+      ARTEMIS_DOOR_CONTROL.OPEN,
+      actor,
+      siteId,
+      reason,
+    );
   }
 
   async controlDoor(
@@ -429,7 +430,12 @@ export class IntegraArtemisService {
     controlType: '0' | '1' | '2' | '3' = ARTEMIS_DOOR_CONTROL.OPEN,
     actor?: Actor,
     siteId?: number | null,
+    reason?: string,
   ) {
+    const reasonTrim = (reason || '').trim();
+    if (reasonTrim.length < 3) {
+      throw new BadRequestException('Motivo obligatorio (mín. 3 caracteres)');
+    }
     const labels: Record<string, string> = {
       '0': 'remain_open',
       '1': 'close',
@@ -447,6 +453,7 @@ export class IntegraArtemisService {
           doorIndexCode,
           provider: 'HCT',
           controlType,
+          reason: reasonTrim,
           email: actor?.email,
         });
         return { success: true, message: `Puerta ${doorIndexCode} abierta (HCT)`, controlType };
@@ -458,6 +465,7 @@ export class IntegraArtemisService {
       await this.auditMut('integra.door.control', actor, companyId, resolved.siteId ?? 0, {
         doorIndexCode,
         controlType,
+        reason: reasonTrim,
         email: actor?.email,
       });
       return {
@@ -824,6 +832,249 @@ export class IntegraArtemisService {
     }
   }
 
+  /** Cola SOC: alarmas Artemis recientes + estado ack local NEXARA. */
+  async alarmQueue(
+    companyId: number | null,
+    siteId?: number | null,
+    opts?: { hours?: number; pageSize?: number },
+  ) {
+    const hours = Math.min(Math.max(opts?.hours ?? 24, 1), 168);
+    const pageSize = Math.min(Math.max(opts?.pageSize ?? 50, 1), 200);
+    const end = new Date();
+    const start = new Date(end.getTime() - hours * 60 * 60 * 1000);
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
+    const sid = resolved.siteId;
+    if (!sid || !companyId) {
+      return { items: [], openCount: 0, source: 'none' as const };
+    }
+
+    let rawList: Record<string, unknown>[] = [];
+    let source: 'artemis' | 'empty' | 'hct' = 'empty';
+    if (resolved.provider === 'HCT') {
+      source = 'hct';
+    } else if (resolved.client) {
+      try {
+        const data = await resolved.client.eventRecordsPage({
+          pageNo: 1,
+          pageSize,
+          startTime: start.toISOString(),
+          endTime: end.toISOString(),
+        });
+        rawList = (data as any)?.list || (data as any)?.data?.list || [];
+        source = 'artemis';
+      } catch {
+        rawList = [];
+        source = 'empty';
+      }
+    }
+
+    const acks = await this.prisma.integraAlarmAck.findMany({
+      where: { companyId, siteId: sid },
+    });
+    const ackByExt = new Map(acks.map((a) => [a.externalAlarmId, a]));
+
+    const items = rawList.map((row) => {
+      const externalId = alarmExternalId(row);
+      const ack = ackByExt.get(externalId);
+      const status = ack?.status === 'CLEARED' ? 'CLEARED' : ack ? 'ACK' : 'OPEN';
+      return {
+        id: externalId,
+        status,
+        title: humanAlarmTitle(row),
+        severity: humanAlarmSeverity(row),
+        timestamp: String(
+          row.startTime || row.happenTime || row.eventTime || row.time || '',
+        ),
+        srcName: String(row.srcName || row.regionName || row.doorName || ''),
+        cameraIndexCode: row.cameraIndexCode != null ? String(row.cameraIndexCode) : null,
+        doorIndexCode: row.doorIndexCode != null ? String(row.doorIndexCode) : null,
+        eventType: row.eventType != null ? String(row.eventType) : null,
+        note: ack?.note || null,
+        ackedAt: ack?.ackedAt?.toISOString() || null,
+        clearedAt: ack?.clearedAt?.toISOString() || null,
+        raw: row,
+      };
+    });
+
+    const openCount = items.filter((i) => i.status === 'OPEN').length;
+    return { items, openCount, source, siteId: sid };
+  }
+
+  async ackAlarm(
+    companyId: number | null,
+    externalAlarmId: string,
+    opts: {
+      note?: string;
+      actor?: Actor;
+      siteId?: number | null;
+      status?: 'ACK' | 'CLEARED';
+      title?: string;
+      severity?: string;
+      raw?: unknown;
+    },
+  ) {
+    if (!companyId) throw new BadRequestException('companyId requerido');
+    const resolved = await this.sites.resolveClient({ companyId, siteId: opts.siteId });
+    const sid = resolved.siteId;
+    if (!sid) throw new BadRequestException('Sitio requerido');
+    const status = opts.status || 'ACK';
+    const note = (opts.note || '').trim() || null;
+    const row = await this.prisma.integraAlarmAck.upsert({
+      where: {
+        siteId_externalAlarmId: { siteId: sid, externalAlarmId },
+      },
+      create: {
+        companyId,
+        siteId: sid,
+        externalAlarmId,
+        status,
+        note,
+        userId: opts.actor?.id ?? null,
+        title: opts.title || null,
+        severity: opts.severity || null,
+        raw: (opts.raw as any) ?? undefined,
+        clearedAt: status === 'CLEARED' ? new Date() : null,
+      },
+      update: {
+        status,
+        note,
+        userId: opts.actor?.id ?? null,
+        title: opts.title || undefined,
+        severity: opts.severity || undefined,
+        clearedAt: status === 'CLEARED' ? new Date() : null,
+        ackedAt: new Date(),
+      },
+    });
+    await this.auditMut(
+      status === 'CLEARED' ? 'integra.alarm.clear' : 'integra.alarm.ack',
+      opts.actor,
+      companyId,
+      sid,
+      { externalAlarmId, note, status },
+    );
+    return {
+      id: row.externalAlarmId,
+      status: row.status,
+      note: row.note,
+      ackedAt: row.ackedAt.toISOString(),
+      clearedAt: row.clearedAt?.toISOString() || null,
+    };
+  }
+
+  async listFloorplans(companyId: number | null, siteId?: number | null) {
+    if (!companyId) return { items: [] };
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
+    const sid = resolved.siteId;
+    if (!sid) return { items: [] };
+    const rows = await this.prisma.integraFloorplan.findMany({
+      where: { companyId, siteId: sid },
+      include: { pins: true },
+      orderBy: { id: 'asc' },
+    });
+    return {
+      items: rows.map((f) => ({
+        id: f.id,
+        name: f.name,
+        imageData: f.imageData,
+        pins: f.pins.map((p) => ({
+          id: p.id,
+          entityType: p.entityType,
+          entityId: p.entityId,
+          label: p.label,
+          xPct: p.xPct,
+          yPct: p.yPct,
+        })),
+      })),
+    };
+  }
+
+  async createFloorplan(
+    companyId: number | null,
+    input: { name: string; imageData: string },
+    siteId?: number | null,
+  ) {
+    if (!companyId) throw new BadRequestException('companyId requerido');
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
+    const sid = resolved.siteId;
+    if (!sid) throw new BadRequestException('Sitio requerido');
+    if (!input.imageData || input.imageData.length < 32) {
+      throw new BadRequestException('Imagen requerida');
+    }
+    const row = await this.prisma.integraFloorplan.create({
+      data: {
+        companyId,
+        siteId: sid,
+        name: input.name.trim() || 'Plano',
+        imageData: input.imageData,
+      },
+    });
+    return { id: row.id, name: row.name };
+  }
+
+  async upsertMapPin(
+    companyId: number | null,
+    floorplanId: number,
+    pin: {
+      entityType: 'CAMERA' | 'DOOR';
+      entityId: string;
+      label?: string;
+      xPct: number;
+      yPct: number;
+    },
+  ) {
+    if (!companyId) throw new BadRequestException('companyId requerido');
+    const fp = await this.prisma.integraFloorplan.findFirst({
+      where: { id: floorplanId, companyId },
+    });
+    if (!fp) throw new BadRequestException('Plano no encontrado');
+    const row = await this.prisma.integraMapPin.upsert({
+      where: {
+        floorplanId_entityType_entityId: {
+          floorplanId,
+          entityType: pin.entityType,
+          entityId: pin.entityId,
+        },
+      },
+      create: {
+        floorplanId,
+        entityType: pin.entityType,
+        entityId: pin.entityId,
+        label: pin.label || null,
+        xPct: pin.xPct,
+        yPct: pin.yPct,
+      },
+      update: {
+        label: pin.label || null,
+        xPct: pin.xPct,
+        yPct: pin.yPct,
+      },
+    });
+    return row;
+  }
+
+  async deleteMapPin(companyId: number | null, pinId: number) {
+    if (!companyId) throw new BadRequestException('companyId requerido');
+    const pin = await this.prisma.integraMapPin.findFirst({
+      where: { id: pinId, floorplan: { companyId } },
+    });
+    if (!pin) throw new BadRequestException('Pin no encontrado');
+    await this.prisma.integraMapPin.delete({ where: { id: pinId } });
+    return { success: true };
+  }
+
+  async visitorRecords(
+    companyId: number | null,
+    body: Record<string, unknown>,
+    siteId?: number | null,
+  ) {
+    try {
+      const { client } = await this.client(companyId, siteId);
+      return await client.visitorAppointmentRecords(body);
+    } catch (error) {
+      rethrowArtemis(error, 'No se pudieron listar visitas');
+    }
+  }
+
   async visitorQr(companyId: number | null, body: Record<string, unknown>, siteId?: number | null) {
     try {
       const { client } = await this.client(companyId, siteId);
@@ -857,4 +1108,55 @@ export class IntegraArtemisService {
       rethrowArtemis(error, 'No se pudieron listar cruces ANPR');
     }
   }
+
+  async pollLiveEvents(
+    companyId: number | null,
+    siteId?: number | null,
+    limit = 40,
+  ) {
+    const end = new Date();
+    const start = new Date(end.getTime() - 2 * 60 * 60 * 1000);
+    try {
+      return await this.listEvents(companyId, {
+        limit,
+        pageNo: 1,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        siteId,
+      });
+    } catch {
+      return { items: [], total: 0, source: 'error' as const };
+    }
+  }
+}
+
+function alarmExternalId(row: Record<string, unknown>): string {
+  const id =
+    row.eventId ??
+    row.id ??
+    row.alarmId ??
+    `${row.eventType ?? 'e'}-${row.startTime ?? row.happenTime ?? row.eventTime ?? ''}-${row.srcIndex ?? row.srcName ?? ''}`;
+  return String(id).slice(0, 220);
+}
+
+function humanAlarmTitle(row: Record<string, unknown>): string {
+  const name =
+    row.eventTypeName ||
+    row.srcName ||
+    row.regionName ||
+    row.doorName ||
+    row.eventType ||
+    'Alarma';
+  return String(name);
+}
+
+function humanAlarmSeverity(row: Record<string, unknown>): string {
+  const raw = row.eventLvl ?? row.priority ?? row.severity ?? row.eventType;
+  const n = Number(raw);
+  if (Number.isFinite(n)) {
+    if (n >= 3) return 'alta';
+    if (n === 2) return 'media';
+    return 'baja';
+  }
+  return 'media';
 }
