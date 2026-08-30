@@ -526,3 +526,64 @@
   flex-direction: column;
   gap: 14px;
 }
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 12px 14px;
+  background: var(--ig-panel);
+  border: 1px solid var(--ig-line);
+}
+
+.filterField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 120px;
+}
+
+.filterLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+}
+
+.camGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.camTile {
+  border: 1px solid var(--ig-line);
+  background: #0b1524;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.camTileHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  background: color-mix(in srgb, #0b1524 92%, white);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.camTileBody {
+  aspect-ratio: 16 / 9;
+  background: #020617;
+}
+
+.tableScroll {
+  max-height: min(62vh, 640px);
+  overflow: auto;
+}

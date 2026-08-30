@@ -23,6 +23,9 @@ export type ArtemisEventRaw = {
   eventTime?: string;
   eventType?: number | string;
   eventTypeName?: string;
+  picUri?: string;
+  readerName?: string;
+  checkInAndOutType?: number;
 };
 
 export type ArtemisCameraRaw = {

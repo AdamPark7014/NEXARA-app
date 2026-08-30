@@ -352,61 +352,117 @@ export class IntegraArtemisService {
     actor?: Actor,
     siteId?: number | null,
   ) {
+    return this.controlDoor(companyId, doorIndexCode, ARTEMIS_DOOR_CONTROL.OPEN, actor, siteId);
+  }
+
+  async controlDoor(
+    companyId: number | null,
+    doorIndexCode: string,
+    controlType: '0' | '1' | '2' | '3' = ARTEMIS_DOOR_CONTROL.OPEN,
+    actor?: Actor,
+    siteId?: number | null,
+  ) {
+    const labels: Record<string, string> = {
+      '0': 'remain_open',
+      '1': 'close',
+      '2': 'open',
+      '3': 'remain_closed',
+    };
     try {
       const resolved = await this.sites.resolveClient({ companyId, siteId });
       if (resolved.provider === 'HCT' && resolved.hct) {
+        if (controlType !== ARTEMIS_DOOR_CONTROL.OPEN) {
+          throw new BadRequestException('HCT solo soporta apertura remota (controlType=2)');
+        }
         await resolved.hct.remoteDoorControl([doorIndexCode]);
         await this.auditMut('integra.door.open', actor, companyId, resolved.siteId ?? 0, {
           doorIndexCode,
           provider: 'HCT',
+          controlType,
           email: actor?.email,
         });
-        return { success: true, message: `Puerta ${doorIndexCode} abierta (HCT)` };
+        return { success: true, message: `Puerta ${doorIndexCode} abierta (HCT)`, controlType };
       }
       if (!resolved.client) {
         throw new BadRequestException('Sin cliente Artemis/HCT');
       }
-      await resolved.client.doorControl([doorIndexCode], ARTEMIS_DOOR_CONTROL.OPEN);
-      await this.auditMut('integra.door.open', actor, companyId, resolved.siteId ?? 0, {
+      await resolved.client.doorControl([doorIndexCode], controlType);
+      await this.auditMut('integra.door.control', actor, companyId, resolved.siteId ?? 0, {
         doorIndexCode,
+        controlType,
         email: actor?.email,
       });
-      return { success: true, message: `Puerta ${doorIndexCode} abierta` };
+      return {
+        success: true,
+        message: `Puerta ${doorIndexCode}: ${labels[controlType] || controlType}`,
+        controlType,
+      };
     } catch (error) {
-      rethrowArtemis(error, `No se pudo abrir la puerta ${doorIndexCode}`);
+      rethrowArtemis(error, `No se pudo controlar la puerta ${doorIndexCode}`);
     }
   }
 
   async listEvents(
     companyId: number | null,
-    opts: { limit?: number; doorId?: string; siteId?: number | null } = {},
+    opts: {
+      limit?: number;
+      pageNo?: number;
+      doorId?: string;
+      personId?: string;
+      personName?: string;
+      eventType?: number;
+      startTime?: string;
+      endTime?: string;
+      siteId?: number | null;
+    } = {},
   ) {
     try {
       const { client } = await this.client(companyId, opts.siteId);
-      const end = new Date();
-      const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+      const end = opts.endTime ? new Date(opts.endTime) : new Date();
+      const start = opts.startTime
+        ? new Date(opts.startTime)
+        : new Date(end.getTime() - 24 * 60 * 60 * 1000);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        throw new BadRequestException('startTime/endTime inválidos');
+      }
+      const pageNo = Math.max(1, opts.pageNo ?? 1);
+      const pageSize = Math.min(Math.max(1, opts.limit ?? 50), 200);
       const data = await client.doorEvents(
         toArtemisOffsetIso(start),
         toArtemisOffsetIso(end),
-        1,
-        Math.min(opts.limit ?? 50, 200),
+        pageNo,
+        pageSize,
+        {
+          doorIndexCodes: opts.doorId ? [opts.doorId] : undefined,
+          eventType: opts.eventType,
+        },
       );
       let list = data?.list ?? [];
-      if (opts.doorId) {
-        list = list.filter((e) => String(e.doorIndexCode) === String(opts.doorId));
+      if (opts.personId) {
+        list = list.filter((e) => String(e.personId ?? '') === String(opts.personId));
+      }
+      if (opts.personName?.trim()) {
+        const q = opts.personName.trim().toLowerCase();
+        list = list.filter((e) => String(e.personName || '').toLowerCase().includes(q));
       }
       return {
-        total: list.length,
+        total: data?.total ?? list.length,
+        pageNo,
+        pageSize,
+        startTime: toArtemisOffsetIso(start),
+        endTime: toArtemisOffsetIso(end),
         items: list.map((e) => ({
-          id: String(e.eventId ?? ''),
+          id: String(e.eventId ?? `${e.eventTime}-${e.doorIndexCode}-${e.personId}`),
           doorId: String(e.doorIndexCode ?? ''),
           doorName: e.doorName,
           personId: e.personId ? String(e.personId) : undefined,
           personName: e.personName,
           cardNo: e.cardNo,
           eventType: String(e.eventTypeName || e.eventType || ''),
+          eventTypeCode: e.eventType != null ? Number(e.eventType) : undefined,
           timestamp: e.eventTime,
-          picUri: (e as any).picUri,
+          picUri: e.picUri,
+          readerName: e.readerName,
         })),
       };
     } catch (error) {
@@ -495,6 +551,16 @@ export class IntegraArtemisService {
       };
     } catch (error) {
       rethrowArtemis(error, 'No se pudieron listar personas');
+    }
+  }
+
+  async getPerson(companyId: number | null, personId: string, siteId?: number | null) {
+    try {
+      const { client } = await this.client(companyId, siteId);
+      const data = await client.personInfo(personId);
+      return { personId, raw: data };
+    } catch (error) {
+      rethrowArtemis(error, `No se pudo obtener persona ${personId}`);
     }
   }
 

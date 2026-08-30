@@ -73,6 +73,12 @@ class SiteUpdateDto {
   @IsOptional() @IsIn(['ARTEMIS', 'HCT']) provider?: 'ARTEMIS' | 'HCT';
 }
 
+class DoorControlDto {
+  /** 0 remain open · 1 close · 2 open · 3 remain closed */
+  @IsIn(['0', '1', '2', '3'])
+  controlType!: '0' | '1' | '2' | '3';
+}
+
 class VehicleDto {
   @IsString() plateNo!: string;
   @IsOptional() @IsString() personId?: string;
@@ -310,6 +316,25 @@ export class IntegraController {
     );
   }
 
+  @Post('doors/:id/control')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'doControl Artemis: 0 remain open · 1 close · 2 open · 3 remain closed' })
+  controlDoor(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() dto: DoorControlDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.controlDoor(
+      companyId,
+      id,
+      dto.controlType,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
   @Get('devices')
   devices(
     @CurrentCompanyId() companyId: number | null,
@@ -322,12 +347,24 @@ export class IntegraController {
   events(
     @CurrentCompanyId() companyId: number | null,
     @Query('limit') limit?: string,
+    @Query('pageNo') pageNo?: string,
     @Query('doorId') doorId?: string,
+    @Query('personId') personId?: string,
+    @Query('personName') personName?: string,
+    @Query('eventType') eventType?: string,
+    @Query('startTime') startTime?: string,
+    @Query('endTime') endTime?: string,
     @Query('siteId') siteId?: string,
   ) {
     return this.integra.listEvents(companyId, {
-      limit: limit ? parseInt(limit, 10) : 50,
+      limit: limit ? parseInt(limit, 10) : 80,
+      pageNo: pageNo ? parseInt(pageNo, 10) : 1,
       doorId,
+      personId,
+      personName,
+      eventType: eventType ? parseInt(eventType, 10) : undefined,
+      startTime,
+      endTime,
       siteId: siteId ? parseInt(siteId, 10) : null,
     });
   }
@@ -363,6 +400,15 @@ export class IntegraController {
       live === '1',
       siteId ? parseInt(siteId, 10) : null,
     );
+  }
+
+  @Get('people/:id')
+  personDetail(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.getPerson(companyId, id, siteId ? parseInt(siteId, 10) : null);
   }
 
   @Post('people')

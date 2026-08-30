@@ -100,6 +100,10 @@ describe('HikCentralArtemisClient · surface P2', () => {
     await c.vehicleDelete('1');
     await c.acsDeviceList(1, 10);
     await c.encodeDeviceList(1, 10);
+    await c.doorEvents('2026-01-01T00:00:00-06:00', '2026-01-02T00:00:00-06:00', 1, 10, {
+      doorIndexCodes: ['2'],
+      eventType: 196893,
+    });
     const urls = (global.fetch as jest.Mock).mock.calls.map((call) => String(call[0]));
     expect(urls.some((u) => u.includes('playbackURLs'))).toBe(true);
     expect(urls.some((u) => u.includes('capture'))).toBe(true);
@@ -109,5 +113,12 @@ describe('HikCentralArtemisClient · surface P2', () => {
     expect(urls.some((u) => u.includes('vehicle/single/delete'))).toBe(true);
     expect(urls.some((u) => u.includes('acsDeviceList'))).toBe(true);
     expect(urls.some((u) => u.includes('encodeDeviceList'))).toBe(true);
+    expect(urls.some((u) => u.includes('/door/events'))).toBe(true);
+    const eventsCall = (global.fetch as jest.Mock).mock.calls.find((call) =>
+      String(call[0]).includes('/door/events'),
+    );
+    const eventsBody = JSON.parse(String(eventsCall?.[1]?.body ?? '{}'));
+    expect(eventsBody.doorIndexCodes).toEqual(['2']);
+    expect(eventsBody.eventType).toBe(196893);
   });
 });

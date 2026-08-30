@@ -111,3 +111,45 @@ export const inputStyle: React.CSSProperties = {
   background: "#fff",
   color: "#0b1524",
 };
+
+export const selectStyle: React.CSSProperties = {
+  ...inputStyle,
+  maxWidth: 320,
+};
+
+export const filterRowStyle: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+  alignItems: "center",
+  marginBottom: 12,
+};
+
+/** datetime-local value from Date (local TZ). */
+export function toDatetimeLocalValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** ISO string from datetime-local input. */
+export function fromDatetimeLocalValue(s: string): string | undefined {
+  if (!s) return undefined;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
+export function defaultRangeHours(hours = 24): { start: string; end: string } {
+  const end = new Date();
+  const start = new Date(end.getTime() - hours * 60 * 60 * 1000);
+  return { start: toDatetimeLocalValue(start), end: toDatetimeLocalValue(end) };
+}
+
+/** doControl Artemis (Developer Guide). */
+export const DOOR_CONTROL_OPTIONS = [
+  { value: "2", label: "Abrir (momentáneo)" },
+  { value: "1", label: "Cerrar" },
+  { value: "0", label: "Quedar abierta" },
+  { value: "3", label: "Quedar cerrada" },
+] as const;
+
+export type DoorControlType = (typeof DOOR_CONTROL_OPTIONS)[number]["value"];

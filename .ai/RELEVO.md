@@ -6,27 +6,23 @@
 
 ## Hecho en este turno
 
-### Integra Absolute Upgrade — cierre P2–P4
-- **A1–A4 / B1–B3 / C** ya en disco (espejo Prisma, sync, audit, Artemis surface, go2rtc HLS, UI densa, NOC adapter, alarmas/visitas/ANPR).
-- **P4 HCT (ADR-0019 Accepted):**
-  - Cliente `hikvision-hct` + `IntegraSite.provider` (`ARTEMIS`|`HCT`) + migración.
-  - resolveClient / health / openDoor / stream / sync espejo para HCT.
-  - Settings UI selector provider; Video tolera token EZUIKit.
-  - INTEGRA-OPS sección HCT; DTO create/update con `provider`.
-- Tests: artemis, hct, media, portfolio, secrets OK; `tsc` API OK.
+### Integra densificación UI + params (post Absolute Upgrade)
+- API: `door/events` con `doorIndexCodes` + `eventType` + rango/página; `POST doors/:id/control` (0/1/2/3); `GET people/:id` (personInfo).
+- UI densa: Video wall 4 cams + filtros región; Access doControl + live doors; Events filtros reales + auto-refresh; People detalle live; Vehicles edit + picker persona; Alarms/ANPR/Visitors con datetime/page/params.
+- CSS `filterBar` / `camGrid` en `integra.module.css`.
 
 ## A medias
-- Player EZUIKit embebido en UI Video (hoy muestra JSON token HCT).
-- Deploy prod: migrate `integra_site_provider` + hard-refresh.
+- Player EZUIKit embebido (HCT sigue mostrando note/token).
+- Deploy densificación a prod.
 
 ## No tocar
 - tickets layout, seed-demo-users, package-lock, xlsx credenciales
 - Oficinas ACS (`/api/access-control` + `OFFICES_HIK_*`)
 
 ## Siguiente paso
-1. `prisma migrate deploy` en droplet + restart api/web.
-2. Smoke health/sync/stream Artemis; opcional site HCT de prueba.
-3. (Opcional) EZUIKit player nativo en `/integra/video`.
+1. Deploy `--force-all` + hard-refresh Integra.
+2. Smoke: events con door + rango; door control; video wall.
+3. (Opcional) EZUIKit player.
 
 ## Estado
-- Absolute Upgrade plan todos cerrados en código; listo para commit/deploy.
+- Listo para relevo cerrar / deploy.
