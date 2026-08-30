@@ -62,6 +62,8 @@ type Dash = {
   provider?: string;
   doors?: number;
   cameras?: number;
+  doorsOnline?: number;
+  people?: number;
 };
 
 type Sel =
@@ -341,6 +343,16 @@ export default function IntegraHome() {
     }
 
     return (
+      <div className={styles.pageStack}>
+        <header className={styles.pageHero}>
+          <div className={styles.pageHeroCopy}>
+            <span className={styles.pageEyebrow}>Integra · alta</span>
+            <h1 className={styles.pageTitle}>Conecta tu primer sitio</h1>
+            <p className={styles.pageSub}>
+              Misma experiencia de shell que CRM y ERP: primero el enlace HikCentral o Hik-Connect.
+            </p>
+          </div>
+        </header>
       <div className={styles.igOnboard}>
         <div className={styles.igOnboardCard}>
           <EmptyState
@@ -378,6 +390,7 @@ export default function IntegraHome() {
           </ol>
         </div>
       </div>
+      </div>
     );
   }
 
@@ -387,8 +400,36 @@ export default function IntegraHome() {
   const wallCams = (tree?.cameras || []).slice(0, 9);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, height: "100%" }}>
+    <div className={styles.pageStack}>
+      <header className={styles.pageHero}>
+        <div className={styles.pageHeroCopy}>
+          <span className={styles.pageEyebrow}>
+            {isClient ? "Mi seguridad" : "Integra · consola"}
+          </span>
+          <h1 className={styles.pageTitle}>
+            {isClient ? "Estado del sitio" : "Ops en vivo"}
+          </h1>
+          <p className={styles.pageSub}>
+            {dash?.connected
+              ? `${dash.provider === "HCT" ? "Hik-Connect" : "HikCentral"} · ${dash.host || "sitio activo"}`
+              : "Árbol de áreas, control de puertas, video y eventos"}
+          </p>
+        </div>
+        <div className={styles.pageHeroActions}>
+          <Button variant="secondary" size="sm" onClick={() => void refreshTree()}>
+            Actualizar
+          </Button>
+          {!isClient && (
+            <Button variant="primary" size="sm" onClick={() => router.push("/integra/video")}>
+              Ir a video →
+            </Button>
+          )}
+        </div>
+      </header>
+
       <IgError>{error}</IgError>
+
+      <div className={styles.workbenchWrap}>
       <IgWorkbench
         tree={
           <>
@@ -557,6 +598,7 @@ export default function IntegraHome() {
           />
         }
       />
+      </div>
     </div>
   );
 }

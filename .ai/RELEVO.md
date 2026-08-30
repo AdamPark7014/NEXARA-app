@@ -6,14 +6,15 @@
 
 ## Hecho en este turno
 
-### Sidebar Integra más rica (match CRM)
-- Grupos: **Monitoreo / Acceso / Flota / Administración** con labels claros.
-- Staff **sin inventario** ve el menú completo (ya no solo Ops+Sitios).
-- Cliente: copy amigable vía `adaptModulePresentation` (Mi sitio, Cámaras…).
-- Iconos en pastilla con acento Integra (`data-panel="integra"`).
+### Pulido Integra (siguiente nivel CRM)
+- Context bar: health pill + KPIs cam/pta/pers + `Button` Sync.
+- SiteSwitcher con estilos de sistema (chip / select redondeado).
+- Home: hero tipo DashKit (eyebrow + título + CTAs) sobre workbench.
+- Sidebar **Mi cuenta**: Notificaciones + Mi perfil (redirect ERP).
+- Workbench card 14px radius.
 
 ## A medias
-- Deploy pendiente tras cierre.
+- Deploy pendiente.
 
 ## No tocar
 - tickets layout, seed-demo-users, package-lock, xlsx
@@ -21,7 +22,6 @@
 
 ## Siguiente paso
 1. Deploy + hard-refresh.
-2. Verificar menú denso sin sitio y con caps reales tras sync.
 
 ## Estado
 - Listo para cerrar + deploy.

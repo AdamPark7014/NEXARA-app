@@ -14,6 +14,8 @@ export const MODULE_CAPABILITY: Record<string, keyof IntegraCapabilities | "alwa
   "integra-visitors": "visitors",
   "integra-anpr": "anpr",
   "integra-settings": "settings",
+  "integra-my-profile": "always",
+  "integra-notifications": "always",
 };
 
 export function setCachedCapabilities(caps: IntegraCapabilities | null) {
