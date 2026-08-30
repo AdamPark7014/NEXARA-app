@@ -988,6 +988,71 @@ export class AuthService {
     return n * 86_400_000;
   }
 
+
+  /**
+   * Sliding session: re-emite JWT y empuja expiresAt (+JWT_EXPIRES_IN),
+   * con tope absoluto de 7 días desde createdAt de la UserSession.
+   */
+  async extendSession(userId: number, jti: string | undefined, _req?: any) {
+    if (!jti) {
+      throw new UnauthorizedException('Sesión sin jti; vuelve a iniciar sesión.');
+    }
+    await this.assertSessionActive(jti, userId);
+
+    const session = await this.prisma.userSession.findUnique({ where: { jti } });
+    if (!session || session.userId !== userId) {
+      throw new UnauthorizedException('Sesión inválida');
+    }
+
+    const ABSOLUTE_MAX_MS = 7 * 24 * 60 * 60 * 1000;
+    const createdMs = session.createdAt.getTime();
+    if (Date.now() - createdMs >= ABSOLUTE_MAX_MS) {
+      throw new UnauthorizedException(
+        'Sesión máxima alcanzada (7 días). Vuelve a iniciar sesión.',
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true, department: true },
+    });
+    if (!user || user.isActive === false) {
+      throw new UnauthorizedException('Usuario inactivo o inexistente');
+    }
+
+    const isSuperAdmin = this.isSuperAdmin(user.email);
+    const permissions = this.resolveUserPermissions(user, isSuperAdmin);
+    const expiresInRaw = process.env.JWT_EXPIRES_IN || '4h';
+    const expiresMs = this.parseExpiresToMs(expiresInRaw);
+    let expiresAt = new Date(Date.now() + expiresMs);
+    const absoluteCap = new Date(createdMs + ABSOLUTE_MAX_MS);
+    if (expiresAt.getTime() > absoluteCap.getTime()) {
+      expiresAt = absoluteCap;
+    }
+
+    await this.prisma.userSession.update({
+      where: { jti },
+      data: { expiresAt, lastSeenAt: new Date() },
+    });
+
+    const payload = {
+      sub: user.id,
+      roleId: user.roleId,
+      roleKey: this.resolveEffectiveRoleKey(user) ?? user.roleKey ?? null,
+      orgRoleKey: user.role?.orgRoleKey ?? null,
+      departmentId: user.departmentId,
+      permissions,
+      isSuperAdmin,
+      isPlatformOwner: this.isPlatformOwner(user.email),
+      jti,
+    };
+
+    return {
+      access_token: this.jwtService.sign(payload, { expiresIn: expiresInRaw as any }),
+      expiresAt: expiresAt.toISOString(),
+    };
+  }
+
   async assertSessionActive(jti: string | undefined, userId: number): Promise<void> {
     // Tokens legacy sin jti siguen válidos hasta expirar (compat).
     if (!jti) return;

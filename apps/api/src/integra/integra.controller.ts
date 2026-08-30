@@ -31,6 +31,7 @@ import { RbacGuard } from '../common/rbac.guard';
 import { CurrentUser } from '../common/current-user.decorator';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
 import { IntegraArtemisService } from './integra-artemis.service';
+import { ServiceClientsService } from '../service-clients/service-clients.service.js';
 import { IntegraSiteService } from './integra-site.service';
 import { IntegraSyncService } from './integra-sync.service';
 
@@ -68,6 +69,7 @@ class SiteCreateDto {
   @IsOptional() @IsObject() modulesOverride?: Record<string, boolean>;
   /** ARTEMIS (HikCentral) | HCT (Hik-Connect for Teams) — ADR-0019 */
   @IsOptional() @IsIn(['ARTEMIS', 'HCT']) provider?: 'ARTEMIS' | 'HCT';
+  @IsOptional() @Type(() => Number) @IsInt() serviceClientId?: number | null;
 }
 
 class SiteUpdateDto {
@@ -80,6 +82,7 @@ class SiteUpdateDto {
   @IsOptional() @IsString() label?: string;
   @IsOptional() @IsObject() modulesOverride?: Record<string, boolean> | null;
   @IsOptional() @IsIn(['ARTEMIS', 'HCT']) provider?: 'ARTEMIS' | 'HCT';
+  @IsOptional() @Type(() => Number) @IsInt() serviceClientId?: number | null;
 }
 
 class DoorControlDto {
@@ -129,7 +132,8 @@ export class IntegraController {
   constructor(
     private readonly integra: IntegraArtemisService,
     private readonly sites: IntegraSiteService,
-    private readonly sync: IntegraSyncService,
+    private readonly sync: IntegraSyncService,,
+    private readonly serviceClients: ServiceClientsService,
   ) {}
 
   @Get('health')
@@ -664,6 +668,49 @@ export class IntegraController {
     @Query('siteId') siteId?: string,
   ) {
     return this.integra.alarmRecords(companyId, body, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  
+  @Post('alarms/:id/ticket')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Crear ticket OPS desde alarma (serviceClientId del sitio)' })
+  async createAlarmTicket(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+    @Body() body?: { title?: string; description?: string; severity?: string },
+  ) {
+    if (!companyId) throw new BadRequestException('companyId requerido');
+    const sites = await this.sites.list(companyId);
+    const sid = siteId ? Number(siteId) : null;
+    const site = sid
+      ? sites.find((s: any) => s.id === sid)
+      : sites.find((s: any) => s.isDefault) || sites[0];
+    if (!site) throw new BadRequestException('Sin sitio Integra activo');
+    const clientId = (site as any).serviceClientId as number | null | undefined;
+    if (!clientId) {
+      throw new BadRequestException(
+        'El sitio no tiene cliente operativo vinculado. Configúralo en Integra → Sitios.',
+      );
+    }
+    const description = [
+      body?.title || `Alarma Integra: ${decodeURIComponent(id)}`,
+      body?.description,
+      body?.severity ? `Severidad: ${body.severity}` : null,
+      `alarmId=${decodeURIComponent(id)}`,
+      `siteId=${site.id}`,
+      (site as any).label || site.name ? `Sitio: ${(site as any).label || site.name}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    // Firma real se ajusta abajo si createTicketRequest difiere
+    const ticket = await this.serviceClients.createTicketRequest(
+      clientId,
+      { description, urgency: 'HIGH', requestType: 'ISSUE' },
+      companyId,
+    );
+    return { ok: true, ticket, clientId, siteId: site.id };
   }
 
   @Sse('events/stream')

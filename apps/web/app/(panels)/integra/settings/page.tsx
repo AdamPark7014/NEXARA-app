@@ -28,6 +28,7 @@ type Site = {
   isDefault: boolean;
   lastSyncAt?: string | null;
   modulesOverride?: Record<string, boolean> | null;
+  serviceClientId?: number | null;
   _count?: { cameras: number; doors: number; people: number; vehicles: number };
 };
 
@@ -62,6 +63,8 @@ export default function IntegraSettingsPage() {
   const [appKey, setAppKey] = useState("");
   const [appSecret, setAppSecret] = useState("");
   const [provider, setProvider] = useState<"ARTEMIS" | "HCT">("ARTEMIS");
+  const [serviceClientId, setServiceClientId] = useState("");
+  const [serviceClients, setServiceClients] = useState<Array<{ id: number; name: string }>>([]);
   const [targetCompanyId, setTargetCompanyId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -71,6 +74,17 @@ export default function IntegraSettingsPage() {
     setError(null);
     try {
       setSites(await integraApi<Site[]>("integra/sites"));
+      try {
+        const raw = await integraApi<any>("service-clients?limit=200");
+        const rows = Array.isArray(raw) ? raw : raw?.items || raw?.data || [];
+        setServiceClients(
+          rows
+            .map((c: any) => ({ id: Number(c.id), name: String(c.name || c.nombre || `#${c.id}`) }))
+            .filter((c: any) => Number.isFinite(c.id) && c.id > 0),
+        );
+      } catch {
+        /* listado opcional */
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
     }
@@ -107,6 +121,7 @@ export default function IntegraSettingsPage() {
         provider,
         label: label || undefined,
         isDefault: sites.length === 0,
+        serviceClientId: serviceClientId ? Number(serviceClientId) : null,
       };
       if (targetCompanyId) body.companyId = Number(targetCompanyId);
       await integraApi("integra/sites", {
@@ -119,6 +134,7 @@ export default function IntegraSettingsPage() {
       setAppKey("");
       setAppSecret("");
       setProvider("ARTEMIS");
+      setServiceClientId("");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
@@ -314,6 +330,22 @@ export default function IntegraSettingsPage() {
                     onChange={(e) => setAppSecret(e.target.value)}
                     style={{ ...inputStyle, maxWidth: "100%" }}
                   />
+                </IgField>
+
+                
+                <IgField label="Cliente operativo (ERP)">
+                  <select
+                    value={serviceClientId}
+                    onChange={(e) => setServiceClientId(e.target.value)}
+                    style={{ ...inputStyle, maxWidth: "100%" }}
+                  >
+                    <option value="">— Sin vincular —</option>
+                    {serviceClients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
                 </IgField>
 
                 <details className={styles.igAdvanced}>

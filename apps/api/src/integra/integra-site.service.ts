@@ -46,6 +46,7 @@ export class IntegraSiteService {
         lastSyncAt: true,
         lastHealthOkAt: true,
         modulesOverride: true,
+        serviceClientId: true,
         createdAt: true,
         _count: {
           select: {
@@ -72,6 +73,7 @@ export class IntegraSiteService {
       label?: string;
       modulesOverride?: Record<string, boolean>;
       provider?: IntegraProviderKind;
+      serviceClientId?: number | null;
     },
   ) {
     if (input.isDefault) {
@@ -92,6 +94,7 @@ export class IntegraSiteService {
         label: input.label?.trim() || null,
         modulesOverride: input.modulesOverride ?? undefined,
         provider,
+        serviceClientId: input.serviceClientId ?? null,
       },
       select: {
         id: true,
@@ -102,6 +105,7 @@ export class IntegraSiteService {
         isActive: true,
         isDefault: true,
         modulesOverride: true,
+        serviceClientId: true,
       },
     });
   }
@@ -119,6 +123,7 @@ export class IntegraSiteService {
       label: string;
       modulesOverride: Record<string, boolean> | null;
       provider: IntegraProviderKind;
+      serviceClientId: number | null;
     }>,
   ) {
     const existing = await this.prisma.integraSite.findFirst({
@@ -150,6 +155,7 @@ export class IntegraSiteService {
               ? Prisma.DbNull
               : input.modulesOverride,
         provider: input.provider ? normalizeProvider(input.provider) : undefined,
+        serviceClientId: input.serviceClientId === undefined ? undefined : input.serviceClientId,
       },
       select: {
         id: true,
@@ -160,6 +166,7 @@ export class IntegraSiteService {
         isActive: true,
         isDefault: true,
         modulesOverride: true,
+        serviceClientId: true,
       },
     });
   }

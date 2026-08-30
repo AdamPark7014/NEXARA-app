@@ -68,6 +68,24 @@ export class ExcelExportController {
     const buffer = await this.excelExport.exportToExcel(data, model);
     res.setHeader('Content-Disposition', `attachment; filename=${model}s.xlsx`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    try {
+      await this.prisma.auditLog.create({
+        data: {
+          entityType: 'Export',
+          entityId: 0,
+          action: 'EXPORT',
+          changes: {
+            model,
+            fields: fields || null,
+            rowCount: Array.isArray(data) ? data.length : 0,
+          },
+          companyId: tenantId,
+          source: 'http',
+        },
+      });
+    } catch {
+      /* no bloquear export */
+    }
     res.send(Buffer.from(buffer));
   }
 }

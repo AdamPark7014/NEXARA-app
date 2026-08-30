@@ -418,6 +418,57 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		safePersistUser(user);
 	}, [user]);
 
+	// Sliding session: renovar JWT cada ~15 min y al volver el foco/visibility.
+	useEffect(() => {
+		if (!user?.token || user.offlineDegraded) return;
+
+		let cancelled = false;
+
+		const extend = async () => {
+			try {
+				const response = await fetch(buildApiUrl('auth/session/extend'), {
+					method: 'POST',
+					credentials: 'include',
+					headers: { Authorization: `Bearer ${user.token}` },
+					cache: 'no-store',
+				});
+				if (cancelled) return;
+				if (response.status === 401 || response.status === 403) {
+					safePersistUser(null);
+					setUser(null);
+					return;
+				}
+				if (!response.ok) return;
+				const data = await response.json();
+				if (cancelled || !data?.expiresAt) return;
+				setUser((prev) => {
+					if (!prev || prev.token !== user.token) return prev;
+					return { ...prev, expiresAt: data.expiresAt };
+				});
+			} catch {
+				/* red intermitente: no expulsar */
+			}
+		};
+
+		const onFocusOrVisible = () => {
+			if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+			void extend();
+		};
+
+		const intervalId = window.setInterval(() => void extend(), 15 * 60_000);
+		window.addEventListener('focus', onFocusOrVisible);
+		document.addEventListener('visibilitychange', onFocusOrVisible);
+
+		return () => {
+			cancelled = true;
+			window.clearInterval(intervalId);
+			window.removeEventListener('focus', onFocusOrVisible);
+			document.removeEventListener('visibilitychange', onFocusOrVisible);
+		};
+	}, [user?.token, user?.offlineDegraded]);
+
+
+
 	const logout = () => {
 		clearActivePanel();
 		setUser(null);

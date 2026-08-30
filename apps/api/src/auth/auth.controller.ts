@@ -96,6 +96,29 @@ export class AuthController {
     return res.redirect(`${web}/login?sso=ok#${hash}`);
   }
 
+
+  @Post('session/extend')
+  @HttpCode(200)
+  @UseGuards(AuthGuard('jwt'))
+  async extendSession(
+    @CurrentUser() user: any,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (!user?.id || user?.isClient || user?.isBranchUser) {
+      throw new UnauthorizedException('Token de usuario inválido');
+    }
+    const result = await this.authService.extendSession(
+      Number(user.id),
+      user.jti as string | undefined,
+      req,
+    );
+    if (result?.access_token) {
+      setSessionCookie(res, result.access_token);
+    }
+    return result;
+  }
+
   @Get('profile')
   @UseGuards(AuthGuard('jwt'))
   profile(@CurrentUser() user: any) {

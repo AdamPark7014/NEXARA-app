@@ -88,6 +88,67 @@ export class TicketAlertsService {
     }
   }
 
+  
+  @Cron('*/5 * * * *')
+  async notifyBreachedDeadlines() {
+    await runScheduledJob('ticket-alerts:sla-breach', this.logger, () =>
+      this.scanBreachedDeadlines(),
+    );
+  }
+
+  private async scanBreachedDeadlines() {
+    const now = new Date();
+    const breached = await this.prisma.$queryRaw<
+      Array<{ id: number; anNumber: string; clientName: string | null }>
+    >`
+      SELECT
+        a.id,
+        a."anNumber",
+        c.name AS "clientName"
+      FROM "Activity" a
+      LEFT JOIN service_clients c ON c.id = a."clientId"
+      WHERE a."clientId" IS NOT NULL
+        AND a.estatus NOT IN (${Prisma.raw(closedStatusSqlList())})
+        AND a."fechaEntregaEsperada" < ${now}
+        AND a."deletedAt" IS NULL
+        AND (
+          a."slaAlertedAt" IS NULL
+          OR a."slaAlertedAt" < a."fechaEntregaEsperada"
+        )
+    `;
+    // Nota: reutilizamos slaAlertedAt como marca de aviso; si ya se alertó
+    // "por vencer" (slaAlertedAt >= fechaEntregaEsperada no aplica), alertamos
+    // breach una vez poniendo slaAlertedAt = now tras notificar.
+
+    if (!breached.length) return;
+
+    const adminUserIds = await this.getConsoleAdminIds();
+    for (const activity of breached) {
+      const message = `Ticket ${activity.anNumber} de ${activity.clientName || 'cliente'} SUPERÓ el SLA`;
+      await Promise.all(
+        adminUserIds.map((userId) =>
+          this.notifications
+            .createNotification({
+              userId,
+              type: 'SLA_BREACH' as any,
+              category: 'sla-breach',
+              priority: 'high',
+              title: '🚨 SLA vencido',
+              message,
+              entityType: 'Activity',
+              relatedEntityId: activity.id,
+              relatedUrl: `/ops/activities`,
+            })
+            .catch((err) => this.logger.warn(`SLA breach notify: ${err?.message || err}`)),
+        ),
+      );
+      await this.prisma['activity'].update({
+        where: { id: activity.id },
+        data: { slaAlertedAt: new Date() },
+      });
+    }
+  }
+
   private async getConsoleAdminIds(): Promise<number[]> {
     const admins = await this.prisma.user.findMany({
       where: {
