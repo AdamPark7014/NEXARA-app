@@ -6,24 +6,22 @@
 
 ## Hecho en este turno
 
-### Homologación visual Integra ↔ NEXARA
-- Tokens `--ig-*` alias a `--surface` / `--background` / `--text-*` / `--panel-accent` / hairline.
-- Radios 6–8px en chips, botones, paneles, inputs, badges pill.
-- HUD: logo NEXARA + marca Integra, CompanySwitcher, Paneles ▾, chips suaves.
-- Empty Ops/Sitios: `EmptyState` + `Button` del design system + pasos numerados.
-- Gradiente primary en CTAs (estilo Button NEXARA, acento Integra).
+### Integra = mismo AppShell que CRM/ERP
+- Quitado `data-console` / full-bleed: vuelve **sidebar + topbar** NEXARA (breadcrumbs, company, rol, paneles, ⌘K, notifs).
+- `IntegraChrome` reducido a **barra de contexto** (health + SiteSwitcher + Sync); sin HUD paralelo.
+- Sidebar: grupos Consola / Administración; home label "Ops".
+- **Cliente** (`role=cliente`): empty state distinto (sin CTA Sitios/admin); sin botón Sync.
 
 ## A medias
-- Deploy `--force-all` tras este cierre.
+- Deploy `--force-all` tras cierre.
 
 ## No tocar
 - tickets layout, seed-demo-users, package-lock, xlsx
 - Oficinas ACS
-- SSE/WS, mapas GIS, skin HikCentral
 
 ## Siguiente paso
 1. Deploy + hard-refresh.
-2. Crear sitio y verificar workbench con inventario.
+2. Comparar visual Integra vs CRM/ERP lado a lado.
 
 ## Estado
-- Homologación lista para cerrar + deploy.
+- Shell homologado listo para cerrar + deploy.

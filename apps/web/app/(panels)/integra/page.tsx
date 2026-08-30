@@ -4,6 +4,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
+import { useUser } from "@/components/UserContext";
+import { resolveV2RoleKey } from "@/lib/user-access";
+import { ROLES } from "@/lib/rbac/roles";
 import {
   IgBadge,
   IgBtn,
@@ -181,6 +184,8 @@ function buildTree(regions: Region[], doors: Door[], cameras: Cam[]): IgTreeNode
 
 export default function IntegraHome() {
   const router = useRouter();
+  const { user } = useUser();
+  const isClient = resolveV2RoleKey(user) === ROLES.CLIENTE;
   const [tree, setTree] = useState<TreePayload | null>(null);
   const [dash, setDash] = useState<Dash | null>(null);
   const [events, setEvents] = useState<Ev[]>([]);
@@ -298,6 +303,43 @@ export default function IntegraHome() {
     tree && tree.doors.length === 0 && tree.cameras.length === 0 && tree.regions.length === 0;
 
   if (noSite || (emptyInventory && dash && !dash.configured)) {
+    if (isClient) {
+      return (
+        <div className={styles.igOnboard}>
+          <div className={styles.igOnboardCard}>
+            <EmptyState
+              title="Tu sitio aún no está activo"
+              description="NEXARA está configurando cámaras y accesos de tu sede. Cuando el enlace esté listo, aquí verás el monitoreo en vivo, eventos y el estado de tus puertas."
+              icon={
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M12 3 4 9v11h5v-6h6v6h5V9l-8-6Z"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              }
+            />
+            <ol className={styles.igOnboardSteps}>
+              <li>
+                <span className={styles.igOnboardStepNum}>1</span>
+                <span>Tu equipo NEXARA registra el sitio</span>
+              </li>
+              <li>
+                <span className={styles.igOnboardStepNum}>2</span>
+                <span>Se sincronizan cámaras, puertas y personas</span>
+              </li>
+              <li>
+                <span className={styles.igOnboardStepNum}>3</span>
+                <span>Ops queda listo para consultar y operar</span>
+              </li>
+            </ol>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className={styles.igOnboard}>
         <div className={styles.igOnboardCard}>

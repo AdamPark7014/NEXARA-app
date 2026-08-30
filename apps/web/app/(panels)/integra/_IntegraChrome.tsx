@@ -1,23 +1,14 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { subscribeActiveCompany } from "@/lib/tenant";
 import { useUser } from "@/components/UserContext";
-import CompanySwitcher from "@/components/CompanySwitcher";
-import { NEXARA_LOGO_MARK } from "@/lib/brand";
-import { type PanelId } from "@/lib/access-matrix";
-import {
-  getUserAllowedPanels,
-  getUserPanelSwitchPath,
-  getUserRoleLabel,
-} from "@/lib/user-access";
-import { buildCrossPanelUrl } from "@/lib/cross-panel-handoff";
+import { resolveV2RoleKey } from "@/lib/user-access";
+import { ROLES } from "@/lib/rbac/roles";
 import {
   integraApi,
   type IntegraCapabilities,
-  INTEGRA_MODULE_CARDS,
 } from "./_lib";
 import { IntegraSiteSwitcher } from "./_SiteSwitcher";
 import {
@@ -47,21 +38,16 @@ type HealthBrief = {
   provider?: string;
 };
 
+/** Barra de contexto del sitio — la nav vive en AppShell (como CRM/ERP). */
 export function IntegraChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout, user } = useUser();
+  const { user } = useUser();
+  const isClient = resolveV2RoleKey(user) === ROLES.CLIENTE;
   const [caps, setCaps] = useState<IntegraCapabilities | null>(null);
   const [health, setHealth] = useState<HealthBrief | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [tick, setTick] = useState(0);
-  const [switcherOpen, setSwitcherOpen] = useState(false);
-  const switcherRef = useRef<HTMLDivElement>(null);
-
-  const allowedPanels = useMemo(
-    () => (user ? getUserAllowedPanels(user) : []),
-    [user],
-  );
 
   const refreshCaps = useCallback(async () => {
     try {
@@ -110,19 +96,6 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
     }
   }, [caps, pathname, router]);
 
-  useEffect(() => {
-    if (!switcherOpen) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!switcherRef.current?.contains(e.target as Node)) setSwitcherOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [switcherOpen]);
-
-  const activeMods = INTEGRA_MODULE_CARDS.filter(
-    (m) => m.capability === "always" || (caps ? caps[m.capability] : true),
-  );
-
   const syncNow = async () => {
     setSyncing(true);
     try {
@@ -130,7 +103,7 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
       await refreshHealth();
       setTick((t) => t + 1);
     } catch {
-      /* toast vía página */
+      /* página muestra error */
     } finally {
       setSyncing(false);
     }
@@ -138,35 +111,24 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
 
   const healthTone =
     health?.connected === true ? "ok" : health?.configured ? "warn" : "off";
-
-  const pathClean = (pathname || "/integra").replace(/\/$/, "") || "/integra";
-  const homeActive = pathClean === "/integra";
-  const userJson = user ? JSON.stringify(user) : null;
+  const healthLabel = health?.connected
+    ? `En línea · ${health.provider === "HCT" ? "Hik-Connect" : "HikCentral"}`
+    : health?.configured
+      ? "Sitio sin enlace"
+      : isClient
+        ? "Pendiente de activación"
+        : "Sin sitio";
 
   return (
-    <div className={styles.shell} style={{ ["--panel-accent" as string]: "#0e7490" }}>
-      <div className={styles.hud}>
-        <div className={styles.hudLeft}>
-          <Link href="/integra" className={styles.hudBrandBlock}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className={styles.hudMark} src={NEXARA_LOGO_MARK} alt="" />
-            <span className={styles.hudBrandText}>
-              <span className={styles.hudBrand}>Integra</span>
-              <span className={styles.hudBrandSub}>Nexara</span>
-            </span>
-          </Link>
+    <div className={styles.shell} data-client={isClient ? "1" : undefined}>
+      <div className={styles.contextBar}>
+        <div className={styles.contextLeft}>
           <span
             className={styles.hudHealth}
             data-tone={healthTone}
-            title={
-              health?.connected
-                ? `En línea · ${health.provider || "ARTEMIS"}`
-                : health?.configured
-                  ? "Sitio configurado, sin enlace"
-                  : "Sin sitio"
-            }
+            title={healthLabel}
           />
-          <CompanySwitcher compact />
+          <span className={styles.contextLabel}>{healthLabel}</span>
           <IntegraSiteSwitcher
             onChange={() => {
               setTick((t) => t + 1);
@@ -175,127 +137,18 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
             }}
           />
         </div>
-        <nav className={styles.hudMods} aria-label="Módulos">
-          <Link
-            href="/integra"
-            className={styles.hudChip}
-            data-active={homeActive ? "1" : undefined}
-          >
-            Ops
-          </Link>
-          {activeMods.map((m) => {
-            const active =
-              pathname === m.href ||
-              (m.href !== "/integra" && pathname?.startsWith(m.href));
-            return (
-              <Link
-                key={m.href}
-                href={m.href}
-                className={styles.hudChip}
-                data-active={active ? "1" : undefined}
-              >
-                {m.title}
-              </Link>
-            );
-          })}
-          {caps?.settings !== false && (
+        <div className={styles.contextRight}>
+          {!isClient && caps?.settings !== false && (
             <button
               type="button"
               className={styles.hudChip}
               disabled={syncing}
               onClick={() => void syncNow()}
             >
-              {syncing ? "Sync…" : "Sync"}
+              {syncing ? "Sincronizando…" : "Sincronizar"}
             </button>
           )}
-          {!caps && <span className={styles.hudChip}>Cargando…</span>}
-
-          {allowedPanels.length > 1 && (
-            <div ref={switcherRef} style={{ position: "relative" }}>
-              <button
-                type="button"
-                className={styles.hudChip}
-                onClick={() => setSwitcherOpen((v) => !v)}
-                aria-haspopup="menu"
-                aria-expanded={switcherOpen}
-              >
-                Paneles ▾
-              </button>
-              {switcherOpen && (
-                <div
-                  role="menu"
-                  style={{
-                    position: "absolute",
-                    right: 0,
-                    top: "calc(100% + 6px)",
-                    minWidth: 220,
-                    zIndex: 40,
-                    background: "var(--surface, #fff)",
-                    border: "1px solid var(--nx-panel-hairline, #e2e8f0)",
-                    borderRadius: 12,
-                    boxShadow: "0 12px 32px rgba(8,24,38,0.14)",
-                    padding: 6,
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: "6px 10px 4px",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      color: "var(--text-tertiary)",
-                    }}
-                  >
-                    Mis paneles
-                  </div>
-                  {allowedPanels.map((p) => {
-                    const href = buildCrossPanelUrl(
-                      p.id,
-                      getUserPanelSwitchPath(user, p.id),
-                      userJson,
-                    );
-                    const current = p.id === ("integra" as PanelId);
-                    return (
-                      <a
-                        key={p.id}
-                        href={href}
-                        role="menuitem"
-                        onClick={() => setSwitcherOpen(false)}
-                        style={{
-                          display: "flex",
-                          gap: 8,
-                          alignItems: "center",
-                          padding: "8px 10px",
-                          borderRadius: 8,
-                          textDecoration: "none",
-                          color: "var(--text-primary)",
-                          background: current
-                            ? "color-mix(in srgb, var(--panel-accent, #0e7490) 12%, transparent)"
-                            : "transparent",
-                          fontSize: 13,
-                          fontWeight: current ? 700 : 550,
-                        }}
-                      >
-                        <span aria-hidden>{p.icon || "◆"}</span>
-                        <span>{p.name?.replace(/^NEXARA\s+/i, "") || p.id}</span>
-                      </a>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {user && (
-            <span className={styles.hudUser} title={getUserRoleLabel(user)}>
-              {(user.nombre || user.email || "U").split(" ")[0]}
-            </span>
-          )}
-          <button type="button" className={styles.hudChip} onClick={() => logout()}>
-            Salir
-          </button>
-        </nav>
+        </div>
       </div>
       <div className={styles.inner}>{children}</div>
     </div>
