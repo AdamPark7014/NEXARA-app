@@ -29,6 +29,8 @@ type PanelLoginProps = {
   title?: string;
   subtitle?: string;
   accessNotice?: string;
+  /** Skin visual del panel (p. ej. integra) — preferir desde SSR vía Host. */
+  skin?: "default" | "integra";
   /**
    * Si es `true`, después del login se redirige al panel HOME del usuario
    * (ventas/operacion/contabilidad/console según su rol) en vez de a la
@@ -38,7 +40,7 @@ type PanelLoginProps = {
   smartRedirect?: boolean;
 };
 
-export default function PanelLogin({ redirectTo, requiredPermission, mode = "console", onClientLogin, onBranchLogin, title, subtitle, accessNotice, smartRedirect = false }: PanelLoginProps) {
+export default function PanelLogin({ redirectTo, requiredPermission, mode = "console", onClientLogin, onBranchLogin, title, subtitle, accessNotice, skin = "default", smartRedirect = false }: PanelLoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mfaCode, setMfaCode] = useState("");
@@ -47,17 +49,22 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [ssoEnabled, setSsoEnabled] = useState(false);
-  const [panelSkin, setPanelSkin] = useState<"default" | "integra">("default");
+  const [panelSkin, setPanelSkin] = useState<"default" | "integra">(skin);
   const { setUser } = useUser();
   const router = useRouter();
 
   useEffect(() => {
+    setPanelSkin(skin);
+  }, [skin]);
+
+  useEffect(() => {
+    if (skin !== "default") return;
     if (typeof window === "undefined") return;
     const host = window.location.hostname;
     if (host.startsWith("integra.") || host.includes(".integra.")) {
       setPanelSkin("integra");
     }
-  }, []);
+  }, [skin]);
 
   useEffect(() => {
     void fetch(buildApiUrl("auth/oidc/status"))

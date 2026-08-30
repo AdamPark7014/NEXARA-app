@@ -6,21 +6,21 @@
 
 ## Hecho en este turno
 
-### Redesign visual Integra (+ login contraste)
-- Consola acero/cian: `integra.module.css`, home tiles, HUD, portfolio cards.
-- Login Integra: fondo acero visible, tarjeta blanca con sombra, copy «Consola de seguridad», CTA cian.
-- Deploy web/api en curso o hecho (`37c9819` + este commit).
+### Redesign Integra + login SSR skin
+- Consola visual acero/cian (home/HUD/tiles).
+- Login Integra: contraste fuerte + skin SSR vía `Host` / `x-forwarded-host` (antes solo client → flash blanco).
+- `PanelLogin` prop `skin`.
 
 ## A medias
-- Homogeneizar video/access/settings al mismo CSS.
-- Artemis creds reales.
+- Homogeneizar módulos video/access al CSS Integra.
+- Artemis creds.
 
 ## No tocar
 - tickets layout, seed-demo-users, package-lock, xlsx credenciales
 
 ## Siguiente paso
-1. Hard-refresh https://integra.nexara.com.mx/login
-2. Login y validar home
+1. Deploy y hard-refresh login Integra — debe verse tarjeta blanca sobre acero y «Consola de seguridad».
+2. Login → home tiles.
 
 ## Estado
-- Push/deploy inmediato tras cerrar.
+- Listo para cerrar/deploy.
