@@ -47,6 +47,19 @@ Sitios se crean en UI `/integra/settings` (roles altos). Rotar keys = editar sit
 - El contenedor debe alcanzar la red donde Artemis publica RTSP (VPN/LAN).
 - Puerto interno `1984`; público solo vía Traefik path `/go2rtc`.
 
+## Provider HCT (ADR-0019)
+
+| Campo sitio | Valor |
+|-------------|--------|
+| `provider` | `HCT` (UI settings o API) |
+| `host` | `areaDomain` inicial (p.ej. `https://ius.hikcentralconnect.com`) |
+| appKey / appSecret | App Key / Secret Key de la consola HCT |
+
+- Sync: cámaras, puertas y devices → mismo espejo Prisma; people/vehicles Artemis quedan en 0.
+- Stream: respuesta con `provider: HCT` + token EZUIKit (`stream`); **no** usa go2rtc.
+- Open door: endpoint remoto HCT documentado.
+- No mezclar credenciales Artemis y HCT en la misma fila `IntegraSite`.
+
 ## Sync
 
 - Cron cada 15 min por sitio activo.

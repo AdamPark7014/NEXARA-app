@@ -27,6 +27,8 @@ export default function IntegraVideoPage() {
   const [hls, setHls] = useState<string | null>(null);
   const [rtsp, setRtsp] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [provider, setProvider] = useState<string | null>(null);
+  const [hctStream, setHctStream] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [begin, setBegin] = useState("");
@@ -52,14 +54,20 @@ export default function IntegraVideoPage() {
     setError(null);
     setSelected(id);
     setPlaybackUrl(null);
+    setHctStream(null);
     try {
-      const data = await integraApi<{ hls: string | null; rtsp: string | null; note?: string }>(
-        `integra/cameras/${encodeURIComponent(id)}/stream`,
-        { method: "POST" },
-      );
+      const data = await integraApi<{
+        hls: string | null;
+        rtsp: string | null;
+        note?: string;
+        provider?: string;
+        stream?: unknown;
+      }>(`integra/cameras/${encodeURIComponent(id)}/stream`, { method: "POST" });
       setHls(data.hls);
       setRtsp(data.rtsp);
       setNote(data.note || null);
+      setProvider(data.provider || null);
+      setHctStream(data.provider === "HCT" ? data.stream ?? null : null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error stream");
     } finally {
@@ -104,7 +112,7 @@ export default function IntegraVideoPage() {
       <DashHero
         eyebrow="Video"
         title="Cámaras"
-        subtitle="Live HLS (go2rtc) · snapshot · playback por rango."
+        subtitle="Live HLS (go2rtc Artemis) · HCT stream token · snapshot · playback."
         actions={
           <button type="button" style={btnGhost} onClick={() => void load()}>
             Actualizar
@@ -145,9 +153,31 @@ export default function IntegraVideoPage() {
             title={selected ? `Live · ${selected}` : "Player"}
             subtitle={note || "Selecciona una cámara"}
           >
-            <IntegraHlsPlayer src={hls} />
+            {provider === "HCT" ? (
+              <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                <p style={{ marginTop: 0 }}>
+                  Sitio HCT: token EZUIKit listo (sin go2rtc). Integra el player cloud con el
+                  payload abajo — ADR-0019.
+                </p>
+                {hctStream != null && (
+                  <pre
+                    style={{
+                      fontSize: 11,
+                      overflow: "auto",
+                      maxHeight: 180,
+                      background: "var(--surface-2, #f4f6f8)",
+                      padding: 10,
+                    }}
+                  >
+                    {JSON.stringify(hctStream, null, 2)}
+                  </pre>
+                )}
+              </div>
+            ) : (
+              <IntegraHlsPlayer src={hls} />
+            )}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-              <button type="button" style={btnGhost} disabled={!selected} onClick={() => void capture()}>
+              <button type="button" style={btnGhost} disabled={!selected || provider === "HCT"} onClick={() => void capture()}>
                 Snapshot
               </button>
               {rtsp && (
@@ -159,6 +189,7 @@ export default function IntegraVideoPage() {
                   Copiar RTSP
                 </button>
               )}
+              {provider === "HCT" && <DashPill tone="warning">HCT</DashPill>}
               {hls && <DashPill tone="positive">HLS</DashPill>}
               {!hls && rtsp && <DashPill tone="warning">solo RTSP</DashPill>}
             </div>
@@ -169,14 +200,21 @@ export default function IntegraVideoPage() {
                 value={begin}
                 onChange={(e) => setBegin(e.target.value)}
                 style={{ maxWidth: 220 }}
+                disabled={provider === "HCT"}
               />
               <input
                 type="datetime-local"
                 value={end}
                 onChange={(e) => setEnd(e.target.value)}
                 style={{ maxWidth: 220 }}
+                disabled={provider === "HCT"}
               />
-              <button type="button" style={btnPrimary} disabled={!selected} onClick={() => void loadPlayback()}>
+              <button
+                type="button"
+                style={btnPrimary}
+                disabled={!selected || provider === "HCT"}
+                onClick={() => void loadPlayback()}
+              >
                 {busy === "pb" ? "…" : "Obtener playback"}
               </button>
               {playbackUrl && (

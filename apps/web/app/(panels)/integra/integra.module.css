@@ -518,3 +518,11 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Dense module pages (DashKit inside IntegraChrome) */
+.inner :global([data-dash-page]),
+.denseModules {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}

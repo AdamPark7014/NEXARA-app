@@ -16,6 +16,7 @@ type Site = {
   name: string;
   label?: string | null;
   host: string;
+  provider?: "ARTEMIS" | "HCT";
   isActive: boolean;
   isDefault: boolean;
   lastSyncAt?: string | null;
@@ -48,6 +49,7 @@ export default function IntegraSettingsPage() {
   const [host, setHost] = useState("");
   const [appKey, setAppKey] = useState("");
   const [appSecret, setAppSecret] = useState("");
+  const [provider, setProvider] = useState<"ARTEMIS" | "HCT">("ARTEMIS");
   const [targetCompanyId, setTargetCompanyId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -75,6 +77,7 @@ export default function IntegraSettingsPage() {
         host,
         appKey,
         appSecret,
+        provider,
         label: label || undefined,
         isDefault: sites.length === 0,
       };
@@ -88,6 +91,7 @@ export default function IntegraSettingsPage() {
       setHost("");
       setAppKey("");
       setAppSecret("");
+      setProvider("ARTEMIS");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
@@ -137,7 +141,7 @@ export default function IntegraSettingsPage() {
       <DashHero
         eyebrow="Configuración multi-cliente"
         title="Sitios Integra"
-        subtitle="Desde NEXARA creas un sitio Artemis por CompanyProfile. Credenciales AES-GCM. Sync alimenta el espejo → módulos."
+        subtitle="Artemis (HikCentral) o HCT por CompanyProfile. Credenciales AES-GCM. Sync alimenta el espejo → módulos."
         actions={
           <button type="button" style={btnGhost} onClick={() => void load()}>
             Actualizar
@@ -151,9 +155,12 @@ export default function IntegraSettingsPage() {
           <div key={s.id} style={{ marginBottom: 14 }}>
             <ListRow
               title={s.label || s.name}
-              sub={`${s.host} · cam ${s._count?.cameras ?? "—"} · puertas ${s._count?.doors ?? "—"} · sync ${s.lastSyncAt ? new Date(s.lastSyncAt).toLocaleString("es-MX") : "nunca"}`}
+              sub={`${s.provider || "ARTEMIS"} · ${s.host} · cam ${s._count?.cameras ?? "—"} · puertas ${s._count?.doors ?? "—"} · sync ${s.lastSyncAt ? new Date(s.lastSyncAt).toLocaleString("es-MX") : "nunca"}`}
               trail={
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <DashPill tone={s.provider === "HCT" ? "warning" : "accent"}>
+                    {s.provider || "ARTEMIS"}
+                  </DashPill>
                   {s.isDefault && <DashPill tone="accent">default</DashPill>}
                   <DashPill tone={s.isActive ? "positive" : "warning"}>
                     {s.isActive ? "activo" : "off"}
@@ -211,8 +218,8 @@ export default function IntegraSettingsPage() {
       </DashPanel>
 
       <DashPanel
-        title="Nuevo sitio Artemis"
-        subtitle="Cambia CompanySwitcher (o companyId) para aprovisionar otro cliente"
+        title="Nuevo sitio"
+        subtitle="Artemis on-prem o HCT cloud (ADR-0019). Cambia CompanySwitcher para otro cliente."
       >
         <div style={{ display: "grid", gap: 10, maxWidth: 440 }}>
           <input
@@ -221,6 +228,15 @@ export default function IntegraSettingsPage() {
             onChange={(e) => setTargetCompanyId(e.target.value)}
             style={inputStyle}
           />
+          <select
+            value={provider}
+            onChange={(e) => setProvider(e.target.value as "ARTEMIS" | "HCT")}
+            style={inputStyle}
+            aria-label="Provider"
+          >
+            <option value="ARTEMIS">Artemis (HikCentral)</option>
+            <option value="HCT">HCT (Hik-Connect for Teams)</option>
+          </select>
           <input
             placeholder="Nombre interno"
             value={name}
@@ -234,7 +250,11 @@ export default function IntegraSettingsPage() {
             style={inputStyle}
           />
           <input
-            placeholder="Host https://hikcentral…"
+            placeholder={
+              provider === "HCT"
+                ? "Host areaDomain https://ius.hikcentralconnect.com"
+                : "Host https://hikcentral…"
+            }
             value={host}
             onChange={(e) => setHost(e.target.value)}
             style={inputStyle}
