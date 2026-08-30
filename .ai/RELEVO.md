@@ -6,22 +6,23 @@
 
 ## Hecho en este turno
 
-### Integra: matar chrome ineficiente
-- AppShell `data-console`: **sin sidebar ERP**, topbar 40px, **main full-bleed** (como chat).
-- IntegraChrome HUD fino + Salir; sin rail de módulos duplicado en home.
-- Todas las rutas Ig* (alarms/vehicles/anpr/visitors/settings migradas).
-- Tablas con `max-height: calc(100dvh - …)` en vez de 62vh.
+### Fix crítico: build web roto (por eso prod seguía “ineficiente”)
+- `AppShell.module.scss` tenía CSS huérfano tras `.contentInnerFullBleed` → SassError → deploy `--force-all` fallaba; **nexara-web seguía con imagen vieja**.
+- SCSS reparado; redeploy pendiente en este cierre.
+
+### Integra full-bleed (código ya en main d274214 + fix)
+- Sin sidebar ERP, topbar fino, main full-bleed, rutas Ig*.
 
 ## A medias
-- EZUIKit player HCT.
+- Confirmar deploy web OK en droplet tras este fix.
 
 ## No tocar
 - tickets layout, seed-demo-users, package-lock, xlsx
 - Oficinas ACS
 
 ## Siguiente paso
-1. Hard-refresh Integra — debe ocupar casi todo el viewport (sin menú izquierdo NEXARA).
-2. Verificar logout vía HUD «Salir» / ⌘K.
+1. Verificar build web en `/tmp/integra-bleed2.log` sin SassError.
+2. Hard-refresh Integra.
 
 ## Estado
-- Listo para cerrar / deploy.
+- Fix listo para cerrar + redeploy.
