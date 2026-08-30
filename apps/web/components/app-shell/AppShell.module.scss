@@ -53,13 +53,12 @@
   --shell-sidebar-w: 76px;
 }
 
-/* Integra consola: sin sidebar ERP, topbar fino, main full-bleed */
+/* Integra consola: sin sidebar ni topbar ERP — HUD propio full viewport */
 .shell[data-console="true"] {
   --shell-sidebar-w: 0px;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas:
-    "topbar"
-    "main";
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "main";
 }
 
 .shell[data-console="true"] .sidebar {
@@ -67,21 +66,11 @@
 }
 
 .shell[data-console="true"] .topbar {
-  padding: 4px 12px;
-  min-height: 40px;
-  border-bottom: 1px solid color-mix(in srgb, var(--panel-accent, #0e7490) 25%, var(--nx-panel-hairline, #e2e8f0));
+  display: none;
 }
 
 .shell[data-console="true"] .overlay {
   display: none;
-}
-
-.consoleTitle {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--panel-accent, #0e7490);
 }
 
 @media (max-width: 1024px) {

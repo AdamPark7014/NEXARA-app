@@ -81,18 +81,18 @@ export default function IntegraAlarmsPage() {
         <IgField label="Hasta">
           <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} style={inputStyle} />
         </IgField>
-        <IgField label="pageSize">
+        <IgField label="Por página">
           <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 80 }}>
             {[25, 50, 100, 200].map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
           </select>
         </IgField>
-        <IgField label="pageNo">
+        <IgField label="Página">
           <input type="number" min={1} value={pageNo} onChange={(e) => setPageNo(Math.max(1, Number(e.target.value) || 1))} style={{ ...inputStyle, maxWidth: 70 }} />
         </IgField>
-        <IgField label="eventType(s)">
-          <input value={eventTypes} onChange={(e) => setEventTypes(e.target.value)} placeholder="opcional" style={inputStyle} />
+        <IgField label="Tipos de alarma">
+          <input value={eventTypes} onChange={(e) => setEventTypes(e.target.value)} placeholder="códigos, opc." style={inputStyle} title="eventType Artemis" />
         </IgField>
         <IgField label="Preset">
           <div style={{ display: "flex", gap: 4 }}>

@@ -1,28 +1,31 @@
 # RELEVO
 
 - **Último turno:** cursor
-- **Fecha:** 2026-08-29
+- **Fecha:** 2026-08-30
 - **Rama:** mejora/calidad-y-web
 
 ## Hecho en este turno
 
-### Fix crítico: build web roto (por eso prod seguía “ineficiente”)
-- `AppShell.module.scss` tenía CSS huérfano tras `.contentInnerFullBleed` → SassError → deploy `--force-all` fallaba; **nexara-web seguía con imagen vieja**.
-- SCSS reparado; redeploy pendiente en este cierre.
-
-### Integra full-bleed (código ya en main d274214 + fix)
-- Sin sidebar ERP, topbar fino, main full-bleed, rutas Ig*.
+### Integra Ops Workbench (plan completo)
+- **Chrome único:** AppShell sin topbar ERP en `panel=integra`; solo HUD Integra (~40px) con health, Sync, Ops, módulos, Salir.
+- **Kit:** `IgWorkbench` / `IgTree` / `IgCanvas` / `IgFeed` en `_Console.tsx` + CSS; limpia hero/moduleGrid/companyCard muertos.
+- **API:** `GET /integra/tree`; `regionId` en doors/cameras (doors vía match regionName).
+- **Home `/integra`:** workbench 3 paneles (árbol | puertas/video/foco | feed eventos poll 8s).
+- **Settings:** copy humano, Avanzado colapsable, empty state con pasos; módulos con labels de producto.
+- **Módulos:** labels humanos en events/access/alarms/anpr/visitors/people/video.
 
 ## A medias
-- Confirmar deploy web OK en droplet tras este fix.
+- Deploy `--force-all` pendiente tras este cierre.
+- Artefacto Windows `apps/web/NUL` (no se pudo borrar fácil); ignorar / no commitear.
 
 ## No tocar
 - tickets layout, seed-demo-users, package-lock, xlsx
 - Oficinas ACS
+- SSE/WS eventos, mapas GIS, skin HikCentral
 
 ## Siguiente paso
-1. Verificar build web en `/tmp/integra-bleed2.log` sin SassError.
-2. Hard-refresh Integra.
+1. Deploy `--force-all` y hard-refresh Integra.
+2. Smoke: árbol → puerta/open; cámara → HLS; feed; crear sitio sin jerga.
 
 ## Estado
-- Fix listo para cerrar + redeploy.
+- Código workbench listo para cerrar + deploy.

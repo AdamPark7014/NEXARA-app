@@ -277,6 +277,7 @@ export class IntegraArtemisService {
             id: c.cameraIndexCode,
             name: c.name,
             region: c.regionName,
+            regionId: c.regionIndexCode,
             status: c.status,
             encodeDevIndexCode: c.encodeDevIndexCode,
           })),
@@ -293,6 +294,7 @@ export class IntegraArtemisService {
           id: String(c.cameraIndexCode ?? ''),
           name: c.cameraName || String(c.cameraIndexCode ?? ''),
           region: c.regionName,
+          regionId: c.regionIndexCode != null ? String(c.regionIndexCode) : null,
           status: c.status,
         })),
       };
@@ -347,10 +349,17 @@ export class IntegraArtemisService {
 
   async listDoors(companyId: number | null, live = false, siteId?: number | null) {
     if (!live && companyId) {
-      const items = await this.prisma.integraDoor.findMany({
-        where: { companyId, ...(siteId ? { siteId } : {}) },
-        orderBy: { name: 'asc' },
-      });
+      const [items, regions] = await Promise.all([
+        this.prisma.integraDoor.findMany({
+          where: { companyId, ...(siteId ? { siteId } : {}) },
+          orderBy: { name: 'asc' },
+        }),
+        this.prisma.integraRegion.findMany({
+          where: { companyId, ...(siteId ? { siteId } : {}) },
+          select: { indexCode: true, name: true },
+        }),
+      ]);
+      const regionByName = new Map(regions.map((r) => [r.name, r.indexCode]));
       return {
         total: items.length,
         source: 'mirror' as const,
@@ -358,6 +367,7 @@ export class IntegraArtemisService {
           id: d.doorIndexCode,
           name: d.name,
           location: d.regionName,
+          regionId: d.regionName ? regionByName.get(d.regionName) ?? null : null,
           online: d.online,
           status: ARTEMIS_DOOR_STATE[String(d.doorState ?? '')] || 'unknown',
           doorState: d.doorState,
@@ -374,6 +384,7 @@ export class IntegraArtemisService {
           id: String(d.doorIndexCode ?? d.doorNo ?? ''),
           name: d.doorName || String(d.doorIndexCode ?? ''),
           location: d.regionName,
+          regionId: d.regionIndexCode != null ? String(d.regionIndexCode) : null,
           online: d.online !== false,
           status: ARTEMIS_DOOR_STATE[String(d.doorState ?? '')] || 'unknown',
           doorState: d.doorState,
@@ -382,6 +393,25 @@ export class IntegraArtemisService {
     } catch (error) {
       rethrowArtemis(error, 'No se pudieron listar puertas');
     }
+  }
+
+  /** Workbench: regiones + puertas + cámaras en una round-trip. */
+  async getTree(companyId: number | null, siteId?: number | null) {
+    const [regions, doors, cameras] = await Promise.all([
+      this.listRegions(companyId, siteId),
+      this.listDoors(companyId, false, siteId),
+      this.listCameras(companyId, false, siteId),
+    ]);
+    return {
+      regions: regions?.items ?? [],
+      doors: doors?.items ?? [],
+      cameras: cameras?.items ?? [],
+      source: {
+        regions: regions?.source,
+        doors: doors?.source,
+        cameras: cameras?.source,
+      },
+    };
   }
 
   async openDoor(

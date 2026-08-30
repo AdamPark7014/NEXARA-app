@@ -60,8 +60,8 @@ export default function IntegraVisitorsPage() {
               <IgField label="Fin">
                 <input type="datetime-local" value={visitEnd} onChange={(e) => setVisitEnd(e.target.value)} style={inputStyle} />
               </IgField>
-              <IgField label="receptionistId">
-                <input value={receptionistId} onChange={(e) => setReceptionistId(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
+              <IgField label="Recepcionista (ID)">
+                <input value={receptionistId} onChange={(e) => setReceptionistId(e.target.value)} placeholder="opcional" style={{ ...inputStyle, maxWidth: "100%" }} title="receptionistId" />
               </IgField>
               <IgField label="Propósito">
                 <input value={purpose} onChange={(e) => setPurpose(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
@@ -109,8 +109,8 @@ export default function IntegraVisitorsPage() {
         }
         right={
           <IgPanel title="QR">
-            <IgField label="orderId">
-              <input value={orderId} onChange={(e) => setOrderId(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
+            <IgField label="ID de cita">
+              <input value={orderId} onChange={(e) => setOrderId(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} title="orderId" />
             </IgField>
             <IgBtn
               onClick={async () => {

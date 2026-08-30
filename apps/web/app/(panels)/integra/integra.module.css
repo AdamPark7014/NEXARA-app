@@ -44,8 +44,8 @@
   gap: 6px;
   flex: 1;
   min-height: 0;
-  padding: 6px 8px 8px;
-  overflow: auto;
+  padding: 0;
+  overflow: hidden;
 }
 
 /* ── HUD / chrome ─────────────────────────────────────────── */
@@ -76,6 +76,35 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ig-accent-deep);
+  text-decoration: none;
+}
+
+.hudBrand:hover {
+  color: var(--ig-accent);
+}
+
+.hudHealth {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--ig-muted);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ig-muted) 25%, transparent);
+}
+
+.hudHealth[data-tone="ok"] {
+  background: var(--ig-ok);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ig-ok) 30%, transparent);
+}
+
+.hudHealth[data-tone="warn"] {
+  background: var(--ig-warn);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ig-warn) 30%, transparent);
+}
+
+.hudHealth[data-tone="off"] {
+  background: var(--ig-danger);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ig-danger) 25%, transparent);
 }
 
 .hudCompany {
@@ -84,6 +113,13 @@
   color: var(--ig-ink);
   padding-left: 12px;
   border-left: 2px solid var(--ig-accent);
+}
+
+.hudUser {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ig-muted);
+  padding: 0 4px;
 }
 
 .hudMods {
@@ -116,69 +152,6 @@
   color: var(--ig-accent-deep);
   background: color-mix(in srgb, var(--ig-accent) 12%, white);
   font-weight: 700;
-}
-
-/* ── Hero ─────────────────────────────────────────────────── */
-.hero {
-  display: grid;
-  gap: 10px;
-  padding: 8px 2px 4px;
-}
-
-.eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ig-accent-deep);
-}
-
-.eyebrowDot {
-  width: 8px;
-  height: 8px;
-  background: var(--ig-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ig-accent) 22%, transparent);
-  animation: pulse 2.4s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
-}
-
-.title {
-  margin: 0;
-  font-family: var(--ig-font-display);
-  font-size: clamp(1.75rem, 1.4rem + 1.4vw, 2.35rem);
-  font-weight: 700;
-  letter-spacing: -0.035em;
-  line-height: 1.08;
-  color: var(--ig-ink);
-}
-
-.sub {
-  margin: 0;
-  max-width: 62ch;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--ig-muted);
-}
-
-.heroRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 14px;
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 /* ── Buttons ──────────────────────────────────────────────── */
@@ -294,180 +267,7 @@
   color: var(--ig-muted);
 }
 
-/* ── Module tiles ─────────────────────────────────────────── */
-.moduleGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px;
-}
-
-.moduleTile {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px 14px;
-  text-decoration: none;
-  color: inherit;
-  background:
-    linear-gradient(165deg, color-mix(in srgb, var(--ig-accent) 7%, white) 0%, white 55%);
-  border: 1px solid var(--ig-line);
-  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  min-height: 118px;
-}
-
-.moduleTile:hover {
-  border-color: color-mix(in srgb, var(--ig-accent) 55%, var(--ig-line));
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--ig-ink) 8%, transparent);
-}
-
-.moduleMark {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  font-family: var(--ig-font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--ig-accent-deep);
-  background: color-mix(in srgb, var(--ig-accent) 12%, white);
-  border: 1px solid color-mix(in srgb, var(--ig-accent) 28%, transparent);
-}
-
-.moduleTitle {
-  margin: 0;
-  font-family: var(--ig-font-display);
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--ig-ink);
-}
-
-.moduleSub {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.35;
-  color: var(--ig-muted);
-  flex: 1;
-}
-
-.moduleFoot {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ig-ok);
-}
-
-/* ── Portfolio ────────────────────────────────────────────── */
-.portfolioList {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.companyCard {
-  border: 1px solid var(--ig-line);
-  background: color-mix(in srgb, var(--ig-surface) 65%, white);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  transition: border-color 0.15s ease;
-}
-
-.companyCard:hover {
-  border-color: color-mix(in srgb, var(--ig-accent) 40%, var(--ig-line));
-}
-
-.companyTop {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.companyName {
-  margin: 0;
-  font-family: var(--ig-font-display);
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--ig-ink);
-}
-
-.companyMeta {
-  margin: 4px 0 0;
-  font-family: var(--ig-font-mono);
-  font-size: 11px;
-  color: var(--ig-muted);
-}
-
-.capRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.capOn,
-.capOff {
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 3px 7px;
-  border: 1px solid var(--ig-line);
-}
-
-.capOn {
-  color: var(--ig-accent-deep);
-  background: color-mix(in srgb, var(--ig-accent) 10%, white);
-  border-color: color-mix(in srgb, var(--ig-accent) 30%, var(--ig-line));
-}
-
-.capOff {
-  color: #94a3b8;
-  background: transparent;
-  text-decoration: line-through;
-  opacity: 0.55;
-}
-
-.siteList {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding-top: 4px;
-  border-top: 1px dashed var(--ig-line);
-}
-
-.siteRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 10px;
-  background: var(--ig-panel);
-  border: 1px solid transparent;
-}
-
-.siteRow:hover {
-  border-color: var(--ig-line);
-}
-
-.siteName {
-  font-size: 13px;
-  font-weight: 650;
-  color: var(--ig-ink);
-}
-
-.siteHost {
-  font-size: 11px;
-  font-family: var(--ig-font-mono);
-  color: var(--ig-muted);
-}
-
+/* ── Shared messages ──────────────────────────────────────── */
 .empty {
   margin: 0;
   padding: 18px 8px;
@@ -485,20 +285,6 @@
   border: 1px solid color-mix(in srgb, var(--ig-danger) 22%, transparent);
 }
 
-.footNote {
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.45;
-  color: var(--ig-muted);
-}
-
-.footNote code {
-  font-family: var(--ig-font-mono);
-  font-size: 10px;
-  padding: 1px 4px;
-  background: color-mix(in srgb, var(--ig-ink) 5%, white);
-}
-
 @media (max-width: 720px) {
   .hud {
     grid-template-columns: 1fr;
@@ -506,23 +292,6 @@
   .hudMods {
     justify-content: flex-start;
   }
-  .moduleGrid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 420px) {
-  .moduleGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Dense module pages (DashKit inside IntegraChrome) */
-.inner :global([data-dash-page]),
-.denseModules {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
 }
 
 .filterBar {
@@ -594,6 +363,8 @@
   gap: 6px;
   flex: 1;
   min-height: 0;
+  padding: 6px 8px 8px;
+  overflow: auto;
 }
 
 .igToolbar {
@@ -915,4 +686,368 @@
   font-size: 9px;
   letter-spacing: 0.06em;
   color: var(--ig-accent-deep);
+}
+
+/* ── Ops workbench (3 panes) ──────────────────────────────── */
+.igWorkbench {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) minmax(220px, 280px);
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  border-top: 1px solid var(--ig-line);
+  background: var(--ig-surface);
+}
+
+@media (max-width: 1100px) {
+  .igWorkbench {
+    grid-template-columns: minmax(160px, 200px) minmax(0, 1fr);
+  }
+  .igWorkbenchFeed {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .igWorkbench {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(160px, 30%) minmax(0, 1fr);
+  }
+  .igWorkbenchTree {
+    border-right: none;
+    border-bottom: 1px solid var(--ig-line);
+    max-height: 30dvh;
+  }
+}
+
+.igWorkbenchTree,
+.igWorkbenchCanvas,
+.igWorkbenchFeed {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ig-panel);
+}
+
+.igWorkbenchTree {
+  border-right: 1px solid var(--ig-line);
+  overflow: auto;
+}
+
+.igWorkbenchCanvas {
+  overflow: hidden;
+}
+
+.igWorkbenchFeed {
+  border-left: 1px solid var(--ig-line);
+  overflow: hidden;
+}
+
+.igTree {
+  padding: 4px 0 8px;
+}
+
+.igTreeNode {
+  --ig-depth: 0;
+}
+
+.igTreeRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 8px 4px calc(6px + var(--ig-depth) * 12px);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.igTreeRow:hover {
+  background: color-mix(in srgb, var(--ig-accent) 8%, white);
+}
+
+.igTreeRow[data-selected="1"] {
+  background: color-mix(in srgb, var(--ig-accent) 14%, white);
+  font-weight: 650;
+}
+
+.igTreeTwist {
+  width: 12px;
+  font-size: 10px;
+  color: var(--ig-muted);
+  flex-shrink: 0;
+}
+
+.igTreeKind {
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  font-family: var(--ig-font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--ig-accent-deep);
+  border: 1px solid color-mix(in srgb, var(--ig-accent) 30%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-accent) 8%, white);
+  flex-shrink: 0;
+}
+
+.igTreeKind[data-kind="door"] {
+  color: var(--ig-ok);
+  border-color: color-mix(in srgb, var(--ig-ok) 35%, var(--ig-line));
+}
+
+.igTreeKind[data-kind="camera"] {
+  color: var(--ig-accent-deep);
+}
+
+.igTreeLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.igTreeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--ig-ok);
+}
+
+.igTreeDot[data-online="0"] {
+  background: var(--ig-warn);
+}
+
+.igTreeKids {
+  display: flex;
+  flex-direction: column;
+}
+
+.igCanvas {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.igCanvasBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--ig-line);
+  background: color-mix(in srgb, var(--ig-surface) 70%, white);
+  flex-shrink: 0;
+}
+
+.igCanvasTabs {
+  display: flex;
+  gap: 2px;
+}
+
+.igCanvasTab {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  color: var(--ig-muted);
+  cursor: pointer;
+}
+
+.igCanvasTab[data-active="1"] {
+  color: var(--ig-accent-deep);
+  border-color: var(--ig-line);
+  background: white;
+}
+
+.igCanvasActions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.igCanvasBody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+}
+
+.igFeed {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.igFeedHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ig-line);
+  background: color-mix(in srgb, var(--ig-surface) 70%, white);
+  flex-shrink: 0;
+}
+
+.igFeedTitle {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ig-ink-soft);
+}
+
+.igFeedList {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.igFeedItem {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--ig-line) 70%, transparent);
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.igFeedItem[data-click="1"] {
+  cursor: pointer;
+}
+
+.igFeedItem[data-click="1"]:hover {
+  background: color-mix(in srgb, var(--ig-accent) 7%, white);
+}
+
+.igFeedItem[data-tone="warn"] {
+  box-shadow: inset 3px 0 0 var(--ig-warn);
+}
+
+.igFeedItem[data-tone="danger"] {
+  box-shadow: inset 3px 0 0 var(--ig-danger);
+}
+
+.igFeedTime {
+  font-family: var(--ig-font-mono);
+  font-size: 10px;
+  color: var(--ig-muted);
+  flex-shrink: 0;
+  width: 52px;
+}
+
+.igFeedMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.igFeedItemTitle {
+  font-size: 12px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.igFeedMeta {
+  font-size: 11px;
+  color: var(--ig-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.igEmptyCta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: 1;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.igEmptyCta h2 {
+  margin: 0;
+  font-family: var(--ig-font-display);
+  font-size: 1.25rem;
+}
+
+.igEmptyCta p {
+  margin: 0;
+  max-width: 36ch;
+  font-size: 13px;
+  color: var(--ig-muted);
+  line-height: 1.45;
+}
+
+.igEmptySteps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ig-ink-soft);
+  text-align: left;
+}
+
+.igEmptySteps li {
+  padding: 6px 10px;
+  border: 1px solid var(--ig-line);
+  background: white;
+}
+
+.igAdvanced {
+  margin-top: 10px;
+  border: 1px solid var(--ig-line);
+  background: color-mix(in srgb, var(--ig-surface) 50%, white);
+}
+
+.igAdvanced summary {
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+  cursor: pointer;
+}
+
+.igAdvancedBody {
+  padding: 0 10px 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.camGridDense {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
 }

@@ -32,12 +32,20 @@ const PATH_TO_MODULE: Record<string, string> = {
   "/integra/settings": "integra-settings",
 };
 
+type HealthBrief = {
+  connected?: boolean;
+  configured?: boolean;
+  provider?: string;
+};
+
 export function IntegraChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useUser();
+  const { logout, user } = useUser();
   const [caps, setCaps] = useState<IntegraCapabilities | null>(null);
-  const [companyLabel, setCompanyLabel] = useState("Empresa primaria");
+  const [companyLabel, setCompanyLabel] = useState("Empresa");
+  const [health, setHealth] = useState<HealthBrief | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [tick, setTick] = useState(0);
 
   const refreshCaps = useCallback(async () => {
@@ -50,19 +58,32 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const refreshHealth = useCallback(async () => {
+    try {
+      const h = await integraApi<HealthBrief>("integra/health");
+      setHealth(h);
+    } catch {
+      setHealth(null);
+    }
+  }, []);
+
   useEffect(() => {
     setCaps(getCachedCapabilities());
     void refreshCaps();
+    void refreshHealth();
     const unsub = subscribeActiveCompany(() => {
       setTick((t) => t + 1);
       void refreshCaps();
+      void refreshHealth();
     });
     const unsubCaps = subscribeCapabilities((c) => setCaps(c));
+    const iv = setInterval(() => void refreshHealth(), 30000);
     return () => {
       unsub();
       unsubCaps();
+      clearInterval(iv);
     };
-  }, [refreshCaps, tick]);
+  }, [refreshCaps, refreshHealth, tick]);
 
   useEffect(() => {
     const id = getActiveCompanyId();
@@ -83,20 +104,60 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
     (m) => m.capability === "always" || (caps ? caps[m.capability] : true),
   );
 
+  const syncNow = async () => {
+    setSyncing(true);
+    try {
+      await integraApi("integra/sync", { method: "POST" });
+      await refreshHealth();
+      setTick((t) => t + 1);
+    } catch {
+      /* toast vía página */
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const healthTone =
+    health?.connected === true ? "ok" : health?.configured ? "warn" : "off";
+
+  const pathClean = (pathname || "/integra").replace(/\/$/, "") || "/integra";
+  const homeActive = pathClean === "/integra";
+
   return (
     <div className={styles.shell}>
       <div className={styles.hud}>
         <div className={styles.hudLeft}>
-          <span className={styles.hudBrand}>Integra</span>
+          <Link href="/integra" className={styles.hudBrand}>
+            Integra
+          </Link>
+          <span
+            className={styles.hudHealth}
+            data-tone={healthTone}
+            title={
+              health?.connected
+                ? `En línea · ${health.provider || "ARTEMIS"}`
+                : health?.configured
+                  ? "Sitio configurado, sin enlace"
+                  : "Sin sitio"
+            }
+          />
           <span className={styles.hudCompany}>{companyLabel}</span>
           <IntegraSiteSwitcher
             onChange={() => {
               setTick((t) => t + 1);
               void refreshCaps();
+              void refreshHealth();
             }}
           />
         </div>
-        <nav className={styles.hudMods} aria-label="Módulos activos">
+        <nav className={styles.hudMods} aria-label="Módulos">
+          <Link
+            href="/integra"
+            className={styles.hudChip}
+            data-active={homeActive ? "1" : undefined}
+          >
+            Ops
+          </Link>
           {activeMods.map((m) => {
             const active =
               pathname === m.href ||
@@ -112,7 +173,22 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          {caps?.settings !== false && (
+            <button
+              type="button"
+              className={styles.hudChip}
+              disabled={syncing}
+              onClick={() => void syncNow()}
+            >
+              {syncing ? "Sync…" : "Sync"}
+            </button>
+          )}
           {!caps && <span className={styles.hudChip}>Cargando…</span>}
+          {user?.nombre && (
+            <span className={styles.hudUser} title={user.email || undefined}>
+              {(user.nombre || user.email || "U").split(" ")[0]}
+            </span>
+          )}
           <button type="button" className={styles.hudChip} onClick={() => logout()}>
             Salir
           </button>

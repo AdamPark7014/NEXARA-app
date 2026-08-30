@@ -128,7 +128,7 @@ export default function IntegraAccessPage() {
       <IgError>{error}</IgError>
 
       <IgFilters>
-        <IgField label="doControl">
+        <IgField label="Acción">
           <select
             value={controlType}
             onChange={(e) => setControlType(e.target.value as DoorControlType)}
