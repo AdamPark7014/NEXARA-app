@@ -379,11 +379,8 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
   };
 
   return (
-    <div
-      className={`${styles.stage}${panelSkin === "integra" ? ` ${styles.stageIntegra}` : ""}`}
-      data-panel={panelSkin}
-    >
-      <div className={`${styles.wrap}${panelSkin === "integra" ? ` ${styles.wrapIntegra}` : ""}`}>
+    <div className={styles.stage} data-panel={panelSkin}>
+      <div className={styles.wrap}>
         <div className={styles.brand}>
           <Image
             src="/logo-nexara-platform.png"
@@ -393,8 +390,8 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
             className={styles.brandMark}
             priority
           />
-          <p className={`${styles.brandName}${panelSkin === "integra" ? ` ${styles.brandNameIntegra}` : ""}`}>
-            {panelSkin === "integra" ? "NEXARA Integra" : "Nexara"}
+          <p className={styles.brandName}>
+            {panelSkin === "integra" ? "NEXARA · Integra" : "NEXARA"}
           </p>
         </div>
 
@@ -404,13 +401,9 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           </div>
         ) : null}
 
-        <h1 className={`${styles.heading}${panelSkin === "integra" ? ` ${styles.headingIntegra}` : ""}`}>
-          {panelSkin === "integra" ? "Consola de seguridad" : title || "Iniciar sesión"}
-        </h1>
-        <p className={`${styles.subheading}${panelSkin === "integra" ? ` ${styles.subIntegra}` : ""}`}>
-          {panelSkin === "integra"
-            ? "CCTV, accesos y sitios HikCentral Artemis"
-            : subtitle || "Ingresa a tu cuenta de Nexara"}
+        <h1 className={styles.heading}>{title || "Iniciar sesión"}</h1>
+        <p className={styles.subheading}>
+          {subtitle || "Ingresa a tu cuenta de NEXARA"}
         </p>
 
         <form className={styles.form} onSubmit={handleLogin}>

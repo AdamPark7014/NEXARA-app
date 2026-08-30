@@ -187,7 +187,7 @@ export default function PortalShell({ children }: { children: React.ReactNode })
             window.location.replace(`/tickets/${slug}`);
           }}
           title="Iniciar sesión"
-          subtitle="Ingresa a tu cuenta de Nexara"
+          subtitle="Ingresa a tu cuenta de NEXARA"
         />
       </div>
     );

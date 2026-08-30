@@ -1,4 +1,4 @@
-/* Scoped login — never reuse global .panel / .input / .label class names */
+/* Login unificado NEXARA — mismo look en todos los subdominios */
 
 .stage {
   min-height: 100vh;
@@ -12,9 +12,9 @@
   font-family: var(--nx-font-body, "Manrope", system-ui, sans-serif);
   color: var(--text-primary, #0f1c2e);
   background:
-    radial-gradient(circle at 12% -8%, color-mix(in srgb, var(--primary, #15a99d) 16%, transparent), transparent 42%),
-    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--secondary, #36bcae) 12%, transparent), transparent 38%),
-    linear-gradient(180deg, #f4f7fb 0%, #eef3f8 55%, #e8eef5 100%);
+    radial-gradient(circle at 12% -8%, color-mix(in srgb, var(--primary, #15a99d) 18%, transparent), transparent 44%),
+    radial-gradient(circle at 92% 108%, color-mix(in srgb, var(--secondary, #36bcae) 14%, transparent), transparent 40%),
+    linear-gradient(180deg, #f5f8fc 0%, #eef3f8 55%, #e9eef5 100%);
 }
 
 .stage::before {
@@ -22,10 +22,9 @@
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(15, 106, 100, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 106, 100, 0.045) 1px, transparent 1px);
-  background-size: 52px 52px;
-  mask-image: radial-gradient(ellipse 60% 55% at 50% 42%, black, transparent 78%);
+    radial-gradient(circle at 1px 1px, rgba(15, 106, 100, 0.09) 1px, transparent 0);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black, transparent 75%);
   pointer-events: none;
   z-index: 0;
 }
@@ -33,18 +32,28 @@
 .wrap {
   position: relative;
   z-index: 1;
-  width: min(100%, 400px);
+  width: min(100%, 420px);
+  padding: clamp(28px, 4vw, 36px) clamp(24px, 4vw, 32px) 28px;
+  border-radius: 24px;
+  background: color-mix(in srgb, #ffffff 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary, #15a99d) 12%, rgba(15, 28, 46, 0.06));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 18px 48px rgba(15, 28, 46, 0.1),
+    0 4px 12px rgba(15, 28, 46, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   animation: enter 0.35s ease-out both;
 }
 
 @keyframes enter {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(12px) scale(0.985);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -52,7 +61,7 @@
   display: grid;
   justify-items: center;
   gap: 10px;
-  margin-bottom: 22px;
+  margin-bottom: 20px;
   text-align: center;
 }
 
@@ -60,6 +69,7 @@
   width: 64px;
   height: 64px;
   object-fit: contain;
+  border-radius: 16px;
 }
 
 .brandName {
@@ -67,15 +77,15 @@
   font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--text-primary, #0f1c2e);
+  color: var(--primary-strong, #0b7a72);
 }
 
 .heading {
   margin: 0 0 6px;
   font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: clamp(1.4rem, 2.4vw, 1.65rem);
+  font-size: clamp(1.35rem, 2.4vw, 1.55rem);
   font-weight: 650;
   letter-spacing: -0.02em;
   line-height: 1.2;
@@ -84,7 +94,7 @@
 }
 
 .subheading {
-  margin: 0 0 24px;
+  margin: 0 0 22px;
   font-size: 0.92rem;
   line-height: 1.45;
   color: var(--text-secondary, #445668);
@@ -128,7 +138,7 @@
   width: 100%;
   min-height: 48px;
   padding: 0 14px 0 44px;
-  border-radius: 10px;
+  border-radius: 14px;
   border: 1px solid var(--border, rgba(12, 71, 69, 0.14));
   background: var(--surface, #ffffff);
   color: var(--text-primary, #0f1c2e);
@@ -166,7 +176,7 @@
   width: 34px;
   height: 34px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   background: transparent;
   color: var(--text-tertiary, #6b7a8f);
   display: grid;
@@ -183,7 +193,7 @@
   margin-top: 4px;
   min-height: 48px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 14px;
   background: linear-gradient(138deg, var(--primary, #15a99d) 0%, var(--secondary, #36bcae) 100%);
   color: #fff;
   font-size: 0.95rem;
@@ -191,7 +201,7 @@
   font-family: var(--nx-font-ui, "Inter Tight", system-ui, sans-serif);
   letter-spacing: 0.01em;
   cursor: pointer;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary, #15a99d) 24%, transparent);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--primary, #15a99d) 26%, transparent);
   transition: filter 0.18s ease, transform 0.15s ease;
 }
 
@@ -208,7 +218,7 @@
 
 .sso {
   min-height: 44px;
-  border-radius: 10px;
+  border-radius: 14px;
   border: 1px solid var(--border, rgba(12, 71, 69, 0.14));
   background: var(--surface, #ffffff);
   color: var(--text-primary, #0f1c2e);
@@ -226,7 +236,7 @@
 .notice {
   margin-bottom: 16px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: 14px;
   border: 1px solid color-mix(in srgb, var(--primary, #15a99d) 35%, transparent);
   background: color-mix(in srgb, var(--primary, #15a99d) 10%, #fff);
   color: var(--primary-strong, #0b7a72);
@@ -236,7 +246,7 @@
 
 .error {
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: 14px;
   border: 1px solid color-mix(in srgb, var(--danger, #c9423d) 35%, transparent);
   background: color-mix(in srgb, var(--danger, #c9423d) 8%, #fff);
   color: var(--danger, #c9423d);
@@ -268,88 +278,6 @@
   to {
     transform: rotate(360deg);
   }
-}
-
-/* Integra — contraste alto, atmósfera acero/cian (seguridad física) */
-.stageIntegra {
-  color: #0b1524 !important;
-  background:
-    radial-gradient(ellipse 80% 50% at 15% 0%, rgba(14, 116, 144, 0.35), transparent 50%),
-    radial-gradient(ellipse 60% 45% at 100% 100%, rgba(3, 105, 161, 0.22), transparent 48%),
-    linear-gradient(165deg, #9bb0c4 0%, #c5d2df 38%, #d8e2ec 100%) !important;
-}
-
-.stageIntegra::before {
-  background-image:
-    linear-gradient(rgba(11, 21, 36, 0.09) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(11, 21, 36, 0.09) 1px, transparent 1px);
-  background-size: 40px 40px;
-  opacity: 0.7;
-}
-
-.wrapIntegra {
-  padding: 32px 28px 24px;
-  background: #ffffff;
-  border: 1px solid rgba(11, 21, 36, 0.16);
-  box-shadow:
-    0 24px 48px rgba(11, 21, 36, 0.18),
-    0 2px 0 rgba(255, 255, 255, 0.6) inset;
-}
-
-.brandNameIntegra {
-  color: #0e7490;
-  letter-spacing: 0.18em;
-  font-size: 0.85rem;
-}
-
-.headingIntegra {
-  color: #0b1524;
-  font-size: clamp(1.55rem, 2.6vw, 1.85rem);
-}
-
-.subIntegra {
-  color: #334155;
-  font-weight: 500;
-}
-
-.stageIntegra .label {
-  color: #0b1524;
-}
-
-.stageIntegra .field {
-  background: #f8fafc;
-  color: #0b1524;
-  border: 1.5px solid rgba(11, 21, 36, 0.22);
-  box-shadow: none;
-}
-
-.stageIntegra .field:focus {
-  border-color: #0e7490;
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.2);
-}
-
-.stageIntegra .controlIcon {
-  color: #64748b;
-}
-
-.stageIntegra .submit {
-  background: #0e7490;
-  border: 1px solid #155e75;
-  min-height: 48px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  font-size: 0.82rem;
-}
-
-.stageIntegra .submit:hover:not(:disabled) {
-  background: #155e75;
-}
-
-.stageIntegra .foot {
-  color: #475569;
-  font-weight: 500;
 }
 
 @media (prefers-reduced-motion: reduce) {

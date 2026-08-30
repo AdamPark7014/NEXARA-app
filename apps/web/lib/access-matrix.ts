@@ -105,7 +105,7 @@ export const PANEL_META: Record<PanelId, PanelMeta> = {
     id: PANELS.INTEGRA,
     publicSubdomain: "integra",
     name: "NEXARA INTEGRA",
-    tagline: "Seguridad física · CCTV y accesos",
+    tagline: "Seguridad física · video y accesos",
     accent: "#0e7490",
     icon: "🔐",
     entryPath: "/",

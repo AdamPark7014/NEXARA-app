@@ -32,7 +32,7 @@ export default async function LoginPage({
         <PanelLogin
           redirectTo="/dashboard"
           title="Iniciar sesión"
-          subtitle="Ingresa a tu cuenta de Nexara"
+          subtitle="Ingresa a tu cuenta de NEXARA"
           skin={skin}
         />
       }
@@ -40,7 +40,7 @@ export default async function LoginPage({
       <PanelLogin
         redirectTo="/dashboard"
         title="Iniciar sesión"
-        subtitle="Ingresa a tu cuenta de Nexara"
+        subtitle="Ingresa a tu cuenta de NEXARA"
         accessNotice={accessNotice}
         smartRedirect={true}
         skin={skin}
