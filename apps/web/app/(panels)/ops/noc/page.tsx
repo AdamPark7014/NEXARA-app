@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -13,6 +12,7 @@ import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import { getIntegraUrl } from "@/lib/panel-urls";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac";
 
@@ -110,11 +110,11 @@ export default function NocPage() {
           title="Sin sitios conectados al NOC"
           description="El monitoreo real usa el espejo de Integra (cámaras y accesos). Conecta un sitio HikCentral o Hik-Connect para ver dispositivos vivos — ya no se inventan routers de demo."
           action={
-            <Link href="/integra/settings">
+            <a href={getIntegraUrl("/settings")} style={{ textDecoration: "none" }}>
               <Button size="sm" variant="primary">
                 Ir a Sitios Integra
               </Button>
-            </Link>
+            </a>
           }
         />
       )}

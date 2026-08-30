@@ -42,6 +42,9 @@ const MODULE_LABELS: Record<string, string> = {
   alarms: "Alarmas",
 };
 
+/** Overrides Artemis-only — no deben fingirse disponibles en HCT (ADR-0019). */
+const HCT_ARTEMIS_ONLY = new Set(["people", "visitors", "vehicles", "anpr"]);
+
 const MODULE_KEYS = Object.keys(MODULE_LABELS);
 
 export default function IntegraSettingsPage() {
@@ -343,15 +346,20 @@ export default function IntegraSettingsPage() {
               <IgPanel title="Módulos del sitio" count={selected.label || selected.name}>
                 <p className={styles.empty} style={{ padding: "8px 10px", textAlign: "left" }}>
                   Activa o desactiva lo que verá el operador en este sitio.
+                  {selected.provider === "HCT" && (
+                    <> Personas / Visitas / Vehículos / ANPR son solo Artemis — no se pueden habilitar en Hik-Connect.</>
+                  )}
                 </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4, padding: "0 10px 10px" }}>
                   {MODULE_KEYS.map((k) => {
                     const on = selected.modulesOverride?.[k] !== false;
+                    const artemisOnly = selected.provider === "HCT" && HCT_ARTEMIS_ONLY.has(k);
                     return (
                       <IgBtn
                         key={k}
-                        disabled={busy}
+                        disabled={busy || artemisOnly}
                         onClick={async () => {
+                          if (artemisOnly) return;
                           const current = { ...(selected.modulesOverride || {}) };
                           current[k] = !(current[k] !== false);
                           setBusy(true);
@@ -369,8 +377,8 @@ export default function IntegraSettingsPage() {
                           }
                         }}
                       >
-                        <span style={{ opacity: on ? 1 : 0.45, textDecoration: on ? "none" : "line-through" }}>
-                          {MODULE_LABELS[k] || k}
+                        <span style={{ opacity: artemisOnly ? 0.35 : on ? 1 : 0.45, textDecoration: on && !artemisOnly ? "none" : "line-through" }}>
+                          {MODULE_LABELS[k] || k}{artemisOnly ? " · Artemis" : ""}
                         </span>
                       </IgBtn>
                     );

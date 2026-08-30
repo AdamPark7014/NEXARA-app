@@ -11,6 +11,7 @@ import {
   IgToolbar,
 } from "../_Console";
 import { inputStyle, integraApi, selectStyle } from "../_lib";
+import EmptyState from "@/components/ui/EmptyState";
 
 type Pin = {
   id: number;
@@ -108,6 +109,18 @@ export default function IntegraMapPage() {
     <IgPage>
       <IgToolbar title="Plano del sitio" meta={`${plans.length} planos`} />
       <IgError>{error}</IgError>
+
+      {plans.length === 0 && (
+        <IgPanel title="Sin plano">
+          <div style={{ padding: 16 }}>
+            <EmptyState
+              title="Sin plano del sitio"
+              description="Sube una imagen de planta para colocar cámaras y puertas. Mientras no haya plano, el mapa permanece vacío."
+              icon="🗺️"
+            />
+          </div>
+        </IgPanel>
+      )}
 
       <IgFilters>
         <IgField label="Nombre del plano">

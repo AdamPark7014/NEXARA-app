@@ -47,7 +47,7 @@ export const ROLE_TIER: Record<RoleKey, number> = {
   cliente: 10,
 };
 
-export type PanelKey = 'core' | 'sales' | 'ops' | 'studio' | 'portal';
+export type PanelKey = 'core' | 'sales' | 'ops' | 'studio' | 'portal' | 'lab' | 'integra';
 
 export const ROLE_HOME_PANEL: Record<RoleKey, PanelKey> = {
   super_admin: 'core',
@@ -70,23 +70,23 @@ export const ROLE_HOME_PANEL: Record<RoleKey, PanelKey> = {
 };
 
 export const ROLE_EXTRA_PANELS: Record<RoleKey, PanelKey[]> = {
-  super_admin: ['core', 'sales', 'ops', 'studio', 'portal'],
-  ceo: ['core', 'sales', 'ops', 'studio'],
-  arquitecto: ['ops', 'core', 'sales'],
-  dir_operaciones: ['core', 'ops', 'sales'],
+  super_admin: ['core', 'sales', 'ops', 'studio', 'portal', 'lab', 'integra'],
+  ceo: ['core', 'sales', 'ops', 'studio', 'lab', 'integra'],
+  arquitecto: ['ops', 'core', 'sales', 'integra'],
+  dir_operaciones: ['core', 'ops', 'sales', 'integra'],
   dir_admin: ['core', 'ops'],
   coord_admin: ['core', 'sales', 'ops'],
   administrativo: ['core'],
   rh: ['core'],
   contabilidad: ['core', 'sales'],
-  coord_operaciones: ['ops', 'core'],
+  coord_operaciones: ['ops', 'core', 'integra'],
   ing_campo: ['ops'],
-  ing_soporte: ['ops', 'core'],
+  ing_soporte: ['ops', 'core', 'integra'],
   coord_ventas: ['sales', 'core'],
   vendedor: ['sales'],
   lider_diseno: ['studio', 'core', 'sales'],
   disenador: ['studio', 'core', 'sales'],
-  cliente: ['portal'],
+  cliente: ['portal', 'integra'],
 };
 
 export const ROLE_LABELS: Record<RoleKey, string> = {

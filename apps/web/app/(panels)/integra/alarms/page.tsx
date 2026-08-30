@@ -14,12 +14,14 @@ import {
 import {
   defaultRangeHours,
   fromDatetimeLocalValue,
+  getActiveIntegraSiteId,
   inputStyle,
   integraApi,
   toDatetimeLocalValue,
 } from "../_lib";
 import { PlaybackJumpModal } from "../_PlaybackJumpModal";
 import { getOperacionUrl } from "@/lib/panel-urls";
+import { getCachedProvider, subscribeProvider } from "../_caps";
 
 type AlarmItem = {
   id: string;
@@ -42,6 +44,8 @@ export default function IntegraAlarmsPage() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [playback, setPlayback] = useState<{ cameraId: string; at: string } | null>(null);
+  const [provider, setProvider] = useState<string | null>(() => getCachedProvider());
+  const isHct = provider === "HCT";
 
   // Histórico Artemis (colapsable)
   const range0 = useMemo(() => defaultRangeHours(24), []);
@@ -49,6 +53,21 @@ export default function IntegraAlarmsPage() {
   const [searchItems, setSearchItems] = useState<any[]>([]);
   const [start, setStart] = useState(range0.start);
   const [end, setEnd] = useState(range0.end);
+  const [siteLabel, setSiteLabel] = useState<string>("");
+
+  useEffect(() => subscribeProvider(setProvider), []);
+
+  useEffect(() => {
+    const sid = getActiveIntegraSiteId();
+    if (!sid) return;
+    void integraApi<Array<{ id: number; name?: string; label?: string | null }>>("integra/sites")
+      .then((rows) => {
+        const list = Array.isArray(rows) ? rows : [];
+        const site = list.find((s) => Number(s.id) === sid);
+        if (site) setSiteLabel(String(site.label || site.name || `sitio ${sid}`));
+      })
+      .catch(() => undefined);
+  }, []);
 
   const loadQueue = async () => {
     try {
@@ -159,7 +178,7 @@ export default function IntegraAlarmsPage() {
                       Clear
                     </IgBtn>
                   )}
-                  {a.cameraIndexCode && a.timestamp && (
+                  {!isHct && a.cameraIndexCode && a.timestamp && (
                     <IgBtn
                       onClick={() =>
                         setPlayback({ cameraId: a.cameraIndexCode!, at: a.timestamp! })
@@ -170,17 +189,22 @@ export default function IntegraAlarmsPage() {
                   )}
                   <IgBtn
                     onClick={() => {
+                      const sid = getActiveIntegraSiteId();
                       const title = `Alarma Integra: ${a.title}`;
                       const description = [
                         `Severidad: ${a.severity}`,
                         a.srcName ? `Origen: ${a.srcName}` : null,
                         a.timestamp ? `Hora: ${a.timestamp}` : null,
                         a.note ? `Nota: ${a.note}` : null,
+                        siteLabel ? `Sitio: ${siteLabel}` : null,
+                        sid ? `siteId=${sid}` : null,
                         `alarmId=${a.id}`,
                       ]
                         .filter(Boolean)
                         .join("\n");
                       const qs = new URLSearchParams({ title, description });
+                      if (sid) qs.set("siteId", String(sid));
+                      if (siteLabel) qs.set("clientHint", siteLabel);
                       window.location.href = getOperacionUrl(`/support/new?${qs.toString()}`);
                     }}
                   >
@@ -194,6 +218,7 @@ export default function IntegraAlarmsPage() {
         />
       </IgPanel>
 
+      {!isHct && (
       <details style={{ marginTop: 16 }} open={showSearch} onToggle={(e) => setShowSearch((e.target as HTMLDetailsElement).open)}>
         <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 650 }}>
           Búsqueda histórica Artemis (avanzado)
@@ -236,13 +261,16 @@ export default function IntegraAlarmsPage() {
           </pre>
         )}
       </details>
+      )}
 
+      {!isHct && (
       <PlaybackJumpModal
         open={Boolean(playback)}
         cameraId={playback?.cameraId || ""}
         atIso={playback?.at || toDatetimeLocalValue(new Date())}
         onClose={() => setPlayback(null)}
       />
+      )}
     </IgPage>
   );
 }

@@ -125,6 +125,31 @@ export default function StudioLeadsPage() {
         page += 1;
       }
       setMessages(all);
+
+      // Persistencia de «ya en CRM»: leads con source=Studio (email o contactMessageId en notes)
+      try {
+        const crm = await apiFetch("ventas/leads?limit=200", token);
+        const leads = Array.isArray(crm) ? crm : (crm?.data ?? []);
+        const promoted = new Set<number>();
+        const studioEmails = new Set<string>();
+        const byMsgId = new Set<number>();
+        for (const l of leads) {
+          const src = String(l.source ?? "");
+          if (!/^studio$/i.test(src)) continue;
+          const email = String(l.email ?? "").trim().toLowerCase();
+          if (email) studioEmails.add(email);
+          const notes = String(l.notes ?? "");
+          const m = /contactMessageId=(\d+)/.exec(notes);
+          if (m) byMsgId.add(Number(m[1]));
+        }
+        for (const msg of all) {
+          if (byMsgId.has(msg.id)) promoted.add(msg.id);
+          else if (msg.email && studioEmails.has(msg.email.trim().toLowerCase())) promoted.add(msg.id);
+        }
+        setPromotedIds(promoted);
+      } catch {
+        /* promote check best-effort */
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar leads del sitio");
     } finally { setLoading(false); }
