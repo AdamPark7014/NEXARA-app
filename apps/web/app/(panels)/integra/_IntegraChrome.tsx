@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getActiveCompanyId, subscribeActiveCompany } from "@/lib/tenant";
@@ -15,6 +16,7 @@ import {
   setCachedCapabilities,
   subscribeCapabilities,
 } from "./_caps";
+import styles from "./integra.module.css";
 
 const PATH_TO_MODULE: Record<string, string> = {
   "/integra": "integra-home",
@@ -33,7 +35,7 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [caps, setCaps] = useState<IntegraCapabilities | null>(null);
-  const [companyLabel, setCompanyLabel] = useState<string>("");
+  const [companyLabel, setCompanyLabel] = useState("Empresa primaria");
   const [tick, setTick] = useState(0);
 
   const refreshCaps = useCallback(async () => {
@@ -42,7 +44,7 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
       setCaps(c);
       setCachedCapabilities(c);
     } catch {
-      /* sin sesión / sin sitio */
+      /* sin sesión */
     }
   }, []);
 
@@ -80,26 +82,11 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 10,
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "8px 12px",
-          marginBottom: 12,
-          borderBottom: "1px solid var(--border, #e2e8f0)",
-          background: "color-mix(in srgb, var(--accent, #1d4ed8) 6%, transparent)",
-          borderRadius: 8,
-          fontSize: 12,
-        }}
-      >
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-          <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>
-            Contexto · {companyLabel}
-          </span>
+    <div className={styles.shell}>
+      <div className={styles.hud}>
+        <div className={styles.hudLeft}>
+          <span className={styles.hudBrand}>Integra</span>
+          <span className={styles.hudCompany}>{companyLabel}</span>
           <IntegraSiteSwitcher
             onChange={() => {
               setTick((t) => t + 1);
@@ -107,27 +94,16 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
             }}
           />
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-          {activeMods.slice(0, 8).map((m) => (
-            <span
-              key={m.href}
-              style={{
-                padding: "2px 8px",
-                borderRadius: 999,
-                background: "var(--surface, #fff)",
-                border: "1px solid var(--border, #e2e8f0)",
-                color: "var(--text-tertiary)",
-              }}
-            >
+        <nav className={styles.hudMods} aria-label="Módulos activos">
+          {activeMods.map((m) => (
+            <Link key={m.href} href={m.href} className={styles.hudChip}>
               {m.title}
-            </span>
+            </Link>
           ))}
-          {!caps && (
-            <span style={{ color: "var(--text-tertiary)" }}>Cargando módulos…</span>
-          )}
-        </div>
+          {!caps && <span className={styles.hudChip}>Cargando…</span>}
+        </nav>
       </div>
-      {children}
+      <div className={styles.inner}>{children}</div>
     </div>
   );
 }

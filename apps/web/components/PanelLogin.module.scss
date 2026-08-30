@@ -270,6 +270,66 @@
   }
 }
 
+/* Integra — contraste alto, atmósfera acero/cian (seguridad física) */
+.stageIntegra {
+  color: #0b1524;
+  background:
+    radial-gradient(circle at 10% -10%, rgba(14, 116, 144, 0.22), transparent 42%),
+    radial-gradient(circle at 95% 90%, rgba(3, 105, 161, 0.14), transparent 40%),
+    linear-gradient(180deg, #dce6f0 0%, #e8eef5 48%, #d5dee9 100%);
+}
+
+.stageIntegra::before {
+  background-image:
+    linear-gradient(rgba(11, 21, 36, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(11, 21, 36, 0.06) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.stageIntegra .brandName {
+  color: #155e75;
+  letter-spacing: 0.18em;
+}
+
+.stageIntegra .heading {
+  color: #0b1524;
+}
+
+.stageIntegra .subheading {
+  color: #3d4f63;
+}
+
+.stageIntegra .label {
+  color: #0b1524;
+}
+
+.stageIntegra .field {
+  background: #ffffff;
+  color: #0b1524;
+  border-color: rgba(11, 21, 36, 0.18);
+  box-shadow: 0 1px 2px rgba(11, 21, 36, 0.06);
+}
+
+.stageIntegra .submit {
+  background: #0e7490;
+  border-color: #155e75;
+}
+
+.stageIntegra .submit:hover:not(:disabled) {
+  background: #155e75;
+}
+
+.stageIntegra .wrap {
+  padding: 28px 24px 22px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(11, 21, 36, 0.1);
+  backdrop-filter: blur(8px);
+}
+
+.stageIntegra .foot {
+  color: #5b6b7c;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .wrap,
   .loader {

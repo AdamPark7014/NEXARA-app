@@ -105,7 +105,7 @@ export const PANEL_META: Record<PanelId, PanelMeta> = {
     publicSubdomain: "integra",
     name: "NEXARA INTEGRA",
     tagline: "CCTV y accesos sobre HikCentral Artemis",
-    accent: "#1d4ed8",
+    accent: "#0e7490",
     icon: "🔐",
     entryPath: "/",
   },
