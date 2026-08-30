@@ -1,11 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { DashPage, DashHero, DashPanel, ListRow } from "@/components/dashboard/DashKit";
-import styles from "../integra.module.css";
 import {
-  btnGhost,
-  btnPrimary,
+  IgBtn,
+  IgError,
+  IgField,
+  IgFilters,
+  IgPage,
+  IgPanel,
+  IgTable,
+  IgToolbar,
+} from "../_Console";
+import {
   defaultRangeHours,
   fromDatetimeLocalValue,
   inputStyle,
@@ -43,87 +49,68 @@ export default function IntegraAnprPage() {
       }
       setItems(list);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error — requiere licencia PMS");
+      setError(e instanceof Error ? e.message : "Error — licencia PMS");
     } finally {
       setBusy(false);
     }
   };
 
+  const fmt = (iso?: string) =>
+    iso ? new Date(iso).toLocaleString("es-MX", { hour12: false }) : "—";
+
   return (
-    <DashPage>
-      <DashHero
-        eyebrow="ANPR / PMS"
-        title="Cruces de placa"
-        subtitle="crossRecords/page · rango + paginación · filtro placa local sobre resultados."
+    <IgPage>
+      <IgToolbar
+        title="ANPR / PMS"
+        meta={`crossRecords · ${items.length}`}
         actions={
-          <button type="button" style={btnPrimary} disabled={busy} onClick={() => void search()}>
+          <IgBtn variant="primary" disabled={busy} onClick={() => void search()}>
             {busy ? "…" : "Buscar"}
-          </button>
+          </IgBtn>
         }
       />
-      {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
-
-      <div className={styles.filterBar}>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Desde</span>
+      <IgError>{error}</IgError>
+      <IgFilters>
+        <IgField label="Desde">
           <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} style={inputStyle} />
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Hasta</span>
+        </IgField>
+        <IgField label="Hasta">
           <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} style={inputStyle} />
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>pageSize</span>
-          <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 90 }}>
+        </IgField>
+        <IgField label="pageSize">
+          <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 80 }}>
             {[25, 50, 100].map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
           </select>
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>pageNo</span>
-          <input
-            type="number"
-            min={1}
-            value={pageNo}
-            onChange={(e) => setPageNo(Math.max(1, Number(e.target.value) || 1))}
-            style={{ ...inputStyle, maxWidth: 80 }}
-          />
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Placa (filtro UI)</span>
-          <input
-            placeholder="ABC123"
-            value={plateQ}
-            onChange={(e) => setPlateQ(e.target.value.toUpperCase())}
-            style={inputStyle}
-          />
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Presets</span>
-          <div style={{ display: "flex", gap: 6 }}>
-            <button type="button" style={btnGhost} onClick={() => { const r = defaultRangeHours(24); setStart(r.start); setEnd(r.end); }}>24h</button>
-            <button type="button" style={btnGhost} onClick={() => { const r = defaultRangeHours(168); setStart(r.start); setEnd(r.end); }}>7d</button>
-          </div>
-        </div>
-      </div>
-
-      <DashPanel title="Cruces" subtitle={`${items.length}`}>
-        <div className={styles.tableScroll}>
-          {items.map((r, i) => (
-            <ListRow
-              key={r.crossRecordSyscode || `${r.plateNo}-${r.crossTime}-${i}`}
-              title={r.plateNo || "—"}
-              sub={[r.crossTime, r.entranceName, r.vehicleType, r.vehicleOut].filter(Boolean).join(" · ")}
-            />
-          ))}
-          {items.length === 0 && (
-            <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
-              Sin cruces o PMS no licenciado en el sitio.
-            </p>
-          )}
-        </div>
-      </DashPanel>
-    </DashPage>
+        </IgField>
+        <IgField label="pageNo">
+          <input type="number" min={1} value={pageNo} onChange={(e) => setPageNo(Math.max(1, Number(e.target.value) || 1))} style={{ ...inputStyle, maxWidth: 70 }} />
+        </IgField>
+        <IgField label="Placa">
+          <input value={plateQ} onChange={(e) => setPlateQ(e.target.value.toUpperCase())} style={inputStyle} />
+        </IgField>
+      </IgFilters>
+      <IgPanel title="Cruces" count={items.length} flush>
+        <IgTable
+          columns={[
+            { key: "p", label: "Placa" },
+            { key: "t", label: "Hora", mono: true },
+            { key: "e", label: "Entrada" },
+            { key: "ty", label: "Tipo" },
+          ]}
+          rows={items.map((r, i) => ({
+            key: String(r.crossRecordSyscode || `${r.plateNo}-${i}`),
+            cells: {
+              p: r.plateNo || "—",
+              t: fmt(r.crossTime),
+              e: r.entranceName || "—",
+              ty: r.vehicleType || "—",
+            },
+          }))}
+          empty="Sin cruces / PMS no licenciado"
+        />
+      </IgPanel>
+    </IgPage>
   );
 }

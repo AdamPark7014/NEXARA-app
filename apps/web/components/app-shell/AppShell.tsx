@@ -361,6 +361,9 @@ export default function AppShell({ panel, children }: AppShellProps) {
   };
 
   const isChatRoute = Boolean(pathname && /\/chat(\/|$)/.test(pathname));
+  /** Integra: consola full-bleed sin sidebar ERP (nav vive en HUD). */
+  const isConsolePanel = panel === "integra";
+  const isFullBleed = isChatRoute || isConsolePanel;
 
   // Panel completo sin permiso (p.ej. administrativo en /crm o diseño en /erp sin rutas)
   if (!isSuperAdmin && user && !canAccessPanel) {
@@ -382,9 +385,11 @@ export default function AppShell({ panel, children }: AppShellProps) {
       data-mobile-open={mobileOpen ? "true" : "false"}
       data-collapsed={collapsed ? "true" : "false"}
       data-chat={isChatRoute ? "true" : "false"}
+      data-console={isConsolePanel ? "true" : "false"}
       style={{ "--panel-accent": panelMeta.accent } as React.CSSProperties}
     >
       {/* ───────── SIDEBAR ───────── */}
+      {!isConsolePanel && (
       <aside className={styles.sidebar}>
         <div className={styles.brand}>
           <div className={styles.brandLogo} aria-hidden="true">
@@ -532,6 +537,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
           )}
         </div>
       </aside>
+      )}
 
       <div
         className={styles.overlay}
@@ -546,6 +552,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
           className={styles.mobileMenuBtn}
           onClick={() => setMobileOpen((v) => !v)}
           aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
+          hidden={isConsolePanel}
         >
           ☰
         </button>
@@ -556,11 +563,19 @@ export default function AppShell({ panel, children }: AppShellProps) {
           onClick={() => setCollapsed((v) => !v)}
           aria-label={collapsed ? "Expandir sidebar" : "Colapsar sidebar"}
           title={collapsed ? "Expandir" : "Colapsar"}
+          hidden={isConsolePanel}
         >
           {collapsed ? "›" : "‹"}
         </button>
 
-        <Breadcrumbs panel={panel} pathname={pathname || ""} panelHome={panelEntryPath} />
+        {!isConsolePanel && (
+          <Breadcrumbs panel={panel} pathname={pathname || ""} panelHome={panelEntryPath} />
+        )}
+        {isConsolePanel && (
+          <div className={styles.consoleTitle} aria-hidden="true">
+            Integra
+          </div>
+        )}
 
         <div className={styles.topbarActions}>
           <CompanySwitcher compact />
@@ -698,8 +713,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
       </header>
 
       {/* ───────── MAIN ───────── */}
-      <main className={`${styles.main}${isChatRoute ? ` ${styles.mainFullBleed}` : ""}`}>
-        <div className={`${styles.contentInner}${isChatRoute ? ` ${styles.contentInnerFullBleed}` : ""}`}>
+      <main className={`${styles.main}${isFullBleed ? ` ${styles.mainFullBleed}` : ""}`}>
+        <div className={`${styles.contentInner}${isFullBleed ? ` ${styles.contentInnerFullBleed}` : ""}`}>
           {children}
         </div>
       </main>

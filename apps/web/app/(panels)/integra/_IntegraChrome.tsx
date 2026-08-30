@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getActiveCompanyId, subscribeActiveCompany } from "@/lib/tenant";
+import { useUser } from "@/components/UserContext";
 import {
   integraApi,
   type IntegraCapabilities,
@@ -34,6 +35,7 @@ const PATH_TO_MODULE: Record<string, string> = {
 export function IntegraChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { logout } = useUser();
   const [caps, setCaps] = useState<IntegraCapabilities | null>(null);
   const [companyLabel, setCompanyLabel] = useState("Empresa primaria");
   const [tick, setTick] = useState(0);
@@ -111,6 +113,9 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
             );
           })}
           {!caps && <span className={styles.hudChip}>Cargando…</span>}
+          <button type="button" className={styles.hudChip} onClick={() => logout()}>
+            Salir
+          </button>
         </nav>
       </div>
       <div className={styles.inner}>{children}</div>

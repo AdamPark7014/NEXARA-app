@@ -1,11 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { DashPage, DashHero, DashPanel, ListRow } from "@/components/dashboard/DashKit";
-import styles from "../integra.module.css";
 import {
-  btnGhost,
-  btnPrimary,
+  IgBtn,
+  IgError,
+  IgField,
+  IgFilters,
+  IgPage,
+  IgPanel,
+  IgTable,
+  IgToolbar,
+} from "../_Console";
+import {
   defaultRangeHours,
   fromDatetimeLocalValue,
   inputStyle,
@@ -41,13 +47,11 @@ export default function IntegraAlarmsPage() {
         .filter((n) => Number.isFinite(n));
       if (types.length === 1) body.eventType = types[0];
       else if (types.length > 1) body.eventTypes = types;
-
       const data = await integraApi<any>("integra/alarms/search", {
         method: "POST",
         body: JSON.stringify(body),
       });
-      const list = data?.list || data?.data?.list || (Array.isArray(data) ? data : []);
-      setItems(list);
+      setItems(data?.list || data?.data?.list || (Array.isArray(data) ? data : []));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
     } finally {
@@ -55,81 +59,68 @@ export default function IntegraAlarmsPage() {
     }
   };
 
+  const fmt = (iso?: string) =>
+    iso ? new Date(iso).toLocaleString("es-MX", { hour12: false }) : "—";
+
   return (
-    <DashPage>
-      <DashHero
-        eyebrow="Alarmas"
-        title="eventService"
-        subtitle="eventRecords/page con rango, pageNo/pageSize y eventType(s) documentados."
+    <IgPage>
+      <IgToolbar
+        title="Alarmas"
+        meta={`eventService · ${items.length}`}
         actions={
-          <button type="button" style={btnPrimary} disabled={busy} onClick={() => void search()}>
+          <IgBtn variant="primary" disabled={busy} onClick={() => void search()}>
             {busy ? "…" : "Buscar"}
-          </button>
+          </IgBtn>
         }
       />
-      {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
-
-      <div className={styles.filterBar}>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Desde</span>
+      <IgError>{error}</IgError>
+      <IgFilters>
+        <IgField label="Desde">
           <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} style={inputStyle} />
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Hasta</span>
+        </IgField>
+        <IgField label="Hasta">
           <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} style={inputStyle} />
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>pageSize</span>
-          <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 90 }}>
+        </IgField>
+        <IgField label="pageSize">
+          <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 80 }}>
             {[25, 50, 100, 200].map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
           </select>
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>pageNo</span>
-          <input
-            type="number"
-            min={1}
-            value={pageNo}
-            onChange={(e) => setPageNo(Math.max(1, Number(e.target.value) || 1))}
-            style={{ ...inputStyle, maxWidth: 80 }}
-          />
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>eventType(s)</span>
-          <input
-            placeholder="opcional, ej. 131329 o 1,2"
-            value={eventTypes}
-            onChange={(e) => setEventTypes(e.target.value)}
-            style={inputStyle}
-          />
-        </div>
-        <div className={styles.filterField}>
-          <span className={styles.filterLabel}>Presets</span>
-          <div style={{ display: "flex", gap: 6 }}>
-            <button type="button" style={btnGhost} onClick={() => { const r = defaultRangeHours(1); setStart(r.start); setEnd(r.end); }}>1h</button>
-            <button type="button" style={btnGhost} onClick={() => { const r = defaultRangeHours(24); setStart(r.start); setEnd(r.end); }}>24h</button>
+        </IgField>
+        <IgField label="pageNo">
+          <input type="number" min={1} value={pageNo} onChange={(e) => setPageNo(Math.max(1, Number(e.target.value) || 1))} style={{ ...inputStyle, maxWidth: 70 }} />
+        </IgField>
+        <IgField label="eventType(s)">
+          <input value={eventTypes} onChange={(e) => setEventTypes(e.target.value)} placeholder="opcional" style={inputStyle} />
+        </IgField>
+        <IgField label="Preset">
+          <div style={{ display: "flex", gap: 4 }}>
+            <IgBtn onClick={() => { const r = defaultRangeHours(1); setStart(r.start); setEnd(r.end); }}>1h</IgBtn>
+            <IgBtn onClick={() => { const r = defaultRangeHours(24); setStart(r.start); setEnd(r.end); }}>24h</IgBtn>
           </div>
-        </div>
-      </div>
-
-      <DashPanel title="Registros" subtitle={`${items.length}`}>
-        <div className={styles.tableScroll}>
-          {items.map((a, i) => (
-            <ListRow
-              key={a.eventId || a.id || i}
-              title={a.eventTypeName || a.eventType || a.title || "Alarma"}
-              sub={[a.srcName, a.happenTime || a.eventTime, a.eventId].filter(Boolean).join(" · ")}
-            />
-          ))}
-          {items.length === 0 && (
-            <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
-              Sin resultados o licencia eventService no disponible.
-            </p>
-          )}
-        </div>
-      </DashPanel>
-    </DashPage>
+        </IgField>
+      </IgFilters>
+      <IgPanel title="Registros" count={items.length} flush>
+        <IgTable
+          columns={[
+            { key: "t", label: "Hora", mono: true, width: "22%" },
+            { key: "ty", label: "Tipo" },
+            { key: "s", label: "Fuente" },
+            { key: "id", label: "Id", mono: true },
+          ]}
+          rows={items.map((a, i) => ({
+            key: String(a.eventId || a.id || i),
+            cells: {
+              t: fmt(a.happenTime || a.eventTime),
+              ty: a.eventTypeName || a.eventType || "—",
+              s: a.srcName || "—",
+              id: a.eventId || a.id || "—",
+            },
+          }))}
+          empty="Sin alarmas / sin licencia eventService"
+        />
+      </IgPanel>
+    </IgPage>
   );
 }
