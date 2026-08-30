@@ -361,9 +361,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
   };
 
   const isChatRoute = Boolean(pathname && /\/chat(\/|$)/.test(pathname));
-  /** Integra: consola full-bleed sin sidebar ERP (nav vive en HUD). */
-  const isConsolePanel = panel === "integra";
-  const isFullBleed = isChatRoute || isConsolePanel;
+  const isFullBleed = isChatRoute;
 
   // Panel completo sin permiso (p.ej. administrativo en /crm o diseño en /erp sin rutas)
   if (!isSuperAdmin && user && !canAccessPanel) {
@@ -385,11 +383,9 @@ export default function AppShell({ panel, children }: AppShellProps) {
       data-mobile-open={mobileOpen ? "true" : "false"}
       data-collapsed={collapsed ? "true" : "false"}
       data-chat={isChatRoute ? "true" : "false"}
-      data-console={isConsolePanel ? "true" : "false"}
       style={{ "--panel-accent": panelMeta.accent } as React.CSSProperties}
     >
       {/* ───────── SIDEBAR ───────── */}
-      {!isConsolePanel && (
       <aside className={styles.sidebar}>
         <div className={styles.brand}>
           <div className={styles.brandLogo} aria-hidden="true">
@@ -537,18 +533,14 @@ export default function AppShell({ panel, children }: AppShellProps) {
           )}
         </div>
       </aside>
-      )}
 
-      {!isConsolePanel && (
-        <div
-          className={styles.overlay}
-          role="presentation"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
+      <div
+        className={styles.overlay}
+        role="presentation"
+        onClick={() => setMobileOpen(false)}
+      />
 
-      {/* Integra: sin topbar ERP — el HUD de IntegraChrome es el único chrome */}
-      {!isConsolePanel && (
+      {/* ───────── TOPBAR ───────── */}
       <header className={styles.topbar}>
         <button
           type="button"
@@ -705,7 +697,6 @@ export default function AppShell({ panel, children }: AppShellProps) {
           )}
         </div>
       </header>
-      )}
 
       {/* ───────── MAIN ───────── */}
       <main className={`${styles.main}${isFullBleed ? ` ${styles.mainFullBleed}` : ""}`}>

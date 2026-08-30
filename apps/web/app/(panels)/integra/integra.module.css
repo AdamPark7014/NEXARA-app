@@ -19,13 +19,14 @@
 
   color: var(--ig-ink);
   font-family: var(--ig-font-body);
-  min-height: 100%;
-  height: 100%;
+  min-height: 0;
+  height: auto;
+  flex: 1;
   display: flex;
   flex-direction: column;
   position: relative;
   isolation: isolate;
-  background: var(--ig-surface);
+  background: transparent;
 }
 
 .shell::before {
@@ -41,80 +42,51 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 12px;
   flex: 1;
   min-height: 0;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
-/* ── HUD / chrome ─────────────────────────────────────────── */
 .hud {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 6px 12px;
-  align-items: center;
-  padding: 6px 12px;
-  min-height: 48px;
-  background: color-mix(in srgb, var(--ig-panel) 92%, transparent);
-  border-bottom: 1px solid var(--ig-line);
-  backdrop-filter: blur(10px);
-  flex-shrink: 0;
-  z-index: 2;
+  display: none;
 }
 
-.hudLeft {
+.contextBar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 14px;
-  min-width: 0;
-}
-
-.hudBrandBlock {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  text-decoration: none;
-  color: inherit;
-  min-width: 0;
-}
-
-.hudMark {
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: var(--ig-panel);
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius);
+  box-shadow: var(--nx-panel-elev-1, 0 1px 2px rgba(8, 24, 38, 0.04));
   flex-shrink: 0;
 }
 
-.hudBrandText {
+.contextLeft {
   display: flex;
-  flex-direction: column;
-  gap: 0;
-  line-height: 1.15;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
   min-width: 0;
 }
 
-.hudBrand {
-  font-family: var(--ig-font-display);
+.contextRight {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.contextLabel {
   font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ig-accent-deep);
-  text-decoration: none;
-}
-
-.hudBrand:hover {
-  color: var(--ig-accent);
-}
-
-.hudBrandSub {
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ig-muted);
+  font-weight: 600;
+  color: var(--ig-ink-soft);
 }
 
 .hudHealth {
@@ -756,11 +728,14 @@
   display: grid;
   grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) minmax(220px, 280px);
   flex: 1;
-  min-height: 0;
-  height: 100%;
-  border-top: 1px solid var(--ig-line);
+  min-height: min(62dvh, 640px);
+  height: auto;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius);
+  overflow: hidden;
   background: var(--ig-surface);
   gap: 0;
+  box-shadow: var(--nx-panel-elev-1, 0 1px 2px rgba(8, 24, 38, 0.04));
 }
 
 @media (max-width: 1100px) {
@@ -1051,14 +1026,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(24px, 6vh, 56px) 24px;
-  background:
-    radial-gradient(
-      ellipse 70% 50% at 50% 20%,
-      color-mix(in srgb, var(--ig-accent) 8%, transparent),
-      transparent 70%
-    ),
-    var(--ig-surface);
+  padding: clamp(12px, 4vh, 32px) 8px;
+  background: transparent;
 }
 
 .igOnboardCard {
