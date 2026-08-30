@@ -135,13 +135,13 @@ export const SUBDOMAIN_CONFIG: Record<string, SubdomainConfig> = {
     enabled: true,
   },
 
-  // ── Integra · seguridad física (HikCentral Artemis) ──
+  // ── Integra · seguridad física ──
   integra: {
     name: 'Integra',
     publicDomain: 'integra.nexara.com.mx',
     rootPath: '/',
     description:
-      'CCTV, accesos, personas, eventos y vehículos sobre HikCentral Professional Artemis.',
+      'Monitoreo y control de sitios: video, accesos, eventos y alarmas.',
     enabled: true,
   },
 };
