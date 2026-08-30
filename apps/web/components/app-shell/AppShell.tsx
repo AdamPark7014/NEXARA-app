@@ -51,7 +51,9 @@ import {
 import {
   getCachedCapabilities,
   moduleShownInIntegraSidebar,
+  getCachedProvider,
   subscribeCapabilities,
+  subscribeProvider,
 } from "@/app/(panels)/integra/_caps";
 import type { IntegraCapabilities } from "@/app/(panels)/integra/_lib";
 import { getUserHomeUrlAbsolute } from "@/lib/panel-home";
@@ -177,10 +179,17 @@ export default function AppShell({ panel, children }: AppShellProps) {
   const v2RoleKey = resolveV2RoleKey(user);
 
   const [integraCaps, setIntegraCaps] = useState<IntegraCapabilities | null>(null);
+  const [integraProvider, setIntegraProvider] = useState<string | null>(null);
   useEffect(() => {
     if (panel !== "integra") return;
     setIntegraCaps(getCachedCapabilities());
-    return subscribeCapabilities((c) => setIntegraCaps(c));
+    setIntegraProvider(getCachedProvider());
+    const u1 = subscribeCapabilities((c) => setIntegraCaps(c));
+    const u2 = subscribeProvider((p) => setIntegraProvider(p));
+    return () => {
+      u1();
+      u2();
+    };
   }, [panel]);
 
   const sidebarGroups = useMemo(() => {
@@ -191,11 +200,14 @@ export default function AppShell({ panel, children }: AppShellProps) {
       .map((g) => ({
         ...g,
         items: g.items.filter((item) =>
-          moduleShownInIntegraSidebar(item.id, integraCaps, { isClient }),
+          moduleShownInIntegraSidebar(item.id, integraCaps, {
+            isClient,
+            provider: integraProvider,
+          }),
         ),
       }))
       .filter((g) => g.items.length > 0);
-  }, [panel, user, integraCaps, v2RoleKey]);
+  }, [panel, user, integraCaps, integraProvider, v2RoleKey]);
 
   const allowedPanels = useMemo(
     () => getUserAllowedPanels(user),

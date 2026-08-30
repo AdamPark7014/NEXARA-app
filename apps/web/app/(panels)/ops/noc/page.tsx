@@ -104,7 +104,22 @@ export default function NocPage() {
       {loading && <EmptyState icon="⏳" title="Cargando NOC…" description="Consultando estado de dispositivos." />}
       {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
 
-      {!loading && !error && summary && (
+      {!loading && !error && summary && summary.total === 0 && (
+        <EmptyState
+          icon="📡"
+          title="Sin sitios conectados al NOC"
+          description="El monitoreo real usa el espejo de Integra (cámaras y accesos). Conecta un sitio HikCentral o Hik-Connect para ver dispositivos vivos — ya no se inventan routers de demo."
+          action={
+            <Link href="/integra/settings">
+              <Button size="sm" variant="primary">
+                Ir a Sitios Integra
+              </Button>
+            </Link>
+          }
+        />
+      )}
+
+      {!loading && !error && summary && summary.total > 0 && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 18 }}>
             <KpiCard label="Monitoreados" value={summary.total} icon="📡" hint="Total dispositivos" />
