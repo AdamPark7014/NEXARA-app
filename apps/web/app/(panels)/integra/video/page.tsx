@@ -193,8 +193,8 @@ export default function IntegraVideoPage() {
               columns={[
                 { key: "n", label: "Cámara" },
                 { key: "r", label: "Región" },
-                { key: "e", label: "Encode", mono: true },
-                { key: "s", label: "Status" },
+                { key: "e", label: "Encoder", mono: true },
+                { key: "s", label: "Estado" },
                 { key: "x", label: "", width: "120px" },
               ]}
               rows={filtered.map((c) => ({

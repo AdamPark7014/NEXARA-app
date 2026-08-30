@@ -1,6 +1,6 @@
 "use client";
 
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import styles from "./integra.module.css";
 
 /** Página de módulo — toolbar compacta, sin hero DashKit. */
@@ -185,3 +185,180 @@ export function IgBtn({
     </button>
   );
 }
+
+/* ── Ops workbench primitives ─────────────────────────────── */
+
+export function IgWorkbench({
+  tree,
+  canvas,
+  feed,
+}: {
+  tree: ReactNode;
+  canvas: ReactNode;
+  feed: ReactNode;
+}) {
+  return (
+    <div className={styles.igWorkbench}>
+      <aside className={styles.igWorkbenchTree}>{tree}</aside>
+      <section className={styles.igWorkbenchCanvas}>{canvas}</section>
+      <aside className={styles.igWorkbenchFeed}>{feed}</aside>
+    </div>
+  );
+}
+
+export type IgTreeNode = {
+  id: string;
+  label: string;
+  kind: "region" | "door" | "camera" | "group";
+  online?: boolean | null;
+  children?: IgTreeNode[];
+};
+
+export function IgTree({
+  nodes,
+  selectedId,
+  onSelect,
+  empty,
+}: {
+  nodes: IgTreeNode[];
+  selectedId?: string | null;
+  onSelect?: (id: string, kind: IgTreeNode["kind"]) => void;
+  empty?: string;
+}) {
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+
+  const toggle = (id: string) => setOpen((o) => ({ ...o, [id]: !o[id] }));
+
+  const renderNode = (n: IgTreeNode, depth: number) => {
+    const hasKids = Boolean(n.children?.length);
+    const isOpen = open[n.id] !== false; // default expanded
+    const selectable = n.kind === "door" || n.kind === "camera";
+    return (
+      <div key={n.id} className={styles.igTreeNode} style={{ ["--ig-depth" as string]: depth }}>
+        <button
+          type="button"
+          className={styles.igTreeRow}
+          data-selected={selectedId === n.id ? "1" : undefined}
+          data-kind={n.kind}
+          data-online={n.online === false ? "0" : n.online === true ? "1" : undefined}
+          onClick={() => {
+            if (hasKids) toggle(n.id);
+            if (selectable) onSelect?.(n.id, n.kind);
+            else if (n.kind === "region" || n.kind === "group") onSelect?.(n.id, n.kind);
+          }}
+        >
+          <span className={styles.igTreeTwist} aria-hidden>
+            {hasKids ? (isOpen ? "▾" : "▸") : "·"}
+          </span>
+          <span className={styles.igTreeKind} data-kind={n.kind} aria-hidden>
+            {n.kind === "door" ? "D" : n.kind === "camera" ? "C" : n.kind === "region" ? "R" : "·"}
+          </span>
+          <span className={styles.igTreeLabel}>{n.label}</span>
+          {n.online != null && (
+            <span className={styles.igTreeDot} data-online={n.online ? "1" : "0"} />
+          )}
+        </button>
+        {hasKids && isOpen && (
+          <div className={styles.igTreeKids}>
+            {n.children!.map((c) => renderNode(c, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  if (!nodes.length) {
+    return <p className={styles.igEmpty}>{empty || "Sin recursos"}</p>;
+  }
+
+  return <div className={styles.igTree}>{nodes.map((n) => renderNode(n, 0))}</div>;
+}
+
+export function IgCanvas({
+  tabs,
+  active,
+  onTab,
+  children,
+  actions,
+}: {
+  tabs: Array<{ id: string; label: string }>;
+  active: string;
+  onTab: (id: string) => void;
+  children: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className={styles.igCanvas}>
+      <div className={styles.igCanvasBar}>
+        <div className={styles.igCanvasTabs} role="tablist">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={active === t.id}
+              className={styles.igCanvasTab}
+              data-active={active === t.id ? "1" : undefined}
+              onClick={() => onTab(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {actions != null && <div className={styles.igCanvasActions}>{actions}</div>}
+      </div>
+      <div className={styles.igCanvasBody}>{children}</div>
+    </div>
+  );
+}
+
+export type IgFeedItem = {
+  id: string;
+  time: string;
+  title: string;
+  meta?: string;
+  tone?: "ok" | "warn" | "danger" | "muted";
+};
+
+export function IgFeed({
+  title,
+  items,
+  onItemClick,
+  empty,
+  actions,
+}: {
+  title: string;
+  items: IgFeedItem[];
+  onItemClick?: (id: string) => void;
+  empty?: string;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className={styles.igFeed}>
+      <div className={styles.igFeedHead}>
+        <h2 className={styles.igFeedTitle}>{title}</h2>
+        {actions}
+      </div>
+      <div className={styles.igFeedList}>
+        {items.map((it) => (
+          <button
+            key={it.id}
+            type="button"
+            className={styles.igFeedItem}
+            data-tone={it.tone || undefined}
+            data-click={onItemClick ? "1" : undefined}
+            onClick={onItemClick ? () => onItemClick(it.id) : undefined}
+          >
+            <span className={styles.igFeedTime}>{it.time}</span>
+            <span className={styles.igFeedMain}>
+              <span className={styles.igFeedItemTitle}>{it.title}</span>
+              {it.meta && <span className={styles.igFeedMeta}>{it.meta}</span>}
+            </span>
+          </button>
+        ))}
+        {items.length === 0 && <p className={styles.igEmpty}>{empty || "Sin eventos"}</p>}
+      </div>
+    </div>
+  );
+}
+

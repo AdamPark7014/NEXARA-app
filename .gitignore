@@ -95,3 +95,6 @@ apps/mobile-native/ios/**/GoogleService-Info.plist
 # Scratch de scripts (p.ej. smoke-cotizacion-pdf.ts escribe aqui su PDF).
 # El directorio se recrea solo con mkdirSync; no vuelve al arbol versionado.
 apps/tmp/
+
+# Accidente Windows: `> NUL` crea archivo literal apps/web/NUL
+apps/web/NUL

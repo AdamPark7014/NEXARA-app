@@ -77,14 +77,14 @@ export default function IntegraAnprPage() {
         <IgField label="Hasta">
           <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} style={inputStyle} />
         </IgField>
-        <IgField label="pageSize">
+        <IgField label="Por página">
           <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 80 }}>
             {[25, 50, 100].map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
           </select>
         </IgField>
-        <IgField label="pageNo">
+        <IgField label="Página">
           <input type="number" min={1} value={pageNo} onChange={(e) => setPageNo(Math.max(1, Number(e.target.value) || 1))} style={{ ...inputStyle, maxWidth: 70 }} />
         </IgField>
         <IgField label="Placa">

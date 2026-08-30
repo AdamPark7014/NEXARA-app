@@ -121,7 +121,7 @@ export default function IntegraPeoplePage() {
                 { key: "n", label: "Nombre" },
                 { key: "c", label: "Código", mono: true },
                 { key: "o", label: "Org" },
-                { key: "id", label: "personId", mono: true },
+                { key: "id", label: "ID", mono: true },
               ]}
               rows={filtered.map((p) => ({
                 key: p.id,

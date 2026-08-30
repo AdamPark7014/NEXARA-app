@@ -14,6 +14,7 @@ import {
 } from "../_Console";
 import { getActiveCompanyId } from "@/lib/tenant";
 import { inputStyle, integraApi, selectStyle } from "../_lib";
+import styles from "../integra.module.css";
 
 type Site = {
   id: number;
@@ -28,16 +29,18 @@ type Site = {
   _count?: { cameras: number; doors: number; people: number; vehicles: number };
 };
 
-const MODULE_KEYS = [
-  "video",
-  "access",
-  "people",
-  "events",
-  "vehicles",
-  "anpr",
-  "visitors",
-  "alarms",
-] as const;
+const MODULE_LABELS: Record<string, string> = {
+  video: "Video",
+  access: "Accesos",
+  people: "Personas",
+  events: "Eventos",
+  vehicles: "Vehículos",
+  anpr: "ANPR",
+  visitors: "Visitas",
+  alarms: "Alarmas",
+};
+
+const MODULE_KEYS = Object.keys(MODULE_LABELS);
 
 export default function IntegraSettingsPage() {
   const [sites, setSites] = useState<Site[]>([]);
@@ -68,30 +71,75 @@ export default function IntegraSettingsPage() {
   }, [load]);
 
   const fmt = (iso?: string | null) =>
-    iso ? new Date(iso).toLocaleString("es-MX", { hour12: false }) : "nunca";
+    iso ? new Date(iso).toLocaleString("es-MX", { hour12: false }) : "Nunca";
+
+  const createSite = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const body: Record<string, unknown> = {
+        name,
+        host,
+        appKey,
+        appSecret,
+        provider,
+        label: label || undefined,
+        isDefault: sites.length === 0,
+      };
+      if (targetCompanyId) body.companyId = Number(targetCompanyId);
+      await integraApi("integra/sites", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      setName("");
+      setLabel("");
+      setHost("");
+      setAppKey("");
+      setAppSecret("");
+      setProvider("ARTEMIS");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <IgPage>
       <IgToolbar
         title="Sitios"
-        meta={`${sites.length} · Artemis/HCT`}
-        actions={<IgBtn onClick={() => void load()}>Refresh</IgBtn>}
+        meta={sites.length ? `${sites.length} conectados` : "Administración"}
+        actions={<IgBtn onClick={() => void load()}>Actualizar</IgBtn>}
       />
       <IgError>{error}</IgError>
+
+      {sites.length === 0 ? (
+        <div className={styles.igEmptyCta}>
+          <h2>Agrega tu primer sitio</h2>
+          <p>Un sitio es la conexión a HikCentral (en sitio) o Hik-Connect (nube).</p>
+          <ol className={styles.igEmptySteps}>
+            <li>1. Elige el tipo de conexión</li>
+            <li>2. Pega la dirección del servidor y las claves</li>
+            <li>3. Guarda y sincroniza el inventario</li>
+          </ol>
+        </div>
+      ) : null}
+
       <IgSplit
-        leftWidth="58%"
+        leftWidth="55%"
         left={
-          <IgPanel title="Registrados" count={sites.length} flush>
+          <IgPanel title="Tus sitios" count={sites.length} flush>
             <IgTable
               selectedKey={selected ? String(selected.id) : null}
               onRowClick={(key) => setSelected(sites.find((s) => String(s.id) === key) || null)}
               columns={[
                 { key: "n", label: "Nombre" },
-                { key: "p", label: "Prov" },
-                { key: "h", label: "Host", mono: true },
-                { key: "i", label: "Inv", mono: true },
-                { key: "s", label: "Sync", mono: true },
-                { key: "x", label: "", width: "110px" },
+                { key: "p", label: "Tipo" },
+                { key: "h", label: "Servidor" },
+                { key: "i", label: "Inventario", mono: true },
+                { key: "s", label: "Última sync" },
+                { key: "x", label: "", width: "140px" },
               ]}
               rows={sites.map((s) => ({
                 key: String(s.id),
@@ -99,16 +147,16 @@ export default function IntegraSettingsPage() {
                   n: (
                     <>
                       {s.label || s.name}{" "}
-                      {s.isDefault && <IgBadge tone="accent">def</IgBadge>}
+                      {s.isDefault && <IgBadge tone="accent">principal</IgBadge>}
                     </>
                   ),
                   p: (
                     <IgBadge tone={s.provider === "HCT" ? "warn" : "accent"}>
-                      {s.provider || "ARTEMIS"}
+                      {s.provider === "HCT" ? "Hik-Connect" : "HikCentral"}
                     </IgBadge>
                   ),
                   h: s.host,
-                  i: `${s._count?.cameras ?? 0}c/${s._count?.doors ?? 0}p`,
+                  i: `${s._count?.cameras ?? 0} cam · ${s._count?.doors ?? 0} pta`,
                   s: fmt(s.lastSyncAt),
                   x: (
                     <div style={{ display: "flex", gap: 4 }}>
@@ -132,95 +180,117 @@ export default function IntegraSettingsPage() {
                         Sync
                       </IgBtn>
                       <IgBtn
+                        variant="danger"
                         onClick={(e) => {
                           e.stopPropagation();
                           void (async () => {
-                            if (!confirm("¿Borrar sitio?")) return;
+                            if (!confirm("¿Eliminar este sitio?")) return;
                             await integraApi(`integra/sites/${s.id}`, { method: "DELETE" });
                             setSelected(null);
                             await load();
                           })();
                         }}
                       >
-                        Del
+                        Eliminar
                       </IgBtn>
                     </div>
                   ),
                 },
               }))}
-              empty="Sin sitios — usa INTEGRA_HIK_* o crea uno"
+              empty="Aún no hay sitios. Usa el formulario a la derecha."
             />
           </IgPanel>
         }
         right={
           <>
             <IgPanel title="Nuevo sitio">
-              <div style={{ display: "grid", gap: 6 }}>
-                <IgField label="CompanyId">
-                  <input value={targetCompanyId} onChange={(e) => setTargetCompanyId(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
-                </IgField>
-                <IgField label="Provider">
-                  <select value={provider} onChange={(e) => setProvider(e.target.value as "ARTEMIS" | "HCT")} style={{ ...selectStyle, maxWidth: "100%" }}>
-                    <option value="ARTEMIS">Artemis</option>
-                    <option value="HCT">HCT</option>
+              <div style={{ display: "grid", gap: 8 }}>
+                <IgField label="Tipo de conexión">
+                  <select
+                    value={provider}
+                    onChange={(e) => setProvider(e.target.value as "ARTEMIS" | "HCT")}
+                    style={{ ...selectStyle, maxWidth: "100%" }}
+                  >
+                    <option value="ARTEMIS">HikCentral (Artemis)</option>
+                    <option value="HCT">Hik-Connect (nube)</option>
                   </select>
                 </IgField>
                 <IgField label="Nombre">
-                  <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Ej. Planta norte"
+                    style={{ ...inputStyle, maxWidth: "100%" }}
+                  />
                 </IgField>
-                <IgField label="Label">
-                  <input value={label} onChange={(e) => setLabel(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
+                <IgField label="Etiqueta visible (opcional)">
+                  <input
+                    value={label}
+                    onChange={(e) => setLabel(e.target.value)}
+                    placeholder="Cómo lo verá el operador"
+                    style={{ ...inputStyle, maxWidth: "100%" }}
+                  />
                 </IgField>
-                <IgField label="Host">
-                  <input value={host} onChange={(e) => setHost(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
+                <IgField label="Dirección del servidor">
+                  <input
+                    value={host}
+                    onChange={(e) => setHost(e.target.value)}
+                    placeholder={
+                      provider === "HCT"
+                        ? "https://…areaDomain…"
+                        : "https://hikcentral.ejemplo.com"
+                    }
+                    style={{ ...inputStyle, maxWidth: "100%" }}
+                  />
                 </IgField>
-                <IgField label="App Key">
-                  <input value={appKey} onChange={(e) => setAppKey(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
+                <IgField label="Clave de acceso">
+                  <input
+                    value={appKey}
+                    onChange={(e) => setAppKey(e.target.value)}
+                    style={{ ...inputStyle, maxWidth: "100%" }}
+                  />
                 </IgField>
-                <IgField label="Secret">
-                  <input type="password" value={appSecret} onChange={(e) => setAppSecret(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
+                <IgField label="Secreto">
+                  <input
+                    type="password"
+                    value={appSecret}
+                    onChange={(e) => setAppSecret(e.target.value)}
+                    style={{ ...inputStyle, maxWidth: "100%" }}
+                  />
                 </IgField>
+
+                <details className={styles.igAdvanced}>
+                  <summary>Avanzado</summary>
+                  <div className={styles.igAdvancedBody}>
+                    <IgField label="Empresa (ID interno)">
+                      <input
+                        value={targetCompanyId}
+                        onChange={(e) => setTargetCompanyId(e.target.value)}
+                        style={{ ...inputStyle, maxWidth: "100%" }}
+                      />
+                    </IgField>
+                    <p className={styles.empty} style={{ padding: "4px 0", textAlign: "left" }}>
+                      Solo super-admin: asigna el sitio a otra empresa del portfolio.
+                    </p>
+                  </div>
+                </details>
+
                 <IgBtn
                   variant="primary"
                   disabled={busy || !name || !host || !appKey || !appSecret}
-                  onClick={async () => {
-                    setBusy(true);
-                    try {
-                      const body: Record<string, unknown> = {
-                        name,
-                        host,
-                        appKey,
-                        appSecret,
-                        provider,
-                        label: label || undefined,
-                        isDefault: sites.length === 0,
-                      };
-                      if (targetCompanyId) body.companyId = Number(targetCompanyId);
-                      await integraApi("integra/sites", {
-                        method: "POST",
-                        body: JSON.stringify(body),
-                      });
-                      setName("");
-                      setLabel("");
-                      setHost("");
-                      setAppKey("");
-                      setAppSecret("");
-                      setProvider("ARTEMIS");
-                      await load();
-                    } catch (e) {
-                      setError(e instanceof Error ? e.message : "Error");
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
+                  onClick={() => void createSite()}
                 >
-                  Crear
+                  {busy ? "Guardando…" : "Crear sitio"}
                 </IgBtn>
               </div>
             </IgPanel>
+
             {selected && (
-              <IgPanel title="Override módulos" count={selected.label || selected.name}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              <IgPanel title="Módulos del sitio" count={selected.label || selected.name}>
+                <p className={styles.empty} style={{ padding: "8px 10px", textAlign: "left" }}>
+                  Activa o desactiva lo que verá el operador en este sitio.
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, padding: "0 10px 10px" }}>
                   {MODULE_KEYS.map((k) => {
                     const on = selected.modulesOverride?.[k] !== false;
                     return (
@@ -232,10 +302,11 @@ export default function IntegraSettingsPage() {
                           current[k] = !(current[k] !== false);
                           setBusy(true);
                           try {
-                            await integraApi(`integra/sites/${selected.id}`, {
+                            const updated = await integraApi<Site>(`integra/sites/${selected.id}`, {
                               method: "PATCH",
                               body: JSON.stringify({ modulesOverride: current }),
                             });
+                            setSelected(updated);
                             await load();
                           } catch (e) {
                             setError(e instanceof Error ? e.message : "Error");
@@ -244,8 +315,8 @@ export default function IntegraSettingsPage() {
                           }
                         }}
                       >
-                        <span style={{ opacity: on ? 1 : 0.4, textDecoration: on ? "none" : "line-through" }}>
-                          {k}
+                        <span style={{ opacity: on ? 1 : 0.45, textDecoration: on ? "none" : "line-through" }}>
+                          {MODULE_LABELS[k] || k}
                         </span>
                       </IgBtn>
                     );

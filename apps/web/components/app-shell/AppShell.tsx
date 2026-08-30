@@ -539,20 +539,22 @@ export default function AppShell({ panel, children }: AppShellProps) {
       </aside>
       )}
 
-      <div
-        className={styles.overlay}
-        role="presentation"
-        onClick={() => setMobileOpen(false)}
-      />
+      {!isConsolePanel && (
+        <div
+          className={styles.overlay}
+          role="presentation"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
 
-      {/* ───────── TOPBAR ───────── */}
+      {/* Integra: sin topbar ERP — el HUD de IntegraChrome es el único chrome */}
+      {!isConsolePanel && (
       <header className={styles.topbar}>
         <button
           type="button"
           className={styles.mobileMenuBtn}
           onClick={() => setMobileOpen((v) => !v)}
           aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
-          hidden={isConsolePanel}
         >
           ☰
         </button>
@@ -563,19 +565,11 @@ export default function AppShell({ panel, children }: AppShellProps) {
           onClick={() => setCollapsed((v) => !v)}
           aria-label={collapsed ? "Expandir sidebar" : "Colapsar sidebar"}
           title={collapsed ? "Expandir" : "Colapsar"}
-          hidden={isConsolePanel}
         >
           {collapsed ? "›" : "‹"}
         </button>
 
-        {!isConsolePanel && (
-          <Breadcrumbs panel={panel} pathname={pathname || ""} panelHome={panelEntryPath} />
-        )}
-        {isConsolePanel && (
-          <div className={styles.consoleTitle} aria-hidden="true">
-            Integra
-          </div>
-        )}
+        <Breadcrumbs panel={panel} pathname={pathname || ""} panelHome={panelEntryPath} />
 
         <div className={styles.topbarActions}>
           <CompanySwitcher compact />
@@ -711,6 +705,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
           )}
         </div>
       </header>
+      )}
 
       {/* ───────── MAIN ───────── */}
       <main className={`${styles.main}${isFullBleed ? ` ${styles.mainFullBleed}` : ""}`}>

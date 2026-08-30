@@ -160,13 +160,13 @@ export default function IntegraEventsPage() {
         <IgField label="Persona">
           <input value={personName} onChange={(e) => setPersonName(e.target.value)} placeholder="contiene…" style={inputStyle} />
         </IgField>
-        <IgField label="personId">
-          <input value={personId} onChange={(e) => setPersonId(e.target.value)} style={inputStyle} />
+        <IgField label="ID persona">
+          <input value={personId} onChange={(e) => setPersonId(e.target.value)} placeholder="opcional" style={inputStyle} title="personId Artemis" />
         </IgField>
-        <IgField label="eventType">
-          <input value={eventType} onChange={(e) => setEventType(e.target.value)} placeholder="196893" style={{ ...inputStyle, maxWidth: 110 }} />
+        <IgField label="Tipo evento">
+          <input value={eventType} onChange={(e) => setEventType(e.target.value)} placeholder="código" style={{ ...inputStyle, maxWidth: 110 }} title="eventType Artemis" />
         </IgField>
-        <IgField label="pageSize">
+        <IgField label="Por página">
           <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 80 }}>
             {[50, 100, 200].map((n) => (
               <option key={n} value={n}>{n}</option>
@@ -255,7 +255,7 @@ export default function IntegraEventsPage() {
                 <div>Tipo: {selected.eventType} {selected.eventTypeCode != null ? `(${selected.eventTypeCode})` : ""}</div>
                 <div>Card: {selected.cardNo || "—"}</div>
                 <div>Reader: {selected.readerName || "—"}</div>
-                <div className={styles.doorCellMeta}>personId {selected.personId || "—"}</div>
+                <div className={styles.doorCellMeta}>ID persona {selected.personId || "—"}</div>
                 {selected.picUri && (
                   <IgBtn variant="primary" onClick={() => void loadPic(selected.picUri!)}>
                     Cargar foto

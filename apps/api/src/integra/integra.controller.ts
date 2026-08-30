@@ -163,6 +163,15 @@ export class IntegraController {
     return this.integra.listRegions(companyId, siteId ? parseInt(siteId, 10) : null);
   }
 
+  @Get('tree')
+  @ApiOperation({ summary: 'Árbol workbench: regiones + puertas + cámaras' })
+  tree(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.getTree(companyId, siteId ? parseInt(siteId, 10) : null);
+  }
+
   // ── Sites ──────────────────────────────────────────────────────────
   @Get('sites')
   listSites(@CurrentCompanyId() companyId: number | null) {
