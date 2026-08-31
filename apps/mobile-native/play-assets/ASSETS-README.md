@@ -27,7 +27,23 @@ Textos y checklist operativo: [`docs/PLAY-STORE-LISTING.md`](../../../docs/PLAY-
 | Contenido | Mismo branding que el icono de launcher; sin texto promocional ni badges de “nuevo” |
 | Archivo en repo | `icon-512.png` |
 
-> El icono que instala el usuario en el dispositivo lo genera Android a partir del `mipmap` del APK/AAB; el de 512 px es **solo para la tienda**.
+> **Los dos iconos tienen que ser la misma imagen.** El de 512 px va a la tienda y el del
+> `mipmap` es el que se instala en el teléfono, pero Google los compara: si no coinciden,
+> rechaza la app por *política de afirmaciones engañosas* (“la ficha no coincide con la
+> aplicación”). Nos pasó el 31-08-2026.
+>
+> Por eso los genera el mismo script, desde `drawable/logo_nexara.png`:
+>
+> ```
+> npm run mobile:android:icons
+> ```
+>
+> Eso reescribe `icon-512.png`, los `mipmap-*/ic_launcher*.png` y los
+> `drawable-*/ic_launcher_foreground.png`. **Si el 512 cambia, hay que volver a subirlo a
+> Play Console**, o vuelven a divergir.
+>
+> Ojo con el `logo_nexara.png` de origen: el wordmark “NEXARA” es blanco, así que sobre
+> fondo claro hay que recolorearlo (el script ya lo hace).
 
 ### Gráfico destacado (feature graphic)
 
@@ -124,4 +140,8 @@ icon-512.png: 512x512
 |---|---|
 | Icono 512, feature graphic, screenshots | **No** — se suben manualmente en Play Console |
 | Icono de launcher (`mipmap-*`) | **Sí** — empaquetado en el AAB |
+
+El icono es el único asset que vive en los dos lados a la vez: se genera una vez con
+`npm run mobile:android:icons`, entra al AAB solo, y el 512 se sube a mano. Revisa que
+sigan siendo iguales antes de cada envío a revisión.
 | Gráfico de notificación, splash | **Sí** — recursos Android del proyecto |

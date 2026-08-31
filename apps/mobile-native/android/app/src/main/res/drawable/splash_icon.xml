@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Icono de la splash (Theme.Nexara.Splash). Reusa el foreground del launcher para que
+  la primera pantalla muestre exactamente la misma marca que el icono instalado.
+-->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
-        <bitmap
-            android:src="@drawable/logo_nexara"
-            android:gravity="center"
-            android:tileMode="disabled" />
-    </item>
+    <item android:drawable="@drawable/ic_launcher_foreground" />
 </layer-list>
