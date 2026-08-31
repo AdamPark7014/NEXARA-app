@@ -136,16 +136,19 @@ Esta es la restricción que manda sobre el despliegue.
 el droplet no tiene ruta a `192.168.9.0/24`. Con esa topología el HLS no puede
 funcionar: el contenedor no alcanza el RTSP.
 
-Las dos salidas, en orden de preferencia:
+El diseño del enlace —WireGuard desde el sitio + go2rtc on-site, y la trampa de
+los rangos de LAN repetidos— está en **[INTEGRA-LAN-ENLACE](INTEGRA-LAN-ENLACE.md)**.
 
-1. **go2rtc on-site.** Un equipo en la LAN del cliente (mini PC, el propio
-   servidor del sitio) corriendo `alexxit/go2rtc`, publicado hacia el droplet
-   por VPN o túnel. `GO2RTC_URL` apunta a él.
-2. **VPN sitio ↔ droplet.** WireGuard entre el droplet y la LAN, y go2rtc se
-   queda donde está. Más simple de operar, pero mete todo el video en el túnel.
+Mientras no exista, la API responde con el RTSP y la nota «GO2RTC_URL no
+configurado». Desde dentro de la LAN sí hay video:
 
-Mientras no exista ninguna de las dos, la API responde con el RTSP y la nota
-«GO2RTC_URL no configurado»: el video se ve con VLC desde la LAN, no en el panel.
+```bash
+npm run integra:isapi:publish -- --company 1 --site 1 --go2rtc http://127.0.0.1:1984
+```
+
+Publica las 13 cámaras llamando al mismo `liveStream` que atiende el endpoint, así
+que elige la misma fuente y **no escribe credenciales en disco**. go2rtc sirve el
+muro en `:1984` para cualquier navegador de la red.
 
 ## Apertura de puertas
 

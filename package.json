@@ -53,7 +53,8 @@
     "seed:play-reviewer": "npm run seed:play-reviewer --workspace=apps/api",
     "integra:isapi:scan": "npm run integra:isapi:scan --workspace=apps/api --",
     "integra:isapi:seed": "npm run integra:isapi:seed --workspace=apps/api --",
-    "integra:isapi:sync": "npm run integra:isapi:sync --workspace=apps/api --"
+    "integra:isapi:sync": "npm run integra:isapi:sync --workspace=apps/api --",
+    "integra:isapi:publish": "npm run integra:isapi:publish --workspace=apps/api --"
   },
   "prisma": {
     "seed": "node apps/api/prisma/seed.js"
