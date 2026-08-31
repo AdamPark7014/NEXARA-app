@@ -11,6 +11,7 @@ import { buildStudioPageMetadata } from "@/lib/page-seo";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { INDUSTRIA_SLUGS } from "@/lib/page-content-api";
+import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 
 const resolveIndustriaSlug = (label: string) =>
   INDUSTRIA_SLUGS[label] || label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -140,6 +141,25 @@ export default async function ProyectosPage() {
 
   return (
     <main className={`${shared.page} home-main-flush`}>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          name: "Proyectos | NEXARA",
+          url: `${siteBaseUrl()}/proyectos`,
+          description:
+            "Casos y proyectos de CCTV, redes y soporte ejecutados por Nexara.",
+          mainEntity: {
+            "@type": "ItemList",
+            itemListElement: casos.map((c, i) => ({
+              "@type": "ListItem",
+              position: i + 1,
+              name: `${c.sector}: ${c.title}`,
+              description: c.desc,
+            })),
+          },
+        }}
+      />
       <PublicPageHero
         eyebrow="Proyectos"
         title={

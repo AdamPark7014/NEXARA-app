@@ -18,6 +18,7 @@ import { apiRequest } from "@/lib/api-base";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES, type RoleKey } from "@/lib/rbac";
 import { biRecommendationHref, buildBiQuickLinks } from "@/lib/bi-drill-links";
+import { resolveCrossPanelHref } from "@/lib/cross-panel-handoff";
 
 const ERP_BI_ROLES = new Set<RoleKey>([
   ROLES.CEO, ROLES.DIR_ADMIN, ROLES.DIR_OPERACIONES,
@@ -52,6 +53,7 @@ export default function BiPage() {
   const searchParams = useSearchParams();
   const focusSection = searchParams.get("section") ?? "";
   const token = user?.token ?? "";
+  const userJson = useMemo(() => (user ? JSON.stringify(user) : null), [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -326,7 +328,11 @@ export default function BiPage() {
                 variant="accent"
                 icon="🏆"
                 hint={topClient.clientName}
-                onClick={() => router.push(`/crm/clients/${topClient.clientId}`)}
+                onClick={() => {
+                  const href = resolveCrossPanelHref(`/crm/clients/${topClient.clientId}`, userJson);
+                  if (href.startsWith("http")) window.location.assign(href);
+                  else router.push(href);
+                }}
               />
             )}
           </div>

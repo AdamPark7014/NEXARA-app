@@ -13,9 +13,19 @@ import {
   normalizeNewsImageUrl,
   toPlainExcerpt,
 } from "@/lib/public-news";
+import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 
 export async function generateMetadata(): Promise<Metadata> {
-  return buildStudioPageMetadata("blog");
+  const base = await buildStudioPageMetadata("blog");
+  return {
+    ...base,
+    alternates: {
+      ...(typeof base.alternates === "object" ? base.alternates : {}),
+      types: {
+        "application/rss+xml": `${siteBaseUrl()}/feed.xml`,
+      },
+    },
+  };
 }
 
 export const revalidate = 300;
@@ -26,6 +36,21 @@ export default async function BlogPage() {
 
   return (
     <main className={`${shared.page} home-main-flush`}>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "Blog",
+          name: "Blog NEXARA",
+          url: `${siteBaseUrl()}/blog`,
+          description: "Noticias, guías y notas de campo sobre CCTV, redes y soporte TI.",
+          blogPost: posts.slice(0, 12).map((p) => ({
+            "@type": "BlogPosting",
+            headline: p.title,
+            url: `${siteBaseUrl()}/blog/${p.slug}`,
+            datePublished: p.publishedAt || p.createdAt,
+          })),
+        }}
+      />
       <PublicPageHero
         eyebrow="Blog"
         title={

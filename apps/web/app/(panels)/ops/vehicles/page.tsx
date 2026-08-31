@@ -64,6 +64,8 @@ export default function VehiclesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
+  const tabParam = searchParams.get("tab");
+  const focusRequests = tabParam === "requests";
   const cfg = useMemo(() => getVehiclesSectionConfig(user), [user]);
   useOpsCanonicalRoute(user, "vehicles");
   const token = user?.token ?? "";
@@ -217,6 +219,13 @@ export default function VehiclesPage() {
   const [searchQ, setSearchQ] = useState("");
   const [filterEstado, setFilterEstado] = useState("");
 
+  const visibleRequests = useMemo(() => {
+    if (!highlightId || !focusRequests) return requests;
+    const id = Number(highlightId);
+    if (Number.isNaN(id)) return requests;
+    return [...requests].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+  }, [requests, highlightId, focusRequests]);
+
   const visibleVehicles = useMemo(() => {
     let result = items;
     if (searchQ.trim()) {
@@ -224,12 +233,12 @@ export default function VehiclesPage() {
       result = result.filter((v) => (v.nombre ?? "").toLowerCase().includes(q) || (v.placas ?? "").toLowerCase().includes(q));
     }
     if (filterEstado) result = result.filter((v) => v.estatus === filterEstado);
-    if (highlightId) {
+    if (highlightId && !focusRequests) {
       const id = Number(highlightId);
       if (!Number.isNaN(id)) result = [...result].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
     }
     return result;
-  }, [items, highlightId, searchQ, filterEstado]);
+  }, [items, highlightId, searchQ, filterEstado, focusRequests]);
 
   const columns: Column<Vehicle>[] = [
     { key: "nombre", label: "Vehículo", render: v => (
@@ -263,18 +272,27 @@ export default function VehiclesPage() {
         actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Agregar vehículo</Button> : undefined}
       />
 
-      {cfg.canApprove && requests.filter((r) => r.estatusAprobacion === "Pendiente").length > 0 && (
-        <Section title="Solicitudes pendientes de autorización">
+      {cfg.canApprove && visibleRequests.filter((r) => r.estatusAprobacion === "Pendiente" || focusRequests).length > 0 && (
+        <Section title={focusRequests ? "Solicitudes de vehículo" : "Solicitudes pendientes de autorización"}>
+          {focusRequests && highlightId && (
+            <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 10 }}>
+              Enlace desde notificación · solicitud <strong>#{highlightId}</strong>.
+            </p>
+          )}
           <div style={{ display: "grid", gap: 8 }}>
-            {requests.filter((r) => r.estatusAprobacion === "Pendiente").map((r) => (
-              <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: 12, border: "1px solid var(--border)", borderRadius: 10 }}>
+            {(focusRequests ? visibleRequests : visibleRequests.filter((r) => r.estatusAprobacion === "Pendiente")).map((r) => (
+              <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: 12, border: "1px solid var(--border)", borderRadius: 10, outline: highlightId && Number(highlightId) === r.id ? "2px solid var(--primary)" : undefined }}>
                 <div>
                   <div style={{ fontWeight: 600 }}>{r.solicitante?.nombre ?? "—"} · {r.nombreVehiculo ?? "Vehículo"}</div>
-                  <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>#{r.id}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>#{r.id} · {r.estatusAprobacion ?? "—"}</div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
-                  <Button size="sm" variant="primary" onClick={() => void approveRequest(r.id, "approve")}>Autorizar</Button>
-                  <Button size="sm" variant="danger" onClick={() => void approveRequest(r.id, "reject")}>Rechazar</Button>
+                  {r.estatusAprobacion === "Pendiente" && (
+                    <>
+                      <Button size="sm" variant="primary" onClick={() => void approveRequest(r.id, "approve")}>Autorizar</Button>
+                      <Button size="sm" variant="danger" onClick={() => void approveRequest(r.id, "reject")}>Rechazar</Button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}

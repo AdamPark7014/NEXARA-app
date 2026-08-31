@@ -15,5 +15,20 @@ export default function ServiceWorkerHeadsUpPrep() {
     void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => undefined);
   }, [user?.token]);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || data.type !== "NEXARA_NOTIFICATION_NAV" || typeof data.url !== "string") return;
+      try {
+        window.location.assign(data.url);
+      } catch {
+        /* ignore */
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, []);
+
   return null;
 }

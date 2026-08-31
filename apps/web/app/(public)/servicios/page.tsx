@@ -9,6 +9,7 @@ import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
 import { buildStudioPageMetadata } from "@/lib/page-seo";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
+import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("servicios");
@@ -87,6 +88,29 @@ export default async function ServiciosPage() {
 
   return (
     <main className={`${shared.page} home-main-flush`}>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          name: "Servicios NEXARA",
+          url: `${siteBaseUrl()}/servicios`,
+          description:
+            "Videovigilancia, redes Wi‑Fi, cómputo, infraestructura y soporte TI bajo el mismo contrato.",
+          mainEntity: {
+            "@type": "ItemList",
+            itemListElement: servicios.map((s, i) => ({
+              "@type": "ListItem",
+              position: i + 1,
+              item: {
+                "@type": "Service",
+                name: s.title,
+                description: s.text,
+                url: `${siteBaseUrl()}/servicios#${s.id}`,
+              },
+            })),
+          },
+        }}
+      />
       <PublicPageHero
         eyebrow="Servicios"
         title={

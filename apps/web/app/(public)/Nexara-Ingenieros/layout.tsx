@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Nexara Ingenieros",
   alternates: { canonical: "/" },
-  robots: { index: true, follow: true },
+  robots: { index: false, follow: true },
 };
 
 export default function NexaraIngenierosLayout({ children }: { children: React.ReactNode }) {

@@ -21,9 +21,27 @@ export const appUrls = {
   opsMyVehicles: (id?: number) => (id ? `/ops/my-vehicles?highlight=${id}` : `/ops/my-vehicles`),
   opsProject: (id: number) => `/ops/projects/${id}`,
   opsMaintenance: (woId?: number) => (woId ? `/ops/maintenance?woId=${woId}` : `/ops/maintenance`),
-  opsTools: (id?: number) => (id ? `/ops/tools?highlight=${id}` : `/ops/tools`),
-  opsVehicles: (id?: number) => (id ? `/ops/vehicles?highlight=${id}` : `/ops/vehicles`),
+  opsTools: (id?: number, tab?: "requests" | "renewals" | "inventory" | "kits") => {
+    const params = new URLSearchParams();
+    if (tab) params.set("tab", tab);
+    if (id != null) params.set("highlight", String(id));
+    const qs = params.toString();
+    return qs ? `/ops/tools?${qs}` : `/ops/tools`;
+  },
+  opsVehicles: (id?: number, tab?: "requests" | "inventory") => {
+    const params = new URLSearchParams();
+    if (tab) params.set("tab", tab);
+    if (id != null) params.set("highlight", String(id));
+    const qs = params.toString();
+    return qs ? `/ops/vehicles?${qs}` : `/ops/vehicles`;
+  },
   opsActivities: () => `/ops/activities`,
+  opsMaintenanceContracts: (highlightId?: number) =>
+    highlightId
+      ? `/ops/maintenance/contracts?highlight=${highlightId}`
+      : `/ops/maintenance/contracts`,
+  erpFines: (fineId?: number) =>
+    fineId ? `/erp/hr/fines?highlight=${fineId}` : `/erp/hr/fines`,
 
   erpAttendance: (tab?: string, highlightId?: number) => {
     if (tab === "lunch") return `/erp/hr/lunch-breaks`;

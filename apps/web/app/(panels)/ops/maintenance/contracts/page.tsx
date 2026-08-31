@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -56,6 +57,8 @@ interface ServiceClient { id: number; name: string; }
 
 export default function MaintenanceContractsPage() {
   const { user } = useUser();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
   const cfg = useMemo(() => getOpsTeamSectionConfig(user, "maintenance-contracts"), [user]);
   const token = user?.token ?? "";
 
@@ -221,8 +224,14 @@ export default function MaintenanceContractsPage() {
       );
     }
     if (filterStatus) rows = rows.filter((c) => c.status === filterStatus);
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) {
+        rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+      }
+    }
     return rows;
-  }, [items, searchQ, filterStatus]);
+  }, [items, searchQ, filterStatus, highlightId]);
 
   const activos = items.filter((c) => c.status === "ACTIVE").length;
   const mrr = items.filter((c) => c.status === "ACTIVE").reduce((s, c) => s + Number(c.monthlyFee), 0);
@@ -406,6 +415,11 @@ export default function MaintenanceContractsPage() {
       })()}
 
       <Section title={loading ? "Cargando…" : `${visibleContracts.length} contratos`}>
+        {highlightId && (
+          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+            Contrato resaltado <strong>#{highlightId}</strong> desde enlace.
+          </p>
+        )}
         <FilterToolbar
           search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por cliente, título o folio…" }}
           selects={[{

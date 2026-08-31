@@ -61,7 +61,7 @@ import type { User } from "@/components/UserContext";
 import { buildCrossPanelUrl, detectCurrentPanelId, isCrossPanelHref, resolveCrossPanelHref } from "@/lib/cross-panel-handoff";
 import { buildFreshLoginUrl } from "@/lib/tab-session";
 import { buildApiUrl } from "@/lib/api-base";
-import { normalizeLegacyPath } from "@/lib/legacy-path-remap";
+import { normalizeLegacyRelatedUrl } from "@/lib/legacy-path-remap";
 import styles from "./AppShell.module.scss";
 import CommandPalette from "./CommandPalette";
 import ShellConnectionStatus from "./ShellConnectionStatus";
@@ -184,10 +184,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
       }
     }
     if (!n.relatedUrl) return;
-    const path = n.relatedUrl;
-    const normalized =
-      normalizeLegacyPath(path.split("?")[0]) +
-      (path.includes("?") ? "?" + path.split("?").slice(1).join("?") : "");
+    const normalized = normalizeLegacyRelatedUrl(n.relatedUrl);
     const current = detectCurrentPanelId(pathname) ?? panel;
     const userJson = JSON.stringify(user);
     setNotifOpen(false);

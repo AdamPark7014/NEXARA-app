@@ -60,7 +60,7 @@ export const PAGE_SEO_META: Record<
   cobertura: { label: "Cobertura", path: "/cobertura", section: "seo_cobertura" },
 };
 
-const DEFAULT_OG = "/logo-nexara-lockup.png";
+const DEFAULT_OG = "/opengraph-image";
 
 export const DEFAULT_PAGE_SEO: Record<PageSeoKey, PageSeoContent> = {
   home: {

@@ -255,3 +255,23 @@ export function normalizeLegacyPath(pathname: string): string {
   clean = dedupePanelPath(clean);
   return remapLegacySlugs(clean);
 }
+
+/**
+ * Normaliza relatedUrl completo (path + query) sin generar `?` duplicados.
+ * Útil cuando el remap ya incluye `?tab=` y el emisor añade `activityId`.
+ */
+export function normalizeLegacyRelatedUrl(fullUrl: string): string {
+  const qIdx = fullUrl.indexOf('?');
+  const pathname = qIdx >= 0 ? fullUrl.slice(0, qIdx) : fullUrl;
+  const originalSearch = qIdx >= 0 ? fullUrl.slice(qIdx + 1) : '';
+  const remapped = normalizeLegacyPath(pathname);
+  const rq = remapped.indexOf('?');
+  const basePath = rq >= 0 ? remapped.slice(0, rq) : remapped;
+  const remapSearch = rq >= 0 ? remapped.slice(rq + 1) : '';
+  const params = new URLSearchParams(remapSearch);
+  new URLSearchParams(originalSearch).forEach((value, key) => {
+    params.set(key, value);
+  });
+  const qs = params.toString();
+  return qs ? `${basePath}?${qs}` : basePath;
+}

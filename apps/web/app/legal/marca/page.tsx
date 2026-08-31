@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Uso de marca",
+  description:
+    "Guía de uso de marca NEXARA: slogan, tipografías, colores y reglas de aplicación del logo.",
   alternates: { canonical: "/legal/marca" },
   robots: { index: true, follow: true },
 };

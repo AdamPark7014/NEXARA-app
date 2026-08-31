@@ -22,7 +22,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${baseUrl}/nosotros`, lastModified: now, changeFrequency: "weekly", priority: 0.86 },
     { url: `${baseUrl}/blog`, lastModified: now, changeFrequency: "daily", priority: 0.85 },
     { url: `${baseUrl}/qa`, lastModified: now, changeFrequency: "monthly", priority: 0.75 },
-    { url: `${baseUrl}/Nexara-Ingenieros`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${baseUrl}/feed.xml`, lastModified: now, changeFrequency: "daily", priority: 0.4 },
     { url: `${baseUrl}/legal/privacidad`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
     { url: `${baseUrl}/legal/eliminar-cuenta`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
     { url: `${baseUrl}/legal/terminos`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },

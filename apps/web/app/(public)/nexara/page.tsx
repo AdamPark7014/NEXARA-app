@@ -22,6 +22,7 @@ import { GEO_CITIES } from "@/lib/seo/geo-cities";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { fetchPublicHeroSlidesCached } from "@/lib/hero-slides-api";
 import { fetchPublicHeroVideoCached, resolveHeroVideoUrl } from "@/lib/hero-video-api";
+import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildStudioPageMetadata("home");
@@ -161,6 +162,26 @@ export default async function NexaraPage() {
 
   return (
     <main className={`${shared.page} home-main-flush`} aria-label="Nexara — Inicio">
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "WebPage",
+          name: "NEXARA | CCTV, redes y soporte TI en México",
+          url: siteBaseUrl(),
+          description:
+            "Integramos CCTV, redes Wi‑Fi, cómputo y soporte TI para empresas en Puebla, CDMX y cobertura nacional.",
+          isPartOf: { "@type": "WebSite", name: "NEXARA", url: siteBaseUrl() },
+          mainEntity: {
+            "@type": "ItemList",
+            itemListElement: CAPABILITIES.map((c, i) => ({
+              "@type": "ListItem",
+              position: i + 1,
+              name: c.title,
+              url: `${siteBaseUrl()}/servicios#${c.id}`,
+            })),
+          },
+        }}
+      />
       {heroBootstrap.posterUrl ? (
         <link rel="preload" as="image" href={heroBootstrap.posterUrl} fetchPriority="high" />
       ) : null}

@@ -54,7 +54,7 @@ const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").re
 const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "";
 const googleSiteVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim() || "";
 const bingSiteVerification = process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION?.trim() || "";
-const defaultOgImage = NEXARA_LOGO_LOCKUP;
+const defaultOgImage = "/opengraph-image";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -90,6 +90,11 @@ export const metadata: Metadata = {
   creator: "NEXARA",
   publisher: "NEXARA",
   applicationName: "NEXARA",
+  alternates: {
+    types: {
+      "application/rss+xml": `${siteUrl}/feed.xml`,
+    },
+  },
   icons: {
     icon: [
       // Prefer PNG (transparent) over ICO so tabs don't show a black square

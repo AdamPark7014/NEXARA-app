@@ -150,7 +150,14 @@ export default function OpsProjectSummaryPage() {
           <>
             <DetailFieldGrid>
               <DetailField label="Cliente" value={project.client?.id ? (
-                <CrossPanelLink href={`/crm/clients/${project.client.id}`} style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+                <CrossPanelLink
+                  href={
+                    project.client.salesClients?.[0]?.id
+                      ? `/crm/clients/${project.client.salesClients[0].id}`
+                      : `/ops/service-clients/${project.client.id}`
+                  }
+                  style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}
+                >
                   {project.client.name} →
                 </CrossPanelLink>
               ) : (project.client?.name ?? "—")} />

@@ -69,13 +69,16 @@ export default async function BlogPostPage({ params }: { params: Params }) {
   );
   const cover = normalizeNewsImageUrl(post.coverImageUrl);
   const published = post.publishedAt || post.createdAt;
+  const coverAbs = cover.startsWith("http")
+    ? cover
+    : `${siteUrl}${cover.startsWith("/") ? cover : `/${cover}`}`;
 
   const articleJson = {
     "@context": "https://schema.org",
     "@type": "Article",
     headline: post.title,
     description: toPlainExcerpt(post.summary, post.content, 160),
-    image: cover.startsWith("http") ? cover : `${siteUrl}${cover}`,
+    image: coverAbs,
     datePublished: published,
     dateModified: post.updatedAt || published,
     author: { "@type": "Organization", name: "NEXARA", url: siteUrl },
@@ -87,11 +90,30 @@ export default async function BlogPostPage({ params }: { params: Params }) {
     mainEntityOfPage: `${siteUrl}/blog/${post.slug}`,
   };
 
+  const breadcrumbJson = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Inicio", item: siteUrl },
+      { "@type": "ListItem", position: 2, name: "Blog", item: `${siteUrl}/blog` },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: post.title,
+        item: `${siteUrl}/blog/${post.slug}`,
+      },
+    ],
+  };
+
   return (
     <main className={`${shared.page} home-main-flush`} aria-label={post.title}>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJson) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJson).replace(/</g, "\\u003c") }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJson).replace(/</g, "\\u003c") }}
       />
 
       <article className={shared.section} data-reveal="up">

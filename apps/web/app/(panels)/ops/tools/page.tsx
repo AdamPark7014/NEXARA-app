@@ -29,18 +29,25 @@ export default function ToolsPage() {
   const isManager = cfg.viewMode !== "execute";
   const highlightId = searchParams.get("highlight");
 
-  const [managerTab, setManagerTab] = useState<ManagerTab>(() =>
-    highlightId ? "requests" : parseManagerTab(searchParams.get("tab")),
-  );
+  const [managerTab, setManagerTab] = useState<ManagerTab>(() => {
+    const tab = parseManagerTab(searchParams.get("tab"));
+    if (searchParams.get("tab")) return tab;
+    return highlightId ? "requests" : "inventory";
+  });
   const [engineerTab, setEngineerTab] = useState<EngineerTab>(() =>
     highlightId ? "myrequests" : "mykit",
   );
 
   useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "renewals" || tab === "requests" || tab === "kits" || tab === "inventory") {
+      setManagerTab(tab);
+      return;
+    }
     if (!highlightId) return;
     if (isManager) setManagerTab("requests");
     else setEngineerTab("myrequests");
-  }, [highlightId, isManager]);
+  }, [highlightId, isManager, searchParams]);
 
   const tabBtn = (active: boolean): React.CSSProperties => ({
     padding: "7px 16px",
