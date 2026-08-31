@@ -6,6 +6,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
 import { Tag, Money } from "@/components/ui/DataTable";
 import { DetailSection } from "@/components/detail/DetailFrame";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import {
   computeClientHealth,
   type ClientSnapshot,
@@ -181,10 +182,13 @@ export default function Customer360Dashboard({ client, snapshot, timeline }: Pro
           alignItems: "center",
         }}
       >
-        <Link href={`/crm/quotes/builder?clientName=${encodeURIComponent(client.name)}`} style={{ textDecoration: "none" }}>
+        <Link
+          href={`/crm/quotes/builder?clientId=${client.id}&clientName=${encodeURIComponent(client.name)}`}
+          style={{ textDecoration: "none" }}
+        >
           <Button size="sm" variant="primary">Cotizar</Button>
         </Link>
-        <Link href={`/crm/opportunities/new?clientId=${client.id}`} style={{ textDecoration: "none" }}>
+        <Link href={`/crm/opportunities?new=1&clientId=${client.id}`} style={{ textDecoration: "none" }}>
           <Button size="sm" variant="secondary">Nueva oportunidad</Button>
         </Link>
         <Link href={`${base}/tickets`} style={{ textDecoration: "none" }}>
@@ -194,9 +198,9 @@ export default function Customer360Dashboard({ client, snapshot, timeline }: Pro
           <Button size="sm" variant="ghost">Facturas</Button>
         </Link>
         {client.serviceClientId && (
-          <Link href={`/ops/service-clients/${client.serviceClientId}`} style={{ textDecoration: "none" }}>
+          <CrossPanelLink href={`/ops/service-clients/${client.serviceClientId}`} style={{ textDecoration: "none" }}>
             <Button size="sm" variant="ghost">OPS</Button>
-          </Link>
+          </CrossPanelLink>
         )}
       </div>
 
@@ -329,9 +333,9 @@ export default function Customer360Dashboard({ client, snapshot, timeline }: Pro
                 return (
                   <li key={id}>
                     {id ? (
-                      <Link href={`/ops/projects/${id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                      <CrossPanelLink href={`/ops/projects/${id}`} style={{ textDecoration: "none", color: "inherit" }}>
                         {inner}
-                      </Link>
+                      </CrossPanelLink>
                     ) : inner}
                   </li>
                 );
@@ -360,7 +364,7 @@ export default function Customer360Dashboard({ client, snapshot, timeline }: Pro
                 const id = rowNum(row, "id");
                 return (
                   <li key={id}>
-                    <Link
+                    <CrossPanelLink
                       href={`/ops/activities/${id}`}
                       style={{ textDecoration: "none", color: "inherit" }}
                     >
@@ -379,7 +383,7 @@ export default function Customer360Dashboard({ client, snapshot, timeline }: Pro
                           {rowStr(row, "estatus")} · {rowStr(row, "branchName")}
                         </div>
                       </div>
-                    </Link>
+                    </CrossPanelLink>
                   </li>
                 );
               })}
@@ -522,7 +526,7 @@ export default function Customer360Dashboard({ client, snapshot, timeline }: Pro
                 return (
                   <li key={ev.id}>
                     {ev.href ? (
-                      <Link href={ev.href} style={{ textDecoration: "none", color: "inherit" }}>{inner}</Link>
+                      <CrossPanelLink href={ev.href} style={{ textDecoration: "none", color: "inherit" }}>{inner}</CrossPanelLink>
                     ) : inner}
                   </li>
                 );

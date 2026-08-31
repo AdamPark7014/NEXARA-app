@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -44,6 +45,8 @@ const emptyForm = { title: "", description: "", priority: "MEDIA", status: "PEND
 
 export default function MaintenancePage() {
   const { user } = useUser();
+  const searchParams = useSearchParams();
+  const woIdParam = searchParams.get("woId");
   const cfg = useMemo(() => getOpsTeamSectionConfig(user, "maintenance"), [user]);
   const showContracts = useMemo(() => canAccessMaintenanceContracts(user), [user]);
   const token = user?.token ?? "";
@@ -121,8 +124,12 @@ export default function MaintenancePage() {
     }
     if (filterStatus) rows = rows.filter((w) => w.status === filterStatus);
     if (filterPriority) rows = rows.filter((w) => w.priority === filterPriority);
+    if (woIdParam) {
+      const id = Number(woIdParam);
+      if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
     return rows;
-  }, [items, searchQ, filterStatus, filterPriority]);
+  }, [items, searchQ, filterStatus, filterPriority, woIdParam]);
 
   const statusVariant = (s?: string): "accent" | "warning" | "neutral" | "danger" =>
     s === "COMPLETADA" ? "neutral" : s === "EN_PROGRESO" ? "accent" : s === "CANCELADA" ? "danger" : "warning";
@@ -191,6 +198,12 @@ export default function MaintenancePage() {
           </div>
         }
       />
+
+      {woIdParam && (
+        <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface-2)", fontSize: 13 }}>
+          Mostrando OT de mantenimiento <strong>#{woIdParam}</strong> desde enlace directo.
+        </div>
+      )}
 
       {actionErr && (
         <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>

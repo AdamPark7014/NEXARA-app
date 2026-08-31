@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -40,6 +41,8 @@ export default function MyViaticsPage() {
   const cfg = useMemo(() => getViaticsSectionConfig(user), [user]);
   useOpsCanonicalRoute(user, "viatics");
   const token = user?.token ?? "";
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
 
   const [items, setItems] = useState<ViaticoRow[]>([]);
   const [searchQ, setSearchQ] = useState("");
@@ -101,8 +104,12 @@ export default function MyViaticsPage() {
       rows = rows.filter((v) => (v.concepto ?? "").toLowerCase().includes(q));
     }
     if (filterEstatus) rows = rows.filter((v) => v.estatus === filterEstatus);
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
     return rows;
-  }, [items, searchQ, filterEstatus]);
+  }, [items, searchQ, filterEstatus, highlightId]);
 
   const pendiente = items.filter((v) => v.estatus !== "Rechazado" && v.estatus !== "Pagado").reduce((s, v) => s + (v.montoSolicitado ?? 0), 0);
   const pagado = items.filter((v) => v.estatus === "Pagado").reduce((s, v) => s + (v.montoSolicitado ?? 0), 0);
@@ -202,6 +209,12 @@ export default function MyViaticsPage() {
           </>
         }
       />
+
+      {highlightId && (
+        <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface-2)", fontSize: 13 }}>
+          Mostrando viático <strong>#{highlightId}</strong> desde enlace directo.
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
         <KpiCard label="Total solicitudes" value={items.length} icon="📋" />

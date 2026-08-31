@@ -19,6 +19,7 @@ import { useUser } from "./UserContext";
 
 interface ToolRenewalsTableProps {
   refreshTrigger?: number;
+  highlightId?: string | null;
 }
 
 function fmtDate(value: string) {
@@ -37,7 +38,7 @@ function renewalStatusVariant(status: string): "warning" | "positive" | "danger"
   return "default";
 }
 
-const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 0 }) => {
+const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 0, highlightId = null }) => {
   const { user } = useUser();
   const token = user?.token ?? "";
 
@@ -96,8 +97,12 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
           (r.renewalReason ?? "").toLowerCase().includes(q),
       );
     }
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
     return rows;
-  }, [items, filterStatus, searchQ]);
+  }, [items, filterStatus, searchQ, highlightId]);
 
   const counts = {
     total: items.length,

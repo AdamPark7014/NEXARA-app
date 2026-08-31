@@ -42,7 +42,11 @@ function fmtDate(value: string | null) {
   });
 }
 
-const ToolRequestsTable: React.FC = () => {
+type ToolRequestsTableProps = {
+  highlightId?: string | null;
+};
+
+const ToolRequestsTable: React.FC<ToolRequestsTableProps> = ({ highlightId = null }) => {
   const { user } = useUser();
   const token = user?.token ?? "";
   const canManage = hasPermission(user, PERMISSIONS.TOOLS_MANAGE);
@@ -112,8 +116,12 @@ const ToolRequestsTable: React.FC = () => {
           r.reason.toLowerCase().includes(q),
       );
     }
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
     return rows;
-  }, [items, filterStatus, searchQ]);
+  }, [items, filterStatus, searchQ, highlightId]);
 
   const now = Date.now();
   const counts = {

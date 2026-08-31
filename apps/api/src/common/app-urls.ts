@@ -17,14 +17,18 @@ export const appUrls = {
     activityId ? `/ops/my-evidences?activityId=${activityId}` : `/ops/my-evidences`,
   opsEvidencesReview: (activityId: number) => `/ops/evidences?activityId=${activityId}`,
   opsViatic: (id: number) => `/ops/viatics?highlight=${id}`,
-  opsMyViatics: () => `/ops/my-viatics`,
+  opsMyViatics: (id?: number) => (id ? `/ops/my-viatics?highlight=${id}` : `/ops/my-viatics`),
+  opsMyVehicles: (id?: number) => (id ? `/ops/my-vehicles?highlight=${id}` : `/ops/my-vehicles`),
   opsProject: (id: number) => `/ops/projects/${id}`,
   opsMaintenance: (woId?: number) => (woId ? `/ops/maintenance?woId=${woId}` : `/ops/maintenance`),
   opsTools: (id?: number) => (id ? `/ops/tools?highlight=${id}` : `/ops/tools`),
   opsVehicles: (id?: number) => (id ? `/ops/vehicles?highlight=${id}` : `/ops/vehicles`),
   opsActivities: () => `/ops/activities`,
 
-  erpAttendance: (tab?: string) => (tab ? `/erp/hr/attendance?tab=${tab}` : `/erp/hr/attendance`),
+  erpAttendance: (tab?: string) => {
+    if (tab === "lunch") return `/erp/hr/lunch-breaks`;
+    return tab ? `/erp/hr/attendance?tab=${tab}` : `/erp/hr/attendance`;
+  },
   erpUsers: (id?: number) => (id ? `/erp/users?highlight=${id}` : `/erp/users`),
   erpProcurement: (tab: string, id?: number) =>
     id ? `/erp/procurement?tab=${tab}&id=${id}` : `/erp/procurement?tab=${tab}`,
@@ -41,4 +45,6 @@ export const appUrls = {
   erpApprovals: (instanceId: number) => `/erp/approvals?highlight=${instanceId}`,
   erpFinanceViatics: (id?: number) =>
     id ? `/erp/finance/viatics?highlight=${id}` : `/erp/finance/viatics`,
+  erpLunchBreaks: (highlightId?: number) =>
+    highlightId ? `/erp/hr/lunch-breaks?highlight=${highlightId}` : `/erp/hr/lunch-breaks`,
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -53,6 +53,8 @@ export default function AssetsPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getOpsTeamSectionConfig(user, "assets"), [user]);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
   const token = user?.token ?? "";
 
   useEffect(() => {
@@ -175,8 +177,12 @@ export default function AssetsPage() {
       );
     }
     if (filterStatus) rows = rows.filter((s) => s.status === filterStatus);
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
     return rows;
-  }, [items, searchQ, filterStatus]);
+  }, [items, searchQ, filterStatus, highlightId]);
 
   const pendientes = items.filter((i) => i.status === "PENDING").length;
   const conDiferencia = items.filter((i) => (i.deltaCount ?? 0) !== 0).length;
@@ -243,6 +249,12 @@ export default function AssetsPage() {
           </>
         }
       />
+
+      {highlightId && (
+        <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface-2)", fontSize: 13 }}>
+          Mostrando activo <strong>#{highlightId}</strong> desde enlace directo.
+        </div>
+      )}
 
       {showForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>

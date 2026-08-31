@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -39,6 +40,8 @@ export default function MyVehiclesPage() {
   useOpsCanonicalRoute(user, "vehicles");
   const cfg = useMemo(() => getVehiclesSectionConfig(user), [user]);
   const token = user?.token ?? "";
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
 
   const [items, setItems] = useState<VehicleRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,6 +117,13 @@ export default function MyVehiclesPage() {
 
   const fmt = (v?: string | null) => (v ? new Date(v).toLocaleString("es-MX") : "—");
 
+  const visibleItems = useMemo(() => {
+    if (!highlightId) return items;
+    const id = Number(highlightId);
+    if (Number.isNaN(id)) return items;
+    return [...items].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+  }, [items, highlightId]);
+
   return (
     <>
       <PageHeader
@@ -131,6 +141,12 @@ export default function MyVehiclesPage() {
           </>
         }
       />
+
+      {highlightId && (
+        <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface-2)", fontSize: 13 }}>
+          Destacando solicitud <strong>#{highlightId}</strong> desde notificación.
+        </div>
+      )}
 
       {!loading && items.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 18 }}>
@@ -195,7 +211,7 @@ export default function MyVehiclesPage() {
         )}
         {!loading && !error && items.length > 0 && (
           <div style={{ display: "grid", gap: 12 }}>
-            {items.map((v) => (
+            {visibleItems.map((v) => (
               <article key={v.id} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 16, background: "var(--surface)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
                   <div>

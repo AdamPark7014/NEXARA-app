@@ -8,6 +8,7 @@ export default function NewActivityPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestId = Number(searchParams.get("requestId") || 0);
+  const clientId = Number(searchParams.get("clientId") || 0);
 
   return (
     <>
@@ -27,6 +28,7 @@ export default function NewActivityPage() {
       />
       <OpsActivityForm
         requestId={requestId > 0 ? requestId : undefined}
+        initialClientId={clientId > 0 ? clientId : undefined}
         onCancel={() => router.push("/ops/activities")}
         onSuccess={(id) => router.push(`/ops/activities/${id}`)}
       />

@@ -37,7 +37,7 @@ export function searchResultUrl(result: GlobalSearchResult): string | null {
   const { type, id } = result;
   switch (type) {
     case "user":
-      return "/erp/users";
+      return `/erp/users?highlight=${id}`;
     case "sales-client":
       return `/crm/clients/${id}`;
     case "sales-project":
