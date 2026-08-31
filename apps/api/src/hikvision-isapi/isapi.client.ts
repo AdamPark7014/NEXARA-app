@@ -1,5 +1,5 @@
-import { request as httpRequest } from 'node:http';
-import { request as httpsRequest } from 'node:https';
+import { Agent as HttpAgent, request as httpRequest } from 'node:http';
+import { Agent as HttpsAgent, request as httpsRequest } from 'node:https';
 import { URL } from 'node:url';
 import { buildAuthorization, parseChallenge, type DigestChallenge } from './digest';
 import { parseXml, type XmlValue } from './xml';
@@ -88,6 +88,21 @@ export class HikvisionIsapiClient {
   private readonly minGapMs: number;
   private readonly scope: string;
 
+  /**
+   * Agentes propios **sin pooling**, en vez del `globalAgent`.
+   *
+   * Dos razones, y las dos muerden:
+   *
+   * - Desde Node 19 el agente global trae `keepAlive: true`. Sus sockets libres
+   *   mantienen vivo el bucle de eventos, así que un CLI que ya terminó su
+   *   trabajo se queda colgado sin decir por qué.
+   * - Un equipo Hikvision admite pocas conexiones simultáneas. Reservar sockets
+   *   ociosos contra 14 equipos es gastar un recurso escaso para ahorrar un
+   *   handshake TCP que en LAN cuesta un milisegundo.
+   */
+  private readonly httpAgent = new HttpAgent({ keepAlive: false });
+  private readonly httpsAgent = new HttpsAgent({ keepAlive: false });
+
   constructor(opts: IsapiClientOpts) {
     this.host = (opts.host || '').replace(/\/$/, '');
     this.username = opts.username || '';
@@ -102,6 +117,19 @@ export class HikvisionIsapiClient {
   /** True cuando el equipo ya rechazó estas credenciales en esta instancia. */
   get rejected(): boolean {
     return this.authRejected;
+  }
+
+  /**
+   * Sockets ociosos que el cliente mantiene abiertos contra el equipo.
+   *
+   * Debe ser siempre 0: los agentes van sin pooling a propósito. Expuesto para
+   * poder afirmarlo en un test — un socket ocioso cuelga el proceso y ocupa
+   * una de las pocas conexiones del firmware.
+   */
+  get idleSockets(): number {
+    const count = (free: Record<string, unknown[]> | undefined) =>
+      Object.values(free ?? {}).reduce((n, list) => n + list.length, 0);
+    return count(this.httpAgent.freeSockets as never) + count(this.httpsAgent.freeSockets as never);
   }
 
   private raw(
@@ -128,6 +156,7 @@ export class HikvisionIsapiClient {
             ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {}),
             ...(authorization ? { Authorization: authorization } : {}),
           },
+          agent: isHttps ? this.httpsAgent : this.httpAgent,
           ...(isHttps ? { rejectUnauthorized: this.verifyTls } : {}),
           timeout: this.timeoutMs,
         },

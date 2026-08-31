@@ -80,7 +80,18 @@ esta no podrá descifrar la contraseña.
 
 ## Sync
 
-`POST /api/integra/sync`, o el cron de 15 minutos.
+> **El cron del droplet no puede sincronizar un sitio ISAPI.** Corre en el
+> droplet, que no tiene ruta a la LAN del cliente: para `provider=ISAPI` falla
+> siempre. El sync tiene que dispararlo algo que vea los equipos.
+>
+> ```bash
+> npm run integra:isapi:sync -- --company 1 --site 1
+> ```
+>
+> Desde una máquina del sitio, con `DATABASE_URL` apuntando a la base que toque.
+> Mientras no haya agente on-site ni VPN, es a mano.
+
+`POST /api/integra/sync` sirve igual si quien atiende la petición está en la LAN.
 
 - El **equipo cabecera** manda: sus canales son el inventario de cámaras.
 - `cameraIndexCode` = `<ip-cabecera>|<canal>` → `192.168.9.34|301`.
@@ -89,6 +100,19 @@ esta no podrá descifrar la contraseña.
 - Los equipos ya registrados que el cabecera no cubre se refrescan uno a uno;
   lo que sí cubre, no se vuelve a sondear.
 - Cada terminal de acceso da de alta una puerta `<ip>|1`.
+
+## Verificado end-to-end (31-08-2026)
+
+Con la laptop dentro de la LAN, base Postgres local y el sitio dado de alta:
+
+```
+seed  → sitio #1 "Oficinas NEXARA" + 4 terminales
+sync  → 13 cámaras · 4 puertas · 18 equipos · 6.4 s
+```
+
+Espejo resultante: 9 cámaras con IP propia (RTSP directo) y 4 en plug & play
+(vía grabador). Las puertas salieron con el nombre que tienen en el equipo:
+Sala de Juntas, Acceso Privados, Gerencia, Acceso General.
 
 ## Video
 

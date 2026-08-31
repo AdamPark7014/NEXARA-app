@@ -22,8 +22,9 @@
     "seed:play-reviewer": "ts-node ./prisma/seed-play-reviewer.ts",
     "audit:org-users": "node ./scripts/audit-org-users.mjs",
     "generate:vapid": "web-push generate-vapid-keys",
-    "integra:isapi:scan": "node -r ts-node/register/transpile-only ./src/hikvision-isapi/isapi-scan.ts",
-    "integra:isapi:seed": "node -r ts-node/register/transpile-only ./src/hikvision-isapi/isapi-seed.ts"
+    "integra:isapi:scan": "node --env-file-if-exists=.env -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only ./src/hikvision-isapi/isapi-scan.ts",
+    "integra:isapi:seed": "node --env-file-if-exists=.env -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only ./src/hikvision-isapi/isapi-seed.ts",
+    "integra:isapi:sync": "node --env-file-if-exists=.env -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only ./src/hikvision-isapi/isapi-sync.ts"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",
