@@ -102,6 +102,38 @@ de errores y el invariante de que no queden sockets ociosos.
 extensión `.js` (por `moduleResolution: node16`). Sin compilar, Node no resuelve.
 Es el mismo mapeo que jest hace con `moduleNameMapper`, en un require hook.
 
+### go2rtc montado y las 13 cámaras publicadas
+
+Adam autorizó la descarga. `go2rtc 1.9.7` (`go2rtc_win64.zip`, 6,109,103 bytes,
+sha256 `50E61FAB…C90AA`, release oficial de AlexxIT) en `.tools/go2rtc/`.
+**`.tools/` añadido al `.gitignore`** — no estaba, y ahí caen tanto el binario
+como cualquier config con credenciales.
+
+**CLI nuevo `integra:isapi:publish`.** En vez de generar un YAML con contraseñas,
+llama a `IntegraMediaService.liveStream`, el mismo método que atiende
+`POST /api/integra/cameras/:id/stream`. Una sola lógica de elegir fuente, y las
+credenciales salen cifradas de la base, van a go2rtc por su API y no tocan disco.
+
+Las 13 se registraron y el enrutado quedó verificado en la API de go2rtc:
+los canales 101/201/901/1001 (las de plug & play) por el NVR, las otras 9 directo
+a su IP. No entregan imagen todavía porque la laptop ya no está en esa red.
+
+### Diseño del enlace servidor ↔ sitio: `docs/INTEGRA-LAN-ENLACE.md`
+
+WireGuard iniciado **desde el sitio** (el router es del cliente y puede haber
+CGNAT: nada de puertos entrantes) más go2rtc dentro del sitio, para que el RTSP
+crudo no cruce el túnel. Arregla de una vez las **dos** funciones caídas: el
+video y el cron de sync.
+
+La decisión que hay que tomar antes del segundo sitio: **enrutar solo el `/32`
+del peer, no la LAN del cliente**. `192.168.1.0/24` es el default de medio
+México; en cuanto dos sitios compartan rango, `AllowedIPs` ya no puede decidir a
+qué peer enrutar. Con go2rtc y el sync en la caja on-site, el servidor no
+necesita ver `192.168.9.x` para nada.
+
+Servidor: Hetzner, resuelve a `5.78.215.109`. **No se tocó.** `~/.ssh/config`
+tiene `HostName REEMPLAZA_CON_IP_HETZNER`, así que desde esta laptop no hay SSH.
+
 ## A medias
 
 - **go2rtc no está en la LAN, y ahí se queda parado el puente.**
@@ -116,9 +148,11 @@ Es el mismo mapeo que jest hace con `moduleNameMapper`, en un require hook.
 - El sitio #1 está dado de alta **en la base local**, no en producción.
 - Inventario del barrido (sin contraseñas) en el scratchpad de la sesión, no
   versionado.
-- **go2rtc sigue sin montarse.** No está instalado en la laptop y Docker Desktop
-  está apagado; instalarlo implica descargar un binario, que Adam no ha
-  autorizado. Es lo único que falta para ver video en el navegador.
+- **Falta la caja on-site.** El enlace necesita algo siempre encendido en la LAN
+  del cliente (mini PC o Raspberry Pi) con WireGuard + go2rtc. Durante las
+  pruebas el peer fue la laptop, que se va cuando se va Adam.
+- **Nada del enlace está aplicado en el servidor.** El documento tiene los
+  ficheros de configuración listos, pero no se ha ejecutado nada allá.
 
 ## No tocar
 
@@ -136,14 +170,16 @@ Es el mismo mapeo que jest hace con `moduleNameMapper`, en un require hook.
 
 ## Siguiente paso
 
-1. Autorizar la descarga de go2rtc (binario único, ~15 MB, releases oficiales de
-   AlexxIT/go2rtc — la misma versión 1.9.7 que fija el compose). Con eso hay
-   video en el navegador **desde la LAN** en minutos.
-2. Decidir cómo llega ese video al panel de producción: agente on-site o VPN
-   sitio↔droplet. Sin una de las dos, `integra.nexara.com.mx` no lo verá.
-3. Repetir seed + sync contra la base de producción, desde dentro de la LAN.
-4. Probar apertura remota en una terminal (`.160`) antes de ofrecerlo al cliente.
-5. Avisar al instalador: el NVR marca `PasswordStatus: invalid` en los canales
+1. Volver a la red del sitio y correr `integra:isapi:publish` con go2rtc local:
+   se ve el muro de las 13 cámaras en `:1984` desde cualquier navegador de la LAN.
+   Es la primera confirmación visual de imagen real.
+2. Conseguir la caja on-site y decidir `/32` vs. LAN completa
+   (`docs/INTEGRA-LAN-ENLACE.md`). Es la única decisión que cuesta cara si se
+   toma tarde.
+3. Completar `~/.ssh/config` con la IP del Hetzner antes de configurar nada allá.
+4. Repetir seed + sync contra la base de producción, desde dentro de la LAN.
+5. Probar apertura remota en una terminal (`.160`) antes de ofrecerlo al cliente.
+6. Avisar al instalador: el NVR marca `PasswordStatus: invalid` en los canales
    1, 2, 9 y 10 — las cuatro cámaras en plug & play.
 
 ## Estado del turno anterior (mobile/Play), sin cambios

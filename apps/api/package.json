@@ -24,7 +24,8 @@
     "generate:vapid": "web-push generate-vapid-keys",
     "integra:isapi:scan": "node --env-file-if-exists=.env -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only ./src/hikvision-isapi/isapi-scan.ts",
     "integra:isapi:seed": "node --env-file-if-exists=.env -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only ./src/hikvision-isapi/isapi-seed.ts",
-    "integra:isapi:sync": "node --env-file-if-exists=.env -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only ./src/hikvision-isapi/isapi-sync.ts"
+    "integra:isapi:sync": "node --env-file-if-exists=.env -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only ./src/hikvision-isapi/isapi-sync.ts",
+    "integra:isapi:publish": "node --env-file-if-exists=.env -r ./scripts/ts-node-js-ext.js -r ts-node/register/transpile-only ./src/hikvision-isapi/isapi-publish.ts"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",
