@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
+import InlineAlert from "@/components/ui/InlineAlert";
 import { buildApiUrl } from "@/lib/api-base";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection, formatDate, formatDateTime } from "@/components/detail/DetailFrame";
 import ActivityEvidenceReviewPanel from "@/components/ops/ActivityEvidenceReviewPanel";
@@ -14,6 +15,7 @@ import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac";
 import { activityStatusVariant } from "@/lib/activity-status";
 import { countEvidenceFiles } from "@/lib/evidence-display";
+import { getMissingEvidence, parseApiErrorWithEvidence } from "@/lib/parse-missing-evidence";
 import Link from "next/link";
 
 const STATUSES = ["PROGRAMADA", "EN_CURSO", "COMPLETADA", "REPROGRAMAR", "CANCELADA"];
@@ -24,7 +26,10 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
     ...init,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init.headers as Record<string, string> ?? {}) },
   });
-  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  if (!res.ok) {
+    const raw = await res.text().catch(() => `HTTP ${res.status}`);
+    throw parseApiErrorWithEvidence(raw, res.status);
+  }
   if (res.status === 204) return null;
   const t = await res.text();
   return t ? JSON.parse(t) : null;
@@ -65,6 +70,7 @@ export default function ActivityDetailPage() {
   });
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [missingEvidence, setMissingEvidence] = useState<string[] | null>(null);
 
   const toDateLocal = (iso?: string | null) => {
     if (!iso) return "";
@@ -87,6 +93,7 @@ export default function ActivityDetailPage() {
       fechaFinalizacion: toDateLocal(activity.fechaFinalizacion),
     });
     setSaveErr(null);
+    setMissingEvidence(null);
     setEditing(true);
   }, [activity]);
 
@@ -94,6 +101,7 @@ export default function ActivityDetailPage() {
     if (!token || !id) return;
     setSaving(true);
     setSaveErr(null);
+    setMissingEvidence(null);
     try {
       const payload: Record<string, string | null> = {
         estatus: form.estatus,
@@ -108,6 +116,12 @@ export default function ActivityDetailPage() {
       setEditing(false);
       reload();
     } catch (e) {
+      const missing = getMissingEvidence(e);
+      if (missing) {
+        setMissingEvidence(missing);
+        setSaveErr("No se puede finalizar: faltan evidencias mínimas");
+        return;
+      }
       setSaveErr(e instanceof Error ? e.message : "Error al guardar");
     } finally {
       setSaving(false);
@@ -142,6 +156,23 @@ export default function ActivityDetailPage() {
 
   return (
     <>
+      {missingEvidence && missingEvidence.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <InlineAlert
+            variant="warning"
+            message="Faltan evidencias para marcar la OT como completada"
+            onDismiss={() => setMissingEvidence(null)}
+          />
+          <ul style={{ margin: "0 0 10px", paddingLeft: 20, fontSize: 13, color: "var(--text-secondary)" }}>
+            {missingEvidence.map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+          <Link href={`/ops/activities/${id}/evidences`} style={{ textDecoration: "none" }}>
+            <Button size="sm" variant="primary" iconLeft="📸">Subir evidencias</Button>
+          </Link>
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 16 }}>
         <KpiCard label="Estado" value={activity.estatus.replace(/_/g, " ")} variant={activityStatusVariant(activity.estatus)} icon="📋" />
         <KpiCard label="Prioridad" value={activity.prioridad || "—"} variant={activity.prioridad === "URGENTE" ? "danger" : activity.prioridad === "ALTA" ? "warning" : "default"} icon="⚡" />

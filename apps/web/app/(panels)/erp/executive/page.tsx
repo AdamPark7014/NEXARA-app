@@ -160,7 +160,7 @@ export default function ExecutivePage() {
         ]
       : [
           { href: "/erp/approvals", label: "Aprobaciones", desc: "Solicitudes pendientes" },
-          { href: "/erp/bi", label: "Business Intelligence", desc: "Márgenes y ROI" },
+          { href: "/erp/analytics/bi", label: "Business Intelligence", desc: "Márgenes y ROI" },
           { href: "/erp/accounting", label: "Contabilidad", desc: "Estados financieros" },
           { href: "/erp/users", label: "Roles y accesos", desc: "Gobierno de usuarios" },
         ];
@@ -327,7 +327,7 @@ export default function ExecutivePage() {
             title="Top vendedores del mes"
             subtitle="Ingresos por oportunidades cerradas"
             action="Ver BI"
-            actionHref="/erp/bi"
+            actionHref="/erp/analytics/bi"
           >
             {loading && <DashEmpty title="Cargando…" />}
             {!loading && (!data || data.topSellers.length === 0) && (

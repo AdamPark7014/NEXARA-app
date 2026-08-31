@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
@@ -18,6 +17,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import { useProjectDetail } from "@/components/crm/ProjectDetailShell";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { resolveCrossPanelHref } from "@/lib/cross-panel-handoff";
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
   CONFIRMED: "Confirmada",
@@ -27,7 +27,6 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
 
 export default function ProjectOrderPage() {
   const { user } = useUser();
-  const router = useRouter();
   const token = user?.token ?? "";
   const { id, summary, error, reload } = useProjectDetail();
   const invoiceCfg = useMemo(() => getErpFinanceSectionConfig(user, "invoicing"), [user]);
@@ -101,7 +100,9 @@ export default function ProjectOrderPage() {
           setOrder(refreshed);
           const stillPending = (refreshed.lines ?? []).filter((l) => !l.invoiceItem).map((l) => l.id);
           setSelectedLineIds(stillPending);
-          router.push(`/erp/invoicing?highlight=${inv.id}`);
+          const invoicingPath = `/erp/invoicing?highlight=${inv.id}`;
+          const userJson = user ? JSON.stringify(user) : null;
+          window.location.assign(resolveCrossPanelHref(invoicingPath, userJson, "crm"));
         } catch (e) {
           setSaveErr(e instanceof Error ? e.message : "No se pudo generar la factura");
         } finally {

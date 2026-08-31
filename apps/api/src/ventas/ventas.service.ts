@@ -24,6 +24,7 @@ import { isSalesTeamLeadUser } from '../common/org-roles.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
 import { opsPatchFromSales } from '../common/project-handoff.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
+import { appUrls } from '../common/app-urls.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ServiceClientsService } from '../service-clients/service-clients.service.js';
 
@@ -3152,7 +3153,7 @@ export class VentasService {
           message: `El proyecto "${project.name}" fue autorizado y puede iniciar ejecución.`,
           entityType: 'SALES_PROJECT',
           relatedEntityId: project.id,
-          relatedUrl: `/crm/proyectos/${project.id}`,
+          relatedUrl: appUrls.crmProject(project.id),
         } as any)
         .catch(() => undefined);
     }
@@ -3203,7 +3204,7 @@ export class VentasService {
           message: msg,
           entityType: 'SALES_PROJECT',
           relatedEntityId: project.id,
-          relatedUrl: `/crm/proyectos/${project.id}`,
+          relatedUrl: appUrls.crmProject(project.id),
         } as any)
         .catch(() => undefined);
     }

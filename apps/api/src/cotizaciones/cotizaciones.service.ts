@@ -19,6 +19,7 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { VentasService } from '../ventas/ventas.service.js';
 import { resolveRequiredCompanyId, companyWhere, assertCompanyAccess } from '../common/tenant/tenant-scope.js';
+import { appUrls } from '../common/app-urls.js';
 import { randomBytes } from 'crypto';
 import nodemailer from 'nodemailer';
 import fs from 'fs/promises';
@@ -551,7 +552,7 @@ export class CotizacionesService {
           message: `La cotización ${quote.quoteNumber} tiene descuento autorizado. Ya puedes enviarla al cliente.`,
           entityType: 'COTIZACION',
           relatedEntityId: quote.id,
-          relatedUrl: `/crm/cotizaciones/${quote.id}`,
+          relatedUrl: appUrls.crmQuote(quote.id),
         } as any)
         .catch(() => undefined);
     }
@@ -593,7 +594,7 @@ export class CotizacionesService {
           message: `La cotización ${quote.quoteNumber} no obtuvo aprobación de descuento.${comments ? ` Motivo: ${comments}` : ''}`,
           entityType: 'COTIZACION',
           relatedEntityId: quote.id,
-          relatedUrl: `/crm/cotizaciones/${quote.id}`,
+          relatedUrl: appUrls.crmQuote(quote.id),
         } as any)
         .catch(() => undefined);
     }

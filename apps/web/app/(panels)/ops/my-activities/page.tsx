@@ -25,6 +25,7 @@ import {
   isEvidenceLocked,
   type ActivityEvidenceSummary,
 } from "@/lib/evidence-lock";
+import { getMissingEvidence, parseApiErrorWithEvidence } from "@/lib/parse-missing-evidence";
 
 interface ActivityEvidenceInfo extends ActivityEvidenceSummary {
   reviewedBy?: { nombre?: string } | null;
@@ -67,19 +68,7 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
   });
   if (!res.ok) {
     const raw = await res.text().catch(() => `HTTP ${res.status}`);
-    let parsed: { message?: string; missingEvidence?: string[]; error?: string } | null = null;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      /* texto plano */
-    }
-    const err = new Error(parsed?.message || parsed?.error || raw) as Error & {
-      missingEvidence?: string[];
-      status?: number;
-    };
-    err.missingEvidence = Array.isArray(parsed?.missingEvidence) ? parsed.missingEvidence : undefined;
-    err.status = res.status;
-    throw err;
+    throw parseApiErrorWithEvidence(raw, res.status);
   }
   if (res.status === 204) return null;
   const t = await res.text();
@@ -215,8 +204,8 @@ export default function MyActivitiesPage() {
 
       void load();
     } catch (e) {
-      const missing = (e as Error & { missingEvidence?: string[] })?.missingEvidence;
-      if (Array.isArray(missing) && missing.length > 0) {
+      const missing = getMissingEvidence(e);
+      if (missing) {
         setEvidenceGate({ activityId: a.id, anNumber: a.anNumber, missing });
         toast.error("No se puede finalizar: faltan evidencias mínimas");
         return;
