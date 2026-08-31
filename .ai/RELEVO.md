@@ -182,8 +182,52 @@ tiene `HostName REEMPLAZA_CON_IP_HETZNER`, así que desde esta laptop no hay SSH
 6. Avisar al instalador: el NVR marca `PasswordStatus: invalid` en los canales
    1, 2, 9 y 10 — las cuatro cámaras en plug & play.
 
-## Estado del turno anterior (mobile/Play), sin cambios
+## Mobile / Play — ENVIADO A REVISIÓN (31-08-2026)
 
-El AAB **5 (1.0.0)** sigue sin subir a Producción, y el icono 512 sin subir a la
-ficha (`apps/mobile-native/play-assets/icon-512.png`; el diálogo de Windows lo
-tiene que manejar Adam). Detalle completo en el commit `1a8f805`.
+La app está **en revisión de Google**. El centro de políticas ya no lista ninguna
+infracción: pasó de dos rechazos a «Actualización en revisión».
+
+Se enviaron 10 cambios juntos:
+
+- **Producción 5 (1.0.0)** — el AAB del commit `c8bccea`. Códigos de versión: solo
+  el 5. El **bundle 3**, que llevaba `READ_MEDIA_IMAGES/VIDEO` y provocó el
+  rechazo, quedó en «No incluido».
+- Ficha es-419: nombre `Nexara` → **`NEXARA`** e **icono 512 nuevo** (hexágono +
+  wordmark sobre blanco, el mismo que el launcher).
+- Categoría → **Economía** (en la consola en español no existe «Empresa»; contra
+  las 32 categorías estándar de Play, Economía *es* BUSINESS — Finanzas es FINANCE).
+- Declaración **«Aplicaciones gubernamentales» → No** (estaba sin empezar y
+  bloqueaba publicar actualizaciones).
+- Resto de declaraciones de contenido, ya existentes.
+
+Detalle técnico de los dos arreglos en `1a8f805` (icono de launcher) y `c8bccea`
+(paridad app↔web).
+
+### Trampas que costaron tiempo, por si se repiten
+
+1. **Subir el AAB no lo mete en la versión.** Acabó en la biblioteca de app
+   bundles y la versión de Producción seguía vacía. Se engancha con
+   «Añadir de la biblioteca», no volviéndolo a subir.
+2. **Una versión en Borrador no entra en la cola de revisión.** Hay que abrirla,
+   «Siguiente» → «Revisar y confirmar» → «Guardar». Hasta entonces, el Resumen de
+   publicación seguía apuntando a la versión **2 (1.0.0)**, la rechazada. Enviar
+   en ese momento habría repetido el rechazo con el icono nuevo puesto.
+3. La declaración de permisos de fotos sigue en «Requiere atención» hasta que la
+   revisión termine: existe porque el bundle 3 los declara, y ese bundle no deja
+   de ser el activo hasta que Google apruebe el 5.
+
+### Pendiente
+
+- **Nadie ha comprobado que `play.review@nexara.com.mx` entre en producción.** Si
+  el revisor no puede iniciar sesión, es rechazo seguro. `seed-play-reviewer.ts`
+  es idempotente, apaga MFA, limpia `lockedUntil`/`failedLoginCount` y valida el
+  hash con `bcrypt.compare`. **Sin `PLAY_REVIEWER_PASSWORD` rota la contraseña** y
+  deja inservible la que está en Play Console; pásasela para revalidar sin rotar:
+
+  ```
+  docker compose --env-file .env.nexara -f docker-compose.nexara.yml \
+    exec -T api sh -c "cd /app/apps/api && PLAY_REVIEWER_PASSWORD='...' npm run seed:play-reviewer"
+  ```
+
+- Símbolos de depuración del código nativo sin subir (solo una advertencia de Play,
+  no bloquea; mejora el análisis de ANR y fallos).
