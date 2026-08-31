@@ -46,6 +46,7 @@
     "apk:build-install": "pwsh -ExecutionPolicy Bypass -File scripts/install-apk-windows.ps1 -Build",
     "mobile:android:preview": "pwsh -ExecutionPolicy Bypass -File scripts/preview-android-emulator.ps1",
     "mobile:android:screenshots": "pwsh -ExecutionPolicy Bypass -File scripts/capture-play-screenshots.ps1",
+    "mobile:android:icons": "python scripts/gen-native-app-icons.py",
     "mobile:android:play-aab": "pwsh -ExecutionPolicy Bypass -File scripts/build-play-aab.ps1",
     "mobile:smoke": "pwsh -ExecutionPolicy Bypass -File scripts/mobile-smoke-checklist.ps1",
     "seed:play-reviewer": "npm run seed:play-reviewer --workspace=apps/api"
