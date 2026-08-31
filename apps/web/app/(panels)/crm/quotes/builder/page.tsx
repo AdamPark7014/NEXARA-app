@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -482,6 +482,9 @@ export default function SmartQuoteBuilderPage() {
   const { user } = useUser();
   const token = user?.token ?? "";
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const prefClientId = searchParams.get("clientId");
+  const prefClientName = searchParams.get("clientName");
 
   const [step, setStep] = useState<Step>(2);
   const [path, setPath] = useState<EntryPath>("search");
@@ -536,7 +539,16 @@ export default function SmartQuoteBuilderPage() {
     listSalesClients(token)
       .then((list) => {
         setClients(list);
-        if (list.length === 1) setClientId(String(list[0].id));
+        if (prefClientId && list.some((c) => String(c.id) === prefClientId)) {
+          setClientId(prefClientId);
+        } else if (prefClientName) {
+          const name = prefClientName.trim().toLowerCase();
+          const match = list.find((c) => (c.name ?? "").trim().toLowerCase() === name);
+          if (match) setClientId(String(match.id));
+          else if (list.length === 1) setClientId(String(list[0].id));
+        } else if (list.length === 1) {
+          setClientId(String(list[0].id));
+        }
       })
       .catch(() => setClients([]));
     smartQuoteCtStatus(token)
@@ -569,7 +581,7 @@ export default function SmartQuoteBuilderPage() {
         if (zones?.length) setLogisticsZones(zones);
       })
       .catch(() => setLogisticsZones(FALLBACK_ZONES));
-  }, [token]);
+  }, [token, prefClientId, prefClientName]);
 
   useEffect(() => {
     if (!toast) return;

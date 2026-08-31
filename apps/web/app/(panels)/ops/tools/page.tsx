@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import { useUser } from "@/components/UserContext";
@@ -27,9 +27,20 @@ export default function ToolsPage() {
   const searchParams = useSearchParams();
   const cfg = useMemo(() => getOpsTeamSectionConfig(user, "tools"), [user]);
   const isManager = cfg.viewMode !== "execute";
+  const highlightId = searchParams.get("highlight");
 
-  const [managerTab, setManagerTab] = useState<ManagerTab>(() => parseManagerTab(searchParams.get("tab")));
-  const [engineerTab, setEngineerTab] = useState<EngineerTab>("mykit");
+  const [managerTab, setManagerTab] = useState<ManagerTab>(() =>
+    highlightId ? "requests" : parseManagerTab(searchParams.get("tab")),
+  );
+  const [engineerTab, setEngineerTab] = useState<EngineerTab>(() =>
+    highlightId ? "myrequests" : "mykit",
+  );
+
+  useEffect(() => {
+    if (!highlightId) return;
+    if (isManager) setManagerTab("requests");
+    else setEngineerTab("myrequests");
+  }, [highlightId, isManager]);
 
   const tabBtn = (active: boolean): React.CSSProperties => ({
     padding: "7px 16px",
@@ -49,6 +60,12 @@ export default function ToolsPage() {
         title={cfg.title}
         subtitle={cfg.subtitle}
       />
+
+      {highlightId && (
+        <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface-2)", fontSize: 13 }}>
+          Destacando solicitud/herramienta <strong>#{highlightId}</strong> desde notificación.
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
         {isManager ? (
@@ -80,8 +97,8 @@ export default function ToolsPage() {
 
       {isManager && managerTab === "inventory" && <ToolInventoryPanel />}
       {isManager && managerTab === "kits" && <ToolUserKitPanel />}
-      {isManager && managerTab === "requests" && <ToolRequestsTable />}
-      {isManager && managerTab === "renewals" && <ToolRenewalsTable />}
+      {isManager && managerTab === "requests" && <ToolRequestsTable highlightId={highlightId} />}
+      {isManager && managerTab === "renewals" && <ToolRenewalsTable highlightId={highlightId} />}
       {!isManager && engineerTab === "mykit" && <ToolMyKitPanel />}
       {!isManager && engineerTab === "myrequests" && <ToolRequestForm />}
     </>

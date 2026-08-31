@@ -7,6 +7,7 @@ import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import { useUser } from "@/components/UserContext";
 import { filterRowsByScope, getCrmSalesSectionConfig } from "@/lib/section-views";
 import { exportToExcel } from "@/lib/export-excel";
@@ -183,9 +184,12 @@ export default function CrmProjectsPage() {
       label: "OPS",
       render: (p) =>
         p.operationalProject ? (
-          <a href={`https://ops.nexara.com.mx/ops/projects/${p.operationalProject.id}`} style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+          <CrossPanelLink
+            href={`/ops/projects/${p.operationalProject.id}`}
+            style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}
+          >
             En campo →
-          </a>
+          </CrossPanelLink>
         ) : (
           <Tag variant="warning">Sin handoff</Tag>
         ),

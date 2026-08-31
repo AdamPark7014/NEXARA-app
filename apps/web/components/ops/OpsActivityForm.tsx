@@ -31,6 +31,8 @@ import {
 type Props = {
   activityId?: number;
   requestId?: number;
+  /** Prefill service-client filter when creating from client detail */
+  initialClientId?: number;
   onSuccess?: (id: number) => void;
   onCancel?: () => void;
 };
@@ -41,7 +43,7 @@ const gridStyle: CSSProperties = {
   gap: 12,
 };
 
-export default function OpsActivityForm({ activityId, requestId, onSuccess, onCancel }: Props) {
+export default function OpsActivityForm({ activityId, requestId, initialClientId, onSuccess, onCancel }: Props) {
   const { user } = useUser();
   const token = user?.token ?? "";
   const actCfg = getActivitiesSectionConfig(user);
@@ -92,6 +94,24 @@ export default function OpsActivityForm({ activityId, requestId, onSuccess, onCa
   useEffect(() => {
     void loadMeta();
   }, [loadMeta]);
+
+  useEffect(() => {
+    if (!initialClientId || isEdit || requestId) return;
+    setForm((prev) => {
+      if (prev.clientId) return prev;
+      return { ...prev, clientId: String(initialClientId) };
+    });
+  }, [initialClientId, isEdit, requestId]);
+
+  useEffect(() => {
+    if (!initialClientId || isEdit || requestId || !activeProjects.length) return;
+    setForm((prev) => {
+      if (prev.projectId) return prev;
+      const matching = activeProjects.filter((p) => String(p.client.id) === String(initialClientId));
+      if (matching.length !== 1) return prev;
+      return { ...prev, clientId: String(initialClientId), projectId: String(matching[0].id) };
+    });
+  }, [initialClientId, isEdit, requestId, activeProjects]);
 
   useEffect(() => {
     if (!token || !isEdit || !activityId) return;

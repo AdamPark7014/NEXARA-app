@@ -250,14 +250,21 @@ export default function ServiceClientDetailPage() {
         eyebrow="Órdenes de trabajo"
         title="Actividades recientes"
         subtitle="Últimas 10 OTs vinculadas a este cliente"
-        actions={<Link href={`/ops/activities`} style={{ fontSize: 12, color: "var(--primary)" }}>Ver todas →</Link>}
+        actions={
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <Link href={`/ops/activities/new?clientId=${client?.id ?? ""}`} style={{ textDecoration: "none" }}>
+              <Button size="sm" variant="primary">Crear OT</Button>
+            </Link>
+            <Link href={`/ops/activities`} style={{ fontSize: 12, color: "var(--primary)" }}>Ver todas →</Link>
+          </div>
+        }
       >
         {activities.length === 0 ? (
           <EmptyState
             title="Sin actividades"
             description="No hay órdenes de trabajo registradas para este cliente."
             action={
-              <Link href={`/ops/activities?clientId=${client?.id ?? ""}`} style={{ textDecoration: "none" }}>
+              <Link href={`/ops/activities/new?clientId=${client?.id ?? ""}`} style={{ textDecoration: "none" }}>
                 <Button size="sm" variant="primary">Crear OT</Button>
               </Link>
             }

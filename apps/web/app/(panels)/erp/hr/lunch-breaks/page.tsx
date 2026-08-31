@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -338,7 +339,15 @@ function TeamBreakCard({ member }: { member: LunchBreak }) {
 
 // ─── Manager: Team view ───────────────────────────────────────────────────────
 
-function TeamLunchView({ token, dateFilter }: { token: string; dateFilter: string }) {
+function TeamLunchView({
+  token,
+  dateFilter,
+  highlightId,
+}: {
+  token: string;
+  dateFilter: string;
+  highlightId?: string | null;
+}) {
   const [items, setItems] = useState<LunchBreak[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -383,8 +392,16 @@ function TeamLunchView({ token, dateFilter }: { token: string; dateFilter: strin
         (b.user?.department?.nombre ?? "").toLowerCase().includes(q)
       );
     }
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) {
+        rows = [...rows].sort((a, b) =>
+          (a.user?.id === id ? -1 : b.user?.id === id ? 1 : 0),
+        );
+      }
+    }
     return rows;
-  }, [items, searchQ, filterStatus]);
+  }, [items, searchQ, filterStatus, highlightId]);
 
   const stats = useMemo(() => {
     const durs = items.map((b) => durationMinutes(b.checkinTime, b.checkoutTime)).filter((d): d is number => d !== null);
@@ -615,6 +632,8 @@ function TeamLunchView({ token, dateFilter }: { token: string; dateFilter: strin
 
 export default function LunchBreaksPage() {
   const { user } = useUser();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
   const viewMode = useMemo(() => getAttendanceViewMode(user), [user]);
   const headerCfg = useMemo(() => getLunchBreaksSectionConfig(user), [user]);
   const isManager = viewMode !== "register";
@@ -676,6 +695,12 @@ export default function LunchBreaksPage() {
         }
       />
 
+      {highlightId && (
+        <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface-2)", fontSize: 13 }}>
+          Destacando usuario <strong>#{highlightId}</strong> desde notificación de comida.
+        </div>
+      )}
+
       {canRegister && (
         <>
           {loadingMy ? (
@@ -710,7 +735,7 @@ export default function LunchBreaksPage() {
       )}
 
       {isManager && (
-        <TeamLunchView token={token} dateFilter={dateFilter} />
+        <TeamLunchView token={token} dateFilter={dateFilter} highlightId={highlightId} />
       )}
     </>
   );

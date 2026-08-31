@@ -133,7 +133,7 @@ export default function ClientQuotesPage() {
           </span>
           <div style={{ display: "flex", gap: 8 }}>
             <Button variant="ghost" size="sm" onClick={() => void load()}>Actualizar</Button>
-            <Link href="/crm/quotes?new=1" style={{ textDecoration: "none" }}>
+            <Link href={`/crm/quotes/builder?clientId=${client.id}&clientName=${encodeURIComponent(client.name)}`} style={{ textDecoration: "none" }}>
               <Button variant="primary" size="sm" iconLeft="+">Nueva cotización</Button>
             </Link>
           </div>
@@ -172,7 +172,7 @@ export default function ClientQuotesPage() {
           <EmptyState icon="📝" title="Sin cotizaciones"
             description="Crea una cotización para este cliente desde la sección de Cotizaciones."
             action={
-              <Link href="/crm/quotes?new=1" style={{ textDecoration: "none" }}>
+              <Link href={`/crm/quotes/builder?clientId=${client.id}&clientName=${encodeURIComponent(client.name)}`} style={{ textDecoration: "none" }}>
                 <Button size="sm" variant="primary">Nueva cotización</Button>
               </Link>
             }

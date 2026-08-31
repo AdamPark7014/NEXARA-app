@@ -36,6 +36,7 @@ const emptyForm = {
   probability: 20,
   stage: "DISCOVERY",
   expectedCloseDate: "",
+  clientId: 0 as number | undefined,
 };
 
 export default function OpportunitiesPage() {
@@ -56,8 +57,12 @@ export default function OpportunitiesPage() {
 
   useEffect(() => {
     if (searchParams.get("new") === "1" && cfg.canCreate) {
+      const deepClientId = Number(searchParams.get("clientId") || 0);
       setEditing(null);
-      setForm({ ...emptyForm });
+      setForm({
+        ...emptyForm,
+        clientId: deepClientId > 0 ? deepClientId : undefined,
+      });
       setShowForm(true);
     }
   }, [searchParams, cfg.canCreate]);
@@ -96,7 +101,7 @@ export default function OpportunitiesPage() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ ...emptyForm });
+    setForm({ ...emptyForm, clientId: undefined });
     setShowForm(true);
   };
 
@@ -109,6 +114,7 @@ export default function OpportunitiesPage() {
       probability: o.probability ?? 20,
       stage: o.stage ?? "DISCOVERY",
       expectedCloseDate: o.expectedCloseDate?.slice(0, 10) ?? "",
+      clientId: o.clientId ?? undefined,
     });
     setShowForm(true);
   };
@@ -117,8 +123,13 @@ export default function OpportunitiesPage() {
     if (!token) return;
     try {
       const payload = {
-        ...form,
+        title: form.title,
+        description: form.description,
+        value: form.value,
+        probability: form.probability,
+        stage: form.stage,
         expectedCloseDate: form.expectedCloseDate || undefined,
+        ...(form.clientId ? { clientId: form.clientId } : {}),
       };
       if (editing) {
         const updated = await updateSalesOpportunity(token, editing.id, payload);
@@ -346,6 +357,11 @@ export default function OpportunitiesPage() {
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Cierre esperado</label>
             <input type="date" value={form.expectedCloseDate} onChange={(e) => setForm((f) => ({ ...f, expectedCloseDate: e.target.value }))} style={inp} />
           </div>
+          {form.clientId ? (
+            <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--text-secondary)" }}>
+              Cliente vinculado: <strong>#{form.clientId}</strong>
+            </div>
+          ) : null}
           <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
             <Button variant="primary" onClick={save}>{editing ? "Guardar" : "Crear oportunidad"}</Button>

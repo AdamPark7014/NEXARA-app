@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import CrossPanelLink from "@/components/CrossPanelLink";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
@@ -259,21 +258,23 @@ export default function ClientTicketsPage() {
           )}
           {visibleTickets.map((t) => (
             <li key={t.id} style={{ padding: "10px 14px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--surface)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontWeight: 600, fontSize: 13 }}>{t.description}</p>
-                  {t.branch && <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>Sucursal: {t.branch.name}</span>}
+              <CrossPanelLink href={`/ops/support/${t.id}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontWeight: 600, fontSize: 13 }}>{t.description}</p>
+                    {t.branch && <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>Sucursal: {t.branch.name}</span>}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    {t.urgency && <Tag variant={urgencyVariant(t.urgency)}>{t.urgency}</Tag>}
+                    <Tag variant={statusVariant(t.status)}>{t.status}</Tag>
+                  </div>
                 </div>
-                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  {t.urgency && <Tag variant={urgencyVariant(t.urgency)}>{t.urgency}</Tag>}
-                  <Tag variant={statusVariant(t.status)}>{t.status}</Tag>
-                </div>
-              </div>
-              {t.createdAt && (
-                <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--text-tertiary)" }}>
-                  {new Date(t.createdAt).toLocaleDateString("es-MX")}
-                </p>
-              )}
+                {t.createdAt && (
+                  <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--text-tertiary)" }}>
+                    {new Date(t.createdAt).toLocaleDateString("es-MX")}
+                  </p>
+                )}
+              </CrossPanelLink>
             </li>
           ))}
         </ul>

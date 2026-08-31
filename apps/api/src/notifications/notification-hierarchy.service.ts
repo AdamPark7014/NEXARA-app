@@ -169,7 +169,7 @@ export class NotificationHierarchyService {
           title: type === 'LUNCH_CHECKIN' ? 'Usuario en comida' : 'Usuario regresó',
           message: `${userName} ${actionText}`,
           triggerUserId: userId,
-          relatedUrl: `/erp/hr/attendance?tab=lunch`,
+          relatedUrl: `/erp/hr/lunch-breaks?highlight=${userId}`,
         });
       }
     } catch (error) {
