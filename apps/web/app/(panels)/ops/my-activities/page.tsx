@@ -9,6 +9,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
+import InlineAlert from "@/components/ui/InlineAlert";
 import { useUser } from "@/components/UserContext";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
@@ -64,7 +65,22 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
     ...init,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init.headers as Record<string, string> ?? {}) },
   });
-  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  if (!res.ok) {
+    const raw = await res.text().catch(() => `HTTP ${res.status}`);
+    let parsed: { message?: string; missingEvidence?: string[]; error?: string } | null = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      /* texto plano */
+    }
+    const err = new Error(parsed?.message || parsed?.error || raw) as Error & {
+      missingEvidence?: string[];
+      status?: number;
+    };
+    err.missingEvidence = Array.isArray(parsed?.missingEvidence) ? parsed.missingEvidence : undefined;
+    err.status = res.status;
+    throw err;
+  }
   if (res.status === 204) return null;
   const t = await res.text();
   return t ? JSON.parse(t) : null;
@@ -124,6 +140,11 @@ export default function MyActivitiesPage() {
   const [searchQ, setSearchQ] = useState("");
   const [items, setItems] = useState<ActivityRow[]>([]);
   const [evidences, setEvidences] = useState<EvidenceRow[]>([]);
+  const [evidenceGate, setEvidenceGate] = useState<{
+    activityId: number;
+    anNumber: string;
+    missing: string[];
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [evLoading, setEvLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -180,9 +201,11 @@ export default function MyActivitiesPage() {
 
   const updateStatus = async (a: ActivityRow, estatus: string) => {
     if (!token) return;
+    setEvidenceGate(null);
     try {
       const body: Record<string, unknown> = { estatus };
       if (estatus === "En Proceso") body.fechaInicio = new Date().toISOString();
+      if (estatus === "Finalizada") body.fechaFinalizacion = new Date().toISOString();
       await apiFetch(`activities/${a.id}/execute`, token, { method: "PATCH", body: JSON.stringify(body) });
 
       const coords = await captureGeolocation();
@@ -192,6 +215,12 @@ export default function MyActivitiesPage() {
 
       void load();
     } catch (e) {
+      const missing = (e as Error & { missingEvidence?: string[] })?.missingEvidence;
+      if (Array.isArray(missing) && missing.length > 0) {
+        setEvidenceGate({ activityId: a.id, anNumber: a.anNumber, missing });
+        toast.error("No se puede finalizar: faltan evidencias mínimas");
+        return;
+      }
       toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
     }
   };
@@ -287,6 +316,24 @@ export default function MyActivitiesPage() {
         ))}
       </div>
 
+      {evidenceGate && (
+        <div style={{ marginBottom: 14 }}>
+          <InlineAlert
+            variant="warning"
+            message={`OT ${evidenceGate.anNumber}: faltan evidencias para finalizar — ${evidenceGate.missing.join(" · ")}`}
+            onDismiss={() => setEvidenceGate(null)}
+          />
+          <ul style={{ margin: "0 0 10px", paddingLeft: 20, fontSize: 13, color: "var(--text-secondary)" }}>
+            {evidenceGate.missing.map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+          <Link href={`/ops/activities/${evidenceGate.activityId}/evidences`} style={{ textDecoration: "none" }}>
+            <Button size="sm" variant="primary" iconLeft="📸">Subir evidencias</Button>
+          </Link>
+        </div>
+      )}
+
       {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando tus actividades asignadas." />}
       {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
       {!loading && !error && visibleItems.length === 0 && <EmptyState icon="📅" title="Sin actividades" description={searchQ ? "Sin resultados para tu búsqueda." : "No tienes OT asignadas en este rango."} />}
@@ -327,6 +374,9 @@ export default function MyActivitiesPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {canStartActivity(a.estatus, a.activityEvidence) && (
                   <Button variant="primary" iconLeft="▶" onClick={() => void updateStatus(a, "En Proceso")}>Iniciar</Button>
+                )}
+                {isActivityInProgress(a.estatus) && !isEvidenceLocked(a.activityEvidence) && !isActivityCompleted(a.estatus) && (
+                  <Button variant="secondary" iconLeft="✓" onClick={() => void updateStatus(a, "Finalizada")}>Finalizar</Button>
                 )}
                 {isEvidenceLocked(a.activityEvidence) && (
                   <Tag variant="warning">En revisión</Tag>

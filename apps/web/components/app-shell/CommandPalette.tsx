@@ -27,7 +27,7 @@ import {
   getModuleEntryUrl,
   getUserPanelSwitchPath,
 } from "@/lib/user-access";
-import { buildCrossPanelUrl } from "@/lib/cross-panel-handoff";
+import { buildCrossPanelUrl, resolveCrossPanelHref, isCrossPanelHref, detectCurrentPanelId, panelIdFromInternalPath } from "@/lib/cross-panel-handoff";
 import type { UserAccessInput } from "@/lib/user-access";
 import { fetchGlobalSearch, type GlobalSearchResult } from "@/lib/search-api";
 import {
@@ -243,22 +243,30 @@ export default function CommandPalette({
   }, [open, query, token]);
 
   const modules = useMemo<Action[]>(() => {
+    const userJson = user ? JSON.stringify(user) : null;
+    const current = detectCurrentPanelId();
     const list = getUserAllowedModules(user)
       .filter((m) => m.visible !== false)
-      .map<Action>((m) => ({
-        id: `mod:${m.id}`,
-        label: m.label,
-        description: m.description,
-        icon: m.icon ?? "•",
-        group: `${PANEL_LABEL[m.panel]} · ${m.group ?? "General"}`,
-        panel: m.panel,
-        url: getModuleEntryUrl(m),
-        keywords: [m.id, m.path],
-      }));
+      .map<Action>((m) => {
+        const internal = getModuleEntryUrl(m);
+        return {
+          id: `mod:${m.id}`,
+          label: m.label,
+          description: m.description,
+          icon: m.icon ?? "•",
+          group: `${PANEL_LABEL[m.panel]} · ${m.group ?? "General"}`,
+          panel: m.panel,
+          url: resolveCrossPanelHref(internal, userJson, current),
+          keywords: [m.id, m.path],
+        };
+      });
     return list;
   }, [user]);
 
   const globalActions = useMemo<Action[]>(() => {
+    const userJson = user ? JSON.stringify(user) : null;
+    const current = detectCurrentPanelId();
+    const toUrl = (path: string) => resolveCrossPanelHref(path, userJson, current);
     const acc: Action[] = [
       {
         id: "act:create-lead",
@@ -266,7 +274,7 @@ export default function CommandPalette({
         description: "Nuevo prospecto en CRM",
         icon: "🌱",
         group: "Crear",
-        url: "/crm/leads",
+        url: toUrl("/crm/leads"),
         keywords: ["nuevo", "prospecto", "lead"],
       },
       {
@@ -275,7 +283,7 @@ export default function CommandPalette({
         description: "Nueva cotización comercial",
         icon: "📄",
         group: "Crear",
-        url: "/crm/quotes",
+        url: toUrl("/crm/quotes"),
         keywords: ["cotizacion", "quote", "nuevo"],
       },
       {
@@ -284,7 +292,7 @@ export default function CommandPalette({
         description: "Bandeja OPS · soporte",
         icon: "🎫",
         group: "Crear",
-        url: "/ops/support",
+        url: toUrl("/ops/support"),
         keywords: ["ticket", "soporte", "incidencia"],
       },
       {
@@ -306,7 +314,6 @@ export default function CommandPalette({
         keywords: ["salir", "logout", "exit"],
       },
     ];
-    const userJson = user ? JSON.stringify(user) : null;
     getUserAllowedPanels(user).forEach((p) => {
       acc.push({
         id: `panel:${p.id}`,
@@ -323,8 +330,11 @@ export default function CommandPalette({
   }, [onToggleDark, onLogout, user]);
 
   const entityActions = useMemo<Action[]>(() => {
+    const userJson = user ? JSON.stringify(user) : null;
+    const current = detectCurrentPanelId();
     return entityResults.map((r) => {
-      const url = searchResultUrl(r);
+      const raw = searchResultUrl(r);
+      const url = raw ? resolveCrossPanelHref(raw, userJson, current) : undefined;
       return {
         id: `entity:${r.type}:${r.id}`,
         label: r.title,
@@ -333,11 +343,11 @@ export default function CommandPalette({
           : searchResultTypeLabel(r.type),
         icon: searchResultIcon(r.type),
         group: "Entidades",
-        url: url ?? undefined,
+        url,
         keywords: [r.type, r.recommendation ?? ""],
       };
     });
-  }, [entityResults]);
+  }, [entityResults, user]);
 
   const allActions = useMemo<Action[]>(
     () => [...entityActions, ...modules, ...globalActions],
@@ -424,10 +434,16 @@ export default function CommandPalette({
     if (a.onSelect) {
       a.onSelect();
     } else if (a.url) {
-      if (a.id.startsWith("panel:")) {
-        window.location.assign(a.url);
+      const url = a.url;
+      if (
+        a.id.startsWith("panel:") ||
+        url.startsWith("http") ||
+        url.includes("?_nxt=") ||
+        isCrossPanelHref(url, detectCurrentPanelId())
+      ) {
+        window.location.assign(url);
       } else {
-        router.push(a.url);
+        router.push(url);
       }
     }
   }

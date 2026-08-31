@@ -1,5 +1,11 @@
-import { redirect } from "next/navigation";
+import CrossPanelRedirect from "@/components/CrossPanelRedirect";
 
 export default function PanelNotificationsRedirect() {
-  redirect("/erp/notifications-center");
+  return (
+    <CrossPanelRedirect
+      panel="erp"
+      path="/erp/notifications-center"
+      label="Abriendo centro de notificaciones…"
+    />
+  );
 }

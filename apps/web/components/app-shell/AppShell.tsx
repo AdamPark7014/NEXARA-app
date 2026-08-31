@@ -73,8 +73,15 @@ type AppShellProps = {
 export default function AppShell({ panel, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout, isContextReady } = useUser();
+  const { user, logout, isContextReady, sessionExpiringSoon, extendSession, sessionEndedMessage, clearSessionEndedMessage } = useUser();
   const { darkMode, toggleDarkMode } = useTheme();
+  const [extendingSession, setExtendingSession] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifPreview, setNotifPreview] = useState<Array<{ id: number; title: string; message: string; isRead: boolean; createdAt: string }>>([]);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const drawerRef = useRef<HTMLElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   // ── Auth gate ─────────────────────────────────────────────────────────
   // Si la sesión cargó y no hay usuario, redirigir a /login. Esto evita el
@@ -132,12 +139,31 @@ export default function AppShell({ panel, children }: AppShellProps) {
     return () => window.clearInterval(id);
   }, [user?.token]);
 
+  const loadNotifPreview = async () => {
+    if (!user?.token) return;
+    setNotifLoading(true);
+    try {
+      const res = await fetch(buildApiUrl("notifications?limit=8"), {
+        headers: { Authorization: `Bearer ${user.token}` },
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setNotifPreview(Array.isArray(data) ? data : (data?.data ?? []));
+    } catch {
+      /* non-critical */
+    } finally {
+      setNotifLoading(false);
+    }
+  };
+
   const panelMeta = PANEL_META[panel];
 
   useEffect(() => {
     setMobileOpen(false);
     setSwitcherOpen(false);
     setUserMenuOpen(false);
+    setNotifOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -147,6 +173,9 @@ export default function AppShell({ panel, children }: AppShellProps) {
       }
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setUserMenuOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
       }
     };
     document.addEventListener("mousedown", onClick);
@@ -159,6 +188,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
         setMobileOpen(false);
         setSwitcherOpen(false);
         setUserMenuOpen(false);
+        setNotifOpen(false);
       }
       // Cmd+K / Ctrl+K abre la paleta global
       if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
@@ -169,6 +199,34 @@ export default function AppShell({ panel, children }: AppShellProps) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
+
+  // Focus trap + restore for mobile drawer
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const drawer = drawerRef.current;
+    if (!drawer) return;
+    const focusables = drawer.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    first?.focus();
+    const onTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || focusables.length === 0) return;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last?.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", onTab);
+    return () => {
+      document.removeEventListener("keydown", onTab);
+      menuBtnRef.current?.focus();
+    };
+  }, [mobileOpen]);
 
   const orgRoleKey = useMemo(() => {
     if (!user) return null;
@@ -218,8 +276,16 @@ export default function AppShell({ panel, children }: AppShellProps) {
   const canAccessPanel = useMemo(() => canUserAccessPanel(user, panel), [user, panel]);
   const panelEntryPath = useMemo(() => getUserPanelEntryPath(user, panel), [user, panel]);
   const notificationsUrl = useMemo(() => {
-    const target = `/${panel}/notifications-center`;
-    return canUserAccessPath(user, target) ? target : null;
+    const erpTarget = "/erp/notifications-center";
+    const panelTarget = `/${panel}/notifications-center`;
+    if (
+      !canUserAccessPath(user, erpTarget) &&
+      !canUserAccessPath(user, panelTarget)
+    ) {
+      return null;
+    }
+    const userJson = user ? JSON.stringify(user) : null;
+    return buildCrossPanelUrl("erp", erpTarget, userJson);
   }, [user, panel]);
   const profileUrl = useMemo(() => {
     const target = `/${panel}/my-profile`;
@@ -401,8 +467,85 @@ export default function AppShell({ panel, children }: AppShellProps) {
       data-panel={panel}
       style={{ "--panel-accent": panelMeta.accent } as React.CSSProperties}
     >
+      <a href="#nx-main" className={styles.skipToMain}>
+        Saltar al contenido
+      </a>
+
+      {(sessionExpiringSoon || sessionEndedMessage) && (
+        <div
+          role="status"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+            flexWrap: "wrap",
+            padding: "10px 16px",
+            background: sessionEndedMessage
+              ? "color-mix(in srgb, var(--danger) 14%, var(--surface))"
+              : "color-mix(in srgb, var(--warning) 16%, var(--surface))",
+            borderBottom: "1px solid var(--nx-panel-hairline)",
+            fontSize: 13,
+            zIndex: 200,
+          }}
+        >
+          <span>
+            {sessionEndedMessage ??
+              "Tu sesión está por expirar. Extiéndela para no perder el trabajo."}
+          </span>
+          {sessionExpiringSoon && user && (
+            <button
+              type="button"
+              disabled={extendingSession}
+              onClick={async () => {
+                setExtendingSession(true);
+                await extendSession();
+                setExtendingSession(false);
+              }}
+              style={{
+                border: "1px solid var(--border)",
+                background: "var(--surface)",
+                borderRadius: 8,
+                padding: "6px 12px",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              {extendingSession ? "Extendiendo…" : "Extender sesión"}
+            </button>
+          )}
+          {sessionEndedMessage && (
+            <button
+              type="button"
+              onClick={() => clearSessionEndedMessage()}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "var(--text-secondary)",
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Cerrar
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ───────── SIDEBAR ───────── */}
-      <aside className={styles.sidebar}>
+      <aside
+        ref={drawerRef}
+        className={styles.sidebar}
+        aria-label="Navegación del panel"
+        {...(mobileOpen
+          ? { role: "dialog", "aria-modal": true, "aria-label": "Menú de navegación" }
+          : {})}
+      >
         <div className={styles.brand}>
           <div className={styles.brandLogo} aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -560,9 +703,12 @@ export default function AppShell({ panel, children }: AppShellProps) {
       <header className={styles.topbar}>
         <button
           type="button"
+          ref={menuBtnRef}
           className={styles.mobileMenuBtn}
           onClick={() => setMobileOpen((v) => !v)}
           aria-label={mobileOpen ? "Cerrar menú" : "Abrir menú"}
+          aria-expanded={mobileOpen}
+          aria-controls="nx-sidebar-nav"
         >
           ☰
         </button>
@@ -684,38 +830,139 @@ export default function AppShell({ panel, children }: AppShellProps) {
           </button>
 
           {notificationsUrl && (
-            <Link href={notificationsUrl} className={styles.iconBtn} title="Notificaciones" style={{ position: "relative" }}>
-              🔔
-              {unreadNotifs > 0 && (
-                <span
+            <div ref={notifRef} style={{ position: "relative" }}>
+              <button
+                type="button"
+                className={styles.iconBtn}
+                title="Notificaciones"
+                aria-label="Notificaciones"
+                aria-haspopup="dialog"
+                aria-expanded={notifOpen}
+                style={{ position: "relative" }}
+                onClick={() => {
+                  const next = !notifOpen;
+                  setNotifOpen(next);
+                  if (next) void loadNotifPreview();
+                }}
+              >
+                🔔
+                {unreadNotifs > 0 && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 2,
+                      right: 2,
+                      minWidth: 16,
+                      height: 16,
+                      padding: "0 4px",
+                      borderRadius: 999,
+                      background: "var(--danger)",
+                      color: "#fff",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {unreadNotifs > 99 ? "99+" : unreadNotifs}
+                  </span>
+                )}
+              </button>
+              {notifOpen && (
+                <div
+                  role="dialog"
+                  aria-label="Notificaciones recientes"
                   style={{
                     position: "absolute",
-                    top: 2,
-                    right: 2,
-                    minWidth: 16,
-                    height: 16,
-                    padding: "0 4px",
-                    borderRadius: 999,
-                    background: "var(--danger)",
-                    color: "#fff",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    lineHeight: 1,
+                    right: 0,
+                    top: "calc(100% + 8px)",
+                    width: 340,
+                    maxWidth: "min(340px, 92vw)",
+                    background: "var(--surface)",
+                    border: "1px solid var(--nx-panel-hairline)",
+                    borderRadius: 14,
+                    boxShadow: "0 8px 28px rgba(8,24,38,0.16)",
+                    zIndex: 60,
+                    overflow: "hidden",
                   }}
                 >
-                  {unreadNotifs > 99 ? "99+" : unreadNotifs}
-                </span>
+                  <div
+                    style={{
+                      padding: "12px 14px",
+                      borderBottom: "1px solid var(--nx-panel-hairline)",
+                      fontWeight: 700,
+                      fontSize: 13,
+                    }}
+                  >
+                    Notificaciones
+                  </div>
+                  <div style={{ maxHeight: 320, overflowY: "auto" }}>
+                    {notifLoading && (
+                      <div style={{ padding: 16, fontSize: 13, color: "var(--text-secondary)" }}>
+                        Cargando…
+                      </div>
+                    )}
+                    {!notifLoading && notifPreview.length === 0 && (
+                      <div style={{ padding: 16, fontSize: 13, color: "var(--text-secondary)" }}>
+                        Sin notificaciones recientes.
+                      </div>
+                    )}
+                    {!notifLoading &&
+                      notifPreview.map((n) => (
+                        <div
+                          key={n.id}
+                          style={{
+                            padding: "10px 14px",
+                            borderBottom: "1px solid var(--nx-panel-hairline-soft)",
+                            background: n.isRead
+                              ? "transparent"
+                              : "color-mix(in srgb, var(--primary) 6%, transparent)",
+                          }}
+                        >
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>{n.title}</div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "var(--text-secondary)",
+                              marginTop: 2,
+                              lineHeight: 1.35,
+                            }}
+                          >
+                            {n.message}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                  <div style={{ padding: 10, borderTop: "1px solid var(--nx-panel-hairline)" }}>
+                    {notificationsUrl.startsWith("http") || notificationsUrl.includes("?_nxt=") ? (
+                      <a
+                        href={notificationsUrl}
+                        style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}
+                        onClick={() => setNotifOpen(false)}
+                      >
+                        Ver todas →
+                      </a>
+                    ) : (
+                      <Link
+                        href={notificationsUrl}
+                        style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}
+                        onClick={() => setNotifOpen(false)}
+                      >
+                        Ver todas →
+                      </Link>
+                    )}
+                  </div>
+                </div>
               )}
-            </Link>
+            </div>
           )}
         </div>
       </header>
 
       {/* ───────── MAIN ───────── */}
-      <main className={`${styles.main}${isFullBleed ? ` ${styles.mainFullBleed}` : ""}`}>
+      <main id="nx-main" className={`${styles.main}${isFullBleed ? ` ${styles.mainFullBleed}` : ""}`} tabIndex={-1}>
         <div className={`${styles.contentInner}${isFullBleed ? ` ${styles.contentInnerFullBleed}` : ""}`}>
           {children}
         </div>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -125,9 +126,9 @@ export default function BiPage() {
       label: "Línea de negocio",
       width: 180,
       render: (r) => (
-        <Link href="/ops/projects" style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>
+        <CrossPanelLink href="/ops/projects" style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>
           {r.projectType}
-        </Link>
+        </CrossPanelLink>
       ),
     },
     { key: "count", label: "Proyectos", width: 90 },
@@ -272,9 +273,9 @@ export default function BiPage() {
                     </strong>
                   </p>
                   {slaCost > 0 && (
-                    <Link href="/ops/dispatch" style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600, marginTop: 8, display: "inline-block" }}>
+                    <CrossPanelLink href="/ops/dispatch" style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600, marginTop: 8, display: "inline-block" }}>
                       Ir al centro de despacho →
-                    </Link>
+                    </CrossPanelLink>
                   )}
                 </div>
               </div>
@@ -338,9 +339,9 @@ export default function BiPage() {
                 <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
                   {margin.map((r) => (
                     <div key={r.projectType} style={{ display: "grid", gridTemplateColumns: "160px 1fr 80px", gap: 10, alignItems: "center" }}>
-                      <Link href="/ops/projects" style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--primary)", textDecoration: "none" }}>
+                      <CrossPanelLink href="/ops/projects" style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--primary)", textDecoration: "none" }}>
                         {r.projectType}
-                      </Link>
+                      </CrossPanelLink>
                       <div style={{ position: "relative", height: 20, background: "var(--surface-2)", borderRadius: 4, overflow: "hidden" }}>
                         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(r.budget / maxBudget) * 100}%`, background: "color-mix(in srgb, var(--primary) 20%, transparent)", borderRadius: 4 }} />
                         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(0, (r.margin / maxBudget) * 100)}%`, background: r.margin >= 0 ? "var(--success)" : "var(--danger)", borderRadius: 4, opacity: 0.7 }} />

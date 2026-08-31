@@ -874,13 +874,13 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   // ════════════════════════════════════════════════════════════════
   "facilities-access": {
     id: "facilities-access", panel: PANELS.ERP, path: "/facilities/access",
-    label: "Accesos oficinas", description: "Puertas Artemis de sedes NEXARA",
+    label: "Accesos oficinas", description: "Control de accesos de sedes NEXARA",
     icon: "🚪", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.ADMIN_STAFF, R.NOC_LEAD],
     group: "Facilities", visible: true,
   },
 
   // ════════════════════════════════════════════════════════════════
-  // INTEGRA — CCTV / ACS sitio (HikCentral Artemis)
+  // INTEGRA — CCTV / ACS sitio
   // ════════════════════════════════════════════════════════════════
   "integra-home": {
     id: "integra-home", panel: PANELS.INTEGRA, path: "/",
@@ -938,7 +938,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "integra-settings": {
     id: "integra-settings", panel: PANELS.INTEGRA, path: "/settings",
-    label: "Sitios", description: "Conexiones HikCentral / Hik-Connect y sync",
+    label: "Sitios", description: "Conexiones de plataforma y sincronización",
     icon: "⚙️", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.DIRECTOR_ADMIN],
     group: "Administración", visible: true,
   },

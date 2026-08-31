@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo } from "react";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES, type RoleKey } from "@/lib/rbac/roles";
@@ -123,7 +123,7 @@ export function CommandCenterRail({
       }}
     >
       {widgets.map((w) => (
-        <Link
+        <CrossPanelLink
           key={w.id}
           href={w.href}
           title={w.hint}
@@ -144,7 +144,7 @@ export function CommandCenterRail({
         >
           <span aria-hidden>{w.icon}</span>
           <span>{w.label}</span>
-        </Link>
+        </CrossPanelLink>
       ))}
     </div>
   );

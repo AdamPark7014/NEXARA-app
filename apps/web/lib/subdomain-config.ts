@@ -109,7 +109,7 @@ export const SUBDOMAIN_CONFIG: Record<string, SubdomainConfig> = {
     aliases: ['monitor.nexara.com.mx'],
     rootPath: '/',
     description:
-      'Centro de monitoreo 24/7: uptime de cámaras Hikvision, POS Toks, impresoras, IoT, alertas en vivo y telemetría histórica.',
+      'Centro de monitoreo 24/7: uptime de cámaras, POS Toks, impresoras, IoT, alertas en vivo y telemetría histórica.',
     enabled: true,
   },
 

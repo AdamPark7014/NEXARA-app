@@ -153,9 +153,7 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
   const healthTone =
     health?.connected === true ? "ok" : health?.configured ? "warn" : "off";
   const healthLabel = health?.connected
-    ? health.provider === "HCT"
-      ? "Hik-Connect"
-      : "HikCentral"
+    ? "Sitio conectado"
     : health?.configured
       ? "Sin enlace"
       : isClient

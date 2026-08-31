@@ -50,7 +50,7 @@ export default function IntegraVisitorsPage() {
       });
       const list = data?.list || data?.data?.list || (Array.isArray(data) ? data : []);
       setInbox(list);
-      if (!list.length) setInboxNote("Sin citas en el rango (o sitio HCT sin visitas Artemis).");
+      if (!list.length) setInboxNote("Sin citas en el rango (o el sitio no tiene módulo de visitas).");
     } catch (e) {
       setInbox([]);
       setInboxNote(e instanceof Error ? e.message : "Inbox no disponible");

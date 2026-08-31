@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import { DashPanel, ListRow } from "@/components/dashboard/DashKit";
 import type { ExecutiveBiDrillLink } from "@/lib/executive-widgets";
 
@@ -15,9 +15,9 @@ export function ExecutiveBiDrillPanel({ links }: { links: ExecutiveBiDrillLink[]
         ))}
       </div>
       <div style={{ padding: "8px 12px 4px" }}>
-        <Link href="/erp/analytics/bi" style={{ fontSize: 12, color: "var(--primary)" }}>
+        <CrossPanelLink href="/erp/analytics/bi" style={{ fontSize: 12, color: "var(--primary)" }}>
           Abrir tablero BI completo
-        </Link>
+        </CrossPanelLink>
       </div>
     </DashPanel>
   );

@@ -161,10 +161,10 @@ export default function IntegraEventsPage() {
           <input value={personName} onChange={(e) => setPersonName(e.target.value)} placeholder="contiene…" style={inputStyle} />
         </IgField>
         <IgField label="ID persona">
-          <input value={personId} onChange={(e) => setPersonId(e.target.value)} placeholder="opcional" style={inputStyle} title="personId Artemis" />
+          <input value={personId} onChange={(e) => setPersonId(e.target.value)} placeholder="opcional" style={inputStyle} title="ID de persona" />
         </IgField>
         <IgField label="Tipo evento">
-          <input value={eventType} onChange={(e) => setEventType(e.target.value)} placeholder="código" style={{ ...inputStyle, maxWidth: 110 }} title="eventType Artemis" />
+          <input value={eventType} onChange={(e) => setEventType(e.target.value)} placeholder="código" style={{ ...inputStyle, maxWidth: 110 }} title="Tipo de evento" />
         </IgField>
         <IgField label="Por página">
           <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 80 }}>

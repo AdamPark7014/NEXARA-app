@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -704,16 +705,16 @@ export default function WarehousePage() {
         <span style={{ padding: "8px 14px", borderRadius: 999, background: "var(--primary)", color: "#fff", fontSize: 12, fontWeight: 700 }}>
           Stock productos
         </span>
-        <Link href="/crm/products" style={{ textDecoration: "none" }}>
+        <CrossPanelLink href="/crm/products" style={{ textDecoration: "none" }}>
           <span style={{ padding: "8px 14px", borderRadius: 999, background: "var(--surface-2)", border: "1px solid var(--border)", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "inline-block" }}>
             Catálogo productos
           </span>
-        </Link>
-        <Link href="/ops/tools?tab=inventory" style={{ textDecoration: "none" }}>
+        </CrossPanelLink>
+        <CrossPanelLink href="/ops/tools?tab=inventory" style={{ textDecoration: "none" }}>
           <span style={{ padding: "8px 14px", borderRadius: 999, background: "var(--surface-2)", border: "1px solid var(--border)", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "inline-block" }}>
             Stock herramientas
           </span>
-        </Link>
+        </CrossPanelLink>
       </div>
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18, borderBottom: "1px solid var(--border)", paddingBottom: 12 }}>

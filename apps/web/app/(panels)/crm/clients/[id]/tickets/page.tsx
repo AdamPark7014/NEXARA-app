@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
 import InlineAlert from "@/components/ui/InlineAlert";
@@ -196,9 +197,9 @@ export default function ClientTicketsPage() {
         <div style={{ display: "flex", gap: 8 }}>
           <Button variant="ghost" size="sm" onClick={() => void load()}>Actualizar</Button>
           <Button variant="primary" size="sm" iconLeft="+" onClick={() => { setSaveErr(null); setShowForm(true); }}>Nuevo ticket</Button>
-          <Link href="/ops/support" style={{ textDecoration: "none" }}>
+          <CrossPanelLink href="/ops/support" style={{ textDecoration: "none" }}>
             <Button variant="secondary" size="sm">Bandeja OPS →</Button>
-          </Link>
+          </CrossPanelLink>
         </div>
       </div>
 

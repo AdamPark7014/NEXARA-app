@@ -360,7 +360,7 @@ export default function IntegraVideoPage() {
                 </>
               ) : (
                 <p className={styles.doorCellMeta}>
-                  Playback Artemis no aplica en Hik-Connect (ADR-0019). Usa live EZUIKit.
+                  Playback histórico no aplica en este proveedor. Usa live EZUIKit.
                 </p>
               )}
             </div>

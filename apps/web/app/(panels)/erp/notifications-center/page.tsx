@@ -14,6 +14,11 @@ import { toast } from "@/components/Toast";
 import KpiCard from "@/components/ui/KpiCard";
 import { fetchActivityFeed, type ActivityFeedItem } from "@/lib/activity-feed-api";
 import { createRealtimeSocket } from "@/lib/realtime-socket";
+import {
+  detectCurrentPanelId,
+  isCrossPanelHref,
+  resolveCrossPanelHref,
+} from "@/lib/cross-panel-handoff";
 
 interface Notif {
   id: number;
@@ -157,9 +162,17 @@ export default function NotificationsCenterPage() {
   };
 
   const openPath = (path: string) => {
-    const normalized = normalizeLegacyPath(path.split("?")[0]) +
+    const normalized =
+      normalizeLegacyPath(path.split("?")[0]) +
       (path.includes("?") ? "?" + path.split("?").slice(1).join("?") : "");
-    router.push(normalized);
+    const current = detectCurrentPanelId();
+    const userJson = user ? JSON.stringify(user) : null;
+    if (isCrossPanelHref(normalized, current)) {
+      window.location.assign(resolveCrossPanelHref(normalized, userJson, current));
+      return;
+    }
+    const local = resolveCrossPanelHref(normalized, null, current);
+    router.push(local);
   };
 
   const openNotif = (n: Notif) => {
