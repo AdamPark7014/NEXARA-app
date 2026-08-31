@@ -4,24 +4,49 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { HikCentralArtemisClient } from '../hikvision-artemis/index';
 import { HikConnectTeamsClient } from '../hikvision-hct/index';
+import { HikvisionIsapiClient } from '../hikvision-isapi/index';
 import { decryptSecret, encryptSecret } from './integra-secrets';
 
-export type IntegraProviderKind = 'ARTEMIS' | 'HCT';
+export type IntegraProviderKind = 'ARTEMIS' | 'HCT' | 'ISAPI';
 
 export type ResolvedIntegraClient = {
   provider: IntegraProviderKind;
-  /** Artemis client — null si provider=HCT */
+  /** Artemis client — null salvo provider=ARTEMIS */
   client: HikCentralArtemisClient | null;
-  /** HCT client — null si provider=ARTEMIS */
+  /** HCT client — null salvo provider=HCT */
   hct: HikConnectTeamsClient | null;
+  /** ISAPI directo a LAN — null salvo provider=ISAPI (ADR-0019 §5) */
+  isapi: HikvisionIsapiClient | null;
+  /**
+   * Cliente ISAPI para OTRA IP del mismo sitio, con las credenciales del sitio.
+   * En LAN un sitio son varios equipos (NVR + cámaras sueltas + terminales) y
+   * casi siempre comparten usuario. Null salvo provider=ISAPI.
+   */
+  isapiForHost: ((host: string) => HikvisionIsapiClient) | null;
   siteId: number | null;
   companyId: number | null;
   host: string;
   source: 'site' | 'env';
 };
 
+const PROVIDERS: IntegraProviderKind[] = ['ARTEMIS', 'HCT', 'ISAPI'];
+
+/**
+ * El espejo guarda la IP pelada del equipo (`192.168.9.171`); el sitio guarda
+ * un host con esquema. Hereda el esquema del sitio para no forzar HTTPS contra
+ * un firmware que solo escucha en :80.
+ */
+function normalizeLanHost(deviceHost: string, siteHost: string): string {
+  if (/^https?:\/\//i.test(deviceHost)) return deviceHost.replace(/\/$/, '');
+  const scheme = siteHost.startsWith('https://') ? 'https' : 'http';
+  return `${scheme}://${deviceHost.replace(/\/$/, '')}`;
+}
+
 function normalizeProvider(raw?: string | null): IntegraProviderKind {
-  return String(raw || 'ARTEMIS').toUpperCase() === 'HCT' ? 'HCT' : 'ARTEMIS';
+  const upper = String(raw || 'ARTEMIS').toUpperCase();
+  return (PROVIDERS as string[]).includes(upper)
+    ? (upper as IntegraProviderKind)
+    : 'ARTEMIS';
 }
 
 @Injectable()
@@ -226,6 +251,8 @@ export class IntegraSiteService {
         scope: 'integra',
       }),
       hct: null,
+      isapi: null,
+      isapiForHost: null,
       siteId: null,
       companyId,
       host,
@@ -259,6 +286,38 @@ export class IntegraSiteService {
           timeoutMs: timeout,
           scope: `integra-hct-${site.id}`,
         }),
+        isapi: null,
+        isapiForHost: null,
+        siteId: site.id,
+        companyId,
+        host: site.host,
+        source: 'site',
+      };
+    }
+
+    if (provider === 'ISAPI') {
+      // Sitio LAN: `host` es la IP del equipo cabecera (NVR o controladora) y
+      // las dos columnas cifradas guardan usuario y contraseña de su consola
+      // web — no hay appKey/appSecret porque ISAPI no los tiene.
+      return {
+        provider: 'ISAPI',
+        client: null,
+        hct: null,
+        isapi: new HikvisionIsapiClient({
+          host: site.host,
+          username: appKey,
+          password: appSecret,
+          timeoutMs: timeout,
+          scope: `integra-isapi-${site.id}`,
+        }),
+        isapiForHost: (deviceHost: string) =>
+          new HikvisionIsapiClient({
+            host: normalizeLanHost(deviceHost, site.host),
+            username: appKey,
+            password: appSecret,
+            timeoutMs: timeout,
+            scope: `integra-isapi-${site.id}-${deviceHost}`,
+          }),
         siteId: site.id,
         companyId,
         host: site.host,
@@ -276,6 +335,8 @@ export class IntegraSiteService {
         scope: `integra-site-${site.id}`,
       }),
       hct: null,
+      isapi: null,
+      isapiForHost: null,
       siteId: site.id,
       companyId,
       host: site.host,

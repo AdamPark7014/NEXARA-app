@@ -2,6 +2,7 @@
 
 Checklist para `integra.nexara.com.mx`, sitios multi-tenant, go2rtc y ACS oficinas.
 Ver [ADR-0017](ADR-0017-nexara-integra.md), [ADR-0018](ADR-0018-integra-media-tenancy.md), [ADR-0019](ADR-0019-integra-hct-adapter.md).
+Sitios sin HikCentral ni HCT (LAN pura): [INTEGRA-LAN](INTEGRA-LAN.md).
 
 ## Frontera
 
@@ -46,6 +47,17 @@ Sitios se crean en UI `/integra/settings` (roles altos). Rotar keys = editar sit
 - API `POST /api/integra/cameras/:id/stream` registra RTSP Artemis y devuelve HLS público.
 - El contenedor debe alcanzar la red donde Artemis publica RTSP (VPN/LAN).
 - Puerto interno `1984`; público solo vía Traefik path `/go2rtc`.
+
+## Provider ISAPI (LAN pura)
+
+| Campo sitio | Valor |
+|-------------|--------|
+| `provider` | `ISAPI` |
+| `host` | `http://<ip-del-grabador>` |
+| appKey / appSecret | **usuario / contraseña** de la consola web del equipo |
+
+Alta y barrido en [INTEGRA-LAN](INTEGRA-LAN.md). **go2rtc debe correr dentro de
+la LAN del sitio**; el del droplet no alcanza el RTSP de los equipos.
 
 ## Provider HCT (ADR-0019)
 

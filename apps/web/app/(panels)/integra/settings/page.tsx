@@ -23,7 +23,7 @@ type Site = {
   name: string;
   label?: string | null;
   host: string;
-  provider?: "ARTEMIS" | "HCT";
+  provider?: "ARTEMIS" | "HCT" | "ISAPI";
   isActive: boolean;
   isDefault: boolean;
   lastSyncAt?: string | null;
@@ -62,7 +62,7 @@ export default function IntegraSettingsPage() {
   const [host, setHost] = useState("");
   const [appKey, setAppKey] = useState("");
   const [appSecret, setAppSecret] = useState("");
-  const [provider, setProvider] = useState<"ARTEMIS" | "HCT">("ARTEMIS");
+  const [provider, setProvider] = useState<"ARTEMIS" | "HCT" | "ISAPI">("ARTEMIS");
   const [serviceClientId, setServiceClientId] = useState("");
   const [serviceClients, setServiceClients] = useState<Array<{ id: number; name: string }>>([]);
   const [targetCompanyId, setTargetCompanyId] = useState("");
@@ -281,11 +281,12 @@ export default function IntegraSettingsPage() {
                 <IgField label="Tipo de conexión">
                   <select
                     value={provider}
-                    onChange={(e) => setProvider(e.target.value as "ARTEMIS" | "HCT")}
+                    onChange={(e) => setProvider(e.target.value as "ARTEMIS" | "HCT" | "ISAPI")}
                     style={{ ...selectStyle, maxWidth: "100%" }}
                   >
                     <option value="ARTEMIS">HikCentral (Artemis)</option>
                     <option value="HCT">Hik-Connect (nube)</option>
+                    <option value="ISAPI">Equipos en red local (ISAPI)</option>
                   </select>
                 </IgField>
                 <IgField label="Nombre">
@@ -304,26 +305,35 @@ export default function IntegraSettingsPage() {
                     style={{ ...inputStyle, maxWidth: "100%" }}
                   />
                 </IgField>
-                <IgField label="Dirección del servidor">
+                <IgField
+                  label={
+                    provider === "ISAPI" ? "Dirección del grabador" : "Dirección del servidor"
+                  }
+                >
                   <input
                     value={host}
                     onChange={(e) => setHost(e.target.value)}
                     placeholder={
                       provider === "HCT"
                         ? "https://…areaDomain…"
-                        : "https://hikcentral.ejemplo.com"
+                        : provider === "ISAPI"
+                          ? "http://192.168.1.10"
+                          : "https://hikcentral.ejemplo.com"
                     }
                     style={{ ...inputStyle, maxWidth: "100%" }}
                   />
                 </IgField>
-                <IgField label="Clave de acceso">
+                {/* ISAPI no tiene appKey/appSecret: son las credenciales de la
+                    consola web del equipo, guardadas en las mismas columnas. */}
+                <IgField label={provider === "ISAPI" ? "Usuario del equipo" : "Clave de acceso"}>
                   <input
                     value={appKey}
                     onChange={(e) => setAppKey(e.target.value)}
+                    placeholder={provider === "ISAPI" ? "admin" : undefined}
                     style={{ ...inputStyle, maxWidth: "100%" }}
                   />
                 </IgField>
-                <IgField label="Secreto">
+                <IgField label={provider === "ISAPI" ? "Contraseña del equipo" : "Secreto"}>
                   <input
                     type="password"
                     value={appSecret}
@@ -331,6 +341,13 @@ export default function IntegraSettingsPage() {
                     style={{ ...inputStyle, maxWidth: "100%" }}
                   />
                 </IgField>
+                {provider === "ISAPI" && (
+                  <p style={{ fontSize: 12, opacity: 0.75, margin: 0 }}>
+                    El grabador es el equipo cabecera: sus canales son el inventario de
+                    cámaras, incluidas las que cuelgan de su PoE interno. Las terminales
+                    de control de acceso se dan de alta aparte.
+                  </p>
+                )}
 
                 
                 <IgField label="Cliente operativo (ERP)">
