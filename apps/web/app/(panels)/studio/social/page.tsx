@@ -5,7 +5,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
-import { Tag } from "@/components/ui/DataTable";
+import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
@@ -29,10 +29,6 @@ interface SocialPost {
 
 const RED_EMOJI: Record<string, string> = {
   Instagram: "📷", LinkedIn: "💼", Facebook: "📘", Twitter: "🐦", TikTok: "🎵",
-};
-
-const ESTADO_VARIANT: Record<string, "neutral" | "warning" | "positive" | "accent"> = {
-  Borrador: "neutral", Programado: "warning", Publicado: "positive", Cancelado: "neutral",
 };
 
 async function apiFetch(path: string, token: string, opts?: RequestInit) {
@@ -299,14 +295,29 @@ export default function StudioSocialPage() {
       />
 
       <Section title={loading ? "Cargando…" : `${visibleItems.length} posts`}>
-        {loading ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-        ) : items.length === 0 ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>
-            No hay posts aún.{" "}
-            <button onClick={openNew} style={{ color: "var(--primary)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Crea el primero →</button>
-          </div>
-        ) : (
+        {loading && (
+          <EmptyState icon="⏳" title="Cargando…" description="Consultando el calendario social." />
+        )}
+        {!loading && error && (
+          <EmptyState
+            icon="⚠️"
+            title="No se pudo cargar"
+            description={error}
+            action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+          />
+        )}
+        {!loading && !error && items.length === 0 ? (
+          <EmptyState
+            icon="📱"
+            title="Sin posts"
+            description="Programa la primera publicación en redes."
+            action={
+              cfg.canCreate ? (
+                <Button size="sm" variant="primary" onClick={openNew}>Crear post</Button>
+              ) : undefined
+            }
+          />
+        ) : !loading && !error ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {visibleItems.map(p => (
               <article key={p.id} style={{
@@ -330,7 +341,7 @@ export default function StudioSocialPage() {
               </article>
             ))}
           </div>
-        )}
+        ) : null}
       </Section>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>

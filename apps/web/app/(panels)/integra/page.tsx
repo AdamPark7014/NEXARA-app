@@ -804,7 +804,7 @@ export default function IntegraHome() {
                         <IntegraHlsPlayer src={preview.hls} />
                       ) : (
                         <p className={styles.igEmpty}>
-                          {preview?.note || "Sin HLS — revisa go2rtc o token HCT"}
+                          {preview?.note || "Sin señal de video — revisa el sitio o el stream"}
                         </p>
                       )}
                     </div>

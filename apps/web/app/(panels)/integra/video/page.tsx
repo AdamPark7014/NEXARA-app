@@ -360,7 +360,7 @@ export default function IntegraVideoPage() {
                 </>
               ) : (
                 <p className={styles.doorCellMeta}>
-                  Playback histórico no aplica en este proveedor. Usa live EZUIKit.
+                  Playback histórico no aplica en este proveedor. Usa video en vivo.
                 </p>
               )}
             </div>

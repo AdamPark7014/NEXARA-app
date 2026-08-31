@@ -69,11 +69,11 @@ export type IntegraModuleCard = {
 };
 
 export const INTEGRA_MODULE_CARDS: IntegraModuleCard[] = [
-  { href: "/integra/video", title: "Video", sub: "HLS go2rtc · HCT token · snapshot", capability: "video" },
+  { href: "/integra/video", title: "Video", sub: "Live · wall · snapshot", capability: "video" },
   { href: "/integra/access", title: "Accesos", sub: "Puertas · devices ACS · privilegios", capability: "access" },
   { href: "/integra/people", title: "Personas", sub: "Directorio · organizaciones", capability: "people" },
   { href: "/integra/events", title: "Eventos ACS", sub: "Timeline 24 h · fotos proxy", capability: "events" },
-  { href: "/integra/alarms", title: "Alarmas", sub: "eventService records", capability: "alarms" },
+  { href: "/integra/alarms", title: "Alarmas", sub: "Abiertas · histórico · tickets", capability: "alarms" },
   { href: "/integra/visitors", title: "Visitas", sub: "Citas · QR", capability: "visitors" },
   { href: "/integra/vehicles", title: "Vehículos", sub: "CRUD flota", capability: "vehicles" },
   { href: "/integra/anpr", title: "ANPR / PMS", sub: "Cruces de placa", capability: "anpr" },
