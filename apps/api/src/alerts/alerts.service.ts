@@ -150,7 +150,7 @@ export class AlertsService {
               message: `Margen real de ${realMarginPct.toFixed(1)}% (umbral ${MARGIN_ALERT_THRESHOLD_PERCENT}%). Revisa costos reales vs presupuesto.`,
               entityType: 'SalesProject',
               relatedEntityId: p.id,
-              relatedUrl: `/ops/projects/${p.id}`,
+              relatedUrl: `/crm/projects/${p.id}`,
               priority: realMarginPct < 0 ? 'high' : 'normal',
             },
             {
@@ -211,6 +211,10 @@ export class AlertsService {
         ]));
         if (!targets.length) continue;
 
+        const landingUrl = v.activityId
+          ? `/ops/activities/${v.activityId}`
+          : `/ops/maintenance/contracts`;
+
         const title = overdue
           ? `⛔ SLA vencido — visita mantenimiento ${v.contract?.contractNumber || ''}`
           : `⏰ SLA próximo — visita mantenimiento ${v.contract?.contractNumber || ''}`;
@@ -227,7 +231,7 @@ export class AlertsService {
             message,
             entityType: 'MaintenanceContractVisit',
             relatedEntityId: v.id,
-            relatedUrl: `/ops/maintenance?woId=${v.contract?.id}`,
+            relatedUrl: landingUrl,
             priority: overdue ? 'high' : 'normal',
           },
           {

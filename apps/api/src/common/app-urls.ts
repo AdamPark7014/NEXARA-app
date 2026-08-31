@@ -25,9 +25,20 @@ export const appUrls = {
   opsVehicles: (id?: number) => (id ? `/ops/vehicles?highlight=${id}` : `/ops/vehicles`),
   opsActivities: () => `/ops/activities`,
 
-  erpAttendance: (tab?: string) => {
+  erpAttendance: (tab?: string, highlightId?: number) => {
     if (tab === "lunch") return `/erp/hr/lunch-breaks`;
-    return tab ? `/erp/hr/attendance?tab=${tab}` : `/erp/hr/attendance`;
+    const params = new URLSearchParams();
+    if (tab) params.set("tab", tab);
+    if (highlightId != null) params.set("highlight", String(highlightId));
+    const qs = params.toString();
+    return qs ? `/erp/hr/attendance?${qs}` : `/erp/hr/attendance`;
+  },
+  erpExpenses: (highlightId?: number) =>
+    highlightId ? `/erp/finance/expenses?highlight=${highlightId}` : `/erp/finance/expenses`,
+  opsSupport: (id?: number) => (id ? `/ops/support/${id}` : `/ops/support`),
+  opsSupportNew: (params?: Record<string, string>) => {
+    const qs = params ? new URLSearchParams(params).toString() : "";
+    return qs ? `/ops/support/new?${qs}` : `/ops/support/new`;
   },
   erpUsers: (id?: number) => (id ? `/erp/users?highlight=${id}` : `/erp/users`),
   erpProcurement: (tab: string, id?: number) =>

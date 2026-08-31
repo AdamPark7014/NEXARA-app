@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
@@ -366,7 +367,17 @@ function TeamCard({ member, token, dateFilter }: { member: TeamMember; token: st
 
 // ─── Team View ────────────────────────────────────────────────────────────────
 
-function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: string; dateFilter: string; visibilityHint?: string }) {
+function TeamAttendanceView({
+  token,
+  dateFilter,
+  visibilityHint,
+  highlightId,
+}: {
+  token: string;
+  dateFilter: string;
+  visibilityHint?: string;
+  highlightId?: string | null;
+}) {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [teamErr, setTeamErr] = useState<string | null>(null);
@@ -407,8 +418,12 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
       result = result.filter((m) => m.nombre.toLowerCase().includes(q) || (m.department ?? "").toLowerCase().includes(q));
     }
     if (filterEstado) result = result.filter((m) => m.estado === filterEstado);
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) result = [...result].sort((a, b) => (a.userId === id ? -1 : b.userId === id ? 1 : 0));
+    }
     return result;
-  }, [members, searchMember, filterEstado]);
+  }, [members, searchMember, filterEstado, highlightId]);
 
   const cols: Column<TeamMember>[] = [
     {
@@ -554,6 +569,8 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
 
 export default function AttendancePage() {
   const { user } = useUser();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
   const token = user?.token ?? "";
   const attCfg = useMemo(() => getAttendanceSectionConfig(user), [user]);
   const viewMode = attCfg.viewMode;
@@ -597,6 +614,12 @@ export default function AttendancePage() {
         ) : undefined}
       />
 
+      {highlightId && (
+        <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface-2)", fontSize: 13 }}>
+          Destacando usuario <strong>#{highlightId}</strong> desde notificación.
+        </div>
+      )}
+
       {canRegister && <EmployeeStatusHero token={token} gpsConsent={gpsConsent} />}
 
       {canRegister && (
@@ -608,7 +631,7 @@ export default function AttendancePage() {
       {viewMode === "register" && <WeeklyBar token={token} />}
 
       {(viewMode === "manage" || viewMode === "manage_register") && (
-        <TeamAttendanceView token={token} dateFilter={dateFilter} visibilityHint={attCfg.visibilityHint} />
+        <TeamAttendanceView token={token} dateFilter={dateFilter} visibilityHint={attCfg.visibilityHint} highlightId={highlightId} />
       )}
     </>
   );

@@ -122,7 +122,7 @@ function buildHealthDomains(exec: ExecutiveDashboard) {
     const note = headlineKpis.pipelineCount > 0
       ? `${headlineKpis.pipelineCount} oportunidades activas · MoM ${headlineKpis.revenueMoMChange >= 0 ? "+" : ""}${headlineKpis.revenueMoMChange}%`
       : "Sin oportunidades activas en pipeline";
-    return { name: "Ventas (CRM)", health: Math.min(100, Math.max(0, score)), note };
+    return { name: "Ventas (CRM)", health: Math.min(100, Math.max(0, score)), note, estimated: true };
   })();
 
   const opsHealth = (() => {
@@ -132,7 +132,7 @@ function buildHealthDomains(exec: ExecutiveDashboard) {
     const note = operations.otOverdue > 0
       ? `${operations.otOverdue} OTs vencidas · ${operations.activeProjects} proyectos activos`
       : `${operations.otOpen} OTs abiertas · ${operations.activeProjects} proyectos activos`;
-    return { name: "Operación (OPS)", health: Math.min(100, Math.max(0, score)), note };
+    return { name: "Operación (OPS)", health: Math.min(100, Math.max(0, score)), note, estimated: true };
   })();
 
   const finHealth = (() => {
@@ -144,7 +144,7 @@ function buildHealthDomains(exec: ExecutiveDashboard) {
     const note = finance.overdueInvoices > 0
       ? `${arFmt} · ${finance.overdueInvoices} facturas vencidas`
       : arFmt;
-    return { name: "Finanzas", health: Math.min(100, Math.max(0, score)), note };
+    return { name: "Finanzas", health: Math.min(100, Math.max(0, score)), note, estimated: true };
   })();
 
   const procHealth = (() => {
@@ -155,7 +155,7 @@ function buildHealthDomains(exec: ExecutiveDashboard) {
     const note = procurement.lowStockItems > 0
       ? `${procurement.lowStockItems} SKU bajo mínimo · ${procurement.pendingPOs} OC pendientes`
       : `${procurement.pendingPOs} OC pendientes de aprobación`;
-    return { name: "Almacén & Compras", health: Math.min(100, Math.max(0, score)), note };
+    return { name: "Almacén & Compras", health: Math.min(100, Math.max(0, score)), note, estimated: true };
   })();
 
   const nocHealth = (() => {
@@ -163,13 +163,14 @@ function buildHealthDomains(exec: ExecutiveDashboard) {
     if (operations.ticketsOpen > 10) score -= 15;
     else if (operations.ticketsOpen > 0) score -= operations.ticketsOpen;
     const note = `${operations.ticketsOpen} tickets abiertos · ${maintenance.activeContracts} contratos de mantenimiento`;
-    return { name: "NOC & Soporte", health: Math.min(100, Math.max(0, score)), note };
+    return { name: "NOC & Soporte", health: Math.min(100, Math.max(0, score)), note, estimated: true };
   })();
 
   const hrHealth = {
     name: "Personas (RH)",
     health: 90,
     note: `${exec.teamSize} colaboradores en plantilla`,
+    estimated: true,
   };
 
   return [salesHealth, opsHealth, finHealth, procHealth, nocHealth, hrHealth].map((d) => ({
@@ -331,7 +332,7 @@ export default function ErpDashboardPage() {
                 <BarList
                   max={100}
                   items={healthDomains.map((d) => ({
-                    label: d.name,
+                    label: d.estimated ? `${d.name} · estimado` : d.name,
                     value: d.health,
                     display: `${d.health}%`,
                     color: d.variant === "positive" ? "var(--success)" : d.variant === "warning" ? "var(--warning)" : "var(--danger)",

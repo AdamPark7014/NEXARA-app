@@ -231,6 +231,14 @@ export default function RootLayout({
     url: siteUrl,
     inLanguage: "es-MX",
     publisher: { "@type": "Organization", name: "NEXARA", url: siteUrl },
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: `${siteUrl}/blog?q={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
   };
 
   return (

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { NotificationsService, INotificationPayload } from './notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
+import { appUrls } from '../common/app-urls.js';
 
 /**
  * Servicio que maneja notificaciones jerárquicas
@@ -140,7 +141,7 @@ export class NotificationHierarchyService {
             title: type === 'ATTENDANCE_CHECKIN' ? 'Usuario en línea' : 'Usuario fuera de línea',
             message: `${userName} ${actionText}${deviceText}`,
             triggerUserId: userId,
-            relatedUrl: `/erp/hr/attendance`,
+            relatedUrl: appUrls.erpAttendance(undefined, userId),
           });
         }
       }
@@ -169,7 +170,7 @@ export class NotificationHierarchyService {
           title: type === 'LUNCH_CHECKIN' ? 'Usuario en comida' : 'Usuario regresó',
           message: `${userName} ${actionText}`,
           triggerUserId: userId,
-          relatedUrl: `/erp/hr/lunch-breaks?highlight=${userId}`,
+          relatedUrl: appUrls.erpLunchBreaks(userId),
         });
       }
     } catch (error) {
@@ -513,17 +514,17 @@ export class NotificationHierarchyService {
       // Determinar URL y mensaje según el tipo de multa
       const fineTypeMap: { [key: string]: { url: string; entityType: string; titulo: string } } = {
         asistencia: {
-          url: '/erp/hr/attendance',
+          url: appUrls.erpAttendance(undefined, userId),
           entityType: 'Attendance',
           titulo: '⏰ Multa por Asistencia',
         },
         vehiculo: {
-          url: '/ops/vehicles',
+          url: appUrls.opsVehicles(fineId),
           entityType: 'Vehicle',
           titulo: '🚗 Multa por Vehículos',
         },
         herramienta: {
-          url: '/ops/tools',
+          url: appUrls.opsTools(fineId),
           entityType: 'ToolRequest',
           titulo: '🔧 Multa por Herramientas',
         },

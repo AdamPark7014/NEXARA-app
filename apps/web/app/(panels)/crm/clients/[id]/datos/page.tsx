@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
@@ -164,9 +165,9 @@ export default function ClientDatosPage() {
           <Button variant="secondary" onClick={() => void provision()}>Activar en operación</Button>
         )}
         {client.serviceClientId && (
-          <Link href={`/ops/service-clients/${client.serviceClientId}`} style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", alignSelf: "center" }}>
+          <CrossPanelLink href={`/ops/service-clients/${client.serviceClientId}`} style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", alignSelf: "center" }}>
             Ver cliente en OPS →
-          </Link>
+          </CrossPanelLink>
         )}
       </div>
     </DetailSection>

@@ -189,6 +189,21 @@ export default function WarehousePage() {
     void listCatalogProducts(token).then(setProducts).catch(() => setProducts([]));
   }, [token]);
 
+  useEffect(() => {
+    if (movementId) setTab("movimientos");
+  }, [movementId]);
+
+  const visibleMovements = useMemo(() => {
+    if (!movementId) return movements;
+    const target = Number(movementId);
+    if (!Number.isFinite(target)) return movements;
+    return [...movements].sort((a, b) => {
+      if (a.id === target) return -1;
+      if (b.id === target) return 1;
+      return 0;
+    });
+  }, [movements, movementId]);
+
   const saveMovement = async () => {
     if (!token || !movement.productId || !movement.warehouseId || movement.quantity <= 0) return;
     setSavingMovement(true);
@@ -1079,12 +1094,18 @@ export default function WarehousePage() {
             </div>
           }
         >
+          {movementId && (
+            <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+              Resaltando movimiento <strong>#{movementId}</strong>.{" "}
+              <Link href="/erp/warehouse?tab=movimientos" style={{ color: "var(--primary)" }}>Quitar filtro</Link>
+            </p>
+          )}
           {movementsLoading ? (
             <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
           ) : (
             <DataTable
               columns={movementColumns}
-              rows={movements}
+              rows={visibleMovements}
               rowKey={(m) => m.id}
               emptyTitle="Sin movimientos"
               emptyDescription="Registra una entrada o salida para ver el historial aquí."

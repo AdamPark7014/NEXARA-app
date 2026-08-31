@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
@@ -162,12 +163,12 @@ export default function OpsProjectsPage() {
       label: "CRM",
       render: (p) =>
         p.salesProjectId || p.salesProject ? (
-          <a
-            href={`https://sales.nexara.com.mx/crm/projects/${p.salesProject?.id ?? p.salesProjectId}`}
+          <CrossPanelLink
+            href={`/crm/projects/${p.salesProject?.id ?? p.salesProjectId}`}
             style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}
           >
             Comercial →
-          </a>
+          </CrossPanelLink>
         ) : (
           <Tag variant="warning">Sin CRM</Tag>
         ),
