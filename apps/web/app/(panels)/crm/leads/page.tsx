@@ -102,6 +102,13 @@ export default function LeadsPage() {
     setShowForm(true);
   };
 
+  useEffect(() => {
+    if (searchParams.get("new") === "1" && cfg.canCreate) {
+      openNew();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on query flag
+  }, [searchParams, cfg.canCreate]);
+
   const openEdit = (l: SalesLead) => {
     setEditing(l);
     setForm({

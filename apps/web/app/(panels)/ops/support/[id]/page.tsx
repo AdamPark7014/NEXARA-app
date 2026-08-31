@@ -158,7 +158,7 @@ export default function SupportTicketDetailPage() {
               </Link>
             )}
             {canManage && !isClosed && (
-              <Link href={`/ops/activities?ticketId=${ticket.id}`} style={{ textDecoration: "none" }}>
+              <Link href={`/ops/activities/new?requestId=${ticket.id}`} style={{ textDecoration: "none" }}>
                 <Button variant="primary">+ Crear OT</Button>
               </Link>
             )}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -49,8 +49,15 @@ export default function QuotesPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getCrmSalesSectionConfig(user, "quotes"), [user]);
   const token = user?.token ?? "";
+  const router = useRouter();
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
+
+  useEffect(() => {
+    if (searchParams.get("new") === "1" && cfg.canCreate) {
+      router.replace("/crm/quotes/builder");
+    }
+  }, [searchParams, cfg.canCreate, router]);
 
   const [items, setItems] = useState<SalesQuote[]>([]);
   const [loading, setLoading] = useState(true);

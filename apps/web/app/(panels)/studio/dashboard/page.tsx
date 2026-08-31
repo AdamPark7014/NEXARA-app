@@ -24,13 +24,13 @@ const RED_COLOR: Record<string, string> = {
   Twitter: "#1da1f2", TikTok: "#000000",
 };
 
-const PAGES_STATIC = [
-  { name: "Inicio", url: "/" },
-  { name: "Soluciones", url: "/soluciones" },
-  { name: "Casos de éxito", url: "/proyectos" },
-  { name: "Cobertura", url: "/cobertura" },
-  { name: "Contacto", url: "/contacto" },
-];
+const SITE_PAGE_LABELS: Record<string, { name: string; url: string }> = {
+  page_home: { name: "Inicio", url: "/" },
+  page_servicios: { name: "Servicios", url: "/servicios" },
+  page_soluciones: { name: "Soluciones", url: "/soluciones" },
+  page_nosotros: { name: "Nosotros", url: "/nosotros" },
+  page_contacto: { name: "Contacto", url: "/contacto" },
+};
 
 interface ContactMessage {
   id: number;
@@ -76,16 +76,20 @@ export default function StudioDashboardPage() {
   const [posts, setPosts] = useState<{ id: number; red: string; titulo: string; cuando: string; estado: string }[]>([]);
   const [nlStats, setNlStats] = useState<NewsletterStats | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [sitePages, setSitePages] = useState<
+    Array<{ section: string; name: string; url: string; published: boolean }>
+  >([]);
 
   const load = useCallback(async () => {
     if (!token) return;
     setLoadErr(null);
     try {
-      const [contactData, caseData, postData, nlData] = await Promise.allSettled([
+      const [contactData, caseData, postData, nlData, pagesData] = await Promise.allSettled([
         apiFetch("contact-messages?limit=5&sort=createdAt:desc", token),
         apiFetch("case-studies?limit=20", token),
         apiFetch("social-posts?limit=6", token),
         apiFetch("newsletter/stats", token),
+        apiFetch("studio/page-content", token),
       ]);
 
       if (contactData.status === "fulfilled") {
@@ -108,6 +112,27 @@ export default function StudioDashboardPage() {
 
       if (nlData.status === "fulfilled") {
         setNlStats(nlData.value);
+      }
+
+      if (pagesData.status === "fulfilled") {
+        const rows = Array.isArray(pagesData.value) ? pagesData.value : [];
+        const bySection = new Map<string, { publishedAt?: string | null; content?: unknown }>();
+        for (const row of rows) {
+          if (row?.section) bySection.set(String(row.section), row);
+        }
+        setSitePages(
+          Object.entries(SITE_PAGE_LABELS).map(([section, meta]) => {
+            const row = bySection.get(section);
+            return {
+              section,
+              name: meta.name,
+              url: meta.url,
+              published: Boolean(row?.publishedAt || row?.content),
+            };
+          }),
+        );
+      } else {
+        setSitePages([]);
       }
     } catch (e) {
       setLoadErr(e instanceof Error ? e.message : "Error al cargar el panel");
@@ -144,7 +169,7 @@ export default function StudioDashboardPage() {
         subtitle={cfg.subtitle}
         actions={
           <>
-            <DashPill tone="positive">Sitio en producción</DashPill>
+            <DashPill tone="accent">CMS Studio</DashPill>
             <Link href="/studio/leads" style={{ textDecoration: "none" }}>
               <Button variant="secondary">Nuevo lead</Button>
             </Link>
@@ -292,13 +317,21 @@ export default function StudioDashboardPage() {
               )}
             </DashPanel>
 
-            <DashPanel title="Sitio público" subtitle="nexara.com.mx — en producción" action="Páginas" actionHref="/studio/pages">
-              {PAGES_STATIC.map((s) => (
+            <DashPanel title="Sitio público" subtitle="Estado CMS · nexara.com.mx" action="Páginas" actionHref="/studio/pages">
+              {sitePages.length === 0 && (
+                <DashEmpty title="Sin datos de páginas" description="Abre el editor CMS para configurar el sitio." />
+              )}
+              {sitePages.map((s) => (
                 <ListRow
-                  key={s.name}
+                  key={s.section}
                   title={s.name}
                   sub={`nexara.com.mx${s.url}`}
-                  trail={<DashPill tone="positive">Publicada</DashPill>}
+                  href="/studio/pages"
+                  trail={
+                    <DashPill tone={s.published ? "positive" : "warning"}>
+                      {s.published ? "Con contenido" : "Sin contenido"}
+                    </DashPill>
+                  }
                 />
               ))}
             </DashPanel>

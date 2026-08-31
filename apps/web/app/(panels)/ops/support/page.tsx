@@ -161,7 +161,7 @@ export default function SupportInboxPage() {
             <>
               {t.status === "NEW" && (
                 <>
-                  <Link href={`/ops/activities?ticketId=${t.id}`} style={{ textDecoration: "none" }}>
+                  <Link href={`/ops/activities/new?requestId=${t.id}`} style={{ textDecoration: "none" }}>
                     <Button size="sm" variant="primary">Crear OT</Button>
                   </Link>
                   <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); void patchStatus(t, "ASSIGNED"); }}>Marcar asignado</Button>

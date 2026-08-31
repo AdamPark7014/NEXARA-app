@@ -162,7 +162,7 @@ export default function CrmDashboardPage() {
         actions={
           <>
             {wonThisMonth.length > 0 && <DashPill tone="positive">{wonThisMonth.length} ganadas este mes</DashPill>}
-            <Link href="/crm/leads" style={{ textDecoration: "none" }}><Button variant="secondary">Nuevo lead</Button></Link>
+            <Link href="/crm/leads?new=1" style={{ textDecoration: "none" }}><Button variant="secondary">Nuevo lead</Button></Link>
             <Link href="/crm/pipeline" style={{ textDecoration: "none" }}><Button variant="primary" iconRight="→">Ver pipeline</Button></Link>
           </>
         }

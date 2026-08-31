@@ -6,22 +6,24 @@
 
 ## Hecho en este turno
 
-### NEXARA Edge Fix (post Pro Polish)
+### NEXARA Handoff Armor
 
-**Ola A — Links**
-- DashKit `StatCard` / `DashPanel.actionHref` → `CrossPanelLink`.
-- Rutas fantasma: CRM `/crm/agenda`, ERP `/erp/analytics/bi`.
-- CRM orden → ERP invoicing vía `resolveCrossPanelHref` + handoff.
-- AppShell notif popover: items clickables (`relatedUrl` + mark read).
+**Ola1 — Support→OT**
+- CTAs Support → `/ops/activities/new?requestId=` (ya no `ticketId` muerto).
+- API `GET client-ticket-requests/:id` + `getTicketRequest` + prefill en `OpsActivityForm` (NEW/by-id).
 
-**Ola B — API + campo**
-- `appUrls.crmQuote` / `crmProject` en cotizaciones + ventas `relatedUrl`.
-- Helper `parse-missing-evidence`; evidence-gate en `ops/activities/[id]` + my-activities.
-- Gate API también reconoce `COMPLETADA` (además de Finalizada).
+**Ola2 — Build limpio**
+- Tipado `c` en support/new; `aria-label` único en AppShell drawer.
+- `V2_PANEL_TO_ID`: lab, integra; portal→ops.
+- `tsconfig` web excluye `*.spec.ts` — `tsc --noEmit` OK sin IGNORE.
 
-**Ola C — Lab + higiene**
-- Lab home: KPIs live (ready + flags count), sin fake SAT/version; link a `/lab/flags`.
-- Purge `QuickActionsFab` huérfano (`NotificationCenter` ya no estaba).
+**Ola3 — Deep-links / verdad**
+- CRM quotes `?new=1` → builder; leads `?new=1` abre form; dashboard “Nuevo lead” con query.
+- Studio dashboard: páginas CMS live (`studio/page-content`), sin “Publicada” fake.
+- Search `asset` → `/ops/assets?highlight=`.
+
+**Ola4 — Integra hint**
+- support/new: `siteId` → `integra/sites` `serviceClientId`; fallback `clientHint` por nombre.
 
 ## A medias
 - (nada)
@@ -31,10 +33,10 @@
 - Oficinas ACS
 
 ## Siguiente paso
-1. Smoke: executive “Ver todo” OPS desde `core.*`.
-2. Smoke: CRM orden → `core` invoicing cross-host.
-3. Smoke: Lab home sin KPIs inventados; flags count live.
-4. Smoke: completar OT sin evidencias en detalle → checklist.
+1. Smoke: Support “Crear OT” abre form prefilled.
+2. Smoke: CRM quotes?new=1 y leads?new=1.
+3. Smoke: Studio dashboard pills “Con contenido / Sin contenido”.
+4. Smoke: alarma Integra → support/new con cliente si el sitio tiene serviceClientId.
 
 ## Estado
-- Listo para cerrar + deploy `--force-all` (API+web; sin migrate).
+- Listo para cerrar + deploy `--force-all` (API+web).

@@ -64,7 +64,9 @@ const V2_PANEL_TO_ID: Record<PanelKey, PanelId> = {
   sales: 'crm',
   ops: 'ops',
   studio: 'studio',
-  portal: 'erp',
+  portal: 'ops',
+  lab: 'lab',
+  integra: 'integra',
 };
 
 export { resolveV2RoleKey };

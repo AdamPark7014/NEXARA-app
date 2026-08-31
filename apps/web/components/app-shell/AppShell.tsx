@@ -582,10 +582,9 @@ export default function AppShell({ panel, children }: AppShellProps) {
       <aside
         ref={drawerRef}
         className={styles.sidebar}
-        aria-label="Navegación del panel"
         {...(mobileOpen
           ? { role: "dialog", "aria-modal": true, "aria-label": "Menú de navegación" }
-          : {})}
+          : { "aria-label": "Navegación del panel" })}
       >
         <div className={styles.brand}>
           <div className={styles.brandLogo} aria-hidden="true">
