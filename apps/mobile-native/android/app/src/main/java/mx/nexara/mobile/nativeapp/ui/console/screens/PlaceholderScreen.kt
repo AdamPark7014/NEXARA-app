@@ -38,17 +38,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import mx.nexara.mobile.nativeapp.access.WebPanelUrl
 import mx.nexara.mobile.nativeapp.ui.enterprise.NxColors
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 
-private const val WEB_CONSOLE_ORIGIN = "https://consola.nexara.com.mx"
-
-private fun webConsoleUrl(webPath: String): String {
-    val path = webPath.trim()
-    if (path.startsWith("http://") || path.startsWith("https://")) return path
-    val normalized = if (path.startsWith("/")) path else "/$path"
-    return WEB_CONSOLE_ORIGIN.trimEnd('/') + normalized
-}
 
 private fun copyModuleKey(context: Context, moduleKey: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -83,7 +76,8 @@ fun PlaceholderScreen(
     onBack: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    val webUrl = webPath?.takeIf { it.isNotBlank() }?.let(::webConsoleUrl)
+    // null cuando el módulo no existe en la web: mejor sin botón que un 404.
+    val webUrl = WebPanelUrl.forPath(webPath)
     val keyForSupport = moduleKey?.trim().orEmpty()
 
     Column(
@@ -144,7 +138,11 @@ fun PlaceholderScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Este módulo ya está disponible en la consola web de NEXARA. Mientras llega a la app móvil, puedes continuar desde tu navegador.",
+                    text = if (webUrl != null) {
+                        "Este módulo ya está disponible en la consola web de NEXARA. Mientras llega a la app móvil, puedes continuar desde tu navegador."
+                    } else {
+                        "Este módulo todavía no está disponible ni en la app ni en la consola web. Avísanos si lo necesitas y lo priorizamos."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = NxColors.Muted,
                     textAlign = TextAlign.Center,

@@ -81,6 +81,7 @@ object DeepLinkParser {
         "support-sla" to "support-sla",
         "maintenance-contracts" to "maintenance-contracts",
         "contratos" to "maintenance-contracts",
+        "contracts" to "maintenance-contracts",
         "companies" to "companies",
         "kb" to "kb",
         "exports" to "exports",
@@ -190,22 +191,28 @@ object DeepLinkParser {
             )
         }
 
-        val pathEntityId = moduleParts.lastOrNull()
+        // `/ops/support/new` es la pantalla de alta del módulo, no un módulo "new".
+        val creating = moduleParts.size >= 2 && moduleParts.last().lowercase() in CREATION_SUFFIXES
+        val addressableParts = if (creating) moduleParts.dropLast(1) else moduleParts
+
+        val pathEntityId = addressableParts.lastOrNull()
             ?.takeIf { it.all(Char::isDigit) }
             ?.toLongOrNull()
 
-        val parts = moduleParts.let { p ->
+        val parts = addressableParts.let { p ->
             if (pathEntityId != null && p.isNotEmpty()) p.dropLast(1) else p
         }
 
         val rawKey = parts.lastOrNull() ?: "dashboard"
-        val key = segmentAliases[rawKey.lowercase()] ?: rawKey.lowercase()
+        val rawLower = rawKey.lowercase()
+        val key = panelKey(panel, rawLower, segmentAliases[rawLower] ?: rawLower)
 
         if (key == "notifications-center") return DeepLinkDestination.Notifications
         if (key == "panels" || key == "paneles") return DeepLinkDestination.PanelHub
 
         val entityId = resolveEntityId(key, pathEntityId, params)
         val extraParams = params.filterKeys { it !in ENTITY_ID_QUERY_KEYS }
+            .let { if (creating) it + ("mode" to "new") else it }
 
         return DeepLinkDestination.Module(
             panel = panel,
@@ -215,7 +222,36 @@ object DeepLinkParser {
         )
     }
 
-    private val ENTITY_ID_QUERY_KEYS = setOf("highlight", "id", "channel", "activityid")
+    private val CREATION_SUFFIXES = setOf("new", "nueva", "nuevo", "crear")
+
+    private val ENTITY_ID_QUERY_KEYS =
+        setOf("highlight", "id", "channel", "activityid", "woid", "productid", "poid")
+
+    /**
+     * Claves que dependen del panel.
+     *
+     * El catálogo de ventas usa las claves en español (`clientes`, `proyectos`,
+     * `licitaciones`) mientras que las rutas web van en inglés, y `/ops/support` es
+     * la bandeja interna de soporte — no los tickets del portal, que en OPS son el
+     * módulo aparte `client-tickets`.
+     */
+    private fun panelKey(panel: PanelId, raw: String, aliased: String): String = when {
+        panel == CRM -> CRM_KEY_ALIASES[aliased] ?: aliased
+        panel == OPS && raw in OPS_SUPPORT_SEGMENTS -> "support"
+        else -> aliased
+    }
+
+    private val CRM_KEY_ALIASES = mapOf(
+        "clients" to "clientes",
+        "projects" to "proyectos",
+        "tenders" to "licitaciones",
+        "products" to "productos",
+        "templates" to "plantillas",
+        "targets" to "metas",
+        "reports" to "reportes",
+    )
+
+    private val OPS_SUPPORT_SEGMENTS = setOf("support", "soporte")
 
     private fun resolveEntityId(
         key: String,
@@ -223,9 +259,16 @@ object DeepLinkParser {
         params: Map<String, String>,
     ): Long? {
         pathEntityId?.let { return it }
+        // Cada módulo nombra su id como lo nombra la web (ver app-urls.ts):
+        // mantenimiento manda `woId`, almacén `productId` y compras `poId`.
         return when (key) {
             "chat" -> params.longParam("channel")
             "my-evidences", "evidences" -> params.longParam("activityid")
+            "maintenance" -> params.longParam("woid") ?: params.longParam("highlight")
+            "warehouse", "stock" ->
+                params.longParam("productid") ?: params.longParam("highlight")
+            "procurement" ->
+                params.longParam("poid") ?: params.longParam("id") ?: params.longParam("highlight")
             else -> params.longParam("highlight") ?: params.longParam("id")
         }
     }
@@ -246,17 +289,40 @@ object DeepLinkParser {
     private fun Map<String, String>.longParam(name: String): Long? =
         this[name]?.toLongOrNull()?.takeIf { it > 0L }
 
-    private val ACTIVITY_DETAIL_SUFFIXES = setOf(
-        "operacion", "info", "evidencias", "viaticos", "equipo",
-        "materiales", "historial", "incidencias", "aprobaciones", "edit",
+    /**
+     * Sufijo de `/ops/activities/{id}/<sufijo>` → clave de pestaña.
+     *
+     * La web emite el sufijo en inglés (`.../1/evidences`, ver
+     * `appUrls.opsActivityEvidences`) pero `activityDetailTabIndex` indexa por el
+     * nombre en español, así que aquí se normaliza. Sin esto la ruta no se
+     * reconocía como detalle y la notificación perdía el id de la actividad.
+     */
+    private val ACTIVITY_DETAIL_TABS = mapOf(
+        "info" to "info",
+        "operacion" to "operacion",
+        "operation" to "operacion",
+        "evidencias" to "evidencias",
+        "evidences" to "evidencias",
+        "viaticos" to "viaticos",
+        "viatics" to "viaticos",
+        "equipo" to "equipo",
+        "team" to "equipo",
+        "materiales" to "materiales",
+        "materials" to "materiales",
+        "historial" to "historial",
+        "history" to "historial",
+        "incidencias" to "incidencias",
+        "incidents" to "incidencias",
+        "aprobaciones" to "aprobaciones",
+        "approvals" to "aprobaciones",
+        "edit" to "edit",
     )
 
     private data class ActivityDetailPath(val key: String, val entityId: Long, val tab: String)
 
     private fun parseActivityDetailPath(moduleParts: List<String>): ActivityDetailPath? {
         if (moduleParts.size < 2) return null
-        val tab = moduleParts.last().lowercase()
-        if (!ACTIVITY_DETAIL_SUFFIXES.contains(tab)) return null
+        val tab = ACTIVITY_DETAIL_TABS[moduleParts.last().lowercase()] ?: return null
         val idSeg = moduleParts[moduleParts.size - 2]
         if (!idSeg.all(Char::isDigit)) return null
         val entityId = idSeg.toLongOrNull() ?: return null
