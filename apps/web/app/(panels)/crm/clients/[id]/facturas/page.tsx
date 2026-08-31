@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import { useEffect, useMemo, useState } from "react";
 import { buildApiUrl } from "@/lib/api-base";
 import EmptyState from "@/components/ui/EmptyState";
@@ -74,9 +75,9 @@ export default function ClientInvoicesPage() {
       key: "invoiceNumber",
       label: "Factura",
       render: (inv) => (
-        <Link href={`/erp/invoicing?highlight=${inv.id}`} style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>
+        <CrossPanelLink href={`/erp/invoicing?highlight=${inv.id}`} style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>
           {inv.invoiceNumber}
-        </Link>
+        </CrossPanelLink>
       ),
       width: 130,
     },
@@ -185,9 +186,9 @@ export default function ClientInvoicesPage() {
             title="Sin facturas registradas"
             description="Las facturas se generan desde Proyectos CRM → Orden de cierre → ERP Facturación."
             action={
-              <Link href="/erp/invoicing" style={{ color: "var(--primary)", fontWeight: 600, fontSize: 13 }}>
+              <CrossPanelLink href="/erp/invoicing" style={{ color: "var(--primary)", fontWeight: 600, fontSize: 13 }}>
                 Ir a facturación →
-              </Link>
+              </CrossPanelLink>
             }
           />
         )}

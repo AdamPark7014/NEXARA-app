@@ -71,6 +71,13 @@ interface UserContextType {
 	isContextReady: boolean;
 	/** JWT del usuario activo, o `null` si no hay sesión. Atajo de `user?.token`. */
 	token: string | null;
+	/** true cuando faltan ≤5 min para expiresAt */
+	sessionExpiringSoon: boolean;
+	/** Renueva la sesión vía POST auth/session/extend */
+	extendSession: () => Promise<boolean>;
+	/** Mensaje si la sesión se cerró por 401/expiración (para banner post-kick). */
+	sessionEndedMessage: string | null;
+	clearSessionEndedMessage: () => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -314,6 +321,41 @@ const safePersistUser = (user: User | null) => {
 export const UserProvider = ({ children }: { children: ReactNode }) => {
 	const [user, setUser] = useState<User | null>(null);
 	const [isContextReady, setIsContextReady] = useState(false);
+	const [sessionEndedMessage, setSessionEndedMessage] = useState<string | null>(null);
+	const [sessionExpiringSoon, setSessionExpiringSoon] = useState(false);
+
+	const kickSession = (reason: string) => {
+		setSessionEndedMessage(reason);
+		safePersistUser(null);
+		setUser(null);
+	};
+
+	const extendSession = async (): Promise<boolean> => {
+		if (!user?.token || user.offlineDegraded) return false;
+		try {
+			const response = await fetch(buildApiUrl('auth/session/extend'), {
+				method: 'POST',
+				credentials: 'include',
+				headers: { Authorization: `Bearer ${user.token}` },
+				cache: 'no-store',
+			});
+			if (response.status === 401 || response.status === 403) {
+				kickSession('Tu sesión expiró. Vuelve a iniciar sesión para continuar.');
+				return false;
+			}
+			if (!response.ok) return false;
+			const data = await response.json();
+			if (!data?.expiresAt) return false;
+			setUser((prev) => {
+				if (!prev || prev.token !== user.token) return prev;
+				return { ...prev, expiresAt: data.expiresAt };
+			});
+			setSessionExpiringSoon(false);
+			return true;
+		} catch {
+			return false;
+		}
+	};
 
 	useEffect(() => {
 		let cancelled = false;
@@ -328,8 +370,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 				if (cancelled) return;
 
 				if (response.status === 401 || response.status === 403) {
-					safePersistUser(null);
-					setUser(null);
+					kickSession('Tu sesión ya no es válida. Inicia sesión de nuevo.');
 					return;
 				}
 
@@ -382,7 +423,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 				if (!online) {
 					setUser({ ...storedUser, offlineDegraded: true });
 				} else {
-					safePersistUser(null);
+					kickSession('Tu sesión expiró. Vuelve a iniciar sesión para continuar.');
 				}
 			} else {
 				setUser(storedUser);
@@ -403,7 +444,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 			setUser((prev) => {
 				if (!prev?.offlineDegraded) return prev;
 				if (isSessionExpired(prev)) {
-					safePersistUser(null);
+					kickSession('Tu sesión expiró. Vuelve a iniciar sesión para continuar.');
 					return null;
 				}
 				const { offlineDegraded: _o, ...rest } = prev;
@@ -418,49 +459,43 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 		safePersistUser(user);
 	}, [user]);
 
+	// Aviso de sesión por expirar (banner en AppShell).
+	useEffect(() => {
+		if (!user?.expiresAt) {
+			setSessionExpiringSoon(false);
+			return;
+		}
+		const tick = () => {
+			const expiresMs = Date.parse(user.expiresAt!);
+			if (!Number.isFinite(expiresMs)) {
+				setSessionExpiringSoon(false);
+				return;
+			}
+			const msLeft = expiresMs - Date.now();
+			setSessionExpiringSoon(msLeft > 0 && msLeft <= 5 * 60_000);
+			if (msLeft <= 0) {
+				kickSession('Tu sesión expiró. Vuelve a iniciar sesión para continuar.');
+			}
+		};
+		tick();
+		const id = window.setInterval(tick, 15_000);
+		return () => window.clearInterval(id);
+	}, [user?.expiresAt, user?.token]);
+
 	// Sliding session: renovar JWT cada ~15 min y al volver el foco/visibility.
 	useEffect(() => {
 		if (!user?.token || user.offlineDegraded) return;
 
-		let cancelled = false;
-
-		const extend = async () => {
-			try {
-				const response = await fetch(buildApiUrl('auth/session/extend'), {
-					method: 'POST',
-					credentials: 'include',
-					headers: { Authorization: `Bearer ${user.token}` },
-					cache: 'no-store',
-				});
-				if (cancelled) return;
-				if (response.status === 401 || response.status === 403) {
-					safePersistUser(null);
-					setUser(null);
-					return;
-				}
-				if (!response.ok) return;
-				const data = await response.json();
-				if (cancelled || !data?.expiresAt) return;
-				setUser((prev) => {
-					if (!prev || prev.token !== user.token) return prev;
-					return { ...prev, expiresAt: data.expiresAt };
-				});
-			} catch {
-				/* red intermitente: no expulsar */
-			}
-		};
-
 		const onFocusOrVisible = () => {
 			if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-			void extend();
+			void extendSession();
 		};
 
-		const intervalId = window.setInterval(() => void extend(), 15 * 60_000);
+		const intervalId = window.setInterval(() => void extendSession(), 15 * 60_000);
 		window.addEventListener('focus', onFocusOrVisible);
 		document.addEventListener('visibilitychange', onFocusOrVisible);
 
 		return () => {
-			cancelled = true;
 			window.clearInterval(intervalId);
 			window.removeEventListener('focus', onFocusOrVisible);
 			document.removeEventListener('visibilitychange', onFocusOrVisible);
@@ -471,6 +506,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
 	const logout = () => {
 		clearActivePanel();
+		setSessionEndedMessage(null);
 		setUser(null);
 		// Cerrar sesión global (cookies legacy / otras pestañas sin sesión propia)
 		if (typeof document !== 'undefined' && !isCapacitorNative()) {
@@ -488,7 +524,19 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 	};
 
 	return (
-		<UserContext.Provider value={{ user, setUser, logout, isContextReady, token: user?.token ?? null }}>
+		<UserContext.Provider
+			value={{
+				user,
+				setUser,
+				logout,
+				isContextReady,
+				token: user?.token ?? null,
+				sessionExpiringSoon,
+				extendSession,
+				sessionEndedMessage,
+				clearSessionEndedMessage: () => setSessionEndedMessage(null),
+			}}
+		>
 			{children}
 		</UserContext.Provider>
 	);

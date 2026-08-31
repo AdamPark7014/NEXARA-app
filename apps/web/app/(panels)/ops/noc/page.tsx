@@ -108,7 +108,7 @@ export default function NocPage() {
         <EmptyState
           icon="📡"
           title="Sin sitios conectados al NOC"
-          description="El monitoreo real usa el espejo de Integra (cámaras y accesos). Conecta un sitio HikCentral o Hik-Connect para ver dispositivos vivos — ya no se inventan routers de demo."
+          description="El monitoreo real usa el espejo de Integra (cámaras y accesos). Conecta un sitio de seguridad para ver dispositivos vivos — ya no se inventan routers de demo."
           action={
             <a href={getIntegraUrl("/settings")} style={{ textDecoration: "none" }}>
               <Button size="sm" variant="primary">

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -146,7 +147,7 @@ export default function ProductsPage() {
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Tag variant={s === 0 ? "danger" : s < 5 ? "warning" : "positive"}>{s}</Tag>
-            <Link href={`/erp/warehouse?productId=${p.id}`} style={{ fontSize: 11, color: "var(--text-tertiary)", textDecoration: "none" }} title="Ver en inventario">📦</Link>
+            <CrossPanelLink href={`/erp/warehouse?productId=${p.id}`} style={{ fontSize: 11, color: "var(--text-tertiary)", textDecoration: "none" }} title="Ver en inventario">📦</CrossPanelLink>
           </div>
         );
       },
@@ -164,9 +165,9 @@ export default function ProductsPage() {
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
             {cfg.viewMode !== "execute" && (
-              <Link href="/erp/warehouse" style={{ textDecoration: "none" }}>
+              <CrossPanelLink href="/erp/warehouse" style={{ textDecoration: "none" }}>
                 <Button variant="secondary" iconLeft="📦">Ver inventario</Button>
-              </Link>
+              </CrossPanelLink>
             )}
             {cfg.canCreate && (
         <Button variant="primary" iconLeft="+" onClick={() => { setShowForm(true); setSaveErr(null); setForm({ ...EMPTY_FORM }); }}>Nuevo producto</Button>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -224,9 +225,9 @@ export default function StudioLeadsPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            <Link href="/crm/leads" style={{ textDecoration: "none" }}>
+            <CrossPanelLink href="/crm/leads" style={{ textDecoration: "none" }}>
               <Button variant="primary" iconLeft="✨">Ver pipeline CRM</Button>
-            </Link>
+            </CrossPanelLink>
           </>
         }
       />

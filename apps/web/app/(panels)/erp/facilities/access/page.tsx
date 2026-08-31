@@ -114,13 +114,13 @@ export default function OfficesAccessPage() {
       <DashHero
         eyebrow="Facilities"
         title="Accesos · oficinas NEXARA"
-        subtitle="Puertas y eventos de sedes propias vía HikCentral Artemis. Independiente del panel Integra."
+        subtitle="Puertas y eventos de sedes NEXARA. Independiente del panel Integra."
       />
 
       <StatStrip
         stats={[
           {
-            label: "Artemis",
+            label: "Plataforma",
             value: health?.connected
               ? "OK"
               : health?.config?.configured
@@ -152,7 +152,7 @@ export default function OfficesAccessPage() {
             {doors.length === 0 && !loading && (
               <p style={{ color: "var(--text-tertiary)", fontSize: 13 }}>
                 {health?.config?.configured
-                  ? "Sin puertas en la respuesta Artemis."
+                  ? "Sin puertas en la respuesta del servidor."
                   : "Configura OFFICES_HIK_HOST / APP_KEY / APP_SECRET."}
               </p>
             )}

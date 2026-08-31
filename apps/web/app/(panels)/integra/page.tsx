@@ -501,7 +501,7 @@ export default function IntegraHome() {
             <span className={styles.pageEyebrow}>Integra · alta</span>
             <h1 className={styles.pageTitle}>Conecta tu primer sitio</h1>
             <p className={styles.pageSub}>
-              Misma experiencia de shell que CRM y ERP: primero el enlace HikCentral o Hik-Connect.
+              Misma experiencia de shell que CRM y ERP: primero conecta tu plataforma de seguridad.
             </p>
           </div>
         </header>
@@ -509,7 +509,7 @@ export default function IntegraHome() {
         <div className={styles.igOnboardCard}>
           <EmptyState
             title="Sin sitio activo"
-            description="Conecta un HikCentral o Hik-Connect para operar video, puertas y eventos en esta consola."
+            description="Conecta un sitio de seguridad para operar video, puertas y eventos en esta consola."
             action={
               <Button variant="primary" size="md" onClick={() => router.push("/integra/settings")}>
                 Ir a Sitios
@@ -563,7 +563,7 @@ export default function IntegraHome() {
           </h1>
           <p className={styles.pageSub}>
             {dash?.connected
-              ? `${dash.provider === "HCT" ? "Hik-Connect" : "HikCentral"} · ${dash.host || "sitio activo"}`
+              ? `Sitio conectado · ${dash.host || "activo"}`
               : "Árbol de áreas, control de puertas, video y eventos"}
           </p>
         </div>

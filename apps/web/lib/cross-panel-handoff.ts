@@ -77,6 +77,59 @@ export function resolvePanelId(input: string): PanelId {
   return SUBDOMAIN_TO_PANEL_ID[input] ?? (input as PanelId);
 }
 
+/** Extrae el PanelId de una ruta interna `/erp/...`, `/ops/...`, etc. */
+export function panelIdFromInternalPath(path: string): PanelId | null {
+  const bare = (path || "").trim().split("?")[0].split("#")[0];
+  const m = /^\/(erp|crm|ops|studio|lab|integra)(\/|$)/.exec(bare);
+  return m ? (m[1] as PanelId) : null;
+}
+
+/**
+ * Panel actual según pathname interno o subdominio canónico.
+ * En SSR (sin window) devuelve null.
+ */
+export function detectCurrentPanelId(pathname?: string | null): PanelId | null {
+  if (typeof window === "undefined") {
+    return pathname ? panelIdFromInternalPath(pathname) : null;
+  }
+  const fromPath = panelIdFromInternalPath(pathname ?? window.location.pathname);
+  if (fromPath) return fromPath;
+  const hostLower = window.location.hostname.toLowerCase();
+  const sub = hostLower.split(".")[0];
+  if (!sub || sub === "localhost" || sub === "127" || sub === "www" || sub === "nexara") {
+    return null;
+  }
+  const mapped = SUBDOMAIN_TO_PANEL_ID[sub];
+  return mapped ?? null;
+}
+
+/**
+ * Resuelve href navegable (mismo host relativo o URL absoluta + handoff).
+ * Usar en openPath / search cuando el destino puede ser otro panel.
+ */
+export function resolveCrossPanelHref(
+  internalPath: string,
+  userJson: string | null,
+  currentPanel?: PanelId | null,
+): string {
+  const panel = panelIdFromInternalPath(internalPath);
+  if (!panel) return internalPath;
+  const current = currentPanel ?? detectCurrentPanelId();
+  if (current && current === panel) {
+    // Mismo panel: buildCrossPanelUrl igual normaliza a publicPath en prod.
+    return buildCrossPanelUrl(panel, internalPath, null);
+  }
+  return buildCrossPanelUrl(panel, internalPath, userJson);
+}
+
+/** true si el href apunta fuera del panel actual (necesita hard navigation). */
+export function isCrossPanelHref(href: string, currentPanel?: PanelId | null): boolean {
+  const target = panelIdFromInternalPath(href);
+  if (!target) return false;
+  const current = currentPanel ?? detectCurrentPanelId();
+  return Boolean(current && current !== target);
+}
+
 export function resolveCanonicalSubdomain(panelOrSub: string): string {
   const panelId = resolvePanelId(panelOrSub);
   return PANEL_CANONICAL_SUBDOMAIN[panelId] ?? panelOrSub;

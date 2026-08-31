@@ -234,7 +234,7 @@ export default function IntegraAlarmsPage() {
       {!isHct && (
       <details style={{ marginTop: 16 }} open={showSearch} onToggle={(e) => setShowSearch((e.target as HTMLDetailsElement).open)}>
         <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 650 }}>
-          Búsqueda histórica Artemis (avanzado)
+          Búsqueda histórica (avanzado)
         </summary>
         <IgFilters>
           <IgField label="Desde">

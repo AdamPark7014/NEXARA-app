@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
-import Link from "next/link";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import styles from "./DashKit.module.css";
 
 /**
@@ -227,9 +227,9 @@ export function ListRow({
     : undefined;
   if (href) {
     return (
-      <Link href={href} className={`${styles.row} ${styles.rowHover}`} style={style}>
+      <CrossPanelLink href={href} className={`${styles.row} ${styles.rowHover}`} style={style}>
         {inner}
-      </Link>
+      </CrossPanelLink>
     );
   }
   return (

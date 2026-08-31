@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
@@ -176,9 +177,9 @@ export default function ClientServicesPage() {
           {canCreate && (
             <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowForm(true)}>Nuevo contrato</Button>
           )}
-          <Link href="/ops/maintenance/contracts" style={{ textDecoration: "none" }}>
+          <CrossPanelLink href="/ops/maintenance/contracts" style={{ textDecoration: "none" }}>
             <Button variant="secondary" size="sm">Ver todos</Button>
-          </Link>
+          </CrossPanelLink>
         </div>
       </div>
 
@@ -247,9 +248,9 @@ export default function ClientServicesPage() {
           title="Sin contratos de servicio"
           description="Este cliente aún no tiene contratos de mantenimiento. Puedes crear uno desde OPS → Contratos."
           action={
-            <Link href="/ops/maintenance/contracts" style={{ textDecoration: "none" }}>
+            <CrossPanelLink href="/ops/maintenance/contracts" style={{ textDecoration: "none" }}>
               <Button size="sm" variant="primary">Crear contrato de servicio</Button>
-            </Link>
+            </CrossPanelLink>
           }
         />
       )}

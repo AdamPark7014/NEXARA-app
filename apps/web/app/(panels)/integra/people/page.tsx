@@ -151,7 +151,7 @@ export default function IntegraPeoplePage() {
                 )}
                 <IgBtn
                   onClick={async () => {
-                    if (!confirm("¿Eliminar en Artemis?")) return;
+                    if (!confirm("¿Eliminar esta persona del directorio?")) return;
                     await integraApi(`integra/people/${encodeURIComponent(selected.id)}`, {
                       method: "DELETE",
                     });
@@ -202,7 +202,7 @@ export default function IntegraPeoplePage() {
                   }
                 }}
               >
-                Alta Artemis
+                Alta persona
               </IgBtn>
             </div>
           </IgPanel>
