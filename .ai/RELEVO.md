@@ -9,7 +9,9 @@
 ### Integra: tercer provider `ISAPI` (LAN pura)
 
 ADR-0019 §5 lo dejaba como «tercer provider futuro». Ya está implementado y
-**verificado en vivo** contra el sitio real (la laptop está en `192.168.9.0/24`).
+**verificado en vivo** contra el sitio real. La laptop estuvo dentro de
+`192.168.9.0/24` durante la sesión; a media tarde el Wi-Fi cambió de red y desde
+entonces los equipos ya no se alcanzan (ver «A medias»).
 
 Documentación: **`docs/INTEGRA-LAN.md`** — topología, alta, sync, video y los
 hallazgos del sitio. ADR-0019 e INTEGRA-OPS actualizados.
@@ -59,7 +61,7 @@ hallazgos del sitio. ADR-0019 e INTEGRA-OPS actualizados.
   (`192.168.254.x`): **no existen en la LAN**, solo se ven vía grabador. Por eso
   el inventario se construye desde el NVR y no barriendo IPs.
 - Nombres reales recuperados del NVR: «Escalera 01», «Coffee Area», «Azotea»…
-- `572 tests API` + `106 web`, verde. `tsc --noEmit` limpio en ambos workspaces.
+- `579 tests API` + `106 web`, verde. `tsc --noEmit` limpio en ambos workspaces.
 
 ### Arreglo de paso
 
@@ -67,6 +69,38 @@ hallazgos del sitio. ADR-0019 e INTEGRA-OPS actualizados.
 que no lo expone → `tsc` del workspace web fallaba y con él `npm run build:web`
 (`ignoreBuildErrors` solo se activa con `NEXT_IGNORE_TYPE_ERRORS=1`). Se serializa
 como en el resto de páginas con handoff. Era del turno anterior; una línea.
+
+### Segunda mitad del turno: montado y corriendo en la laptop
+
+Postgres 17 ya estaba instalado y vivo en `localhost:5432`, y `apps/api/.env`
+apunta ahí (**no** a producción, se verificó antes de tocar nada).
+
+- `prisma migrate deploy` — la base local iba atrasada; 153 migraciones al día.
+- `integra:isapi:seed` **ejecutado**: sitio #1 «Oficinas NEXARA» + 4 terminales,
+  con sus nombres reales (Sala de Juntas, Acceso Privados, Gerencia, Acceso
+  General).
+- **Sync real contra el hardware: 13 cámaras · 4 puertas · 18 equipos · 6.4 s.**
+  El espejo quedó con 9 cámaras de IP propia y 4 en plug & play.
+- `liveStream` verificado con datos reales: elige RTSP directo cuando la cámara
+  tiene IP propia, grabador cuando es plug & play, y tacha la contraseña.
+
+**CLI nuevo `integra:isapi:sync`.** No es un atajo del endpoint: el cron corre en
+el droplet y **para un sitio ISAPI falla siempre**, porque no tiene ruta a la LAN
+del cliente. El sync lo tiene que disparar algo que vea los equipos.
+
+**Bug encontrado y arreglado con el CLI en la mano:** el proceso no terminaba
+nunca. Desde Node 19 el `globalAgent` trae `keepAlive`, y sus sockets ociosos
+mantienen vivo el bucle de eventos. Además ocupaban conexiones del firmware, que
+son pocas. El cliente ISAPI usa ahora agentes propios sin pooling.
+
+Ese cambio **no lo cubría ningún test** — los que había usan un cliente falso y
+se saltan el transporte. `isapi.client.spec.ts` levanta un servidor local que
+habla Digest de verdad: reto 401, reuso del reto, freno anti-bloqueo, traducción
+de errores y el invariante de que no queden sockets ociosos.
+
+`scripts/ts-node-js-ext.js`: los CLI corren TS en CJS y el código importa con
+extensión `.js` (por `moduleResolution: node16`). Sin compilar, Node no resuelve.
+Es el mismo mapeo que jest hace con `moduleNameMapper`, en un require hook.
 
 ## A medias
 
@@ -76,12 +110,15 @@ como en el resto de páginas con handoff. Era del turno anterior; una línea.
   sitio↔droplet, `/stream` devuelve el RTSP con la nota «GO2RTC_URL no
   configurado»: se ve con VLC desde la LAN, **no en el panel**. Las dos salidas
   están escritas en `docs/INTEGRA-LAN.md`.
-- **El sitio no está dado de alta en la base.** No hay Postgres levantado en la
-  laptop (Docker Desktop apagado). `integra:isapi:seed` está escrito y
-  typechequeado, pero **no ejecutado**. Debe correr con el mismo
-  `INTEGRA_SECRETS_KEY`/`JWT_SECRET` que la API.
+- **La laptop se salió de la red del sitio** a media sesión: el Wi-Fi pasó de
+  `192.168.9.82` a `10.206.65.125`. Todo lo verificado arriba se hizo con la
+  laptop dentro. Para repetirlo hay que volver a esa red.
+- El sitio #1 está dado de alta **en la base local**, no en producción.
 - Inventario del barrido (sin contraseñas) en el scratchpad de la sesión, no
   versionado.
+- **go2rtc sigue sin montarse.** No está instalado en la laptop y Docker Desktop
+  está apagado; instalarlo implica descargar un binario, que Adam no ha
+  autorizado. Es lo único que falta para ver video en el navegador.
 
 ## No tocar
 
@@ -99,11 +136,14 @@ como en el resto de páginas con handoff. Era del turno anterior; una línea.
 
 ## Siguiente paso
 
-1. Decidir go2rtc on-site vs VPN sitio↔droplet. Sin eso no hay video en el panel.
-2. Correr `integra:isapi:seed` contra la base real y luego `POST /api/integra/sync`.
-   Deben salir 13 cámaras y 4 puertas.
-3. Probar apertura remota en una terminal (`.160`) antes de ofrecerlo al cliente.
-4. Avisar al instalador: el NVR marca `PasswordStatus: invalid` en los canales
+1. Autorizar la descarga de go2rtc (binario único, ~15 MB, releases oficiales de
+   AlexxIT/go2rtc — la misma versión 1.9.7 que fija el compose). Con eso hay
+   video en el navegador **desde la LAN** en minutos.
+2. Decidir cómo llega ese video al panel de producción: agente on-site o VPN
+   sitio↔droplet. Sin una de las dos, `integra.nexara.com.mx` no lo verá.
+3. Repetir seed + sync contra la base de producción, desde dentro de la LAN.
+4. Probar apertura remota en una terminal (`.160`) antes de ofrecerlo al cliente.
+5. Avisar al instalador: el NVR marca `PasswordStatus: invalid` en los canales
    1, 2, 9 y 10 — las cuatro cámaras en plug & play.
 
 ## Estado del turno anterior (mobile/Play), sin cambios

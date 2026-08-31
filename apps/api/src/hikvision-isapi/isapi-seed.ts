@@ -20,8 +20,10 @@ import type { IsapiDiscoveredDevice } from './isapi.discovery';
  * Es idempotente: correrlo dos veces no duplica nada.
  *
  * **La contraseña se guarda cifrada** (AES-256-GCM) con `INTEGRA_SECRETS_KEY`
- * —o `JWT_SECRET` como respaldo—, así que hay que correrlo con el MISMO
- * entorno que usa la API, o esta no podrá descifrarla.
+ * —o `JWT_SECRET` como respaldo—, así que tiene que correr con el MISMO
+ * entorno que la API o esta no podrá descifrarla. Por eso el script de npm lo
+ * lanza con `--env-file-if-exists=.env`: leyendo el mismo `.env` que la API,
+ * las claves no pueden divergir por descuido.
  */
 
 type Inventory = { scannedAt?: string; devices: IsapiDiscoveredDevice[] };
