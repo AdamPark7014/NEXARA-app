@@ -236,7 +236,7 @@ export default function ActivityDetailPage() {
               <DetailField label="Cliente" value={activity.client?.id ? (
                 <CrossPanelLink href={`/crm/clients/${activity.client.id}`} style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
                   {activity.client.name} →
-                </Link>
+                </CrossPanelLink>
               ) : (activity.client?.name ?? "—")} />
               <DetailField label="Sucursal" value={branch || activity.branchAddress} />
               <DetailField label="Responsable" value={activity.responsable?.nombre} />
