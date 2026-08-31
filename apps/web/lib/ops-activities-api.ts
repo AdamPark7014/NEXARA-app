@@ -195,6 +195,10 @@ export function listApprovedTicketRequests(token: string) {
   return apiFetch<ClientTicketRequestRow[]>("client-ticket-requests?status=APPROVED", token);
 }
 
+export function getTicketRequest(token: string, id: number) {
+  return apiFetch<ClientTicketRequestRow>(`client-ticket-requests/${id}`, token);
+}
+
 export function listOperationalProjects(token: string) {
   return apiFetch<OperationalProjectRow[]>("operational-projects", token);
 }

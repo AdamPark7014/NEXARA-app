@@ -55,22 +55,48 @@ function SupportNewForm() {
   useEffect(() => {
     if (!token) return;
     setLoading(true);
-    void apiFetch("service-clients?limit=200", token)
-      .then((data) => {
+    void (async () => {
+      try {
+        const data = await apiFetch("service-clients?limit=200", token);
         const rows = Array.isArray(data) ? data : (data?.data ?? []);
-        const mapped = rows.map((c: ServiceClient) => ({ id: c.id, name: c.name }));
+        const mapped: ServiceClient[] = rows.map((c: ServiceClient) => ({
+          id: c.id,
+          name: c.name,
+        }));
         setClients(mapped);
-        if (clientHint) {
+
+        let resolvedId = "";
+        if (siteId) {
+          try {
+            const sites = await apiFetch("integra/sites", token);
+            const list = Array.isArray(sites) ? sites : [];
+            const site = list.find(
+              (s: { id?: number | string; serviceClientId?: number | null }) =>
+                String(s.id) === siteId,
+            );
+            if (site?.serviceClientId) {
+              resolvedId = String(site.serviceClientId);
+            }
+          } catch {
+            /* Integra sites may be unavailable for this role */
+          }
+        }
+        if (!resolvedId && clientHint) {
           const hint = clientHint.toLowerCase();
           const match = mapped.find(
-            (c) => c.name.toLowerCase() === hint || c.name.toLowerCase().includes(hint),
+            (c: ServiceClient) =>
+              c.name.toLowerCase() === hint || c.name.toLowerCase().includes(hint),
           );
-          if (match) setClientId(String(match.id));
+          if (match) resolvedId = String(match.id);
         }
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Error clientes"))
-      .finally(() => setLoading(false));
-  }, [token, clientHint]);
+        if (resolvedId) setClientId(resolvedId);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Error clientes");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [token, clientHint, siteId]);
 
   const canSubmit = useMemo(
     () => Boolean(token && clientId && description.trim()),
@@ -153,8 +179,12 @@ function SupportNewForm() {
             >
               Origen Integra
               {clientHint ? ` · ${clientHint}` : ""}
-              {siteId ? ` · siteId=${siteId}` : ""}
-              {clientId ? " · cliente preseleccionado por coincidencia de nombre" : ""}
+              {siteId ? ` · site #${siteId}` : ""}
+              {clientId
+                ? " · cliente preseleccionado"
+                : siteId
+                  ? " · sin serviceClientId en el sitio (elige cliente)"
+                  : ""}
             </div>
           )}
           <div style={{ display: "grid", gap: 12, maxWidth: 560 }}>

@@ -19,6 +19,7 @@ import {
   createActivity,
   fetchNextAnNumber,
   getActivity,
+  getTicketRequest,
   listAssignableUsers,
   listApprovedTicketRequests,
   listOperationalProjects,
@@ -132,9 +133,23 @@ export default function OpsActivityForm({ activityId, requestId, onSuccess, onCa
   }, [activeProjects]);
 
   useEffect(() => {
-    if (!requestId || !token || ticketRequests.length === 0) return;
-    const req = ticketRequests.find((r) => r.id === requestId);
-    if (req) prefillFromRequest(req);
+    if (!requestId || !token) return;
+    const fromList = ticketRequests.find((r) => r.id === requestId);
+    if (fromList) {
+      prefillFromRequest(fromList);
+      return;
+    }
+    let cancelled = false;
+    void getTicketRequest(token, requestId)
+      .then((req) => {
+        if (!cancelled && req) prefillFromRequest(req);
+      })
+      .catch(() => {
+        /* list APPROVED may not include NEW; GET by id is the handoff path */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [requestId, ticketRequests, token, prefillFromRequest]);
 
   const handleSubmit = async () => {

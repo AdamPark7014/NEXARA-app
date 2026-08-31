@@ -26,6 +26,15 @@ export class ClientTicketRequestsService {
     });
   }
 
+  async findOne(id: number, companyId?: number | null) {
+    const request = await this.prisma.clientTicketRequest.findFirst({
+      where: { id, ...companyWhere(companyId ?? null) },
+      include: { client: true, branch: true, activity: true },
+    });
+    assertCompanyAccess(request, companyId ?? null, 'Solicitud');
+    return request;
+  }
+
   async assign(id: number, activityId: number, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
     const request = await this.prisma.clientTicketRequest.findFirst({

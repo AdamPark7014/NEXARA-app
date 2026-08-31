@@ -29,6 +29,15 @@ export class ClientTicketRequestsController {
     return this.service.findAll(this.normalizeStatus(query.status), query, companyId);
   }
 
+  @Get(':id')
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.ACTIVITIES_MANAGE] })
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.service.findOne(id, companyId);
+  }
+
   @Patch(':id/assign')
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
   assign(

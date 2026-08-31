@@ -49,9 +49,9 @@ export function searchResultUrl(result: GlobalSearchResult): string | null {
     case "invoice":
       return `/erp/invoicing/${id}`;
     case "asset":
-      return "/ops/maintenance";
+      return `/ops/assets?highlight=${id}`;
     case "vehicle":
-      return "/ops/vehicles";
+      return `/ops/vehicles?highlight=${id}`;
     default:
       return null;
   }
