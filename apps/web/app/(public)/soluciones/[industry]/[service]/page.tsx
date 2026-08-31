@@ -6,6 +6,7 @@ import {
   findServiceLanding,
   getProgrammaticLandings,
 } from "@/lib/seo/programmatic-landings";
+import { isIndustryHubSlug } from "@/lib/seo/industry-hubs";
 import { getPageKeywords, categoryFromSlug } from "@/lib/seo/keywords";
 import { buildWhatsAppLeadUrl } from "@/lib/seo/money-pages";
 import { getSolucionHeroImage } from "../../solucionesLandingImagery";
@@ -171,12 +172,14 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
     "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Inicio", item: siteUrl },
-      { "@type": "ListItem", position: 2, name: "Soluciones", item: `${siteUrl}/soluciones` },
+      { "@type": "ListItem", position: 2, name: "Servicios", item: `${siteUrl}/servicios` },
       {
         "@type": "ListItem",
         position: 3,
         name: industry.name,
-        item: `${siteUrl}/soluciones/${industry.slug}`,
+        item: isIndustryHubSlug(industry.slug)
+          ? `${siteUrl}/soluciones/${industry.slug}`
+          : `${siteUrl}/servicios`,
       },
       {
         "@type": "ListItem",
@@ -250,10 +253,18 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
             <Link href="/">Inicio</Link>
           </li>
           <li>
-            <Link href="/soluciones">Soluciones</Link>
+            <Link href="/servicios">Servicios</Link>
           </li>
           <li>
-            <Link href={`/soluciones/${industry.slug}`}>{industry.name}</Link>
+            <Link
+              href={
+                isIndustryHubSlug(industry.slug)
+                  ? `/soluciones/${industry.slug}`
+                  : "/servicios"
+              }
+            >
+              {industry.name}
+            </Link>
           </li>
           <li aria-current="page">{service.name}</li>
         </ol>

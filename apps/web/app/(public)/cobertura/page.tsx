@@ -6,6 +6,7 @@ import heroStyles from "../../components/PublicPageHero.module.css";
 import styles from "./page.module.css";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { GEO_CITIES } from "@/lib/seo/geo-cities";
+import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 
 export const revalidate = 1800;
 
@@ -71,6 +72,24 @@ const modeLabel = (mode: string) =>
 export default function CoberturaPage() {
   return (
     <main className={`${shared.page} home-main-flush`}>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          name: "Cobertura NEXARA",
+          url: `${siteBaseUrl()}/cobertura`,
+          description: "Cobertura nacional con base en Puebla y CDMX.",
+          mainEntity: {
+            "@type": "ItemList",
+            itemListElement: GEO_CITIES.slice(0, 20).map((c, i) => ({
+              "@type": "ListItem",
+              position: i + 1,
+              name: c.name,
+              url: `${siteBaseUrl()}/cobertura/${c.slug}`,
+            })),
+          },
+        }}
+      />
       <PublicPageHero
         eyebrow="Cobertura"
         title={

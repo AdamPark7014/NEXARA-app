@@ -4,6 +4,7 @@ import PublicPageHero from "../../components/PublicPageHero";
 import heroStyles from "../../components/PublicPageHero.module.css";
 import { fetchPageVisuals, resolvePageMediaUrl } from "@/lib/page-content-api";
 import ContactoClient from "./ContactoClient";
+import { JsonLd, siteBaseUrl } from "@/lib/seo/json-ld";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,27 @@ export default async function ContactoPage() {
 
   return (
     <main className={`${shared.page} home-main-flush`}>
+      <JsonLd
+        data={{
+          "@context": "https://schema.org",
+          "@type": "ContactPage",
+          name: "Contacto | NEXARA",
+          url: `${siteBaseUrl()}/contacto`,
+          description:
+            "Agenda un diagnóstico con NEXARA: CCTV, redes, cómputo y soporte TI.",
+          mainEntity: {
+            "@type": "Organization",
+            name: "NEXARA",
+            url: siteBaseUrl(),
+            contactPoint: {
+              "@type": "ContactPoint",
+              contactType: "sales",
+              areaServed: "MX",
+              availableLanguage: "Spanish",
+            },
+          },
+        }}
+      />
       <PublicPageHero
         eyebrow="Contacto"
         title={

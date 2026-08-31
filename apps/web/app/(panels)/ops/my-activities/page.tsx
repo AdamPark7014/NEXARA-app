@@ -125,6 +125,8 @@ export default function MyActivitiesPage() {
   useOpsCanonicalRoute(user, "activities");
 
   const viewTab: ViewTab = searchParams.get("tab") === "evidencias" ? "evidencias" : "actividades";
+  const activityIdParam = searchParams.get("activityId");
+  const highlightActivityId = activityIdParam ? Number(activityIdParam) : null;
   const [rangeTab, setRangeTab] = useState<RangeTab>("hoy");
   const [searchQ, setSearchQ] = useState("");
   const [items, setItems] = useState<ActivityRow[]>([]);
@@ -171,16 +173,37 @@ export default function MyActivitiesPage() {
   }, [items, rangeTab]);
 
   const visibleItems = useMemo(() => {
-    if (!searchQ.trim()) return filtered;
-    const q = searchQ.toLowerCase();
-    return filtered.filter((a) =>
-      a.anNumber.toLowerCase().includes(q) ||
-      a.titulo.toLowerCase().includes(q) ||
-      (a.client?.name ?? "").toLowerCase().includes(q) ||
-      (a.branchName ?? "").toLowerCase().includes(q) ||
-      (a.branchAddress ?? "").toLowerCase().includes(q)
-    );
-  }, [filtered, searchQ]);
+    let rows = filtered;
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase();
+      rows = rows.filter((a) =>
+        a.anNumber.toLowerCase().includes(q) ||
+        a.titulo.toLowerCase().includes(q) ||
+        (a.client?.name ?? "").toLowerCase().includes(q) ||
+        (a.branchName ?? "").toLowerCase().includes(q) ||
+        (a.branchAddress ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (highlightActivityId && Number.isFinite(highlightActivityId)) {
+      rows = [...rows].sort((a, b) => {
+        if (a.id === highlightActivityId) return -1;
+        if (b.id === highlightActivityId) return 1;
+        return 0;
+      });
+    }
+    return rows;
+  }, [filtered, searchQ, highlightActivityId]);
+
+  const visibleEvidences = useMemo(() => {
+    if (!highlightActivityId || !Number.isFinite(highlightActivityId)) return evidences;
+    return [...evidences].sort((a, b) => {
+      const aMatch = (a as { activityId?: number }).activityId === highlightActivityId;
+      const bMatch = (b as { activityId?: number }).activityId === highlightActivityId;
+      if (aMatch && !bMatch) return -1;
+      if (!aMatch && bMatch) return 1;
+      return 0;
+    });
+  }, [evidences, highlightActivityId]);
 
   const counts = {
     completadas: visibleItems.filter((a) => isActivityCompleted(a.estatus) || isEvidenceApproved(a.activityEvidence)).length,
@@ -224,6 +247,13 @@ export default function MyActivitiesPage() {
         subtitle={cfg.subtitle}
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
+
+      {highlightActivityId && Number.isFinite(highlightActivityId) && (
+        <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+          Enlace desde notificación · OT <strong>#{highlightActivityId}</strong>.{" "}
+          <Link href="/ops/my-activities" style={{ color: "var(--primary)" }}>Quitar resaltado</Link>
+        </p>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
         <KpiCard label="OT en esta vista" value={visibleItems.length} icon="📋" />
@@ -399,12 +429,12 @@ export default function MyActivitiesPage() {
       {viewTab === "evidencias" && (
         <Section title="Mis evidencias">
           {evLoading && <EmptyState icon="⏳" title="Cargando…" description="Consultando tus evidencias." />}
-          {!evLoading && evidences.length === 0 && (
+          {!evLoading && visibleEvidences.length === 0 && (
             <EmptyState icon="📷" title="Sin evidencias" description="Sube evidencias desde el detalle de cada actividad asignada." />
           )}
-          {!evLoading && evidences.length > 0 && (
+          {!evLoading && visibleEvidences.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
-              {evidences.map((e) => (
+              {visibleEvidences.map((e) => (
                 <article key={e.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 12 }}>
                   <div style={{ fontWeight: 700, fontSize: 12.5 }}>{e.tipoEvidencia}</div>
                   <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>

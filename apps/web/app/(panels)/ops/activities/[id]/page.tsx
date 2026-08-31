@@ -17,7 +17,7 @@ import { activityStatusVariant } from "@/lib/activity-status";
 import { countEvidenceFiles } from "@/lib/evidence-display";
 import { getMissingEvidence, parseApiErrorWithEvidence } from "@/lib/parse-missing-evidence";
 import Link from "next/link";
-import { CrossPanelLink } from "@/components/CrossPanelLink";
+import CrossPanelLink from "@/components/CrossPanelLink";
 
 const STATUSES = ["PROGRAMADA", "EN_CURSO", "COMPLETADA", "REPROGRAMAR", "CANCELADA"];
 const PRIORITIES = ["BAJA", "MEDIA", "ALTA", "URGENTE"];
@@ -234,7 +234,14 @@ export default function ActivityDetailPage() {
           <>
             <DetailFieldGrid>
               <DetailField label="Cliente" value={activity.client?.id ? (
-                <CrossPanelLink href={`/crm/clients/${activity.client.id}`} style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+                <CrossPanelLink
+                  href={
+                    activity.client.salesClients?.[0]?.id
+                      ? `/crm/clients/${activity.client.salesClients[0].id}`
+                      : `/ops/service-clients/${activity.client.id}`
+                  }
+                  style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}
+                >
                   {activity.client.name} →
                 </CrossPanelLink>
               ) : (activity.client?.name ?? "—")} />

@@ -461,7 +461,7 @@ export class NotificationHierarchyService {
           message: `${requesterName} solicitó: "${toolName}"`,
           relatedEntityId: toolRequestId,
           entityType: 'ToolRequest',
-          relatedUrl: `/ops/tools?highlight=${toolRequestId}`,
+          relatedUrl: appUrls.opsTools(toolRequestId, 'requests'),
           priority: 'high',
         });
       }
@@ -519,18 +519,18 @@ export class NotificationHierarchyService {
           titulo: '⏰ Multa por Asistencia',
         },
         vehiculo: {
-          url: appUrls.opsVehicles(fineId),
-          entityType: 'Vehicle',
+          url: appUrls.erpFines(fineId),
+          entityType: 'Fine',
           titulo: '🚗 Multa por Vehículos',
         },
         herramienta: {
-          url: appUrls.opsTools(fineId),
-          entityType: 'ToolRequest',
+          url: appUrls.erpFines(fineId),
+          entityType: 'Fine',
           titulo: '🔧 Multa por Herramientas',
         },
         actividad: {
-          url: '/ops/my-activities',
-          entityType: 'Activity',
+          url: appUrls.erpFines(fineId),
+          entityType: 'Fine',
           titulo: '📋 Multa por Actividades',
         },
       };
@@ -538,7 +538,7 @@ export class NotificationHierarchyService {
       const fineConfig = tipoMulta && fineTypeMap[tipoMulta]
         ? fineTypeMap[tipoMulta]
         : {
-            url: `/erp/hr/fines?highlight=${fineId}`,
+            url: appUrls.erpFines(fineId),
             entityType: 'Fine',
             titulo: '⚠️ Nueva Multa',
           };
@@ -607,7 +607,7 @@ export class NotificationHierarchyService {
           message: `${requesterName} solicitó renovar: "${toolName}"`,
           relatedEntityId: renewalId,
           entityType: 'ToolRenewal',
-          relatedUrl: `/ops/tools?highlight=${renewalId}`,
+          relatedUrl: appUrls.opsTools(renewalId, 'renewals'),
           priority: 'high',
         });
       }
@@ -654,7 +654,7 @@ export class NotificationHierarchyService {
           message,
           relatedEntityId: vehicleRequestId,
           entityType: 'VehicleControl',
-          relatedUrl: `/ops/vehicles?highlight=${vehicleRequestId}`,
+          relatedUrl: appUrls.opsVehicles(vehicleRequestId, 'requests'),
           priority: 'high',
         });
       }
@@ -684,7 +684,7 @@ export class NotificationHierarchyService {
           message: `${requesterName} solicitó: "${vehicleName}"`,
           relatedEntityId: vehicleRequestId,
           entityType: 'VehicleControl',
-          relatedUrl: `/ops/vehicles?highlight=${vehicleRequestId}`,
+          relatedUrl: appUrls.opsVehicles(vehicleRequestId, 'requests'),
           priority: 'high',
         });
       }
@@ -710,7 +710,7 @@ export class NotificationHierarchyService {
         message: `Tu solicitud para "${vehicleName}" ha sido aprobada`,
         relatedEntityId: vehicleRequestId,
         entityType: 'VehicleControl',
-        relatedUrl: `/ops/vehicles?highlight=${vehicleRequestId}`,
+        relatedUrl: appUrls.opsVehicles(vehicleRequestId, 'requests'),
         priority: 'high',
       });
     } catch (error) {
@@ -735,7 +735,7 @@ export class NotificationHierarchyService {
         message: `Tu solicitud para "${vehicleName}" ha sido rechazada`,
         relatedEntityId: vehicleRequestId,
         entityType: 'VehicleControl',
-        relatedUrl: `/ops/vehicles?highlight=${vehicleRequestId}`,
+        relatedUrl: appUrls.opsVehicles(vehicleRequestId, 'requests'),
         priority: 'high',
       });
     } catch (error) {

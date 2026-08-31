@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -233,7 +233,7 @@ export default function CalendarPage() {
                   </div>
                 );
                 return ev.url ? (
-                  <Link key={ev.id} href={ev.url} style={{ textDecoration: "none" }}>{inner}</Link>
+                  <CrossPanelLink key={ev.id} href={ev.url} style={{ textDecoration: "none" }}>{inner}</CrossPanelLink>
                 ) : (
                   <div key={ev.id}>{inner}</div>
                 );

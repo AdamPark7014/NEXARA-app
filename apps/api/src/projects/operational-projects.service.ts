@@ -273,7 +273,11 @@ export class OperationalProjectsService {
           select: { id: true, nombre: true, email: true },
         },
         client: {
-          select: { id: true, name: true },
+          select: {
+            id: true,
+            name: true,
+            salesClients: { select: { id: true, name: true }, take: 1, orderBy: { id: 'asc' } },
+          },
         },
         salesProject: { select: salesProjectInclude },
         engineers: {

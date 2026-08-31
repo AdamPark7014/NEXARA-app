@@ -266,7 +266,11 @@ export class ActivitiesService {
       include: {
         creador: true,
         responsable: true,
-        client: true,
+        client: {
+          include: {
+            salesClients: { select: { id: true, name: true }, take: 1, orderBy: { id: 'asc' } },
+          },
+        },
         serviceSheet: true,
         evidencias: { orderBy: { subidoEn: 'desc' } },
         assignees: {

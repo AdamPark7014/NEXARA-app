@@ -4,6 +4,7 @@ import {
   INDUSTRY_LANDINGS,
   findServiceLanding,
 } from "@/lib/seo/programmatic-landings";
+import { isIndustryHubSlug } from "@/lib/seo/industry-hubs";
 import { MONEY_SERVICE_SLUGS } from "@/lib/seo/money-pages";
 import { GEO_CITIES, findGeoCity } from "@/lib/seo/geo-cities";
 import styles from "./SeoInterlinkHub.module.css";
@@ -139,7 +140,14 @@ export default function SeoInterlinkHub({
           {columns.map(({ industry, links }) => (
             <div key={industry.slug} className={styles.column}>
               <h3 className={styles.columnTitle}>
-                <Link href={`/soluciones/${industry.slug}`} className={styles.columnTitleLink}>
+                <Link
+                  href={
+                    isIndustryHubSlug(industry.slug)
+                      ? `/soluciones/${industry.slug}`
+                      : links[0]?.href || "/servicios"
+                  }
+                  className={styles.columnTitleLink}
+                >
                   {industry.name}
                 </Link>
               </h3>

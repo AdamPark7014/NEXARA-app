@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { isFinishedStatus } from '../activities/activity-status.js';
+import { appUrls } from '../common/app-urls.js';
 
 export type CalendarEvent = {
   id: string;
@@ -132,8 +133,8 @@ export class CalendarService {
         ownerId: v.assignedToId,
         ownerName: v.assignedTo?.nombre || null,
         color: '#0ea5e9',
-        url: `/maintenance/contracts`,
-        metadata: { contract: v.contract, status: v.status },
+        url: `/ops/maintenance/contracts?highlight=${v.contract.id}`,
+        metadata: { contract: v.contract, status: v.status, visitId: v.id },
       });
     });
 
@@ -148,7 +149,7 @@ export class CalendarService {
         ownerId: act.responsable?.id,
         ownerName: act.responsable?.nombre || null,
         color: isFinishedStatus(act.estatus) ? '#16a34a' : act.estatus === 'En Proceso' ? '#3b82f6' : '#f59e0b',
-        url: `/activities`,
+        url: appUrls.opsActivity(act.id),
         metadata: { status: act.estatus, branch: act.branchName },
       });
     });
@@ -164,7 +165,7 @@ export class CalendarService {
         ownerId: t.owner?.id,
         ownerName: t.owner?.nombre || null,
         color: '#dc2626',
-        url: `/licitaciones/${t.id}`,
+        url: appUrls.crmTender(t.id),
         metadata: { status: t.status },
       });
     });
@@ -180,7 +181,7 @@ export class CalendarService {
           ownerId: p.vendor?.id,
           ownerName: p.vendor?.nombre || null,
           color: '#16a34a',
-          url: `/projects/${p.id}`,
+          url: appUrls.opsProject(p.id),
           metadata: { status: p.status },
         });
       }

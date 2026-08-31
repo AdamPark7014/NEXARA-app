@@ -25,7 +25,6 @@ export default function robots(): MetadataRoute.Robots {
     "/login",
     "/auth/",
     "/device/",
-    "/qa/",
     "/cotizaciones/firmar/",
     "/*?*token=*",
     "/*?*session=*",

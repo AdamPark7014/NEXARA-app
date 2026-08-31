@@ -338,7 +338,29 @@ export default function IndustryHubPage({ params }: { params: Params }) {
             </div>
           </div>
         </section>
-      ) : null}
+      ) : (
+        <section className={shared.section} data-reveal="up">
+          <div className={shared.inner}>
+            <header className={shared.sectionHead}>
+              <p className={shared.eyebrow}>Siguiente paso</p>
+              <h2 className={shared.sectionTitle}>
+                Explora servicios y <span className={shared.sectionTitleAccent}>cobertura</span>
+              </h2>
+              <p className={shared.sectionLead}>
+                Mientras armamos landings específicas de {hub.name}, cotiza por línea de servicio o por ciudad.
+              </p>
+            </header>
+            <div className={shared.ctaActions} style={{ marginTop: 8 }}>
+              <Link href="/servicios" className={`${shared.btn} ${shared.btnPrimary}`}>
+                Ver servicios →
+              </Link>
+              <Link href="/cobertura/puebla" className={`${shared.btn} ${shared.btnSecondary}`}>
+                Cobertura Puebla
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       <SeoInterlinkHub
         title={`Más rutas cerca de ${hub.name}`}

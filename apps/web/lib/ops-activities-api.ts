@@ -21,7 +21,11 @@ export type ActivityDetail = {
   fechaFinalizacion?: string | null;
   responsable?: { id: number; nombre: string } | null;
   creador?: { id: number; nombre: string } | null;
-  client?: { id: number; name: string } | null;
+  client?: {
+    id: number;
+    name: string;
+    salesClients?: Array<{ id: number; name: string }>;
+  } | null;
   activityEvidence?: ActivityEvidenceDetail | null;
   evidencias?: Array<{ id: number; tipo?: string; descripcion?: string; url?: string }>;
   assignees?: Array<{

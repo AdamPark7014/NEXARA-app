@@ -52,9 +52,19 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = event.notification.data?.url || '/';
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clientList) => {
       for (const client of clientList) {
-        if (client.url && 'focus' in client) return client.focus();
+        if (!client.url || !('focus' in client)) continue;
+        await client.focus();
+        if ('navigate' in client && typeof client.navigate === 'function') {
+          try {
+            return await client.navigate(url);
+          } catch {
+            /* fall through to postMessage */
+          }
+        }
+        client.postMessage({ type: 'NEXARA_NOTIFICATION_NAV', url });
+        return client;
       }
       if (self.clients.openWindow) return self.clients.openWindow(url);
     }),

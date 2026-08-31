@@ -262,7 +262,11 @@ export default function ClientServicesPage() {
             <li key={c.id} style={{ padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>{c.title}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>
+                    <CrossPanelLink href={`/ops/maintenance/contracts?highlight=${c.id}`} style={{ color: "inherit", textDecoration: "none" }}>
+                      {c.title} →
+                    </CrossPanelLink>
+                  </div>
                   <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 2 }}>
                     <code style={{ fontSize: 11 }}>{c.contractNumber}</code>
                     {" · "}{FREQ_LABEL[c.frequency] ?? c.frequency}

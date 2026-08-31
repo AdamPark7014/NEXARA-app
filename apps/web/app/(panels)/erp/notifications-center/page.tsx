@@ -9,7 +9,7 @@ import { Tag } from "@/components/ui/DataTable";
 import Button from "@/components/ui/Button";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
-import { normalizeLegacyPath } from "@/lib/legacy-path-remap";
+import { normalizeLegacyRelatedUrl } from "@/lib/legacy-path-remap";
 import { toast } from "@/components/Toast";
 import KpiCard from "@/components/ui/KpiCard";
 import { fetchActivityFeed, type ActivityFeedItem } from "@/lib/activity-feed-api";
@@ -162,9 +162,7 @@ export default function NotificationsCenterPage() {
   };
 
   const openPath = (path: string) => {
-    const normalized =
-      normalizeLegacyPath(path.split("?")[0]) +
-      (path.includes("?") ? "?" + path.split("?").slice(1).join("?") : "");
+    const normalized = normalizeLegacyRelatedUrl(path);
     const current = detectCurrentPanelId();
     const userJson = user ? JSON.stringify(user) : null;
     if (isCrossPanelHref(normalized, current)) {

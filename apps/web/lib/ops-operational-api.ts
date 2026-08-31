@@ -13,7 +13,11 @@ export type OperationalProject = {
   salesProjectId?: number | null;
   salesProject?: { id: number; name: string; status: string } | null;
   vendor?: { id: number; nombre: string; email?: string } | null;
-  client?: { id: number; name: string } | null;
+  client?: {
+    id: number;
+    name: string;
+    salesClients?: Array<{ id: number; name: string }>;
+  } | null;
   activities?: Array<{ id: number; anNumber: string; titulo: string; estatus: string }>;
   engineers?: Array<{ id: number; engineer?: { id: number; nombre: string } }>;
 };
