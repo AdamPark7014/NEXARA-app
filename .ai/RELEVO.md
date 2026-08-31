@@ -51,4 +51,5 @@
 4. GSC/Bing: enviar sitemap; Rich Results en home + money page + blog.
 
 ## Estado
-- Commit + push + deploy `--force-all` en este cierre.
+- **Desplegado en prod** @ `2ba0cf8` (2026-08-30): `./deploy/update.sh --force-all` OK.
+- Smoke: sitemap 200, `/qa` + hubs `hospitalidad`/`educacion` presentes, hub `seguridad-electronica` ausente, www→apex 308.
