@@ -47,7 +47,16 @@ del canal que se está viendo. Y si el visor negocia WebRTC, ni eso.
 
 ## Configuración
 
-### Servidor (Hetzner)
+### Servidor (Hetzner · 5.78.215.109, SSH en el 2222)
+
+Estado comprobado el 31-08-2026: **WireGuard no está instalado**. El kernel
+(6.8) ya trae el módulo, así que solo faltan las herramientas.
+
+El servidor **no tiene firewall de host** — `ufw` inactivo y la política de
+`iptables INPUT` en `ACCEPT`. Para el enlace eso significa que no hay que abrir
+nada: el `51820/udp` quedará accesible en cuanto WireGuard escuche. Dicho de
+otro modo, lo que protege esa máquina hoy es que nada más escuche. Con 28
+contenedores de producción encima, merece una revisión aparte.
 
 ```bash
 apt install wireguard
@@ -117,6 +126,20 @@ esos sí entregan RTSP alcanzable desde allá.
 Con eso, `POST /api/integra/sync` y el cron de 15 min empiezan a funcionar para
 sitios ISAPI, y `integra:isapi:sync` deja de ser obligatorio.
 
+**Si se enruta solo el `/32`** (la opción recomendada más abajo), el servidor no
+llega a las cámaras y el sync tiene que correr en la caja. Entonces la caja
+necesita la base, y la vía limpia es publicar Postgres **solo en el túnel**:
+
+```yaml
+# deploy/docker-compose.nexara.yml
+  db:
+    ports:
+      - "10.77.0.1:5432:5432"   # solo la IP de wg0, nunca 0.0.0.0
+```
+
+Así la base es alcanzable desde los peers de WireGuard y desde nadie más — que
+es justo lo que hace falta, y menos superficie que abrir la LAN entera.
+
 ## La trampa que muerde en el sitio número tres
 
 **Las LAN de los clientes se van a repetir.** `192.168.1.0/24` y `192.168.0.0/24`
@@ -155,16 +178,56 @@ que el servidor hable con la caja, no con la LAN.
 Si el volumen de sitios crece, Headscale (coordinador propio) da lo mismo sin el
 tercero.
 
+## Qué caja poner en el sitio
+
+La caja hace dos cosas: cerrar el túnel y correr go2rtc. La segunda es la que
+manda en el dimensionado, y depende de un detalle de las cámaras.
+
+**Las DS-2CD2123G2 publican tres streams por canal:**
+
+| Stream | Códec | Resolución | Sirve para |
+|---|---|---|---|
+| 1 principal | H.265 | 1920×1080 | vista a pantalla completa |
+| 2 sub | H.265 | 640×360 | — |
+| 4 tercero | **H.264** | 704×576 | **mosaico, sin transcodificar** |
+
+Esto importa porque **H.265 no se reproduce bien en navegador**: Safari sí,
+Chrome solo con decodificación por hardware y según plataforma. El tercer stream
+es H.264, así que un mosaico de 13 cámaras se sirve **en crudo, sin gastar CPU**.
+El transcodificado solo hace falta al abrir una cámara a 1080p.
+
+| Opción | ~MXN | Túnel | go2rtc | H.265→H.264 |
+|---|---|---|---|---|
+| **Mini PC Intel N100** (Beelink S12 Pro, Minisforum UN100) | 3,000–4,500 | sí | sí | **sí, por QuickSync** |
+| Raspberry Pi 5 8 GB + SSD | 3,500–4,500 | sí | sí | por software: se ahoga |
+| Router con WireGuard (GL.iNet Flint 2, Mikrotik hAP ax3) | 1,500–3,500 | sí | **no** | no |
+
+**Recomendación: mini PC con Intel N100.**
+
+- El QuickSync del N100 transcodifica varios 1080p H.265 a H.264 casi gratis.
+  Es la única de las tres que cubre el caso completo.
+- Es x86: corre las mismas imágenes Docker que el servidor, sin variantes ARM.
+- Sale más barato que una Pi 5 con almacenamiento decente, y sin tarjeta SD, que
+  es la pieza que se muere en un equipo que no se apaga nunca.
+- Sobra potencia para el `integra:isapi:sync` por cron.
+
+Un router con WireGuard resuelve **solo** el túnel. Sería suficiente si go2rtc se
+quedara en el servidor, pero eso devuelve el RTSP crudo al enlace WAN — que es
+justo lo que la topología evita.
+
+> Nota de catálogo: los gateways Ruijie que distribuye SYSCOM hacen IPsec/L2TP y
+> valdrían para el túnel, pero no hospedan go2rtc. Una sola caja x86 sale más
+> simple que dos equipos.
+
 ## Qué hace falta antes de montarlo
 
-1. **Una caja siempre encendida en el sitio.** Un mini PC o una Raspberry Pi
-   basta: solo corre WireGuard y go2rtc. Hoy no existe — durante las pruebas el
-   peer fue la laptop, que se va cuando se va Adam.
-2. **Acceso SSH al servidor desde donde se vaya a configurar.** `~/.ssh/config`
-   tiene `HostName REEMPLAZA_CON_IP_HETZNER`, o sea que la entrada nunca se
-   completó. El servidor resuelve por DNS a `5.78.215.109`.
+1. **La caja del sitio** (ver arriba). Hoy no existe: durante las pruebas el peer
+   fue la laptop, que se va cuando se va Adam.
+2. **`apt install wireguard` en el servidor.** No está puesto.
 3. **Decidir `/32` vs. LAN completa** (ver arriba). Es la única decisión que
    cuesta cara si se toma tarde.
+4. **Dar de alta el sitio en la base de producción.** El `IntegraSite` de las
+   pruebas vive en la base local de la laptop, no allá.
 
 ## Mientras tanto
 

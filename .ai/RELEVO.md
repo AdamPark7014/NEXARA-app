@@ -134,6 +134,40 @@ necesita ver `192.168.9.x` para nada.
 Servidor: Hetzner, resuelve a `5.78.215.109`. **No se tocó.** `~/.ssh/config`
 tiene `HostName REEMPLAZA_CON_IP_HETZNER`, así que desde esta laptop no hay SSH.
 
+### Desplegado en producción (31-08-2026, 22:32 UTC)
+
+`9c08ee20` está en el servidor. `git push` a GitHub + `deploy/update.sh`; api y
+web reconstruidos y recreados. Sin migraciones (no había ninguna nueva).
+
+Verificado: `integra.nexara.com.mx` 200, `core.nexara.com.mx` 200,
+`/api/integra/health` 401 (el guard responde), módulo `hikvision-isapi` presente
+en `dist/`, los cinco contenedores `nexara-*` arriba. Los errores del log son
+404 preexistentes de secciones de CMS sin publicar.
+
+**El servidor hospeda 28 contenedores de otros proyectos** (arta, agora, pumpkin,
+universidad, biblioteca, family, acrobat, zynoratek…). No es una máquina de
+NEXARA: un build que llene el disco tumba producción ajena. Estaba al **84%** con
+12 GB libres, así que antes del build se liberó caché de build
+(`docker builder prune --keep-storage 2GB`, 8.7 GB). Quedó en 82%.
+El `update.sh` trae auto-prune, pero se dispara al **85%** y **después** del
+build: no habría llegado a tiempo.
+
+### Dos hallazgos del servidor
+
+- **WireGuard no está instalado.** El kernel 6.8 trae el módulo; faltan las
+  herramientas.
+- **No hay firewall de host**: `ufw` inactivo y `iptables INPUT` en `ACCEPT`. Hoy
+  lo único que protege esa máquina es que no haya nada más escuchando. Con 28
+  contenedores de producción encima, merece revisión aparte — no se tocó.
+
+### Las cámaras tienen un tercer stream en H.264
+
+`DS-2CD2123G2`: stream 1 H.265 1080p, stream 2 H.265 640×360 y **stream 4 H.264
+704×576**. Importa porque H.265 no se reproduce bien en navegador: un mosaico de
+13 cámaras se puede servir **en crudo con el stream 4**, sin transcodificar.
+`liveStream` hoy usa siempre el principal — elegir stream por caso de uso es
+mejora pendiente y de las baratas.
+
 ## A medias
 
 - **go2rtc no está en la LAN, y ahí se queda parado el puente.**
@@ -176,8 +210,9 @@ tiene `HostName REEMPLAZA_CON_IP_HETZNER`, así que desde esta laptop no hay SSH
 2. Conseguir la caja on-site y decidir `/32` vs. LAN completa
    (`docs/INTEGRA-LAN-ENLACE.md`). Es la única decisión que cuesta cara si se
    toma tarde.
-3. Completar `~/.ssh/config` con la IP del Hetzner antes de configurar nada allá.
-4. Repetir seed + sync contra la base de producción, desde dentro de la LAN.
+3. `apt install wireguard` en el servidor y montar el enlace.
+4. Repetir seed + sync contra la base de **producción**, desde dentro de la LAN.
+   El `IntegraSite` de las pruebas vive en la base local de la laptop.
 5. Probar apertura remota en una terminal (`.160`) antes de ofrecerlo al cliente.
 6. Avisar al instalador: el NVR marca `PasswordStatus: invalid` en los canales
    1, 2, 9 y 10 — las cuatro cámaras en plug & play.
