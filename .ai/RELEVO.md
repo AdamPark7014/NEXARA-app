@@ -47,4 +47,5 @@
 4. Verificar `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` en prod.
 
 ## Estado
-- Listo para cerrar + push + deploy `--force-all`.
+- **Desplegado en prod** @ `850355b` (2026-08-31): `./deploy/update.sh --force-all` OK.
+- Smoke: sitemap 200 (`/qa`, `/feed.xml`, hospitalidad); sin Nexara-Ingenieros; feed.xml RSS 200; opengraph-image PNG 200.
