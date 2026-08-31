@@ -234,7 +234,7 @@ export default function CrmDashboardPage() {
             title="Tu agenda de hoy"
             subtitle="Seguimientos y actividades pendientes"
             action="Ver actividades"
-            actionHref="/crm/activities"
+            actionHref="/crm/agenda"
           >
             {loading && <DashEmpty title="Cargando…" />}
             {!loading && agenda.length === 0 && (

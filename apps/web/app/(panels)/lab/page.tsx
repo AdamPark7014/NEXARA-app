@@ -31,6 +31,13 @@ const TOOLS = [
     chips: ["API", "DB", "Redis", "PAC SAT"],
   },
   {
+    href: "/lab/flags",
+    title: "Feature flags",
+    desc: "Flags de plataforma y canary — sin números inventados en el home.",
+    accent: "#f59e0b",
+    chips: ["Canary", "Rollout", "Lab"],
+  },
+  {
     href: "/erp/settings/webhooks",
     title: "Webhooks DLQ",
     desc: "Cola de entregas fallidas con replay — mismo control que Stripe Dashboard / Atlassian webhooks.",
@@ -56,28 +63,62 @@ const TOOLS = [
 export default function LabHome() {
   const { user } = useUser();
   const cfg = useMemo(() => getLabSectionConfig(user, "home"), [user]);
+  const token = user?.token ?? "";
 
   const [apiMs, setApiMs] = useState<number | null>(null);
   const [apiOk, setApiOk] = useState<boolean | null>(null);
+  const [readyOk, setReadyOk] = useState<boolean | null>(null);
+  const [flagCount, setFlagCount] = useState<number | null>(null);
+  const [flagsEnabled, setFlagsEnabled] = useState<number | null>(null);
 
   const ping = useCallback(async () => {
     const start = performance.now();
     try {
-      const res = await fetch(buildApiUrl("health/live"), { cache: "no-store" });
-      const ms = Math.round(performance.now() - start);
-      setApiMs(ms);
-      setApiOk(res.ok);
+      const [live, ready] = await Promise.all([
+        fetch(buildApiUrl("health/live"), { cache: "no-store" }),
+        fetch(buildApiUrl("health/ready"), { cache: "no-store" }),
+      ]);
+      setApiMs(Math.round(performance.now() - start));
+      setApiOk(live.ok);
+      setReadyOk(ready.ok);
     } catch {
       setApiOk(false);
+      setReadyOk(false);
       setApiMs(null);
     }
   }, []);
 
+  const loadFlags = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(buildApiUrl("lab/flags"), {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        setFlagCount(null);
+        setFlagsEnabled(null);
+        return;
+      }
+      const data = await res.json();
+      const rows = Array.isArray(data) ? data : (data?.data ?? []);
+      setFlagCount(rows.length);
+      setFlagsEnabled(rows.filter((f: { enabled?: boolean }) => f.enabled).length);
+    } catch {
+      setFlagCount(null);
+      setFlagsEnabled(null);
+    }
+  }, [token]);
+
   useEffect(() => {
     void ping();
-    const interval = setInterval(() => void ping(), 30000);
+    void loadFlags();
+    const interval = setInterval(() => {
+      void ping();
+      void loadFlags();
+    }, 30000);
     return () => clearInterval(interval);
-  }, [ping]);
+  }, [ping, loadFlags]);
 
   return (
     <DashPage>
@@ -91,7 +132,6 @@ export default function LabHome() {
             <DashPill tone={apiOk === false ? "danger" : "positive"}>
               {apiOk === false ? "API down" : apiOk === true ? `API OK · ${apiMs}ms` : "API checking…"}
             </DashPill>
-            <DashPill tone="neutral">v2.4.1-rc</DashPill>
           </>
         }
       />
@@ -106,13 +146,26 @@ export default function LabHome() {
             big: true,
           },
           {
-            label: "Estado API",
-            value: apiOk === null ? "—" : apiOk ? "OK" : "Down",
-            sub: apiOk === null ? "Verificando…" : apiOk ? "Liveness OK" : "API no responde",
-            tone: apiOk === null ? "default" : apiOk ? "positive" : "danger",
+            label: "Readiness",
+            value: readyOk === null ? "—" : readyOk ? "OK" : "Down",
+            sub: readyOk === null ? "Verificando…" : readyOk ? "health/ready" : "Dependencias fallan",
+            tone: readyOk === null ? "default" : readyOk ? "positive" : "danger",
           },
-          { label: "Webhooks SAT", value: "100%", sub: "Ver /lab/health para detalles", tone: "positive" },
-          { label: "Feature flags", value: "14", sub: "3 en canary · 1 rollout pausado", tone: "accent" },
+          {
+            label: "Feature flags",
+            value: flagCount === null ? "—" : String(flagCount),
+            sub:
+              flagsEnabled === null
+                ? "Ver /lab/flags"
+                : `${flagsEnabled} activos · live`,
+            tone: "accent",
+          },
+          {
+            label: "Health detail",
+            value: "→",
+            sub: "Abrir /lab/health",
+            tone: "default",
+          },
         ]}
       />
 
@@ -147,6 +200,7 @@ export default function LabHome() {
           <DashPanel title="Accesos técnicos" subtitle="Diagnóstico y trazabilidad" flush>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 4 }}>
               <ListRow href="/lab/health" title="Monitoreo de servicios" sub="API · DB · Redis · PAC" trail="→" />
+              <ListRow href="/lab/flags" title="Feature flags" sub="Canary y rollouts" trail="→" />
               <ListRow href="/lab/ai" title="Playground de IA" sub="Prompts y agentes" trail="→" />
               <ListRow href="/lab/chat" title="Chat del equipo" sub="Canal técnico" trail="→" />
               <ListRow href="/erp/audit" title="Audit log" sub="Cambios sensibles" trail="→" />

@@ -151,9 +151,9 @@ export function StatCard({
   const cls = `${styles.statCard} ${TONE_CLASS[tone]}`;
   if (href) {
     return (
-      <Link href={href} className={cls}>
+      <CrossPanelLink href={href} className={cls}>
         {body}
-      </Link>
+      </CrossPanelLink>
     );
   }
   return <div className={cls}>{body}</div>;
@@ -186,9 +186,9 @@ export function DashPanel({
         </div>
         {headExtra}
         {action && actionHref && (
-          <Link href={actionHref} className={styles.panelAction}>
+          <CrossPanelLink href={actionHref} className={styles.panelAction}>
             {action} →
-          </Link>
+          </CrossPanelLink>
         )}
       </div>
       <div className={`${styles.panelBody} ${flush ? styles.panelBodyFlush : ""}`}>{children}</div>

@@ -6,26 +6,22 @@
 
 ## Hecho en este turno
 
-### NEXARA Pro Polish (todos los paneles)
+### NEXARA Edge Fix (post Pro Polish)
 
-**Ola1 — Cross-panel**
-- `CrossPanelLink` + `CrossPanelRedirect`; notificaciones crm/ops/studio/lab/integra → ERP canónico + handoff.
-- AppShell campana/popover con URL cross-host; `openPath` ERP + CommandPalette.
-- Barrido handoffs CRM/ERP/Studio/CommandCenter/DashKit; specs en `cross-panel-handoff.spec.ts`.
+**Ola A — Links**
+- DashKit `StatCard` / `DashPanel.actionHref` → `CrossPanelLink`.
+- Rutas fantasma: CRM `/crm/agenda`, ERP `/erp/analytics/bi`.
+- CRM orden → ERP invoicing vía `resolveCrossPanelHref` + handoff.
+- AppShell notif popover: items clickables (`relatedUrl` + mark read).
 
-**Ola2 — Copy sin vendors (UI pública)**
-- Integra home/chrome/cards, NOC, facilities/access, subdomain-config, access-matrix, alarms/people/visitors.
-- Residuales scrub: video empty, EzuiKitPlayer mensajes, `_lib` module cards. Settings sigue con labels de proveedor (staff).
+**Ola B — API + campo**
+- `appUrls.crmQuote` / `crmProject` en cotizaciones + ventas `relatedUrl`.
+- Helper `parse-missing-evidence`; evidence-gate en `ops/activities/[id]` + my-activities.
+- Gate API también reconoce `COMPLETADA` (además de Finalizada).
 
-**Ola3 — Campo + tablet**
-- Evidence gate UX en `ops/my-activities` (checklist `missingEvidence`).
-- Banner sesión por expirar / kick + `extendSession` en UserContext/AppShell.
-- Drawer AppShell `@media` alineado a 900px (`PANEL_DRAWER_BREAKPOINT_PX`).
-
-**Ola4 — Chrome**
-- Popover notificaciones en AppShell; eliminado `NotificationCenter.tsx` huérfano.
-- Skip-to-main CSS + focus trap drawer (ya en shell).
-- Studio cases/social: `EmptyState`; cover sin emoji por defecto.
+**Ola C — Lab + higiene**
+- Lab home: KPIs live (ready + flags count), sin fake SAT/version; link a `/lab/flags`.
+- Purge `QuickActionsFab` huérfano (`NotificationCenter` ya no estaba).
 
 ## A medias
 - (nada)
@@ -35,10 +31,10 @@
 - Oficinas ACS
 
 ## Siguiente paso
-1. Smoke: campana desde `ops.*` / `sales.*` → `core.*` notifications.
-2. Smoke: link CRM→OPS cross-host con handoff.
-3. Smoke: cerrar actividad Finalizada sin evidencias → checklist.
-4. Hard-refresh login + drawer tablet ~900px.
+1. Smoke: executive “Ver todo” OPS desde `core.*`.
+2. Smoke: CRM orden → `core` invoicing cross-host.
+3. Smoke: Lab home sin KPIs inventados; flags count live.
+4. Smoke: completar OT sin evidencias en detalle → checklist.
 
 ## Estado
-- Listo para cerrar + deploy web (`--force-all`, sin migrate).
+- Listo para cerrar + deploy `--force-all` (API+web; sin migrate).

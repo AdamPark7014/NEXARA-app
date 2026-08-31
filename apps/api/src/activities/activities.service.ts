@@ -678,7 +678,7 @@ export class ActivitiesService {
     if (updateActivityDto.estatus !== undefined) {
       const next = String(updateActivityDto.estatus);
       const prevStatus = String(prev?.estatus || '');
-      if (/finalizada/i.test(next) && !/finalizada/i.test(prevStatus)) {
+      if (/finalizada|completada/i.test(next) && !/finalizada|completada/i.test(prevStatus)) {
         const evidences = await this.prisma['evidence'].findMany({
           where: {
             actividadId: id,
@@ -713,7 +713,7 @@ const updatedActivity = await this.prisma['activity'].update({
     if (actor?.id && prev && updateActivityDto.estatus !== undefined) {
       const nextStatus = String(updateActivityDto.estatus);
       const prevStatus = String(prev.estatus || '');
-      if (/finalizada/i.test(nextStatus) && !/finalizada/i.test(prevStatus)) {
+      if (/finalizada|completada/i.test(nextStatus) && !/finalizada|completada/i.test(prevStatus)) {
         const label =
           (updatedActivity.anNumber && String(updatedActivity.anNumber).trim()) ||
           (updatedActivity.titulo && String(updatedActivity.titulo).trim()) ||

@@ -58,9 +58,10 @@ import {
 import type { IntegraCapabilities } from "@/app/(panels)/integra/_lib";
 import { getUserHomeUrlAbsolute } from "@/lib/panel-home";
 import type { User } from "@/components/UserContext";
-import { buildCrossPanelUrl } from "@/lib/cross-panel-handoff";
+import { buildCrossPanelUrl, detectCurrentPanelId, isCrossPanelHref, resolveCrossPanelHref } from "@/lib/cross-panel-handoff";
 import { buildFreshLoginUrl } from "@/lib/tab-session";
 import { buildApiUrl } from "@/lib/api-base";
+import { normalizeLegacyPath } from "@/lib/legacy-path-remap";
 import styles from "./AppShell.module.scss";
 import CommandPalette from "./CommandPalette";
 import ShellConnectionStatus from "./ShellConnectionStatus";
@@ -70,6 +71,15 @@ type AppShellProps = {
   children: React.ReactNode;
 };
 
+type NotifPreviewItem = {
+  id: number;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+  relatedUrl?: string | null;
+};
+
 export default function AppShell({ panel, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -77,7 +87,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
   const { darkMode, toggleDarkMode } = useTheme();
   const [extendingSession, setExtendingSession] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notifPreview, setNotifPreview] = useState<Array<{ id: number; title: string; message: string; isRead: boolean; createdAt: string }>>([]);
+  const [notifPreview, setNotifPreview] = useState<NotifPreviewItem[]>([]);
   const [notifLoading, setNotifLoading] = useState(false);
   const drawerRef = useRef<HTMLElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
@@ -155,6 +165,37 @@ export default function AppShell({ panel, children }: AppShellProps) {
     } finally {
       setNotifLoading(false);
     }
+  };
+
+  const openNotifPreview = async (n: NotifPreviewItem) => {
+    if (!user?.token) return;
+    if (!n.isRead) {
+      try {
+        await fetch(buildApiUrl(`notifications/${n.id}/read`), {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${user.token}` },
+        });
+        setNotifPreview((prev) =>
+          prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)),
+        );
+        setUnreadNotifs((c) => Math.max(0, c - 1));
+      } catch {
+        /* non-critical */
+      }
+    }
+    if (!n.relatedUrl) return;
+    const path = n.relatedUrl;
+    const normalized =
+      normalizeLegacyPath(path.split("?")[0]) +
+      (path.includes("?") ? "?" + path.split("?").slice(1).join("?") : "");
+    const current = detectCurrentPanelId(pathname) ?? panel;
+    const userJson = JSON.stringify(user);
+    setNotifOpen(false);
+    if (isCrossPanelHref(normalized, current)) {
+      window.location.assign(resolveCrossPanelHref(normalized, userJson, current));
+      return;
+    }
+    router.push(resolveCrossPanelHref(normalized, null, current));
   };
 
   const panelMeta = PANEL_META[panel];
@@ -911,14 +952,23 @@ export default function AppShell({ panel, children }: AppShellProps) {
                     )}
                     {!notifLoading &&
                       notifPreview.map((n) => (
-                        <div
+                        <button
                           key={n.id}
+                          type="button"
+                          onClick={() => void openNotifPreview(n)}
                           style={{
+                            display: "block",
+                            width: "100%",
+                            textAlign: "left",
                             padding: "10px 14px",
+                            border: "none",
                             borderBottom: "1px solid var(--nx-panel-hairline-soft)",
                             background: n.isRead
                               ? "transparent"
                               : "color-mix(in srgb, var(--primary) 6%, transparent)",
+                            cursor: n.relatedUrl ? "pointer" : "default",
+                            fontFamily: "inherit",
+                            color: "inherit",
                           }}
                         >
                           <div style={{ fontSize: 13, fontWeight: 600 }}>{n.title}</div>
@@ -932,7 +982,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
                           >
                             {n.message}
                           </div>
-                        </div>
+                        </button>
                       ))}
                   </div>
                   <div style={{ padding: 10, borderTop: "1px solid var(--nx-panel-hairline)" }}>
