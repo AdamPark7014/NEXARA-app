@@ -153,7 +153,7 @@ export default function OfficesAccessPage() {
               <p style={{ color: "var(--text-tertiary)", fontSize: 13 }}>
                 {health?.config?.configured
                   ? "Sin puertas en la respuesta del servidor."
-                  : "Configura OFFICES_HIK_HOST / APP_KEY / APP_SECRET."}
+                  : "Configura las variables de acceso de oficinas en el servidor."}
               </p>
             )}
             {doors.map((d) => (

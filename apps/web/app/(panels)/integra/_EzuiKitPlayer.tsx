@@ -41,21 +41,21 @@ export function IntegraEzuiKitPlayer({ stream, cameraId, height = 280 }: Props) 
           const existing = document.querySelector<HTMLScriptElement>("script[data-ezuikit]");
           if (existing) {
             existing.addEventListener("load", () => resolve());
-            existing.addEventListener("error", () => reject(new Error("EZUIKit CDN")));
+            existing.addEventListener("error", () => reject(new Error("No se pudo cargar el player")));
             return;
           }
           const s = document.createElement("script");
           s.src = "https://open.ys7.com/sdk/js/2.0/ezuikit.js";
           s.dataset.ezuikit = "1";
           s.onload = () => resolve();
-          s.onerror = () => reject(new Error("No se pudo cargar EZUIKit"));
+          s.onerror = () => reject(new Error("No se pudo cargar el player"));
           document.head.appendChild(s);
         });
         if (cancelled) return;
 
         const EZUIKit = (window as any).EZUIKit;
         if (!EZUIKit?.EZUIKitPlayer) {
-          throw new Error("EZUIKit no disponible en este navegador");
+          throw new Error("Player de video no disponible en este navegador");
         }
 
         const accessToken = String(
@@ -69,7 +69,7 @@ export function IntegraEzuiKitPlayer({ stream, cameraId, height = 280 }: Props) 
               : "";
         if (!accessToken || !url) {
           throw new Error(
-            "Token HCT incompleto — revisa streamAreaDomain / appToken en el sitio",
+            "Token de stream incompleto — revisa la configuración del sitio",
           );
         }
 
@@ -117,7 +117,7 @@ export function IntegraEzuiKitPlayer({ stream, cameraId, height = 280 }: Props) 
           fontSize: 13,
         }}
       >
-        Sin token HCT
+        Sin token de stream
       </div>
     );
   }
@@ -140,7 +140,7 @@ export function IntegraEzuiKitPlayer({ stream, cameraId, height = 280 }: Props) 
         {error}
         <br />
         <span style={{ color: "#94a3b8", fontSize: 12 }}>
-          Configura dominio allowlist EZUIKit / revisa ADR-0019.
+          Revisa el dominio allowlist del player o la configuración del sitio.
         </span>
       </div>
     );

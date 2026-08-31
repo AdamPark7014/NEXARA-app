@@ -6,6 +6,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
+import EmptyState from "@/components/ui/EmptyState";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
@@ -59,7 +60,7 @@ function resolveCaseStudyImageUrl(imageUrl?: string | null): string {
   return buildApiUrl(imageUrl.replace(/^\//, ""));
 }
 
-const EMPTY_FORM = { titulo: "", cliente: "", vertical: "Servicios", impacto: "", descripcion: "", cover: "🏆" };
+const EMPTY_FORM = { titulo: "", cliente: "", vertical: "Servicios", impacto: "", descripcion: "", cover: "" };
 
 export default function StudioCasesPage() {
   const { user } = useUser();
@@ -97,7 +98,7 @@ export default function StudioCasesPage() {
   const openNew = () => { setEditing(null); setForm({ ...EMPTY_FORM }); setCoverFile(null); setShowForm(true); };
   const openEdit = (c: CaseStudy) => {
     setEditing(c);
-    setForm({ titulo: c.titulo, cliente: c.cliente, vertical: c.vertical, impacto: c.impacto, descripcion: c.descripcion ?? "", cover: c.cover ?? "🏆" });
+    setForm({ titulo: c.titulo, cliente: c.cliente, vertical: c.vertical, impacto: c.impacto, descripcion: c.descripcion ?? "", cover: c.cover ?? "" });
     setCoverFile(null);
     setShowForm(true);
   };
@@ -233,8 +234,8 @@ export default function StudioCasesPage() {
               </select>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>Cover (emoji)</label>
-              <input style={inputStyle} value={form.cover} onChange={field("cover")} placeholder="🏆" maxLength={10} />
+              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>Cover (opcional)</label>
+              <input style={inputStyle} value={form.cover} onChange={field("cover")} placeholder="Texto corto o deja vacío" maxLength={10} />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4, gridColumn: "1 / -1" }}>
               <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>Impacto (frase clave)</label>
@@ -300,14 +301,29 @@ export default function StudioCasesPage() {
       />
 
       <Section title={loading ? "Cargando…" : `${items.length} casos`}>
-        {loading ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-        ) : items.length === 0 ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>
-            No hay casos de éxito aún.{" "}
-            <button onClick={openNew} style={{ color: "var(--primary)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Crea el primero →</button>
-          </div>
-        ) : (
+        {loading && (
+          <EmptyState icon="⏳" title="Cargando…" description="Consultando casos de estudio." />
+        )}
+        {!loading && error && (
+          <EmptyState
+            icon="⚠️"
+            title="No se pudo cargar"
+            description={error}
+            action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+          />
+        )}
+        {!loading && !error && items.length === 0 ? (
+          <EmptyState
+            icon="🏆"
+            title="Sin casos de éxito"
+            description="Publica el primer caso para el sitio y el embudo comercial."
+            action={
+              cfg.canCreate ? (
+                <Button size="sm" variant="primary" onClick={openNew}>Nuevo caso</Button>
+              ) : undefined
+            }
+          />
+        ) : !loading && !error ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
             {items.filter((c) => {
               if (searchQ.trim()) { const q = searchQ.toLowerCase(); if (!((c.titulo + " " + c.cliente + " " + c.vertical).toLowerCase().includes(q))) return false; }
@@ -330,7 +346,7 @@ export default function StudioCasesPage() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={coverSrc} alt={c.titulo} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   ) : (
-                    c.cover ?? "🏆"
+                    c.cover || null
                   )}
                   <div style={{ position: "absolute", top: 8, right: 8 }}>
                     <Tag variant={c.publicado ? "positive" : "warning"}>{c.publicado ? "Publicado" : "Borrador"}</Tag>
@@ -369,7 +385,7 @@ export default function StudioCasesPage() {
               </article>
             );})}
           </div>
-        )}
+        ) : null}
       </Section>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
