@@ -492,7 +492,7 @@ export class NotificationHierarchyService {
         message,
         relatedEntityId: toolRequestId,
         entityType: 'ToolRequest',
-        relatedUrl: `/ops/tools?highlight=${toolRequestId}`,
+        relatedUrl: appUrls.opsTools(toolRequestId, 'requests'),
         priority: status === 'rejected' ? 'high' : 'normal',
       });
     } catch (error) {
