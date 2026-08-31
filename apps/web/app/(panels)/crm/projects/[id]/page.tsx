@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import { Tag, Money } from "@/components/ui/DataTable";
@@ -247,9 +248,9 @@ export default function CrmProjectDetailPage() {
           <div style={{ marginTop: 20, display: "flex", gap: 10, flexWrap: "wrap" }}>
             {!ops && <Button variant="secondary" onClick={() => void provision()}>Activar en operación</Button>}
             {ops && (
-              <Link href={`/ops/projects/${ops.id}`} style={{ textDecoration: "none" }}>
+              <CrossPanelLink href={`/ops/projects/${ops.id}`} style={{ textDecoration: "none" }}>
                 <Button variant="secondary">Ver en OPS →</Button>
-              </Link>
+              </CrossPanelLink>
             )}
           </div>
         </>

@@ -169,7 +169,7 @@ export default function BiPage() {
   ];
 
   const clientCols: Column<ClientRoiRow>[] = [
-    { key: "clientName", label: "Cliente", render: (r) => <Link href={`/crm/clients/${r.clientId}`} style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{r.clientName}</Link> },
+    { key: "clientName", label: "Cliente", render: (r) => <CrossPanelLink href={`/crm/clients/${r.clientId}`} style={{ fontWeight: 600, fontSize: 13, color: "var(--primary)", textDecoration: "none" }}>{r.clientName}</CrossPanelLink> },
     { key: "projects", label: "Proyectos", width: 90 },
     { key: "revenue", label: "Ingreso", render: (r) => <Money value={r.revenue} />, width: 130 },
     { key: "cost", label: "Costo", render: (r) => <Money value={r.cost} />, width: 130 },

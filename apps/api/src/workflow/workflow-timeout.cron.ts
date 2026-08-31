@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { appUrls } from '../common/app-urls.js';
 
 /**
  * Escalación de aprobaciones pendientes que superan `timeoutHours` del paso actual.
@@ -57,7 +58,7 @@ export class WorkflowTimeoutCronService {
           message: `${inst.workflow.name} · ${inst.entityType} #${inst.entityId} superó el SLA del paso "${step.name}".`,
           relatedEntityId: inst.entityId,
           entityType: inst.entityType,
-          relatedUrl: '/erp/approvals',
+          relatedUrl: appUrls.erpApprovals(inst.id),
           priority: 'high',
           companyId: inst.companyId,
         });

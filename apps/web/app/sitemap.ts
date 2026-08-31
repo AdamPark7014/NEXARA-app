@@ -2,8 +2,8 @@ export const revalidate = 1800;
 import type { MetadataRoute } from "next";
 import {
   getProgrammaticLandings,
-  INDUSTRY_LANDINGS,
 } from "@/lib/seo/programmatic-landings";
+import { INDUSTRY_HUB_SLUGS } from "@/lib/seo/industry-hubs";
 import { sitemapPriorityForLanding } from "@/lib/seo/money-pages";
 import { fetchPublishedNews } from "@/lib/public-news";
 import { GEO_CITIES, getGeoServiceCombos } from "@/lib/seo/geo-cities";
@@ -21,6 +21,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${baseUrl}/cobertura`, lastModified: now, changeFrequency: "weekly", priority: 0.88 },
     { url: `${baseUrl}/nosotros`, lastModified: now, changeFrequency: "weekly", priority: 0.86 },
     { url: `${baseUrl}/blog`, lastModified: now, changeFrequency: "daily", priority: 0.85 },
+    { url: `${baseUrl}/qa`, lastModified: now, changeFrequency: "monthly", priority: 0.75 },
     { url: `${baseUrl}/Nexara-Ingenieros`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: `${baseUrl}/legal/privacidad`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
     { url: `${baseUrl}/legal/eliminar-cuenta`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
@@ -29,13 +30,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${baseUrl}/legal/marca`, lastModified: now, changeFrequency: "yearly", priority: 0.25 },
   ];
 
-  const industryHubs: MetadataRoute.Sitemap = INDUSTRY_LANDINGS.map((industry) => ({
-    url: `${baseUrl}/soluciones/${industry.slug}`,
+  const industryHubs: MetadataRoute.Sitemap = INDUSTRY_HUB_SLUGS.map((slug) => ({
+    url: `${baseUrl}/soluciones/${slug}`,
     lastModified: now,
     changeFrequency: "weekly" as const,
-    priority: industry.slug === "retail" || industry.slug === "manufactura" || industry.slug === "seguridad-electronica"
-      ? 0.9
-      : 0.84,
+    priority: slug === "retail" || slug === "manufactura" ? 0.9 : 0.84,
   }));
 
   const geoPages: MetadataRoute.Sitemap = GEO_CITIES.map((city) => ({

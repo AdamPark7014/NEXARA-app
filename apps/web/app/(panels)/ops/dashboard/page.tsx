@@ -124,7 +124,7 @@ export default function OpsDashboardPage() {
               return [];
             }),
         cfg.viewMode !== "execute"
-          ? apiFetch("support-tickets?limit=5&status=OPEN", token).catch(() => [])
+          ? apiFetch("client-ticket-requests?limit=5", token).catch(() => [])
           : Promise.resolve([]),
       ]);
       setActivities(Array.isArray(actData) ? actData : (actData?.data ?? []));

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -144,9 +145,9 @@ export default function ServiceClientDetailPage() {
         actions={
           <>
             {client.salesClientId && (
-              <Link href={`/crm/clients/${client.salesClientId}`} style={{ textDecoration: "none" }}>
+              <CrossPanelLink href={`/crm/clients/${client.salesClientId}`} style={{ textDecoration: "none" }}>
                 <Button variant="secondary" iconLeft="↗">Ver en CRM</Button>
-              </Link>
+              </CrossPanelLink>
             )}
             {cfg.canEdit && (
               <Button variant="primary" iconLeft="✎" onClick={openEdit}>Editar</Button>
@@ -238,9 +239,9 @@ export default function ServiceClientDetailPage() {
           {client.salesClient && (
             <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Vinculado en CRM</div>
-              <Link href={`/crm/clients/${client.salesClientId}`} style={{ color: "var(--primary)", fontWeight: 600, fontSize: 13 }}>
+              <CrossPanelLink href={`/crm/clients/${client.salesClientId}`} style={{ color: "var(--primary)", fontWeight: 600, fontSize: 13 }}>
                 {client.salesClient.name} →
-              </Link>
+              </CrossPanelLink>
             </div>
           )}
         </Section>

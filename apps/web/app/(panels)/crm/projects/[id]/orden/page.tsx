@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import CrossPanelLink from "@/components/CrossPanelLink";
+import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
@@ -249,9 +250,9 @@ export default function ProjectOrderPage() {
             <div style={{ marginTop: 16, display: "grid", gap: 6 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase" }}>Facturas emitidas</div>
               {invoices.map((inv) => (
-                <Link key={inv.id} href={`/erp/invoicing?highlight=${inv.id}`} style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>
+                <CrossPanelLink key={inv.id} href={`/erp/invoicing?highlight=${inv.id}`} style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>
                   {inv.invoiceNumber} · {inv.status}
-                </Link>
+                </CrossPanelLink>
               ))}
             </div>
           )}

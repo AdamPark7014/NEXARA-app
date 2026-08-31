@@ -20,7 +20,8 @@ import {
   toDatetimeLocalValue,
 } from "../_lib";
 import { PlaybackJumpModal } from "../_PlaybackJumpModal";
-import { getOperacionUrl } from "@/lib/panel-urls";
+import { resolveCrossPanelHref } from "@/lib/cross-panel-handoff";
+import { useUser } from "@/components/UserContext";
 import { getCachedProvider, subscribeProvider } from "../_caps";
 
 type AlarmItem = {
@@ -37,6 +38,7 @@ type AlarmItem = {
 };
 
 export default function IntegraAlarmsPage() {
+  const { userJson } = useUser();
   const [items, setItems] = useState<AlarmItem[]>([]);
   const [openCount, setOpenCount] = useState(0);
   const [statusFilter, setStatusFilter] = useState<"ALL" | "OPEN" | "ACK" | "CLEARED">("OPEN");
@@ -214,7 +216,10 @@ export default function IntegraAlarmsPage() {
                           const qs = new URLSearchParams({ title, description });
                           if (sid) qs.set("siteId", String(sid));
                           if (siteLabel) qs.set("clientHint", siteLabel);
-                          window.location.href = getOperacionUrl(`/support/new?${qs.toString()}`);
+                          window.location.href = resolveCrossPanelHref(
+                            `/ops/support/new?${qs.toString()}`,
+                            userJson,
+                          );
                           return;
                         }
                         setError(msg);

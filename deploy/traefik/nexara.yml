@@ -60,11 +60,19 @@ http:
       service: dummy
 
     public-http:
-      rule: 'Host(`nexara.com.mx`) || Host(`www.nexara.com.mx`)'
+      rule: 'Host(`nexara.com.mx`)'
       entryPoints:
         - web
       middlewares:
         - redirect-https
+      service: dummy
+
+    public-www-http:
+      rule: 'Host(`www.nexara.com.mx`)'
+      entryPoints:
+        - web
+      middlewares:
+        - www-to-apex-http
       service: dummy
 
     api-http:
@@ -231,10 +239,20 @@ http:
       tls:
         certResolver: letsencrypt
 
-    # Sitio público (apex + www en un solo router para que el cert SAN
-    # cubra ambos hostnames y reducir puntos de fallo en ACME).
+    # Sitio público (apex). www → apex 301 para consolidar señal canonical.
+    public-www:
+      rule: 'Host(`www.nexara.com.mx`)'
+      entryPoints:
+        - websecure
+      middlewares:
+        - www-to-apex
+      service: dummy
+      priority: 25
+      tls:
+        certResolver: letsencrypt
+
     public:
-      rule: 'Host(`nexara.com.mx`,`www.nexara.com.mx`)'
+      rule: 'Host(`nexara.com.mx`)'
       entryPoints:
         - websecure
       service: nexara-web
@@ -250,6 +268,18 @@ http:
     redirect-https:
       redirectScheme:
         scheme: https
+        permanent: true
+
+    www-to-apex-http:
+      redirectRegex:
+        regex: "^http://www\\.nexara\\.com\\.mx(.*)"
+        replacement: "https://nexara.com.mx${1}"
+        permanent: true
+
+    www-to-apex:
+      redirectRegex:
+        regex: "^https://www\\.nexara\\.com\\.mx(.*)"
+        replacement: "https://nexara.com.mx${1}"
         permanent: true
 
     integra-go2rtc-strip:

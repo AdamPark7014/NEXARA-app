@@ -335,6 +335,7 @@ export default function IntegraSettingsPage() {
                 
                 <IgField label="Cliente operativo (ERP)">
                   <select
+                    id="integra-client-link"
                     value={serviceClientId}
                     onChange={(e) => setServiceClientId(e.target.value)}
                     style={{ ...inputStyle, maxWidth: "100%" }}
@@ -376,6 +377,15 @@ export default function IntegraSettingsPage() {
 
             {selected && (
               <IgPanel title="Módulos del sitio" count={selected.label || selected.name}>
+                {!selected.serviceClientId && (
+                  <p style={{ fontSize: 12, padding: "8px 12px", margin: 0, color: "#b45309", background: "color-mix(in srgb, var(--warning) 12%, transparent)", borderBottom: "1px solid var(--border)" }}>
+                    Sin cliente operativo vinculado: las alarmas no pueden crear ticket automático.{" "}
+                    <a href="#integra-client-link" style={{ color: "var(--primary)", fontWeight: 600 }}>
+                      Vincula un cliente OPS abajo
+                    </a>{" "}
+                    o crea el sitio con cliente operativo.
+                  </p>
+                )}
                 <p className={styles.empty} style={{ padding: "8px 10px", textAlign: "left" }}>
                   Activa o desactiva lo que verá el operador en este sitio.
                   {selected.provider === "HCT" && (

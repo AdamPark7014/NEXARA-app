@@ -6,6 +6,7 @@ import styles from "./page.module.css";
 import PublicPageHero from "../../../components/PublicPageHero";
 import heroStyles from "../../../components/PublicPageHero.module.css";
 import { findIndustryLanding, getProgrammaticLandings } from "@/lib/seo/programmatic-landings";
+import { INDUSTRY_HUB_SLUGS } from "@/lib/seo/industry-hubs";
 import { buildWhatsAppLeadUrl, MONEY_SERVICE_SLUGS } from "@/lib/seo/money-pages";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 
@@ -137,7 +138,7 @@ const INDUSTRY_HUBS: Record<
 };
 
 export function generateStaticParams() {
-  return Object.keys(INDUSTRY_HUBS).map((industry) => ({ industry }));
+  return INDUSTRY_HUB_SLUGS.map((industry) => ({ industry }));
 }
 
 export function generateMetadata({ params }: { params: Params }): Metadata {
@@ -198,9 +199,29 @@ export default function IndustryHubPage({ params }: { params: Params }) {
     path: `/soluciones/${params.industry}`,
   });
   const contactoHref = `/contacto?industry=${params.industry}`;
+  const hubPath = `/soluciones/${params.industry}`;
+  const collectionJson = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: `${hub.name} | NEXARA`,
+    url: `${siteUrl}${hubPath}`,
+    description: hub.lead,
+    breadcrumb: {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Inicio", item: siteUrl },
+        { "@type": "ListItem", position: 2, name: "Soluciones", item: `${siteUrl}/servicios` },
+        { "@type": "ListItem", position: 3, name: hub.name, item: `${siteUrl}${hubPath}` },
+      ],
+    },
+  };
 
   return (
     <main className={`${shared.page} home-main-flush`} aria-label={`Soluciones ${hub.name}`}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionJson) }}
+      />
       <PublicPageHero
         eyebrow={`Soluciones · ${hub.name}`}
         title={

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
+import CrossPanelLink from "@/components/CrossPanelLink";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
@@ -149,9 +150,9 @@ export default function OpsProjectSummaryPage() {
           <>
             <DetailFieldGrid>
               <DetailField label="Cliente" value={project.client?.id ? (
-                <Link href={`/crm/clients/${project.client.id}`} style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+                <CrossPanelLink href={`/crm/clients/${project.client.id}`} style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
                   {project.client.name} →
-                </Link>
+                </CrossPanelLink>
               ) : (project.client?.name ?? "—")} />
               <DetailField label="Responsable" value={project.vendor?.nombre} />
               <DetailField label="Inicio" value={formatDate(project.startDate)} />
@@ -231,9 +232,9 @@ export default function OpsProjectSummaryPage() {
 
       {project.salesProjectId && (
         <p style={{ marginTop: 16, fontSize: 13 }}>
-          <Link href={`/crm/projects/${project.salesProjectId}`} style={{ color: "var(--primary)", fontWeight: 600 }}>
+          <CrossPanelLink href={`/crm/projects/${project.salesProjectId}`} style={{ color: "var(--primary)", fontWeight: 600 }}>
             Ver proyecto comercial →
-          </Link>
+          </CrossPanelLink>
         </p>
       )}
     </>

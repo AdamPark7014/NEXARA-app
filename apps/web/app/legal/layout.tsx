@@ -1,21 +1,31 @@
-"use client";
+import type { Metadata } from "next";
+import { NEXARA_LOGO_LOCKUP } from "@/lib/brand";
 
-import type { ReactNode } from "react";
-import PublicSiteThemeLock from "@/components/PublicSiteThemeLock";
-import Header from "@/components/Header";
-import Footer from "@/app/components/Footer";
-import CookieConsentBanner from "@/components/CookieConsentBanner";
+const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 
-export default function LegalLayout({ children }: { children: ReactNode }) {
-  return (
-    <>
-      <PublicSiteThemeLock />
-      <Header />
-      <div className="public-layout-content home-main-flush" style={{ background: "#050a14", minHeight: "60vh" }}>
-        {children}
-      </div>
-      <Footer />
-      <CookieConsentBanner />
-    </>
-  );
+export const metadata: Metadata = {
+  openGraph: {
+    type: "website",
+    locale: "es_MX",
+    siteName: "NEXARA",
+    images: [
+      {
+        url: NEXARA_LOGO_LOCKUP,
+        width: 1200,
+        height: 630,
+        alt: "NEXARA",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: [NEXARA_LOGO_LOCKUP],
+  },
+  alternates: {
+    canonical: `${siteUrl}/legal`,
+  },
+};
+
+export default function LegalLayout({ children }: { children: React.ReactNode }) {
+  return children;
 }

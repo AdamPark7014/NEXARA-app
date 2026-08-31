@@ -12,7 +12,7 @@ import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import { getIntegraUrl } from "@/lib/panel-urls";
+import { CrossPanelLink } from "@/components/CrossPanelLink";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac";
 
@@ -23,8 +23,9 @@ interface NocDevice {
   status: "ONLINE" | "OFFLINE" | "DEGRADED" | "ALERT";
   branch: string;
   clientName: string;
-  lastSeen: string;
+  lastSeen?: string;
   uptimePct30d: number;
+  metadata?: { source?: string };
 }
 
 interface NocSummary {
@@ -110,11 +111,11 @@ export default function NocPage() {
           title="Sin sitios conectados al NOC"
           description="El monitoreo real usa el espejo de Integra (cámaras y accesos). Conecta un sitio de seguridad para ver dispositivos vivos — ya no se inventan routers de demo."
           action={
-            <a href={getIntegraUrl("/settings")} style={{ textDecoration: "none" }}>
+            <CrossPanelLink href="/integra/settings" style={{ textDecoration: "none" }}>
               <Button size="sm" variant="primary">
                 Ir a Sitios Integra
               </Button>
-            </a>
+            </CrossPanelLink>
           }
         />
       )}
@@ -194,7 +195,12 @@ export default function NocPage() {
                   <article key={d.id} style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto auto", gap: 16, alignItems: "center", padding: 14, background: "color-mix(in srgb, var(--surface-2) 40%, transparent)", border: "1px solid var(--border)", borderRadius: 12, borderLeftWidth: 3, borderLeftColor: statusColor[d.status] }}>
                     <span style={{ width: 12, height: 12, borderRadius: 999, background: statusColor[d.status], boxShadow: `0 0 12px ${statusColor[d.status]}`, flexShrink: 0 }} />
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13.5 }}>{d.clientName}</div>
+                      <div style={{ fontWeight: 700, fontSize: 13.5, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        {d.clientName}
+                        {d.metadata?.source === "synthetic" && (
+                          <Tag variant="warning">Simulado</Tag>
+                        )}
+                      </div>
                       <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{d.name} · {d.branch} · {d.type}</div>
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>

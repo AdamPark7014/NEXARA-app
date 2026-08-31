@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
@@ -83,6 +84,8 @@ function mapExpenseRow(raw: Record<string, unknown>): Expense {
 
 export default function ExpensesPage() {
   const { user } = useUser();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
   const cfg = useMemo(() => getErpExpensesSectionConfig(user), [user]);
   const token = user?.token ?? "";
 
@@ -163,8 +166,12 @@ export default function ExpensesPage() {
     }
     if (filterCat) result = result.filter((e) => e.categoria === filterCat);
     if (filterEstado) result = result.filter((e) => e.estado === filterEstado);
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) result = [...result].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
     return result;
-  }, [items, user, cfg.defaultScope, searchQ, filterCat, filterEstado]);
+  }, [items, user, cfg.defaultScope, searchQ, filterCat, filterEstado, highlightId]);
 
   const pendientes = visibleItems.filter((e) => e.estado === "Pendiente").length;
   const aprobados = visibleItems.filter((e) => e.estado === "Aprobado").length;
@@ -419,6 +426,11 @@ export default function ExpensesPage() {
 
   return (
     <>
+      {highlightId && (
+        <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface-2)", fontSize: 13 }}>
+          Mostrando gasto <strong>#{highlightId}</strong> desde enlace directo.
+        </div>
+      )}
       <FinanceModuleShell
         eyebrow="ERP · Finanzas"
         title={cfg.title || "Gastos · Admin"}

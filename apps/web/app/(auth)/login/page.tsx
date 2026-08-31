@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Suspense } from "react";
 import PanelLogin from "@/components/PanelLogin";
+
+export const metadata: Metadata = {
+  title: "Iniciar sesión",
+  robots: { index: false, follow: false },
+};
 
 function deniedPanelMessage(denied: string | null | undefined): string | undefined {
   if (denied === "contabilidad") {
