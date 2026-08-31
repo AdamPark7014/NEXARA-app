@@ -24,6 +24,9 @@ object ModulePanelMap {
         "attendance", "lunch-breaks", "my-lunch-breaks",
         "hr", "fines", "users", "employee-payments",
         "accounting", "banking", "invoicing", "expenses",
+        // La web tiene /erp/finance/viatics (appUrls.erpFinanceViatics), así que
+        // viáticos también cuelga de ERP, no solo de OPS.
+        "viatics", "my-viatics",
         "warehouse", "stock", "procurement",
         "documents", "audit", "analytics",
         "clients", "projects", "cotizaciones", "gestion-vendedores",
