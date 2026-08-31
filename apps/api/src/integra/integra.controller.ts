@@ -68,7 +68,7 @@ class SiteCreateDto {
   @IsOptional() @IsString() label?: string;
   @IsOptional() @IsObject() modulesOverride?: Record<string, boolean>;
   /** ARTEMIS (HikCentral) | HCT (Hik-Connect for Teams) — ADR-0019 */
-  @IsOptional() @IsIn(['ARTEMIS', 'HCT']) provider?: 'ARTEMIS' | 'HCT';
+  @IsOptional() @IsIn(['ARTEMIS', 'HCT', 'ISAPI']) provider?: 'ARTEMIS' | 'HCT' | 'ISAPI';
   @IsOptional() @Type(() => Number) @IsInt() serviceClientId?: number | null;
 }
 
@@ -81,7 +81,7 @@ class SiteUpdateDto {
   @IsOptional() @IsBoolean() isDefault?: boolean;
   @IsOptional() @IsString() label?: string;
   @IsOptional() @IsObject() modulesOverride?: Record<string, boolean> | null;
-  @IsOptional() @IsIn(['ARTEMIS', 'HCT']) provider?: 'ARTEMIS' | 'HCT';
+  @IsOptional() @IsIn(['ARTEMIS', 'HCT', 'ISAPI']) provider?: 'ARTEMIS' | 'HCT' | 'ISAPI';
   @IsOptional() @Type(() => Number) @IsInt() serviceClientId?: number | null;
 }
 

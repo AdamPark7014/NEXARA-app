@@ -2,7 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { HikConnectTeamsClient } from '../hikvision-hct/index';
-import { IntegraSiteService } from './integra-site.service';
+import { describeDevice } from '../hikvision-isapi/index';
+import { IntegraSiteService, type ResolvedIntegraClient } from './integra-site.service';
+
+/** `http://192.168.9.34` → `192.168.9.34`. */
+function hostnameOf(host: string): string {
+  return host.replace(/^https?:\/\//, '').replace(/[:/].*$/, '');
+}
 
 @Injectable()
 export class IntegraSyncService {
@@ -56,6 +62,10 @@ export class IntegraSyncService {
 
       if (resolved.provider === 'HCT' && resolved.hct) {
         return await this.syncHctSite(companyId, siteId, run.id, resolved.hct, now);
+      }
+
+      if (resolved.provider === 'ISAPI' && resolved.isapi) {
+        return await this.syncIsapiSite(companyId, siteId, run.id, resolved, now);
       }
 
       const client = resolved.client;
@@ -349,6 +359,257 @@ export class IntegraSyncService {
       where: { companyId, ...(siteId ? { siteId } : {}) },
       orderBy: { startedAt: 'desc' },
     });
+  }
+
+  /**
+   * Sync espejo desde ISAPI en LAN (ADR-0019 §5).
+   *
+   * El **equipo cabecera** (`site.host`, normalmente el NVR) es la fuente de
+   * verdad del inventario de video: sus canales ya incluyen las cámaras en
+   * plug & play, que viven en el switch PoE interno (`192.168.254.x`) y **no
+   * son alcanzables** desde la red del cliente. Por eso el espejo se construye
+   * desde el grabador y no barriendo IPs.
+   *
+   * Los equipos que el grabador no conoce —terminales de control de acceso—
+   * se refrescan a partir de las filas `IntegraDevice` que ya existan con IP.
+   * Ahí es donde el barrido (`isapi-scan --seed`) los da de alta.
+   */
+  private async syncIsapiSite(
+    companyId: number,
+    siteId: number,
+    runId: number,
+    resolved: ResolvedIntegraClient,
+    now: Date,
+  ) {
+    const head = resolved.isapi;
+    if (!head) throw new Error('Sin cliente ISAPI para sync');
+
+    const headIp = hostnameOf(resolved.host);
+    // Se describe con el cliente que ya resolvió el sitio, no con uno nuevo.
+    const headInfo = await describeDevice(head);
+    if (!headInfo.reachable) {
+      throw new Error(`Equipo cabecera ${headIp} no respondió: ${headInfo.error ?? 'sin detalle'}`);
+    }
+
+    const camerasSeen = new Set<string>();
+    const doorsSeen = new Set<string>();
+    const devicesSeen = new Set<string>();
+    let cameraCount = 0;
+    let doorCount = 0;
+    let deviceCount = 0;
+
+    const upsertDevice = async (
+      indexCode: string,
+      kind: 'ENCODE' | 'ACS',
+      name: string,
+      ip: string | null,
+      online: boolean,
+      raw: unknown,
+    ) => {
+      devicesSeen.add(`${kind}:${indexCode}`);
+      deviceCount++;
+      await this.prisma.integraDevice.upsert({
+        where: { siteId_kind_indexCode: { siteId, kind, indexCode } },
+        create: {
+          companyId,
+          siteId,
+          kind,
+          indexCode,
+          name,
+          ip,
+          online,
+          deviceType: 'ISAPI',
+          raw: raw as any,
+          syncedAt: now,
+        },
+        update: { name, ip, online, deviceType: 'ISAPI', raw: raw as any, syncedAt: now },
+      });
+    };
+
+    const upsertCamera = async (
+      cameraIndexCode: string,
+      name: string,
+      online: boolean,
+      raw: unknown,
+    ) => {
+      camerasSeen.add(cameraIndexCode);
+      cameraCount++;
+      await this.prisma.integraCamera.upsert({
+        where: { siteId_cameraIndexCode: { siteId, cameraIndexCode } },
+        create: {
+          companyId,
+          siteId,
+          cameraIndexCode,
+          name,
+          status: online ? 'online' : 'offline',
+          encodeDevIndexCode: headIp,
+          raw: raw as any,
+          syncedAt: now,
+        },
+        update: {
+          name,
+          status: online ? 'online' : 'offline',
+          encodeDevIndexCode: headIp,
+          raw: raw as any,
+          syncedAt: now,
+        },
+      });
+    };
+
+    // ── 1. Equipo cabecera y sus canales ──────────────────────────────────
+    await upsertDevice(
+      headIp,
+      headInfo.kind === 'ACS' ? 'ACS' : 'ENCODE',
+      headInfo.identity?.deviceName || headInfo.identity?.model || headIp,
+      headIp,
+      true,
+      { role: headInfo.role, identity: headInfo.identity },
+    );
+
+    const proxyByStreamId = new Map<string, (typeof headInfo.proxyChannels)[number]>();
+    for (const p of headInfo.proxyChannels) for (const id of p.streamIds) proxyByStreamId.set(id, p);
+
+    for (const ch of headInfo.videoChannels) {
+      // Solo el stream principal: el sub es la misma cámara a menor calidad.
+      if (ch.streamIndex !== 1 || !ch.enabled) continue;
+      const proxy = proxyByStreamId.get(ch.id);
+      // En un grabador, un canal sin cámara enrolada es una ranura vacía.
+      if (headInfo.role === 'NVR' && (!proxy || !proxy.online)) continue;
+
+      await upsertCamera(
+        `${headIp}|${ch.id}`,
+        proxy?.name || ch.name || `${headIp} ch${ch.id}`,
+        proxy ? proxy.online : true,
+        {
+          channelId: ch.id,
+          channelNumber: ch.channelNumber,
+          codec: ch.codec,
+          width: ch.width,
+          height: ch.height,
+          rtsp: ch.rtspRedacted,
+          source: proxy
+            ? {
+                ipAddress: proxy.ipAddress,
+                model: proxy.model,
+                serialNumber: proxy.serialNumber,
+                connMode: proxy.connMode,
+                // `plugplay` = detrás del PoE del NVR: nunca alcanzable directo.
+                reachableDirectly: proxy.connMode === 'manual',
+              }
+            : null,
+        },
+      );
+
+      if (proxy) {
+        await upsertDevice(
+          proxy.serialNumber || `${headIp}-ch${proxy.channel}`,
+          'ENCODE',
+          proxy.name || `Canal ${proxy.channel}`,
+          proxy.ipAddress,
+          proxy.online,
+          proxy,
+        );
+      }
+    }
+
+    // ── 2. Equipos ya registrados que el cabecera no conoce ───────────────
+    // Terminales de acceso, típicamente: no cuelgan del grabador.
+    //
+    // Se excluye todo lo que el cabecera ya cubre. Sin ese filtro, cada sync
+    // volvería a sondear una por una las cámaras que el NVR acaba de reportar
+    // —incluidas las de plug & play, que desde aquí ni siquiera existen— y
+    // serían decenas de peticiones de más cada 15 minutos.
+    const covered = new Set<string>([headIp]);
+    for (const p of headInfo.proxyChannels) if (p.ipAddress) covered.add(p.ipAddress);
+
+    const known = await this.prisma.integraDevice.findMany({
+      where: { siteId, ip: { not: null } },
+      select: { ip: true, kind: true },
+    });
+    const extraIps = [
+      ...new Set(known.map((d) => d.ip as string).filter((ip) => ip && !covered.has(ip))),
+    ];
+
+    for (const ip of extraIps) {
+      const client = resolved.isapiForHost?.(ip);
+      if (!client) continue;
+      let info: Awaited<ReturnType<typeof describeDevice>>;
+      try {
+        info = await describeDevice(client);
+      } catch (e) {
+        this.logger.warn(`ISAPI ${ip} no respondió: ${String(e)}`);
+        continue;
+      }
+
+      const kind = info.kind === 'ACS' ? 'ACS' : 'ENCODE';
+      await upsertDevice(
+        info.identity?.serialNumber || ip,
+        kind,
+        info.identity?.deviceName || info.identity?.model || ip,
+        ip,
+        info.reachable,
+        { role: info.role, identity: info.identity },
+      );
+
+      if (info.accessControl) {
+        // Una terminal DS-K1T gobierna una puerta; el id documentado es 1.
+        const doorIndexCode = `${ip}|1`;
+        doorsSeen.add(doorIndexCode);
+        doorCount++;
+        const name = info.identity?.deviceName || info.identity?.model || ip;
+        await this.prisma.integraDoor.upsert({
+          where: { siteId_doorIndexCode: { siteId, doorIndexCode } },
+          create: {
+            companyId,
+            siteId,
+            doorIndexCode,
+            name,
+            online: info.reachable,
+            raw: { ip, doorNo: 1, model: info.identity?.model } as any,
+            syncedAt: now,
+          },
+          update: { name, online: info.reachable, syncedAt: now },
+        });
+      }
+    }
+
+    // ── 3. Purga de lo que ya no está ─────────────────────────────────────
+    await this.prisma.integraCamera.deleteMany({
+      where: { siteId, cameraIndexCode: { notIn: [...camerasSeen] } },
+    });
+    if (doorsSeen.size) {
+      await this.prisma.integraDoor.deleteMany({
+        where: { siteId, doorIndexCode: { notIn: [...doorsSeen] } },
+      });
+    }
+
+    await this.prisma.integraSite.update({
+      where: { id: siteId },
+      data: { lastSyncAt: now, lastHealthOkAt: now },
+    });
+    await this.prisma.integraSyncRun.update({
+      where: { id: runId },
+      data: {
+        status: 'OK',
+        finishedAt: new Date(),
+        cameras: cameraCount,
+        doors: doorCount,
+        people: 0,
+        devices: deviceCount,
+        vehicles: 0,
+      },
+    });
+
+    return {
+      runId,
+      provider: 'ISAPI' as const,
+      cameras: cameraCount,
+      doors: doorCount,
+      people: 0,
+      devices: deviceCount,
+      vehicles: 0,
+      regions: 0,
+    };
   }
 
   /** Sync espejo desde HCT (cameras/doors/devices documentados). */

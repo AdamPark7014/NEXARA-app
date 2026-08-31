@@ -50,7 +50,9 @@
     "mobile:parity": "python scripts/check-app-web-parity.py",
     "mobile:android:play-aab": "pwsh -ExecutionPolicy Bypass -File scripts/build-play-aab.ps1",
     "mobile:smoke": "pwsh -ExecutionPolicy Bypass -File scripts/mobile-smoke-checklist.ps1",
-    "seed:play-reviewer": "npm run seed:play-reviewer --workspace=apps/api"
+    "seed:play-reviewer": "npm run seed:play-reviewer --workspace=apps/api",
+    "integra:isapi:scan": "npm run integra:isapi:scan --workspace=apps/api --",
+    "integra:isapi:seed": "npm run integra:isapi:seed --workspace=apps/api --"
   },
   "prisma": {
     "seed": "node apps/api/prisma/seed.js"

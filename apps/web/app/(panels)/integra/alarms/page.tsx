@@ -38,7 +38,10 @@ type AlarmItem = {
 };
 
 export default function IntegraAlarmsPage() {
-  const { userJson } = useUser();
+  const { user } = useUser();
+  // `useUser()` no expone `userJson`: se serializa aquí, como en el resto de
+  // páginas que hacen handoff entre paneles (erp/analytics/bi, crm/projects…).
+  const userJson = useMemo(() => (user ? JSON.stringify(user) : null), [user]);
   const [items, setItems] = useState<AlarmItem[]>([]);
   const [openCount, setOpenCount] = useState(0);
   const [statusFilter, setStatusFilter] = useState<"ALL" | "OPEN" | "ACK" | "CLEARED">("OPEN");

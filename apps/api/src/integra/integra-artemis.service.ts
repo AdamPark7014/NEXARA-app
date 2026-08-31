@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { rethrowArtemis, toArtemisOffsetIso } from '../hikvision-artemis/index';
+import { controlDoor, identifyDevice } from '../hikvision-isapi/index';
 import { IntegraSiteService } from './integra-site.service';
 import { IntegraMediaService } from './integra-media.service';
 import { IntegraSyncService } from './integra-sync.service';
@@ -9,6 +10,17 @@ import { IntegraPortfolioService } from './integra-portfolio.service';
 import { ARTEMIS_DOOR_CONTROL, ARTEMIS_DOOR_STATE } from '../hikvision-artemis/artemis.types';
 
 type Actor = { id?: number; email?: string };
+
+/**
+ * Los cuatro `controlType` de Artemis, traducidos al `cmd` que documenta
+ * ISAPI en `/AccessControl/RemoteControl/door/{id}`.
+ */
+const ISAPI_DOOR_CMD: Record<string, 'open' | 'close' | 'alwaysOpen' | 'alwaysClose'> = {
+  [ARTEMIS_DOOR_CONTROL.OPEN]: 'open',
+  [ARTEMIS_DOOR_CONTROL.CLOSE]: 'close',
+  [ARTEMIS_DOOR_CONTROL.REMAIN_OPEN]: 'alwaysOpen',
+  [ARTEMIS_DOOR_CONTROL.REMAIN_CLOSED]: 'alwaysClose',
+};
 
 @Injectable()
 export class IntegraArtemisService {
@@ -23,12 +35,13 @@ export class IntegraArtemisService {
     private readonly portfolioSvc: IntegraPortfolioService,
   ) {}
 
-  /** Artemis-only; sitios HCT → 400 con mensaje claro (ADR-0019). */
+  /** Artemis-only; sitios HCT e ISAPI → 400 con mensaje claro (ADR-0019). */
   private async client(companyId?: number | null, siteId?: number | null) {
     const resolved = await this.sites.resolveClient({ companyId, siteId });
     if (!resolved.client) {
       throw new BadRequestException(
-        'Operación Artemis no disponible en sitio HCT. Usa sync/stream/open adaptados o cambia provider a ARTEMIS.',
+        `Operación Artemis no disponible en sitio ${resolved.provider}. ` +
+          'Usa sync/stream/open adaptados o cambia provider a ARTEMIS.',
       );
     }
     return { ...resolved, client: resolved.client };
@@ -90,6 +103,42 @@ export class IntegraArtemisService {
           version: { provider: 'HCT' },
         };
       }
+      if (resolved.provider === 'ISAPI' && resolved.isapi) {
+        if (!resolved.isapi.configured) {
+          return {
+            connected: false,
+            configured: false,
+            host: resolved.host || null,
+            source: resolved.source,
+            siteId: resolved.siteId,
+            provider: 'ISAPI',
+            version: null,
+          };
+        }
+        // `deviceInfo` es la prueba de vida más barata y siempre presente.
+        const info = await identifyDevice(resolved.isapi);
+        if (resolved.siteId) {
+          await this.prisma.integraSite.update({
+            where: { id: resolved.siteId },
+            data: { lastHealthOkAt: new Date() },
+          });
+        }
+        return {
+          connected: true,
+          configured: true,
+          host: resolved.host,
+          source: resolved.source,
+          siteId: resolved.siteId,
+          provider: 'ISAPI',
+          version: {
+            provider: 'ISAPI',
+            model: info.model,
+            firmwareVersion: info.firmwareVersion,
+            serialNumber: info.serialNumber,
+          },
+        };
+      }
+
       const client = resolved.client;
       if (!client?.configured) {
         return {
@@ -458,8 +507,36 @@ export class IntegraArtemisService {
         });
         return { success: true, message: `Puerta ${doorIndexCode} abierta (HCT)`, controlType };
       }
+      if (resolved.provider === 'ISAPI' && resolved.isapiForHost) {
+        // El espejo guarda `<ip>|<doorNo>`: la terminal se manda directo, sin
+        // plataforma de por medio.
+        const [ip, doorNo] = doorIndexCode.split('|');
+        if (!ip || !doorNo) {
+          throw new BadRequestException(
+            `Puerta ISAPI "${doorIndexCode}" mal formada; se espera "<ip>|<doorNo>"`,
+          );
+        }
+        const isapiCmd = ISAPI_DOOR_CMD[controlType];
+        if (!isapiCmd) {
+          throw new BadRequestException(`controlType ${controlType} no soportado en ISAPI`);
+        }
+        await controlDoor(resolved.isapiForHost(ip), doorNo, isapiCmd);
+        await this.auditMut('integra.door.control', actor, companyId, resolved.siteId ?? 0, {
+          doorIndexCode,
+          provider: 'ISAPI',
+          controlType,
+          cmd: isapiCmd,
+          reason: reasonTrim,
+          email: actor?.email,
+        });
+        return {
+          success: true,
+          message: `Puerta ${doorIndexCode}: ${labels[controlType] || controlType}`,
+          controlType,
+        };
+      }
       if (!resolved.client) {
-        throw new BadRequestException('Sin cliente Artemis/HCT');
+        throw new BadRequestException('Sin cliente Artemis/HCT/ISAPI');
       }
       await resolved.client.doorControl([doorIndexCode], controlType);
       await this.auditMut('integra.door.control', actor, companyId, resolved.siteId ?? 0, {
