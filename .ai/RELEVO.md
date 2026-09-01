@@ -168,6 +168,27 @@ build: no habría llegado a tiempo.
 `liveStream` hoy usa siempre el principal — elegir stream por caso de uso es
 mejora pendiente y de las baratas.
 
+### ADR-0020: dial-home, y por qué no en este servidor
+
+Adam pidió mover Traefik de puerto para meter HikGateway. **No se hizo, y no se
+debe hacer.** Medido: `traefik-main` ocupa 80/443 y sirve **40 dominios de siete
+negocios** (nexara, acrobat.mx, artaproducciones, zynoratek, experiencebt,
+delpozodelvalle, udlagora). Los navegadores van a 80/443, y Let's Encrypt valida
+por el **puerto 80**: moverlo tumba los 40 dominios y además caduca sus
+certificados. El servidor tiene **una sola IPv4**, así que tampoco hay dónde
+poner un segundo juego de puertos.
+
+HikGateway, si se adopta, va en un **VPS propio (~€5/mes)** — y es **uno para
+toda la operación, no uno por cliente**: a partir del segundo sitio sale más
+barato que las cajas on-site.
+
+Pero antes de eso: **el dial-home que Adam quiere ya está implementado y
+desplegado — es HCT.** El equipo marca a la nube de Hikvision; se da de alta con
+`POST /api/hccgw/resource/v1/devices/add` pasando solo `ezvizSerialNo` y
+`ezvizVerifyCode` (serial y código de la etiqueta). La respuesta es por lotes
+(`total`/`succeeded`/`failed`), o sea que el alta masiva está prevista. En
+producción `INTEGRA_HIK_*` está **vacío**: falta el App Key del portal, nada más.
+
 ## A medias
 
 - **go2rtc no está en la LAN, y ahí se queda parado el puente.**
