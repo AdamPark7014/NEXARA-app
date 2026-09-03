@@ -65,7 +65,9 @@ describe('IntegraMediaService', () => {
         },
       });
       const out = await svc.liveStream(1, '192.168.9.34|301');
-      expect(out.rtsp).toBe('rtsp://admin:***@192.168.9.171:554/Streaming/Channels/101');
+      // Secundario (102), no principal: el principal va en H.265 y el navegador
+      // no lo decodifica.
+      expect(out.rtsp).toBe('rtsp://admin:***@192.168.9.171:554/Streaming/Channels/102');
       expect(out.note).toContain('directo');
     });
 
@@ -77,7 +79,8 @@ describe('IntegraMediaService', () => {
         },
       });
       const out = await svc.liveStream(1, '192.168.9.34|101');
-      expect(out.rtsp).toBe('rtsp://admin:***@192.168.9.34:554/Streaming/Channels/101');
+      // Canal 1 del grabador: su secundario es el 102.
+      expect(out.rtsp).toBe('rtsp://admin:***@192.168.9.34:554/Streaming/Channels/102');
       expect(out.note).toContain('grabador');
     });
 

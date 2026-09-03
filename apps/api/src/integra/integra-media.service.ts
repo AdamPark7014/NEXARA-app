@@ -4,6 +4,17 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { IntegraSiteService } from './integra-site.service';
 
 /**
+ * En Hikvision el id de stream es `<canal><perfil>`: 301 es el principal del
+ * canal 3 y 302 su secundario. Una cámara suelta numera desde 1, así que su
+ * secundario es siempre 102.
+ */
+const SUB_STREAM_ID = 102;
+
+function subStreamOf(channelId: string): string {
+  return /^\d{3,}$/.test(channelId) ? `${channelId.slice(0, -1)}2` : channelId;
+}
+
+/**
  * Registra el RTSP de Artemis en go2rtc y devuelve URL HLS consumible por el browser.
  * Sitios HCT: stream token cloud (EZUIKit) — ADR-0019; no go2rtc RTSP.
  * Sitios ISAPI: RTSP directo del equipo en LAN → go2rtc (ADR-0019 §5).
@@ -96,6 +107,13 @@ export class IntegraMediaService {
    * en vez de pasar por el grabador: el firmware del NVR corta a partir de unas
    * pocas sesiones RTSP simultáneas, y con 13 canales se agota enseguida. Las
    * que están en plug & play no tienen alternativa: van por el grabador.
+   *
+   * Se sirve el **stream secundario**, no el principal. El principal de estos
+   * equipos va en H.265, que el navegador no decodifica: el reproductor se
+   * queda girando para siempre aunque go2rtc esté entregando imagen. El
+   * secundario va en H.264 y a 640×360, que es exactamente lo que necesita un
+   * muro de 13 cámaras — y así no hay que transcodificar, que en un servidor
+   * compartido no es opción.
    */
   private async isapiRtsp(
     resolved: Awaited<ReturnType<IntegraSiteService['resolveClient']>>,
@@ -121,15 +139,16 @@ export class IntegraMediaService {
       const direct = resolved.isapiForHost(directIp);
       // La cámara suelta numera desde 101 aunque en el NVR sea el canal 7.
       return {
-        rtsp: direct.rtspUrl(101),
-        redacted: direct.rtspUrlRedacted(101),
+        rtsp: direct.rtspUrl(SUB_STREAM_ID),
+        redacted: direct.rtspUrlRedacted(SUB_STREAM_ID),
         note: `RTSP directo a la cámara (${directIp}), sin cargar el grabador`,
       };
     }
 
+    const sub = subStreamOf(channelId);
     return {
-      rtsp: resolved.isapi.rtspUrl(channelId),
-      redacted: resolved.isapi.rtspUrlRedacted(channelId),
+      rtsp: resolved.isapi.rtspUrl(sub),
+      redacted: resolved.isapi.rtspUrlRedacted(sub),
       note: `RTSP vía grabador ${resolved.host}, canal ${channelId}`,
     };
   }
