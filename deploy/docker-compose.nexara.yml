@@ -166,7 +166,18 @@ services:
     container_name: nexara-go2rtc
     restart: unless-stopped
     volumes:
-      - ./go2rtc/go2rtc.yaml:/config/go2rtc.yaml:rw
+      # Directorio FUERA del repositorio, y de escritura.
+      #
+      # go2rtc reescribe su YAML cada vez que se registra un stream, y esos
+      # streams llevan la contraseña RTSP del equipo en la URL. Con el archivo
+      # versionado, cada cámara publicada dejaba la credencial en un fichero
+      # rastreado por git, a un `commit -a` de acabar en GitHub. Y montado de
+      # solo lectura la escritura fallaba con 400, así que la consola creía que
+      # el stream no se había registrado y no mostraba video.
+      #
+      # deploy/go2rtc/go2rtc.yaml queda como semilla; update.sh lo copia aquí
+      # la primera vez y a partir de ahí manda esta copia.
+      - /var/lib/nexara/go2rtc:/config
     networks:
       - internal
       - proxy

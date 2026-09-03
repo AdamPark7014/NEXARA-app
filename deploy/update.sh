@@ -38,6 +38,19 @@ fi
 
 cd "$REPO_ROOT"
 
+# Configuración de go2rtc fuera del repositorio.
+#
+# go2rtc reescribe su YAML al registrar cada stream, y esas URLs RTSP llevan la
+# contraseña del equipo. Versionado, eso deja credenciales en un archivo
+# rastreado por git. Aquí vive fuera, y el del repositorio es solo la semilla.
+GO2RTC_DIR=/var/lib/nexara/go2rtc
+if [[ ! -f "$GO2RTC_DIR/go2rtc.yaml" ]]; then
+  mkdir -p "$GO2RTC_DIR"
+  cp "$SCRIPT_DIR/go2rtc/go2rtc.yaml" "$GO2RTC_DIR/go2rtc.yaml"
+  chmod 600 "$GO2RTC_DIR/go2rtc.yaml"
+  echo "Sembrada la configuración de go2rtc en $GO2RTC_DIR"
+fi
+
 OLD_REV=""
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   OLD_REV="$(git rev-parse HEAD)"
