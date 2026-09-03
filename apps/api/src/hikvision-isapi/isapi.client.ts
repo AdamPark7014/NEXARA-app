@@ -89,19 +89,44 @@ export class HikvisionIsapiClient {
   private readonly scope: string;
 
   /**
-   * Agentes propios **sin pooling**, en vez del `globalAgent`.
+   * Agentes propios con **una sola conexión reutilizada** por equipo.
    *
-   * Dos razones, y las dos muerden:
+   * La versión anterior iba sin pooling, con este razonamiento: un Hikvision
+   * admite pocas conexiones simultáneas, y en LAN el handshake TCP cuesta un
+   * milisegundo, así que abrir y cerrar por petición salía gratis.
    *
-   * - Desde Node 19 el agente global trae `keepAlive: true`. Sus sockets libres
-   *   mantienen vivo el bucle de eventos, así que un CLI que ya terminó su
-   *   trabajo se queda colgado sin decir por qué.
-   * - Un equipo Hikvision admite pocas conexiones simultáneas. Reservar sockets
-   *   ociosos contra 14 equipos es gastar un recurso escaso para ahorrar un
-   *   handshake TCP que en LAN cuesta un milisegundo.
+   * En LAN es cierto. **Por un túnel se invierte y muerde.** Medido contra el
+   * sitio real a través de WireGuard: el cierre de cada conexión queda a medias
+   * —el `FIN` se retransmite sin que el equipo lo confirme— así que las ranuras
+   * del firmware se agotan y a partir de la segunda petición el equipo deja de
+   * contestar. Síntoma: `deviceInfo` responde en 350 ms y la siguiente llamada
+   * expira, con la misma petición hecha a mano funcionando.
+   *
+   * `maxSockets: 1` mantiene la promesa original —nunca más de una conexión por
+   * equipo— y `close()` las cierra al terminar, que era la otra razón para no
+   * usar el `globalAgent`: sus sockets ociosos cuelgan un CLI ya terminado.
    */
-  private readonly httpAgent = new HttpAgent({ keepAlive: false });
-  private readonly httpsAgent = new HttpsAgent({ keepAlive: false });
+  private readonly httpAgent = new HttpAgent({
+    keepAlive: true,
+    maxSockets: 1,
+    keepAliveMsecs: 1000,
+    timeout: 10_000,
+  });
+  private readonly httpsAgent = new HttpsAgent({
+    keepAlive: true,
+    maxSockets: 1,
+    keepAliveMsecs: 1000,
+    timeout: 10_000,
+  });
+
+  /**
+   * Cierra las conexiones vivas. Obligatorio en un CLI: sin esto el socket
+   * ocioso mantiene el bucle de eventos y el proceso no termina nunca.
+   */
+  close(): void {
+    this.httpAgent.destroy();
+    this.httpsAgent.destroy();
+  }
 
   constructor(opts: IsapiClientOpts) {
     this.host = (opts.host || '').replace(/\/$/, '');
@@ -122,9 +147,9 @@ export class HikvisionIsapiClient {
   /**
    * Sockets ociosos que el cliente mantiene abiertos contra el equipo.
    *
-   * Debe ser siempre 0: los agentes van sin pooling a propósito. Expuesto para
-   * poder afirmarlo en un test — un socket ocioso cuelga el proceso y ocupa
-   * una de las pocas conexiones del firmware.
+   * Como mucho **1**: es la conexión que se reutiliza. Tras `close()` vuelve a
+   * 0. Expuesto para poder afirmarlo en un test — más de uno significaría estar
+   * gastando las pocas ranuras del firmware, y no cerrarlos cuelga un CLI.
    */
   get idleSockets(): number {
     const count = (free: Record<string, unknown[]> | undefined) =>
