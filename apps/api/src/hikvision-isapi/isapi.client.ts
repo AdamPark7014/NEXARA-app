@@ -162,6 +162,7 @@ export class HikvisionIsapiClient {
     path: string,
     body?: string,
     authorization?: string,
+    contentType = 'application/xml',
   ): Promise<RawResponse> {
     const url = new URL(path, this.host);
     const isHttps = url.protocol === 'https:';
@@ -177,7 +178,7 @@ export class HikvisionIsapiClient {
           method,
           headers: {
             Accept: 'application/json, application/xml, text/xml, */*',
-            ...(body ? { 'Content-Type': 'application/xml' } : {}),
+            ...(body ? { 'Content-Type': contentType } : {}),
             ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {}),
             ...(authorization ? { Authorization: authorization } : {}),
           },
@@ -214,7 +215,12 @@ export class HikvisionIsapiClient {
   }
 
   /** `path` incluye la query: la firma Digest se calcula sobre la URI completa. */
-  async request(method: string, path: string, body?: string): Promise<string> {
+  async request(
+    method: string,
+    path: string,
+    body?: string,
+    contentType = 'application/xml',
+  ): Promise<string> {
     if (!this.configured) throw new IsapiNotConfiguredError(this.scope);
     if (this.authRejected) throw new IsapiAuthRejectedError(this.host, this.username);
 
@@ -235,9 +241,10 @@ export class HikvisionIsapiClient {
             challenge: this.challenge,
             nc: this.nc,
           }),
+          contentType,
         );
       } else {
-        res = await this.raw(method, path, body);
+        res = await this.raw(method, path, body, undefined, contentType);
       }
 
       if (res.status === 401) {
@@ -265,6 +272,7 @@ export class HikvisionIsapiClient {
               challenge: fresh,
               nc: this.nc,
             }),
+            contentType,
           );
         }
 
@@ -293,6 +301,13 @@ export class HikvisionIsapiClient {
 
   async post(path: string, body: string): Promise<Record<string, XmlValue>> {
     return decode(await this.request('POST', path, body));
+  }
+
+  /** POST JSON (`?format=json`) — UserInfo/Search, AcsEvent, etc. */
+  async postJson(path: string, payload: unknown): Promise<Record<string, XmlValue>> {
+    return decode(
+      await this.request('POST', path, JSON.stringify(payload), 'application/json'),
+    );
   }
 
   /**

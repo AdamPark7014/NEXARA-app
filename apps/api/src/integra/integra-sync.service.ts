@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { HikConnectTeamsClient } from '../hikvision-hct/index';
-import { describeDevice } from '../hikvision-isapi/index';
+import { describeDevice, listAllUserInfo } from '../hikvision-isapi/index';
 import { IntegraSiteService, type ResolvedIntegraClient } from './integra-site.service';
 
 /** `http://192.168.9.34` → `192.168.9.34`. */
@@ -573,7 +573,69 @@ export class IntegraSyncService {
       }
     }
 
-    // ── 3. Purga de lo que ya no está ─────────────────────────────────────
+    // ── 3. Personas desde cada terminal ACS (UserInfo/Search) ─────────────
+    // Sin HikCentral: la fuente de verdad es el propio equipo. Misma persona
+    // en varios lectores → mismo employeeNo → un solo IntegraPerson.
+    const peopleSeen = new Set<string>();
+    let peopleCount = 0;
+    let peopleFetchOk = false;
+    const acsIps = [
+      ...new Set(
+        (
+          await this.prisma.integraDevice.findMany({
+            where: { siteId, kind: 'ACS', ip: { not: null } },
+            select: { ip: true },
+          })
+        )
+          .map((d) => d.ip as string)
+          .filter(Boolean),
+      ),
+    ];
+    for (const ip of acsIps) {
+      const client = resolved.isapiForHost?.(ip);
+      if (!client) continue;
+      try {
+        const users = await listAllUserInfo(client);
+        peopleFetchOk = true;
+        for (const u of users) {
+          const personId = String(u.employeeNo).trim();
+          if (!personId) continue;
+          peopleSeen.add(personId);
+          const personName = String(u.name || personId).trim() || personId;
+          await this.prisma.integraPerson.upsert({
+            where: { siteId_personId: { siteId, personId } },
+            create: {
+              companyId,
+              siteId,
+              personId,
+              personName,
+              personCode: personId,
+              orgIndexCode: null,
+              orgName: u.userType != null ? String(u.userType) : null,
+              raw: { ...u, sourceIp: ip } as any,
+              syncedAt: now,
+            },
+            update: {
+              personName,
+              personCode: personId,
+              orgName: u.userType != null ? String(u.userType) : null,
+              raw: { ...u, sourceIp: ip } as any,
+              syncedAt: now,
+            },
+          });
+        }
+      } catch (e) {
+        this.logger.warn(`ISAPI UserInfo en ${ip}: ${String(e)}`);
+      }
+    }
+    peopleCount = peopleSeen.size;
+    if (peopleFetchOk && peopleSeen.size) {
+      await this.prisma.integraPerson.deleteMany({
+        where: { siteId, personId: { notIn: [...peopleSeen] } },
+      });
+    }
+
+    // ── 4. Purga de lo que ya no está ─────────────────────────────────────
     await this.prisma.integraCamera.deleteMany({
       where: { siteId, cameraIndexCode: { notIn: [...camerasSeen] } },
     });
@@ -594,7 +656,7 @@ export class IntegraSyncService {
         finishedAt: new Date(),
         cameras: cameraCount,
         doors: doorCount,
-        people: 0,
+        people: peopleCount,
         devices: deviceCount,
         vehicles: 0,
       },
@@ -605,7 +667,7 @@ export class IntegraSyncService {
       provider: 'ISAPI' as const,
       cameras: cameraCount,
       doors: doorCount,
-      people: 0,
+      people: peopleCount,
       devices: deviceCount,
       vehicles: 0,
       regions: 0,

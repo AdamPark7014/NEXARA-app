@@ -2,7 +2,14 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { rethrowArtemis, toArtemisOffsetIso } from '../hikvision-artemis/index';
-import { controlDoor, identifyDevice } from '../hikvision-isapi/index';
+import {
+  controlDoor,
+  describeAcsEvent,
+  identifyDevice,
+  listAcsEvents,
+  listAllUserInfo,
+  type IsapiAcsEvent,
+} from '../hikvision-isapi/index';
 import { IntegraSiteService } from './integra-site.service';
 import { IntegraMediaService } from './integra-media.service';
 import { IntegraSyncService } from './integra-sync.service';
@@ -10,6 +17,20 @@ import { IntegraPortfolioService } from './integra-portfolio.service';
 import { ARTEMIS_DOOR_CONTROL, ARTEMIS_DOOR_STATE } from '../hikvision-artemis/artemis.types';
 
 type Actor = { id?: number; email?: string };
+
+/** ISO con offset local — el firmware ACS lo espera así (no siempre acepta Z). */
+function toIsapiLocalIso(d: Date): string {
+  const pad = (n: number) => String(Math.abs(n)).padStart(2, '0');
+  const off = -d.getTimezoneOffset();
+  const sign = off >= 0 ? '+' : '-';
+  const hh = pad(Math.floor(Math.abs(off) / 60));
+  const mm = pad(Math.abs(off) % 60);
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` +
+    `${sign}${hh}:${mm}`
+  );
+}
 
 /**
  * Los cuatro `controlType` de Artemis, traducidos al `cmd` que documenta
@@ -570,7 +591,10 @@ export class IntegraArtemisService {
     } = {},
   ) {
     try {
-      const { client } = await this.client(companyId, opts.siteId);
+      const resolved = await this.sites.resolveClient({
+        companyId,
+        siteId: opts.siteId,
+      });
       const end = opts.endTime ? new Date(opts.endTime) : new Date();
       const start = opts.startTime
         ? new Date(opts.startTime)
@@ -580,6 +604,20 @@ export class IntegraArtemisService {
       }
       const pageNo = Math.max(1, opts.pageNo ?? 1);
       const pageSize = Math.min(Math.max(1, opts.limit ?? 50), 200);
+
+      if (resolved.provider === 'ISAPI' && resolved.isapiForHost) {
+        return await this.listIsapiEvents(resolved, {
+          start,
+          end,
+          pageNo,
+          pageSize,
+          doorId: opts.doorId,
+          personId: opts.personId,
+          personName: opts.personName,
+        });
+      }
+
+      const { client } = await this.client(companyId, opts.siteId);
       const data = await client.doorEvents(
         toArtemisOffsetIso(start),
         toArtemisOffsetIso(end),
@@ -621,6 +659,139 @@ export class IntegraArtemisService {
     } catch (error) {
       rethrowArtemis(error, 'No se pudieron listar eventos');
     }
+  }
+
+  /**
+   * Eventos ACS en vivo desde cada terminal ISAPI (AcsEvent).
+   * No hay espejo en Prisma: igual que Artemis, se consultan al equipo.
+   */
+  private async listIsapiEvents(
+    resolved: Awaited<ReturnType<IntegraSiteService['resolveClient']>>,
+    opts: {
+      start: Date;
+      end: Date;
+      pageNo: number;
+      pageSize: number;
+      doorId?: string;
+      personId?: string;
+      personName?: string;
+    },
+  ) {
+    const siteId = resolved.siteId;
+    if (!siteId || !resolved.isapiForHost) {
+      throw new BadRequestException('Sitio ISAPI sin cliente');
+    }
+
+    const doors = await this.prisma.integraDoor.findMany({
+      where: { siteId },
+      select: { doorIndexCode: true, name: true, raw: true },
+    });
+    const doorNameByCode = new Map(doors.map((d) => [d.doorIndexCode, d.name]));
+
+    let targets = doors
+      .map((d) => {
+        const ip =
+          (d.raw as { ip?: string } | null)?.ip ||
+          d.doorIndexCode.split('|')[0] ||
+          null;
+        return ip
+          ? { ip, doorIndexCode: d.doorIndexCode, doorName: d.name }
+          : null;
+      })
+      .filter(Boolean) as Array<{ ip: string; doorIndexCode: string; doorName: string }>;
+
+    if (opts.doorId) {
+      targets = targets.filter((t) => t.doorIndexCode === opts.doorId);
+    }
+    if (targets.length === 0) {
+      // Fallback: equipos ACS aunque aún no haya puerta espejada.
+      const acs = await this.prisma.integraDevice.findMany({
+        where: { siteId, kind: 'ACS', ip: { not: null } },
+        select: { ip: true, name: true },
+      });
+      targets = acs.map((d) => ({
+        ip: d.ip as string,
+        doorIndexCode: `${d.ip}|1`,
+        doorName: d.name,
+      }));
+    }
+
+    const startIso = toIsapiLocalIso(opts.start);
+    const endIso = toIsapiLocalIso(opts.end);
+    const merged: Array<{
+      id: string;
+      doorId: string;
+      doorName?: string;
+      personId?: string;
+      personName?: string;
+      cardNo?: string;
+      eventType: string;
+      eventTypeCode?: number;
+      timestamp?: string;
+      picUri?: string;
+      readerName?: string;
+    }> = [];
+
+    for (const t of targets) {
+      const client = resolved.isapiForHost(t.ip);
+      if (!client) continue;
+      let events: IsapiAcsEvent[] = [];
+      try {
+        // Hasta 10 páginas × 30 = 300 por terminal (ventana típica 24 h).
+        events = await listAcsEvents(client, {
+          startTime: startIso,
+          endTime: endIso,
+          maxPages: 10,
+        });
+      } catch (e) {
+        this.logger.warn(`AcsEvent ${t.ip}: ${String(e)}`);
+        continue;
+      }
+      for (const ev of events) {
+        const empRaw =
+          ev.employeeNoString ?? (ev as { employeeNo?: string }).employeeNo ?? null;
+        const emp = empRaw != null && String(empRaw).length ? String(empRaw) : undefined;
+        merged.push({
+          id: String(
+            ev.serialNo ??
+              `${ev.time}-${t.doorIndexCode}-${emp || ev.cardNo || ''}-${ev.major}-${ev.minor}`,
+          ),
+          doorId: t.doorIndexCode,
+          doorName: doorNameByCode.get(t.doorIndexCode) || t.doorName || ev.doorName,
+          personId: emp,
+          personName: ev.name,
+          cardNo: ev.cardNo != null ? String(ev.cardNo) : undefined,
+          eventType: describeAcsEvent(ev),
+          eventTypeCode: ev.minor != null ? Number(ev.minor) : undefined,
+          timestamp: ev.time,
+          picUri: ev.pictureURL != null ? String(ev.pictureURL) : undefined,
+          readerName: t.doorName,
+        });
+      }
+    }
+
+    let list = merged;
+    if (opts.personId) {
+      list = list.filter((e) => String(e.personId ?? '') === String(opts.personId));
+    }
+    if (opts.personName?.trim()) {
+      const q = opts.personName.trim().toLowerCase();
+      list = list.filter((e) => String(e.personName || '').toLowerCase().includes(q));
+    }
+    list.sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+
+    const total = list.length;
+    const startIdx = (opts.pageNo - 1) * opts.pageSize;
+    const items = list.slice(startIdx, startIdx + opts.pageSize);
+    return {
+      total,
+      pageNo: opts.pageNo,
+      pageSize: opts.pageSize,
+      startTime: startIso,
+      endTime: endIso,
+      source: 'isapi' as const,
+      items,
+    };
   }
 
   async eventPicture(companyId: number | null, picUri: string, siteId?: number | null) {
@@ -688,6 +859,41 @@ export class IntegraArtemisService {
         })),
       };
     }
+
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
+    if (resolved.provider === 'ISAPI' && resolved.isapiForHost && resolved.siteId) {
+      // Live ISAPI: lee UserInfo de cada ACS y opcionalmente refresca el espejo.
+      const acs = await this.prisma.integraDevice.findMany({
+        where: { siteId: resolved.siteId, kind: 'ACS', ip: { not: null } },
+        select: { ip: true },
+      });
+      const byId = new Map<
+        string,
+        { id: string; name: string; code?: string; orgId?: string; orgName?: string }
+      >();
+      for (const d of acs) {
+        const client = resolved.isapiForHost(d.ip as string);
+        if (!client) continue;
+        try {
+          const users = await listAllUserInfo(client);
+          for (const u of users) {
+            const id = String(u.employeeNo).trim();
+            if (!id || byId.has(id)) continue;
+            byId.set(id, {
+              id,
+              name: String(u.name || id),
+              code: id,
+              orgName: u.userType != null ? String(u.userType) : undefined,
+            });
+          }
+        } catch (e) {
+          this.logger.warn(`UserInfo live ${d.ip}: ${String(e)}`);
+        }
+      }
+      const items = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+      return { total: items.length, source: 'live' as const, items };
+    }
+
     try {
       const { client } = await this.client(companyId, siteId);
       const data = await client.personList(1, 200);

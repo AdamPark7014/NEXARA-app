@@ -22,6 +22,18 @@ export {
   type IsapiVideoChannel,
 } from './isapi.discovery';
 
+export {
+  describeAcsEvent,
+  listAcsEvents,
+  listAllUserInfo,
+  searchAcsEvents,
+  searchUserInfo,
+  type AcsEventPage,
+  type IsapiAcsEvent,
+  type IsapiUserInfo,
+  type UserInfoPage,
+} from './isapi-acs';
+
 export { probeRtsp, type RtspProbeResult } from './rtsp-probe';
 
 export { asList, parseXml, pick, type XmlValue } from './xml';
