@@ -5023,6 +5023,7 @@ model CompanyProfile {
   integraSyncRuns           IntegraSyncRun[]
   integraAlarmAcks          IntegraAlarmAck[]
   integraFloorplans         IntegraFloorplan[]
+  integraEdgeAgents         IntegraEdgeAgent[]
 
   @@map("company_profile")
 }
@@ -5711,6 +5712,7 @@ model IntegraSite {
   syncRuns   IntegraSyncRun[]
   alarmAcks  IntegraAlarmAck[]
   floorplans IntegraFloorplan[]
+  edgeAgent  IntegraEdgeAgent?
   /// Cliente operativo ERP (opcional) — no confundir con CompanyProfile
   serviceClientId Int?
   /// Override de módulos visibles: { "video": true, "anpr": false, ... }
@@ -5723,6 +5725,47 @@ model IntegraSite {
   @@index([companyId, isActive])
   @@unique([companyId, name])
   @@map("integra_sites")
+}
+
+/// Caja on-site que cierra el tunel de un sitio ISAPI y corre go2rtc + sync.
+/// El servidor nunca entra a la LAN del cliente: habla solo con esta caja
+/// por su `tunnelIp`, que es unica por sitio. Ver ADR-0021.
+model IntegraEdgeAgent {
+  id        Int @id @default(autoincrement())
+  companyId Int
+  /// Un sitio tiene como mucho una caja.
+  siteId    Int @unique
+
+  /// sha256 del token de alta, de un solo uso. El token en claro se muestra
+  /// una vez al generarlo y no se vuelve a poder leer.
+  enrollTokenHash      String?   @db.VarChar(64)
+  enrollTokenExpiresAt DateTime?
+  /// sha256 del token permanente que la caja usa despues de enrolarse.
+  agentTokenHash       String?   @db.VarChar(64)
+
+  /// Clave publica WireGuard de la caja (base64, 44 chars).
+  publicKey String? @db.VarChar(64)
+  /// IP dentro del tunel (10.77.0.x). Unica en toda la instalacion.
+  tunnelIp  String? @unique @db.VarChar(45)
+
+  hostname     String? @db.VarChar(120)
+  agentVersion String? @db.VarChar(40)
+
+  /// PENDING (token emitido) | ENROLLED (caja activa) | REVOKED
+  status     String    @default("PENDING") @db.VarChar(16)
+  enrolledAt DateTime?
+  lastSeenAt DateTime?
+  lastSyncAt DateTime?
+  lastError  String?   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+  @@map("integra_edge_agents")
 }
 
 model IntegraRegion {

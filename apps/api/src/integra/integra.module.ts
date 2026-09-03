@@ -9,17 +9,29 @@ import { IntegraSiteService } from './integra-site.service';
 import { IntegraSyncService } from './integra-sync.service';
 import { IntegraMediaService } from './integra-media.service';
 import { IntegraPortfolioService } from './integra-portfolio.service';
+import { IntegraEdgeService } from './integra-edge.service';
+import {
+  IntegraEdgeController,
+  IntegraEdgeAdminController,
+} from './integra-edge.controller';
 
 @Module({
   imports: [ConfigModule, PrismaModule, AuditModule, ServiceClientsModule],
-  controllers: [IntegraController],
+  controllers: [IntegraController, IntegraEdgeController, IntegraEdgeAdminController],
   providers: [
     IntegraArtemisService,
     IntegraSiteService,
     IntegraSyncService,
     IntegraMediaService,
     IntegraPortfolioService,
+    IntegraEdgeService,
   ],
-  exports: [IntegraArtemisService, IntegraSiteService, IntegraSyncService, IntegraPortfolioService],
+  exports: [
+    IntegraArtemisService,
+    IntegraSiteService,
+    IntegraSyncService,
+    IntegraPortfolioService,
+    IntegraEdgeService,
+  ],
 })
 export class IntegraModule {}

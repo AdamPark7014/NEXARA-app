@@ -35,7 +35,7 @@ import { ServiceClientsService } from '../service-clients/service-clients.servic
 import { IntegraSiteService } from './integra-site.service';
 import { IntegraSyncService } from './integra-sync.service';
 
-function integraCanSettings(user: { roleKey?: string; isSuperAdmin?: boolean } | null) {
+export function integraCanSettings(user: { roleKey?: string; isSuperAdmin?: boolean } | null) {
   if (!user) return false;
   if (user.isSuperAdmin) return true;
   return user.roleKey !== 'cliente';
