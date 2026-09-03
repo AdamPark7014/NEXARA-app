@@ -1,122 +1,105 @@
 # RELEVO
 
 - **Último turno:** claude-code
-- **Fecha:** 2026-09-02
-- **Rama:** `claude/integra-edge-enrollment` (sale de `mejora/calidad-y-web` en `47e406a`)
+- **Fecha:** 2026-09-03
+- **Rama:** `claude/integra-edge-enrollment` — **ya empujada a `mejora/calidad-y-web`** y desplegada.
 
-## Antes que nada: se duplicó trabajo. Que no se repita
+## Arranque obligatorio: comparar contra origin
 
-Este turno arrancó en un worktree cuya rama salía de `e08c5aa`, **29 commits por
-detrás** de `mejora/calidad-y-web`. Sin comparar contra `origin`, se reimplementó
-entero el provider ISAPI que ya existía (`0ffb2fc`, `6cc9c3c`, `9d1d1e6`).
-Hasta coincidió el número de ADR: había dos ADR-0020 distintos.
-
-Ese trabajo se **descartó** (quedó en la rama muerta `claude/nexara-device-integration-f85726`,
-sin fusionar ni desplegar). La implementación buena es la que ya estaba.
-
-**Arranque obligatorio a partir de ahora**, además de `relevo.ps1 estado`:
+Este turno empezó duplicando entero el provider ISAPI que Cursor ya había hecho,
+por no mirar `origin`. Ese trabajo se descartó. Antes de escribir código:
 
 ```
 git fetch origin && git log --oneline HEAD..origin/mejora/calidad-y-web | head
 ```
 
-Si sale cualquier cosa, leerla antes de diseñar nada. En worktrees vale doble:
-el aislamiento hace que una rama vieja se sienta actual.
+## El sitio de oficinas ya está en producción y funciona sin la laptop
 
-## Hecho en este turno
+**El puente es el NAS Synology (`192.168.9.32`)**, no la laptop de Adam. Tiene el
+paquete Tailscale, se enroló como `nas-nexara` (100.71.203.3) y anuncia
+`192.168.9.0/24` con la ruta aprobada. **Verificado quitándole el anuncio a la
+laptop**: el servidor siguió alcanzando NVR, terminales, cámaras y domo.
 
-### 1. Desplegado a producción el ISAPI que ya estaba escrito (y no corría)
+Sitio `#1 "Oficinas NEXARA"`, **empresa 2 (NEXARA Demo)**, provider ISAPI,
+`host http://192.168.9.34`. Espejo: **13 cámaras · 4 puertas · 18 equipos**.
 
-El código de Cursor estaba en el disco del servidor pero **los contenedores nunca
-se reconstruyeron**: `nexara-api` corría una imagen anterior sin `hikvision-isapi`.
-De ahí que la consola dijera «Sin sitios configurados» y no fuera un bug.
+## Tres fallos de raíz, encontrados con medición y arreglados
 
-- `/var/www/nexara-app` actualizado de `9c08ee20` a `47e406af` (eran dos commits
-  de documentación).
-- `deploy/update.sh --force-all --with-migrate`: `nexara-api` y `nexara-web`
-  reconstruidos. Verificado `dist/hikvision-isapi/` dentro del contenedor y la
-  API respondiendo.
+### 1. El cliente ISAPI se ahogaba a través del túnel (`7270143`)
 
-### 2. Alta automática de la caja on-site — ADR-0021 (lo nuevo de este turno)
+Iba **sin pooling**: una conexión TCP nueva por petición. En LAN era la decisión
+correcta y está bien razonada en el código. **Por túnel se invierte.** Con
+tcpdump sobre `tailscale0`: los cierres quedan a medias, el `FIN` se retransmite
+sin que el equipo lo confirme, y las pocas ranuras del firmware se agotan.
+Síntoma exacto: `deviceInfo` responde en 350 ms y **la siguiente llamada expira
+a los 15 s**, mientras la misma petición hecha a mano funciona en 200 ms.
 
-`INTEGRA-LAN-ENLACE` pedía generar claves a mano y editar `wg0.conf` por cada
-sitio, con un `systemctl restart` que afecta a todos los sitios ya montados.
-Sirve para el primero; no para el décimo. Ahora la caja se da de alta sola, como
-el tótem de un estacionamiento.
+Ahora **una conexión reutilizada por equipo** (`maxSockets: 1`, que mantiene la
+promesa de no acaparar ranuras) y `close()` para que un CLI pueda terminar.
 
-- **`IntegraEdgeAgent`** + migración `20260902230000_integra_edge_agents`. Una
-  fila por sitio: hash del token, clave pública de la caja, `tunnelIp`, latido.
-- **`integra-edge.service.ts`** — emisión de token de un solo uso (solo se guarda
-  el `sha256`), alta, latido, y la lista de peers para el reconciliador.
-- **`integra-edge.controller.ts`** — dos superficies: la de la caja (sin
-  `RbacGuard`, se autentica con su token) y la de administración (con sesión y
-  permisos).
-- **`integra-edge.install.ts`** — instalador que se sirve en
-  `GET /api/integra/edge/install.sh`. La caja genera sus claves, se registra,
-  levanta WireGuard, arranca go2rtc y queda latiendo cada minuto.
-- **`deploy/edge/server-setup.sh`** y **`deploy/edge/wg-reconcile.sh`** — la API
-  **no** toca WireGuard (corre en un contenedor, no es root); declara el peer en
-  la base y un timer de systemd lo aplica con `wg set`, que no reinicia la
-  interfaz: dar de alta el sitio diez no interrumpe a los otros nueve.
+Sync del sitio real: **de 133 s devolviendo 0 cámaras, a 7.3 s con todo**.
 
-**Tres decisiones que conviene no revisitar sin leer el ADR:**
+### 2. go2rtc no podía escribir su configuración (`7270143`, `ef22944`)
 
-1. `AllowedIPs` es **siempre** la red del túnel, nunca la LAN del cliente. No es
-   configurable por sitio y hay un test que lo fija. Es la trampa del sitio
-   número tres que ya avisaba INTEGRA-LAN-ENLACE.
-2. La clave privada de cada sitio vive solo en su caja. Un volcado de la base no
-   compromete ningún túnel.
-3. Re-emitir el token invalida a la caja anterior. Es la vía para revocar un
-   equipo perdido sin entrar en él.
+El YAML iba montado `:ro`. Al registrar un stream, go2rtc lo añadía en memoria
+pero fallaba al persistirlo y devolvía **400** — la API lo leía como fallo y la
+consola no mostraba video.
 
-`14 tests` nuevos; `60` en las suites de integra + hikvision-isapi, verde.
-`tsc --noEmit` limpio.
+Al ponerlo `:rw` apareció un problema peor: **go2rtc escribe las URLs RTSP con
+la contraseña dentro**, y el archivo estaba **versionado en git**. Quedaron
+cuatro líneas con la clave en un fichero rastreado. Ahora la configuración viva
+está en `/var/lib/nexara/go2rtc` (fuera del repo, permisos 600) y
+`deploy/go2rtc/go2rtc.yaml` es solo semilla que `update.sh` copia la primera vez.
 
-### 3. Hallazgos de red del sitio (contradicen la hoja de datos original)
+### 3. El reproductor giraba para siempre: todo estaba en H.265 (`0a53899`)
 
-- **El router de la oficina cuelga de la red del auditorio**: doble NAT. El IP
-  público visto desde el sitio (`187.191.42.145`, Uninet) **no es de NEXARA**.
-  Reenvío de puertos e IP fija quedan descartados, y no solo aquí: no
-  generalizan a sucursales.
-- El NVR **no** está en `192.168.1.198` sino en `192.168.9.34`. La columna «mask»
-  de la hoja era el **número de canal**. Son **13 cámaras**, no 12: falta en la
-  hoja el domo PTZ del canal 13.
+Los equipos publican el principal en **H.265 y el navegador no lo decodifica**.
+Los JPEG sí se veían porque los decodifica go2rtc en el servidor — por eso
+parecía problema de red y no de códec.
 
-### 4. Tailscale, montado y luego relegado
+- **Equipos reconfigurados**: los 13 sub-streams del grabador y los 9 de las
+  cámaras con IP propia pasaron de H.265 a **H.264**. El principal, que es el
+  que graba, **no se tocó**: misma calidad y mismo espacio.
+- **Código**: `IntegraMediaService` sirve ahora el **secundario** (`302`, `102`…),
+  H.264 a 640×360 — justo lo que necesita un muro de 13 cámaras, y sin
+  transcodificar, que en un servidor de 4 núcleos con 28 contenedores de otros
+  seis negocios no es opción.
 
-Se instaló en el servidor (`nexara-hetzner`, 100.119.133.69) y en la laptop
-(`nexara-oficina`, 100.71.252.10) enrutando `192.168.9.0/24`, y **se verificó de
-punta a punta**: el contenedor `nexara-api` alcanzó el NVR y `nexara-go2rtc` el
-RTSP 554, con el servidor en Alemania y los equipos en la oficina.
+## Alta automática de la caja on-site — ADR-0021 (`3cba6e9`)
 
-Sirvió para probar que la cadena entera funciona, pero **enruta la LAN completa,
-que es justo lo que el diseño de Cursor evita**. Se deja instalado porque hoy es
-el único puente que existe; se retira cuando esté la caja permanente. La laptop
-es de Adam y se va con él: el puente se cae cuando sale de la oficina.
+Emitir token del sitio, correr una línea en la caja, y se registra sola: genera
+sus claves (la privada nunca sale), recibe su `10.77.0.x`, levanta WireGuard y
+queda latiendo. La API **no toca WireGuard**: declara el peer y un reconciliador
+de systemd lo aplica con `wg set`, que no reinicia la interfaz. `AllowedIPs` es
+siempre la red del túnel, nunca la LAN del cliente, y hay un test que lo fija.
+
+`deploy/edge/server-setup.sh` **no se ha ejecutado**: el sitio de oficinas va por
+Tailscale sobre el NAS, no por este WireGuard. Está listo para el primer cliente.
+
+## Además, de paso
+
+**NEXARA estaba lentísimo por culpa de otro proyecto.** `biblioteca-web` llevaba
+4 días acumulando zombis: **10,541 procesos** contra los 23 de nexara-web. Con
+10,800 tareas el kernel se atasca en cada `fork()`, de ahí los SSH que expiraban
+y respuestas de 27 s con el ping perfecto a 110 ms. Reiniciado con permiso de
+Adam: de 10,541 zombis a 4, de 10,807 tareas a 302. **Vuelve a pasar** si no se
+le pone `init: true` al compose de biblioteca y se arregla su healthcheck.
 
 ## A medias
 
-- **No hay caja on-site.** Es lo único que falta para que el sitio deje de
-  depender de la laptop. Recomendación de INTEGRA-LAN-ENLACE: **mini PC Intel
-  N100** (3,000–4,500 MXN) — x86 corre las mismas imágenes que el servidor, y su
-  QuickSync transcodifica; la Pi 5 se ahoga y muere por la SD.
-- **Nada del enlace está aplicado en el servidor.** `deploy/edge/server-setup.sh`
-  existe pero **no se ha ejecutado**, y las variables `INTEGRA_EDGE_*` no están
-  en `deploy/.env.nexara`. WireGuard sigue sin instalarse allá.
-- **No hay ningún `IntegraSite` en la base de producción** (`select count(*)`
-  = 0). El sitio de las pruebas de Cursor vive en la base local de la laptop.
-- **Falta el espejo desde la caja.** Con `AllowedIPs = /32` el cron del servidor
-  no alcanza los equipos, así que `integra:isapi:sync` se sigue corriendo a mano
-  desde la LAN. El siguiente paso es `POST /api/integra/edge/mirror`; está
-  deliberadamente fuera del ADR-0021.
-- **HCT sigue siendo la vía por defecto del ADR-0020 y sigue sin App Key.**
-  `INTEGRA_HIK_HOST/APP_KEY/APP_SECRET` están **vacías** en producción
-  (verificado). Es un trámite con SYSCOM, no un problema técnico, y resolvería
-  las sucursales **sin fierro en sitio**.
-- Empresas: `1 = NEXARA Tech S.A. de C.V.`, `2 = NEXARA Demo (revisión de
-  tiendas)`. Adam quiere que la **Demo** sea «Oficinas NEXARA» y la otra la
-  infraestructura multi-locación de clientes. **No se ha cambiado nada**: cambiar
-  el nombre de una empresa en producción necesita su confirmación explícita.
+- **Personas y eventos siguen en 0 para sitios ISAPI.** No es el túnel: es código
+  que falta. Comprobado que el terminal `192.168.9.163` tiene **21 usuarios**
+  dados de alta y `/ISAPI/AccessControl/UserInfo/Search` responde bien. Lo mismo
+  con `AcsEvent` (tope de 30 por página). Es lo siguiente y ahora es directo.
+- **Las reglas TCPMSS que añadí en el servidor no hacen falta** (el problema era
+  el pooling, no el MTU) y **no son persistentes**. Se pueden quitar:
+  `iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -o tailscale0 -j TCPMSS --set-mss 1240`
+  y la misma en POSTROUTING.
+- **Tailscale en el NAS es la versión 1.58.2**, de hace dos años. Conviene
+  actualizarla.
+- El sitio quedó en la **empresa 2**. Adam quiere que la Demo sea «Oficinas
+  NEXARA» y la 1 la infraestructura de clientes; **renombrar empresas en
+  producción no se ha hecho** y necesita su confirmación.
 
 ## No tocar
 
@@ -124,40 +107,30 @@ es de Adam y se va con él: el puente se cae cuando sale de la oficina.
 - Oficinas ACS, PortalShell rewrite, Meta/ESP, OFX
 - `key.properties` y el keystore — credenciales
 - `ModuleEntry.webPath` — alimenta RBAC
-- `scripts/generate-mobile-icons.js` — código muerto; usar `gen-native-app-icons.py`
-- **No inventar rutas ISAPI.** Las que se usan están tabuladas en
-  `docs/INTEGRA-LAN.md`.
-- **No meter las credenciales de los equipos en el repo.** Van por
-  `ISAPI_USER`/`ISAPI_PASSWORD` o cifradas en `IntegraSite`.
-- **No mover Traefik de puerto** (ADR-0020): sirve 40 dominios de siete negocios
-  en 80/443, y Let's Encrypt valida por el 80.
+- **No inventar rutas ISAPI**: las verificadas están en `docs/INTEGRA-LAN.md`.
+- **No meter credenciales de equipos en el repo.** Van por `ISAPI_USER` /
+  `ISAPI_PASSWORD` o cifradas en `IntegraSite`. Ojo con lo que escriben los
+  servicios: go2rtc lo hacía sin que nadie lo notara.
+- **No mover Traefik de puerto** (ADR-0020): sirve 40 dominios de siete negocios.
 - El servidor hospeda **28 contenedores de otros proyectos**. Un build que llene
-  el disco tumba producción ajena; vigilar antes de construir.
+  el disco tumba producción ajena.
 
 ## Siguiente paso
 
-1. Comprar el mini PC N100 y montarlo en la oficina por Ethernet.
-2. En el servidor: `deploy/edge/server-setup.sh`, abrir `51820/udp` en el
-   firewall de Hetzner, pegar las `INTEGRA_EDGE_*` y redesplegar.
-3. Emitir token del sitio y correr el instalador en la caja. Verificar que
-   `GET /api/integra/edge-agents` la marca en línea.
-4. Seed + sync contra la base de **producción** (falta decidir empresa 1 o 2).
-5. Retirar el anuncio de ruta de la laptop (`tailscale set --advertise-routes=`)
-   para que no compitan dos puentes.
-6. En paralelo y sin depender de nada: pedir el App Key de HCT a SYSCOM.
+1. Sync de **personas y eventos** para ISAPI — es lo que falta para que la
+   consola muestre accesos y caras.
+2. Quitar las reglas TCPMSS sobrantes del servidor.
+3. `init: true` en el compose de biblioteca, o los zombis vuelven.
+4. Decidir el tema de las empresas 1 y 2 con Adam.
 
 ## Mobile / Play — ENVIADO A REVISIÓN (31-08-2026)
 
-Sin cambios este turno. La app sigue en revisión de Google con **Producción 5
-(1.0.0)** del commit `c8bccea`; el bundle 3, que provocó el rechazo por
-`READ_MEDIA_IMAGES/VIDEO`, quedó en «No incluido».
+Sin cambios. Sigue en revisión con **Producción 5 (1.0.0)** del commit `c8bccea`.
 
 **Pendiente y sin comprobar:** que `play.review@nexara.com.mx` entre en
-producción. Si el revisor no puede iniciar sesión, es rechazo seguro.
-`seed-play-reviewer.ts` es idempotente, pero **sin `PLAY_REVIEWER_PASSWORD` rota
-la contraseña** y deja inservible la que está en Play Console:
+producción. Sin `PLAY_REVIEWER_PASSWORD` el seed **rota la contraseña** y deja
+inservible la que está en Play Console:
 
 ```
-docker compose --env-file .env.nexara -f docker-compose.nexara.yml \
-  exec -T api sh -c "cd /app/apps/api && PLAY_REVIEWER_PASSWORD='...' npm run seed:play-reviewer"
+docker compose --env-file .env.nexara -f docker-compose.nexara.yml   exec -T api sh -c "cd /app/apps/api && PLAY_REVIEWER_PASSWORD='...' npm run seed:play-reviewer"
 ```
