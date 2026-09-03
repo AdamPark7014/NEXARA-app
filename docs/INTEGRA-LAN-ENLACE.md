@@ -45,6 +45,29 @@ cada canal que alguien mira arrastra el RTSP crudo por el túnel. Con go2rtc
 local, el RTSP no sale de la LAN: por el túnel viaja solo el stream ya remuxado
 del canal que se está viendo. Y si el visor negocia WebRTC, ni eso.
 
+## Alta automática (lo que se usa en la práctica)
+
+Lo que sigue en «Configuración» es el montaje **a mano**, útil para entender qué
+hace cada pieza. Para operar hay una vía automática — [ADR-0021](ADR-0021-integra-edge-enrolamiento.md):
+
+```bash
+sudo bash deploy/edge/server-setup.sh
+```
+
+```bash
+sudo bash deploy/edge/wg-reconcile.sh --install <token-que-imprime>
+```
+
+Y por cada sitio, emitir el token en la consola y correr en la caja:
+
+```bash
+curl -fsSL https://integra.nexara.com.mx/api/integra/edge/install.sh | sudo bash -s -- <token>
+```
+
+La caja genera sus claves —la privada nunca sale de ahí—, se registra, recibe su
+`10.77.0.x` y arranca sola con go2rtc y el latido. **Nadie edita `wg0.conf`**, y
+dar de alta un sitio no reinicia la interfaz ni interrumpe a los que ya estaban.
+
 ## Configuración
 
 ### Servidor (Hetzner · 5.78.215.109, SSH en el 2222)

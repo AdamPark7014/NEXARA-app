@@ -34,6 +34,13 @@ INTEGRA_HIK_APP_SECRET=...
 # Cifrado de secrets de sitio (32 bytes vía sha256 del string)
 INTEGRA_SECRETS_KEY=...
 
+# Caja on-site (ADR-0021) — los imprime deploy/edge/server-setup.sh
+INTEGRA_EDGE_WG_ENDPOINT=5.78.215.109:51820
+INTEGRA_EDGE_WG_SERVER_PUBKEY=...
+INTEGRA_EDGE_WG_SUBNET=10.77.0.0/24
+INTEGRA_EDGE_API_URL=https://integra.nexara.com.mx
+INTEGRA_EDGE_RECONCILE_TOKEN=...
+
 # Media
 GO2RTC_URL=http://nexara-go2rtc:1984
 GO2RTC_PUBLIC_URL=https://integra.nexara.com.mx/go2rtc
@@ -58,6 +65,34 @@ Sitios se crean en UI `/integra/settings` (roles altos). Rotar keys = editar sit
 
 Alta y barrido en [INTEGRA-LAN](INTEGRA-LAN.md). **go2rtc debe correr dentro de
 la LAN del sitio**; el del droplet no alcanza el RTSP de los equipos.
+
+## Caja on-site: alta y estado (ADR-0021)
+
+Un sitio ISAPI necesita una caja en la sucursal que cierre el túnel y corra
+go2rtc. Se da de alta sola; nadie edita `wg0.conf`.
+
+**Una vez en el servidor:**
+
+```bash
+sudo bash deploy/edge/server-setup.sh
+sudo bash deploy/edge/wg-reconcile.sh --install <token-que-imprime>
+```
+
+Abrir `51820/udp` en el firewall de Hetzner y pegar las variables
+`INTEGRA_EDGE_*` en `deploy/.env.nexara`.
+
+**Por cada sitio:**
+
+1. `POST /api/integra/sites/:id/edge/token` — el token **se muestra una sola vez**.
+2. En la caja: `curl -fsSL <api>/api/integra/edge/install.sh | sudo bash -s -- <token>`
+3. `GET /api/integra/edge-agents` para ver estado; se marca offline sin latido
+   en 5 min. Revocar: `DELETE /api/integra/sites/:id/edge`.
+
+Re-emitir el token invalida a la caja anterior — es la vía si se pierde el equipo.
+
+**Pendiente:** el espejo de inventario. Con `AllowedIPs = /32` el cron del
+servidor no alcanza los equipos, así que `integra:isapi:sync` sigue corriéndose
+a mano desde dentro de la LAN hasta que el agente empuje el espejo.
 
 ## Provider HCT (ADR-0019)
 
