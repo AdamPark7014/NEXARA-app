@@ -113,20 +113,29 @@ describe('HikvisionIsapiClient · transporte', () => {
     }
   });
 
-  it('no deja sockets vivos: el proceso puede terminar', async () => {
+  it('reutiliza una sola conexión y la cierra al terminar', async () => {
     const dev = await startFakeDevice();
     try {
       const client = new HikvisionIsapiClient({
         host: `http://127.0.0.1:${dev.port}`,
         username: USER,
         password: PASS,
+        reqPerSecond: 50,
       });
       await client.get('/ISAPI/System/deviceInfo');
       await client.get('/ISAPI/Streaming/channels');
       await new Promise((r) => setImmediate(r));
-      // El agente global de Node (>=19) trae keepAlive: dejaría el socket
-      // ocioso abierto, colgando cualquier CLI que ya terminó su trabajo y
-      // ocupando una de las pocas conexiones que admite el firmware.
+
+      // Nunca más de una: el firmware admite pocas conexiones a la vez. Y
+      // reutilizarla es lo que evita que, a través de un túnel, se acumulen
+      // cierres a medias hasta que el equipo deja de contestar.
+      expect(client.idleSockets).toBeLessThanOrEqual(1);
+
+      // Sin esto el socket ocioso cuelga un CLI que ya terminó su trabajo.
+      client.close();
+      // destroy() cierra los sockets, pero la lista de libres se vacía cuando
+      // llega el evento 'close' del socket, no en el mismo tick.
+      await new Promise((r) => setTimeout(r, 50));
       expect(client.idleSockets).toBe(0);
     } finally {
       await dev.close();

@@ -166,7 +166,7 @@ services:
     container_name: nexara-go2rtc
     restart: unless-stopped
     volumes:
-      - ./go2rtc/go2rtc.yaml:/config/go2rtc.yaml:ro
+      - ./go2rtc/go2rtc.yaml:/config/go2rtc.yaml:rw
     networks:
       - internal
       - proxy
