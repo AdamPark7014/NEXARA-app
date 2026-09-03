@@ -173,8 +173,8 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
             {healthLabel}
           </span>
           {mediaDown && (
-            <span className={styles.healthPill} data-tone="warn" title="go2rtc / media">
-              media down
+            <span className={styles.healthPill} data-tone="warn" title="Servicio de video (go2rtc)">
+              Video offline
             </span>
           )}
           <IntegraSiteSwitcher
@@ -204,6 +204,17 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
           )}
         </div>
         <div className={styles.contextRight}>
+          {(dash?.cameras ?? 0) > 0 && (
+            <div className={styles.contextQuick}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => router.push("/integra/video")}
+              >
+                Video wall
+              </Button>
+            </div>
+          )}
           {!isClient && caps?.settings !== false && (
             <Button
               variant="secondary"

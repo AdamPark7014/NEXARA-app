@@ -165,7 +165,7 @@ de plataforma que un equipo suelto no tiene.
 
 ## Rutas ISAPI empleadas
 
-Todas documentadas en `HIKVISION-apps/docs/API-DOCS/HIKVISION/`:
+Todas documentadas en `HIKVISION-apps/docs/API-DOCS/HIKVISION/` (salvo InputProxy):
 
 | Ruta | Uso |
 |---|---|
@@ -174,12 +174,18 @@ Todas documentadas en `HIKVISION-apps/docs/API-DOCS/HIKVISION/`:
 | `GET /ISAPI/AccessControl/capabilities` | ¿es control de acceso? |
 | `GET /ISAPI/PTZCtrl/channels/{id}/presets` | ¿el canal es motorizado? |
 | `PUT /ISAPI/AccessControl/RemoteControl/door/{id}` | apertura remota |
+| `POST /ISAPI/AccessControl/UserInfo/Search?format=json` | personas del terminal → espejo `IntegraPerson` |
+| `POST /ISAPI/AccessControl/AcsEvent?format=json` | eventos de acceso (live, tope 30/página) |
 
 Más `/ISAPI/ContentMgmt/InputProxy/channels[/status]`, que **no** está en el doc
 set de SYSCOM. Da el nombre real de cada cámara, su IP de origen y si está en
 plug & play. Se usa solo como enriquecimiento: verificado en vivo contra
 DS-7616NXI-I2/16P/VPro V5.05.370, y si falla se ignora. Nada estructural depende
 de él.
+
+**Personas / eventos sin HikCentral:** el sync ISAPI lee `UserInfo/Search` en cada
+equipo ACS del sitio y escribe el espejo. `GET /integra/events` consulta
+`AcsEvent` en vivo en esos mismos terminales (no hay tabla de eventos).
 
 ## Hallazgos del sitio que no son de software
 

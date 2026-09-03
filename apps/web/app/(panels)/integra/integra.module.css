@@ -590,6 +590,490 @@
 .camTileBody {
   aspect-ratio: 16 / 9;
   background: #020617;
+  position: relative;
+}
+
+.camTileBody :global(video),
+.camTileBody .playerShell {
+  border-radius: 0;
+  aspect-ratio: auto;
+  height: 100%;
+}
+
+.camTile[data-active="1"] {
+  outline: 2px solid var(--ig-accent, #0e7490);
+  outline-offset: 1px;
+}
+
+.playerShell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #020617;
+  border-radius: var(--ig-radius);
+  overflow: hidden;
+}
+
+.playerVideo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #020617;
+}
+
+.playerEmpty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.playerOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: color-mix(in srgb, #020617 72%, transparent);
+  color: #e2e8f0;
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.playerOverlay[data-tone="error"] {
+  color: #fca5a5;
+}
+
+.playerSpinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, #94a3b8 35%, transparent);
+  border-top-color: #e2e8f0;
+  animation: igSpin 0.7s linear infinite;
+}
+
+@keyframes igSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.playerLiveBadge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, #b91c1c 88%, #000);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+.playerLiveBadge[data-compact="1"] {
+  top: 6px;
+  left: 6px;
+  padding: 2px 6px;
+  font-size: 9px;
+  gap: 4px;
+}
+
+.playerCompact .playerOverlay span {
+  display: none;
+}
+
+.playerCompact .playerPlayIcon {
+  width: 40px;
+  height: 40px;
+}
+
+.playerCompact .playerPlayIcon::after {
+  border-width: 7px 0 7px 12px;
+}
+
+.playerLiveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+  animation: igPulse 1.4s ease-out infinite;
+}
+
+@keyframes igPulse {
+  70% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.playerMuteBtn {
+  position: absolute;
+  right: 10px;
+  bottom: 44px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border: 1px solid color-mix(in srgb, #fff 18%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, #0b1524 78%, transparent);
+  color: #e2e8f0;
+  font-size: 14px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(6px);
+}
+
+.playerMuteBtn:hover {
+  background: color-mix(in srgb, #0b1524 92%, #fff);
+}
+
+.playerPlayCue {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 0;
+  background: color-mix(in srgb, #020617 45%, transparent);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.playerPlayIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ig-accent, #0e7490) 92%, #000);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  position: relative;
+}
+
+.playerPlayIcon::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 54%;
+  transform: translate(-50%, -50%);
+  border-style: solid;
+  border-width: 10px 0 10px 16px;
+  border-color: transparent transparent transparent #fff;
+}
+
+.videoFocusEmpty {
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  background: #0b1524;
+  border-radius: var(--ig-radius);
+  color: #94a3b8;
+  text-align: center;
+  padding: 24px;
+}
+
+.videoFocusEmpty strong {
+  display: block;
+  color: #e2e8f0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.videoFocusEmpty span {
+  font-size: 12px;
+  max-width: 280px;
+  line-height: 1.4;
+}
+
+.videoNote {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--ig-muted);
+  font-family: var(--ig-font-mono);
+  word-break: break-all;
+}
+
+/* ── Video wall workbench ───────────────────────────────── */
+.segGroup {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--ig-line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--ig-surface);
+}
+
+.segBtn {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--ig-ink-soft);
+  background: transparent;
+  cursor: pointer;
+  border-right: 1px solid var(--ig-line);
+}
+
+.segBtn:last-child {
+  border-right: 0;
+}
+
+.segBtn:hover {
+  background: color-mix(in srgb, var(--ig-accent) 8%, var(--ig-panel));
+}
+
+.segBtn[data-on="1"] {
+  background: color-mix(in srgb, var(--ig-accent) 16%, var(--ig-panel));
+  color: var(--ig-accent-deep);
+}
+
+.wallWorkbench {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 8px;
+  flex: 1;
+  min-height: min(68dvh, 760px);
+  height: auto;
+}
+
+.wallWorkbench[data-rail="closed"] {
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+
+@media (max-width: 900px) {
+  .wallWorkbench,
+  .wallWorkbench[data-rail="closed"] {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+}
+
+.wallRail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--ig-panel);
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius);
+  overflow: hidden;
+}
+
+.wallRailHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ig-line);
+  font-size: 12px;
+}
+
+.wallRailFilters {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ig-line);
+}
+
+.wallRailList {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wallCamRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 9px;
+  background: transparent;
+  color: var(--ig-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wallCamRow:hover {
+  background: color-mix(in srgb, var(--ig-accent) 8%, transparent);
+}
+
+.wallCamRow[data-selected="1"] {
+  background: color-mix(in srgb, var(--ig-accent) 14%, transparent);
+}
+
+.wallCamRow[data-active="1"] {
+  box-shadow: inset 2px 0 0 var(--ig-accent);
+}
+
+.wallCamDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ig-warn);
+  flex-shrink: 0;
+}
+
+.wallCamDot[data-ok="1"] {
+  background: var(--ig-ok);
+}
+
+.wallCamName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wallCamBusy {
+  color: var(--ig-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.wallHint {
+  margin: 0;
+  padding: 8px 10px;
+  border-top: 1px solid var(--ig-line);
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--ig-muted);
+}
+
+.wallGrid {
+  display: grid;
+  gap: 6px;
+  min-height: 0;
+  min-width: 0;
+  background: #071018;
+  border: 1px solid #0f1c2a;
+  border-radius: var(--ig-radius);
+  padding: 6px;
+  align-content: stretch;
+}
+
+.wallCell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #0b1524;
+  border: 1px solid color-mix(in srgb, #fff 8%, transparent);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.wallCell[data-selected="1"] {
+  border-color: color-mix(in srgb, var(--ig-accent) 70%, #fff);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ig-accent) 45%, transparent);
+}
+
+.wallCellHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 5px 8px;
+  background: color-mix(in srgb, #0b1524 88%, #fff);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.wallCellActions {
+  display: flex;
+  gap: 2px;
+}
+
+.wallCellBody {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background: #020617;
+  aspect-ratio: 16 / 9;
+}
+
+.wallCellBody .playerShell {
+  position: absolute;
+  inset: 0;
+  aspect-ratio: auto;
+  height: 100%;
+  border-radius: 0;
+}
+
+.wallEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  border: 1px dashed color-mix(in srgb, #94a3b8 35%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, #0b1524 70%, transparent);
+  color: #94a3b8;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wallEmpty:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ig-accent) 55%, transparent);
+  color: #e2e8f0;
+  background: color-mix(in srgb, var(--ig-accent) 10%, #0b1524);
+}
+
+.wallEmpty:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.wallEmptyPlus {
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 700;
+  color: inherit;
+}
+
+.wallEmptyMeta {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.contextQuick {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
 }
 
 .tableScroll {
