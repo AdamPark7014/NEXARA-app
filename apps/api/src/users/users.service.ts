@@ -10,6 +10,12 @@ import { ChatService } from '../chat/chat.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
 import { IntegraAcsFanoutService } from '../integra/integra-acs-fanout.service.js';
+import {
+  buildAccessScheduleAssignment,
+  deviceMatchesDoorScope,
+  listAccessScheduleTemplates,
+  type AccessScheduleAssignment,
+} from '../integra/access-schedule-defaults.js';
 
 /** Roles que reciben OT, kits de herramientas y asignaciones de campo. */
 const FIELD_ASSIGNEE_ROLE_KEYS = ['ing_campo', 'ing_soporte'] as const;
@@ -332,32 +338,56 @@ export class UsersService {
 
   /**
    * Push en vivo a ACS si hay sitio ISAPI.
-   * Clave: employeeNumber ↔ employeeNo del terminal (sibling identity-unification).
+   * Clave: employeeNumber ↔ employeeNo. Plantilla según rol / contrato / activo.
    */
   private async pushAcsFromErp(opts: {
     companyId: number | null | undefined;
+    userId?: number;
     employeeNumber?: string | null;
     name: string;
     enable: boolean;
   }) {
     if (opts.companyId == null || !opts.employeeNumber) return undefined;
     try {
+      const schedule = await this.resolveScheduleForPush(opts);
+      if (!schedule.pushToAcs && schedule.key === 'none') {
+        return { skipped: true, reason: 'Plantilla sin acceso ACS', sites: [], schedule };
+      }
+
+      const targetIps = await this.resolveScheduleTargetIps(
+        opts.companyId,
+        schedule.doorScope,
+      );
+      const scoped =
+        schedule.doorScope === 'meeting_room' ||
+        schedule.doorScope === 'contractor_subset';
+
       const acsPush = await this.acsFanout.pushErpUser({
         companyId: opts.companyId,
         employeeNo: opts.employeeNumber,
         name: opts.name,
-        enable: opts.enable,
-        createIfMissing: opts.enable,
+        enable: opts.enable && schedule.validEnable,
+        createIfMissing: opts.enable && schedule.validEnable,
+        userType: schedule.userType,
+        doorRight: schedule.doorRight || undefined,
+        RightPlan: schedule.RightPlan,
+        beginTime: schedule.beginTime,
+        endTime: schedule.endTime,
+        targetIps: scoped ? targetIps : null,
+        disableOthers: scoped,
+        scheduleKey: schedule.key,
       });
       if (!acsPush.skipped) {
         const bad = acsPush.sites.flatMap((s) => s.results.filter((r) => !r.ok));
         if (bad.length) {
           this.logger.warn(
-            `ERP→ACS ${opts.employeeNumber}: ${bad.map((b) => `${b.deviceIp}=${b.error}`).join('; ')}`,
+            `ERP→ACS ${opts.employeeNumber} [${schedule.key}]: ${bad
+              .map((b) => `${b.deviceIp}=${b.error}`)
+              .join('; ')}`,
           );
         }
       }
-      return acsPush;
+      return { ...acsPush, schedule };
     } catch (e) {
       this.logger.warn(`ERP→ACS push falló: ${e instanceof Error ? e.message : String(e)}`);
       return {
@@ -366,6 +396,106 @@ export class UsersService {
         sites: [],
       };
     }
+  }
+
+  private async resolveScheduleForPush(opts: {
+    companyId: number | null | undefined;
+    userId?: number;
+    employeeNumber?: string | null;
+    enable: boolean;
+  }): Promise<AccessScheduleAssignment> {
+    let roleKey: string | null = null;
+    let orgRoleKey: string | null = null;
+    let tipoContrato: string | null = null;
+    let fechaIngreso: Date | null = null;
+    let isActive = opts.enable;
+
+    if (opts.userId) {
+      const u = await this.prisma.user.findUnique({
+        where: { id: opts.userId },
+        select: {
+          roleKey: true,
+          tipoContrato: true,
+          fechaIngreso: true,
+          isActive: true,
+          employeeNumber: true,
+          role: { select: { orgRoleKey: true } },
+        },
+      });
+      if (u) {
+        roleKey = u.roleKey;
+        orgRoleKey = u.role?.orgRoleKey ?? null;
+        tipoContrato = u.tipoContrato;
+        fechaIngreso = u.fechaIngreso;
+        isActive = u.isActive;
+      }
+    }
+
+    return buildAccessScheduleAssignment({
+      employeeNumber: opts.employeeNumber,
+      isActive,
+      roleKey,
+      orgRoleKey,
+      tipoContrato,
+      fechaIngreso,
+    });
+  }
+
+  private async resolveScheduleTargetIps(
+    companyId: number,
+    doorScope: AccessScheduleAssignment['doorScope'],
+  ): Promise<string[]> {
+    if (doorScope === 'all' || doorScope === 'none') return [];
+    const devices = await this.prisma.integraDevice.findMany({
+      where: { companyId, kind: 'ACS', ip: { not: null }, site: { isActive: true } },
+      select: { ip: true, name: true },
+    });
+    return devices
+      .filter((d) => deviceMatchesDoorScope(doorScope, d))
+      .map((d) => d.ip as string);
+  }
+
+  /** Vista previa «Horario de acceso Integra» para ficha ERP. */
+  async getIntegraAccessSchedule(userId: number, companyId?: number | null) {
+    await this.assertUserInCompany(userId, companyId);
+    const u = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        nombre: true,
+        employeeNumber: true,
+        isActive: true,
+        roleKey: true,
+        tipoContrato: true,
+        fechaIngreso: true,
+        role: { select: { id: true, nombre: true, orgRoleKey: true } },
+      },
+    });
+    if (!u) throw new NotFoundException('Usuario no encontrado');
+    const emp = this.withEmployeeNumber(u).employeeNumber;
+    const schedule = buildAccessScheduleAssignment({
+      employeeNumber: emp,
+      isActive: u.isActive,
+      roleKey: u.roleKey,
+      orgRoleKey: u.role?.orgRoleKey,
+      tipoContrato: u.tipoContrato,
+      fechaIngreso: u.fechaIngreso,
+    });
+    const targetIps =
+      companyId != null
+        ? await this.resolveScheduleTargetIps(companyId, schedule.doorScope)
+        : [];
+    return {
+      userId: u.id,
+      nombre: u.nombre,
+      employeeNumber: emp,
+      role: u.role,
+      schedule,
+      targetIps,
+      templates: listAccessScheduleTemplates(),
+      note:
+        'El Nº empleado es el employeeNo ACS. El editor semanal vive en Integra Personas; aquí solo la plantilla por rol.',
+    };
   }
 
   private async resolveRoleId(value: unknown) {
