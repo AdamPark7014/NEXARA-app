@@ -87,6 +87,8 @@ export default function CrmDashboardPage() {
 
   const [opps, setOpps] = useState<SalesOpportunity[]>([]);
   const [agenda, setAgenda] = useState<CrmActivity[]>([]);
+  const [overdueAgenda, setOverdueAgenda] = useState<CrmActivity[]>([]);
+  const [salesNotifs, setSalesNotifs] = useState<SalesNotif[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [recentLeads, setRecentLeads] = useState<CrmLead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,17 +98,25 @@ export default function CrmDashboardPage() {
     if (!token) return;
     setLoading(true); setError(null);
     try {
-      const [oppData, agendaData, metricsData, leadsData] = await Promise.all([
+      const [oppData, agendaData, metricsData, leadsData, notifData] = await Promise.all([
         listSalesOpportunities(token),
         apiFetch("crm-activities/my-agenda", token).catch(() => null),
         apiFetch("ventas/reportes/metricas?period=month", token).catch(() => null),
-        apiFetch("leads?limit=5&sort=createdAt:desc", token).catch(() => null),
+        apiFetch("ventas/leads?limit=5", token).catch(() => null),
+        apiFetch("ventas/reportes/notificaciones?limit=10", token).catch(() => []),
       ]);
       setOpps(oppData);
       setAgenda(agendaData?.pendingToday ?? []);
+      setOverdueAgenda(agendaData?.overdue ?? []);
       setMetrics(metricsData);
       const leadsArr = Array.isArray(leadsData) ? leadsData : (leadsData?.data ?? []);
       setRecentLeads(leadsArr.slice(0, 5));
+      const nArr: SalesNotif[] = Array.isArray(notifData) ? notifData : (notifData?.data ?? []);
+      setSalesNotifs(
+        nArr
+          .filter((n) => !n.isRead && (n.priority === "high" || /quote|crm|sales/i.test(n.category)))
+          .slice(0, 5),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar el panel comercial");
     } finally { setLoading(false); }

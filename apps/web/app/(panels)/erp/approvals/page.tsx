@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import PageHeader from "@/components/ui/PageHeader";
+import PageChrome from "@/components/ui/PageChrome";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
@@ -20,6 +20,8 @@ import {
   type PendingApproval,
   type ApprovalChainStep,
 } from "@/lib/workflow-api";
+import Link from "next/link";
+import chrome from "@/components/erp/erp-chrome.module.css";
 
 /**
  * Aprobaciones jerárquicas: el flujo va de OPERATIVE → SPECIALIST → MANAGER →
@@ -188,27 +190,36 @@ export default function ApprovalsPage() {
   }, [data]);
 
   return (
-    <>
-      <PageHeader
-        eyebrow="ERP · Gobierno corporativo"
-        title={cfg.title}
-        subtitle={cfg.subtitle}
-        actions={
-          <>
-            <Button variant="ghost" iconLeft="🔄" onClick={() => void fetchPending()} disabled={loading}>
-              Actualizar
-            </Button>
-            <Button
-              variant="secondary"
-              iconLeft="🛠️"
-              onClick={() => toast.info("La configuración visual de flujos de aprobación estará disponible próximamente. Los flujos actuales se definen por tipo de entidad y nivel jerárquico.")}
-            >
-              Definir flujos
-            </Button>
-          </>
-        }
-      />
-
+    <PageChrome
+      eyebrow="ERP · Gobierno"
+      title={cfg.title}
+      subtitle={cfg.subtitle}
+      secondaryActions={
+        <>
+          <Button variant="ghost" iconLeft="🔄" onClick={() => void fetchPending()} disabled={loading}>
+            Actualizar
+          </Button>
+          <Link href="/erp/architecture" style={{ textDecoration: "none" }}>
+            <Button variant="secondary" iconLeft="🗺️">Ver flujos en mapa</Button>
+          </Link>
+        </>
+      }
+      filters={
+        <FilterToolbar
+          search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por tipo, título o solicitante…" }}
+          onClear={() => { setSearchQ(""); setFilter("all"); }}
+          resultCount={loading ? null : list.length}
+          rightActions={list.length > 0 ? (
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(list, [
+              { key: "type", label: "Tipo" },
+              { key: "titulo", label: "Título" },
+              { key: "prioridad", label: "Prioridad" },
+              { key: "monto", label: "Monto" },
+            ], "aprobaciones-pendientes")}>Excel</Button>
+          ) : undefined}
+        />
+      }
+    >
       {error && (
         <div
           role="alert"
@@ -234,8 +245,8 @@ export default function ApprovalsPage() {
       )}
 
       {!loading && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 16 }}>
-          <KpiCard label="Pendientes totales" value={counts.all} variant={counts.all > 0 ? "warning" : "positive"} icon="📋" hint={counts.all === 0 ? "Bandeja limpia" : "Requieren decisión"} />
+        <div className={chrome.kpiStrip}>
+          <KpiCard label="Pendientes" value={counts.all} variant={counts.all > 0 ? "warning" : "positive"} icon="📋" hint={counts.all === 0 ? "Bandeja limpia" : "Requieren decisión"} />
           <KpiCard label="Prioridad alta" value={counts.Alta} variant={counts.Alta > 0 ? "danger" : "positive"} icon="🔴" hint={counts.Alta > 0 ? "Atención inmediata" : "Sin urgentes"} />
           <KpiCard label="Prioridad media" value={counts.Media} variant={counts.Media > 0 ? "accent" : "default"} icon="🟡" />
           <KpiCard label="Prioridad baja" value={counts.Baja} icon="🟢" />
@@ -243,8 +254,8 @@ export default function ApprovalsPage() {
       )}
 
       {!loading && counts.all > 0 && (
-        <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por prioridad</div>
+        <div className={chrome.distCard}>
+          <div className={chrome.distLabel}>Distribución por prioridad</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
             {(["Alta", "Media", "Baja"] as const).filter(p => counts[p] > 0).map((p) => (
               <div key={p} style={{ display: "grid", gridTemplateColumns: "60px 1fr 36px", gap: 10, alignItems: "center" }}>
@@ -258,20 +269,6 @@ export default function ApprovalsPage() {
           </div>
         </div>
       )}
-
-      <FilterToolbar
-        search={{ value: searchQ, onChange: setSearchQ, placeholder: "Buscar por tipo, título o solicitante…" }}
-        onClear={() => { setSearchQ(""); setFilter("all"); }}
-        resultCount={loading ? null : list.length}
-        rightActions={list.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(list, [
-            { key: "type", label: "Tipo" },
-            { key: "titulo", label: "Título" },
-            { key: "prioridad", label: "Prioridad" },
-            { key: "monto", label: "Monto" },
-          ], "aprobaciones-pendientes")}>Excel</Button>
-        ) : undefined}
-      />
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         {(["all", "Alta", "Media", "Baja"] as const).map((p) => (
