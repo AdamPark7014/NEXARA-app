@@ -14,7 +14,7 @@ import {
   IgToolbar,
 } from "../_Console";
 import { IntegraEzuiKitPlayer } from "../_EzuiKitPlayer";
-import { IntegraDetectionOverlay, subscribePushEvents } from "../_DetectionOverlay";
+import { IntegraDetectionOverlay, LIVE_DET_BADGE_MS, subscribePushEvents } from "../_DetectionOverlay";
 import { IntegraLivePlayer, preloadGo2rtcPlayer } from "../_LivePlayer";
 import { IntegraLiveAccessBanner } from "../_LiveAccessBanner";
 import { IntegraAcsIdentityStrip } from "../_AcsIdentityStrip";
@@ -151,7 +151,7 @@ export default function IntegraVideoPage() {
           if (!ev.deviceIp) continue;
           if (!ev.targets?.length && !ev.personName) continue;
           const age = now - Date.parse(ev.occurredAt);
-          if (!Number.isFinite(age) || age > 12_000) continue;
+          if (!Number.isFinite(age) || age > LIVE_DET_BADGE_MS) continue;
           if (!next) next = { ...prev };
           next[ev.deviceIp] = now;
           if (ev.personName) named += 1;
@@ -170,7 +170,7 @@ export default function IntegraVideoPage() {
   useEffect(() => {
     let stop = false;
     void integraApi<{ items: Array<{ id: number; deviceIp: string; personName?: string | null; targets?: unknown; occurredAt: string }> }>(
-      "integra/push/events?sinceMs=12000&limit=60&live=1",
+      `integra/push/events?sinceMs=${LIVE_DET_BADGE_MS}&limit=60&live=1`,
     )
       .then((d) => {
         if (stop) return;
@@ -179,7 +179,7 @@ export default function IntegraVideoPage() {
         for (const ev of d.items || []) {
           if (!ev.deviceIp) continue;
           const age = now - Date.parse(ev.occurredAt);
-          if (!Number.isFinite(age) || age > 12_000) continue;
+          if (!Number.isFinite(age) || age > LIVE_DET_BADGE_MS) continue;
           next[ev.deviceIp] = now - Math.max(0, age);
         }
         if (Object.keys(next).length) setDetByIp((prev) => ({ ...next, ...prev }));
@@ -192,7 +192,7 @@ export default function IntegraVideoPage() {
 
   useEffect(() => {
     const id = window.setInterval(() => {
-      const cut = Date.now() - 10_000;
+      const cut = Date.now() - LIVE_DET_BADGE_MS;
       setDetByIp((prev) => {
         const keys = Object.keys(prev);
         if (!keys.some((k) => prev[k] < cut)) return prev;
@@ -676,7 +676,7 @@ export default function IntegraVideoPage() {
                     const sel = selected === c.id;
                     const det =
                       c.sourceIp && detByIp[c.sourceIp]
-                        ? Date.now() - detByIp[c.sourceIp] < 10_000
+                        ? Date.now() - detByIp[c.sourceIp] < LIVE_DET_BADGE_MS
                         : false;
                     const online = onlineish(c.status);
                     return (
@@ -950,6 +950,7 @@ export default function IntegraVideoPage() {
                       <div className={styles.focusStage}>
                         <IntegraDetectionOverlay
                           deviceIp={focusCam?.sourceIp ?? null}
+                          showEmpty
                         />
                         <IntegraLivePlayer
                           src={focusSrc}
