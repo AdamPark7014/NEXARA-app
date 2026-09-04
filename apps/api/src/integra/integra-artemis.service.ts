@@ -345,14 +345,26 @@ export class IntegraArtemisService {
         return {
           total: items.length,
           source: 'mirror' as const,
-          items: items.map((c) => ({
-            id: c.cameraIndexCode,
-            name: c.name,
-            region: c.regionName,
-            regionId: c.regionIndexCode,
-            status: c.status,
-            encodeDevIndexCode: c.encodeDevIndexCode,
-          })),
+          items: items.map((c) => {
+            const raw = (c.raw ?? {}) as {
+              hasAudio?: boolean;
+              deviceKind?: string;
+              doorIndexCode?: string;
+            };
+            return {
+              id: c.cameraIndexCode,
+              name: c.name,
+              region: c.regionName,
+              regionId: c.regionIndexCode,
+              status: c.status,
+              encodeDevIndexCode: c.encodeDevIndexCode,
+              hasAudio: raw.hasAudio === true,
+              // Puesto solo en las terminales de acceso: es la cámara que mira
+              // a quien pasa por esa puerta.
+              doorIndexCode: raw.doorIndexCode ?? null,
+              isDoorCamera: raw.deviceKind === 'ACS',
+            };
+          }),
         };
       }
     }

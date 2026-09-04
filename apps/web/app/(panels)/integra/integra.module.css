@@ -2166,3 +2166,91 @@
   display: grid;
   gap: 8px;
 }
+
+/* ── Puesto de puerta ───────────────────────────────────────────────────
+ * Ver quién llama y accionar la puerta sin cambiar de pantalla. El video a
+ * la izquierda porque es lo que se mira; las acciones a la derecha, donde
+ * cae la mano, y con el motivo obligatorio de por medio.
+ */
+.doorConsole {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(240px, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .doorConsole {
+    grid-template-columns: 1fr;
+  }
+}
+
+.doorConsoleVideo {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #05070d;
+}
+
+.doorConsoleNoCam {
+  display: grid;
+  place-content: center;
+  gap: 4px;
+  height: 100%;
+  padding: 16px;
+  text-align: center;
+  color: var(--ig-muted);
+  font-size: 12px;
+}
+
+.doorConsoleNoCam strong {
+  color: var(--ig-text);
+  font-size: 13px;
+}
+
+.doorConsoleSide {
+  display: grid;
+  gap: 10px;
+}
+
+.doorConsoleHint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ig-muted);
+}
+
+.doorConsoleActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.doorConsoleFacts {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--ig-line);
+  border-radius: 8px;
+  background: var(--ig-panel);
+}
+
+.doorConsoleFacts dt {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+}
+
+.doorConsoleFacts dd {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ig-text);
+}
+
+.doorCell[data-selected="1"] {
+  border-color: var(--ig-accent);
+  box-shadow: 0 0 0 1px var(--ig-accent) inset;
+}

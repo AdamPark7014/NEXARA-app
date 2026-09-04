@@ -72,13 +72,25 @@ Aparecen en el muro como «<nombre> (puerta)».
 
 SSH: `-p 2222 root@5.78.215.109` → `/var/www/nexara-app`
 
+## Puesto de puerta
+
+En Control de acceso, al elegir una puerta sale su cámara en vivo (con audio,
+que las terminales llevan micro) junto a las cuatro acciones. El clic en la
+rejilla **ya no dispara el modal**: selecciona. Accionar sigue pidiendo motivo
+y pasando por auditoría.
+
+## Ojo con `deploy/update.sh`
+
+Compara `OLD_REV`/`NEW_REV` para decidir qué reconstruir. Si antes de correrlo
+se hace `git reset --hard` al commit nuevo, no ve cambios y **no construye
+nada** (pasa directo al prune y sale con 0). O se le deja hacer el pull a él,
+o se le pasa `--force-all`.
+
 ## A medias
 
-1. Verificar el muro tras este despliegue + correr sync para que aparezcan
-   las 4 cámaras de puerta (13 → 17).
-2. Control de acceso desde la ficha de persona (abrir puerta, ver su cámara).
-3. Decidir si se encienden los micros de las cámaras.
-4. TCPMSS / biblioteca `init: true` / empresas 1-2.
+1. Correr sync para que aparezcan las 4 cámaras de puerta (13 → 17).
+2. Decidir si se encienden los micros de las cámaras.
+3. TCPMSS / biblioteca `init: true` / empresas 1-2.
 
 ## No tocar
 
