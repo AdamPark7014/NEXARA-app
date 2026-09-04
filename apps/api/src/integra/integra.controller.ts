@@ -1349,6 +1349,162 @@ export class IntegraController {
     });
   }
 
+  // ── Horarios ACS (ISAPI UserRight* + UserInfo.Valid/RightPlan) ───
+  @Get('access-schedules')
+  @ApiOperation({
+    summary:
+      'Plantillas y horarios semanales en todos los ACS del sitio (modelo Hikvision verificado)',
+  })
+  accessSchedules(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.schedules.listSiteSchedules(
+      companyId,
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Post('access-schedules/ensure-preset')
+  @ApiOperation({
+    summary: 'Materializa oficina / after-hours / weekend en slots ≥2 (no pisa plantilla 1 24/7)',
+  })
+  ensureSchedulePreset(
+    @CurrentCompanyId() companyId: number | null,
+    @Body() dto: EnsureSchedulePresetDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para horarios ACS');
+    }
+    return this.schedules.ensurePresets(
+      companyId,
+      dto,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Get('access-schedules/devices/:ip/week-plans/:id')
+  getWeekPlan(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('ip') ip: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.schedules.getWeekPlanDetail(
+      companyId,
+      decodeURIComponent(ip),
+      id,
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Put('access-schedules/devices/:ip/week-plans/:id')
+  putWeekPlan(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('ip') ip: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: WeekPlanPutDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para horarios ACS');
+    }
+    return this.schedules.putWeekPlanDetail(
+      companyId,
+      decodeURIComponent(ip),
+      id,
+      dto as any,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Get('access-schedules/devices/:ip/templates/:id')
+  getPlanTemplate(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('ip') ip: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.schedules.getTemplateDetail(
+      companyId,
+      decodeURIComponent(ip),
+      id,
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Put('access-schedules/devices/:ip/templates/:id')
+  putPlanTemplate(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('ip') ip: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: PlanTemplatePutDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para horarios ACS');
+    }
+    return this.schedules.putTemplateDetail(
+      companyId,
+      decodeURIComponent(ip),
+      id,
+      {
+        enable: dto.enable !== false,
+        templateName: dto.templateName,
+        weekPlanNo: dto.weekPlanNo,
+        holidayGroupNo: dto.holidayGroupNo ?? '',
+      },
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Get('people/:id/access')
+  @ApiOperation({
+    summary: 'Vigencia Valid + RightPlan por puerta/terminal para una persona',
+  })
+  personAccess(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.schedules.getPersonAccess(
+      companyId,
+      id,
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Patch('people/:id/access')
+  @ApiOperation({
+    summary:
+      'Asigna Valid/RightPlan (presets always/never/office/visitor/contractor + por puerta). Push inmediato.',
+  })
+  patchPersonAccess(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() dto: PersonAccessPatchDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para horarios ACS');
+    }
+    return this.schedules.patchPersonAccess(
+      companyId,
+      id,
+      dto,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
   // ── Espacios / puertas (política de vigencia + uso) ───────────────
   @Get('spaces/templates')
   @ApiOperation({ summary: 'Catálogo de plantillas de vigencia por espacio' })
