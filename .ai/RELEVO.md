@@ -8,32 +8,43 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — playback NVR: XML + go2rtc query PUT
+## Este turno — Stock: historial hiper-detallado por producto
 
-Verificado en prod contra `.34`. El cableado JSON de ContentMgmt **no**
-funcionaba.
+Seguimiento auditado de movimientos: quién, cuándo, por qué, origen/destino,
+saldo antes/después, documento (OC/OP/AN/referencia) y notas.
 
-### Fixes
+### Qué cambió
 
-1. **ContentMgmt/search** en **XML** (JSON → 400 `badXmlFormat`).
-2. **go2rtc**: `PUT ?name=&src=` (aunque responda 400 YAML, **sí registra** en
-   memoria). El PUT JSON a `/api/streams` en 1.9.7 **no añade**.
-3. UI Video: 24h, Obtener, segmentos, Volver a vivo; playback **solo foco**.
-4. Docs + tests.
+1. **Schema** `StockMovement`: `fromQtyBefore/After`, `toQtyBefore/After`
+   + migración `20260904180000_stock_movement_qty_audit`.
+2. **API** `createStockMovement`: captura saldos en la misma tx; acepta
+   `productionOrderId` / `activityId`; create incluye docs ligados.
+3. **API** `listStockMovements`: incluye PO, OP, actividad, lot, createdBy;
+   tope 500.
+4. **Web** `stock-api`: tipos + helpers de documento/saldo.
+5. **UI warehouse**: tabla enriquecida; filtros producto/fecha/tipo/almacén;
+   export Excel; form con traspaso/ajuste/notas; drawer de historial por
+   producto (timeline + existencia por almacén).
 
-(UI ops chrome / PTZ / Personas del hermano siguen en la rama.)
+### Concurrente en la rama (siblings — no pisar)
 
-SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109`
+- Integra ops chrome / Personas / PTZ / playback NVR.
+- CRM PO PDFs · Integra asistencia.
 
-Verificar: Video → Support → Últimas 24h → Obtener → MSE en foco.
+SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
+`/var/www/nexara-app`
+
+Verificar: ERP → Almacén → Movimientos (filtros + Excel); click producto →
+drawer con saldo antes→después; entrada/salida/traspaso escriben auditoría.
 
 ## A medias
 
 1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
 2. Re-aplicar FieldDetection en equipos tras sync/push install.
-3. go2rtc.yaml en disco corruptible (400 al persistir) — streams viven en RAM.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales, Face ID óptico inventado.
+Puente NAS, Traefik, credenciales en repo, rutas ISAPI no verificadas.
+Face ID óptico inventado sobre AcuSense.
+CRM PO PDFs · Integra asistencia (siblings).
 No pelear pad PTZ ni reescribir Personas CRUD del sibling.
