@@ -1,5 +1,6 @@
 "use client";
 
+import type HlsType from "hls.js";
 import { useEffect, useRef, useState } from "react";
 import styles from "./integra.module.css";
 
@@ -47,12 +48,9 @@ export function IntegraHlsPlayer({
       return;
     }
 
-    let hls: {
-      destroy: () => void;
-      on?: (ev: string, cb: (...args: unknown[]) => void) => void;
-      startLoad?: () => void;
-      recoverMediaError?: () => void;
-    } | null = null;
+    // Tipo real del paquete. Antes era una forma estructural a mano porque
+    // `Hls` llegaba como global sin tipos desde el CDN.
+    let hls: HlsType | null = null;
     let usingHls = false;
     let cancelled = false;
     setPhase("loading");
@@ -104,31 +102,22 @@ export function IntegraHlsPlayer({
         return;
       }
 
-      await new Promise<void>((resolve, reject) => {
-        if ((window as any).Hls) {
-          resolve();
-          return;
-        }
-        const existing = document.querySelector<HTMLScriptElement>("script[data-hlsjs]");
-        if (existing) {
-          if ((window as any).Hls) {
-            resolve();
-            return;
-          }
-          existing.addEventListener("load", () => resolve(), { once: true });
-          existing.addEventListener("error", () => reject(new Error("HLS.js")), { once: true });
-          return;
-        }
-        const s = document.createElement("script");
-        s.src = "https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js";
-        s.dataset.hlsjs = "1";
-        s.onload = () => resolve();
-        s.onerror = () => reject(new Error("No se pudo cargar HLS.js"));
-        document.head.appendChild(s);
-      });
+      // hls.js va **empaquetado**, no desde un CDN.
+      //
+      // Antes se inyectaba un <script> a jsdelivr y en producción no cargaba
+      // nunca: la CSP del sitio permite scripts de Google Maps, Brevo y Stripe,
+      // pero no jsdelivr. El navegador lo bloqueaba en silencio, el player caía
+      // al modo nativo —que sólo Safari tiene— y Chrome mostraba «No se pudo
+      // reproducir el stream» aunque go2rtc estuviera sirviendo el HLS
+      // perfectamente.
+      //
+      // Importarlo también quita una dependencia de internet en una consola de
+      // seguridad: si el sitio del cliente no alcanza el CDN, el video seguía
+      // sin verse. El `import()` lo deja en su propio chunk, así que sólo lo
+      // descarga quien abre el video.
+      const Hls = (await import("hls.js")).default;
 
       if (cancelled) return;
-      const Hls = (window as any).Hls;
       if (!Hls?.isSupported()) {
         video.src = src;
         video.addEventListener("loadedmetadata", tryPlay, { once: true });
