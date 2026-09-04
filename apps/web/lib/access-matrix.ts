@@ -1013,6 +1013,7 @@ export const CLIENTE_INTEGRA_MODULE_IDS: ModuleId[] = [
   "integra-access",
   "integra-people",
   "integra-schedules",
+  "integra-espacios",
   "integra-events",
   "integra-alarms",
   "integra-visitors",

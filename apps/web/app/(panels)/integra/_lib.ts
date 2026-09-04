@@ -89,6 +89,7 @@ export const INTEGRA_MODULE_CARDS: IntegraModuleCard[] = [
   { href: "/integra/access", title: "Accesos", sub: "Abrir puertas · privilegios ACS", capability: "access" },
   { href: "/integra/people", title: "Personas", sub: "Alta · Face ID en terminales", capability: "people" },
   { href: "/integra/schedules", title: "Horarios", sub: "Vigencia · puertas · presets", capability: "access" },
+  { href: "/integra/espacios", title: "Espacios", sub: "Indefinido vs temporal · uso · vivo", capability: "access" },
   { href: "/integra/events", title: "Eventos ACS", sub: "Accesos · foto · KPIs hoy", capability: "events" },
   { href: "/integra/alarms", title: "Alarmas", sub: "Abiertas · histórico · tickets", capability: "alarms" },
   { href: "/integra/visitors", title: "Visitas", sub: "Citas · QR", capability: "visitors" },
