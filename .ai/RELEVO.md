@@ -8,50 +8,48 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — PTZ/NVR/ACS al límite ISAPI (vehicle + wire)
+## Este turno — Live detection hotpath + (sibling) PTZ/NVR wire
 
-Adam: placas/vehículos en PTZ + programar dentro de equipos.
+Adam: UX detección en vivo al límite bajo ráfagas (sibling reconfigura
+cámaras). Sin inventar Face ID óptico.
 
-### Verdad hardware (re-medida en prod)
+### Live detection hotpath (este agente)
 
-| Equipo | Smart vehicle/ANPR | Qué sí |
-|---|---|---|
-| PTZ `.179` DS-2DF8C442 | FieldDetection/Line/Traffic/ITC **403/404**; SmartCap FD=false | Video + PTZ + **motion** (200). httpHosts ya apuntaba a NEXARA. 0 push históricos. |
-| NVR `.34` ch **13** (PTZ) | FieldDetection **403** | — |
-| NVR ch **1/2/9/10** PoE | FieldDetection **200** con `human,vehicle` (ya enabled) | **httpHosts estaba vacío** → no empujaba vehicle |
-| AcuSense `.171-.178` | FD `human` / `human,vehicle` | Oficinas (no parking) |
-| ACS `.160-.163` | FaceDataRecord + FP doc; sin FaceContrast inventado | httpHosts + FDLib |
+1. **Bus SSE/poll**: fan-out coalescido 32 ms + dedupe por id; poll 1.2 s
+   con SSE sano / 280 ms degradado; reconnect 800 ms; lote por chunk.
+2. **Paint ~30 fps** (rAF + refs): merge sticky; edad placa 1 Hz — no se
+   frena el poll con FieldDetection a tope.
+3. **Multi-caja**: nombres distintos no se fusionan; tope 12; VMD 90 s.
+4. **Stream**: `preloadGo2rtcPlayer`; kicks densos; remount 2.6 s;
+   stagger muro 90 ms; fallback MSE 4.5 s.
+5. Índices `integra_push_events_*` (`20260904160000_*`);
+   `attachSnapshotLater` + JPEG enrolado al instante (face sibling).
+6. Placa óptica: «Humano · sin ID».
 
-### Código
+### PTZ/NVR wire (sibling — no pisar)
 
-1. `enableFieldDetection` / `enableMotionDetection` / `enableNvrParkingVehicleDetection` / `readHttpNotificationHosts` / `probeAcsIdentityCaps`.
-2. `wireDevices`: asegura cabecera NVR; skip `192.168.254.*`; PTZ→motion; NVR→vehicle FD; `rotateToken:false` reusa URL viva.
-3. `plate-events`: reconoce `human,vehicle`; lista `vehicleSources`; nota PTZ honesta.
-4. UI: chips Video/PTZ/Motion vs Vehicle/Placas; VehicleStrip en PTZ = **sitio entero** (no filtra `.179`).
-
-### Deploy / enable
-
-Tras deploy: script `tmp-enable-absolute.js` en contenedor (cablea NVR+ACS, motion PTZ, reafirma FD PoE).
+PTZ `.179` sin vehicle/ANPR (403/404); motion sí. NVR PoE ch 1/2/9/10 FD
+`human,vehicle` + httpHosts. VehicleStrip sitio entero. Ver commits
+`wireDevices` / `plate-events`.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` → `./deploy/update.sh`
+`/var/www/nexara-app` → `./deploy/update.sh --force-all --with-migrate`
 
-### Verificar
+### Verificar (hard refresh)
 
-1. Video → PTZ → HUD chips + banner límite; tira Vehículos sin «SIN ANPR» vacío confuso.
-2. NVR httpHosts con URL integra; eventos vehicle desde Entrance/Azotea/Escalera.
-3. ACS siguen empujando accesos (no romper face sibling).
+1. Video: cajas sticky multi-persona sin lag bajo ráfagas.
+2. Pase ACS: banner &lt;1 s; Eventos «En vivo · ACS» + cards.
+3. PTZ no eterno en «Conectando…»; chips motion vs vehicle honestos.
+4. Óptica: «Humano · sin ID» — no Face ID de oficina.
 
 ## A medias
 
 1. Portal empleado · ANPR ITC (hardware) · micros · TCPMSS.
-2. Si motion PTZ sigue sin push: linkage Event/triggers (500 en sonda).
-3. CaptureFaceData en sensor si firmware lo expone.
+2. Migración índices push en prod si no aplica sola.
+3. Motion PTZ push / Event triggers si sigue vacío.
 
 ## No tocar
 
 Puente NAS, Traefik, credenciales.
 Face ID óptico inventado sobre AcuSense.
-CRM/stock/asistencia siblings.
-
-Cerrado: cursor 2026-09-04 PTZ/NVR/ACS absolute limit.
+Personas enroll CRUD del face sibling.
