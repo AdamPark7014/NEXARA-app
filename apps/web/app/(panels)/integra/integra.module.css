@@ -622,6 +622,26 @@
   background: #020617;
 }
 
+/* go2rtc pone controls=true; el play azul nativo tapa el mosaico. */
+.playerVideo :global(video-stream),
+.playerVideo :global(video-stream video) {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+  background: #020617;
+}
+
+.playerVideo :global(video-stream video) {
+  pointer-events: none;
+}
+
+.playerVideo :global(video-stream .info),
+.playerVideo :global(video::-webkit-media-controls),
+.playerVideo :global(video::-webkit-media-controls-enclosure) {
+  display: none !important;
+  opacity: 0 !important;
+}
+
 .playerEmpty {
   position: absolute;
   inset: 0;

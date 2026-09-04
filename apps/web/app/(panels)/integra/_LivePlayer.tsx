@@ -24,9 +24,10 @@ type Props = {
 /**
  * Reproductor en vivo sobre **MSE por WebSocket**, no HLS.
  *
- * Se usa el componente `<video-stream>` del propio go2rtc: arranque,
- * reconexión y respaldo ya resueltos. Se sirve desde `/go2rtc/` (mismo
- * dominio → CSP `script-src 'self'`).
+ * go2rtc `<video-stream>` por defecto pide audio y deja `controls=true`.
+ * En un muro eso provoca el botón play grande: Chrome bloquea autoplay con
+ * audio y el decodificador se satura con 9 MSE a la vez. Aquí forzamos
+ * `media=video`, `muted` y sin controles, y reintentamos `play()`.
  */
 
 let loaderPromise: Promise<void> | null = null;
@@ -62,6 +63,45 @@ function parseHls(src: string): { base: string; name: string } | null {
   }
 }
 
+type VideoStreamEl = HTMLElement & {
+  mode?: string;
+  media?: string;
+  src?: URL | string;
+  background?: boolean;
+  visibilityThreshold?: number;
+  visibilityCheck?: boolean;
+  video?: HTMLVideoElement;
+  play?: () => void;
+};
+
+/** Silencia y quita controles del `<video>` interno (go2rtc los crea con controls). */
+function hardenVideo(node: VideoStreamEl) {
+  const v = node.video || node.querySelector("video");
+  if (!v) return null;
+  v.muted = true;
+  v.defaultMuted = true;
+  v.setAttribute("muted", "");
+  v.playsInline = true;
+  v.setAttribute("playsinline", "");
+  v.controls = false;
+  v.removeAttribute("controls");
+  v.autoplay = true;
+  return v;
+}
+
+function kickPlay(node: VideoStreamEl) {
+  const v = hardenVideo(node);
+  if (!v) return;
+  if (typeof node.play === "function") {
+    node.play();
+    return;
+  }
+  void v.play().catch(() => {
+    v.muted = true;
+    void v.play().catch(() => undefined);
+  });
+}
+
 export function IntegraLivePlayer({
   src,
   showLiveBadge = true,
@@ -83,9 +123,9 @@ export function IntegraLivePlayer({
     const io = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
-        setVisible(Boolean(entry?.isIntersecting && (entry.intersectionRatio ?? 0) > 0.02));
+        setVisible(Boolean(entry?.isIntersecting && (entry.intersectionRatio ?? 0) > 0.05));
       },
-      { threshold: [0, 0.02, 0.15] },
+      { threshold: [0, 0.05, 0.2] },
     );
     io.observe(el);
     return () => io.disconnect();
@@ -102,12 +142,7 @@ export function IntegraLivePlayer({
       host.innerHTML = "";
       return;
     }
-    if (!enabled) {
-      setState("queued");
-      host.innerHTML = "";
-      return;
-    }
-    if (!visible) {
+    if (!enabled || !visible) {
       setState("queued");
       host.innerHTML = "";
       return;
@@ -120,7 +155,9 @@ export function IntegraLivePlayer({
     }
 
     let cancelled = false;
-    let el: HTMLElement | null = null;
+    let el: VideoStreamEl | null = null;
+    let playWatch: number | null = null;
+    let kickTimers: number[] = [];
     setState("loading");
 
     const timer = window.setTimeout(() => {
@@ -128,20 +165,44 @@ export function IntegraLivePlayer({
       void loadVideoStream(parsed.base)
         .then(() => {
           if (cancelled || !hostRef.current) return;
-          const node = document.createElement("video-stream") as HTMLElement & {
-            mode?: string;
-            src?: URL | string;
-            background?: boolean;
-          };
+          const node = document.createElement("video-stream") as VideoStreamEl;
+          // Solo video: con audio Chrome bloquea autoplay y aparece el play azul.
           node.mode = "mse";
+          node.media = "video";
           node.background = false;
+          node.visibilityCheck = false;
           node.style.width = "100%";
           node.style.height = "100%";
           node.style.display = "block";
           node.src = `${parsed.base}/api/ws?src=${encodeURIComponent(parsed.name)}`;
           hostRef.current.appendChild(node);
           el = node;
-          setState("live");
+
+          const arm = () => {
+            if (cancelled) return;
+            hardenVideo(node);
+            kickPlay(node);
+          };
+
+          // connectedCallback crea el <video> de forma síncrona; reforzamos
+          // muted/controls en varios ticks porque MSE tarda en tener frames.
+          arm();
+          kickTimers = [50, 200, 600, 1500, 3000].map((ms) =>
+            window.setTimeout(arm, ms),
+          );
+
+          playWatch = window.setInterval(() => {
+            if (cancelled) return;
+            const v = hardenVideo(node);
+            if (!v) return;
+            if (v.paused || v.ended) {
+              kickPlay(node);
+              return;
+            }
+            if (v.readyState >= 2 && !v.paused) {
+              setState("live");
+            }
+          }, 1200);
         })
         .catch(() => {
           if (!cancelled) setState("error");
@@ -151,6 +212,8 @@ export function IntegraLivePlayer({
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
+      if (playWatch != null) window.clearInterval(playWatch);
+      for (const t of kickTimers) window.clearTimeout(t);
       el?.remove();
       if (host) host.innerHTML = "";
     };
