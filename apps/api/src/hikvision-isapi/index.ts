@@ -8,6 +8,7 @@ export {
 
 export {
   controlDoor,
+  setChannelAudio,
   describeDevice,
   discoverDevice,
   identifyDevice,

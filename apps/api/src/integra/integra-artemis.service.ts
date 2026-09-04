@@ -411,6 +411,25 @@ export class IntegraArtemisService {
     return this.media.liveStream(companyId, cameraIndexCode, siteId, opts);
   }
 
+  /** Enciende/apaga el micrófono en el equipo. Queda escrito allí: se audita. */
+  async setCameraAudio(
+    companyId: number | null,
+    cameraIndexCode: string,
+    enabled: boolean,
+    actor?: Actor,
+    siteId?: number | null,
+  ) {
+    const result = await this.media.setCameraAudio(companyId, cameraIndexCode, enabled, siteId);
+    if (result.changed) {
+      await this.auditMut('integra.camera.audio', actor, companyId, siteId ?? 0, {
+        cameraIndexCode,
+        enabled,
+        email: actor?.email,
+      });
+    }
+    return result;
+  }
+
   async playback(
     companyId: number | null,
     cameraIndexCode: string,

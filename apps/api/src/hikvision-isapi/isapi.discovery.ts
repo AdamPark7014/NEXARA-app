@@ -285,6 +285,39 @@ export async function controlDoor(
 }
 
 /**
+ * Enciende o apaga la pista de audio de un canal de streaming.
+ *
+ * El firmware rechaza un PUT parcial: hay que devolverle el `StreamingChannel`
+ * entero. Así que se lee el XML tal cual, se toca **solo** el `<enabled>` que
+ * está dentro de `<Audio>` —el de `<Video>` es otro y apagarlo dejaría el canal
+ * mudo y ciego— y se reenvía.
+ *
+ * Devuelve `false` si el canal no declara bloque de audio: ese equipo no tiene
+ * micrófono y no hay nada que encender.
+ */
+export async function setChannelAudio(
+  client: HikvisionIsapiClient,
+  channelId: string | number,
+  enabled: boolean,
+): Promise<boolean> {
+  const path = `/ISAPI/Streaming/channels/${channelId}`;
+  const { buffer } = await client.getBinary(path);
+  const xml = buffer.toString('utf8');
+
+  const audioBlock = /<Audio[^>]*>([\s\S]*?)<\/Audio>/.exec(xml);
+  if (!audioBlock) return false;
+
+  const patched = audioBlock[0].replace(
+    /<enabled>\s*(?:true|false)\s*<\/enabled>/,
+    `<enabled>${enabled ? 'true' : 'false'}</enabled>`,
+  );
+  if (patched === audioBlock[0]) return false;
+
+  await client.put(path, xml.replace(audioBlock[0], patched));
+  return true;
+}
+
+/**
  * Deriva el papel del equipo. Manda lo que el equipo **reporta**; el modelo
  * solo desempata (un NVR y una cámara fija responden lo mismo salvo el nº de
  * canales, y el firmware no siempre rellena `deviceType`).

@@ -86,10 +86,18 @@ se hace `git reset --hard` al commit nuevo, no ve cambios y **no construye
 nada** (pasa directo al prune y sale con 0). O se le deja hacer el pull a él,
 o se le pasa `--force-all`.
 
+## Micrófono de una cámara
+
+`POST integra/cameras/:id/audio` `{enabled}` lee el `StreamingChannel`
+entero, cambia **solo** el `<enabled>` de dentro de `<Audio>` y lo reenvía —
+el firmware rechaza un PUT parcial, y el `<enabled>` de `<Video>` es otro.
+Escribe en el equipo del cliente, así que va con el permiso de puertas y se
+audita (`integra.camera.audio`). Botón en Foco. No se ha encendido ninguno.
+
 ## A medias
 
 1. Correr sync para que aparezcan las 4 cámaras de puerta (13 → 17).
-2. Decidir si se encienden los micros de las cámaras.
+2. Decidir si se encienden los micros de las cámaras (el botón ya está).
 3. TCPMSS / biblioteca `init: true` / empresas 1-2.
 
 ## No tocar

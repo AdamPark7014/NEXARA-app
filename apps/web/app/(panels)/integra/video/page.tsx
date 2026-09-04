@@ -23,7 +23,12 @@ import {
   selectStyle,
   toDatetimeLocalValue,
 } from "../_lib";
-import { getCachedProvider, subscribeProvider } from "../_caps";
+import {
+  getCachedCapabilities,
+  getCachedProvider,
+  subscribeCapabilities,
+  subscribeProvider,
+} from "../_caps";
 import styles from "../integra.module.css";
 
 type Cam = {
@@ -102,7 +107,10 @@ export default function IntegraVideoPage() {
   const autoOpened = useRef(false);
   const isHct = provider === "HCT" || slots.some((s) => s.provider === "HCT");
 
+  const [caps, setCaps] = useState(() => getCachedCapabilities());
+
   useEffect(() => subscribeProvider(setProvider), []);
+  useEffect(() => subscribeCapabilities(setCaps), []);
 
   const load = useCallback(async () => {
     setError(null);
@@ -628,6 +636,35 @@ export default function IntegraVideoPage() {
                   </>
                 )}
                 <div className={styles.focusActions}>
+                  {focus && !focus.hasAudio && caps?.canControlDoors && (
+                    <IgBtn
+                      disabled={busy === "mic"}
+                      title="Enciende el micrófono de esta cámara en el propio equipo"
+                      onClick={async () => {
+                        const cam = items.find((c) => c.id === focus.id);
+                        if (!cam) return;
+                        setBusy("mic");
+                        try {
+                          const r = await integraApi<{ changed: boolean; note: string }>(
+                            `integra/cameras/${encodeURIComponent(focus.id)}/audio`,
+                            { method: "POST", body: JSON.stringify({ enabled: true }) },
+                          );
+                          setNote(r.note);
+                          setShowTech(true);
+                          if (r.changed) {
+                            const slot = await fetchStream(cam, true);
+                            setSlots((prev) => prev.map((x) => (x.id === slot.id ? slot : x)));
+                          }
+                        } catch (e) {
+                          setError(e instanceof Error ? e.message : "Error micrófono");
+                        } finally {
+                          setBusy(null);
+                        }
+                      }}
+                    >
+                      {busy === "mic" ? "…" : "Activar micrófono"}
+                    </IgBtn>
+                  )}
                   {focus?.hasAudio && (
                     <IgBtn
                       variant={focus.audio ? "primary" : undefined}

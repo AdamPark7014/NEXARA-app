@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { setChannelAudio } from '../hikvision-isapi';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { IntegraSiteService } from './integra-site.service';
@@ -179,6 +180,72 @@ export class IntegraMediaService {
       redacted: resolved.isapi.rtspUrlRedacted(sub),
       note: `RTSP vía grabador ${resolved.host}, canal ${channelId}`,
       hasAudio,
+    };
+  }
+
+  /**
+   * Enciende o apaga el micrófono de una cámara en el propio equipo.
+   *
+   * El parque salió de fábrica con `<Audio><enabled>false</enabled>`, así que
+   * sin esto no hay sonido que servir por mucho que el hardware lo tenga. Es
+   * una escritura en el equipo del cliente y se queda puesta: por eso vive tras
+   * el permiso de control y pasa por auditoría, no es un ajuste de la consola.
+   */
+  async setCameraAudio(
+    companyId: number | null,
+    cameraIndexCode: string,
+    enabled: boolean,
+    siteId?: number | null,
+  ): Promise<{ cameraIndexCode: string; enabled: boolean; changed: boolean; note: string }> {
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
+    if (resolved.provider !== 'ISAPI' || !resolved.siteId) {
+      throw new BadRequestException('El audio del equipo solo se ajusta en sitios ISAPI');
+    }
+
+    const camera = await this.prisma.integraCamera.findUnique({
+      where: { siteId_cameraIndexCode: { siteId: resolved.siteId, cameraIndexCode } },
+      select: { raw: true },
+    });
+    if (!camera) throw new NotFoundException(`Cámara ${cameraIndexCode} no está en el espejo`);
+
+    const raw = (camera.raw ?? {}) as {
+      channelId?: string;
+      streamId?: string;
+      source?: { ipAddress?: string | null; reachableDirectly?: boolean } | null;
+    };
+    if (!raw.channelId) throw new BadRequestException('La cámara no tiene canal conocido');
+
+    const directIp = raw.source?.reachableDirectly ? raw.source.ipAddress : null;
+    const client = directIp && resolved.isapiForHost ? resolved.isapiForHost(directIp) : resolved.isapi;
+    if (!client) throw new BadRequestException('Cliente ISAPI no disponible');
+
+    // El mismo canal que se sirve: encender el audio del principal no se oye.
+    const channel = directIp
+      ? (raw.streamId ?? String(SUB_STREAM_ID))
+      : subStreamOf(raw.channelId);
+
+    const changed = await setChannelAudio(client, channel, enabled);
+    if (!changed) {
+      return {
+        cameraIndexCode,
+        enabled: false,
+        changed: false,
+        note: 'El canal no declara audio: ese equipo no tiene micrófono.',
+      };
+    }
+
+    await this.prisma.integraCamera.update({
+      where: { siteId_cameraIndexCode: { siteId: resolved.siteId, cameraIndexCode } },
+      data: { raw: { ...(camera.raw as object), hasAudio: enabled } as never },
+    });
+
+    return {
+      cameraIndexCode,
+      enabled,
+      changed: true,
+      note: enabled
+        ? 'Micrófono encendido en el equipo. Abre el stream con audio para oírlo.'
+        : 'Micrófono apagado en el equipo.',
     };
   }
 
