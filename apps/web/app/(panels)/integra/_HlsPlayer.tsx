@@ -53,22 +53,50 @@ export function IntegraHlsPlayer({
     let hls: HlsType | null = null;
     let usingHls = false;
     let cancelled = false;
+    let playTimer: ReturnType<typeof setTimeout> | null = null;
     setPhase("loading");
     setErrMsg(null);
+
+    /**
+     * Arranca el video, reintentando si el navegador dice que no.
+     *
+     * En un muro de 9 cámaras, Chrome rechaza parte de los `play()` cuando
+     * todos arrancan en el mismo instante: no es la política de autoplay —el
+     * video va muteado, que ella sí permite— sino que el navegador no da abasto
+     * montando nueve decodificadores a la vez. Rendirse al primer intento
+     * dejaba media rejilla con el botón de play puesto, y el usuario tenía que
+     * ir clic por clic.
+     *
+     * Los reintentos van escalonados, así que cada mosaico entra cuando hay
+     * hueco en vez de pelearse con los demás. Sólo tras agotarlos se muestra el
+     * play manual, que es la salida honesta si el navegador de verdad no puede.
+     */
+    let playAttempt = 0;
+    const PLAY_RETRY_MS = [250, 750, 1500, 3000];
 
     const tryPlay = () => {
       if (cancelled || !autoPlay) return;
       video.muted = true;
       const p = video.play();
-      if (p && typeof p.then === "function") {
-        void p
-          .then(() => {
-            if (!cancelled) setPhase("playing");
-          })
-          .catch(() => {
-            if (!cancelled) setPhase("paused");
-          });
-      }
+      if (!p || typeof p.then !== "function") return;
+      void p
+        .then(() => {
+          if (!cancelled) {
+            playAttempt = 0;
+            setPhase("playing");
+          }
+        })
+        .catch(() => {
+          if (cancelled) return;
+          const wait = PLAY_RETRY_MS[playAttempt];
+          if (wait == null) {
+            setPhase("paused");
+            return;
+          }
+          playAttempt += 1;
+          setPhase("loading");
+          playTimer = setTimeout(tryPlay, wait);
+        });
     };
 
     const onPlaying = () => {
@@ -166,6 +194,7 @@ export function IntegraHlsPlayer({
 
     return () => {
       cancelled = true;
+      if (playTimer) clearTimeout(playTimer);
       video.removeEventListener("playing", onPlaying);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("waiting", onWaiting);
