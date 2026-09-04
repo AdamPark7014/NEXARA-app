@@ -16,6 +16,7 @@ import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import Modal from "@/components/ui/Modal";
+import FinanceModuleRail from "@/components/erp/FinanceModuleRail";
 
 interface BankAccount {
   id: number;
@@ -236,6 +237,7 @@ export default function BankingPage() {
         eyebrow="ERP · Finanzas"
         title={cfg.title}
         subtitle={cfg.subtitle}
+        density="ops"
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
@@ -243,6 +245,7 @@ export default function BankingPage() {
           </>
         }
       />
+      <FinanceModuleRail />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
         <KpiCard label="Saldo total" value={<Money value={totalBalance} compact />} icon="🏦" variant={totalBalance > 0 ? "positive" : "danger"} hint={`${accounts.length} cuentas registradas`} />
