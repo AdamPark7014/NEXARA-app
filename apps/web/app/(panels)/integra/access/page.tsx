@@ -208,6 +208,7 @@ export default function IntegraAccessPage() {
         actions={
           <>
             <IgBtn onClick={() => router.push("/integra/people")}>Alta persona</IgBtn>
+            <IgBtn onClick={() => router.push("/integra/schedules")}>Horarios</IgBtn>
             <IgBtn onClick={() => router.push("/integra/events")}>Eventos Face</IgBtn>
             <IgBtn
               onClick={() => setLiveDoors((v) => !v)}

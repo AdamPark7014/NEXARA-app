@@ -8,47 +8,44 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — ACS fan-out en vivo (sin Sync obligatorio)
+## Este turno — ERP shell UX (amigable / denso)
 
-Adam: cada cambio debe empujar ISAPI en tiempo real a todos los ACS.
-Sync queda como reconciliación / recuperación.
+Ownership: AppShell + chrome de páginas ERP (no motores PDF/hybrid).
 
-### Qué dispara el push en vivo
+### Entregado
 
-1. **Integra Personas** — alta / editar ficha / Face upload-delete / baja →
-   `UserInfo` + `FaceDataRecord` a todos los ACS del sitio (await DeleteProcess).
-2. **ERP Usuarios** — create / update nombre·employeeNumber / HR isActive /
-   bulk deactivate → si hay sitio ISAPI, `employeeNumber` = `employeeNo` ACS.
-3. **RightPlan / doorRight** — van en UserInfo/Modify cuando llegan en el PATCH.
-4. **Push ACS** — evento con personId+personName actualiza espejo sin sync full.
+1. **PageChrome** + `PageHeader density="ops"`: título denso, primaria,
+   secundarias, filtros. FilterToolbar / EmptyState más ops.
+2. **Rails**: `SettingsModuleRail`, `FinanceModuleRail`, `ErpModuleCards`
+   + `erp-chrome.module.css`.
+3. **Labels ES** en access-matrix (Analítica, Base de conocimiento,
+   Registro de auditoría, Bancos, Documentos en Gobierno, etc.) y
+   breadcrumbs AppShell.
+4. **AppShell denso** ERP/OPS (sidebar 248px, menos glow, padding tight).
+5. **Callejones**: approvals → mapa (fuera “Definir flujos” toast);
+   settings EN→ES + rail; facilities → enlace Integra + estados ES;
+   documentos eyebrow Gobierno; facturación/bancos/contabilidad con rail.
 
-### Código
+No toqué: hybrid asistencia, PDF OC/cotización, Integra siblings,
+stock kardex (turno hermano).
 
-- `IntegraAcsFanoutService`: fan-out + reintento en línea + cola
-  `integra.acs.fanout.retry` + `GET integra/acs-fanout/status`.
-- Espejo upsert inmediato (no esperar sync completo).
-- UI: «Reconciliar» + copy «Cambios en vivo a terminales».
+SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
+`/var/www/nexara-app` → `./deploy/update.sh`
 
-Clave identidad (sibling): `employeeNumber` ↔ `personId`/`employeeNo`.
+### Verificar (hard refresh)
 
-SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109`
-→ `/var/www/nexara-app` → `./deploy/update.sh`
-
-### Verificar
-
-1. Personas: alta/editar/foto → detalle por IP OK sin pulsar Reconciliar.
-2. ERP: crear usuario con employeeNumber → aparece en ACS (o status por IP).
-3. Desactivar en HR → Valid.enable=false en terminales.
-4. Fallo de un IP → no success total; reintento en cola / status.
+1. ERP sidebar: labels en español claros; densidad.
+2. Configuración / Facturación CFDI / Bancos: rails de contexto.
+3. Aprobaciones: sin botón muerto; Excel en filtros.
+4. Accesos oficinas: banner hacia Integra.
 
 ## A medias
 
-1. Portal empleado · ANPR ITC · micros · TCPMSS.
-2. CaptureFaceData en sensor si firmware lo expone.
-3. Re-wire httpHosts tras cambios de PUBLIC_API_URL.
-4. Sibling dejó `_lib.ts` sin commitear — no tocar salvo su turno.
+1. Portal empleado · NVR httpHost · ANPR · micros · TCPMSS.
+2. FieldDetection; employeeNumber↔personId.
+3. Más páginas ERP aún con PageHeader “default” (migración gradual).
 
 ## No tocar
 
 Puente NAS, Traefik, credenciales.
-No Face ID óptico inventado. No pisar stock/CRM/PTZ siblings.
+No pelear siblings PTZ/Personas/Eventos/asistencia/OC PDF/ACS/stock kardex.
