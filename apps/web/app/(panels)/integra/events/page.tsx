@@ -65,6 +65,7 @@ function relAge(at: number): string {
 }
 
 export default function IntegraEventsPage() {
+  const router = useRouter();
   const range0 = useMemo(() => defaultRangeHours(24), []);
   const [items, setItems] = useState<Ev[]>([]);
   const [doors, setDoors] = useState<Door[]>([]);
@@ -81,6 +82,7 @@ export default function IntegraEventsPage() {
   const [picByUri, setPicByUri] = useState<Record<string, string>>({});
   const [liveHits, setLiveHits] = useState<LiveHit[]>([]);
   const [auto, setAuto] = useState(true);
+  const [faceOnly, setFaceOnly] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [, setTick] = useState(0);
