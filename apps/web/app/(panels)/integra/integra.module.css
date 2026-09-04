@@ -544,6 +544,8 @@
   border: 1px solid color-mix(in srgb, var(--ig-danger) 22%, transparent);
   border-radius: var(--ig-radius);
   border-left: 3px solid var(--ig-danger);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .igNotice {
@@ -3519,6 +3521,56 @@ select.igControl {
 .personDangerZone .personSectionHead strong {
   color: var(--ig-danger);
   font-size: 14px;
+}
+
+.personForceBox {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--ig-danger) 35%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-danger) 6%, var(--ig-panel));
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ig-ink);
+  cursor: pointer;
+}
+
+.personForceBox input {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  accent-color: var(--ig-danger);
+}
+
+.personForceBox[data-on="1"] {
+  border-color: color-mix(in srgb, var(--ig-danger) 65%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-danger) 14%, var(--ig-panel));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ig-danger) 25%, transparent);
+}
+
+.personForceBox strong {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ig-danger);
+  margin-bottom: 2px;
+}
+
+.personDangerError {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ig-danger);
+  background: color-mix(in srgb, var(--ig-danger) 10%, var(--ig-panel));
+  border: 1px solid color-mix(in srgb, var(--ig-danger) 28%, transparent);
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* Eventos: cards con cara */
