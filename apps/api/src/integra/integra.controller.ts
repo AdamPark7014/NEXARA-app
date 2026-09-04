@@ -1281,6 +1281,111 @@ export class IntegraController {
     });
   }
 
+  // ── Espacios / puertas (política de vigencia + uso) ───────────────
+  @Get('spaces/templates')
+  @ApiOperation({ summary: 'Catálogo de plantillas de vigencia por espacio' })
+  spaceTemplates() {
+    return this.spaces.templates();
+  }
+
+  @Get('spaces')
+  @ApiOperation({
+    summary: 'Todas las puertas/zonas: plantilla, indefinido vs temporal, última entrada',
+  })
+  async spacesOverview(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    return this.spaces.overview(companyId, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  @Get('spaces/:doorId')
+  @ApiOperation({ summary: 'Detalle de un espacio: personas, ventanas de uso, accesos vivos' })
+  async spaceDetail(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('doorId') doorId: string,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    return this.spaces.detail(
+      companyId,
+      decodeURIComponent(doorId),
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Put('spaces/:doorId/policy')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Plantilla de vigencia por defecto del espacio' })
+  async spacePolicy(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('doorId') doorId: string,
+    @Body() dto: SpacePolicyDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    if (!integraCanControlDoors(user)) {
+      throw new BadRequestException('Sin permiso para cambiar política de espacios');
+    }
+    return this.spaces.upsertPolicy(companyId, decodeURIComponent(doorId), {
+      templateKey: dto.templateKey,
+      label: dto.label,
+      config: dto.config,
+      siteId: siteId ? parseInt(siteId, 10) : null,
+    });
+  }
+
+  @Get('spaces-bookings')
+  @ApiOperation({ summary: 'Ventanas de uso planificadas (todas las puertas)' })
+  async spaceBookings(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+    @Query('doorId') doorId?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    return this.spaces.listBookings(companyId, {
+      siteId: siteId ? parseInt(siteId, 10) : null,
+      doorIndexCode: doorId ? decodeURIComponent(doorId) : null,
+    });
+  }
+
+  @Post('spaces-bookings')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Crear ventana de uso de un espacio' })
+  async createSpaceBooking(
+    @CurrentCompanyId() companyId: number | null,
+    @Body() dto: SpaceBookingDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    if (!integraCanControlDoors(user)) {
+      throw new BadRequestException('Sin permiso para planificar uso de espacios');
+    }
+    return this.spaces.createBooking(companyId, {
+      ...dto,
+      siteId: siteId ? parseInt(siteId, 10) : null,
+      createdById: user?.id ?? null,
+    });
+  }
+
+  @Delete('spaces-bookings/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cancelar ventana de uso' })
+  async cancelSpaceBooking(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    if (!integraCanControlDoors(user)) {
+      throw new BadRequestException('Sin permiso para cancelar uso de espacios');
+    }
+    return this.spaces.cancelBooking(companyId, id);
+  }
+
   @Get('floorplans')
   floorplans(
     @CurrentCompanyId() companyId: number | null,

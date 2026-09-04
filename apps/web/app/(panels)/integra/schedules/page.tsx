@@ -19,6 +19,7 @@ import { toast } from "@/components/Toast";
 import styles from "../integra.module.css";
 import {
   ACCESS_PRESETS,
+  ISAPI_INDEFINITE_END,
   applyPreset,
   fetchDoorAccess,
   fetchPersonSchedule,
@@ -123,11 +124,7 @@ function WeekGridPreview({
 export default function IntegraSchedulesPage() {
   const router = useRouter();
   const search = useSearchParams();
-  const [provider, setProvider] = useState<string | null>(() =>
-    typeof window !== "undefined"
-      ? sessionStorage.getItem("nexara_integra_provider")
-      : null,
-  );
+  const [provider, setProvider] = useState<string | null>(() => getCachedProvider());
   const [view, setView] = useState<ViewMode>(
     () => (search.get("view") as ViewMode) || "person",
   );
