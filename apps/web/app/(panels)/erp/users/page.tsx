@@ -286,6 +286,22 @@ export default function UsersPage() {
   const [sessions, setSessions] = useState<UserSessionRow[]>([]);
   const [activity, setActivity] = useState<AuthActivityRow[]>([]);
   const [drawerLoading, setDrawerLoading] = useState(false);
+  const [integraSchedule, setIntegraSchedule] = useState<{
+    employeeNumber?: string | null;
+    schedule?: {
+      key: string;
+      label: string;
+      description: string;
+      hint: string;
+      beginTime: string;
+      endTime: string;
+      doorScope: string;
+      planTemplateNo: string;
+      integraEditorPath: string;
+    };
+    targetIps?: string[];
+    note?: string;
+  } | null>(null);
 
   const [myMfa, setMyMfa] = useState<{ mfaEnabled: boolean; mfaEnabledAt?: string | null } | null>(null);
   const [mfaSetup, setMfaSetup] = useState<{ secret: string; otpauthUrl: string } | null>(null);

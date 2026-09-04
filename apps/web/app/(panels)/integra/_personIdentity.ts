@@ -1,6 +1,7 @@
 /**
  * Enlace canónico ERP ↔ ACS: User.employeeNumber ↔ personId / personCode.
- * La UI une en cliente; el sibling de identidad endurece APIs de link/unlink.
+ * API: POST/DELETE integra/people/:id/link + listPeople.erpUser.
+ * Helpers de UI para emparejar en cliente mientras llega el payload.
  */
 import type { ApiUserRow } from "@/lib/users-api";
 

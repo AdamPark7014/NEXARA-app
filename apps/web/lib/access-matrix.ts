@@ -236,6 +236,7 @@ export type ModuleId =
   | "integra-video"
   | "integra-access"
   | "integra-people"
+  | "integra-schedules"
   | "integra-events"
   | "integra-vehicles"
   | "integra-alarms"
@@ -919,6 +920,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     icon: "👤", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD],
     group: "Acceso", visible: true,
   },
+  "integra-schedules": {
+    id: "integra-schedules", panel: PANELS.INTEGRA, path: "/schedules",
+    label: "Horarios", description: "Cuándo y por qué puertas puede entrar cada persona",
+    icon: "🗓️", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD, R.NOC_OPERATOR],
+    group: "Acceso", visible: true,
+  },
   "integra-attendance": {
     id: "integra-attendance", panel: PANELS.INTEGRA, path: "/attendance",
     label: "Asistencia", description: "Puertas ACS; contraste ERP en /hr/attendance",
@@ -998,6 +1005,7 @@ export const CLIENTE_INTEGRA_MODULE_IDS: ModuleId[] = [
   "integra-video",
   "integra-access",
   "integra-people",
+  "integra-schedules",
   "integra-events",
   "integra-alarms",
   "integra-visitors",
