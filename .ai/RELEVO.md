@@ -183,14 +183,42 @@ sin `RegionCoordinatesList`, hay que darle el polígono (cuadro entero sobre la
 rejilla 1000×1000 que declara el equipo). `detectionTarget` se fuerza a
 `human`: con `vehicle` una oficina dispara con cualquier cosa.
 
+## Estado real tras cablear (2026-09-04 15:25)
+
+Empujando a NEXARA: **4 terminales + 9 cámaras**. Detección de personas
+encendida en **8 cámaras** (la PTZ `.179` no tiene `FieldDetection`, usa otro
+esquema). Llegan `AccessControllerEvent`, `VMD`, `fielddetection`, `heartBeat`
+y `duration` con 0-4 s de retraso.
+
+**El grabador `.34` no acepta el `httpHost`.** `httpHosts/capabilities` →
+`Device Busy`; el PUT devuelve `Invalid XML Content` en todas las variantes
+probadas (por id, lista completa, su propio documento devuelto tal cual, con y
+sin `Extensions`, XML y JSON). Consecuencia: los 4 canales plug & play
+(`192.168.254.x` — Escalera 01, Escaleras 02, Azotea, Office Entrance) **no
+empujan eventos**. Su video va bien. Pendiente.
+
+### Los relojes estaban mal — corregido
+
+Las 9 cámaras venían en **zona horaria de China** (`CST-8:00`, 14 h de
+desfase) y el grabador 14 min atrasado; los terminales estaban bien. Con eso
+los eventos de cámara aterrizaban con hora falsa. Se pusieron los 10 en
+`manual` + `CST+6:00:00`, **igual que los terminales**, en vez de meter NTP.
+
+### Las dos cajas del aviso de detección
+
+`TargetRect` es **la persona** (ya en 0..1). `RegionCoordinatesList` es **la
+zona vigilada**, en la rejilla del equipo. Se leía la segunda y, como la zona
+es el encuadre entero, todos los recuadros salían `0,0,1,1`. Se usa
+`TargetRect`; la zona queda de recurso, descartando la caja que ocupa todo.
+
 ## A medias
 
-1. Comprobar que los equipos alcanzan `integra.nexara.com.mx` (DNS + salida a
-   internet desde la LAN de la oficina). Es lo único que puede tumbar todo esto.
-2. Asistencia y portal del empleado (Adam: asistencia + credencial).
-3. Dibujar los recuadros sobre el video en el muro con `targets`.
-4. Decidir si se encienden los micros de las cámaras (el botón ya está).
-5. TCPMSS / biblioteca `init: true` / empresas 1-2.
+1. Asistencia y portal del empleado (Adam: asistencia + credencial).
+2. Dibujar los recuadros sobre el video en el muro con `targets`.
+3. El `httpHost` del grabador (ver arriba).
+4. Purgar eventos viejos: la tabla crece rápido con VMD y heartBeat.
+5. Decidir si se encienden los micros de las cámaras (el botón ya está).
+6. TCPMSS / biblioteca `init: true` / empresas 1-2.
 
 ## No tocar
 
