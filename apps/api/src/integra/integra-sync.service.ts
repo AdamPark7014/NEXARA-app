@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { HikConnectTeamsClient } from '../hikvision-hct/index';
-import { describeDevice, listAllUserInfo } from '../hikvision-isapi/index';
+import { describeDevice, listAllUserInfo, supportsAnpr, supportsPtz } from '../hikvision-isapi/index';
 import { IntegraSiteService, type ResolvedIntegraClient } from './integra-site.service';
 
 /** `http://192.168.9.34` → `192.168.9.34`. */
@@ -476,6 +476,37 @@ export class IntegraSyncService {
       // En un grabador, un canal sin cámara enrolada es una ranura vacía.
       if (headInfo.role === 'NVR' && (!proxy || !proxy.online)) continue;
 
+      // En el NVR, `PTZCtrl` responde 200 en todos los canales (engaña). La
+      // verdad está en la cámara directa: se sondea su IP si está en la LAN.
+      const sourceIp = proxy?.ipAddress || null;
+      const reachableDirectly = Boolean(
+        sourceIp && (proxy?.connMode === 'manual' || !sourceIp.startsWith('192.168.254.')),
+      );
+      let isPtz = ch.ptz === true;
+      let anprCapable = ch.anprCapable === true;
+      if (reachableDirectly && sourceIp && resolved.isapiForHost) {
+        const camClient = resolved.isapiForHost(sourceIp);
+        if (camClient) {
+          try {
+            isPtz = await supportsPtz(camClient, 1);
+          } catch (e) {
+            this.logger.warn(`PTZ probe ${sourceIp}: ${String(e)}`);
+          }
+          try {
+            anprCapable = await supportsAnpr(camClient, 1);
+          } catch {
+            anprCapable = false;
+          }
+        }
+      }
+      // Por si el sondeo falla: modelo/nombre de domo conocidos.
+      if (
+        !isPtz &&
+        /ptz|df8|dome|darkfighter/i.test(`${proxy?.name || ch.name || ''} ${proxy?.model || ''}`)
+      ) {
+        isPtz = true;
+      }
+
       await upsertCamera(
         `${headIp}|${ch.id}`,
         proxy?.name || ch.name || `${headIp} ch${ch.id}`,
@@ -487,22 +518,17 @@ export class IntegraSyncService {
           width: ch.width,
           height: ch.height,
           rtsp: ch.rtspRedacted,
-          // El parque sale de fábrica con el audio apagado en el canal. Se
-          // guarda lo que el equipo reporta para no prometer sonido que no hay.
           hasAudio: ch.audio === true,
           audioCodec: ch.audioCodec,
-          // La domo se sondea en el descubrimiento; guardarlo evita volver a
-          // preguntárselo al equipo cada vez que alguien abre el foco.
-          ptz: ch.ptz === true,
-          anprCapable: ch.anprCapable === true,
+          ptz: isPtz,
+          anprCapable,
           source: proxy
             ? {
                 ipAddress: proxy.ipAddress,
                 model: proxy.model,
                 serialNumber: proxy.serialNumber,
                 connMode: proxy.connMode,
-                // `plugplay` = detrás del PoE del NVR: nunca alcanzable directo.
-                reachableDirectly: proxy.connMode === 'manual',
+                reachableDirectly,
               }
             : null,
         },

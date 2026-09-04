@@ -365,6 +365,8 @@ export default function IntegraVideoPage() {
   const liveCount = liveWallIds.size;
   const activeDetCount = Object.keys(detByIp).length;
   const focusCam = focus ? items.find((c) => c.id === focus.id) : undefined;
+  const showPtz =
+    Boolean(focusCam?.isPtz) || /ptz|df8|dome/i.test(`${focusCam?.name || focus?.name || ""}`);
   const detMeta =
     activeDetCount || namedDetCount || opticalDetCount
       ? ` · ${activeDetCount} det.${namedDetCount ? ` · ${namedDetCount} con nombre` : ""}${
@@ -722,15 +724,15 @@ export default function IntegraVideoPage() {
                           enabled={mode === "focus"}
                         />
                       )}
-                      {(focusCam?.isPtz || focusCam?.anprCapable === false) && (
+                      {(showPtz || focusCam?.anprCapable === false) && (
                         <IntegraVehicleStrip
                           deviceIp={focusCam?.sourceIp ?? null}
                           enabled={mode === "focus"}
                         />
                       )}
-                      {focusCam?.isPtz && (
+                      {showPtz && (
                         <>
-                          {focusCam.anprCapable === false && (
+                          {focusCam?.anprCapable !== true && (
                             <p className={styles.ptzHint}>
                               Esta PTZ no tiene ANPR: se mueve y hace zoom, pero no lee
                               matrículas. Hace falta cámara serie ITC.

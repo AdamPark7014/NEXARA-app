@@ -378,7 +378,9 @@ export class IntegraArtemisService {
               sourceIp: raw.source?.ipAddress ?? null,
               model: raw.source?.model ?? null,
               channelNumber: raw.channelNumber ?? null,
-              isPtz: raw.ptz === true,
+              isPtz:
+                raw.ptz === true ||
+                /ptz|df8|dome|darkfighter/i.test(`${c.name} ${raw.source?.model || ''}`),
               anprCapable: raw.anprCapable === true,
             };
           }),

@@ -8,52 +8,37 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno (cursor) — Personas + placas SOC (sin magia)
+## Este turno — fix PTZ + detecciones
 
-### Identidad vs detección óptica
+**Bug PTZ:** en sync del NVR se anulaba `ptz` en todos los canales
+(`c.ptz = null` porque PTZCtrl del grabador miente). La cámara «PTZ»
+(`.179`) quedaba `ptz:false` → **no salía el mando** en Foco.
 
-En cámaras de **oficina** (AcuSense) el overlay dice **«Humano · sin ID»**:
-FieldDetection trae caja sin `name`/`employeeNo`. Face ID del directorio **no**
-se proyecta sobre Support/Meeting: solo identifica en **puertas** (ACS event).
-Con 4 personas sentadas es normal ver 0–2 cajas (aviso puntual, no tracking).
+**Arreglo:** sondear PTZ/ANPR en la IP directa de cada cámara LAN; heurística
+por nombre/modelo; listCameras y UI también reconocen «PTZ»/DF8. `ptzTarget`
+habla a `.179` canal 1 aunque `reachableDirectly` viniera mal.
 
-Panel **En sitio ahora** (`GET integra/occupancy`) = ocupación por accesos
-concedidos hoy, no PeopleCounting VCA (`isSupportPeopleDetection=false`).
-
-### Personas ISAPI
-
-- CRUD: `UserInfo/Record|Modify|Delete` fan-out a todos los ACS del sitio
-- Foto: `FDLib/FaceDataRecord` multipart + `FDSearch/Delete`
-- UI `/integra/people`: editar, alta, subir/quitar foto, resultados por IP
-
-### Vehículos / placas
-
-- Lista NEXARA (`integra/vehicles`) en ISAPI; **no** se empuja al NVR (403)
-- `anprCapable` en `raw` de cámara (sonda Traffic/Smart); PTZ marca sin ANPR
-- `GET integra/plate-events` — vehículos detectados; `plate` solo si el evento
-  trae OCR (ITC futuro)
-- PTZ hold-to-move intacto
+**Detecciones:** eventos `fielddetection` sí llegan (p.ej. `.173`). Overlay
+ahora **siembra** los últimos ~6 s al abrir la cámara (antes solo veía lo
+nuevo tras montar). TTL 6 s, poll 1.5 s. Etiqueta `Humano · sin ID` (no Face ID).
 
 SSH: `-p 2222 root@5.78.215.109` → `/var/www/nexara-app`
 
-## Muro / audio / push / TargetRect / PTZ / asistencia
+Tras deploy: hard-refresh Video → Foco «PTZ» (debe verse el pad) → mover;
+Foco Support (cajas al haber movimiento).
 
-Ver historial en commits previos (`2d9e868`…`6fdd7ac`). Resumen operativo:
+## Personas / placas / ocupación
 
-- Muro `mode=auto` (MSE → snapshot); Foco MSE
-- Push inbox `/api/integra/hik/:siteId/:token`; TargetRect = persona
-- PTZ momentary + stop al soltar
-- Asistencia `/integra/attendance`; fotos en `/uploads/integra/...` con sesión
-- NVR `.34` no acepta httpHost; PTZ sin FieldDetection; faceURL 404 en DS-K1T
+Ver commit `9308b92`. CRUD ISAPI + foto FaceDataRecord; occupancy; vehicles
+sin OCR falso.
 
 ## A medias
 
-1. Portal del empleado (User↔`employeeNo`).
-2. httpHost del grabador (Escalera/Azotea/Office Entrance sin push).
-3. Comprar cámara ANPR (ITC) si se quieren matrículas reales.
-4. Encender micros / Hik-Connect alarms — decisión Adam.
-5. Desplegar este turno (api+web) y hard-refresh Personas/Video/Vehículos.
-6. TCPMSS / biblioteca init / empresas 1-2.
+1. Portal empleado (User↔employeeNo).
+2. httpHost NVR `.34`.
+3. Cámara ANPR ITC si se quieren placas.
+4. Micros / Hik-Connect — decisión Adam.
+5. TCPMSS / biblioteca init / empresas 1-2.
 
 ## No tocar
 
