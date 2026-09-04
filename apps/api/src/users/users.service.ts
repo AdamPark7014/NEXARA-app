@@ -1575,6 +1575,7 @@ export class UsersService {
       const emp = this.withEmployeeNumber(u).employeeNumber;
       void this.pushAcsFromErp({
         companyId: tenantId,
+        userId: u.id,
         employeeNumber: emp,
         name: u.nombre,
         enable: isActive,

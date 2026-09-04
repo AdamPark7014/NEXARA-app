@@ -605,6 +605,7 @@ export default function IntegraPeoplePage() {
       let employeeNo: string | null = autoCode ? null : code.trim();
       let useAuto = autoCode;
       let notePrefix = "";
+      let erpUserIdToLink: number | null = null;
 
       if (altaMode === "unified") {
         const password = tempPassword || generateTempPassword();
@@ -621,6 +622,7 @@ export default function IntegraPeoplePage() {
         });
         employeeNo = created.employeeNumber || code.trim() || null;
         useAuto = !employeeNo;
+        erpUserIdToLink = created.id;
         notePrefix = `ERP OK (${created.email}${created.employeeNumber ? ` · ${created.employeeNumber}` : ""}). Contraseña temporal: ${password}. `;
         setTempPassword(password);
         toast.success(`Usuario ERP creado · ${created.employeeNumber || created.email}`);
@@ -629,6 +631,7 @@ export default function IntegraPeoplePage() {
         const linked = erpUsers.find((u) => String(u.id) === linkUserId);
         if (!linked) throw new Error("Usuario ERP no encontrado");
         employeeNo = linked.employeeNumber || code.trim() || null;
+        erpUserIdToLink = linked.id;
         if (!employeeNo) {
           if (!token) throw new Error("Sesión requerida para asignar nº de empleado");
           const patched = await erpApiFetch<ApiUserRow>(`users/${linked.id}`, token, {
@@ -655,6 +658,18 @@ export default function IntegraPeoplePage() {
         useAuto,
       );
       if (!createdId) return;
+
+      // Garantiza clave canónica: User.employeeNumber = ACS personId.
+      if (erpUserIdToLink) {
+        try {
+          await integraApi(`integra/people/${encodeURIComponent(createdId)}/link`, {
+            method: "POST",
+            body: JSON.stringify({ userId: erpUserIdToLink }),
+          });
+        } catch {
+          // Si ya coincidían los códigos, el link puede ser no-op / conflicto benigno.
+        }
+      }
 
       if (notePrefix) {
         setOpNote((prev) => `${notePrefix}${prev || ""}`);
