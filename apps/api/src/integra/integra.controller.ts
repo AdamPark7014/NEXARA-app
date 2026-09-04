@@ -830,6 +830,30 @@ export class IntegraController {
     return { items, total: items.length };
   }
 
+  @Get('attendance')
+  @ApiOperation({ summary: 'Asistencia deducida de los accesos concedidos' })
+  async attendance(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('personId') personId?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    // Por defecto, la semana en curso: es la ventana con la que se mira esto.
+    const end = to ? new Date(to) : new Date();
+    const start = from ? new Date(from) : new Date(end.getTime() - 7 * 86_400_000);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      throw new BadRequestException('Rango de fechas no válido');
+    }
+    return this.push.attendance(companyId, {
+      siteId: siteId ? parseInt(siteId, 10) : null,
+      from: start,
+      to: end,
+      personId: personId || null,
+    });
+  }
+
   @Get('floorplans')
   floorplans(
     @CurrentCompanyId() companyId: number | null,
