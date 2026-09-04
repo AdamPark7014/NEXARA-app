@@ -2853,6 +2853,49 @@ select.igControl {
   margin: 0;
 }
 
+.ptzCapChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ptzCapChips span {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--ig-line);
+  color: var(--ig-muted);
+  background: color-mix(in srgb, var(--ig-panel) 80%, transparent);
+}
+
+.ptzCapChips span[data-on="1"] {
+  color: var(--ig-accent);
+  border-color: color-mix(in srgb, var(--ig-accent) 45%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-accent) 12%, var(--ig-panel));
+}
+
+.ptzCapChips span[data-on="0"] {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.ptzCapBanner {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ig-text);
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--ig-warn, #c47a2c) 35%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-warn, #c47a2c) 10%, var(--ig-panel));
+}
+
+.ptzCapBanner[data-tone="limit"] {
+  border-color: color-mix(in srgb, #b45309 40%, var(--ig-line));
+}
+
 .focusStage .detOverlay {
   z-index: 6;
 }

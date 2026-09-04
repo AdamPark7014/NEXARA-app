@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buildApiUrl } from "@/lib/api-base";
 import { withTenantHeaders } from "@/lib/tenant";
 import { getActiveIntegraSiteId, integraApi, withSiteQuery } from "./_lib";
@@ -12,8 +12,9 @@ import styles from "./integra.module.css";
  * Vienen del propio equipo (`TargetRect` 0..1). Identidad real solo en accesos
  * ACS (`personName`). AcuSense = human/vehicle sin nombre.
  *
- * Transporte: SSE con headers de tenant (fetch stream) + sondeo `afterId`
- * cada ~400 ms de respaldo. Antes solo poll 1.5 s → cajas “fantasma” tarde.
+ * Transporte: SSE (primario) + sondeo `afterId` de respaldo. Bajo ráfagas
+ * (reconfig FieldDetection) se **deduplica y se agrupa el fan-out**; el paint
+ * del overlay se limita por rAF — no se ralentiza el poll.
  */
 
 export type PushTarget = { type: string; x: number; y: number; w: number; h: number };
@@ -47,16 +48,24 @@ type Box = PushTarget & {
 const BOX_TTL_OPTICAL_MS = 90_000;
 /** ACS FaceRect + nombre: sticky más largo — el pase es un flash, la placa no. */
 const BOX_TTL_NAMED_MS = 75_000;
-/** Sondeo incremental si SSE cae o aún no conectó. */
-const POLL_MS = 250;
+/** Poll de respaldo cuando SSE está sano (ráfagas las come SSE). */
+const POLL_HEALTHY_MS = 1200;
+/** Poll agresivo si SSE cayó. */
+const POLL_DEGRADED_MS = 280;
 const SEED_MS = 120_000;
 /** VMD sin TargetRect: solo mantiene cajas ya pintadas (presencia sentada). */
 const PRESENCE_HOLD_MS = 90_000;
 /** Distancia de centros (0..1) bajo la cual dos humanos se consideran el mismo.
- *  Conservador: en Meeting Room tres sentados están lejos; no fusionarlos. */
+ *  Conservador: Meeting Room tres sentados lejos → no fusionar. */
 const SOFT_CENTER_DIST = 0.1;
 /** Tope de cajas sticky simultáneas (multi-persona / sala de juntas). */
 const MAX_TRACKS = 12;
+/** Agrupa fan-out SSE/poll: dedupe por id, un solo tick a listeners. */
+const FANOUT_COALESCE_MS = 32;
+/** Paint del overlay: máx ~30 fps aunque lleguen 200 eventos/s. */
+const PAINT_MIN_MS = 33;
+/** Reloj de edad en placa (no hace falta 4 Hz). */
+const AGE_TICK_MS = 1000;
 
 type Listener = (events: PushEvent[]) => void;
 
@@ -65,6 +74,10 @@ let pollTimer: number | null = null;
 let lastId = 0;
 let sseAbort: AbortController | null = null;
 let sseRetryTimer: number | null = null;
+let sseHealthy = false;
+let coalesceTimer: number | null = null;
+/** Última versión por id (foto diferida pisa la anterior). */
+const pendingById = new Map<number, PushEvent>();
 
 function ttlFor(ev: PushEvent, t: PushTarget): number {
   if (ev.personName?.trim()) return BOX_TTL_NAMED_MS;
@@ -72,7 +85,12 @@ function ttlFor(ev: PushEvent, t: PushTarget): number {
   return BOX_TTL_OPTICAL_MS;
 }
 
-function sameTrackKind(a: PushTarget, b: PushTarget, namedA?: string | null, namedB?: string | null): boolean {
+function sameTrackKind(
+  a: PushTarget,
+  b: PushTarget,
+  namedA?: string | null,
+  namedB?: string | null,
+): boolean {
   const na = namedA?.trim();
   const nb = namedB?.trim();
   // Nombres distintos = personas distintas (Meeting Room multi-caja).
@@ -97,7 +115,6 @@ function overlapScore(a: PushTarget, b: PushTarget): number {
     const bcx = b.x + b.w / 2;
     const bcy = b.y + b.h / 2;
     const d = Math.hypot(acx - bcx, acy - bcy);
-    // Personas sentadas: el TargetRect tiembla poco; unir por centro cercano.
     return d < SOFT_CENTER_DIST ? 0.28 : 0;
   }
   const uni = a.w * a.h + b.w * b.h - inter;
@@ -106,49 +123,15 @@ function overlapScore(a: PushTarget, b: PushTarget): number {
 
 /** Fusiona cajas solapadas / cercanas para que el track “siga” (sentados). */
 export function mergeBoxes(prev: Box[], incoming: Box[]): Box[] {
-  const out = [...prev];
-  for (const n of incoming) {
-    let best = -1;
-    let bestScore = 0.18;
-    for (let i = 0; i < out.length; i++) {
-      const o = out[i];
-      if (!sameTrackKind(o, n, o.personName, n.personName)) continue;
-      const s = overlapScore(o, n);
-      if (s > bestScore) {
-        bestScore = s;
-        best = i;
-      }
-    }
-    if (best >= 0) {
-      const prevBox = out[best];
-      // Suaviza posición: 65 % nueva + 35 % previa evita saltos de bbox.
-      const blend = (a: number, b: number) => a * 0.65 + b * 0.35;
-      out[best] = {
-        ...n,
-        x: blend(n.x, prevBox.x),
-        y: blend(n.y, prevBox.y),
-        w: blend(n.w, prevBox.w),
-        h: blend(n.h, prevBox.h),
-        // ACS face gana sobre human óptico; no volver a "unknown".
-        type:
-          n.type === "face" || prevBox.type === "face"
-            ? "face"
-            : n.type === "unknown"
-              ? prevBox.type
-              : n.type,
-        key: prevBox.key,
-        at: n.at,
-        personName: n.personName || prevBox.personName,
-        personId: n.personId || prevBox.personId,
-        photoPath: n.photoPath || prevBox.photoPath,
-        ttl: Math.max(n.ttl, prevBox.ttl, PRESENCE_HOLD_MS),
-      };
-    } else {
-      out.push(n);
-    }
+  // Colapsa el lote entrante contra sí mismo (varios eventos del mismo frame).
+  let seed = incoming;
+  if (incoming.length > 1) {
+    seed = [];
+    for (const n of incoming) seed = mergeOne(seed, n);
   }
+  let out = [...prev];
+  for (const n of seed) out = mergeOne(out, n);
   if (out.length <= MAX_TRACKS) return out;
-  // Conserva las más recientes / con nombre; no tira las demás al llegar 1 caja nueva.
   return out
     .slice()
     .sort((a, b) => {
@@ -157,6 +140,47 @@ export function mergeBoxes(prev: Box[], incoming: Box[]): Box[] {
       return b.at - a.at;
     })
     .slice(0, MAX_TRACKS);
+}
+
+function mergeOne(out: Box[], n: Box): Box[] {
+  const next = [...out];
+  let best = -1;
+  let bestScore = 0.18;
+  for (let i = 0; i < next.length; i++) {
+    const o = next[i];
+    if (!sameTrackKind(o, n, o.personName, n.personName)) continue;
+    const s = overlapScore(o, n);
+    if (s > bestScore) {
+      bestScore = s;
+      best = i;
+    }
+  }
+  if (best < 0) {
+    next.push(n);
+    return next;
+  }
+  const prevBox = next[best];
+  const blend = (a: number, b: number) => a * 0.65 + b * 0.35;
+  next[best] = {
+    ...n,
+    x: blend(n.x, prevBox.x),
+    y: blend(n.y, prevBox.y),
+    w: blend(n.w, prevBox.w),
+    h: blend(n.h, prevBox.h),
+    type:
+      n.type === "face" || prevBox.type === "face"
+        ? "face"
+        : n.type === "unknown"
+          ? prevBox.type
+          : n.type,
+    key: prevBox.key,
+    at: n.at,
+    personName: n.personName || prevBox.personName,
+    personId: n.personId || prevBox.personId,
+    photoPath: n.photoPath || prevBox.photoPath,
+    ttl: Math.max(n.ttl, prevBox.ttl, PRESENCE_HOLD_MS),
+  };
+  return next;
 }
 
 function boxesFromEvents(events: PushEvent[], deviceIp: string, now = Date.now()): Box[] {
@@ -183,10 +207,51 @@ function boxesFromEvents(events: PushEvent[], deviceIp: string, now = Date.now()
   return fresh;
 }
 
+function flushFanOut() {
+  coalesceTimer = null;
+  if (pendingById.size === 0) return;
+  const items = [...pendingById.values()].sort((a, b) => a.id - b.id);
+  pendingById.clear();
+  lastId = Math.max(lastId, ...items.map((e) => e.id));
+  for (const fn of listeners) {
+    try {
+      fn(items);
+    } catch {
+      /* un listener roto no tumba el bus */
+    }
+  }
+}
+
+/** Encola eventos: mismo id (foto diferida) pisa; un solo flush coalescido. */
 function fanOut(items: PushEvent[]) {
   if (!items.length) return;
-  lastId = Math.max(lastId, ...items.map((e) => e.id));
-  for (const fn of listeners) fn(items);
+  for (const ev of items) {
+    if (!ev?.id) continue;
+    const prev = pendingById.get(ev.id);
+    if (prev) {
+      pendingById.set(ev.id, {
+        ...prev,
+        ...ev,
+        photoPath: ev.photoPath || prev.photoPath,
+        targets: ev.targets?.length ? ev.targets : prev.targets,
+        personName: ev.personName || prev.personName,
+      });
+    } else {
+      pendingById.set(ev.id, ev);
+    }
+  }
+  if (coalesceTimer != null) return;
+  coalesceTimer = window.setTimeout(flushFanOut, FANOUT_COALESCE_MS);
+}
+
+function reschedulePoll() {
+  if (pollTimer != null) {
+    window.clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  if (listeners.size === 0) return;
+  const ms = sseHealthy ? POLL_HEALTHY_MS : POLL_DEGRADED_MS;
+  pollTimer = window.setInterval(() => void pollOnce(), ms);
 }
 
 async function pollOnce() {
@@ -197,7 +262,7 @@ async function pollOnce() {
       return;
     }
     const data = await integraApi<{ items: PushEvent[] }>(
-      `integra/push/events?afterId=${lastId}&limit=80`,
+      `integra/push/events?afterId=${lastId}&limit=120`,
     );
     fanOut(data.items || []);
   } catch {
@@ -205,7 +270,10 @@ async function pollOnce() {
   }
 }
 
-function parseSseChunk(buffer: string): { events: Array<{ type?: string; item?: PushEvent }>; rest: string } {
+function parseSseChunk(buffer: string): {
+  events: Array<{ type?: string; item?: PushEvent }>;
+  rest: string;
+} {
   const parts = buffer.split("\n\n");
   const rest = parts.pop() ?? "";
   const events: Array<{ type?: string; item?: PushEvent }> = [];
@@ -232,39 +300,50 @@ async function runSse(signal: AbortSignal) {
   const headers = new Headers(withTenantHeaders({ Accept: "text/event-stream" }));
   const res = await fetch(url, { credentials: "include", headers, signal });
   if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`);
+  sseHealthy = true;
+  reschedulePoll();
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
+  // Micro-lote por chunk de red: varios eventos en un solo fanOut.
   while (!signal.aborted) {
     const { done, value } = await reader.read();
     if (done) break;
     buf += decoder.decode(value, { stream: true });
     const parsed = parseSseChunk(buf);
     buf = parsed.rest;
+    const batch: PushEvent[] = [];
     for (const msg of parsed.events) {
-      if (msg.type === "event" && msg.item?.id) fanOut([msg.item]);
+      if (msg.type === "event" && msg.item?.id) batch.push(msg.item);
     }
+    if (batch.length) fanOut(batch);
   }
 }
 
 function ensureTransport() {
   if (pollTimer == null) {
     void pollOnce();
-    pollTimer = window.setInterval(() => void pollOnce(), POLL_MS);
+    reschedulePoll();
   }
   if (sseAbort) return;
   const start = () => {
     sseAbort?.abort();
     sseAbort = new AbortController();
-    void runSse(sseAbort.signal).catch(() => {
-      sseAbort = null;
-      if (listeners.size === 0) return;
-      if (sseRetryTimer != null) window.clearTimeout(sseRetryTimer);
-      sseRetryTimer = window.setTimeout(() => {
-        sseRetryTimer = null;
-        if (listeners.size > 0) start();
-      }, 2500);
-    });
+    void runSse(sseAbort.signal)
+      .catch(() => {
+        /* reconnect abajo */
+      })
+      .finally(() => {
+        sseHealthy = false;
+        sseAbort = null;
+        reschedulePoll();
+        if (listeners.size === 0) return;
+        if (sseRetryTimer != null) window.clearTimeout(sseRetryTimer);
+        sseRetryTimer = window.setTimeout(() => {
+          sseRetryTimer = null;
+          if (listeners.size > 0) start();
+        }, 800);
+      });
   };
   start();
 }
@@ -275,8 +354,14 @@ function stopTransportIfIdle() {
     window.clearInterval(pollTimer);
     pollTimer = null;
   }
+  if (coalesceTimer != null) {
+    window.clearTimeout(coalesceTimer);
+    coalesceTimer = null;
+  }
+  pendingById.clear();
   sseAbort?.abort();
   sseAbort = null;
+  sseHealthy = false;
   if (sseRetryTimer != null) {
     window.clearTimeout(sseRetryTimer);
     sseRetryTimer = null;
@@ -322,9 +407,62 @@ export function IntegraDetectionOverlay({
   const [motionAt, setMotionAt] = useState<number | null>(null);
   const [, setTick] = useState(0);
 
+  const boxesRef = useRef<Box[]>([]);
+  const motionRef = useRef<number | null>(null);
+  const pendingRef = useRef<{ boxes: Box[] | null; motion: number | null | undefined }>({
+    boxes: null,
+    motion: undefined,
+  });
+  const paintTimer = useRef<number | null>(null);
+  const lastPaint = useRef(0);
+
+  const flushPaint = () => {
+    paintTimer.current = null;
+    lastPaint.current = Date.now();
+    const p = pendingRef.current;
+    if (p.boxes) {
+      boxesRef.current = p.boxes;
+      setBoxes(p.boxes);
+      p.boxes = null;
+    }
+    if (p.motion !== undefined) {
+      motionRef.current = p.motion;
+      setMotionAt(p.motion);
+      p.motion = undefined;
+    }
+  };
+
+  const schedulePaint = () => {
+    if (paintTimer.current != null) return;
+    const wait = Math.max(0, PAINT_MIN_MS - (Date.now() - lastPaint.current));
+    paintTimer.current = window.setTimeout(() => {
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(flushPaint);
+      } else {
+        flushPaint();
+      }
+    }, wait);
+  };
+
+  const applyBoxes = (next: Box[]) => {
+    pendingRef.current.boxes = next;
+    schedulePaint();
+  };
+
+  const applyMotion = (at: number | null) => {
+    pendingRef.current.motion = at;
+    schedulePaint();
+  };
+
   useEffect(() => {
+    boxesRef.current = [];
+    motionRef.current = null;
+    pendingRef.current = { boxes: null, motion: undefined };
     setBoxes([]);
     setMotionAt(null);
+    return () => {
+      if (paintTimer.current != null) window.clearTimeout(paintTimer.current);
+    };
   }, [deviceIp]);
 
   // Semilla: últimos segundos de esta cámara (el canal solo ve lo nuevo).
@@ -332,13 +470,17 @@ export function IntegraDetectionOverlay({
     if (!deviceIp) return;
     let stop = false;
     void integraApi<{ items: PushEvent[] }>(
-      `integra/push/events?sinceMs=${SEED_MS}&limit=80`,
+      `integra/push/events?sinceMs=${SEED_MS}&limit=80&live=1`,
     )
       .then((d) => {
         if (stop) return;
         const items = d.items || [];
         const fresh = boxesFromEvents(items, deviceIp);
-        if (fresh.length) setBoxes((prev) => mergeBoxes(prev, fresh));
+        if (fresh.length) {
+          const merged = mergeBoxes(boxesRef.current, fresh);
+          boxesRef.current = merged;
+          applyBoxes(merged);
+        }
         const maxId = Math.max(0, ...items.map((e) => e.id));
         if (maxId > lastId) lastId = maxId;
         const motion = items.find(
@@ -347,22 +489,29 @@ export function IntegraDetectionOverlay({
             (e.eventType === "VMD" || e.eventType === "fielddetection") &&
             Date.now() - Date.parse(e.occurredAt) < PRESENCE_HOLD_MS,
         );
-        if (motion) setMotionAt(Date.parse(motion.occurredAt) || Date.now());
+        if (motion) {
+          const at = Date.parse(motion.occurredAt) || Date.now();
+          motionRef.current = at;
+          applyMotion(at);
+        }
       })
       .catch(() => undefined);
     return () => {
       stop = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- paint helpers estables por render
   }, [deviceIp]);
 
   useEffect(() => {
     if (!deviceIp) return;
     return subscribePushEvents((events) => {
       const fresh = boxesFromEvents(events, deviceIp);
-      if (fresh.length) setBoxes((prev) => mergeBoxes(prev, fresh));
+      if (fresh.length) {
+        const merged = mergeBoxes(boxesRef.current, fresh);
+        boxesRef.current = merged;
+        applyBoxes(merged);
+      }
 
-      // FieldDetection es puntual (entra a la zona). VMD no trae caja, pero
-      // si hay gente quieta mantiene las últimas posiciones un rato más.
       let sawMotion = false;
       for (const ev of events) {
         if (ev.deviceIp !== deviceIp) continue;
@@ -372,27 +521,38 @@ export function IntegraDetectionOverlay({
       }
       if (sawMotion) {
         const now = Date.now();
-        setMotionAt(now);
-        setBoxes((prev) =>
-          prev.map((b) => ({
-            ...b,
-            at: now,
-            ttl: Math.max(b.ttl, PRESENCE_HOLD_MS),
-          })),
-        );
+        motionRef.current = now;
+        applyMotion(now);
+        const held = boxesRef.current.map((b) => ({
+          ...b,
+          at: now,
+          ttl: Math.max(b.ttl, PRESENCE_HOLD_MS),
+        }));
+        boxesRef.current = held;
+        applyBoxes(held);
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceIp]);
 
   useEffect(() => {
     if (boxes.length === 0 && motionAt == null) return;
     const id = window.setInterval(() => {
       const now = Date.now();
-      setBoxes((prev) => prev.filter((b) => now - b.at < b.ttl));
-      setMotionAt((m) => (m != null && now - m > PRESENCE_HOLD_MS ? null : m));
+      const next = boxesRef.current.filter((b) => now - b.at < b.ttl);
+      if (next.length !== boxesRef.current.length) {
+        boxesRef.current = next;
+        applyBoxes(next);
+      }
+      const m = motionRef.current;
+      if (m != null && now - m > PRESENCE_HOLD_MS) {
+        motionRef.current = null;
+        applyMotion(null);
+      }
       setTick((n) => n + 1);
-    }, 250);
+    }, AGE_TICK_MS);
     return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boxes.length, motionAt]);
 
   if (!deviceIp) return null;
@@ -411,7 +571,6 @@ export function IntegraDetectionOverlay({
         const name = b.personName?.trim();
         const tag = plateLabel(b.type, b.personName);
         const life = Math.max(0.25, 1 - (Date.now() - b.at) / b.ttl);
-        // Placa sticky dentro del marco si la caja está arriba (evita clip + doble label).
         const tagInside = b.y < 0.08;
         return (
           <div
