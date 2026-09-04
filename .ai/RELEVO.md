@@ -85,6 +85,57 @@ y respuestas de 27 s con el ping perfecto a 110 ms. Reiniciado con permiso de
 Adam: de 10,541 zombis a 4, de 10,807 tareas a 302. **Vuelve a pasar** si no se
 le pone `init: true` al compose de biblioteca y se arregla su healthcheck.
 
+## Sesión 03-09 (tarde): video, y por qué media rejilla no arrancaba
+
+**El backend nunca fue el problema.** Medido: los 9 canales entregan imagen
+**simultánea** (16-24 KB por fotograma, 9 de 9). La cadena HLS pública completa
+—maestra, hija y primer segmento con 12,596 bytes de MPEG-TS— responde bien, y
+HTTP/2 está activo, así que tampoco era el límite de conexiones del navegador.
+
+### hls.js venía de un CDN que la CSP bloquea (`a057c26`)
+
+El player inyectaba `<script src="cdn.jsdelivr.net/...hls.min.js">` en runtime.
+La CSP del sitio permite Google Maps, Brevo y Stripe; **jsdelivr no está**. El
+navegador lo bloqueaba en silencio, el player caía al modo nativo —que sólo
+tiene Safari— y Chrome mostraba «No se pudo reproducir el stream».
+
+Ahora es dependencia (`hls.js@1.5.17`) y entra por `import()`, en su propio
+chunk. **Verificado en el bundle desplegado: 0 referencias a jsdelivr.** De paso
+quita una dependencia de internet en una consola de seguridad.
+
+### Chrome rechaza parte de los play() en un muro (`f807115`)
+
+Con 9 vídeos arrancando a la vez, parte de los `play()` se rechazan. No es la
+política de autoplay —van muteados, que ella permite— sino que el navegador no
+da abasto montando nueve decodificadores en el mismo instante. El player se
+rendía al primer rechazo y dejaba el mosaico con el play manual. Ahora reintenta
+escalonado (250 ms, 750, 1.5 s, 3 s).
+
+### La laptop competía con el NAS por la misma ruta
+
+Al intentar recuperar el inventario le devolví el `--advertise-routes` a la
+laptop y **no se lo quité**. Con los dos anunciando `192.168.9.0/24`, Tailscale
+elige uno; si elige la laptop y está fuera de la oficina, todo cae en un agujero
+negro. Explica el sync fallido de 03:30 y los eventos que expiraban. Ya
+corregido: **el NAS es el único que anuncia**. Si alguien vuelve a poner la ruta
+en un equipo móvil, esto se repite.
+
+## Lo que los terminales exponen y la consola todavía no muestra
+
+Comprobado contra `192.168.9.163` (`UserInfo/Search` y `FDLib/FDSearch`):
+
+- **Foto** por persona (`faceURL`) — las 21 tienen rostro dado de alta
+- Nº de empleado, nombre, género
+- **Vigencia**: `2026-05-23` → `2036-05-23`
+- **Puertas que puede abrir**: `RightPlan` con `doorNo` y plan horario
+- Contadores de rostros / huellas / tarjetas (`numOfFace`, `numOfFP`, `numOfCard`)
+- **Audio bidireccional**: `TwoWayAudio/channels` responde 200
+
+**Cuidado legal:** rostro y huella son datos personales **sensibles** bajo la
+LFPDPPP y las multas se duplican. Mostrar la foto haciendo de proxy contra el
+terminal sí; **copiar la plantilla biométrica (`modelData`) a nuestra base, no**.
+Se guarda el identificador, no el biométrico.
+
 ## A medias
 
 - **Personas y eventos siguen en 0 para sitios ISAPI.** No es el túnel: es código
@@ -117,8 +168,10 @@ le pone `init: true` al compose de biblioteca y se arregla su healthcheck.
 
 ## Siguiente paso
 
-1. Sync de **personas y eventos** para ISAPI — es lo que falta para que la
-   consola muestre accesos y caras.
+1. **Fotos y ficha completa de personas** en la consola (ver arriba de dónde
+   salen). Es lo que Adam pide y ya está todo localizado.
+2. **Rediseño de la UI de Integra.** Adam insiste en que sigue poco intuitiva;
+   lo tocado hasta ahora han sido fallos concretos, no diseño.
 2. Quitar las reglas TCPMSS sobrantes del servidor.
 3. `init: true` en el compose de biblioteca, o los zombis vuelven.
 4. Decidir el tema de las empresas 1 y 2 con Adam.
