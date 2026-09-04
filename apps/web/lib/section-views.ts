@@ -494,7 +494,7 @@ export function adaptModulePresentation(
     'integra-people':
       v2 === ROLES.CLIENTE
         ? { label: 'Personas', description: 'Quién tiene acceso a tu sitio' }
-        : { label: 'Personas', description: 'Directorio y credenciales' },
+        : { label: 'Personas', description: 'Alta · Face ID · baja en terminales' },
     'integra-events':
       v2 === ROLES.CLIENTE
         ? { label: 'Actividad', description: 'Entradas y salidas recientes' }

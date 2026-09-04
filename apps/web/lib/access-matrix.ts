@@ -915,13 +915,13 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "integra-people": {
     id: "integra-people", panel: PANELS.INTEGRA, path: "/people",
-    label: "Personas", description: "Directorio y credenciales",
+    label: "Personas", description: "Alta · Face ID · baja en terminales",
     icon: "👤", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD],
     group: "Acceso", visible: true,
   },
   "integra-attendance": {
     id: "integra-attendance", panel: PANELS.INTEGRA, path: "/attendance",
-    label: "Asistencia", description: "Entradas y salidas con foto",
+    label: "Asistencia", description: "Quién pasó hoy (ACS + foto)",
     icon: "🕘", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD],
     group: "Acceso", visible: true,
   },

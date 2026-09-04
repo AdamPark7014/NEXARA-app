@@ -174,9 +174,11 @@ Límites verificados en Oficinas NEXARA (`192.168.9.34`):
 - El muro sigue en vivo; solo el foco cambia a playback.
 - Sin segmentos: la API devuelve `url: null` y nota clara (no inventa video).
 
-Personas ISAPI: CRUD UserInfo + FaceDataRecord; el delete espera
-`UserInfoDetail/DeleteProcess` y solo limpia el espejo si **todos** los
-terminales ACS confirman.
+Personas ISAPI: CRUD UserInfo + FaceDataRecord. El delete es idempotente
+(face → `UserInfoDetail/Delete` → `DeleteProcess` → reintento → listado
+UserInfo autoritativo). El espejo solo se limpia si **todos** los ACS OK.
+Alta puede omitir código (`autoCode`): asigna el siguiente numérico libre
+del espejo (o marca de tiempo).
 
 ## Rutas ISAPI empleadas
 
