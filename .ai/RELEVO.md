@@ -8,49 +8,46 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — AcuSense al límite (Field/Line/Face/Motion + push)
+## Este turno — Live detection hotpath + AcuSense max (sibling wire)
 
-Adam: maximizar cajas y tasa de eventos en cámaras LAN `.171–.178`
-(DS-2CD2123G2-LIS2U). Sin Face ID óptico inventado.
+Adam: UX detección en vivo al límite bajo ráfagas (sibling reconfigura
+cámaras `.171–.178`). Sin inventar Face ID óptico.
 
-### Qué cambió (código)
+### Live detection hotpath (UI/SSE — este agente)
 
-1. **`enableMaxSmartDetection`** (hikvision-isapi): FieldDetection todas las
-   regiones, polígono full-frame, `sensitivityLevel=100`, `timeThreshold=0`,
-   `alarmConfidence=low`, `detectionTarget=human` (Almacén → `human,vehicle`).
-2. **Bugfix**: el tag real es `sensitivityLevel` (antes se escribía
-   `sensitivity` y el firmware lo ignoraba).
-3. **LineDetection** línea horizontal mid-frame; **FaceDetect** (cajas, no ID);
-   **Motion** sens. 80; **substream H.264** confirmado; audio ON si hay mic.
-4. **`ensureSmartEventTriggersCenter`**: field/line/face/VMD → `center`
-   (httpHosts). `uploadImagesDataType=binary` + `httpBroken=false`.
-5. **`wireDevices(detection)`** usa `enableMaxSmartDetection` en AcuSense;
-   NVR PoE vehicle y PTZ motion intactos.
-6. Parser: `facedetection` usa `FaceRect` de la raíz del alert.
-7. Docs `INTEGRA-LAN.md` rutas Smart verificadas en vivo.
+1. **Bus SSE/poll**: fan-out coalescido 32 ms + dedupe por id; poll 1.2 s
+   con SSE sano / 280 ms degradado; reconnect 800 ms.
+2. **Paint ~30 fps** (rAF + refs): merge sticky; edad placa 1 Hz — no se
+   frena el poll con FieldDetection a tope.
+3. **Multi-caja**: nombres distintos no se fusionan; tope 12; VMD 90 s.
+4. **Stream**: `preloadGo2rtcPlayer`; kicks densos; remount 2.6 s;
+   stagger muro 90 ms; fallback MSE 4.5 s.
+5. Índices `integra_push_events_*`; placa óptica «Humano · sin ID».
 
-### Probe real (prod → NAS → .178)
+### AcuSense max wire (sibling — hardware)
 
-- SmartCap: Field+Line+FaceDetect true; IntrusionDetection 404; Parking false.
-- Antes: regiones FieldDetection **todas disabled**; httpHosts sin binary.
-- Substream ya H.264 640×360; audio true.
+1. `enableMaxSmartDetection`: Field todas regiones, poly full-frame,
+   `sensitivityLevel=100`, Line/FaceDetect/Motion; triggers → center.
+2. Bugfix: tag real `sensitivityLevel` (antes `sensitivity` ignorado).
+3. Parser `facedetection` usa FaceRect raíz; docs INTEGRA-LAN.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` → `./deploy/update.sh --force-all`
+`/var/www/nexara-app` → `./deploy/update.sh --force-all --with-migrate`
 
-### Verificar
+### Verificar (hard refresh)
 
-1. Tras deploy: `POST .../sites/1/push/wire` con `{detection:true}` (o script).
-2. GET FieldDetection/1 en .178 → 4 regiones enabled, sens 100, poly full.
-3. httpHosts/1 → `uploadImagesDataType=binary`.
-4. Eventos fielddetection↑; Meeting Room multi-caja sticky.
+1. Video: sticky multi-caja Meeting Room sin lag bajo ráfagas.
+2. ACS banner &lt;1 s; Eventos cards / En vivo.
+3. Tras wire: FieldDetection enabled sens 100; httpHosts binary.
+4. Óptica: «Humano · sin ID» — no Face ID de oficina.
 
 ## A medias
 
 1. Portal empleado · ANPR ITC · micros · TCPMSS.
-2. Confirmar wire+event rate en prod tras este deploy.
+2. Confirmar tasa de eventos tras wire+deploy.
+3. Migración índices push si no aplica sola.
 
 ## No tocar
 
 Puente NAS, Traefik, credenciales, Face ID inventado sobre AcuSense.
-CRM/stock/asistencia siblings.
+Personas enroll CRUD del face sibling.
