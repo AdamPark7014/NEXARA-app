@@ -8,49 +8,40 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Personas: delete real + alta auto-código + UI prod
+## Este turno — playback NVR verificado (Track Recording)
 
-### Delete (bug «no borra / reaparece»)
+Adam: «FALTA TODO EL TEMA DE GRABACION». El cableado previo de
+`ContentMgmt/search` **no funcionaba** en el DS-7616 real; verificado por smoke
+en prod contra `192.168.9.34`.
 
-- Idempotente: si ya no está en el ACS → OK.
-- Face → `UserInfoDetail/Delete` → `DeleteProcess` → **reintento** si sigue.
-- Verificación autoritativa con `listAllUserInfo` (si no se puede listar →
-  **falla**, no se limpia espejo; antes un falso OK reimportaba en sync 15 min).
-- Espejo solo si **todos** los ACS OK. UI: danger + confirm + fan-out por IP +
-  quita de la lista al instante si success.
+### Causa raíz
 
-### Alta con código auto
+1. JSON `?format=json` → **400 badXmlFormat**. Hace falta **cuerpo XML**.
+2. go2rtc `PUT ?name=&src=` → **400 YAML** si el `playbackURI` trae
+   `?starttime=&endtime=`. Registro con **JSON body** `{name:[rtsp]}`.
+3. Track = `channelId` del espejo (`501`…). Hay segmentos en 24h+; 1h a veces
+   vacía.
 
-- `autoCode` (default): siguiente numérico libre del espejo, o `9`+timestamp.
-- UI: «+ Nueva persona» abre panel Alta (ya no enterrado bajo editar).
-  Nombre obligatorio; código opcional (override manual).
+### Qué quedó usable
 
-### UX
+- API XML search + `segmentIndex` + publish JSON → MSE.
+- UI Video: 24h default, Obtener, lista de segmentos, Volver a vivo; playback
+  **solo en foco** (muro vivo).
+- Docs `INTEGRA-LAN.md` con límites.
+- Tests unitarios playback XML.
 
-- Título «Control de personal»; secciones 1 Datos / 2 Editar / 3 Face ID /
-  4 Eliminar; estados de carga; copy Face ID terminal ≠ video oficina.
-- Nav Acceso: Personas «Alta · Face ID · baja».
+(PTZ pad arriba / continuous del turno hermano sigue en la rama — no tocado.)
 
-### Sibling (ya en rama, no pisar)
+SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109`
 
-PTZ pad arriba + continuous; overlay sticky Meeting Room — ver commits
-recientes de video/PTZ.
-
-SSH: `-p 2222 root@5.78.215.109` → `/var/www/nexara-app`
-
-Verificar: Personas → + Nueva (solo nombre) → aparece con código auto;
-Eliminar a alguien de prueba → fan-out OK → desaparece y no vuelve tras sync.
+Verificar: Video → Support → Últimas 24h → Obtener → segmentos → MSE en foco.
 
 ## A medias
 
-1. Portal empleado (User↔employeeNo).
-2. httpHost NVR `.34`.
-3. Cámara ANPR ITC.
-4. Micros / Hik-Connect — decisión Adam.
-5. TCPMSS / biblioteca init / empresas 1-2.
-6. Re-aplicar FieldDetection tras sync (sibling overlay).
+1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
+2. Re-aplicar FieldDetection en equipos tras sync/push install.
 
 ## No tocar
 
 Puente NAS, Traefik, credenciales en repo, rutas ISAPI no verificadas.
-Face ID óptico inventado sobre AcuSense. Playback/PTZ de siblings.
+Face ID óptico inventado sobre AcuSense.
