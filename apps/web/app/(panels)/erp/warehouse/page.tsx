@@ -744,6 +744,21 @@ export default function WarehousePage() {
       <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{new Date(m.createdAt).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
     ), width: 130 },
     { key: "createdBy", label: "Quién", accessor: (m) => m.createdBy?.nombre ?? "—", width: 110 },
+    {
+      key: "actions",
+      label: "",
+      width: 56,
+      render: (m) => (
+        <button
+          type="button"
+          title="Comprobante PDF"
+          onClick={() => void downloadMovementSlip(m.id)}
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--primary)", padding: "4px 6px", fontWeight: 600 }}
+        >
+          PDF
+        </button>
+      ),
+    },
   ];
 
   const today = new Date();
