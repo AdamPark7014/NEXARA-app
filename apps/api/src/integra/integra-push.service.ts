@@ -217,46 +217,106 @@ export class IntegraPushService {
     return { deleted: count, photos };
   }
 
-  /** Lo que ya llegó, del más reciente al más antiguo. */
+  /**
+   * Listado de eventos empujados.
+   *
+   * Por defecto (sin filtros de negocio) sirve al overlay/SSE: todo lo reciente.
+   * Con `scope=acs` prioriza control de acceso (major=5) y excluye heartBeat/VMD.
+   * `afterId` = sondeo incremental barato (índice companyId+id).
+   * `beforeId` = paginación hacia atrás sin OFFSET.
+   */
   async listEvents(
     companyId: number,
     opts: {
       siteId?: number | null;
       personId?: string | null;
+      personName?: string | null;
+      deviceIp?: string | null;
       take: number;
       /** Solo filas nuevas tras este id (sondeo incremental barato). */
       afterId?: number | null;
+      /** Página siguiente: ids estrictamente menores (historial hacia atrás). */
+      beforeId?: number | null;
       /** Ventana reciente en ms (semilla de overlay / badges). */
       sinceMs?: number | null;
       /** Solo eventos con caja o con nombre (live UI). */
       liveOnly?: boolean;
+      /**
+       * `acs` = AccessControllerEvent major 5 (vista de negocio).
+       * `noise` = heartBeat/VMD/… · `all` = sin filtro de tipo.
+       */
+      scope?: 'acs' | 'all' | 'noise' | null;
+      /** Solo concedidos o denegados (requiere scope acs o major 5). */
+      outcome?: 'granted' | 'denied' | null;
+      from?: Date | null;
+      to?: Date | null;
     },
   ) {
+    const t0 = Date.now();
     const afterId =
       opts.afterId != null && Number.isFinite(opts.afterId) && opts.afterId > 0
         ? Math.floor(opts.afterId)
         : null;
+    const beforeId =
+      opts.beforeId != null && Number.isFinite(opts.beforeId) && opts.beforeId > 0
+        ? Math.floor(opts.beforeId)
+        : null;
     const sinceMs =
       opts.sinceMs != null && Number.isFinite(opts.sinceMs) && opts.sinceMs > 0
-        ? Math.min(Math.floor(opts.sinceMs), 180_000)
+        ? Math.min(Math.floor(opts.sinceMs), 86_400_000)
         : null;
 
+    const scope = opts.scope || 'all';
+    const personName = opts.personName?.trim() || null;
+    const deviceIp = opts.deviceIp?.trim() || null;
+
+    const occurredAt: { gte?: Date; lte?: Date } = {};
+    if (opts.from && Number.isFinite(opts.from.getTime())) occurredAt.gte = opts.from;
+    if (opts.to && Number.isFinite(opts.to.getTime())) occurredAt.lte = opts.to;
+    if (sinceMs && !occurredAt.gte) {
+      occurredAt.gte = new Date(Date.now() - sinceMs);
+    }
+
+    const where: Record<string, unknown> = {
+      companyId,
+      ...(opts.siteId ? { siteId: opts.siteId } : {}),
+      ...(opts.personId ? { personId: opts.personId } : {}),
+      ...(deviceIp ? { deviceIp } : {}),
+      ...(personName
+        ? { personName: { contains: personName, mode: 'insensitive' as const } }
+        : {}),
+      ...(afterId ? { id: { gt: afterId } } : {}),
+      ...(beforeId && !afterId ? { id: { lt: beforeId } } : {}),
+      ...(Object.keys(occurredAt).length ? { occurredAt } : {}),
+    };
+
+    if (scope === 'acs') {
+      where.eventType = 'AccessControllerEvent';
+      where.major = 5;
+    } else if (scope === 'noise') {
+      where.eventType = { in: NOISE_TYPES };
+    }
+
+    if (opts.outcome === 'granted') {
+      where.major = 5;
+      where.minor = { in: GRANTED_MINORS };
+    } else if (opts.outcome === 'denied') {
+      where.major = 5;
+      where.minor = { in: DENIED_MINORS };
+    }
+
     const rows = await this.prisma.integraPushEvent.findMany({
-      where: {
-        companyId,
-        ...(opts.siteId ? { siteId: opts.siteId } : {}),
-        ...(opts.personId ? { personId: opts.personId } : {}),
-        ...(afterId ? { id: { gt: afterId } } : {}),
-        ...(sinceMs ? { occurredAt: { gte: new Date(Date.now() - sinceMs) } } : {}),
-      },
+      where,
       // Incremental: id ASC para no saltar huecos. Semilla/listado: lo más nuevo.
-      orderBy: afterId ? { id: 'asc' } : { occurredAt: 'desc' },
+      orderBy: afterId ? { id: 'asc' } : [{ occurredAt: 'desc' }, { id: 'desc' }],
       take: opts.take,
       select: {
         id: true,
         deviceIp: true,
         deviceName: true,
         eventType: true,
+        major: true,
+        minor: true,
         label: true,
         occurredAt: true,
         personId: true,
@@ -268,14 +328,74 @@ export class IntegraPushService {
       },
     });
 
-    if (!opts.liveOnly || afterId) return rows.map((r) => this.toDto(r));
-
-    return rows
-      .filter((r) => {
+    let items = rows.map((r) => this.toDto(r));
+    if (opts.liveOnly && !afterId && scope !== 'acs') {
+      items = items.filter((r) => {
         const hasTargets = Array.isArray(r.targets) && r.targets.length > 0;
         return hasTargets || Boolean(r.personName);
-      })
-      .map((r) => this.toDto(r));
+      });
+    }
+
+    const ms = Date.now() - t0;
+    const oldestId = items.length ? Math.min(...items.map((i) => i.id)) : null;
+    const newestId = items.length ? Math.max(...items.map((i) => i.id)) : null;
+    return {
+      items,
+      total: items.length,
+      ms,
+      hasMore: items.length >= opts.take,
+      nextBeforeId: afterId ? null : oldestId,
+      newestId,
+    };
+  }
+
+  /**
+   * KPIs del día laboral (zona MX): entradas, denegados, personas únicas, en sitio.
+   * Consultas acotadas a major=5 + ventana desde medianoche local aprox.
+   */
+  async eventStats(
+    companyId: number,
+    opts: { siteId?: number | null; tz?: string } = {},
+  ) {
+    const t0 = Date.now();
+    const tz = opts.tz || 'America/Mexico_City';
+    const now = new Date();
+    const today = dayIn(now, tz);
+    // Desde ~00:00 local: 30 h cubre DST y deriva de reloj de terminal.
+    const from = new Date(now.getTime() - 30 * 3600_000);
+
+    const baseWhere = {
+      companyId,
+      ...(opts.siteId ? { siteId: opts.siteId } : {}),
+      major: 5,
+      eventType: 'AccessControllerEvent',
+      occurredAt: { gte: from },
+    };
+
+    const [grantedRows, deniedRows, occupancy] = await Promise.all([
+      this.prisma.integraPushEvent.findMany({
+        where: { ...baseWhere, minor: { in: GRANTED_MINORS } },
+        select: { personId: true, occurredAt: true },
+      }),
+      this.prisma.integraPushEvent.count({
+        where: { ...baseWhere, minor: { in: DENIED_MINORS } },
+      }),
+      this.occupancy(companyId, { siteId: opts.siteId, tz }),
+    ]);
+
+    const grantedToday = grantedRows.filter((r) => dayIn(r.occurredAt, tz) === today);
+    const unique = new Set(
+      grantedToday.map((r) => r.personId).filter((id): id is string => Boolean(id)),
+    );
+
+    return {
+      day: today,
+      entradas: grantedToday.length,
+      denegados: deniedRows,
+      unicos: unique.size,
+      enSitio: occupancy.total,
+      ms: Date.now() - t0,
+    };
   }
 
   /**
