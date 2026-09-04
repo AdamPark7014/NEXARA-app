@@ -236,7 +236,7 @@ export class AcsOpsBridgeService {
 
   private async onDenied(
     site: { companyId: number },
-    ev: NormalizedEvent,
+    ev: AcsOpsEventInput,
   ): Promise<AcsOpsBridgeResult> {
     if (!this.notifyDeniedEnabled()) {
       return { handled: false, direction: 'denied', reason: 'notify_off' };
