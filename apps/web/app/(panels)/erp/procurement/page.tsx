@@ -1325,6 +1325,35 @@ export default function ProcurementPage() {
             { key: "status", label: "Estado", format: (v) => REQ_STATUS[String(v ?? "")] ?? String(v ?? "") },
             { key: "requestedBy", label: "Solicitó", format: (v) => (v as Requisition["requestedBy"])?.nombre ?? "—" },
           ], "requisiciones", { title: "REQUISICIONES" })}>Descargar Excel</Button>
+        ) : tab === "receipts" && visibleReceipts.length > 0 ? (
+          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(
+            visibleReceipts.map((r) => ({
+              folio: r.receiptNumber,
+              oc: r.purchaseOrder?.poNumber ?? `OC-${r.purchaseOrderId}`,
+              proveedor: r.purchaseOrder?.supplier?.name ?? "",
+              almacen: r.warehouse ? [r.warehouse.code, r.warehouse.name].filter(Boolean).join(" — ") : "",
+              partidas: r.items?.length ?? 0,
+              cantidad: (r.items ?? []).reduce((s, i) => s + Number(i.quantityReceived || 0), 0),
+              landed: receiptLandedTotal(r),
+              recibio: r.receivedBy?.nombre ?? "",
+              fecha: r.receiptDate ? String(r.receiptDate).slice(0, 10) : "",
+              notas: r.notes ?? "",
+            })),
+            [
+              { key: "folio", label: "Folio" },
+              { key: "oc", label: "OC" },
+              { key: "proveedor", label: "Proveedor" },
+              { key: "almacen", label: "Almacén" },
+              { key: "partidas", label: "Partidas" },
+              { key: "cantidad", label: "Cant. recibida" },
+              { key: "landed", label: "Landed cost" },
+              { key: "recibio", label: "Usuario" },
+              { key: "fecha", label: "Fecha" },
+              { key: "notas", label: "Notas" },
+            ],
+            "recepciones-mercancia",
+            { title: "RECEPCIONES DE MERCANCÍA" },
+          )}>Descargar Excel</Button>
         ) : undefined}
       />
       )}

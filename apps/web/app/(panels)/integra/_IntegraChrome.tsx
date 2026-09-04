@@ -255,6 +255,16 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
                 Accesos
               </Button>
             )}
+            {showAccess && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => router.push("/integra/schedules")}
+                title="Horarios de acceso por persona y puerta"
+              >
+                Horarios
+              </Button>
+            )}
             {showPeople && (
               <Button
                 variant="secondary"

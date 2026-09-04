@@ -495,6 +495,10 @@ export function adaptModulePresentation(
       v2 === ROLES.CLIENTE
         ? { label: 'Personas', description: 'Quién tiene acceso a tu sitio' }
         : { label: 'Personas', description: 'Alta persona · Face ID en terminales' },
+    'integra-schedules':
+      v2 === ROLES.CLIENTE
+        ? { label: 'Horarios', description: 'Cuándo pueden entrar y a qué puertas' }
+        : { label: 'Horarios', description: 'Vigencia, presets y plan por puerta' },
     'integra-events':
       v2 === ROLES.CLIENTE
         ? { label: 'Actividad', description: 'Entradas y salidas con foto' }
