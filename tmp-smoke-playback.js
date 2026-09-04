@@ -1,6 +1,7 @@
 /* Smoke: ContentMgmt/search + go2rtc register. Run inside nexara-api container. */
 const { PrismaClient } = require('@prisma/client');
 const { createHash, randomUUID } = require('crypto');
+const { decryptSecret } = require('/app/apps/api/dist/integra/integra-secrets.js');
 
 async function digestFetch(url, user, pass, method, body, contentType) {
   const first = await fetch(url, { method, headers: body ? { 'Content-Type': contentType } : {}, body });
@@ -40,9 +41,11 @@ function toUtc(d) {
   const p = new PrismaClient();
   const site = await p.integraSite.findFirst({
     where: { provider: 'ISAPI' },
-    select: { id: true, name: true, host: true, username: true, password: true },
+    select: { id: true, name: true, host: true, appKeyEnc: true, appSecretEnc: true },
   });
   if (!site) throw new Error('no ISAPI site');
+  const username = decryptSecret(site.appKeyEnc);
+  const password = decryptSecret(site.appSecretEnc);
   const cams = await p.integraCamera.findMany({
     where: { siteId: site.id },
     take: 20,
@@ -77,12 +80,12 @@ function toUtc(d) {
 
   const host = String(site.host).replace(/\/$/, '');
   const url = `${host}/ISAPI/ContentMgmt/search?format=json`;
-  const res = await digestFetch(url, site.username, site.password, 'POST', body, 'application/json');
+  const res = await digestFetch(url, username, password, 'POST', body, 'application/json');
   let parsed = null;
   try {
     parsed = JSON.parse(res.text);
   } catch {
-    parsed = { rawHead: res.text.slice(0, 400) };
+    parsed = { rawHead: res.text.slice(0, 500) };
   }
   const result = (parsed && parsed.CMSearchResult) || parsed || {};
   const matchList = Array.isArray(result.matchList)
@@ -96,7 +99,7 @@ function toUtc(d) {
       const seg = item.mediaSegmentDescriptor || {};
       const span = item.timeSpan || {};
       return {
-        playbackURI: seg.playbackURI ? String(seg.playbackURI).slice(0, 120) : null,
+        playbackURI: seg.playbackURI ? String(seg.playbackURI).replace(/\/\/([^:/@]+):([^@]+)@/i, '//$1:***@').slice(0, 140) : null,
         startTime: span.startTime || null,
         endTime: span.endTime || null,
         size: seg.size || null,
@@ -107,9 +110,11 @@ function toUtc(d) {
   const go2rtc = (process.env.GO2RTC_URL || '').replace(/\/$/, '');
   let go2 = null;
   if (go2rtc && segs[0]?.playbackURI) {
-    let rtsp = segs[0].playbackURI;
+    // Re-fetch raw URI from parsed for register (with auth)
+    const rawItem = (matchList[0].searchMatchItem || matchList[0]).mediaSegmentDescriptor || {};
+    let rtsp = String(rawItem.playbackURI || '');
     if (!/^rtsp:\/\/[^/@]+@/i.test(rtsp)) {
-      const cred = `${encodeURIComponent(site.username)}:${encodeURIComponent(site.password)}`;
+      const cred = `${encodeURIComponent(username)}:${encodeURIComponent(password)}`;
       rtsp = rtsp.replace(/^rtsp:\/\//i, `rtsp://${cred}@`);
     }
     const name = `smoke_pb_${Date.now()}`;
@@ -130,6 +135,7 @@ function toUtc(d) {
         responseStatusStrg: result.responseStatusStrg || result.responseStatus || null,
         segments: segs.length,
         first: segs[0] || null,
+        parseHint: segs.length ? null : (parsed.rawHead || Object.keys(parsed || {})),
         go2,
       },
       null,
