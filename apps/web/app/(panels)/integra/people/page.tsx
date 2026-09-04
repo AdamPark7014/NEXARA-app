@@ -190,6 +190,7 @@ function OpFanout({ results }: { results: OpResult[] | null }) {
       {results.map((r) => (
         <li key={r.deviceIp} data-ok={r.ok ? "1" : "0"}>
           {r.deviceIp}: {r.ok ? "OK" : r.error || "falló"}
+          {r.attempts != null && r.attempts > 1 ? ` · ${r.attempts} intentos` : ""}
         </li>
       ))}
     </ul>

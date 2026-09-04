@@ -8,62 +8,57 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Business events ROI (ops/CRM, no Integra push)
+## Este turno — Event ingest + API performance
 
-Elevé streams que más mueven el negocio: SLA/OT, tickets portal,
-cotizaciones por expirar, seguimientos CRM y OC pendientes. Inbox +
-dashboards accionables. **No toqué** Integra push/FieldDetection ni
-PDF OC / stock detail.
+Perfil prod (última hora): **VMD 10906 / duration 1857 / heartBeat 236 /
+fielddetection 134 / ACS 58** · ~205 evt/min · tabla ~92k filas / 71 MB.
 
-Nota: en paralelo hubo polish Integra Video/Personas/Accesos/Eventos
-Face (chrome CTAs) — no pisar ese trabajo.
+### Qué hay (API)
 
-### Qué hay
+1. **Skip store** — `heartBeat`/`duration`/`VMD`/`videoloss` no se insertan
+   ni emiten SSE (~97 % del tráfico medido).
+2. **listEvents** — default excluye ruido; `scope=acs|noise|all`; `afterId` /
+   `beforeId`; select lean; `outcome` granted/denied.
+3. **SSE** — `publish` solo si hay oyentes (`Subject.observed`).
+4. **Token cache** 30 s en `siteForToken`.
+5. **Poda** — hourly wipe de ruido + nocturna business TTL 90 d.
+6. **Índices** — `(companyId,id)`, `(siteId,id)`, major/occurredAt,
+   eventType/occurredAt.
+7. **`GET integra/push/events/stats`** — `entradas`/`denegados`/`unicos`/
+   `enSitio` + aliases EN `granted`/`denied`/`uniquePersons`/`onSite`.
 
-1. **Inbox notificaciones visible** — soft-scope (`companyId` null
-   legacy) + stamp al crear + heal al marcar leída. Antes hard-scope
-   dejaba el centro casi vacío.
-2. **`client-ticket-requests` RBAC** — SUPPORT_*/ACTIVITIES_* (no solo
-   CONSOLE_ADMIN). `/ops/support` y dashboard dejan de fallar en silencio.
-3. **`activity-feed`** — OT SLA vencidas, tickets NEW/APPROVED,
-   seguimientos CRM vencidos, cotiz SENT por expirar, OC DRAFT.
-4. **Centro notificaciones** — Acción ahora / Inbox / Señales; filtro
-   Ops·CRM·ERP; densidad sin KPIs vanity.
-5. **Ops dashboard** — «Decisiones ahora» + KPI SLA + tickets deep-link.
-6. **CRM dashboard** — fix `leads`→`ventas/leads`; decisiones comerciales
-   (vencidos + notifs ventas).
-7. **CommandCenterRail** — Ops: SLA+notifs; Sales: notifs.
-8. **Ticket SLA alerts** — stamp `companyId` desde Activity.
+### Contrato Eventos UI sibling
+
+- `GET integra/push/events?scope=acs&outcome=&afterId=&beforeId=`
+- `GET integra/push/events/stats?siteId=`
+- Overlay/poll: sin `scope` ⇒ útil (sin VMD); `scope=all` diagnóstico.
 
 ### Concurrente (siblings — no pisar)
 
-Integra Video/Personas/Eventos Face chrome · FieldDetection · Face ACS
-JPEG / Personas biometrics · CRM OC PDF · stock historial · PTZ · hybrid
-attendance · identity-link WIP.
+Integra UX chrome · Eventos ACS UI · Business events ops/CRM · Face ACS ·
+AcuSense FieldDetection · PTZ/vehicle · hybrid · stock/OC PDF · People.
+
+### No toqué
+
+FieldDetection XML (AcuSense). No reescribí UI Eventos del sibling.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` · `deploy/update.sh --force-all` (rebuild api+web)
+`/var/www/nexara-app` · `deploy/update.sh --force-all` (api + migrate)
 
-### Verificar (hard refresh)
+### Verificar
 
-1. `/erp/notifications-center` — inbox con filas; Acción ahora.
-2. `/ops/dashboard` — Decisiones ahora + tickets (rol soporte).
-3. `/ops/support` — listado sin 403.
-4. `/crm/dashboard` — leads + seguimientos vencidos.
-5. Feed `?view=feed` — OT/cotiz/OC según permisos.
+1. Inserts/min caen (ACS + fielddetection).
+2. `/push/events/stats` KPIs del día.
+3. Poll `afterId` sin VMD; SSE sin flood.
 
 ## A medias
 
-1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
-2. Alinear códigos employeeNumber↔personId en plantilla real Oficinas.
-3. go2rtc.yaml en disco corruptible — streams viven en RAM.
-4. FieldDetection re-apply tras sync/push install.
-5. Backfill masivo `notifications.companyId` (heal parcial al marcar).
-6. identity-link WIP (rescate) — no cableado a AppModule.
+1. Portal empleado · ANPR ITC · micros · TCPMSS.
+2. employeeNumber↔personId Oficinas.
+3. go2rtc.yaml corruptible — streams en RAM.
+4. FieldDetection re-apply tras sync/push.
+5. Vaciar histórico VMD vía poda hourly.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales, ISAPI no verificada.
-Face ID óptico inventado. No pelear PTZ / Personas biometrics CRUD /
-hybrid attendance / stock detail / OC PDF / FieldDetection /
-Integra push del sibling.
+Puente NAS, Traefik, credenciales. Face ID óptico inventado.
