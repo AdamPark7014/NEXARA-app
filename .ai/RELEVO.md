@@ -8,33 +8,33 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — playback NVR verificado (Track Recording)
+## Este turno — UI general Integra (ops chrome)
 
-Adam: «FALTA TODO EL TEMA DE GRABACION». El cableado previo de
-`ContentMgmt/search` **no funcionaba** en el DS-7616 real; verificado por smoke
-en prod contra `192.168.9.34`.
+Polish de consola SOC. **No** reescritura pesada de Personas CRUD (sibling).
+Tokens compartidos: CSS + `inputStyle`/`selectStyle`.
 
-### Causa raíz
+### Qué cambió
 
-1. JSON `?format=json` → **400 badXmlFormat**. Hace falta **cuerpo XML**.
-2. go2rtc `PUT ?name=&src=` → **400 YAML** si el `playbackURI` trae
-   `?starttime=&endtime=`. Registro con **JSON body** `{name:[rtsp]}`.
-3. Track = `channelId` del espejo (`501`…). Hay segmentos en 24h+; 1h a veces
-   vacía.
+1. **`integra.module.css`**: densidad ops (radios 6/4), toolbar/paneles
+   compactos, botones flat, `--ig-focus` en inputs/botones (vale para Personas).
+2. **`_Console`**: `IgNotice`, `IgEmptyState`; empties en tabla/tree/feed.
+3. **`error.tsx` / `loading.tsx`**: clases del módulo (sin inline genérico).
+4. **`_IntegraChrome`**: KPI en español; barra de contexto más densa.
+5. **Access**: ES, checklist, empty puertas, tones en equipos.
+6. **AppShell Integra**: nav SOC (active inset, menos glow).
+7. **Video**: solo chrome compartido; **PTZ/`ptzChrome` intacto**.
 
-### Qué quedó usable
+### Concurrente en la rama (siblings — no pisar)
 
-- API XML search + `segmentIndex` + publish JSON → MSE.
-- UI Video: 24h default, Obtener, lista de segmentos, Volver a vivo; playback
-  **solo en foco** (muro vivo).
-- Docs `INTEGRA-LAN.md` con límites.
-- Tests unitarios playback XML.
+- Playback NVR XML+go2rtc verificado (`599330d` / docs).
+- Personas delete/alta/UI control personal (`b71eed5` + rescates).
+- PTZ pad arriba + continuous (`6137c32` / `fb65c10`).
 
-(PTZ pad arriba / continuous del turno hermano sigue en la rama — no tocado.)
+SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
+`/var/www/nexara-app`
 
-SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109`
-
-Verificar: Video → Support → Últimas 24h → Obtener → segmentos → MSE en foco.
+Verificar: barra sitio + nav; Access empty/notice; Video PTZ arriba + playback
+24h; Personas focus ring compartido.
 
 ## A medias
 
@@ -45,3 +45,4 @@ Verificar: Video → Support → Últimas 24h → Obtener → segmentos → MSE 
 
 Puente NAS, Traefik, credenciales en repo, rutas ISAPI no verificadas.
 Face ID óptico inventado sobre AcuSense.
+No pelear pad PTZ ni reescribir Personas CRUD del sibling.
