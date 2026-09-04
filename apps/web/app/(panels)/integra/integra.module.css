@@ -633,6 +633,14 @@
 
 .playerVideo :global(video-stream video) {
   pointer-events: none;
+  object-fit: cover;
+}
+
+/* MJPEG del muro: el frame vive en poster — que llene el mosaico. */
+.playerShell[data-mode="mjpeg"] .playerVideo :global(video) {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
 }
 
 .playerVideo :global(video-stream .info),

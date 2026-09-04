@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "./integra.module.css";
 
+type StreamMode = "mse" | "mjpeg";
+
 type Props = {
   /** URL HLS que devuelve la API. De ella se deriva el WebSocket. */
   src: string | null;
@@ -11,23 +13,26 @@ type Props = {
   className?: string;
   /**
    * Retraso antes de abrir el WebSocket. En el muro cada mosaico entra con
-   * turno propio para no saturar el decodificador del navegador.
+   * turno propio para no saturar el navegador.
    */
   startDelayMs?: number;
   /**
-   * Si es false, no se abre el stream (cupo de vivos / en cola). El mosaico
-   * sigue montado y muestra “En cola”.
+   * Si es false, no se abre el stream. El mosaico muestra “En cola”.
    */
   enabled?: boolean;
+  /**
+   * `mjpeg` = mosaicos del muro (ligero, se ven todos).
+   * `mse` = Foco / calidad (decodificador H.264; pocos a la vez).
+   */
+  mode?: StreamMode;
 };
 
 /**
- * Reproductor en vivo sobre **MSE por WebSocket**, no HLS.
+ * Reproductor go2rtc `<video-stream>`.
  *
- * go2rtc `<video-stream>` por defecto pide audio y deja `controls=true`.
- * En un muro eso provoca el botón play grande: Chrome bloquea autoplay con
- * audio y el decodificador se satura con 9 MSE a la vez. Aquí forzamos
- * `media=video`, `muted` y sin controles, y reintentamos `play()`.
+ * En el muro usamos MJPEG: JPEG por WebSocket, sin decodificador H.264 por
+ * mosaico — así se ven 9–16 cámaras sin el tope de 4 MSE ni el play azul.
+ * En Foco usamos MSE (mejor latencia/calidad).
  */
 
 let loaderPromise: Promise<void> | null = null;
@@ -74,7 +79,6 @@ type VideoStreamEl = HTMLElement & {
   play?: () => void;
 };
 
-/** Silencia y quita controles del `<video>` interno (go2rtc los crea con controls). */
 function hardenVideo(node: VideoStreamEl) {
   const v = node.video || node.querySelector("video");
   if (!v) return null;
@@ -102,6 +106,16 @@ function kickPlay(node: VideoStreamEl) {
   });
 }
 
+function isShowing(node: VideoStreamEl, mode: StreamMode): boolean {
+  const v = hardenVideo(node);
+  if (!v) return false;
+  if (mode === "mjpeg") {
+    // MJPEG pinta en `poster`; basta con que haya imagen.
+    return Boolean(v.poster && v.poster.length > 32);
+  }
+  return v.readyState >= 2 && !v.paused;
+}
+
 export function IntegraLivePlayer({
   src,
   showLiveBadge = true,
@@ -109,6 +123,7 @@ export function IntegraLivePlayer({
   className,
   startDelayMs = 0,
   enabled = true,
+  mode = "mse",
 }: Props) {
   const shellRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -166,8 +181,7 @@ export function IntegraLivePlayer({
         .then(() => {
           if (cancelled || !hostRef.current) return;
           const node = document.createElement("video-stream") as VideoStreamEl;
-          // Solo video: con audio Chrome bloquea autoplay y aparece el play azul.
-          node.mode = "mse";
+          node.mode = mode;
           node.media = "video";
           node.background = false;
           node.visibilityCheck = false;
@@ -181,11 +195,9 @@ export function IntegraLivePlayer({
           const arm = () => {
             if (cancelled) return;
             hardenVideo(node);
-            kickPlay(node);
+            if (mode === "mse") kickPlay(node);
           };
 
-          // connectedCallback crea el <video> de forma síncrona; reforzamos
-          // muted/controls en varios ticks porque MSE tarda en tener frames.
           arm();
           kickTimers = [50, 200, 600, 1500, 3000].map((ms) =>
             window.setTimeout(arm, ms),
@@ -193,16 +205,14 @@ export function IntegraLivePlayer({
 
           playWatch = window.setInterval(() => {
             if (cancelled) return;
-            const v = hardenVideo(node);
-            if (!v) return;
-            if (v.paused || v.ended) {
-              kickPlay(node);
-              return;
+            if (mode === "mse") {
+              const v = hardenVideo(node);
+              if (v && (v.paused || v.ended)) kickPlay(node);
+            } else {
+              hardenVideo(node);
             }
-            if (v.readyState >= 2 && !v.paused) {
-              setState("live");
-            }
-          }, 1200);
+            if (isShowing(node, mode)) setState("live");
+          }, mode === "mjpeg" ? 800 : 1200);
         })
         .catch(() => {
           if (!cancelled) setState("error");
@@ -217,7 +227,7 @@ export function IntegraLivePlayer({
       el?.remove();
       if (host) host.innerHTML = "";
     };
-  }, [src, shouldPlay, startDelayMs, enabled, visible]);
+  }, [src, shouldPlay, startDelayMs, enabled, visible, mode]);
 
   return (
     <div
@@ -225,6 +235,7 @@ export function IntegraLivePlayer({
       className={`${styles.playerShell} ${className || ""}`}
       data-compact={compact ? "1" : undefined}
       data-state={state}
+      data-mode={mode}
     >
       <div ref={hostRef} className={styles.playerVideo} />
       {showLiveBadge && state === "live" && (
