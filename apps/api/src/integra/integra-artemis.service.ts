@@ -1239,7 +1239,7 @@ export class IntegraArtemisService {
     actor?: Actor,
     siteId?: number | null,
   ) {
-    const resolved = await this.client(companyId, siteId);
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
     if (resolved.provider === 'ISAPI' && resolved.isapiForHost && resolved.siteId && companyId) {
       const name = String(input.personName || '').trim();
       if (!name) throw new BadRequestException('Nombre requerido');
@@ -1303,6 +1303,12 @@ export class IntegraArtemisService {
             : 'No se pudo crear en ningún terminal.',
       };
     }
+    if (!resolved.client) {
+      throw new BadRequestException(
+        `Operación Artemis no disponible en sitio ${resolved.provider}. ` +
+          'Usa sync/stream/open adaptados o cambia provider a ARTEMIS.',
+      );
+    }
     try {
       if (!input.orgIndexCode) throw new BadRequestException('orgIndexCode requerido en Artemis');
       const data = await resolved.client.personAdd({
@@ -1360,7 +1366,7 @@ export class IntegraArtemisService {
     actor?: Actor,
     siteId?: number | null,
   ) {
-    const resolved = await this.client(companyId, siteId);
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
     if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost || !resolved.siteId || !companyId) {
       throw new BadRequestException('Edición de ficha solo disponible en sitios ISAPI');
     }
@@ -1443,7 +1449,8 @@ export class IntegraArtemisService {
     siteId?: number | null,
     force = false,
   ) {
-    const resolved = await this.client(companyId, siteId);
+    // ISAPI first via resolveClient — this.client() throws on ISAPI (no Artemis client).
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
     if (resolved.provider === 'ISAPI' && resolved.isapiForHost && resolved.siteId && companyId) {
       const id = decodeURIComponent(String(personId || '').trim());
       if (!id) throw new BadRequestException('personId requerido');
@@ -1540,6 +1547,12 @@ export class IntegraArtemisService {
               : `No se pudo eliminar en ningún terminal; el espejo no se tocó.${failSummary}`,
       };
     }
+    if (!resolved.client) {
+      throw new BadRequestException(
+        `Operación Artemis no disponible en sitio ${resolved.provider}. ` +
+          'Usa sync/stream/open adaptados o cambia provider a ARTEMIS.',
+      );
+    }
     try {
       await resolved.client.personDelete(personId);
       await this.auditMut('integra.person.delete', actor, companyId, resolved.siteId ?? 0, {
@@ -1576,7 +1589,7 @@ export class IntegraArtemisService {
     if (jpeg[0] !== 0xff || jpeg[1] !== 0xd8) {
       throw new BadRequestException('La foto debe ser JPEG (FF D8). Convierte PNG a JPG antes de subir.');
     }
-    const resolved = await this.client(companyId, siteId);
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
     if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost || !resolved.siteId || !companyId) {
       throw new BadRequestException('Subida de rostro solo en sitios ISAPI');
     }
@@ -1657,7 +1670,7 @@ export class IntegraArtemisService {
     actor?: Actor,
     siteId?: number | null,
   ) {
-    const resolved = await this.client(companyId, siteId);
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
     if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost || !resolved.siteId || !companyId) {
       throw new BadRequestException('Borrado de rostro solo en sitios ISAPI');
     }
@@ -1702,7 +1715,7 @@ export class IntegraArtemisService {
     actor?: Actor,
     siteId?: number | null,
   ) {
-    const resolved = await this.client(companyId, siteId);
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
     if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost || !resolved.siteId || !companyId) {
       throw new BadRequestException('Huella solo en sitios ISAPI');
     }
@@ -1783,7 +1796,7 @@ export class IntegraArtemisService {
     actor?: Actor,
     siteId?: number | null,
   ) {
-    const resolved = await this.client(companyId, siteId);
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
     if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost || !resolved.siteId || !companyId) {
       throw new BadRequestException('Huella solo en sitios ISAPI');
     }
@@ -1841,7 +1854,7 @@ export class IntegraArtemisService {
     actor?: Actor,
     siteId?: number | null,
   ) {
-    const resolved = await this.client(companyId, siteId);
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
     if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost || !resolved.siteId || !companyId) {
       throw new BadRequestException('Huella solo en sitios ISAPI');
     }
