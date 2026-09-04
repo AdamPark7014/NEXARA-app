@@ -8,52 +8,40 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Asistencia híbrida Integra ↔ ERP
+## Este turno — PDF profesional de Órdenes de compra
 
-Contraste honest: ACS = puertas; ERP = checador/nómina. Sin biometría inventada
-ni escritura automática de fichajes desde la puerta.
+Las OC con Excel viven en **ERP → Compras** (`/erp/procurement`), no en el
+panel CRM. PDF de producción (familia cotizaciones) como salida principal;
+Excel de listado se conserva.
 
-### Qué cambió
+### Qué cambió (OC PDF)
 
-1. **API** `GET /api/attendance/hybrid?date=YYYY-MM-DD`
-   - Une checador (`Attendance`/`AttendanceDay`) con jornadas ACS
-     (`IntegraPushService.attendance`).
-   - Match por `User.employeeNumber` / `UserCompany.employeeNumber` ↔
-     `personId` / `personCode` (normalizado).
-   - Estados: `linked` | `erp_only` | `acs_only` + flags (desfase, sin salida…).
-   - Managers ven equipo; el resto solo a sí mismo (`selfOnly`).
-2. **UI ERP** `/erp/hr/attendance` → panel **Híbrido Integra ↔ ERP**.
-3. **UI Integra** `/integra/attendance` → badge/link ERP si hay match del día.
-4. Tests: `attendance-hybrid.match.spec.ts`.
+1. **`purchase-order-pdf.ts`**: letterhead tenant, proveedor / facturar-a /
+   enviar-a, pago, entrega, Incoterms (si en notas), partidas SKU/UdM/IVA,
+   aprobaciones, firmas, multipágina ES-MX.
+2. **API** `GET procurement/purchase-orders/:id/pdf`.
+3. **UI** tab Órdenes: **PDF** en fila + **Descargar PDF** en detalle.
+4. Smoke: `apps/api/scripts/smoke-purchase-order-pdf.ts`.
 
-### Cómo usarlo (Adam)
-
-1. En ficha RRHH / User: pon el **mismo** código que el `employeeNo` del
-   terminal (o `personCode` del espejo Personas).
-2. Abre **ERP → Asistencia**: abajo del equipo, sección híbrida del día.
-3. Alertas = contraste (p. ej. pasó puerta sin checar app). **Nómina** sigue
-   saliendo del checador app, no de la puerta.
+Commit: `ab8ce5e`. Build API desbloqueado con `3621b00` (import asistencia).
 
 ### Concurrente (siblings — no pisar)
 
-- UI Integra ops chrome, Personas CRUD, PTZ, playback NVR, CRM quotes PDFs,
-  stock movements.
+- Asistencia híbrida Integra↔ERP (`3621b00` + rescates `hr/`, integra-push).
+- Stock historial, PTZ, Personas, playback NVR, CRM clients/opportunities.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` · `deploy/update.sh`
+`/var/www/nexara-app`
 
-Verificar: `/erp/hr/attendance` panel híbrido; `/integra/attendance` link ERP;
-`GET /api/attendance/hybrid?date=…`.
+Verificar: ERP → Compras → Órdenes de compra → PDF.
 
 ## A medias
 
-1. Portal empleado (self-service más allá del checador).
-2. httpHost NVR · ANPR ITC · micros · TCPMSS.
-3. Re-aplicar FieldDetection en equipos tras sync/push install.
-4. Alinear códigos employeeNumber ↔ personId en plantilla real Oficinas.
+1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
+2. Re-aplicar FieldDetection; alinear employeeNumber↔personId Oficinas.
+3. Pedidos CT CRM (`SupplierPurchaseOrder`) sin PDF propio.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales en repo, rutas ISAPI no verificadas.
-Face ID óptico inventado sobre AcuSense.
-No pelear pad PTZ ni reescribir Personas CRUD / CRM PDFs / stock del sibling.
+Puente NAS, Traefik, credenciales, ISAPI no verificada.
+No pelear pad PTZ / Personas CRUD / asistencia híbrida del sibling.
