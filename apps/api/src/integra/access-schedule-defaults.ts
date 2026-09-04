@@ -6,16 +6,26 @@
  *
  * IDs de plantilla en terminal (DS-K1T):
  *   1 = acceso todo el día (fábrica)
- *   2 = horario oficina (sibling week editor / UserRightWeekPlanCfg)
- *   3 = horario contratista (franjas reducidas)
+ *   2 = horario oficina (UserRightWeekPlanCfg)
+ *   3 = contratista / diurno restringido
+ *   4 = fuera de horario (overnight 2 franjas)
+ *   5 = fin de semana
  *
  * Override por env: INTEGRA_PLAN_ALWAYS | INTEGRA_PLAN_OFFICE |
- * INTEGRA_PLAN_CONTRACTOR | INTEGRA_PLAN_VISITOR
+ * INTEGRA_PLAN_CONTRACTOR | INTEGRA_PLAN_VISITOR |
+ * INTEGRA_PLAN_AFTER_HOURS | INTEGRA_PLAN_WEEKEND
  */
+
+import {
+  formatMexicoValidLocal,
+  mexicoTodayBounds,
+} from './access-schedule-validate';
 
 export type AccessScheduleTemplateKey =
   | 'always_on'
   | 'office_hours'
+  | 'after_hours'
+  | 'weekend'
   | 'contractor'
   | 'visitor'
   | 'disabled'

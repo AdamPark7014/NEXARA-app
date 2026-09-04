@@ -1332,7 +1332,23 @@ export class IntegraController {
     @Query('siteId') siteId?: string,
   ) {
     if (!companyId) throw new BadRequestException('Empresa requerida');
-    return this.push.occupancy(companyId, {
+    return this.presence.occupancyEnriched(companyId, {
+      siteId: siteId ? parseInt(siteId, 10) : null,
+    });
+  }
+
+  @Get('presence/:personId')
+  @ApiOperation({
+    summary:
+      'Ficha presencia: puertas hoy + actividades abiertas + CRM (si hay vínculo ERP)',
+  })
+  async presenceDetail(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('personId') personId: string,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    return this.presence.personDetail(companyId, personId, {
       siteId: siteId ? parseInt(siteId, 10) : null,
     });
   }
