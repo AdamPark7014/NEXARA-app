@@ -7,7 +7,7 @@ import { Observable, Subject } from 'rxjs';
 import {
   clearHttpNotificationHost,
   disableFieldDetection,
-  enableHumanFieldDetection,
+  enableMaxSmartDetection,
   enableMotionDetection,
   enableNvrParkingVehicleDetection,
   readHttpNotificationHosts,
@@ -76,10 +76,6 @@ const NOISE_TTL_HOURS = 6;
 const EVENT_TTL_DAYS = 90;
 /** Caché corta del token de empuje (evita 1 SELECT/evento a 200/min). */
 const TOKEN_CACHE_MS = 30_000;
-
-/** ACS concedido / denegado (major 5). */
-const ACS_GRANTED = new Set([1, 75, 76]);
-const ACS_DENIED = new Set([21, 22, 23, 24]);
 
 /** Un evento ya normalizado, venga en XML de cámara o en JSON de terminal. */
 export type NormalizedEvent = {
@@ -870,8 +866,16 @@ export class IntegraPushService {
               ? 'motion-ok'
               : 'no-soportado';
           } else {
-            entry.detection = (await enableHumanFieldDetection(client))
-              ? 'ok'
+            // AcuSense (.171–.178): Field+Line+FaceDetect+Motion al máximo.
+            // Almacén puede ver carritos → human,vehicle en una región vía target.
+            const vehicleish = /almacen|warehouse|entrada|entrance|azotea|parking/i.test(
+              info.name,
+            );
+            const r = await enableMaxSmartDetection(client, {
+              fieldTarget: vehicleish ? 'human,vehicle' : 'human',
+            });
+            entry.detection = r.field
+              ? `max:fd=${r.field}/ln=${r.line}/fc=${r.face}/md=${r.motion}/au=${r.audio}/sub=${r.substream}`
               : 'no-soportado';
           }
         } catch (e) {

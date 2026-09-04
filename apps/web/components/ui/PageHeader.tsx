@@ -11,6 +11,7 @@ import { ReactNode } from "react";
  */
 
 type Variant = "default" | "hero";
+type Density = "default" | "ops";
 
 export default function PageHeader({
   eyebrow,
@@ -19,6 +20,7 @@ export default function PageHeader({
   actions,
   meta,
   variant = "default",
+  density = "default",
 }: {
   eyebrow?: ReactNode;
   title: ReactNode;
@@ -27,14 +29,17 @@ export default function PageHeader({
   /** Píldoras/badges extra debajo del subtítulo (status, sla, dueño…). */
   meta?: ReactNode;
   variant?: Variant;
+  /** ops = título compacto, subtítulo corto, menos aire (ERP/OPS). */
+  density?: Density;
 }) {
   const isHero = variant === "hero";
+  const isOps = density === "ops";
 
   return (
     <header
       style={{
         position: "relative",
-        marginBottom: isHero ? 28 : 24,
+        marginBottom: isHero ? 28 : isOps ? 16 : 24,
         padding: isHero ? "24px 26px" : "0",
         background: isHero ? "var(--nx-panel-surface-overlay)" : "transparent",
         border: isHero ? "1px solid var(--nx-panel-hairline)" : "none",

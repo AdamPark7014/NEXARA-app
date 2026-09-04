@@ -6,6 +6,7 @@ import { CreateActivityDto } from './dto/create-activity.dto.js';
 import { UpdateActivityDto } from './dto/update-activity.dto.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { generateTicketReportPdf } from './ticket-report-pdf.js';
+import { generateActivitiesReportPdf } from './activities-report-pdf.js';
 import { assertCompanyAccess, companyWhere, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import fs from 'fs/promises';
 import path from 'path';
