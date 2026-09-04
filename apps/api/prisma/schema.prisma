@@ -5383,6 +5383,11 @@ model ActivityAssignee {
   asignadoAt  DateTime             @default(now())
   /// Fecha de salida del equipo; null mientras sigue asignado.
   retiradoAt  DateTime?
+  /// Check-in ACS de esta persona en la OT (Acceso General).
+  acsEnteredAt DateTime?
+  acsExitedAt  DateTime?
+  acsLeftSite  Boolean   @default(false)
+  acsEntryDoor String?   @db.VarChar(120)
   companyId   Int
 
   activity Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
