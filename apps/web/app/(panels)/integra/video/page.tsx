@@ -262,7 +262,9 @@ export default function IntegraVideoPage() {
       setSelected(cam.id);
       setPlaybackUrl(null);
       try {
-        const slot = await fetchStream(cam);
+        // Si el espejo ya marca micrófono, abrir con audio (antes había que
+        // pulsar «Escuchar» y parecía que no había canal).
+        const slot = await fetchStream(cam, cam.hasAudio === true);
         setNote(slot.note || null);
         setSlots((prev) => {
           if (!multi) return [slot];
@@ -754,6 +756,8 @@ export default function IntegraVideoPage() {
                         <IntegraVehicleStrip
                           deviceIp={focusCam?.sourceIp ?? null}
                           enabled={mode === "focus"}
+                          anprCapable={focusCam?.anprCapable}
+                          isPtz={Boolean(showPtz || focusCam?.isPtz)}
                         />
                       )}
                       {showPtz && (

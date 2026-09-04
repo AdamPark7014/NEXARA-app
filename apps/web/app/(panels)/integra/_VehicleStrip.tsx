@@ -25,9 +25,13 @@ function relAge(iso: string): string {
 export function IntegraVehicleStrip({
   deviceIp,
   enabled,
+  anprCapable,
+  isPtz,
 }: {
   deviceIp: string | null;
   enabled: boolean;
+  anprCapable?: boolean;
+  isPtz?: boolean;
 }) {
   const [items, setItems] = useState<PlateEv[]>([]);
   const [note, setNote] = useState<string | null>(null);
@@ -42,9 +46,7 @@ export function IntegraVehicleStrip({
         );
         if (stop) return;
         const all = data.items || [];
-        setItems(
-          deviceIp ? all.filter((e) => e.deviceIp === deviceIp) : all.slice(0, 8),
-        );
+        setItems(deviceIp ? all.filter((e) => e.deviceIp === deviceIp) : all.slice(0, 8));
         setNote(data.note || null);
       } catch {
         // Silencioso: no romper el foco PTZ.
@@ -58,15 +60,20 @@ export function IntegraVehicleStrip({
     };
   }, [deviceIp, enabled]);
 
-  if (!enabled || (items.length === 0 && !note)) return null;
+  if (!enabled) return null;
+
+  const emptyHint =
+    isPtz && anprCapable !== true
+      ? "Esta PTZ no clasifica vehículo ni lee placa (FieldDetection/ANPR no soportados). Solo se ve el video; hace falta cámara ITC/AcuSense con vehicle."
+      : note || "Sin detecciones vehicle recientes.";
 
   return (
     <aside className={styles.accessStrip} aria-label="Vehículos">
       <header className={styles.accessStripHead}>
         <strong>Vehículos</strong>
-        <span>{items.length ? "30 min" : "sin ANPR"}</span>
+        <span>{anprCapable ? "ANPR" : "SIN ANPR"}</span>
       </header>
-      {items.length === 0 && note && <p className={styles.ptzHint}>{note}</p>}
+      {items.length === 0 && <p className={styles.ptzHint}>{emptyHint}</p>}
       <ul className={styles.accessStripList}>
         {items.map((h) => (
           <li key={h.id} className={styles.accessStripRow}>
@@ -80,7 +87,10 @@ export function IntegraVehicleStrip({
             </div>
             <div className={styles.accessStripBody}>
               <strong>{h.plate || "Vehículo · sin placa"}</strong>
-              <span>{h.deviceName || h.deviceIp}{h.anpr ? " · ANPR" : ""}</span>
+              <span>
+                {h.deviceName || h.deviceIp}
+                {h.anpr ? " · ANPR" : ""}
+              </span>
               <em>{relAge(h.occurredAt)}</em>
             </div>
           </li>

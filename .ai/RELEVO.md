@@ -8,34 +8,32 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — mega-opt live detecciones / identidad
+## Este turno — audio roto + cajas/vehículos honestos
 
-**Límite de hardware (sigue igual):** AcuSense = cajas `human`/`vehicle` **sin
-nombre**. Identidad real solo en terminales ACS (`personName` + FaceRect).
+**Audio:** `setChannelAudio` tenía el regex corrupto (`<Audio\x08…>`) → **nunca
+encendía el mic**. Arreglado + enciende 101/102 en IP directa (no solo NVR).
+UI: si `hasAudio`, el foco abre stream con audio; botón «🔇 Sonido» más visible
+(el navegador exige gesto para oír).
 
-**Qué se optimizó:**
+**Support (.173):** FieldDetection SÍ manda `human`+TargetRect, pero es
+**intrusión puntual** (no tracking continuo). Gente sentada = sin caja nueva.
+Overlay: TTL 25 s, hold con VMD, chip «Detección activa / Movimiento».
 
-1. **SSE `GET integra/push/stream`** + poll incremental `afterId` cada **400 ms**
-   (antes solo poll 1.5 s). Entrega casi al instante vía Subject en ingest.
-2. **listEvents** acepta `afterId` / `sinceMs` / `live=1`.
-3. Overlay: TTL 10–14 s, **fusión IoU** de cajas (track continuo), semilla
-   `sinceMs`, fade CSS alineado, transición de posición.
-4. Banner sitio **LiveAccess** cuando alguien pasa por ACS (aunque mires oficina).
-5. Occupancy se refresca al vuelo con accesos; RecentAccess 60 s + semilla.
-6. FieldDetection wire: `sensitivity=90`, `timeThreshold=0`.
+**PTZ (.179):** FieldDetection/LineDetection = **403 notSupport**. Cero eventos
+push de esa IP. No puede pintar vehículos ni placas — mensaje claro en panel.
+Hace falta ITC/AcuSense vehicle para cajas de coche.
+
+Tras deploy: hard-refresh Video → PTZ debe mostrar «🔇 Sonido» → clic para oír;
+Support: caminar en zona → cajas; sentados solo chip de movimiento.
+Script one-shot en prod: habilitar audio en cámaras LAN con mic.
 
 SSH: `-p 2222 root@5.78.215.109` → `/var/www/nexara-app`
-
-Tras deploy: hard-refresh Video → caminar frente a Support (cajas más rápidas);
-pasar por puerta (banner + nameplate en cámara-puerta). Re-wire detección en
-Sitios si las cámaras aún tienen umbrales viejos:
-`POST .../sites/:id/push/wire` con `{ detection: true }`.
 
 ## A medias
 
 1. Portal empleado (User↔employeeNo).
 2. httpHost NVR `.34`.
-3. Cámara ANPR ITC si se quieren placas.
+3. Cámara ANPR ITC si se quieren placas / vehicle boxes en parking.
 4. Micros / Hik-Connect — decisión Adam.
 5. TCPMSS / biblioteca init / empresas 1-2.
 

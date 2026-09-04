@@ -41,11 +41,13 @@ type Box = PushTarget & {
   ttl: number;
 };
 
-const BOX_TTL_OPTICAL_MS = 10_000;
-const BOX_TTL_NAMED_MS = 14_000;
+const BOX_TTL_OPTICAL_MS = 25_000;
+const BOX_TTL_NAMED_MS = 20_000;
 /** Sondeo incremental si SSE cae o aún no conectó. */
 const POLL_MS = 400;
-const SEED_MS = 12_000;
+const SEED_MS = 20_000;
+/** VMD sin TargetRect: solo mantiene cajas ya pintadas (presencia). */
+const PRESENCE_HOLD_MS = 18_000;
 
 type Listener = (events: PushEvent[]) => void;
 
@@ -265,10 +267,12 @@ export function IntegraDetectionOverlay({
   deviceIp: string | null;
 }) {
   const [boxes, setBoxes] = useState<Box[]>([]);
+  const [motionAt, setMotionAt] = useState<number | null>(null);
   const [, setTick] = useState(0);
 
   useEffect(() => {
     setBoxes([]);
+    setMotionAt(null);
   }, [deviceIp]);
 
   // Semilla: últimos segundos de esta cámara (el canal solo ve lo nuevo).
@@ -276,14 +280,22 @@ export function IntegraDetectionOverlay({
     if (!deviceIp) return;
     let stop = false;
     void integraApi<{ items: PushEvent[] }>(
-      `integra/push/events?sinceMs=${SEED_MS}&limit=60&live=1`,
+      `integra/push/events?sinceMs=${SEED_MS}&limit=80`,
     )
       .then((d) => {
         if (stop) return;
-        const fresh = boxesFromEvents(d.items || [], deviceIp);
+        const items = d.items || [];
+        const fresh = boxesFromEvents(items, deviceIp);
         if (fresh.length) setBoxes((prev) => mergeBoxes(prev, fresh));
-        const maxId = Math.max(0, ...(d.items || []).map((e) => e.id));
+        const maxId = Math.max(0, ...items.map((e) => e.id));
         if (maxId > lastId) lastId = maxId;
+        const motion = items.find(
+          (e) =>
+            e.deviceIp === deviceIp &&
+            (e.eventType === "VMD" || e.eventType === "fielddetection") &&
+            Date.now() - Date.parse(e.occurredAt) < PRESENCE_HOLD_MS,
+        );
+        if (motion) setMotionAt(Date.parse(motion.occurredAt) || Date.now());
       })
       .catch(() => undefined);
     return () => {
@@ -296,27 +308,55 @@ export function IntegraDetectionOverlay({
     return subscribePushEvents((events) => {
       const fresh = boxesFromEvents(events, deviceIp);
       if (fresh.length) setBoxes((prev) => mergeBoxes(prev, fresh));
+
+      // FieldDetection es puntual (entra a la zona). VMD no trae caja, pero
+      // si hay gente quieta mantiene las últimas posiciones un rato más.
+      let sawMotion = false;
+      for (const ev of events) {
+        if (ev.deviceIp !== deviceIp) continue;
+        if (ev.eventType === "VMD" || ev.eventType === "fielddetection") {
+          sawMotion = true;
+        }
+      }
+      if (sawMotion) {
+        const now = Date.now();
+        setMotionAt(now);
+        setBoxes((prev) =>
+          prev.map((b) => ({
+            ...b,
+            at: now,
+            ttl: Math.max(b.ttl, PRESENCE_HOLD_MS),
+          })),
+        );
+      }
     });
   }, [deviceIp]);
 
   useEffect(() => {
-    if (boxes.length === 0) return;
+    if (boxes.length === 0 && motionAt == null) return;
     const id = window.setInterval(() => {
       const now = Date.now();
       setBoxes((prev) => prev.filter((b) => now - b.at < b.ttl));
+      setMotionAt((m) => (m != null && now - m > PRESENCE_HOLD_MS ? null : m));
       setTick((n) => n + 1);
     }, 250);
     return () => window.clearInterval(id);
-  }, [boxes.length]);
+  }, [boxes.length, motionAt]);
 
-  if (!deviceIp || boxes.length === 0) return null;
+  if (!deviceIp) return null;
+  if (boxes.length === 0 && motionAt == null) return null;
 
   return (
     <div className={styles.detOverlay} aria-hidden>
+      {motionAt != null && (
+        <div className={styles.detMotionChip} data-boxes={boxes.length ? "1" : undefined}>
+          {boxes.length ? "Detección activa" : "Movimiento · sin caja AcuSense"}
+        </div>
+      )}
       {boxes.map((b) => {
         const name = b.personName?.trim();
         const tag = name || (b.type === "human" ? "Humano · sin ID" : labelFor(b.type));
-        const life = Math.max(0.2, 1 - (Date.now() - b.at) / b.ttl);
+        const life = Math.max(0.25, 1 - (Date.now() - b.at) / b.ttl);
         return (
           <div
             key={b.key}
@@ -328,8 +368,7 @@ export function IntegraDetectionOverlay({
               top: `${b.y * 100}%`,
               width: `${b.w * 100}%`,
               height: `${b.h * 100}%`,
-              opacity: 0.35 + life * 0.65,
-              // Reinicia el fade al actualizar posición (track continuo).
+              opacity: 0.4 + life * 0.6,
               animationDuration: `${b.ttl}ms`,
             }}
           >
