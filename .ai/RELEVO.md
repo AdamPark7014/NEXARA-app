@@ -8,30 +8,36 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Personas force-delete + deploy
+## Este turno — Health heap + deploy estable
 
-### Causa
+Prod `/api/health` daba 503 por `memory_heap` (umbral Terminus 300 MB).
+Contenedor ~1.2 GiB RSS; umbral demasiado bajo bajo carga Integra.
 
-1. Espejo solo se borraba si **todos** los ACS OK → UI «no borra».
-2. Sync 15 min reimportaba desde terminales restantes.
-3. Retry `userDelete` hacía upsert del espejo (bug).
-4. Ariadna Sierra `2632768193` solo en **.163** (Acceso General). `.155` muerto.
+### Qué hay
 
-### Fix (fa7bd33 + este)
+1. **Heap runtime** — `NODE_OPTIONS=--max-old-space-size=2048` en
+   `Dockerfile.api` runner + `docker-compose.nexara.yml`.
+2. **Health** — umbral `HEALTH_HEAP_LIMIT_MB` default **1536** (env).
+3. **Sitio** — `resolveClient`: si `siteId` no pertenece al tenant, cae al
+   sitio default activo (evita 404 por localStorage stale / company mismatch).
+   Oficinas reales: `integra_sites.id=1` / `companyId=2`.
+4. Pre-deploy: health ya 200 (heap bajo tras restart); falta aplicar env.
 
-- `DELETE …/people/:id?force=1` + tombstone + UI checkbox.
-- Import `people/page` → `../_personIdentity` (rompía build web).
+SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
+`/var/www/nexara-app` · `bash deploy/update.sh --force-all`
 
-### Ariadna
+### Verificar
 
-Ya eliminada de ACS `.163` + espejo en turno anterior. Confirmar post-deploy.
-
-SSH deploy: `./deploy/update.sh --force-all --with-migrate`
+1. `GET /api/health` → 200; `memory_heap` up.
+2. `docker exec nexara-api printenv NODE_OPTIONS` → max-old-space-size=2048.
+3. nexara-api / nexara-web Up.
 
 ## A medias
 
-Portal empleado · ANPR · sibling Espacios/Horarios.
+1. Portal empleado · ANPR ITC · micros · TCPMSS.
+2. Visitas recurrentes / Espacios / Horarios — validar UI en prod.
+3. FieldDetection re-apply · employeeNumber↔personId.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales.
+Puente NAS, Traefik, credenciales. Face ID óptico inventado.
