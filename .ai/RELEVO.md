@@ -94,11 +94,54 @@ el firmware rechaza un PUT parcial, y el `<enabled>` de `<Video>` es otro.
 Escribe en el equipo del cliente, así que va con el permiso de puertas y se
 audita (`integra.camera.audio`). Botón en Foco. No se ha encendido ninguno.
 
+## Qué saben hacer los equipos — sondeado 2026-09-04
+
+### Cámaras DS-2CD2123G2-LIS2U (AcuSense)
+
+`/ISAPI/Smart/capabilities`: `isSupportFaceDetect`, `isSupportLineDetection`,
+`isSupportFieldDetection` = **true**; `detectionTarget` = `human,vehicle`
+(clasifica persona de vehículo); `enableDualVca: true`. `isSupportPeopleDetection`
+(conteo) = false.
+
+Las reglas existen pero **con las zonas apagadas** (`FieldDetectionRegion
+enabled: false`, `LineItem enabled: false`). Encenderlas es un PUT.
+
+**Ojo antes de encenderlas:** `/ISAPI/Event/triggers/{fielddetection-1,
+linedetection-1,VMD-1}` enlazan a `record-1` **y `center`** → grabación y aviso
+a quien tenga Hik-Connect. No se ha tocado ninguna.
+
+`httpHosts/capabilities` de la cámara trae `uploadImagesDataType opt="URL,binary"`
+→ la cámara **sí** puede empujar el evento con el JPEG dentro.
+
+No hay ruta de «pintar VCA sobre el video» en este firmware (probadas
+VcaDisplayCfg y variantes: 404). El recuadro habría que dibujarlo en el
+navegador sobre el `<video>`, a partir de los eventos.
+
+### Terminales DS-K1T — la foto del acceso NO la dan
+
+Escuchado `Event/notification/alertStream` de `.163` durante 4 min:
+**596 eventos, 0 imágenes** (`Content-Type: application/json` × 596, `JFIF` × 0).
+`SNAPConfig` responde 200 (`snapTimes: 1`) pero el `httpHosts/capabilities` del
+terminal **no** declara `uploadImagesDataType` — al revés que la cámara.
+`AttendanceMode` → `notSupport` en estos modelos.
+
+Lo que **sí** trae cada evento de acceso concedido (major 5 / minor 75):
+`name`, `employeeNoString`, `dateTime`, `deviceName`, `currentVerifyMode`,
+`mask`, `userType`, `serialNo`, `attendanceStatus` y **`FaceRect`** (el
+terminal localiza la cara, solo no manda los píxeles).
+
+**Salida para la foto:** el terminal es una cámara y
+`/ISAPI/Streaming/channels/101/picture` devuelve JPEG en ~300 ms. Con evento
+empujado (<1 s) la persona sigue delante: la foto la toma NEXARA y se guarda
+en NEXARA. Eso además resuelve el rostro del directorio con el tiempo.
+
 ## A medias
 
-1. Correr sync para que aparezcan las 4 cámaras de puerta (13 → 17).
-2. Decidir si se encienden los micros de las cámaras (el botón ya está).
-3. TCPMSS / biblioteca `init: true` / empresas 1-2.
+1. Decidir si se encienden las reglas de detección (avisan a Hik-Connect).
+2. Decidir si se apunta el `httpHost` de los equipos a NEXARA (ahora está en
+   `0.0.0.0`, no desplaza a nadie).
+3. Decidir si se encienden los micros de las cámaras (el botón ya está).
+4. TCPMSS / biblioteca `init: true` / empresas 1-2.
 
 ## No tocar
 
