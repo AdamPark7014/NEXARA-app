@@ -639,6 +639,10 @@ export class IntegraPushService {
    * Solo se fotografía lo que lo merece —un acceso concedido, una persona
    * detectada—: disparar una captura por cada latido del equipo llenaría el
    * disco de fotos de un pasillo vacío.
+   *
+   * Publica por SSE **antes** del snapshot ISAPI (~300 ms): el nombre y el
+   * FaceRect no deben esperar a la JPEG. Si llega foto después, se re-emite
+   * el mismo id con `photoPath` para que banner/tira/overlay la enganchen.
    */
   async ingest(
     site: { id: number; companyId: number },
@@ -650,11 +654,6 @@ export class IntegraPushService {
       // Si el equipo mandó la imagen, esa es la buena: es el fotograma exacto
       // del evento. Solo las cámaras la mandan; los terminales, nunca.
       photoPath = await this.savePhoto(site, ev, pushedImage).catch(() => null);
-    } else if (worthAPhoto(ev) && isFresh(ev.occurredAt)) {
-      photoPath = await this.snapshot(site, ev).catch((e) => {
-        this.logger.warn(`Sin foto para ${ev.deviceIp}: ${String(e)}`);
-        return null;
-      });
     }
 
     const row = await this.prisma.integraPushEvent.create({
@@ -678,9 +677,45 @@ export class IntegraPushService {
       },
     });
 
-    // SSE al instante (antes el sondeo UI esperaba hasta 1.5 s).
     this.publish(site.id, this.toDto(row));
+
+    if (!photoPath && worthAPhoto(ev) && isFresh(ev.occurredAt)) {
+      void this.attachSnapshotLater(site, row.id, ev);
+    }
     return row;
+  }
+
+  /** Snapshot ISAPI en segundo plano; re-publica el DTO con foto. */
+  private async attachSnapshotLater(
+    site: { id: number; companyId: number },
+    rowId: number,
+    ev: NormalizedEvent,
+  ) {
+    try {
+      const photoPath = await this.snapshot(site, ev);
+      if (!photoPath) return;
+      const updated = await this.prisma.integraPushEvent.update({
+        where: { id: rowId },
+        data: { photoPath },
+        select: {
+          id: true,
+          deviceIp: true,
+          deviceName: true,
+          eventType: true,
+          label: true,
+          occurredAt: true,
+          personId: true,
+          personName: true,
+          doorNo: true,
+          verifyMode: true,
+          photoPath: true,
+          targets: true,
+        },
+      });
+      this.publish(site.id, this.toDto(updated));
+    } catch (e) {
+      this.logger.warn(`Sin foto diferida para ${ev.deviceIp}: ${String(e)}`);
+    }
   }
 
   /** Captura del propio equipo que mandó el evento. */

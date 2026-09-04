@@ -38,13 +38,15 @@ type Box = PushTarget & {
   at: number;
   personName?: string | null;
   personId?: string | null;
+  photoPath?: string | null;
   ttl: number;
 };
 
 /** AcuSense FieldDetection es puntual: la caja debe “pegarse” mientras
  *  alguien sigue sentado y solo llega VMD / re-intrusiones esporádicas. */
 const BOX_TTL_OPTICAL_MS = 90_000;
-const BOX_TTL_NAMED_MS = 45_000;
+/** ACS FaceRect + nombre: sticky más largo — el pase es un flash, la placa no. */
+const BOX_TTL_NAMED_MS = 60_000;
 /** Sondeo incremental si SSE cae o aún no conectó. */
 const POLL_MS = 400;
 const SEED_MS = 120_000;
@@ -124,11 +126,18 @@ export function mergeBoxes(prev: Box[], incoming: Box[]): Box[] {
         y: blend(n.y, prevBox.y),
         w: blend(n.w, prevBox.w),
         h: blend(n.h, prevBox.h),
-        type: n.type === "unknown" ? prevBox.type : n.type,
+        // ACS face gana sobre human óptico; no volver a "unknown".
+        type:
+          n.type === "face" || prevBox.type === "face"
+            ? "face"
+            : n.type === "unknown"
+              ? prevBox.type
+              : n.type,
         key: prevBox.key,
         at: n.at,
         personName: n.personName || prevBox.personName,
         personId: n.personId || prevBox.personId,
+        photoPath: n.photoPath || prevBox.photoPath,
         ttl: Math.max(n.ttl, prevBox.ttl, PRESENCE_HOLD_MS),
       };
     } else {
@@ -163,6 +172,7 @@ function boxesFromEvents(events: PushEvent[], deviceIp: string, now = Date.now()
         at: now - Math.max(0, age),
         personName: ev.personName,
         personId: ev.personId,
+        photoPath: ev.photoPath,
         ttl,
       });
     }

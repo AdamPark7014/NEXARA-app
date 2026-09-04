@@ -12,12 +12,14 @@ import { toast } from "@/components/Toast";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import EmptyState from "@/components/ui/EmptyState";
 import {
   createSalesClient,
   listSalesClients,
   updateSalesClient,
   type SalesClient,
 } from "@/lib/sales-api";
+import chrome from "@/components/crm/crm-chrome.module.css";
 
 const INDUSTRIES = ["Corporativo", "Gobierno", "PyME", "Hogar", "Retail", "Industrial"];
 const ESTADOS = ["Activo", "Inactivo", "Prospecto"];
@@ -122,17 +124,6 @@ export default function ClientsPage() {
     }
   };
 
-  const inp: React.CSSProperties = {
-    width: "100%",
-    padding: "8px 10px",
-    border: "1px solid var(--border)",
-    borderRadius: 8,
-    background: "var(--surface)",
-    color: "var(--foreground)",
-    fontSize: 13,
-    boxSizing: "border-box",
-  };
-
   const columns: Column<SalesClient>[] = [
     {
       key: "name",
@@ -198,8 +189,13 @@ export default function ClientsPage() {
       <PageHeader
         eyebrow="CRM · Clientes"
         title={cfg.title}
-        subtitle={cfg.subtitle}
-        actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo cliente</Button> : undefined}
+        subtitle={cfg.subtitle ?? "Cartera comercial con datos fiscales y vínculo a operación."}
+        actions={
+          <>
+            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
+            {cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo cliente</Button> : null}
+          </>
+        }
       />
 
       {!loading && items.length > 0 && (
@@ -216,8 +212,8 @@ export default function ClientsPage() {
             ).sort((a, b) => b[1] - a[1]);
             if (byIndustry.length === 0) return null;
             return (
-              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Clientes por industria</div>
+              <div className={chrome.distCard}>
+                <div className={chrome.distLabel}>Clientes por industria</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                   {byIndustry.map(([industry, count]) => (
                     <div key={industry} style={{ display: "grid", gridTemplateColumns: "120px 1fr 36px", gap: 10, alignItems: "center" }}>
@@ -236,18 +232,8 @@ export default function ClientsPage() {
       )}
 
       {showForm && (
-        <div
-          style={{
-            background: "var(--surface-2)",
-            border: "1px solid var(--border)",
-            borderRadius: 12,
-            padding: 20,
-            marginBottom: 20,
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 12,
-          }}
-        >
+        <div className={chrome.formPanel}>
+          <p className={chrome.formPanelTitle}>{editing ? "Editar cliente" : "Nuevo cliente"}</p>
           {[
             { label: "Nombre comercial", key: "name", ph: "Marca o alias", span: true },
             { label: "Razón social", key: "legalName", ph: "Empresa S.A. de C.V.", span: true },
@@ -256,55 +242,43 @@ export default function ClientsPage() {
             { label: "Teléfono", key: "billingPhone", ph: "222 555 1234" },
             { label: "Sitio web", key: "website", ph: "https://..." },
           ].map(({ label, key, ph, span }) => (
-            <div key={key} style={span ? { gridColumn: "1 / -1" } : undefined}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
-                {label}
-              </label>
+            <div key={key} className={span ? chrome.formFull : undefined}>
+              <label className={chrome.fieldLabel}>{label}</label>
               <input
                 value={(form as Record<string, string>)[key]}
                 onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                 placeholder={ph}
-                style={inp}
+                className={chrome.fieldInput}
               />
             </div>
           ))}
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
-              Dirección fiscal
-            </label>
+          <div className={chrome.formFull}>
+            <label className={chrome.fieldLabel}>Dirección fiscal</label>
             <input
               value={form.fiscalAddress}
               onChange={(e) => setForm((f) => ({ ...f, fiscalAddress: e.target.value }))}
-              style={inp}
+              className={chrome.fieldInput}
             />
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
-              Industria
-            </label>
-            <select value={form.industry} onChange={(e) => setForm((f) => ({ ...f, industry: e.target.value }))} style={inp}>
+            <label className={chrome.fieldLabel}>Industria</label>
+            <select value={form.industry} onChange={(e) => setForm((f) => ({ ...f, industry: e.target.value }))} className={chrome.fieldInput}>
               {INDUSTRIES.map((t) => (
                 <option key={t}>{t}</option>
               ))}
             </select>
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
-              Estado
-            </label>
-            <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} style={inp}>
+            <label className={chrome.fieldLabel}>Estado</label>
+            <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} className={chrome.fieldInput}>
               {ESTADOS.map((s) => (
                 <option key={s}>{s}</option>
               ))}
             </select>
           </div>
-          <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <Button variant="ghost" onClick={() => setShowForm(false)}>
-              Cancelar
-            </Button>
-            <Button variant="primary" onClick={save}>
-              {editing ? "Guardar" : "Crear cliente"}
-            </Button>
+          <div className={chrome.formActions}>
+            <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={save}>{editing ? "Guardar" : "Crear cliente"}</Button>
           </div>
         </div>
       )}
@@ -329,16 +303,30 @@ export default function ClientsPage() {
         ) : undefined}
       />
 
-      <Section title={loading ? "Cargando…" : `${visibleItems.length} clientes`}>
-        {loading ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-        ) : (
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} cliente${visibleItems.length === 1 ? "" : "s"}`}>
+        {loading && (
+          <EmptyState icon="⏳" title="Cargando clientes…" description="Consultando la cartera comercial." />
+        )}
+        {!loading && loadError && (
+          <EmptyState
+            icon="⚠️"
+            title="No se pudo cargar"
+            description={loadError}
+            action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+          />
+        )}
+        {!loading && !loadError && (
           <DataTable
             columns={columns}
             rows={visibleItems}
             rowKey={(c) => c.id}
-            emptyTitle={loadError ? `⚠ ${loadError}` : "Sin clientes"}
+            emptyTitle="Sin clientes"
             emptyDescription="Agrega el primer cliente a la cartera comercial."
+            emptyAction={
+              cfg.canCreate ? (
+                <Button size="sm" variant="primary" iconLeft="+" onClick={openNew}>Nuevo cliente</Button>
+              ) : undefined
+            }
           />
         )}
       </Section>
