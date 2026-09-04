@@ -85,6 +85,7 @@ function isAcsBusiness(ev: PushEvent): boolean {
 }
 
 export default function IntegraEventsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<PushEvent[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);

@@ -84,7 +84,7 @@ const ENTITIES: ExportCard[] = [
     label: "Asistencia híbrida",
     icon: "🕒",
     desc: "Contraste checador ERP ↔ accesos ACS (día fin = Hasta)",
-    xlsxPath: (_from, to) => `attendance/hybrid?date=${to}&format=xlsx`,
+    xlsxPath: (_from, to) => `attendance/hybrid/export.xlsx?date=${to}`,
   },
   {
     key: "vehicles",

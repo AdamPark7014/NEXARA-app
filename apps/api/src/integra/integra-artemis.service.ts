@@ -1021,22 +1021,25 @@ export class IntegraArtemisService {
         orderBy: { personName: 'asc' },
       });
       const label = await this.personLabels(siteId ?? items[0]?.siteId ?? null);
+      const mapped = items.map((p) => {
+        const dto = mapMirrorPersonToDto(p);
+        const localFace = hasLocalPersonFace(companyId, p.personId);
+        const localFpIds = listLocalFingerIds(companyId, p.personId);
+        return {
+          ...dto,
+          hasLocalFace: localFace,
+          hasFace: Boolean(dto.hasFace || localFace),
+          localFpIds,
+          sourceName: label.name(dto.sourceIp),
+          doorNames: label.doors(dto.sourceIp, dto.rightPlan),
+        };
+      });
+      const withErp = await this.identity.attachErpUsers(companyId, mapped);
       return {
-        total: items.length,
+        total: withErp.length,
         source: 'mirror' as const,
-        items: items.map((p) => {
-          const dto = mapMirrorPersonToDto(p);
-          const localFace = hasLocalPersonFace(companyId, p.personId);
-          const localFpIds = listLocalFingerIds(companyId, p.personId);
-          return {
-            ...dto,
-            hasLocalFace: localFace,
-            hasFace: Boolean(dto.hasFace || localFace),
-            localFpIds,
-            sourceName: label.name(dto.sourceIp),
-            doorNames: label.doors(dto.sourceIp, dto.rightPlan),
-          };
-        }),
+        linkModel: 'User.employeeNumber ↔ ACS employeeNo',
+        items: withErp,
       };
     }
 
