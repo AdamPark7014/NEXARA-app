@@ -8,39 +8,53 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Live detection hotpath (ráfagas) + ACS face
+## Este turno — Exports PDF/Excel HR·Ops·Finance + UX listas
 
-Sin Face ID óptico sobre AcuSense. UI lista para más eventos tras wire sibling.
+Gaps ERP de documentos: PDFs/Excels faltantes y botones «Excel» sueltos.
+Sin tocar cámaras Integra ni núcleo CRM OC / stock / FieldDetection.
 
-### Live detection hotpath
+### Exports añadidos / cableados
 
-1. **Bus SSE/poll**: fan-out 32 ms + dedupe por id; poll 1.2 s / 280 ms;
-   reconnect 800 ms.
-2. **Paint ~30 fps** (rAF): merge sticky en refs; edad 1 Hz.
-3. **Multi-caja**: nombres distintos no se fusionan; tope 12; VMD 90 s.
-4. **Stream**: `preloadGo2rtcPlayer`; remount 2.6 s; stagger 90 ms;
-   fallback MSE 4.5 s.
-5. Placa óptica: «Humano · sin ID».
+1. **Actividades OPS PDF** — `GET activities/report.pdf` (landscape, KPIs
+   estatus/prioridad, detalle OT). UI en `OpsActivitiesBoard` + pack
+   `/erp/exports`.
+2. **Viáticos PDF** — API ya existía; cableado en OPS campo, Mis viáticos y
+   ERP finance con patrón **Exportar PDF / Exportar Excel**.
+3. **Asistencia híbrida Excel** — `GET attendance/hybrid/export.xlsx` +
+   botón en `HybridAttendancePanel` + tarjeta en `/erp/exports`.
+4. **Componente** `ListExportActions` — labels consistentes en listas.
 
-### ACS face / build
+### UX polish
 
-1. JPEG enrolado al instante en primer SSE; snapshot 102→101 diferido.
-2. Build: `identity-link` usa `orgRoleKey`; tsc api limpio.
+- OT: empty con Limpiar filtros + Nueva OT; Excel con más columnas.
+- Viáticos ops/mis: empty con CTA primaria; PDF últimos 90 días.
+- Finance viáticos: «Exportar PDF» (antes «PDF control»).
+- Asistencia HR: «Exportar Excel».
+
+### Concurrente — no pisar
+
+ACS face JPEG / FDSearch · Integra UX Video/Personas · FieldDetection ·
+identity-link · stock · CRM OC PDF · accounting/banking UI siblings.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` → `./deploy/update.sh --force-all --with-migrate`
+`/var/www/nexara-app` · `./deploy/update.sh --force-all`
 
-### Verificar (hard refresh Video)
+### Verificar (hard refresh)
 
-1. Sticky multi-caja Meeting Room sin lag bajo ráfagas.
-2. Banner ACS &lt;1 s; Eventos cards.
-3. PTZ no eterno en «Conectando…».
+1. `/ops/activities` → Exportar Excel + Exportar PDF.
+2. `/ops/viatics` y `/ops/my-viatics` → Exportar PDF/Excel.
+3. `/erp/finance/viatics` → Exportar PDF + Excel.
+4. `/erp/hr/attendance` híbrido → Exportar Excel; `/erp/exports` Actividades PDF
+   + Asistencia híbrida.
 
 ## A medias
 
-Portal empleado · ANPR · confirmar wire+event rate en prod.
+1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
+2. PDF nómina/pagos en UI (API `employee-payments/report.pdf` ya existe).
+3. identity-link WIP — no cableado a AppModule.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales, Face ID inventado.
-Personas enroll CRUD del face sibling.
+Puente NAS, Traefik, credenciales.
+Face ID óptico inventado. No pelear PTZ / biometrics CRUD / FieldDetection /
+stock detail / OC PDF del sibling.
