@@ -7,6 +7,7 @@ import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac/roles";
 import Button from "@/components/ui/Button";
+import { toast } from "@/components/Toast";
 import {
   integraApi,
   type IntegraCapabilities,

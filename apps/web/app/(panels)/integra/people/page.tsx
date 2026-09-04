@@ -917,8 +917,9 @@ export default function IntegraPeoplePage() {
                         <span>NEXARA + FaceDataRecord</span>
                       </header>
                       <p className={styles.personNote}>
-                        JPEG se guarda en uploads y se empuja a cada ACS. El terminal puede no
-                        re-entregar la imagen (solo modelo).
+                        JPEG se guarda en uploads y se empuja a cada ACS (FaceDataRecord +
+                        verificación FDSearch). Ideal: frontal 50–400 KB. El terminal puede
+                        no re-entregar la imagen (solo modelo).
                       </p>
                       <div className={styles.personBtnRow}>
                         <label
