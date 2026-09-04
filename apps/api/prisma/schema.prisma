@@ -3196,6 +3196,14 @@ model StockMovement {
   fromWarehouseId   Int?
   toWarehouseId     Int?
   quantity          Decimal           @db.Decimal(14, 4)
+  /// Existencia en almacén origen justo antes del movimiento (auditoría).
+  fromQtyBefore     Decimal?          @db.Decimal(14, 4)
+  /// Existencia en almacén origen justo después del movimiento.
+  fromQtyAfter      Decimal?          @db.Decimal(14, 4)
+  /// Existencia en almacén destino justo antes del movimiento.
+  toQtyBefore       Decimal?          @db.Decimal(14, 4)
+  /// Existencia en almacén destino justo después del movimiento.
+  toQtyAfter        Decimal?          @db.Decimal(14, 4)
   unitCost          Decimal           @default(0) @db.Decimal(14, 4)
   totalCost         Decimal           @default(0) @db.Decimal(14, 2)
   lotId             Int?
