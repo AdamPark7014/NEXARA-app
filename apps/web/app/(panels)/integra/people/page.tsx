@@ -1716,7 +1716,7 @@ export default function IntegraPeoplePage() {
                       </div>
                     </section>
 
-                    <section className={styles.personDangerZone}>
+                    <section className={styles.personDangerZone} id="person-danger-zone">
                       <header className={styles.personSectionHead}>
                         <strong>Eliminar persona</strong>
                         <span>zona de peligro</span>
@@ -1724,9 +1724,13 @@ export default function IntegraPeoplePage() {
                       <p className={styles.personNote}>
                         Borra rostro, huella y ficha en cada ACS (.160–.163), verifica UserInfo y
                         limpia el espejo NEXARA. Si un terminal falla, por defecto la persona se
-                        queda. Con force: sale de NEXARA y se reintenta el Delete en las IPs caídas.
+                        queda (parece que «no se guardó»). Marca force para sacarla de NEXARA y
+                        reintentar el Delete en las IPs caídas — el sync no la reimporta.
                       </p>
-                      <label className={styles.personNote} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                      <label
+                        className={styles.personForceBox}
+                        data-on={forceDelete ? "1" : undefined}
+                      >
                         <input
                           type="checkbox"
                           checked={forceDelete}
@@ -1734,8 +1738,9 @@ export default function IntegraPeoplePage() {
                           disabled={mutating}
                         />
                         <span>
-                          Eliminar de NEXARA aunque un terminal falle (force). Queda reintento en cola
-                          para IPs offline; el sync no la reimporta.
+                          <strong>Forzar baja en NEXARA (force)</strong>
+                          Aunque un ACS falle: sale del espejo, queda tombstone + reintento en cola
+                          para IPs offline. Sin esto, un solo fallo deja a la persona en la lista.
                         </span>
                       </label>
                       <IgBtn
@@ -1746,7 +1751,7 @@ export default function IntegraPeoplePage() {
                             !confirm(
                               forceDelete
                                 ? `¿ELIMINAR a ${selected.name} (${selected.code || selected.id})?\n\nFORCE: sale del espejo aunque algún ACS falle. Se reintentará el Delete en IPs caídas.`
-                                : `¿ELIMINAR a ${selected.name} (${selected.code || selected.id}) de TODOS los terminales?\n\nSi uno falla, se conserva en NEXARA.`,
+                                : `¿ELIMINAR a ${selected.name} (${selected.code || selected.id}) de TODOS los terminales?\n\nSi uno falla, se conserva en NEXARA (marca «Forzar baja» para insistir).`,
                             )
                           ) {
                             return;
@@ -1777,20 +1782,39 @@ export default function IntegraPeoplePage() {
                               setOpNote(r.note || "Eliminado.");
                               setOpOk(true);
                               setError(null);
+                              toast.success(
+                                r.forced
+                                  ? "Baja forzada en NEXARA. Reintento ACS en cola."
+                                  : "Eliminado en terminales y NEXARA.",
+                              );
                             } else {
                               const fails = (r.results || [])
                                 .filter((x) => !x.ok)
                                 .map((x) => `${x.deviceIp}: ${x.error || "falló"}`)
                                 .join("\n");
-                              setError(
+                              const msg = fails
+                                ? `${r.note || "Borrado incompleto"}\n${fails}\n\nMarca «Forzar baja en NEXARA» e inténtalo de nuevo.`
+                                : r.note || "Borrado incompleto — revisa por IP abajo.";
+                              setError(msg);
+                              setForceDelete(true);
+                              toast.error(
                                 fails
-                                  ? `${r.note || "Borrado incompleto"}\n${fails}`
-                                  : r.note || "Borrado incompleto — revisa por IP abajo.",
+                                  ? `Borrado incompleto. Fallos:\n${fails}`
+                                  : msg,
                               );
+                              requestAnimationFrame(() => {
+                                document
+                                  .getElementById("person-danger-zone")
+                                  ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                              });
                             }
                           } catch (err) {
-                            setError(err instanceof Error ? err.message : "Error al eliminar");
+                            const msg =
+                              err instanceof Error ? err.message : "Error al eliminar";
+                            setError(msg);
                             setOpOk(false);
+                            setForceDelete(true);
+                            toast.error(msg);
                           } finally {
                             setMutKind(null);
                           }
@@ -1802,14 +1826,18 @@ export default function IntegraPeoplePage() {
                             ? "Eliminar (force) de NEXARA + ACS"
                             : "Eliminar de todos los terminales"}
                       </IgBtn>
+                      {error && mode === "ficha" && (
+                        <p className={styles.personDangerError} role="alert">
+                          {error}
+                        </p>
+                      )}
+                      {opNote && mode === "ficha" && (
+                        <p className={styles.personNote} data-tone={opOk ? "ok" : "warn"}>
+                          {opNote}
+                        </p>
+                      )}
+                      {mode === "ficha" && <OpFanout results={opResults} />}
                     </section>
-
-                    {opNote && mode === "ficha" && (
-                      <p className={styles.personNote} data-tone={opOk ? "ok" : "warn"}>
-                        {opNote}
-                      </p>
-                    )}
-                    {mode === "ficha" && <OpFanout results={opResults} />}
                   </>
                 )}
 

@@ -8,30 +8,30 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Visitas recurrentes ACS desplegadas
+## Este turno — Personas: eliminar visible / force
 
-Feature completa (UI + servicio + migración + endpoints Nest) en prod.
+Diagnóstico + UX fix para «Eliminar de todos los terminales» que parecía no guardar.
+
+### Causa
+
+1. Sin `?force=1`, el espejo solo se limpia si **todos** los ACS OK → un fallo = la persona se queda (parece que no guardó).
+2. Errores solo arriba (`IgError`); sin toast; force checkbox poco visible / cache vieja en screenshot.
+3. Inventario ACS OK: `.160–.163` (Acceso General `.163`). `.155` muerto **no** está en DB.
 
 ### Qué hay
 
-1. **API en vivo** — Nest mapea:
-   `GET/POST /api/integra/visitors/recurring`,
-   `POST …/:id/cancel`, `DELETE …/:id`.
-2. **UI** — `/integra/visitors` pestaña **Recurrente**: puertas, Lun–Vie,
-   vigencia, foto JPEG, cancel → apaga ACS.
-3. **How-to ES** — `docs/INTEGRA-VISITAS-RECURRENTES.md` (+ link INTEGRA-OPS).
-4. **Deploy Hetzner** — `nexara-api` / `nexara-web` Up; migrate: sin pendientes
-   (tabla `integra_recurring_visitors` ya aplicada). Hubo conflicto Docker
-   Dead containers; limpios y recreados.
+1. **UI** — caja «Forzar baja en NEXARA (force)» visible; toast OK/error; error inline en zona de peligro con IPs; tras fallo parcial auto-marca force + scroll.
+2. **API** sin cambio de contrato — `DELETE …/people/:id?force=1` + tombstone (`integraPersonDeletePending`) ya existían desde `fa7bd33`.
+3. Deploy web pendiente al cerrar este turno (`deploy/update.sh`).
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
 `/var/www/nexara-app`
 
-### Verificar (ops)
+### Cómo borrar bien (ops)
 
-1. Hard refresh `integra…/visitors` → Recurrente.
-2. Alta Lun–Vie 09–18 + Acceso General → estado **En terminales**.
-3. Cancel → `Valid.enable=false` en terminales.
+1. Hard refresh Personas.
+2. Abrir ficha → zona de peligro → marcar **Forzar baja en NEXARA** si un ACS falló o quieres que salga del espejo sí o sí.
+3. Ver toast + lista por IP; sync no reimporta mientras haya tombstone.
 
 ## A medias
 
