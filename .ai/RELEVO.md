@@ -8,33 +8,36 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — delete personas + playback NVR + presencia ACS
+## Este turno — PTZ snappy arriba + presencia multi-caja
 
-### C) Delete personas (bug «no borra»)
+### PTZ (prioridad Adam)
 
-Causa: `UserInfoDetail/Delete` es async; se borraba el espejo aunque el ACS
-fallara → sync 15 min / live **re-importaba** a la persona. UI ignoraba
-`success:false`.
+1. **Pad ARRIBA del video** (`ptzChrome`): ya no queda enterrado bajo
+   Identidad ACS / Vehículos. Visible aunque MSE diga «Conectando…».
+2. **Hold continuo** (`continuous: true` → ISAPI `/continuous` a velocidad 92):
+   una sola orden al pulsar + `stop` al soltar. Antes `momentary` cada ~320 ms
+   sumaba RTT Tailscale y se sentía lento.
+3. Mensaje honesto: PTZ sin ANPR/FieldDetection; mando útil sin video.
 
-Arreglo: face delete → Delete → poll `DeleteProcess` → verificar que ya no
-está en UserInfo; **espejo solo si TODOS los ACS OK**; UI muestra error si
-parcial/falla.
+### Overlay Meeting Room (sitting)
 
-### B) Playback / grabación ISAPI
+- Label: `Humano` + `sin ID · Ns` (antes «Humano · sin ID sin ID · ahora»).
+- Sticky 90 s / VMD hold 75 s / seed 120 s; merge multi-track (máx 8) sin
+  reemplazar todas las cajas por la última.
+- Parser: `TargetRectList`, X/x, todas las `DetectionRegionEntry`.
+- FieldDetection: habilita **todas** las regiones del canal, sens. 95.
 
-Antes solo Artemis. Ahora `POST .../playback` en sitio ISAPI usa
-`ContentMgmt/search` en el NVR → `playbackURI` → go2rtc HLS y sustituye el
-foco. Sin segmentos = nota clara.
+### Límite hardware (no mentir)
 
-### A) Sitting + identidad ACS (honesto)
+AcuSense FieldDetection empuja TargetRect por evento — a menudo **1 humano
+por aviso**, no tracking continuo de 3 sentados. Si solo dispara uno, solo
+hay una caja nueva; las demás viven del sticky/VMD si ya se pintaron antes.
 
-TTL/hold overlay ~45 s; chip movimiento. Strip **Identidad ACS** (fotos de
-ocupación/terminales) junto al foco de oficina — **no** Face ID sobre AcuSense.
+SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
+`/var/www/nexara-app`
 
-SSH: `-p 2222 root@5.78.215.109` → `/var/www/nexara-app`
-
-Verificar: Personas → Eliminar (debe fallar visible si un ACS falla);
-Video → Playback última 1h en Support; Video Support → cajas + strip ACS.
+Verificar: Video → PTZ → pad arriba + hold snappy; Meeting Room → labels
+sin duplicar «sin ID»; cajas sticky multi-persona cuando el equipo dispara.
 
 ## A medias
 
@@ -43,8 +46,9 @@ Video → Playback última 1h en Support; Video Support → cajas + strip ACS.
 3. Cámara ANPR ITC.
 4. Micros / Hik-Connect — decisión Adam.
 5. TCPMSS / biblioteca init / empresas 1-2.
+6. Re-aplicar FieldDetection en prod tras deploy (push install / sync).
 
 ## No tocar
 
 Puente NAS, Traefik, credenciales en repo, rutas ISAPI no verificadas.
-Face ID óptico inventado sobre AcuSense.
+Face ID óptico inventado sobre AcuSense. People CRUD / playback (siblings).

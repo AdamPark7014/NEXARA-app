@@ -47,7 +47,7 @@ const BOX_TTL_OPTICAL_MS = 90_000;
 const BOX_TTL_NAMED_MS = 45_000;
 /** Sondeo incremental si SSE cae o aún no conectó. */
 const POLL_MS = 400;
-const SEED_MS = 90_000;
+const SEED_MS = 120_000;
 /** VMD sin TargetRect: solo mantiene cajas ya pintadas (presencia sentada). */
 const PRESENCE_HOLD_MS = 75_000;
 /** Distancia de centros (0..1) bajo la cual dos humanos se consideran el mismo.
