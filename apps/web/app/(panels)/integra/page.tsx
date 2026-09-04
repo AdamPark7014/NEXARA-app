@@ -572,9 +572,17 @@ export default function IntegraHome() {
             Actualizar
           </Button>
           {!isClient && (
-            <Button variant="primary" size="sm" onClick={() => router.push("/integra/video")}>
-              Ir a video →
-            </Button>
+            <>
+              <Button variant="secondary" size="sm" onClick={() => router.push("/integra/people")}>
+                Alta persona
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => router.push("/integra/events")}>
+                Eventos Face
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => router.push("/integra/video")}>
+                Video · 24h →
+              </Button>
+            </>
           )}
         </div>
       </header>

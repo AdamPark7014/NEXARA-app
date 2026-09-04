@@ -44,30 +44,30 @@ export default function EmptyState({
         flexDirection: "column",
         alignItems: "center",
         textAlign: "center",
-        padding: isCompact ? "28px 18px" : "48px 28px",
-        gap: isCompact ? 10 : 14,
+        padding: isCompact ? "22px 16px" : "36px 24px",
+        gap: isCompact ? 8 : 12,
         background:
-          "radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--primary) 5%, transparent) 0%, transparent 60%), color-mix(in srgb, var(--surface-2) 40%, transparent)",
+          "color-mix(in srgb, var(--surface-2) 55%, transparent)",
         border: "1px dashed var(--nx-panel-hairline)",
-        borderRadius: "var(--nx-panel-radius)",
+        borderRadius: "var(--nx-panel-radius-sm, 12px)",
         overflow: "hidden",
       }}
     >
       <div
         aria-hidden="true"
         style={{
-          width: isCompact ? 52 : 72,
-          height: isCompact ? 52 : 72,
-          borderRadius: 18,
+          width: isCompact ? 44 : 56,
+          height: isCompact ? 44 : 56,
+          borderRadius: 12,
           background:
-            "linear-gradient(160deg, color-mix(in srgb, var(--primary) 16%, var(--surface)) 0%, color-mix(in srgb, var(--primary) 8%, var(--surface)) 100%)",
+            "color-mix(in srgb, var(--primary) 10%, var(--surface))",
           color: "var(--primary)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: isCompact ? 24 : 32,
-          border: "1px solid color-mix(in srgb, var(--primary) 24%, var(--border))",
-          boxShadow: "0 8px 18px color-mix(in srgb, var(--primary) 18%, transparent)",
+          fontSize: isCompact ? 20 : 26,
+          border: "1px solid color-mix(in srgb, var(--primary) 20%, var(--border))",
+          boxShadow: "none",
         }}
       >
         {resolvedIcon}

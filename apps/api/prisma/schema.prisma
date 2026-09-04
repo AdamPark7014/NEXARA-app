@@ -5967,8 +5967,9 @@ model IntegraPushEvent {
   /// Eventos ACS de negocio (major=5) por empresa / sitio.
   @@index([companyId, major, occurredAt])
   @@index([siteId, major, occurredAt])
-  /// Sondeo afterId por tenant.
+  /// Sondeo afterId por tenant / sitio.
   @@index([companyId, id])
+  @@index([siteId, id])
   /// Filtrar ruido (heartBeat/VMD) vs AccessControllerEvent.
   @@index([siteId, eventType, occurredAt])
   @@map("integra_push_events")

@@ -355,7 +355,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   bi: {
     id: "bi", panel: PANELS.ERP, path: "/analytics/bi",
-    label: "Business Intelligence", description: "Dashboards analíticos",
+    label: "Analítica", description: "Tableros y reportes del negocio",
     icon: "📈", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.DIRECTOR_COMMERCIAL, R.SALES_MANAGER, R.PROJECT_MANAGER],
     group: "Tablero", visible: true,
   },
@@ -369,25 +369,25 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   companies: {
     id: "companies", panel: PANELS.ERP, path: "/companies",
-    label: "Multi-empresa", description: "Razones sociales y sucursales",
+    label: "Empresas", description: "Razones sociales y sucursales",
     icon: "🏛️", allowedRoles: ADMIN_TIER,
     group: "Gobierno", visible: true,
   },
   settings: {
     id: "settings", panel: PANELS.ERP, path: "/settings",
-    label: "Datos de la empresa", description: "Configuración general y branding",
-    icon: "🏢", allowedRoles: ADMIN_TIER,
+    label: "Configuración", description: "Parámetros, integraciones y branding",
+    icon: "⚙️", allowedRoles: ADMIN_TIER,
     group: "Gobierno", visible: true,
   },
   architecture: {
     id: "architecture", panel: PANELS.ERP, path: "/architecture",
-    label: "Arquitectura del ERP", description: "Mapa de módulos y dependencias",
+    label: "Mapa del sistema", description: "Módulos, paneles y dependencias",
     icon: "🗺️", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.DIRECTOR_COMMERCIAL],
     group: "Gobierno", visible: true,
   },
   kb: {
     id: "kb", panel: PANELS.ERP, path: "/kb",
-    label: "Knowledge Base", description: "Procedimientos y documentación interna",
+    label: "Base de conocimiento", description: "Procedimientos y documentación interna",
     icon: "📚", allowedRoles: ANY_INTERNAL,
     group: "Gobierno", visible: true,
   },
@@ -407,25 +407,25 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   banking: {
     id: "banking", panel: PANELS.ERP, path: "/banking",
-    label: "Banca", description: "Movimientos, pagos y conciliación",
+    label: "Bancos", description: "Movimientos, pagos y conciliación",
     icon: "🏦", allowedRoles: FINANCE_TEAM,
     group: "Finanzas", visible: true,
   },
   "viatics-admin": {
     id: "viatics-admin", panel: PANELS.ERP, path: "/finance/viatics",
-    label: "Viáticos · Admin", description: "Comprobación y autorización de viáticos",
+    label: "Viáticos", description: "Comprobación y autorización de viáticos",
     icon: "💸", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.DIRECTOR_OPS, R.ACCOUNTANT, R.PROJECT_MANAGER],
     group: "Finanzas", visible: true,
   },
   "expenses-admin": {
     id: "expenses-admin", panel: PANELS.ERP, path: "/finance/expenses",
-    label: "Gastos · Admin", description: "Captura y autorización de gastos",
+    label: "Gastos", description: "Captura y autorización de gastos",
     icon: "💳", allowedRoles: FINANCE_TEAM,
     group: "Finanzas", visible: true,
   },
   "employee-payments": {
     id: "employee-payments", panel: PANELS.ERP, path: "/finance/employee-payments",
-    label: "Pagos a personal", description: "Nómina, finiquitos y bonos",
+    label: "Pagos a personal", description: "Dispersiones internas (no CFDI nómina)",
     icon: "💼", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.ACCOUNTANT, R.HR_SPECIALIST],
     group: "Finanzas", visible: true,
   },
@@ -433,7 +433,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   // ── RH y personas ──
   hr: {
     id: "hr", panel: PANELS.ERP, path: "/hr",
-    label: "RRHH", description: "Plantilla, vacaciones e incidencias",
+    label: "Plantilla RRHH", description: "Colaboradores, vacaciones e incidencias",
     icon: "👥", allowedRoles: HR_TEAM,
     group: "Personas", visible: true,
   },
@@ -451,7 +451,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   fines: {
     id: "fines", panel: PANELS.ERP, path: "/hr/fines",
-    label: "Multas e incidencias", description: "Sanciones administrativas",
+    label: "Incidencias", description: "Multas y faltas administrativas",
     icon: "⚠️", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.HR_SPECIALIST],
     group: "Personas", visible: true,
   },
@@ -463,7 +463,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "kpis-hr": {
     id: "kpis-hr", panel: PANELS.ERP, path: "/hr/kpis",
-    label: "KPIs de personas", description: "Productividad, rotación, satisfacción",
+    label: "KPIs de personas", description: "Productividad y desempeño por área",
     icon: "📊", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.HR_SPECIALIST],
     group: "Personas", visible: true,
   },
@@ -483,15 +483,15 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   documents: {
     id: "documents", panel: PANELS.ERP, path: "/documents",
-    label: "Gestión documental", description: "Contratos, manuales y compliance",
+    label: "Documentos", description: "Contratos, manuales y compliance",
     icon: "📂", allowedRoles: [R.CEO, R.DIRECTOR_ADMIN, R.ADMIN_STAFF, R.HR_SPECIALIST, R.ACCOUNTANT],
-    group: "Logística", visible: true,
+    group: "Gobierno", visible: true,
   },
 
   // ── Auditoría y comunicados ──
   audit: {
     id: "audit", panel: PANELS.ERP, path: "/audit",
-    label: "Audit log", description: "Trazabilidad de cambios sensibles",
+    label: "Registro de auditoría", description: "Trazabilidad de cambios sensibles",
     icon: "🔍", allowedRoles: ADMIN_TIER,
     group: "Auditoría", visible: true,
   },
@@ -503,13 +503,13 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "notifications-center": {
     id: "notifications-center", panel: PANELS.ERP, path: "/notifications-center",
-    label: "Centro de notificaciones", description: "Alertas y comunicados",
+    label: "Notificaciones", description: "Alertas y comunicados",
     icon: "🔔", allowedRoles: ANY_INTERNAL,
     group: "Auditoría", visible: true,
   },
   news: {
     id: "news", panel: PANELS.ERP, path: "/news",
-    label: "Comunicación interna", description: "Comunicados, boletín mensual y métricas de lectura",
+    label: "Comunicados", description: "Boletín interno y métricas de lectura",
     icon: "📰", allowedRoles: ADMIN_PLUS,
     group: "Auditoría", visible: true,
   },

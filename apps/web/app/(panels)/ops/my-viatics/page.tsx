@@ -14,10 +14,12 @@ import { getViaticsSectionConfig } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
 import { isViaticoPending, normalizeViaticoRow, viaticoEstatusVariant, type ViaticoRow } from "@/lib/viatics-display";
-import { patchViatico, postViatico } from "@/lib/viatics-api";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import ListExportActions from "@/components/ui/ListExportActions";
+import { patchViatico, postViatico, downloadViaticsReportPdf } from "@/lib/viatics-api";
 import FileDropzone from "@/components/ui/FileDropzone";
+import { toast } from "@/components/Toast";
 
 async function apiFetch(path: string, token: string) {
   const res = await fetch(buildApiUrl(path), { headers: { Authorization: `Bearer ${token}` } });
@@ -57,6 +59,7 @@ export default function MyViaticsPage() {
   const [saving, setSaving] = useState(false);
   const [projects, setProjects] = useState<{ id: number; name: string }[]>([]);
   const [vehicles, setVehicles] = useState<{ id: number; nombre: string; placas?: string | null }[]>([]);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;

@@ -1336,6 +1336,7 @@ export class IntegraArtemisService {
       validTo?: string;
       validEnable?: boolean;
       doorRight?: string;
+      rightPlan?: unknown;
     },
     actor?: Actor,
     siteId?: number | null,
@@ -1359,6 +1360,10 @@ export class IntegraArtemisService {
       gender: input.gender ?? (raw.gender != null ? String(raw.gender) : undefined),
       doorRight:
         input.doorRight ?? (raw.doorRight != null ? String(raw.doorRight) : undefined),
+      RightPlan:
+        input.rightPlan !== undefined
+          ? input.rightPlan
+          : (raw.RightPlan ?? raw.rightPlan),
       Valid: {
         enable: input.validEnable !== false,
         beginTime:
@@ -1371,20 +1376,44 @@ export class IntegraArtemisService {
           '2037-12-31T23:59:59',
       },
     };
-    const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
-      await modifyUserInfo(client, user);
-    });
+    const results = await this.fanoutAcs(
+      companyId,
+      resolved.siteId,
+      employeeNo,
+      'person.update',
+      resolved.isapiForHost,
+      async (client) => {
+        await modifyUserInfo(client, user);
+      },
+      { op: 'userUpsert', user },
+    );
     await this.auditMut('integra.person.update', actor, companyId, resolved.siteId, {
       employeeNo,
       results,
     });
-    await this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
     const allOk = results.length > 0 && results.every((r) => r.ok);
+    const anyOk = results.some((r) => r.ok);
+    if (anyOk) {
+      await this.acsFanout.upsertMirror({
+        companyId,
+        siteId: resolved.siteId,
+        employeeNo,
+        name: user.name,
+        raw: { ...raw, ...user },
+      });
+      void this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
+    }
     return {
       success: allOk,
-      partial: results.some((r) => r.ok) && !allOk,
+      partial: anyOk && !allOk,
       results,
       provider: 'ISAPI' as const,
+      livePush: true,
+      note: allOk
+        ? 'Cambios en vivo a terminales.'
+        : anyOk
+          ? 'Guardado parcial — revisa IP; reintento en cola.'
+          : 'No se pudo guardar en ningún terminal.',
     };
   }
 
@@ -1399,9 +1428,20 @@ export class IntegraArtemisService {
       const id = decodeURIComponent(String(personId || '').trim());
       if (!id) throw new BadRequestException('personId requerido');
 
-      const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
-        await deleteUserInfo(client, id);
-      });
+      const results = await this.fanoutAcs(
+        companyId,
+        resolved.siteId,
+        id,
+        'person.delete',
+        resolved.isapiForHost,
+        async (client) => {
+          await deleteUserInfo(client, id);
+        },
+        {
+          op: 'userDelete',
+          user: { employeeNo: id, name: id },
+        },
+      );
       await this.auditMut('integra.person.delete', actor, companyId, resolved.siteId, {
         personId: id,
         results,

@@ -518,7 +518,7 @@ const drawInternalEconomics = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: nu
   const marginAmt = Math.round((sellNet - costTotal) * 100) / 100;
   const marginPct = sellNet > 0 ? Math.round((marginAmt / sellNet) * 1000) / 10 : 0;
 
-  y = ensureY(ctx, y, 88);
+  y = ensureY(ctx, y, 88, payload.quoteNumber);
   doc.save();
   doc.roundedRect(margin, y, contentWidth, 78, 5).fill(COLORS.fill);
   doc.roundedRect(margin, y, contentWidth, 78, 5).strokeColor(COLORS.line).lineWidth(0.6).stroke();
