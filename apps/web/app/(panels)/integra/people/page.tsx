@@ -46,7 +46,11 @@ type Person = {
 
 type Org = { id: string; name: string; parentId?: string };
 
+type OpResult = { deviceIp: string; ok: boolean; error?: string };
+
 type ValidityFilter = "" | "ok" | "warn" | "expired" | "off" | "face" | "noface";
+
+type MutKind = "save" | "photo" | "faceDel" | "delete" | "create" | null;
 
 function genderLabel(g?: string) {
   const v = String(g || "").toLowerCase();
@@ -56,7 +60,11 @@ function genderLabel(g?: string) {
   return String(g);
 }
 
-function validityOf(p: Person): { key: "ok" | "warn" | "expired" | "off" | "unknown"; label: string; tone: "ok" | "warn" | "danger" | "neutral" } {
+function validityOf(p: Person): {
+  key: "ok" | "warn" | "expired" | "off" | "unknown";
+  label: string;
+  tone: "ok" | "warn" | "danger" | "neutral";
+} {
   if (p.validEnable === false) return { key: "off", label: "Deshabilitada", tone: "danger" };
   if (!p.validTo) return { key: "unknown", label: "Sin vigencia", tone: "neutral" };
   const end = Date.parse(p.validTo);
@@ -80,10 +88,7 @@ function formatWhen(iso?: string) {
 
 /**
  * `enrolled` = el terminal dice tener rostro; `unavailable` = lo tiene, pero no
- * lo entrega. Los DS-K1T guardan el rostro como **modelo biométrico**, no como
- * JPEG: `FDLib/capabilities` responde `isSupportModelData: true` y la `faceURL`
- * del UserInfo devuelve 404 con cualquier autenticación. No es un fallo nuestro
- * ni se arregla con otra ruta: la foto no está en el equipo.
+ * lo entrega (modelo biométrico DS-K1T, faceURL 404).
  */
 type FaceState = "none" | "enrolled" | "unavailable" | "ok";
 
@@ -129,12 +134,14 @@ function PersonAvatar({
       });
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-    // `onState` es un setState estable; incluirlo relanzaría la descarga.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [person.id, person.hasFace, person.numOfFace, person.faceUrl]);
 
   return (
-    <div className={large ? styles.personAvatarLg : styles.personAvatar} data-empty={!src ? "1" : undefined}>
+    <div
+      className={large ? styles.personAvatarLg : styles.personAvatar}
+      data-empty={!src ? "1" : undefined}
+    >
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt="" />
@@ -148,8 +155,11 @@ function PersonAvatar({
 function CredChips({ person }: { person: Person }) {
   return (
     <div className={styles.personChips}>
-      <span className={styles.personChip} data-on={(person.numOfFace ?? 0) > 0 || person.hasFace ? "1" : undefined}>
-        Rostro {person.numOfFace ?? (person.hasFace ? "·" : "0")}
+      <span
+        className={styles.personChip}
+        data-on={(person.numOfFace ?? 0) > 0 || person.hasFace ? "1" : undefined}
+      >
+        Face ID {person.numOfFace ?? (person.hasFace ? "·" : "0")}
       </span>
       <span className={styles.personChip} data-on={(person.numOfFP ?? 0) > 0 ? "1" : undefined}>
         Huella {person.numOfFP ?? 0}
@@ -161,6 +171,19 @@ function CredChips({ person }: { person: Person }) {
   );
 }
 
+function OpFanout({ results }: { results: OpResult[] | null }) {
+  if (!results?.length) return null;
+  return (
+    <ul className={styles.personOpList}>
+      {results.map((r) => (
+        <li key={r.deviceIp} data-ok={r.ok ? "1" : "0"}>
+          {r.deviceIp}: {r.ok ? "OK" : r.error || "falló"}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function IntegraPeoplePage() {
   const [people, setPeople] = useState<Person[]>([]);
   const [orgs, setOrgs] = useState<Org[]>([]);
@@ -169,14 +192,16 @@ export default function IntegraPeoplePage() {
   const [detail, setDetail] = useState<unknown>(null);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [autoCode, setAutoCode] = useState(true);
   const [orgId, setOrgId] = useState("");
   const [editName, setEditName] = useState("");
   const [editValidFrom, setEditValidFrom] = useState("");
   const [editValidTo, setEditValidTo] = useState("");
   const [editValidEnable, setEditValidEnable] = useState(true);
   const [opNote, setOpNote] = useState<string | null>(null);
-  const [opResults, setOpResults] = useState<Array<{ deviceIp: string; ok: boolean; error?: string }> | null>(null);
-  const [mutating, setMutating] = useState(false);
+  const [opOk, setOpOk] = useState<boolean | null>(null);
+  const [opResults, setOpResults] = useState<OpResult[] | null>(null);
+  const [mutKind, setMutKind] = useState<MutKind>(null);
   const [orgFilter, setOrgFilter] = useState("");
   const [validityFilter, setValidityFilter] = useState<ValidityFilter>("");
   const [error, setError] = useState<string | null>(null);
@@ -185,9 +210,11 @@ export default function IntegraPeoplePage() {
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [provider, setProvider] = useState<string | null>(() => getCachedProvider());
-  const [altaOpen, setAltaOpen] = useState(true);
+  /** panel derecho: alta vs ficha */
+  const [mode, setMode] = useState<"alta" | "ficha">("alta");
   const isArtemis = !provider || provider === "ARTEMIS";
   const isIsapi = provider === "ISAPI";
+  const mutating = mutKind != null;
 
   useEffect(() => subscribeProvider(setProvider), []);
 
@@ -198,7 +225,9 @@ export default function IntegraPeoplePage() {
     setEditValidTo(selected.validTo?.slice(0, 19) || "");
     setEditValidEnable(selected.validEnable !== false);
     setOpNote(null);
+    setOpOk(null);
     setOpResults(null);
+    setMode("ficha");
   }, [selected?.id]);
 
   const load = useCallback(async () => {
@@ -245,6 +274,7 @@ export default function IntegraPeoplePage() {
   const openDetail = async (p: Person) => {
     setSelected(p);
     setDetail(null);
+    setMode("ficha");
     setBusy(true);
     try {
       setDetail(await integraApi(`integra/people/${encodeURIComponent(p.id)}`));
@@ -261,6 +291,19 @@ export default function IntegraPeoplePage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const startAlta = () => {
+    setSelected(null);
+    setDetail(null);
+    setMode("alta");
+    setOpNote(null);
+    setOpOk(null);
+    setOpResults(null);
+    setError(null);
+    setName("");
+    setCode("");
+    setAutoCode(true);
   };
 
   const syncNow = async () => {
@@ -284,29 +327,34 @@ export default function IntegraPeoplePage() {
 
   const withFace = people.filter((p) => p.hasFace || (p.numOfFace ?? 0) > 0).length;
 
+  const applyOp = (r: {
+    success?: boolean;
+    note?: string;
+    results?: OpResult[];
+  }) => {
+    setOpResults(r.results || null);
+    setOpNote(r.note || (r.success ? "Listo" : "No se completó"));
+    setOpOk(r.success === true);
+    if (!r.success) {
+      setError(r.note || "Revisa el resultado por terminal.");
+    }
+  };
+
   return (
     <IgPage>
       <IgToolbar
-        title="Personas"
-        meta={`${filtered.length}/${people.length}${withFace ? ` · ${withFace} con rostro` : ""}${orgs.length ? ` · ${orgs.length} orgs` : ""} · ${live ? "live" : "espejo"}`}
+        title="Control de personal"
+        meta={`${filtered.length}/${people.length}${withFace ? ` · ${withFace} Face ID terminal` : ""}${
+          orgs.length ? ` · ${orgs.length} orgs` : ""
+        } · ${live ? "live" : "espejo"}`}
         actions={
           <>
             {isIsapi && (
-              <IgBtn
-                variant="primary"
-                onClick={() => {
-                  setSelected(null);
-                  setDetail(null);
-                  setAltaOpen(true);
-                  setOpNote(null);
-                  setOpResults(null);
-                  setError(null);
-                }}
-              >
+              <IgBtn variant="primary" onClick={startAlta}>
                 + Nueva persona
               </IgBtn>
             )}
-            <IgBtn onClick={() => setLive((v) => !v)}>{live ? "Live" : "Espejo"}</IgBtn>
+            <IgBtn onClick={() => setLive((v) => !v)}>{live ? "Live ACS" : "Espejo"}</IgBtn>
             {isIsapi && (
               <IgBtn disabled={syncing} onClick={() => void syncNow()}>
                 {syncing ? "Sincronizando…" : "Sincronizar"}
@@ -317,14 +365,24 @@ export default function IntegraPeoplePage() {
         }
       />
       <IgError>{error}</IgError>
+      <p className={styles.personLead}>
+        Alta, foto Face ID y baja se empujan a <strong>todos los terminales ACS</strong> del
+        sitio. Face ID vive en el lector — las cámaras de oficina no identifican rostros.
+      </p>
 
       <IgFilters>
         {isArtemis && (
           <IgField label="Org">
-            <select value={orgFilter} onChange={(e) => setOrgFilter(e.target.value)} style={selectStyle}>
+            <select
+              value={orgFilter}
+              onChange={(e) => setOrgFilter(e.target.value)}
+              style={selectStyle}
+            >
               <option value="">Todas</option>
               {orgs.map((o) => (
-                <option key={o.id} value={o.id}>{o.name}</option>
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
               ))}
             </select>
           </IgField>
@@ -341,24 +399,29 @@ export default function IntegraPeoplePage() {
               <option value="warn">Por vencer</option>
               <option value="expired">Vencidas</option>
               <option value="off">Deshabilitadas</option>
-              <option value="face">Con rostro</option>
-              <option value="noface">Sin rostro</option>
+              <option value="face">Con Face ID</option>
+              <option value="noface">Sin Face ID</option>
             </select>
           </IgField>
         )}
         <IgField label="Buscar">
-          <input value={q} onChange={(e) => setQ(e.target.value)} style={inputStyle} placeholder="nombre / código / id" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            style={inputStyle}
+            placeholder="nombre / código"
+          />
         </IgField>
       </IgFilters>
 
       <IgSplit
-        leftWidth="56%"
+        leftWidth="52%"
         left={
           <IgPanel title="Directorio" count={filtered.length} flush>
             <div className={styles.personDirectory}>
               {filtered.map((p) => {
                 const v = validityOf(p);
-                const sel = selected?.id === p.id;
+                const sel = selected?.id === p.id && mode === "ficha";
                 return (
                   <button
                     key={p.id}
@@ -375,9 +438,7 @@ export default function IntegraPeoplePage() {
                       </div>
                       <div className={styles.personRowMeta}>
                         <span className={styles.personMono}>{p.code || p.id}</span>
-                        {(p.userType || p.orgName) && (
-                          <span>{p.userType || p.orgName}</span>
-                        )}
+                        {(p.userType || p.orgName) && <span>{p.userType || p.orgName}</span>}
                         {genderLabel(p.gender) && <span>{genderLabel(p.gender)}</span>}
                       </div>
                       {isIsapi && <CredChips person={p} />}
@@ -386,19 +447,200 @@ export default function IntegraPeoplePage() {
                 );
               })}
               {filtered.length === 0 && (
-                <p className={styles.igEmpty}>
-                  {isArtemis
-                    ? "Sin personas"
-                    : "Sin personas en espejo — pulsa «Sincronizar terminales»"}
-                </p>
+                <div className={styles.personEmptyBox}>
+                  <strong>Sin personas</strong>
+                  <p>
+                    {isArtemis
+                      ? "No hay coincidencias en el directorio."
+                      : "El espejo está vacío o el filtro no deja nada. Sincroniza terminales o da de alta a alguien."}
+                  </p>
+                  {isIsapi && (
+                    <IgBtn variant="primary" onClick={startAlta}>
+                      + Nueva persona
+                    </IgBtn>
+                  )}
+                </div>
               )}
             </div>
           </IgPanel>
         }
         right={
-          <IgPanel title={isArtemis ? "Detalle / alta" : "Ficha"} count={selected?.name || "—"}>
-            {detailPerson && selected ? (
-              <div className={styles.personCard}>
+          <IgPanel
+            title={
+              mode === "alta"
+                ? "Alta nueva persona"
+                : selected
+                  ? "Ficha"
+                  : "Selecciona o da de alta"
+            }
+            count={mode === "ficha" ? selected?.name || "—" : autoCode ? "código auto" : "código manual"}
+          >
+            {/* ── ALTA ─────────────────────────────────────────────── */}
+            {mode === "alta" && isIsapi && (
+              <div className={styles.personCrud}>
+                <section className={styles.personSection} data-tone="accent">
+                  <header className={styles.personSectionHead}>
+                    <strong>1 · Datos</strong>
+                    <span>se propaga a todos los ACS</span>
+                  </header>
+                  <IgField label="Nombre completo">
+                    <input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      style={{ ...inputStyle, maxWidth: "100%" }}
+                      placeholder="Ej. Ariadna Sierra"
+                      autoFocus
+                    />
+                  </IgField>
+                  <label className={styles.personCheck}>
+                    <input
+                      type="checkbox"
+                      checked={autoCode}
+                      onChange={(e) => {
+                        setAutoCode(e.target.checked);
+                        if (e.target.checked) setCode("");
+                      }}
+                    />
+                    Generar código de empleado automáticamente
+                  </label>
+                  {!autoCode && (
+                    <IgField label="Código empleado (manual)">
+                      <input
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        style={{ ...inputStyle, maxWidth: "100%" }}
+                        placeholder="máx. 32 caracteres"
+                      />
+                    </IgField>
+                  )}
+                  {autoCode && (
+                    <p className={styles.personNote}>
+                      El código se asigna al dar de alta (siguiente número libre del
+                      espejo, o marca de tiempo si no hay numéricos).
+                    </p>
+                  )}
+                  <IgBtn
+                    variant="primary"
+                    disabled={!name.trim() || mutating || (!autoCode && !code.trim())}
+                    onClick={async () => {
+                      setMutKind("create");
+                      setError(null);
+                      setOpOk(null);
+                      try {
+                        const r = await integraApi<{
+                          success?: boolean;
+                          note?: string;
+                          employeeNo?: string;
+                          results?: OpResult[];
+                        }>("integra/people", {
+                          method: "POST",
+                          body: JSON.stringify({
+                            personName: name.trim(),
+                            autoCode,
+                            ...(autoCode
+                              ? {}
+                              : {
+                                  employeeNo: code.trim(),
+                                  personCode: code.trim(),
+                                }),
+                          }),
+                        });
+                        applyOp(r);
+                        if (r.success) {
+                          setName("");
+                          setCode("");
+                          setAutoCode(true);
+                          await load();
+                          if (r.employeeNo) {
+                            const created = (
+                              await integraApi<{ items: Person[] }>("integra/people")
+                            ).items.find((p) => p.id === r.employeeNo);
+                            if (created) void openDetail(created);
+                          }
+                        }
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "Error al dar de alta");
+                        setOpOk(false);
+                      } finally {
+                        setMutKind(null);
+                      }
+                    }}
+                  >
+                    {mutKind === "create" ? "Dando de alta…" : "Dar de alta en terminales"}
+                  </IgBtn>
+                  {opNote && mode === "alta" && (
+                    <p className={styles.personNote} data-tone={opOk ? "ok" : "warn"}>
+                      {opNote}
+                    </p>
+                  )}
+                  {mode === "alta" && <OpFanout results={opResults} />}
+                </section>
+              </div>
+            )}
+
+            {mode === "alta" && isArtemis && (
+              <div className={styles.personCrud}>
+                <section className={styles.personSection}>
+                  <IgField label="Nombre">
+                    <input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      style={{ ...inputStyle, maxWidth: "100%" }}
+                    />
+                  </IgField>
+                  <IgField label="Código">
+                    <input
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      style={{ ...inputStyle, maxWidth: "100%" }}
+                    />
+                  </IgField>
+                  <IgField label="Org">
+                    <select
+                      value={orgId}
+                      onChange={(e) => setOrgId(e.target.value)}
+                      style={{ ...selectStyle, maxWidth: "100%" }}
+                    >
+                      {orgs.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                        </option>
+                      ))}
+                    </select>
+                  </IgField>
+                  <IgBtn
+                    variant="primary"
+                    disabled={!name || !orgId || mutating}
+                    onClick={async () => {
+                      setMutKind("create");
+                      try {
+                        await integraApi("integra/people", {
+                          method: "POST",
+                          body: JSON.stringify({
+                            personName: name,
+                            personCode: code || undefined,
+                            orgIndexCode: orgId,
+                          }),
+                        });
+                        setName("");
+                        setCode("");
+                        await load();
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "Error");
+                      } finally {
+                        setMutKind(null);
+                      }
+                    }}
+                  >
+                    Alta persona
+                  </IgBtn>
+                </section>
+              </div>
+            )}
+
+            {/* ── FICHA ────────────────────────────────────────────── */}
+            {mode === "ficha" && detailPerson && selected ? (
+              <div className={styles.personCrud}>
                 <div className={styles.personCardHead}>
                   <PersonAvatar person={detailPerson} large onState={setFaceState} />
                   <div>
@@ -411,12 +653,11 @@ export default function IntegraPeoplePage() {
                       {(detailPerson.userType || detailPerson.orgName) && (
                         <IgBadge>{detailPerson.userType || detailPerson.orgName}</IgBadge>
                       )}
-                      {genderLabel(detailPerson.gender) && (
-                        <IgBadge tone="neutral">{genderLabel(detailPerson.gender)}</IgBadge>
-                      )}
                     </div>
                   </div>
                 </div>
+
+                {busy && <IgBadge>Cargando detalle…</IgBadge>}
 
                 {isIsapi && (
                   <>
@@ -448,21 +689,20 @@ export default function IntegraPeoplePage() {
                       )}
                     </dl>
                     <CredChips person={detailPerson} />
-                    {detailPerson.rightPlan != null && (
-                      <details className={styles.personRaw}>
-                        <summary>Plan de puertas (RightPlan)</summary>
-                        <pre>{JSON.stringify(detailPerson.rightPlan, null, 2)}</pre>
-                      </details>
-                    )}
+
                     {faceState === "unavailable" && (
                       <p className={styles.personNote} data-tone="warn">
-                        El rostro está dado de alta, pero el terminal no entrega la foto: la
-                        guarda como modelo biométrico, no como imagen. Sube un JPEG desde aquí
-                        para actualizarlo en todos los terminales.
+                        Face ID enrolado en terminal, pero el equipo no entrega JPEG (modelo
+                        biométrico). Sube una foto desde aquí para actualizarla en todos los
+                        lectores.
                       </p>
                     )}
 
-                    <div className={styles.personCreate}>
+                    <section className={styles.personSection}>
+                      <header className={styles.personSectionHead}>
+                        <strong>2 · Editar ficha</strong>
+                        <span>UserInfo/Modify</span>
+                      </header>
                       <IgField label="Nombre">
                         <input
                           value={editName}
@@ -494,39 +734,57 @@ export default function IntegraPeoplePage() {
                         />
                         Vigencia activa
                       </label>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        <IgBtn
-                          variant="primary"
-                          disabled={mutating || !editName.trim()}
-                          onClick={async () => {
-                            setMutating(true);
-                            setError(null);
-                            try {
-                              const r = await integraApi<{
-                                results?: Array<{ deviceIp: string; ok: boolean; error?: string }>;
-                              }>(`integra/people/${encodeURIComponent(selected.id)}`, {
-                                method: "PATCH",
-                                body: JSON.stringify({
-                                  personName: editName.trim(),
-                                  validFrom: editValidFrom || undefined,
-                                  validTo: editValidTo || undefined,
-                                  validEnable: editValidEnable,
-                                }),
-                              });
-                              setOpResults(r.results || null);
-                              setOpNote("Ficha actualizada en terminales");
-                              await load();
-                            } catch (e) {
-                              setError(e instanceof Error ? e.message : "Error al guardar");
-                            } finally {
-                              setMutating(false);
-                            }
-                          }}
-                        >
-                          {mutating ? "…" : "Guardar en terminales"}
-                        </IgBtn>
-                        <label className={styles.personFileBtn}>
-                          Subir foto
+                      <IgBtn
+                        variant="primary"
+                        disabled={mutating || !editName.trim()}
+                        onClick={async () => {
+                          setMutKind("save");
+                          setError(null);
+                          try {
+                            const r = await integraApi<{
+                              success?: boolean;
+                              note?: string;
+                              results?: OpResult[];
+                            }>(`integra/people/${encodeURIComponent(selected.id)}`, {
+                              method: "PATCH",
+                              body: JSON.stringify({
+                                personName: editName.trim(),
+                                validFrom: editValidFrom || undefined,
+                                validTo: editValidTo || undefined,
+                                validEnable: editValidEnable,
+                              }),
+                            });
+                            applyOp({
+                              ...r,
+                              note: r.success
+                                ? "Ficha guardada en todos los terminales."
+                                : r.note || "Guardado incompleto.",
+                            });
+                            await load();
+                          } catch (e) {
+                            setError(e instanceof Error ? e.message : "Error al guardar");
+                            setOpOk(false);
+                          } finally {
+                            setMutKind(null);
+                          }
+                        }}
+                      >
+                        {mutKind === "save" ? "Guardando…" : "Guardar en terminales"}
+                      </IgBtn>
+                    </section>
+
+                    <section className={styles.personSection}>
+                      <header className={styles.personSectionHead}>
+                        <strong>3 · Face ID del terminal</strong>
+                        <span>FaceDataRecord · no es video</span>
+                      </header>
+                      <p className={styles.personNote}>
+                        La foto se empuja a cada ACS. El terminal guarda un modelo biométrico;
+                        no se puede descargar de vuelta.
+                      </p>
+                      <div className={styles.personBtnRow}>
+                        <label className={styles.personFileBtn} data-busy={mutKind === "photo" ? "1" : undefined}>
+                          {mutKind === "photo" ? "Subiendo…" : "Subir foto JPEG"}
                           <input
                             type="file"
                             accept="image/jpeg,image/jpg,image/png"
@@ -536,28 +794,32 @@ export default function IntegraPeoplePage() {
                               const file = e.target.files?.[0];
                               e.target.value = "";
                               if (!file) return;
-                              setMutating(true);
+                              setMutKind("photo");
                               setError(null);
                               try {
                                 const buf = await file.arrayBuffer();
                                 const bytes = new Uint8Array(buf);
                                 let binary = "";
-                                for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+                                for (let i = 0; i < bytes.length; i++) {
+                                  binary += String.fromCharCode(bytes[i]);
+                                }
                                 const imageBase64 = btoa(binary);
                                 const r = await integraApi<{
-                                  results?: Array<{ deviceIp: string; ok: boolean; error?: string }>;
+                                  success?: boolean;
                                   note?: string;
+                                  results?: OpResult[];
                                 }>(`integra/people/${encodeURIComponent(selected.id)}/face`, {
                                   method: "POST",
                                   body: JSON.stringify({ imageBase64 }),
                                 });
-                                setOpResults(r.results || null);
-                                setOpNote(r.note || "Foto empujada a terminales");
+                                applyOp(r);
                                 await load();
+                                await openDetail(selected);
                               } catch (err) {
                                 setError(err instanceof Error ? err.message : "Error foto");
+                                setOpOk(false);
                               } finally {
-                                setMutating(false);
+                                setMutKind(null);
                               }
                             }}
                           />
@@ -565,91 +827,113 @@ export default function IntegraPeoplePage() {
                         <IgBtn
                           disabled={mutating}
                           onClick={async () => {
-                            if (!confirm("¿Quitar el rostro biométrico en todos los terminales?")) return;
-                            setMutating(true);
-                            try {
-                              const r = await integraApi<{
-                                results?: Array<{ deviceIp: string; ok: boolean; error?: string }>;
-                              }>(`integra/people/${encodeURIComponent(selected.id)}/face`, {
-                                method: "DELETE",
-                              });
-                              setOpResults(r.results || null);
-                              setOpNote("Rostro eliminado");
-                              await load();
-                            } catch (err) {
-                              setError(err instanceof Error ? err.message : "Error");
-                            } finally {
-                              setMutating(false);
+                            if (
+                              !confirm(
+                                `¿Quitar el Face ID biométrico de ${selected.name} en todos los terminales?`,
+                              )
+                            ) {
+                              return;
                             }
-                          }}
-                        >
-                          Quitar foto
-                        </IgBtn>
-                        <IgBtn
-                          disabled={mutating}
-                          onClick={async () => {
-                            if (!confirm(`¿Eliminar ${selected.name} de todos los terminales?`)) return;
-                            setMutating(true);
+                            setMutKind("faceDel");
                             setError(null);
                             try {
                               const r = await integraApi<{
                                 success?: boolean;
-                                partial?: boolean;
                                 note?: string;
-                                results?: Array<{ deviceIp: string; ok: boolean; error?: string }>;
-                              }>(`integra/people/${encodeURIComponent(selected.id)}`, {
+                                results?: OpResult[];
+                              }>(`integra/people/${encodeURIComponent(selected.id)}/face`, {
                                 method: "DELETE",
                               });
-                              setOpResults(r.results || null);
-                              setOpNote(r.note || (r.success ? "Eliminado" : "No se eliminó"));
-                              if (!r.success) {
-                                setError(
-                                  r.note ||
-                                    "La persona sigue en uno o más terminales. Revisa el detalle por IP.",
-                                );
-                                return;
-                              }
-                              setSelected(null);
-                              setDetail(null);
+                              applyOp({
+                                ...r,
+                                note: r.success ? "Face ID quitado." : r.note || "No se quitó del todo.",
+                                success: r.results ? r.results.every((x) => x.ok) : r.success,
+                              });
                               await load();
                             } catch (err) {
                               setError(err instanceof Error ? err.message : "Error");
+                              setOpOk(false);
                             } finally {
-                              setMutating(false);
+                              setMutKind(null);
                             }
                           }}
                         >
-                          Eliminar persona
+                          {mutKind === "faceDel" ? "Quitando…" : "Quitar Face ID"}
                         </IgBtn>
                       </div>
-                      {opNote && <p className={styles.personNote}>{opNote}</p>}
-                      {opResults && (
-                        <ul className={styles.personOpList}>
-                          {opResults.map((r) => (
-                            <li key={r.deviceIp} data-ok={r.ok ? "1" : "0"}>
-                              {r.deviceIp}: {r.ok ? "OK" : r.error || "falló"}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                    </section>
+
+                    <section className={styles.personSection} data-tone="danger">
+                      <header className={styles.personSectionHead}>
+                        <strong>4 · Eliminar persona</strong>
+                        <span>DeleteProcess + verificación</span>
+                      </header>
                       <p className={styles.personNote}>
-                        La foto se empuja al terminal con FaceDataRecord; no se puede
-                        descargar el modelo biométrico de vuelta.
+                        Borra rostro y ficha en cada ACS, espera DeleteProcess y comprueba
+                        que ya no aparece en UserInfo. Solo entonces limpia el espejo — si un
+                        terminal falla, la persona se queda y verás el error por IP.
                       </p>
-                    </div>
+                      <IgBtn
+                        variant="danger"
+                        disabled={mutating}
+                        onClick={async () => {
+                          if (
+                            !confirm(
+                              `¿Eliminar a ${selected.name} (${selected.code || selected.id}) de TODOS los terminales?\n\nEsta acción no se puede deshacer desde aquí.`,
+                            )
+                          ) {
+                            return;
+                          }
+                          setMutKind("delete");
+                          setError(null);
+                          try {
+                            const r = await integraApi<{
+                              success?: boolean;
+                              partial?: boolean;
+                              note?: string;
+                              results?: OpResult[];
+                            }>(`integra/people/${encodeURIComponent(selected.id)}`, {
+                              method: "DELETE",
+                            });
+                            applyOp(r);
+                            if (r.success) {
+                              const gone = selected.id;
+                              setPeople((prev) => prev.filter((p) => p.id !== gone));
+                              setSelected(null);
+                              setDetail(null);
+                              setMode("alta");
+                              setOpNote(r.note || "Eliminado de todos los terminales.");
+                              setOpOk(true);
+                            }
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : "Error al eliminar");
+                            setOpOk(false);
+                          } finally {
+                            setMutKind(null);
+                          }
+                        }}
+                      >
+                        {mutKind === "delete"
+                          ? "Eliminando (esperando terminales)…"
+                          : "Eliminar de todos los terminales"}
+                      </IgBtn>
+                    </section>
+
+                    {opNote && mode === "ficha" && (
+                      <p className={styles.personNote} data-tone={opOk ? "ok" : "warn"}>
+                        {opNote}
+                      </p>
+                    )}
+                    {mode === "ficha" && <OpFanout results={opResults} />}
                   </>
                 )}
 
-                {busy && <IgBadge>Cargando detalle…</IgBadge>}
-
                 {isArtemis && detail != null && (
-                  <pre className={styles.personRawPre}>
-                    {JSON.stringify(detail, null, 2)}
-                  </pre>
+                  <pre className={styles.personRawPre}>{JSON.stringify(detail, null, 2)}</pre>
                 )}
-
                 {isArtemis && (
                   <IgBtn
+                    variant="danger"
                     onClick={async () => {
                       if (!confirm("¿Eliminar esta persona del directorio?")) return;
                       await integraApi(`integra/people/${encodeURIComponent(selected.id)}`, {
@@ -664,102 +948,18 @@ export default function IntegraPeoplePage() {
                   </IgBtn>
                 )}
               </div>
-            ) : (
-              <p className={styles.personEmptyHint}>
-                {isArtemis
-                  ? "Selecciona una persona del directorio"
-                  : "Selecciona una persona para ver foto, vigencia y credenciales del terminal."}
-              </p>
-            )}
+            ) : null}
 
-            {isIsapi && (
-              <>
-                <hr className={styles.personDivider} />
-                <div className={styles.personCreate}>
-                  <strong>Alta en terminales</strong>
-                  <IgField label="Nombre">
-                    <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
-                  </IgField>
-                  <IgField label="Código empleado">
-                    <input value={code} onChange={(e) => setCode(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
-                  </IgField>
-                  <IgBtn
-                    variant="primary"
-                    disabled={!name.trim() || !code.trim() || mutating}
-                    onClick={async () => {
-                      setMutating(true);
-                      setError(null);
-                      try {
-                        const r = await integraApi<{
-                          results?: Array<{ deviceIp: string; ok: boolean; error?: string }>;
-                        }>("integra/people", {
-                          method: "POST",
-                          body: JSON.stringify({
-                            personName: name.trim(),
-                            employeeNo: code.trim(),
-                            personCode: code.trim(),
-                          }),
-                        });
-                        setOpResults(r.results || null);
-                        setOpNote("Persona creada");
-                        setName("");
-                        setCode("");
-                        await load();
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : "Error");
-                      } finally {
-                        setMutating(false);
-                      }
-                    }}
-                  >
-                    Alta persona
+            {mode === "ficha" && !selected && (
+              <div className={styles.personEmptyBox}>
+                <strong>Ninguna ficha abierta</strong>
+                <p>Elige a alguien del directorio o da de alta a una persona nueva.</p>
+                {isIsapi && (
+                  <IgBtn variant="primary" onClick={startAlta}>
+                    + Nueva persona
                   </IgBtn>
-                </div>
-              </>
-            )}
-
-            {isArtemis && (
-              <>
-                <hr className={styles.personDivider} />
-                <div className={styles.personCreate}>
-                  <IgField label="Nombre">
-                    <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
-                  </IgField>
-                  <IgField label="Código">
-                    <input value={code} onChange={(e) => setCode(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
-                  </IgField>
-                  <IgField label="Org">
-                    <select value={orgId} onChange={(e) => setOrgId(e.target.value)} style={{ ...selectStyle, maxWidth: "100%" }}>
-                      {orgs.map((o) => (
-                        <option key={o.id} value={o.id}>{o.name}</option>
-                      ))}
-                    </select>
-                  </IgField>
-                  <IgBtn
-                    variant="primary"
-                    disabled={!name || !orgId}
-                    onClick={async () => {
-                      try {
-                        await integraApi("integra/people", {
-                          method: "POST",
-                          body: JSON.stringify({
-                            personName: name,
-                            personCode: code || undefined,
-                            orgIndexCode: orgId,
-                          }),
-                        });
-                        setName("");
-                        setCode("");
-                        await load();
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : "Error");
-                      }
-                    }}
-                  >
-                    Alta persona
-                  </IgBtn>
-                </div>
-              </>
+                )}
+              </div>
             )}
           </IgPanel>
         }
