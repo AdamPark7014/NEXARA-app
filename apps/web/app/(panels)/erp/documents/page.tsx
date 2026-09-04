@@ -224,20 +224,51 @@ export default function DocumentsPage() {
   ];
 
   return (
-    <>
-      <PageHeader
-        eyebrow="ERP · Logística"
-        title="Gestión documental"
-        subtitle="Repositorio único de contratos, manuales, certificados y actas. Versionado y aprobación incluidos."
-        actions={
-          <>
-            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo documento</Button>}
-          </>
-        }
-      />
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 14 }}>
+    <PageChrome
+      eyebrow="ERP · Gobierno"
+      title="Documentos"
+      subtitle="Contratos, manuales, certificados y actas con versionado y aprobación."
+      primaryAction={
+        cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo documento</Button> : undefined
+      }
+      secondaryActions={
+        <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
+      }
+      filters={
+        <FilterToolbar
+          search={{ value: search, onChange: setSearch, placeholder: "Buscar por título o folio…" }}
+          selects={[
+            {
+              label: "Estado",
+              value: filterStatus,
+              onChange: setFilterStatus,
+              options: [
+                { value: "DRAFT", label: "Borrador" },
+                { value: "PENDING_APPROVAL", label: "Pendiente de aprobación" },
+                { value: "APPROVED", label: "Aprobado" },
+                { value: "ARCHIVED", label: "Archivado" },
+              ],
+            },
+            {
+              label: "Categoría",
+              value: filterCategory,
+              onChange: setFilterCategory,
+              options: cats.map((c) => ({ value: String(c.id), label: c.name })),
+            },
+          ]}
+          onClear={() => { setSearch(""); setFilterStatus(""); setFilterCategory(""); }}
+          resultCount={loading ? null : filtered.length}
+          rightActions={filtered.length > 0 ? (
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(filtered, [
+              { key: "documentNumber", label: "Folio" },
+              { key: "title", label: "Título" },
+              { key: "status", label: "Estado" },
+            ], "documentos")}>Excel</Button>
+          ) : undefined}
+        />
+      }
+    >
+      <div className={chrome.kpiStrip}>
         <KpiCard label="Total documentos" value={docs.length} icon="📂" />
         <KpiCard label="Pendientes de aprobar" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" />
         <KpiCard label="Aprobados" value={aprobados} variant="positive" icon="✅" />

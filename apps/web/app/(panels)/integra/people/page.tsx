@@ -18,6 +18,18 @@ import { PersonFaceThumb, invalidatePersonFaceCache, prefetchPersonFace } from "
 import { inputStyle, integraApi, selectStyle } from "../_lib";
 import { toast } from "@/components/Toast";
 import styles from "../integra.module.css";
+import { useUser } from "@/components/UserContext";
+import { buildApiUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
+import { listUsers, type ApiUserRow } from "@/lib/users-api";
+import { withTenantHeaders } from "@/lib/tenant";
+import {
+  asList,
+  buildErpByKey,
+  findErpForPerson,
+  generateTempPassword,
+  type AltaMode,
+} from "./_personIdentity";
 
 type Person = {
   id: string;
@@ -47,9 +59,28 @@ type Person = {
 type Org = { id: string; name: string; parentId?: string };
 type AcsDev = { id: string; name: string; kind: string; ip?: string | null; deviceType?: string | null };
 type OpResult = { deviceIp: string; ok: boolean; error?: string };
-type ValidityFilter = "" | "ok" | "warn" | "expired" | "off" | "face" | "noface";
+type ValidityFilter = "" | "ok" | "warn" | "expired" | "off" | "face" | "noface" | "erp" | "noerp";
 type MutKind = "save" | "photo" | "faceDel" | "delete" | "create" | "fp" | null;
 type AltaStep = 1 | 2 | 3 | 4;
+type ErpRole = { id: number; nombre: string };
+type ErpDept = { id: number; nombre: string };
+
+async function erpApiFetch<T>(path: string, token: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(
+    withTenantHeaders({
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    }),
+  );
+  const res = await fetch(buildApiUrl(path), { ...init, credentials: "include", headers });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  const text = await res.text();
+  return (text ? JSON.parse(text) : null) as T;
+}
 
 function genderLabel(g?: string) {
   const v = String(g || "").toLowerCase();

@@ -1443,6 +1443,19 @@ export class UsersService {
         data: { revokedAt: new Date(), revokeReason: 'bulk_deactivate' },
       });
     }
+    const toPush = await this.prisma.user.findMany({
+      where: { id: { in: allowed } },
+      select: { id: true, nombre: true, employeeNumber: true },
+    });
+    for (const u of toPush) {
+      const emp = this.withEmployeeNumber(u).employeeNumber;
+      void this.pushAcsFromErp({
+        companyId: tenantId,
+        employeeNumber: emp,
+        name: u.nombre,
+        enable: isActive,
+      });
+    }
     return { updated: result.count, skipped: safeIds.length - allowed.length };
   }
 

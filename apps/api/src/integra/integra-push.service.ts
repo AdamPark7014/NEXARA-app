@@ -1071,6 +1071,18 @@ export class IntegraPushService {
 
     this.publish(site.id, this.toDto(row));
 
+    // Espejo: actualizar personName sin sync completo (ocupación / listados).
+    if (ev.personId && ev.personName) {
+      void this.acsFanout
+        .touchMirrorName({
+          companyId: site.companyId,
+          siteId: site.id,
+          personId: ev.personId,
+          personName: ev.personName,
+        })
+        .catch(() => undefined);
+    }
+
     // Snapshot de canal siempre en fresco (aunque ya haya cara enrolada):
     // captura el instante en puerta; sustituye photoPath si llega.
     if (worthAPhoto(ev) && isFresh(ev.occurredAt)) {

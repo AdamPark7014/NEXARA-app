@@ -126,4 +126,63 @@ export class AttendanceController {
       selfOnly: !canManage,
     });
   }
+
+  /** Excel del contraste híbrido del día (ruta literal antes de params genéricos). */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.ATTENDANCE_MANAGE,
+      PERMISSIONS.ATTENDANCE_VIEW,
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.CONSOLE_ADMIN,
+    ],
+  })
+  @Get('hybrid/export.xlsx')
+  async hybridExport(
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('date') date?: string,
+    @Query('siteId') siteId?: string,
+    @Res() res?: Response,
+  ) {
+    const canManage = Boolean(
+      req.user?.isSuperAdmin ||
+        req.user?.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE) ||
+        req.user?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN),
+    );
+    const day = date || new Date().toLocaleDateString('sv-SE');
+    const data = await this.hybridService.getHybridDay(req.user, day, companyId, {
+      siteId: siteId ? parseInt(siteId, 10) : null,
+      selfOnly: !canManage,
+    });
+    const rows = (data.items || []).map((item: any) => ({
+      fecha: data.date,
+      persona: item.user?.nombre || item.acs?.personName || item.acs?.personId || '',
+      codigo:
+        item.user?.employeeNumber ||
+        item.user?.companyEmployeeNumber ||
+        item.acs?.personId ||
+        '',
+      departamento: item.user?.department || '',
+      vinculo: item.linkStatus,
+      erpEntrada: item.erp?.checkIn || '',
+      erpSalida: item.erp?.checkOut || '',
+      erpMinutos: item.erp?.totalMinutes ?? '',
+      acsEntrada: item.acs?.firstAt || '',
+      acsSalida: item.acs?.lastAt || '',
+      acsMinutos: item.acs?.minutes ?? '',
+      puerta: item.acs?.firstDoor || '',
+      alertas: Array.isArray(item.flags) ? item.flags.join('; ') : '',
+    }));
+    const buffer = await this.excelExport.exportToExcel(rows, 'asistencia-hibrida');
+    res!.header(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res!.header(
+      'Content-Disposition',
+      `attachment; filename="asistencia-hibrida-${day}.xlsx"`,
+    );
+    return res!.send(Buffer.from(buffer));
+  }
 }

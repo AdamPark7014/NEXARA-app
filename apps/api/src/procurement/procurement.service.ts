@@ -11,6 +11,7 @@ import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCom
 import { FolioService } from '../common/folio/folio.service.js';
 import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
 import { generatePurchaseOrderPdf, type PurchaseOrderPdfPayload } from './purchase-order-pdf.js';
+import { generateGoodsReceiptPdf, type GoodsReceiptPdfPayload } from './goods-receipt-pdf.js';
 
 @Injectable()
 export class ProcurementService {
@@ -665,9 +666,105 @@ export class ProcurementService {
     if (purchaseOrderId) where.purchaseOrderId = purchaseOrderId;
     return this.prisma.goodsReceipt.findMany({
       where,
-      include: { items: true, purchaseOrder: { select: { id: true, poNumber: true } }, receivedBy: { select: { id: true, nombre: true } } },
+      include: {
+        items: {
+          include: {
+            purchaseOrderItem: {
+              select: {
+                id: true,
+                description: true,
+                unitPrice: true,
+                product: { select: { id: true, sku: true, name: true } },
+              },
+            },
+          },
+        },
+        warehouse: { select: { id: true, code: true, name: true } },
+        purchaseOrder: {
+          select: {
+            id: true,
+            poNumber: true,
+            supplier: { select: { id: true, name: true } },
+          },
+        },
+        receivedBy: { select: { id: true, nombre: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async getGoodsReceipt(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const receipt = await this.prisma.goodsReceipt.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+      include: {
+        items: {
+          include: {
+            purchaseOrderItem: {
+              select: {
+                id: true,
+                description: true,
+                unitPrice: true,
+                product: { select: { id: true, sku: true, name: true } },
+              },
+            },
+          },
+        },
+        warehouse: { select: { id: true, code: true, name: true } },
+        purchaseOrder: {
+          select: {
+            id: true,
+            poNumber: true,
+            supplier: { select: { id: true, name: true } },
+          },
+        },
+        receivedBy: { select: { id: true, nombre: true } },
+        company: {
+          select: {
+            id: true,
+            legalName: true,
+            tradeName: true,
+          },
+        },
+      },
+    });
+    if (!receipt) throw new NotFoundException('Recepción no encontrada');
+    return receipt;
+  }
+
+  async getGoodsReceiptPdfBuffer(id: number, companyId?: number | null) {
+    const receipt = await this.getGoodsReceipt(id, companyId);
+    const payload: GoodsReceiptPdfPayload = {
+      receiptNumber: receipt.receiptNumber,
+      receiptDate: receipt.receiptDate.toISOString().slice(0, 10),
+      notes: receipt.notes,
+      companyName: receipt.company?.tradeName || receipt.company?.legalName || 'NEXARA',
+      warehouseName: receipt.warehouse?.name ?? null,
+      warehouseCode: receipt.warehouse?.code ?? null,
+      poNumber: receipt.purchaseOrder?.poNumber ?? null,
+      supplierName: receipt.purchaseOrder?.supplier?.name ?? null,
+      receivedByName: receipt.receivedBy?.nombre ?? null,
+      freightCost: Number(receipt.freightCost || 0),
+      insuranceCost: Number(receipt.insuranceCost || 0),
+      customsCost: Number(receipt.customsCost || 0),
+      otherLandedCost: Number(receipt.otherLandedCost || 0),
+      items: (receipt.items ?? []).map((item) => ({
+        sku: item.purchaseOrderItem?.product?.sku ?? null,
+        description:
+          item.purchaseOrderItem?.description ||
+          item.purchaseOrderItem?.product?.name ||
+          `Partida #${item.purchaseOrderItemId}`,
+        quantityReceived: Number(item.quantityReceived),
+        quantityRejected: Number(item.quantityRejected || 0),
+        lotNumber: item.lotNumber,
+        unitPrice: item.purchaseOrderItem?.unitPrice != null ? Number(item.purchaseOrderItem.unitPrice) : null,
+        landedCostAllocated: Number(item.landedCostAllocated || 0),
+      })),
+    };
+    return {
+      pdf: await generateGoodsReceiptPdf(payload),
+      receiptNumber: receipt.receiptNumber,
+    };
   }
 
   // ── Supplier Evaluations ──────────────────────────────────────────
