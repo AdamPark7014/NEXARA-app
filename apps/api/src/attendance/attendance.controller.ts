@@ -1,4 +1,5 @@
-import { Controller, Post, Body, Req, UseGuards, Get, Query } from '@nestjs/common';
+import { Controller, Post, Body, Req, UseGuards, Get, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { AttendanceService } from './attendance.service';
 import { AttendanceHybridService } from './attendance-hybrid.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
@@ -6,6 +7,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
+import { ExcelExportService } from '../common/excel-export.service.js';
 
 @Controller('attendance')
 export class AttendanceController {
