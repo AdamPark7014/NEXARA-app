@@ -32,10 +32,41 @@ interface ProfileResponse {
   id: number;
   nombre: string;
   email: string;
+  employeeNumber?: string | null;
   perfil?: Profile | null;
   role?: { nombre: string };
   department?: { nombre: string };
 }
+
+type MyIdentity = {
+  status: "linked" | "erp_only" | "acs_only" | "unlinked";
+  user: {
+    employeeNumber?: string | null;
+    companyEmployeeNumber?: string | null;
+  };
+  acsPerson: {
+    personId: string;
+    personName: string;
+    personCode?: string | null;
+  } | null;
+  howToLink?: string;
+};
+
+type HybridSelf = {
+  date: string;
+  items: Array<{
+    linkStatus: string;
+    flags: string[];
+    erp: { checkIn?: string | null; checkOut?: string | null; totalMinutes?: number | null } | null;
+    acs: {
+      personId: string;
+      firstAt?: string;
+      lastAt?: string;
+      passes?: number;
+      firstDoor?: string | null;
+    } | null;
+  }>;
+};
 
 async function apiFetch(path: string, token: string, init: RequestInit = {}) {
   const res = await fetch(buildApiUrl(path), {
@@ -64,13 +95,22 @@ export default function MyProfilePage() {
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [identity, setIdentity] = useState<MyIdentity | null>(null);
+  const [hybrid, setHybrid] = useState<HybridSelf | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true); setError(null);
     try {
-      const data = await apiFetch("users/profile/me", token);
+      const today = new Date().toLocaleDateString("sv-SE");
+      const [data, idn, hyb] = await Promise.all([
+        apiFetch("users/profile/me", token),
+        apiFetch("integra/identity/me", token).catch(() => null),
+        apiFetch(`attendance/hybrid?date=${today}`, token).catch(() => null),
+      ]);
       setProfile(data);
+      setIdentity(idn);
+      setHybrid(hyb);
       if (data?.perfil) {
         setForm({
           ...emptyForm,

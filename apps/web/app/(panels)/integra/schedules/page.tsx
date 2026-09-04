@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   IgBadge,
   IgBtn,
@@ -37,6 +37,15 @@ import {
 } from "../_schedulesApi";
 
 type ViewMode = "person" | "door" | "matrix";
+
+function readQuery(): { person: string; door: string; view: ViewMode } {
+  if (typeof window === "undefined") return { person: "", door: "", view: "person" };
+  const q = new URLSearchParams(window.location.search);
+  const viewRaw = q.get("view");
+  const view: ViewMode =
+    viewRaw === "door" || viewRaw === "matrix" || viewRaw === "person" ? viewRaw : "person";
+  return { person: q.get("person") || "", door: q.get("door") || "", view };
+}
 
 function OpFanout({ results }: { results: OpResult[] | null }) {
   if (!results?.length) return null;
@@ -123,17 +132,15 @@ function WeekGridPreview({
 
 export default function IntegraSchedulesPage() {
   const router = useRouter();
-  const search = useSearchParams();
+  const initialQ = readQuery();
   const [provider, setProvider] = useState<string | null>(() => getCachedProvider());
-  const [view, setView] = useState<ViewMode>(
-    () => (search.get("view") as ViewMode) || "person",
-  );
+  const [view, setView] = useState<ViewMode>(initialQ.view);
   const [catalog, setCatalog] = useState<SchedulesCatalog | null>(null);
   const [people, setPeople] = useState<Array<{ id: string; name: string; code?: string }>>(
     [],
   );
-  const [personId, setPersonId] = useState(search.get("person") || "");
-  const [doorId, setDoorId] = useState(search.get("door") || "");
+  const [personId, setPersonId] = useState(initialQ.person);
+  const [doorId, setDoorId] = useState(initialQ.door);
   const [draft, setDraft] = useState<PersonSchedule | null>(null);
   const [doorPeople, setDoorPeople] = useState<DoorAccessRow[]>([]);
   const [doorNote, setDoorNote] = useState<string | null>(null);

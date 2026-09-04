@@ -859,27 +859,177 @@ export default function IntegraPeoplePage() {
         right={
           <IgPanel
             title={
-              mode === "alta" ? "Alta nueva persona" : selected ? "Ficha" : "Selecciona o da de alta"
+              mode === "alta"
+                ? altaMode === "unified"
+                  ? "Alta unificada ERP + ACS"
+                  : altaMode === "link"
+                    ? "Enrolar usuario ERP en ACS"
+                    : "Alta solo ACS"
+                : selected
+                  ? "Ficha"
+                  : "Selecciona o da de alta"
             }
             count={
               mode === "ficha"
                 ? selected?.name || "—"
-                : altaStep === 3
-                  ? "foto requerida"
-                  : autoCode
-                    ? "código auto"
-                    : "código manual"
+                : altaMode === "unified"
+                  ? "ERP + terminales"
+                  : altaMode === "link"
+                    ? "vincular"
+                    : "solo ACS"
             }
           >
             {mode === "alta" && isIsapi && (
               <div className={styles.personCrud}>
-                <WizardSteps step={altaStep} />
+                <div className={styles.personModeTabs} role="tablist">
+                  {(
+                    [
+                      ["unified", "Unificada"],
+                      ["link", "Vincular ERP"],
+                      ["acs", "Solo ACS"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      className={styles.personModeTab}
+                      data-on={altaMode === key ? "1" : undefined}
+                      onClick={() => {
+                        setAltaMode(key);
+                        setAltaStep(1);
+                        setError(null);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <WizardSteps step={altaStep} mode={altaMode} />
 
-                {altaStep === 1 && (
+                {altaStep === 1 && altaMode === "unified" && (
+                  <section className={styles.personSection} data-tone="accent">
+                    <header className={styles.personSectionHead}>
+                      <strong>1 · Identidad ERP</strong>
+                      <span>nombre · correo · rol</span>
+                    </header>
+                    <IgField label="Nombre completo">
+                      <input
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        style={{ ...inputStyle, maxWidth: "100%" }}
+                        placeholder="Ej. Ariadna Sierra"
+                        autoFocus
+                      />
+                    </IgField>
+                    <IgField label="Correo">
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        style={{ ...inputStyle, maxWidth: "100%" }}
+                        placeholder="nombre@empresa.com"
+                      />
+                    </IgField>
+                    <IgField label="Rol ERP">
+                      <select
+                        value={roleId}
+                        onChange={(e) => setRoleId(e.target.value)}
+                        style={{ ...selectStyle, maxWidth: "100%" }}
+                        disabled={erpRoles.length === 0}
+                      >
+                        <option value="">— Seleccionar —</option>
+                        {erpRoles.map((r) => (
+                          <option key={r.id} value={String(r.id)}>
+                            {r.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </IgField>
+                    {erpDepts.length > 1 && (
+                      <IgField label="Departamento">
+                        <select
+                          value={departmentId}
+                          onChange={(e) => setDepartmentId(e.target.value)}
+                          style={{ ...selectStyle, maxWidth: "100%" }}
+                        >
+                          {erpDepts.map((d) => (
+                            <option key={d.id} value={String(d.id)}>
+                              {d.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </IgField>
+                    )}
+                    <p className={styles.personNote}>
+                      Se crea el usuario ERP con contraseña temporal y el mismo nº irá a los
+                      terminales ACS.
+                    </p>
+                    <IgBtn
+                      variant="primary"
+                      disabled={!name.trim() || !email.trim() || !roleId || !departmentId}
+                      onClick={() => setAltaStep(2)}
+                    >
+                      Continuar →
+                    </IgBtn>
+                  </section>
+                )}
+
+                {altaStep === 1 && altaMode === "link" && (
+                  <section className={styles.personSection} data-tone="accent">
+                    <header className={styles.personSectionHead}>
+                      <strong>1 · Usuario ERP</strong>
+                      <span>ya existe en NEXARA</span>
+                    </header>
+                    <IgField label="Elegir usuario">
+                      <select
+                        value={linkUserId}
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          setLinkUserId(id);
+                          const u = erpUsers.find((x) => String(x.id) === id);
+                          if (u) {
+                            setName(u.nombre);
+                            setEmail(u.email);
+                            setCode(u.employeeNumber || "");
+                            setAutoCode(!u.employeeNumber);
+                          }
+                        }}
+                        style={{ ...selectStyle, maxWidth: "100%" }}
+                      >
+                        <option value="">— Seleccionar —</option>
+                        {erpOnlyUsers.map((u) => (
+                          <option key={u.id} value={String(u.id)}>
+                            {u.nombre} · {u.role?.nombre || "sin rol"}
+                            {u.employeeNumber ? ` · ${u.employeeNumber}` : ""}
+                          </option>
+                        ))}
+                        {erpUsers
+                          .filter((u) => !erpOnlyUsers.some((o) => o.id === u.id))
+                          .slice(0, 30)
+                          .map((u) => (
+                            <option key={`all-${u.id}`} value={String(u.id)}>
+                              {u.nombre} (ya en ACS?) · {u.employeeNumber || "sin nº"}
+                            </option>
+                          ))}
+                      </select>
+                    </IgField>
+                    {erpLoading && <p className={styles.personNote}>Cargando usuarios ERP…</p>}
+                    <IgBtn
+                      variant="primary"
+                      disabled={!linkUserId}
+                      onClick={() => setAltaStep(2)}
+                    >
+                      Continuar →
+                    </IgBtn>
+                  </section>
+                )}
+
+                {altaStep === 1 && altaMode === "acs" && (
                   <section className={styles.personSection} data-tone="accent">
                     <header className={styles.personSectionHead}>
                       <strong>1 · Nombre</strong>
-                      <span>se propaga a todos los ACS</span>
+                      <span>solo terminales (sin ERP)</span>
                     </header>
                     <IgField label="Nombre completo">
                       <input
@@ -904,7 +1054,7 @@ export default function IntegraPeoplePage() {
                   <section className={styles.personSection} data-tone="accent">
                     <header className={styles.personSectionHead}>
                       <strong>2 · Código empleado</strong>
-                      <span>máx. 32</span>
+                      <span>enlace ERP ↔ ACS · máx. 32</span>
                     </header>
                     <label className={styles.personCheck}>
                       <input
@@ -915,7 +1065,9 @@ export default function IntegraPeoplePage() {
                           if (e.target.checked) setCode("");
                         }}
                       />
-                      Generar código automáticamente
+                      {altaMode === "unified"
+                        ? "Generar nº automático (NXR25SYS… en ERP)"
+                        : "Generar código automáticamente"}
                     </label>
                     {!autoCode && (
                       <IgField label="Código manual">
@@ -923,13 +1075,15 @@ export default function IntegraPeoplePage() {
                           value={code}
                           onChange={(e) => setCode(e.target.value)}
                           style={{ ...inputStyle, maxWidth: "100%" }}
-                          placeholder="ej. 1042"
+                          placeholder="ej. NXR25SYS042"
                         />
                       </IgField>
                     )}
                     {autoCode && (
                       <p className={styles.personNote}>
-                        Siguiente número libre del espejo, o marca de tiempo.
+                        {altaMode === "unified"
+                          ? "El ERP asigna el siguiente libre del tenant; ese mismo código se usa en ACS."
+                          : "Siguiente número libre del espejo ACS, o marca de tiempo."}
                       </p>
                     )}
                     <div className={styles.personBtnRow}>
@@ -952,9 +1106,8 @@ export default function IntegraPeoplePage() {
                       <span>JPEG obligatorio</span>
                     </header>
                     <p className={styles.personNote}>
-                      Se guarda en NEXARA y se empuja a cada terminal (FaceDataRecord).
-                      JPEG frontal, buena luz, cara llenando el cuadro (~480–720 px,
-                      ~50–400 KB). PNG no sirve; archivos enormes los rechaza el DS-K1T.
+                      Se guarda en NEXARA y se empuja a cada terminal. JPEG frontal, buena luz
+                      (~480–720 px, ~50–400 KB). PNG no sirve.
                     </p>
                     {altaPreview && (
                       <div className={styles.personAltaPreview}>
@@ -979,7 +1132,7 @@ export default function IntegraPeoplePage() {
                             setAltaPreview(URL.createObjectURL(file));
                             setError(null);
                           } catch (err) {
-                            setError(err instanceof Error ? err.message : "Foto inválida");
+                            setError(formatApiError(err, "Foto inválida"));
                             setAltaJpegB64(null);
                           }
                         }}
@@ -1001,14 +1154,31 @@ export default function IntegraPeoplePage() {
                 {altaStep === 4 && (
                   <section className={styles.personSection} data-tone="accent">
                     <header className={styles.personSectionHead}>
-                      <strong>4 · Guardar en terminales</strong>
-                      <span>UserInfo + FaceDataRecord</span>
+                      <strong>4 · Confirmar</strong>
+                      <span>
+                        {altaMode === "unified"
+                          ? "ERP + ACS + foto"
+                          : altaMode === "link"
+                            ? "ACS + foto"
+                            : "solo ACS + foto"}
+                      </span>
                     </header>
                     <dl className={styles.personFacts}>
                       <div>
                         <dt>Nombre</dt>
-                        <dd>{name}</dd>
+                        <dd>{name || "—"}</dd>
                       </div>
+                      {altaMode === "unified" && (
+                        <div>
+                          <dt>Correo / rol</dt>
+                          <dd>
+                            {email}
+                            <span className={styles.personFactSub}>
+                              {erpRoles.find((r) => String(r.id) === roleId)?.nombre || "—"}
+                            </span>
+                          </dd>
+                        </div>
+                      )}
                       <div>
                         <dt>Código</dt>
                         <dd>{autoCode ? "automático" : code}</dd>
@@ -1024,16 +1194,16 @@ export default function IntegraPeoplePage() {
                         <img src={altaPreview} alt="" />
                       </div>
                     )}
-                    <p className={styles.personNote}>
-                      Tras el alta puedes enrolar huella en la ficha (terminales .162/.163 con
-                      sensor). Huella se digitaliza en NEXARA si el ACS exporta plantilla.
-                    </p>
                     <div className={styles.personBtnRow}>
                       <IgBtn onClick={() => setAltaStep(3)} disabled={mutating}>
                         ← Atrás
                       </IgBtn>
                       <IgBtn variant="primary" disabled={mutating} onClick={() => void runAlta()}>
-                        {mutKind === "create" ? "Guardando…" : "Dar de alta + empujar foto"}
+                        {mutKind === "create"
+                          ? "Guardando…"
+                          : altaMode === "unified"
+                            ? "Crear persona unificada"
+                            : "Dar de alta + empujar foto"}
                       </IgBtn>
                     </div>
                     {opNote && (
