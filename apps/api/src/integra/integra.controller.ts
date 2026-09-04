@@ -705,6 +705,80 @@ export class IntegraController {
     );
   }
 
+  @Post('people/:id/fingerprint')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Captura huella en un ACS (CaptureFingerPrint) y la aplica a todos (FingerPrintDownload); guarda plantilla en NEXARA',
+  })
+  enrollPersonFingerprint(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      deviceIp?: string;
+      fingerPrintID?: number;
+      fingerData?: string;
+      fingerType?: string;
+    },
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para gestionar personas');
+    }
+    return this.integra.enrollPersonFingerprint(
+      companyId,
+      id,
+      body || {},
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Post('people/:id/fingerprint/fetch')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Intenta bajar plantilla del ACS (FingerPrintUpload) a NEXARA' })
+  fetchPersonFingerprint(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() body: { deviceIp?: string; fingerPrintID?: number },
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para gestionar personas');
+    }
+    return this.integra.fetchPersonFingerprint(
+      companyId,
+      id,
+      body || {},
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Delete('people/:id/fingerprint')
+  @ApiOperation({ summary: 'Elimina huellas en ACS (FingerPrint/Delete) y copia local' })
+  deletePersonFingerprint(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() body: { fingerPrintIDs?: number[] },
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para gestionar personas');
+    }
+    return this.integra.deletePersonFingerprint(
+      companyId,
+      id,
+      body || {},
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
   @Get('privilege-groups')
   privilegeGroups(
     @CurrentCompanyId() companyId: number | null,

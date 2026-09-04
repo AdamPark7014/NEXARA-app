@@ -31,6 +31,8 @@ import {
   listReservations,
   createReservation,
   releaseReservation,
+  stockMovementDocumentLabel,
+  stockMovementBalanceLabel,
   type StockMovementRow,
   type LotRow,
   type ValuationRow,
@@ -93,7 +95,16 @@ export default function WarehousePage() {
   const [minimo, setMinimo] = useState(5);
   const [products, setProducts] = useState<{ id: number; name: string; sku: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([]);
-  const [movement, setMovement] = useState({ type: "RECEIPT" as "RECEIPT" | "DISPATCH", productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "" });
+  const [movement, setMovement] = useState({
+    type: "RECEIPT" as "RECEIPT" | "DISPATCH" | "TRANSFER" | "ADJUSTMENT",
+    productId: "",
+    warehouseId: "",
+    toWarehouseId: "",
+    quantity: 1,
+    unitCost: "",
+    reference: "",
+    notes: "",
+  });
   const [savingMovement, setSavingMovement] = useState(false);
   const [showWarehouseForm, setShowWarehouseForm] = useState(false);
   const [warehouseForm, setWarehouseForm] = useState({ name: "", code: "", address: "", city: "" });
@@ -107,6 +118,17 @@ export default function WarehousePage() {
   const [movementsLoading, setMovementsLoading] = useState(false);
   const [movementTypeFilter, setMovementTypeFilter] = useState("");
   const [movementWarehouseFilter, setMovementWarehouseFilter] = useState("");
+  const [movementProductFilter, setMovementProductFilter] = useState(productFilter ?? "");
+  const [movementFromDate, setMovementFromDate] = useState("");
+  const [movementToDate, setMovementToDate] = useState("");
+  const [productTrace, setProductTrace] = useState<{
+    productId: number;
+    sku: string;
+    name: string;
+    levels: StockRow[];
+    movements: StockMovementRow[];
+  } | null>(null);
+  const [productTraceLoading, setProductTraceLoading] = useState(false);
 
   const [lots, setLots] = useState<LotRow[]>([]);
   const [lotsLoading, setLotsLoading] = useState(false);
@@ -193,6 +215,10 @@ export default function WarehousePage() {
     if (movementId) setTab("movimientos");
   }, [movementId]);
 
+  useEffect(() => {
+    if (productFilter) setMovementProductFilter(productFilter);
+  }, [productFilter]);
+
   const visibleMovements = useMemo(() => {
     if (!movementId) return movements;
     const target = Number(movementId);
@@ -204,26 +230,79 @@ export default function WarehousePage() {
     });
   }, [movements, movementId]);
 
+  const openProductTrace = useCallback(async (productId: number, sku?: string, name?: string) => {
+    if (!token || !productId) return;
+    setProductTraceLoading(true);
+    setProductTrace({
+      productId,
+      sku: sku ?? "—",
+      name: name ?? `Producto #${productId}`,
+      levels: [],
+      movements: [],
+    });
+    try {
+      const [levels, movs] = await Promise.all([
+        listStockLevels(token).then((rows) =>
+          rows.map(mapStockLevelToRow).filter((r) => r.productId === productId),
+        ),
+        listStockMovements(token, { productId }),
+      ]);
+      setProductTrace({
+        productId,
+        sku: levels[0]?.sku ?? sku ?? "—",
+        name: levels[0]?.nombre ?? name ?? `Producto #${productId}`,
+        levels,
+        movements: movs,
+      });
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo cargar el historial del producto"));
+      setProductTrace(null);
+    } finally {
+      setProductTraceLoading(false);
+    }
+  }, [token]);
+
   const saveMovement = async () => {
-    if (!token || !movement.productId || !movement.warehouseId || movement.quantity <= 0) return;
+    if (!token || !movement.productId || movement.quantity <= 0) return;
+    if (movement.type === "TRANSFER") {
+      if (!movement.warehouseId || !movement.toWarehouseId) return;
+      if (movement.warehouseId === movement.toWarehouseId) {
+        toast.error("Origen y destino deben ser distintos");
+        return;
+      }
+    } else if (!movement.warehouseId) {
+      return;
+    }
     setSavingMovement(true);
     try {
-      await createStockMovement(token, {
+      const payload: Parameters<typeof createStockMovement>[1] = {
         type: movement.type,
         productId: Number(movement.productId),
-        ...(movement.type === "RECEIPT"
-          ? { toWarehouseId: Number(movement.warehouseId) }
-          : { fromWarehouseId: Number(movement.warehouseId) }),
         quantity: movement.quantity,
         unitCost: movement.unitCost ? Number(movement.unitCost) : undefined,
         reference: movement.reference.trim() || undefined,
-      });
+        notes: movement.notes.trim() || undefined,
+      };
+      if (movement.type === "RECEIPT" || movement.type === "ADJUSTMENT") {
+        payload.toWarehouseId = Number(movement.warehouseId);
+      } else if (movement.type === "DISPATCH") {
+        payload.fromWarehouseId = Number(movement.warehouseId);
+      } else if (movement.type === "TRANSFER") {
+        payload.fromWarehouseId = Number(movement.warehouseId);
+        payload.toWarehouseId = Number(movement.toWarehouseId);
+      }
+      await createStockMovement(token, payload);
+      const movedProductId = Number(movement.productId);
       setShowMovementForm(false);
-      setMovement({ type: "RECEIPT", productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "" });
+      setMovement({ type: "RECEIPT", productId: "", warehouseId: "", toWarehouseId: "", quantity: 1, unitCost: "", reference: "", notes: "" });
       void load();
       if (tab === "movimientos") void loadMovements();
+      if (productTrace?.productId === movedProductId) {
+        void openProductTrace(movedProductId, productTrace.sku, productTrace.name);
+      }
+      toast.success("Movimiento registrado");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error al registrar entrada");
+      toast.error(e instanceof Error ? e.message : "Error al registrar movimiento");
     } finally {
       setSavingMovement(false);
     }
@@ -253,6 +332,9 @@ export default function WarehousePage() {
       const rows = await listStockMovements(token, {
         type: movementTypeFilter || undefined,
         warehouseId: movementWarehouseFilter ? Number(movementWarehouseFilter) : undefined,
+        productId: movementProductFilter ? Number(movementProductFilter) : undefined,
+        from: movementFromDate || undefined,
+        to: movementToDate ? `${movementToDate}T23:59:59.999` : undefined,
       });
       setMovements(rows);
     } catch (e) {
@@ -261,7 +343,7 @@ export default function WarehousePage() {
     } finally {
       setMovementsLoading(false);
     }
-  }, [token, movementTypeFilter, movementWarehouseFilter]);
+  }, [token, movementTypeFilter, movementWarehouseFilter, movementProductFilter, movementFromDate, movementToDate]);
 
   const loadLots = useCallback(async () => {
     if (!token) return;
@@ -526,12 +608,17 @@ export default function WarehousePage() {
       key: "nombre",
       label: "Producto",
       render: (s) => (
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{s.nombre}</div>
+        <button
+          type="button"
+          onClick={() => s.productId && void openProductTrace(s.productId, s.sku, s.nombre)}
+          style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer", color: "inherit" }}
+          title="Ver historial de movimientos"
+        >
+          <div style={{ fontWeight: 700, fontSize: 13, color: "var(--primary)" }}>{s.nombre}</div>
           <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
             {s.categoria} · {s.ubicacion}
           </div>
-        </div>
+        </button>
       ),
     },
     {
@@ -559,38 +646,58 @@ export default function WarehousePage() {
     {
       key: "id",
       label: "",
-      render: (s) =>
-        cfg.canEdit ? (
-          <button onClick={() => openEdit(s)} title="Editar mínimos" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>
-            ✎
-          </button>
-        ) : null,
-      width: 40,
+      render: (s) => (
+        <div style={{ display: "flex", gap: 2 }}>
+          {s.productId ? (
+            <button onClick={() => void openProductTrace(s.productId!, s.sku, s.nombre)} title="Historial" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-tertiary)", padding: "4px 6px" }}>
+              ⏱
+            </button>
+          ) : null}
+          {cfg.canEdit ? (
+            <button onClick={() => openEdit(s)} title="Editar mínimos" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>
+              ✎
+            </button>
+          ) : null}
+        </div>
+      ),
+      width: 72,
     },
   ];
 
   const movementColumns: Column<StockMovementRow>[] = [
-    { key: "movementNumber", label: "Folio", render: (m) => <code style={{ fontSize: 11.5 }}>{m.movementNumber}</code>, width: 120 },
+    { key: "movementNumber", label: "Folio", render: (m) => <code style={{ fontSize: 11.5 }}>{m.movementNumber}</code>, width: 110 },
     { key: "type", label: "Tipo", render: (m) => (
-      <Tag variant={m.type === "RECEIPT" || m.type === "PRODUCTION_IN" || m.type === "RETURN" ? "positive" : m.type === "SCRAP" ? "danger" : "default"}>
+      <Tag variant={m.type === "RECEIPT" || m.type === "PRODUCTION_IN" || m.type === "RETURN" || m.type === "ADJUSTMENT" ? "positive" : m.type === "SCRAP" ? "danger" : "default"}>
         {MOVEMENT_TYPE_LABEL[m.type] ?? m.type}
       </Tag>
-    ), width: 130 },
+    ), width: 120 },
     { key: "product", label: "Producto", render: (m) => (
-      <div>
-        <div style={{ fontSize: 13 }}>{m.product?.name ?? "—"}</div>
+      <button
+        type="button"
+        onClick={() => m.product?.id && void openProductTrace(m.product.id, m.product.sku, m.product.name)}
+        style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: m.product?.id ? "pointer" : "default" }}
+      >
+        <div style={{ fontSize: 13, color: m.product?.id ? "var(--primary)" : undefined }}>{m.product?.name ?? "—"}</div>
         <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{m.product?.sku}{m.lot ? ` · Lote ${m.lot.lotNumber}` : ""}</div>
-      </div>
+      </button>
     ) },
     { key: "route", label: "Origen → Destino", render: (m) => (
       <span style={{ fontSize: 12 }}>{m.fromWarehouse?.name ?? "—"} → {m.toWarehouse?.name ?? "—"}</span>
-    ), width: 200 },
-    { key: "quantity", label: "Cantidad", render: (m) => <strong style={{ fontSize: 13 }}>{Number(m.quantity)}</strong>, width: 90, numeric: true },
-    { key: "totalCost", label: "Costo total", render: (m) => <Money value={Number(m.totalCost ?? 0)} compact />, width: 110, numeric: true },
+    ), width: 180 },
+    { key: "quantity", label: "Cant.", render: (m) => <strong style={{ fontSize: 13 }}>{Number(m.quantity)}</strong>, width: 70, numeric: true },
+    { key: "balance", label: "Saldo", render: (m) => (
+      <span style={{ fontSize: 11.5, fontVariantNumeric: "tabular-nums", color: "var(--text-secondary)" }} title="Existencia antes → después">
+        {stockMovementBalanceLabel(m)}
+      </span>
+    ), width: 100, numeric: true },
+    { key: "document", label: "Documento", render: (m) => (
+      <span style={{ fontSize: 11.5 }} title={m.notes ?? undefined}>{stockMovementDocumentLabel(m)}</span>
+    ), width: 150 },
+    { key: "totalCost", label: "Costo", render: (m) => <Money value={Number(m.totalCost ?? 0)} compact />, width: 90, numeric: true },
     { key: "createdAt", label: "Fecha", render: (m) => (
       <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{new Date(m.createdAt).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
-    ), width: 140 },
-    { key: "createdBy", label: "Registró", accessor: (m) => m.createdBy?.nombre ?? "—", width: 130 },
+    ), width: 130 },
+    { key: "createdBy", label: "Quién", accessor: (m) => m.createdBy?.nombre ?? "—", width: 110 },
   ];
 
   const today = new Date();
@@ -771,16 +878,27 @@ export default function WarehousePage() {
         </div>
       )}
 
-      {/* ── Entrada/salida de stock (disponible desde cualquier pestaña) ── */}
+      {/* ── Entrada/salida/traspaso de stock (disponible desde cualquier pestaña) ── */}
       {showMovementForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>{movement.type === "RECEIPT" ? "Entrada de inventario" : "Salida de inventario"}</p>
+          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>
+            {movement.type === "RECEIPT" ? "Entrada de inventario"
+              : movement.type === "DISPATCH" ? "Salida de inventario"
+              : movement.type === "TRANSFER" ? "Traspaso entre almacenes"
+              : "Ajuste de inventario"}
+          </p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Tipo de movimiento *</span>
-              <select value={movement.type} onChange={(e) => setMovement((m) => ({ ...m, type: e.target.value as "RECEIPT" | "DISPATCH" }))} style={inp}>
+              <select
+                value={movement.type}
+                onChange={(e) => setMovement((m) => ({ ...m, type: e.target.value as typeof m.type, toWarehouseId: "" }))}
+                style={inp}
+              >
                 <option value="RECEIPT">Entrada (recepción)</option>
                 <option value="DISPATCH">Salida (despacho)</option>
+                <option value="TRANSFER">Traspaso</option>
+                <option value="ADJUSTMENT">Ajuste (alta)</option>
               </select>
             </label>
             <label style={{ display: "grid", gap: 4 }}>
@@ -792,13 +910,28 @@ export default function WarehousePage() {
               </select>
             </label>
             <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>{movement.type === "RECEIPT" ? "Almacén destino *" : "Almacén origen *"}</span>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>
+                {movement.type === "RECEIPT" || movement.type === "ADJUSTMENT"
+                  ? "Almacén destino *"
+                  : movement.type === "TRANSFER"
+                    ? "Almacén origen *"
+                    : "Almacén origen *"}
+              </span>
               <select value={movement.warehouseId} onChange={(e) => setMovement((m) => ({ ...m, warehouseId: e.target.value }))} style={inp}>
                 <option value="">Seleccionar…</option>
-                {warehouses.length === 0 && <option disabled>Sin almacenes — usa "Nuevo almacén" arriba</option>}
+                {warehouses.length === 0 && <option disabled>Sin almacenes — usa &quot;Nuevo almacén&quot; arriba</option>}
                 {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
             </label>
+            {movement.type === "TRANSFER" && (
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Almacén destino *</span>
+                <select value={movement.toWarehouseId} onChange={(e) => setMovement((m) => ({ ...m, toWarehouseId: e.target.value }))} style={inp}>
+                  <option value="">Seleccionar…</option>
+                  {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </label>
+            )}
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Cantidad *</span>
               <input type="number" min={1} value={movement.quantity} onChange={(e) => setMovement((m) => ({ ...m, quantity: +e.target.value }))} style={inp} />
@@ -807,14 +940,29 @@ export default function WarehousePage() {
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Costo unitario</span>
               <input type="number" min={0} step="0.01" value={movement.unitCost} onChange={(e) => setMovement((m) => ({ ...m, unitCost: e.target.value }))} style={inp} />
             </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Referencia / documento</span>
+              <input value={movement.reference} onChange={(e) => setMovement((m) => ({ ...m, reference: e.target.value }))} placeholder="OC-000123, venta, ajuste inicial…" style={inp} />
+            </label>
             <label style={{ gridColumn: "1 / -1", display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Referencia</span>
-              <input value={movement.reference} onChange={(e) => setMovement((m) => ({ ...m, reference: e.target.value }))} placeholder="OC-000123, ajuste inicial…" style={inp} />
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo / notas</span>
+              <input value={movement.notes} onChange={(e) => setMovement((m) => ({ ...m, notes: e.target.value }))} placeholder="Por qué se mueve el stock…" style={inp} />
             </label>
           </div>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
             <Button variant="ghost" onClick={() => setShowMovementForm(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={() => void saveMovement()} disabled={savingMovement}>{savingMovement ? "Registrando…" : movement.type === "RECEIPT" ? "Registrar entrada" : "Registrar salida"}</Button>
+            <Button
+              variant="primary"
+              onClick={() => void saveMovement()}
+              disabled={
+                savingMovement
+                || !movement.productId
+                || !movement.warehouseId
+                || (movement.type === "TRANSFER" && !movement.toWarehouseId)
+              }
+            >
+              {savingMovement ? "Registrando…" : "Registrar movimiento"}
+            </Button>
           </div>
         </div>
       )}
@@ -1077,17 +1225,64 @@ export default function WarehousePage() {
       {tab === "movimientos" && (
         <Section
           title="Movimientos de inventario"
-          subtitle="Historial de entradas, salidas, traspasos y ajustes registrados en el almacén."
+          subtitle="Historial auditado: quién, cuándo, por qué, de/hacia qué almacén, saldo antes/después y documento (OC, venta, traspaso, ajuste)."
           actions={
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <select value={movementWarehouseFilter} onChange={(e) => setMovementWarehouseFilter(e.target.value)} style={{ ...inp, width: 170 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <select value={movementProductFilter} onChange={(e) => setMovementProductFilter(e.target.value)} style={{ ...inp, width: 200 }}>
+                <option value="">Todos los productos</option>
+                {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
+              </select>
+              <select value={movementWarehouseFilter} onChange={(e) => setMovementWarehouseFilter(e.target.value)} style={{ ...inp, width: 160 }}>
                 <option value="">Todos los almacenes</option>
                 {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
-              <select value={movementTypeFilter} onChange={(e) => setMovementTypeFilter(e.target.value)} style={{ ...inp, width: 150 }}>
+              <select value={movementTypeFilter} onChange={(e) => setMovementTypeFilter(e.target.value)} style={{ ...inp, width: 140 }}>
                 <option value="">Todos los tipos</option>
                 {Object.entries(MOVEMENT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
+              <input type="date" value={movementFromDate} onChange={(e) => setMovementFromDate(e.target.value)} style={{ ...inp, width: 140 }} title="Desde" />
+              <input type="date" value={movementToDate} onChange={(e) => setMovementToDate(e.target.value)} style={{ ...inp, width: 140 }} title="Hasta" />
+              <Button
+                variant="ghost"
+                size="sm"
+                iconLeft="⬇"
+                onClick={() => exportToExcel(
+                  visibleMovements.map((m) => ({
+                    folio: m.movementNumber,
+                    tipo: MOVEMENT_TYPE_LABEL[m.type] ?? m.type,
+                    sku: m.product?.sku ?? "",
+                    producto: m.product?.name ?? "",
+                    origen: m.fromWarehouse?.name ?? "",
+                    destino: m.toWarehouse?.name ?? "",
+                    cantidad: Number(m.quantity),
+                    saldo: stockMovementBalanceLabel(m),
+                    documento: stockMovementDocumentLabel(m),
+                    notas: m.notes ?? "",
+                    costo: Number(m.totalCost ?? 0),
+                    fecha: new Date(m.createdAt).toLocaleString("es-MX"),
+                    quien: m.createdBy?.nombre ?? "",
+                  })),
+                  [
+                    { key: "folio", label: "Folio" },
+                    { key: "tipo", label: "Tipo" },
+                    { key: "sku", label: "SKU" },
+                    { key: "producto", label: "Producto" },
+                    { key: "origen", label: "Origen" },
+                    { key: "destino", label: "Destino" },
+                    { key: "cantidad", label: "Cantidad" },
+                    { key: "saldo", label: "Saldo antes→después" },
+                    { key: "documento", label: "Documento" },
+                    { key: "notas", label: "Notas" },
+                    { key: "costo", label: "Costo" },
+                    { key: "fecha", label: "Fecha" },
+                    { key: "quien", label: "Registró" },
+                  ],
+                  "movimientos-inventario",
+                  "Movimientos de inventario",
+                )}
+              >
+                Excel
+              </Button>
               {cfg.canCreate && (
                 <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowMovementForm(true)}>Registrar movimiento</Button>
               )}
@@ -1108,7 +1303,7 @@ export default function WarehousePage() {
               rows={visibleMovements}
               rowKey={(m) => m.id}
               emptyTitle="Sin movimientos"
-              emptyDescription="Registra una entrada o salida para ver el historial aquí."
+              emptyDescription="Registra una entrada, salida o traspaso para ver el historial aquí."
               emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={() => setShowMovementForm(true)}>Registrar movimiento</Button> : undefined}
             />
           )}
@@ -1379,6 +1574,157 @@ export default function WarehousePage() {
               />
             )}
           </Section>
+        </div>
+      )}
+
+      {productTrace && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Historial de ${productTrace.name}`}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.45)",
+            zIndex: 80,
+            display: "flex",
+            justifyContent: "flex-end",
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setProductTrace(null); }}
+        >
+          <aside
+            style={{
+              width: "min(560px, 100%)",
+              height: "100%",
+              background: "var(--surface)",
+              borderLeft: "1px solid var(--border)",
+              boxShadow: "-8px 0 32px rgba(0,0,0,.12)",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <header style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+              <div>
+                <div style={{ fontSize: 11, color: "var(--text-tertiary)", letterSpacing: 0.4, textTransform: "uppercase", fontWeight: 600 }}>Historial de producto</div>
+                <h2 style={{ margin: "4px 0 0", fontSize: 18, fontWeight: 750 }}>{productTrace.name}</h2>
+                <code style={{ fontSize: 12, color: "var(--text-secondary)" }}>{productTrace.sku}</code>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconLeft="⬇"
+                  onClick={() => exportToExcel(
+                    productTrace.movements.map((m) => ({
+                      folio: m.movementNumber,
+                      tipo: MOVEMENT_TYPE_LABEL[m.type] ?? m.type,
+                      origen: m.fromWarehouse?.name ?? "",
+                      destino: m.toWarehouse?.name ?? "",
+                      cantidad: Number(m.quantity),
+                      saldoOrigen: m.fromQtyBefore != null ? `${Number(m.fromQtyBefore)} → ${Number(m.fromQtyAfter)}` : "",
+                      saldoDestino: m.toQtyBefore != null ? `${Number(m.toQtyBefore)} → ${Number(m.toQtyAfter)}` : "",
+                      documento: stockMovementDocumentLabel(m),
+                      notas: m.notes ?? "",
+                      fecha: new Date(m.createdAt).toLocaleString("es-MX"),
+                      quien: m.createdBy?.nombre ?? "",
+                    })),
+                    [
+                      { key: "folio", label: "Folio" },
+                      { key: "tipo", label: "Tipo" },
+                      { key: "origen", label: "Origen" },
+                      { key: "destino", label: "Destino" },
+                      { key: "cantidad", label: "Cantidad" },
+                      { key: "saldoOrigen", label: "Saldo origen" },
+                      { key: "saldoDestino", label: "Saldo destino" },
+                      { key: "documento", label: "Documento" },
+                      { key: "notas", label: "Notas" },
+                      { key: "fecha", label: "Fecha" },
+                      { key: "quien", label: "Registró" },
+                    ],
+                    `historial-${productTrace.sku}`,
+                    `Historial ${productTrace.sku}`,
+                  )}
+                >
+                  Excel
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setProductTrace(null)}>Cerrar</Button>
+              </div>
+            </header>
+            <div style={{ padding: 16, overflow: "auto", flex: 1 }}>
+              {productTraceLoading ? (
+                <div style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando historial…</div>
+              ) : (
+                <>
+                  <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: 0.3 }}>Existencia por almacén</p>
+                  {productTrace.levels.length === 0 ? (
+                    <p style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 16 }}>Sin niveles de stock registrados.</p>
+                  ) : (
+                    <div style={{ display: "grid", gap: 8, marginBottom: 20 }}>
+                      {productTrace.levels.map((lv) => (
+                        <div key={lv.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 8, border: "1px solid var(--border)", fontSize: 13 }}>
+                          <span>{lv.ubicacion}</span>
+                          <strong style={{ fontVariantNumeric: "tabular-nums" }}>{lv.existencia}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p style={{ margin: "0 0 10px", fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: 0.3 }}>
+                    Línea de tiempo ({productTrace.movements.length})
+                  </p>
+                  {productTrace.movements.length === 0 ? (
+                    <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Aún no hay movimientos para este producto.</p>
+                  ) : (
+                    <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
+                      {productTrace.movements.map((m) => (
+                        <li
+                          key={m.id}
+                          style={{
+                            border: "1px solid var(--border)",
+                            borderRadius: 10,
+                            padding: "12px 14px",
+                            background: "var(--surface)",
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                              <code style={{ fontSize: 11 }}>{m.movementNumber}</code>
+                              <Tag variant={m.type === "RECEIPT" || m.type === "PRODUCTION_IN" || m.type === "RETURN" || m.type === "ADJUSTMENT" ? "positive" : m.type === "SCRAP" ? "danger" : "default"}>
+                                {MOVEMENT_TYPE_LABEL[m.type] ?? m.type}
+                              </Tag>
+                            </div>
+                            <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                              {new Date(m.createdAt).toLocaleString("es-MX", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 13, marginBottom: 4 }}>
+                            <strong style={{ fontVariantNumeric: "tabular-nums" }}>{Number(m.quantity)}</strong>
+                            {" · "}
+                            {m.fromWarehouse?.name ?? "—"} → {m.toWarehouse?.name ?? "—"}
+                          </div>
+                          <div style={{ fontSize: 12, color: "var(--text-secondary)", display: "grid", gap: 2 }}>
+                            {m.fromQtyBefore != null && (
+                              <span>Origen: {Number(m.fromQtyBefore)} → {Number(m.fromQtyAfter)}</span>
+                            )}
+                            {m.toQtyBefore != null && (
+                              <span>Destino: {Number(m.toQtyBefore)} → {Number(m.toQtyAfter)}</span>
+                            )}
+                            <span>Documento: {stockMovementDocumentLabel(m)}</span>
+                            <span>Registró: {m.createdBy?.nombre ?? "—"}</span>
+                            {m.notes ? <span>Notas: {m.notes}</span> : null}
+                            {m.lot ? <span>Lote: {m.lot.lotNumber}</span> : null}
+                            {Number(m.totalCost ?? 0) > 0 ? (
+                              <span>Costo total: ${Number(m.totalCost).toLocaleString("es-MX", { maximumFractionDigits: 2 })}</span>
+                            ) : null}
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </>
+              )}
+            </div>
+          </aside>
         </div>
       )}
     </>

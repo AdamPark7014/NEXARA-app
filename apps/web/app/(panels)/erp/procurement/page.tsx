@@ -464,6 +464,26 @@ export default function ProcurementPage() {
     }
   };
 
+  const downloadPoPdf = async (id: number, poNumber?: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(buildApiUrl(`procurement/purchase-orders/${id}/pdf`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `OC-${(poNumber || String(id)).replace(/[^\w.-]+/g, "_")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("PDF de orden de compra descargado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo generar el PDF");
+    }
+  };
+
   const loadReqDetail = async (id: number) => {
     if (!token) return;
     setDetailKind("req");
@@ -733,13 +753,21 @@ export default function ProcurementPage() {
             {PO_STATUS[o.status] ?? o.status}
           </Tag>
           {o.status === "DRAFT" && cfg.canApprove && (
-            <button onClick={() => void approvePo(o.id)} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
+            <button onClick={(e) => { e.stopPropagation(); void approvePo(o.id); }} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
               ✓
             </button>
           )}
+          <button
+            type="button"
+            title="Descargar PDF"
+            onClick={(e) => { e.stopPropagation(); void downloadPoPdf(o.id, o.poNumber); }}
+            style={{ fontSize: 11, background: "transparent", color: "var(--primary)", border: "1px solid var(--border)", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}
+          >
+            PDF
+          </button>
         </div>
       ),
-      width: 160,
+      width: 200,
     },
   ];
 
@@ -1152,13 +1180,25 @@ export default function ProcurementPage() {
         onClear={() => { setSearchQ(""); setFilterPoStatus(""); setFilterReqStatus(""); }}
         resultCount={loading ? null : tab === "orders" ? visibleOrders.length : tab === "requisitions" ? visibleReqs.length : tab === "rfq" ? rfqs.length : visibleReceipts.length}
         rightActions={tab === "orders" && orders.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleOrders, [
-            { key: "poNumber", label: "OC" },
-            { key: "supplier", label: "Proveedor", format: (v) => (v as PurchaseOrder["supplier"])?.name ?? "—" },
-            { key: "totalAmount", label: "Monto" },
-            { key: "status", label: "Estado", format: (v) => PO_STATUS[String(v ?? "")] ?? String(v ?? "") },
-            { key: "expectedDate", label: "Entrega est.", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "ordenes-compra")}>Excel</Button>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {poDetail && detailKind === "order" ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                iconLeft="📄"
+                onClick={() => void downloadPoPdf(poDetail.id, poDetail.poNumber)}
+              >
+                PDF OC
+              </Button>
+            ) : null}
+            <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleOrders, [
+              { key: "poNumber", label: "OC" },
+              { key: "supplier", label: "Proveedor", format: (v) => (v as PurchaseOrder["supplier"])?.name ?? "—" },
+              { key: "totalAmount", label: "Monto" },
+              { key: "status", label: "Estado", format: (v) => PO_STATUS[String(v ?? "")] ?? String(v ?? "") },
+              { key: "expectedDate", label: "Entrega est.", format: (v) => v ? String(v).slice(0, 10) : "" },
+            ], "ordenes-compra")}>Excel</Button>
+          </div>
         ) : tab === "requisitions" && requisitions.length > 0 ? (
           <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleReqs, [
             { key: "reqNumber", label: "Folio" },
@@ -1292,11 +1332,18 @@ export default function ProcurementPage() {
 
       {(detailKind === "order" || detailKind === "req") && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 8, flexWrap: "wrap" }}>
             <p style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>
               {detailKind === "order" ? `Detalle OC ${poDetail?.poNumber ?? ""}` : `Detalle requisición ${reqDetail?.reqNumber ?? ""}`}
             </p>
-            <Button variant="ghost" onClick={() => { setDetailKind(null); setPoDetail(null); setReqDetail(null); setDetailErr(null); }}>Cerrar</Button>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              {detailKind === "order" && poDetail ? (
+                <Button variant="primary" size="sm" iconLeft="📄" onClick={() => void downloadPoPdf(poDetail.id, poDetail.poNumber)}>
+                  Descargar PDF
+                </Button>
+              ) : null}
+              <Button variant="ghost" onClick={() => { setDetailKind(null); setPoDetail(null); setReqDetail(null); setDetailErr(null); }}>Cerrar</Button>
+            </div>
           </div>
           {detailLoading && <p style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Cargando detalle…</p>}
           {detailErr && (
@@ -1334,9 +1381,14 @@ export default function ProcurementPage() {
                   </tbody>
                 </table>
               )}
-              {cfg.canCreate && poDetail.status !== "RECEIVED" && poDetail.status !== "CANCELLED" && (
-                <Button variant="primary" onClick={() => openReceiptForPo(poDetail.id)}>Registrar recepción</Button>
-              )}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <Button variant="secondary" iconLeft="📄" onClick={() => void downloadPoPdf(poDetail.id, poDetail.poNumber)}>
+                  PDF profesional
+                </Button>
+                {cfg.canCreate && poDetail.status !== "RECEIVED" && poDetail.status !== "CANCELLED" && (
+                  <Button variant="primary" onClick={() => openReceiptForPo(poDetail.id)}>Registrar recepción</Button>
+                )}
+              </div>
             </>
           )}
           {!detailLoading && detailKind === "req" && reqDetail && (

@@ -86,7 +86,19 @@ export async function listCatalogProducts(token: string) {
 
 export async function createStockMovement(
   token: string,
-  payload: { type: string; productId: number; fromWarehouseId?: number; toWarehouseId?: number; quantity: number; unitCost?: number; reference?: string; notes?: string },
+  payload: {
+    type: string;
+    productId: number;
+    fromWarehouseId?: number;
+    toWarehouseId?: number;
+    quantity: number;
+    unitCost?: number;
+    reference?: string;
+    notes?: string;
+    purchaseOrderId?: number;
+    productionOrderId?: number;
+    activityId?: number;
+  },
 ) {
   return stockRequest<unknown>("stock/movements", token, { method: "POST", body: JSON.stringify(payload) }, "No se pudo registrar el movimiento");
 }
@@ -96,17 +108,47 @@ export type StockMovementRow = {
   movementNumber: string;
   type: string;
   quantity: number | string;
+  fromQtyBefore?: number | string | null;
+  fromQtyAfter?: number | string | null;
+  toQtyBefore?: number | string | null;
+  toQtyAfter?: number | string | null;
   unitCost?: number | string;
   totalCost?: number | string;
   reference?: string | null;
   notes?: string | null;
   createdAt: string;
   product?: { id: number; name: string; sku: string } | null;
-  fromWarehouse?: { id: number; name: string } | null;
-  toWarehouse?: { id: number; name: string } | null;
+  fromWarehouse?: { id: number; name: string; code?: string } | null;
+  toWarehouse?: { id: number; name: string; code?: string } | null;
   lot?: { id: number; lotNumber: string } | null;
   createdBy?: { id: number; nombre: string } | null;
+  purchaseOrder?: { id: number; poNumber: string } | null;
+  productionOrder?: { id: number; orderNumber: string } | null;
+  activity?: { id: number; anNumber: string; titulo?: string | null } | null;
 };
+
+/** Etiqueta de documento ligado al movimiento (OC, OP, AN, referencia libre). */
+export function stockMovementDocumentLabel(m: StockMovementRow): string {
+  const parts: string[] = [];
+  if (m.purchaseOrder?.poNumber) parts.push(`OC ${m.purchaseOrder.poNumber}`);
+  if (m.productionOrder?.orderNumber) parts.push(`OP ${m.productionOrder.orderNumber}`);
+  if (m.activity?.anNumber) parts.push(`AN ${m.activity.anNumber}`);
+  if (m.reference?.trim()) parts.push(m.reference.trim());
+  return parts.length ? parts.join(" · ") : "—";
+}
+
+/** Resumen saldo antes→después (prioriza origen; si no, destino). */
+export function stockMovementBalanceLabel(m: StockMovementRow): string {
+  const fmt = (v: number | string | null | undefined) =>
+    v == null || v === "" ? null : Number(v);
+  const fromB = fmt(m.fromQtyBefore);
+  const fromA = fmt(m.fromQtyAfter);
+  if (fromB != null && fromA != null) return `${fromB} → ${fromA}`;
+  const toB = fmt(m.toQtyBefore);
+  const toA = fmt(m.toQtyAfter);
+  if (toB != null && toA != null) return `${toB} → ${toA}`;
+  return "—";
+}
 
 export async function listStockMovements(
   token: string,

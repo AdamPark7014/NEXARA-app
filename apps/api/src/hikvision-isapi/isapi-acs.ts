@@ -50,6 +50,10 @@ export type IntegraPersonDto = {
   /** URL en el terminal; el navegador usa el proxy autenticado. */
   faceUrl?: string | null;
   hasFace?: boolean;
+  /** JPEG guardado en NEXARA (uploads) aunque el ACS no entregue faceURL. */
+  hasLocalFace?: boolean;
+  /** IDs de huella (1–10) con plantilla Base64 en NEXARA. */
+  localFpIds?: number[];
   sourceIp?: string;
   /** Nombre del terminal donde está dada de alta. La IP no le dice nada a nadie. */
   sourceName?: string;
@@ -569,6 +573,123 @@ export async function deleteFaceData(
     FaceInfoDelCond: {
       faceLibType,
       EmployeeNoList: [{ employeeNo }],
+    },
+  });
+}
+
+/**
+ * Huella — rutas HikGateway §5.11 + Postman oficial (sin `devIndex`: ISAPI
+ * directo al equipo, igual que UserInfo).
+ *
+ * - Capture → Base64 `fingerData` + calidad
+ * - Download → aplica plantilla a persona en el lector
+ * - Upload → obtiene plantilla del lector (si el firmware la exporta)
+ * - Delete → baja por employeeNo
+ */
+
+export type CapturedFingerPrint = {
+  fingerData: string;
+  fingerNo: number;
+  fingerPrintQuality?: number;
+};
+
+/** Captura en el sensor del terminal. Bloquea hasta que el usuario ponga el dedo. */
+export async function captureFingerPrint(
+  client: HikvisionIsapiClient,
+  fingerNo = 1,
+): Promise<CapturedFingerPrint> {
+  const n = Math.min(10, Math.max(1, Math.floor(fingerNo) || 1));
+  const raw = await client.postJson('/ISAPI/AccessControl/CaptureFingerPrint?format=json', {
+    CaptureFingerPrintCond: { fingerNo: n },
+  });
+  const block = (raw.CaptureFingerPrint ?? raw) as Record<string, unknown>;
+  const fingerData = String(block.fingerData ?? '').trim();
+  if (!fingerData) {
+    throw new Error('El terminal no devolvió fingerData (captura vacía o cancelada)');
+  }
+  const quality = block.fingerPrintQuality != null ? Number(block.fingerPrintQuality) : undefined;
+  return {
+    fingerData,
+    fingerNo: num(block.fingerNo, n),
+    fingerPrintQuality: Number.isFinite(quality) ? quality : undefined,
+  };
+}
+
+/** Empuja plantilla a una persona. Doc HikGateway 5.11.2 — FingerPrintDownload. */
+export async function downloadFingerPrint(
+  client: HikvisionIsapiClient,
+  opts: {
+    employeeNo: string;
+    fingerPrintID: number;
+    fingerData: string;
+    fingerType?: string;
+    enableCardReader?: number[];
+  },
+): Promise<void> {
+  const fingerPrintID = Math.min(10, Math.max(1, Math.floor(opts.fingerPrintID) || 1));
+  await client.postJson('/ISAPI/AccessControl/FingerPrintDownload?format=json', {
+    FingerPrintCfg: {
+      employeeNo: opts.employeeNo,
+      fingerPrintID,
+      fingerData: opts.fingerData,
+      fingerType: opts.fingerType || 'normalFP',
+      enableCardReader: opts.enableCardReader?.length ? opts.enableCardReader : [1],
+    },
+  });
+}
+
+/**
+ * Obtiene plantilla del lector. Postman «Obtener huella» —
+ * FingerPrintUpload + FingerPrintCond.
+ */
+export async function uploadFingerPrint(
+  client: HikvisionIsapiClient,
+  opts: { employeeNo: string; fingerPrintID?: number; searchID?: string },
+): Promise<CapturedFingerPrint | null> {
+  const fingerPrintID = Math.min(
+    10,
+    Math.max(1, Math.floor(opts.fingerPrintID ?? 1) || 1),
+  );
+  const raw = await client.postJson('/ISAPI/AccessControl/FingerPrintUpload?format=json', {
+    FingerPrintCond: {
+      searchID: opts.searchID || randomUUID(),
+      employeeNo: opts.employeeNo,
+      fingerPrintID,
+    },
+  });
+  const block = (raw.FingerPrintInfo ??
+    raw.FingerPrintCfg ??
+    raw.FingerPrint ??
+    raw.CaptureFingerPrint ??
+    raw) as Record<string, unknown>;
+  const fingerData = String(block.fingerData ?? '').trim();
+  if (!fingerData) return null;
+  return {
+    fingerData,
+    fingerNo: num(block.fingerPrintID ?? block.fingerNo, fingerPrintID),
+    fingerPrintQuality:
+      block.fingerPrintQuality != null ? Number(block.fingerPrintQuality) : undefined,
+  };
+}
+
+/** Baja huellas. Postman + HikGateway 5.11.3 — mode byEmployeeNo. */
+export async function deleteFingerPrint(
+  client: HikvisionIsapiClient,
+  employeeNo: string,
+  fingerPrintIDs?: number[],
+): Promise<void> {
+  const no = String(employeeNo).trim();
+  if (!no) throw new Error('employeeNo vacío');
+  const ids = (fingerPrintIDs || [])
+    .map((n) => Math.min(10, Math.max(1, Math.floor(Number(n)) || 0)))
+    .filter((n) => n >= 1);
+  await client.putJson('/ISAPI/AccessControl/FingerPrint/Delete?format=json', {
+    FingerPrintDelete: {
+      mode: 'byEmployeeNo',
+      EmployeeNoDetail: {
+        employeeNo: no,
+        ...(ids.length ? { fingerPrintID: ids } : {}),
+      },
     },
   });
 }
