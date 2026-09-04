@@ -296,3 +296,127 @@ export function describeAcsEvent(ev: IsapiAcsEvent): string {
   if (major === 3) return `Excepción ${minor}`;
   return `Evento ${major}.${minor}`;
 }
+
+export type UserInfoWrite = {
+  employeeNo: string;
+  name: string;
+  userType?: string;
+  gender?: string;
+  Valid?: { enable?: boolean; beginTime?: string; endTime?: string };
+  doorRight?: string;
+  RightPlan?: unknown;
+};
+
+export type DeviceOpResult = {
+  deviceIp: string;
+  ok: boolean;
+  error?: string;
+};
+
+const DEFAULT_VALID = {
+  enable: true,
+  beginTime: '2020-01-01T00:00:00',
+  endTime: '2037-12-31T23:59:59',
+};
+
+/** Alta en un terminal. Doc HikGateway 5.8.1 — UserInfo/Record. */
+export async function recordUserInfo(
+  client: HikvisionIsapiClient,
+  user: UserInfoWrite,
+): Promise<void> {
+  await client.postJson('/ISAPI/AccessControl/UserInfo/Record?format=json', {
+    UserInfo: [
+      {
+        employeeNo: user.employeeNo,
+        name: user.name,
+        userType: user.userType || 'normal',
+        ...(user.gender ? { gender: user.gender } : {}),
+        Valid: user.Valid
+          ? {
+              enable: user.Valid.enable !== false,
+              beginTime: user.Valid.beginTime || DEFAULT_VALID.beginTime,
+              endTime: user.Valid.endTime || DEFAULT_VALID.endTime,
+            }
+          : DEFAULT_VALID,
+        ...(user.doorRight != null ? { doorRight: user.doorRight } : {}),
+        ...(user.RightPlan != null ? { RightPlan: user.RightPlan } : {}),
+      },
+    ],
+  });
+}
+
+/** Edición. Doc HikGateway 5.8.3 — UserInfo/Modify. */
+export async function modifyUserInfo(
+  client: HikvisionIsapiClient,
+  user: UserInfoWrite,
+): Promise<void> {
+  await client.putJson('/ISAPI/AccessControl/UserInfo/Modify?format=json', {
+    UserInfo: {
+      employeeNo: user.employeeNo,
+      name: user.name,
+      ...(user.userType ? { userType: user.userType } : {}),
+      ...(user.gender ? { gender: user.gender } : {}),
+      ...(user.Valid
+        ? {
+            Valid: {
+              enable: user.Valid.enable !== false,
+              beginTime: user.Valid.beginTime || DEFAULT_VALID.beginTime,
+              endTime: user.Valid.endTime || DEFAULT_VALID.endTime,
+            },
+          }
+        : {}),
+      ...(user.doorRight != null ? { doorRight: user.doorRight } : {}),
+      ...(user.RightPlan != null ? { RightPlan: user.RightPlan } : {}),
+    },
+  });
+}
+
+/** Baja. Doc HikGateway 5.8.2 — UserInfoDetail/Delete. */
+export async function deleteUserInfo(
+  client: HikvisionIsapiClient,
+  employeeNo: string,
+): Promise<void> {
+  await client.putJson('/ISAPI/AccessControl/UserInfoDetail/Delete?format=json', {
+    UserInfoDetail: {
+      mode: 'byEmployeeNo',
+      EmployeeNoList: [{ employeeNo }],
+    },
+  });
+}
+
+/**
+ * Empuja JPEG de cara al terminal. Doc HikGateway 5.9.1 — FaceDataRecord multipart.
+ * `faceLibType` por defecto `blackFD` (lista ACS habitual).
+ */
+export async function uploadFaceData(
+  client: HikvisionIsapiClient,
+  opts: { employeeNo: string; jpeg: Buffer; faceLibType?: string },
+): Promise<void> {
+  const meta = JSON.stringify({
+    faceLibType: opts.faceLibType || 'blackFD',
+    FaceInfo: { employeeNo: opts.employeeNo },
+  });
+  await client.postMultipart('/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json', [
+    { name: 'FaceDataRecord', contentType: 'application/json', body: meta },
+    {
+      name: 'FaceImage',
+      contentType: 'image/jpeg',
+      body: opts.jpeg,
+      filename: 'face.jpg',
+    },
+  ]);
+}
+
+/** Quita el registro de rostro. Doc HikGateway 5.9.2. */
+export async function deleteFaceData(
+  client: HikvisionIsapiClient,
+  employeeNo: string,
+  faceLibType = 'blackFD',
+): Promise<void> {
+  await client.putJson('/ISAPI/Intelligent/FDLib/FDSearch/Delete?format=json', {
+    FaceInfoDelCond: {
+      faceLibType,
+      EmployeeNoList: [{ employeeNo }],
+    },
+  });
+}

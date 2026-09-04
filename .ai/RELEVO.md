@@ -8,297 +8,52 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno (cursor) — en vivo profesional
+## Este turno (cursor) — Personas + placas SOC (sin magia)
 
-Tras ff de `origin` (`2d9e868`, overlay/PTZ/push/asistencia ya en disco):
+### Identidad vs detección óptica
 
-1. **Nameplates:** overlay usa `personName` del `AccessControllerEvent` cuando
-   viene; si no, etiqueta de tipo (`Persona`/`Vehículo`/`Rostro`). Sin matching
-   facial inventado.
-2. **Últimos accesos (30 s)** en Foco de cámara-puerta (`_RecentAccess.tsx`),
-   con foto `/uploads/integra/...` si existe.
-3. **PTZ hold-to-move:** ráfagas `momentary` + `stop` en pointerup / blur /
-   visibilitychange / unmount. Presets y HUD compacto.
-4. **Chrome:** badges vivo/det/off en rail; contador de detecciones en toolbar;
-   muro sigue en `mode="auto"` (MSE → snapshot).
+En cámaras de **oficina** (AcuSense) el overlay dice **«Humano · sin ID»**:
+FieldDetection trae caja sin `name`/`employeeNo`. Face ID del directorio **no**
+se proyecta sobre Support/Meeting: solo identifica en **puertas** (ACS event).
+Con 4 personas sentadas es normal ver 0–2 cajas (aviso puntual, no tracking).
+
+Panel **En sitio ahora** (`GET integra/occupancy`) = ocupación por accesos
+concedidos hoy, no PeopleCounting VCA (`isSupportPeopleDetection=false`).
+
+### Personas ISAPI
+
+- CRUD: `UserInfo/Record|Modify|Delete` fan-out a todos los ACS del sitio
+- Foto: `FDLib/FaceDataRecord` multipart + `FDSearch/Delete`
+- UI `/integra/people`: editar, alta, subir/quitar foto, resultados por IP
+
+### Vehículos / placas
+
+- Lista NEXARA (`integra/vehicles`) en ISAPI; **no** se empuja al NVR (403)
+- `anprCapable` en `raw` de cámara (sonda Traffic/Smart); PTZ marca sin ANPR
+- `GET integra/plate-events` — vehículos detectados; `plate` solo si el evento
+  trae OCR (ITC futuro)
+- PTZ hold-to-move intacto
 
 SSH: `-p 2222 root@5.78.215.109` → `/var/www/nexara-app`
 
-## Muro: por qué se quedaba en «Conectando»
-
-`video-stream mode=mjpeg` **no entrega frames** con estos RTSP. Medido:
-`/api/frame.jpeg?src=cam_…_101` → **200 / 16 KB**; el WS mjpeg del
-componente se queda vacío → spinner eterno.
-
-### Arreglo actual
-
-- **Muro** → `mode="auto"`: intenta MSE y, si un mosaico no da imagen ~7 s,
-  cae a snapshots HTTP `frame.jpeg` él solo.
-- **Foco** → MSE (`video-stream`), `src` se asigna **después** de
-  `appendChild` (si no, `onconnect` sale con `isConnected=false`).
-
-## Muro visible en modo Foco («En cola» en todos los mosaicos)
-
-Muro y foco viven montados a la vez y se alternan con el atributo `hidden`.
-Un `display` de clase **le gana** a `[hidden]`, así que `.wallWorkbench`
-(`display: grid`) seguía a la vista en Foco: sus mosaicos se quedaban «En
-cola» —en Foco el muro pierde el cupo— y el panel de foco quedaba debajo,
-ese sí oculto. Por eso «no dejaba ver ninguna en grande».
-Arreglo: `.wallWorkbench[hidden] { display: none }`.
-
-## Audio — medido, no supuesto
-
-| Equipo | Canal | Video | Audio |
-|---|---|---|---|
-| Cámaras (NVR y directas) | 102 / x02 | H.264 | **ninguno** — `<Audio><enabled>false</enabled>` de fábrica |
-| Terminales DS-K1T (.160–.163) | 101 | H.264 720p | **PCM mu-law 8 kHz, activo** |
-
-El hardware de las cámaras sí lleva micro (`audioInputType: MicIn`,
-`TwoWayAudio` presente pero `enabled:false`). **No se ha encendido**:
-prender micrófonos en toda la oficina es decisión de Adam, no del código
-(LFPDPPP + laboral). Se guarda `hasAudio` por cámara en el espejo.
-
-**Transporte:** MSE no reproduce G.711 — con el RTSP crudo el MP4 llega
-**sin pista de audio** (ffprobe sobre `/api/stream.mp4`). Se transcodifica
-solo el audio: `ffmpeg:<rtsp>#video=copy#audio=aac` → `aac 8000 Hz`. go2rtc
-1.9.7 trae ffmpeg 6.1.1 en la imagen. Va a un stream aparte (`…_a`) para no
-cargar el mudo que comparte el muro.
-
-## Fotos de rostro — no se pueden bajar, y está probado
-
-`FDLib/capabilities` → `isSupportModelData: true`, sin capacidad de imagen.
-El terminal guarda un **modelo biométrico** (`modelData`, cabecera `FR700006`),
-no un JPEG. La `faceURL` del UserInfo da **404 con todo**: digest, sin auth
-(401, o sea que la auth sí entra), token `@WEB` recién emitido por FDSearch,
-y `sessionLogin` v2 (login 200 OK). Rutas alternativas probadas: 404.
-
-Los eventos tampoco traen `pictureURL` ni con `picEnable:true` — sí traen
-`FaceRect`, `mask`, `currentVerifyMode`, `cardType`.
-
-**Salidas reales:** (a) que NEXARA sea la fuente y empuje la foto al
-terminal con `FDLib/pictureUpload`; (b) mirar la cámara de la puerta en vivo.
-La ficha ya lo dice en vez de fallar en silencio.
-
-## Terminales de acceso como cámaras
-
-Los cuatro DS-K1T publican `/ISAPI/Streaming/channels/101` (H.264 720p +
-audio). El sync los da de alta en `integra_cameras` con
-`streamId: '101'` — **no** se les deriva sub-stream: solo tienen ese.
-Aparecen en el muro como «<nombre> (puerta)».
-
-## Puesto de puerta
-
-En Control de acceso, al elegir una puerta sale su cámara en vivo (con audio,
-que las terminales llevan micro) junto a las cuatro acciones. El clic en la
-rejilla **ya no dispara el modal**: selecciona. Accionar sigue pidiendo motivo
-y pasando por auditoría.
-
-## Ojo con `deploy/update.sh`
-
-Compara `OLD_REV`/`NEW_REV` para decidir qué reconstruir. Si antes de correrlo
-se hace `git reset --hard` al commit nuevo, no ve cambios y **no construye
-nada** (pasa directo al prune y sale con 0). O se le deja hacer el pull a él,
-o se le pasa `--force-all`.
-
-## Micrófono de una cámara
-
-`POST integra/cameras/:id/audio` `{enabled}` lee el `StreamingChannel`
-entero, cambia **solo** el `<enabled>` de dentro de `<Audio>` y lo reenvía —
-el firmware rechaza un PUT parcial, y el `<enabled>` de `<Video>` es otro.
-Escribe en el equipo del cliente, así que va con el permiso de puertas y se
-audita (`integra.camera.audio`). Botón en Foco. No se ha encendido ninguno.
-
-## Qué saben hacer los equipos — sondeado 2026-09-04
-
-### Cámaras DS-2CD2123G2-LIS2U (AcuSense)
-
-`/ISAPI/Smart/capabilities`: `isSupportFaceDetect`, `isSupportLineDetection`,
-`isSupportFieldDetection` = **true**; `detectionTarget` = `human,vehicle`
-(clasifica persona de vehículo); `enableDualVca: true`. `isSupportPeopleDetection`
-(conteo) = false.
-
-Las reglas existen pero **con las zonas apagadas** (`FieldDetectionRegion
-enabled: false`, `LineItem enabled: false`). Encenderlas es un PUT.
-
-**Ojo antes de encenderlas:** `/ISAPI/Event/triggers/{fielddetection-1,
-linedetection-1,VMD-1}` enlazan a `record-1` **y `center`** → grabación y aviso
-a quien tenga Hik-Connect. No se ha tocado ninguna.
-
-`httpHosts/capabilities` de la cámara trae `uploadImagesDataType opt="URL,binary"`
-→ la cámara **sí** puede empujar el evento con el JPEG dentro.
-
-No hay ruta de «pintar VCA sobre el video» en este firmware (probadas
-VcaDisplayCfg y variantes: 404). El recuadro habría que dibujarlo en el
-navegador sobre el `<video>`, a partir de los eventos.
-
-### Terminales DS-K1T — la foto del acceso NO la dan
-
-Escuchado `Event/notification/alertStream` de `.163` durante 4 min:
-**596 eventos, 0 imágenes** (`Content-Type: application/json` × 596, `JFIF` × 0).
-`SNAPConfig` responde 200 (`snapTimes: 1`) pero el `httpHosts/capabilities` del
-terminal **no** declara `uploadImagesDataType` — al revés que la cámara.
-`AttendanceMode` → `notSupport` en estos modelos.
-
-Lo que **sí** trae cada evento de acceso concedido (major 5 / minor 75):
-`name`, `employeeNoString`, `dateTime`, `deviceName`, `currentVerifyMode`,
-`mask`, `userType`, `serialNo`, `attendanceStatus` y **`FaceRect`** (el
-terminal localiza la cara, solo no manda los píxeles).
-
-**Salida para la foto:** el terminal es una cámara y
-`/ISAPI/Streaming/channels/101/picture` devuelve JPEG en ~300 ms. Con evento
-empujado (<1 s) la persona sigue delante: la foto la toma NEXARA y se guarda
-en NEXARA. Eso además resuelve el rostro del directorio con el tiempo.
-
-## Eventos empujados (Adam dijo que sí a todo, 2026-09-04)
-
-`POST|PUT /api/integra/hik/:siteId/:token` — sin `RbacGuard`: quien llama es
-un aparato. El token va en la URL porque el firmware no sabe otra cosa
-(`urlLen max=128`, de ahí que sean 96 bits en hex); en la base solo el sha256.
-**Siempre responde 200**: un Hikvision que recibe un error deshabilita el host
-de notificación y se queda mudo hasta que alguien lo note.
-
-El cuerpo llega en tres formas y ninguna con la cabecera correcta, así que
-`main.ts` monta `express.raw` **solo** en `/api/integra/hik` y se decide por la
-forma del cuerpo. Multipart se trocea a mano: no es un formulario, son partes
-sin nombre de campo, y multer las tiraría.
-
-Dos cosas hicieron falta para que la ruta acepte XML (probado contra
-producción, daba **415**):
-
-1. `bodyParser: false` en `NestFactory.create`, o el parser de Nest se registra
-   antes que cualquier `app.use`. El `rawBody` de Stripe se conserva con el
-   `verify` de `express.json`, que además guarda los bytes exactos sobre los
-   que se firma.
-2. **El filtro de `Content-Type` de `main.ts` es de casa, no de Nest** — un
-   allowlist de seguridad que además mete strike a la IP. Se exime solo el
-   buzón de los equipos, y solo para xml/text: lo que protege esa ruta es el
-   token, no la cabecera. No tocar el allowlist global.
-
-La foto: si el equipo la manda (solo las cámaras), esa. Si no, NEXARA se la
-pide al propio equipo por `Streaming/channels/101/picture` — ~300 ms, la
-persona sigue delante. Se guardan en `uploads/integra/<siteId>/<día>/`.
-
-Se guardan con `resolveUploadsDir`, **no** contra `process.cwd()`: en Docker
-el proceso corre desde `/app/apps/api` y el volumen está en `/app/uploads`, así
-que resolver por cwd escribe en la capa efímera y las fotos se pierden en el
-siguiente despliegue. `common/uploads-path.ts` ya avisaba de esto.
-
-**Solo se fotografía lo reciente (20 s).** Al darle host de notificación a un
-equipo, este **vuelca todo su historial**: entraron de golpe eventos de mayo, y
-a cada uno se le pegaba una foto tomada en ese momento — el pasillo de hoy con
-el nombre de quien entró hace tres meses. Parecía correcto y era falso. Las
-fotos de ese primer volcado se borraron a mano.
-
-`POST integra/sites/:id/push/wire {detection}` apunta los 17 equipos y
-enciende la detección; `/unwire` lo deshace. Cada `wire` emite token nuevo.
-
-**La detección de intrusión no basta con `enabled: true`**: la región 1 viene
-sin `RegionCoordinatesList`, hay que darle el polígono (cuadro entero sobre la
-rejilla 1000×1000 que declara el equipo). `detectionTarget` se fuerza a
-`human`: con `vehicle` una oficina dispara con cualquier cosa.
-
-## Estado real tras cablear (2026-09-04 15:25)
-
-Empujando a NEXARA: **4 terminales + 9 cámaras**. Detección de personas
-encendida en **8 cámaras** (la PTZ `.179` no tiene `FieldDetection`, usa otro
-esquema). Llegan `AccessControllerEvent`, `VMD`, `fielddetection`, `heartBeat`
-y `duration` con 0-4 s de retraso.
-
-**El grabador `.34` no acepta el `httpHost`.** `httpHosts/capabilities` →
-`Device Busy`; el PUT devuelve `Invalid XML Content` en todas las variantes
-probadas (por id, lista completa, su propio documento devuelto tal cual, con y
-sin `Extensions`, XML y JSON). Consecuencia: los 4 canales plug & play
-(`192.168.254.x` — Escalera 01, Escaleras 02, Azotea, Office Entrance) **no
-empujan eventos**. Su video va bien. Pendiente.
-
-### Los relojes estaban mal — corregido
-
-Las 9 cámaras venían en **zona horaria de China** (`CST-8:00`, 14 h de
-desfase) y el grabador 14 min atrasado; los terminales estaban bien. Con eso
-los eventos de cámara aterrizaban con hora falsa. Se pusieron los 10 en
-`manual` + `CST+6:00:00`, **igual que los terminales**, en vez de meter NTP.
-
-### Las dos cajas del aviso de detección
-
-`TargetRect` es **la persona** (ya en 0..1). `RegionCoordinatesList` es **la
-zona vigilada**, en la rejilla del equipo. Se leía la segunda y, como la zona
-es el encuadre entero, todos los recuadros salían `0,0,1,1`. Se usa
-`TargetRect`; la zona queda de recurso, descartando la caja que ocupa todo.
-
-## Calidad del muro
-
-Los sub-streams estaban a **64 kbps** (algunos 96) en 640×360: de ahí que se
-vieran pixeladas. La resolución del sub está bloqueada por firmware
-(`opt="640,640"`) pero el bitrate admite 32-8192. Se subieron los 13 a **768**.
-Coste: hasta ~10 Mbps de subida de la oficina si se miran todas a la vez.
-
-El muro pasó de un JPEG por segundo a **`mode="auto"`**: intenta MSE y, si un
-mosaico concreto no da imagen en 7 s, cae a snapshots él solo. Antes el muro
-entero pagaba el precio del peor.
-
-## Placas: no se puede con este hardware
-
-`Smart/vehicleDetection` → **403 en todos los canales** del NVR;
-`Traffic/channels/13/licensePlateAuditData` → `notSupport`. La PTZ
-(DS-2DF8C442IXG-ELW) declara `isSupportFaceDetect/LineDetection/FieldDetection`
-= **false**: es una DarkFighter, no una ANPR. El NVR anuncia `plateCap` con
-lista de 10 000, pero es capacidad de firmware sin canal que la ejerza.
-Hace falta cámara dedicada (serie ITC/checkpoint).
-
-## PTZ
-
-`PTZCtrl/channels/1/{capabilities,presets,status}` → 200. Rango continuo
--100..100, 300 presets, 8 patrullas. Se usa **`momentary`**, que lleva la
-parada dentro: con el modo continuo, si se cae la red entre el «muévete» y el
-«para», la domo se queda girando contra el tope.
-
-UX consola: hold-to-move + stop garantizado al soltar; presets en Foco.
-
-## Asistencia
-
-Módulo nuevo `integra-attendance` en `/integra/attendance` (alta en
-`access-matrix.ts`, `_caps.ts` → capacidad `events`, y `_IntegraChrome`).
-Fichas con foto, no tabla: lo que se busca es la cara y la hora.
-
-Las fotos van a `/uploads/integra/...`, que **no** está en
-`PUBLIC_UPLOAD_PREFIXES`: se sirven solo con sesión, y `next.config.js` ya
-reescribe `/uploads/:path*` a la API, así que la cookie viaja. Son caras de
-empleados; que sigan detrás de sesión es deliberado.
-
-## Verificado en producción (2026-09-04 16:30)
-
-- Muro y foco: `ca9f4578` desplegado. 17 cámaras, las 4 puertas con audio.
-- Recuadros reales: `x 0.672 y 0.349 w 0.098 h 0.304 human` (antes `0,0,1,1`).
-- Detecciones con foto: **116/116**. Los accesos la tendrán en cuanto los
-  terminales acaben de volcar historial (iban por 24 días de retraso medio).
-- Cero fotos engañosas creadas desde que arrancó la API con el arreglo de
-  frescura. Las 632 residuales se limpiaron a mano (solo 3 existían en disco;
-  el resto se había escrito en la capa efímera antes del arreglo de rutas).
-- Entran ~460 eventos/min. Tabla: 53 770 filas / 47 MB y subiendo.
-
-`WorkflowSeedService` escupe `Unique constraint failed on (name)` en cada
-arranque. **No es de esto**: siembra definiciones que ya existen. Venía de antes.
-
-## Ojo operativo
-
-- El NVR está `bindStatus: bind` con Hik-Connect: con la detección encendida en
-  8 cámaras, quien tenga esa app recibe alarmas.
-- Se cambió el reloj de 10 equipos (cámaras en zona horaria de China). Toca
-  marcas de tiempo de un sistema de grabación; reversible.
-- Disco compartido con 27 contenedores de terceros. Vigilar la tabla hasta que
-  la poda de las 04:27 se lleve lo anterior a junio.
+## Muro / audio / push / TargetRect / PTZ / asistencia
+
+Ver historial en commits previos (`2d9e868`…`6fdd7ac`). Resumen operativo:
+
+- Muro `mode=auto` (MSE → snapshot); Foco MSE
+- Push inbox `/api/integra/hik/:siteId/:token`; TargetRect = persona
+- PTZ momentary + stop al soltar
+- Asistencia `/integra/attendance`; fotos en `/uploads/integra/...` con sesión
+- NVR `.34` no acepta httpHost; PTZ sin FieldDetection; faceURL 404 en DS-K1T
 
 ## A medias
 
-1. Portal del empleado (Adam pidió asistencia + credencial: falta que el
-   empleado entre y vea lo suyo). Requiere User↔`employeeNo`.
-2. El `httpHost` del grabador (ver arriba). Sin él, Escalera 01, Escaleras 02,
-   Azotea y Office Entrance no empujan eventos; su video va bien.
-3. La PTZ `.179` no tiene `FieldDetection`: sin recuadros en el estacionamiento.
-4. Decidir si se encienden los micros de las cámaras (el botón ya está).
-5. Hard-refresh del en vivo en el navegador (web `6fdd7ac` ya en prod; smoke:
-   `/integra/video` 200; en 10 min: 13 ACS + 2 con `personName`, fielddetection OK).
-6. TCPMSS / biblioteca `init: true` / empresas 1-2.
+1. Portal del empleado (User↔`employeeNo`).
+2. httpHost del grabador (Escalera/Azotea/Office Entrance sin push).
+3. Comprar cámara ANPR (ITC) si se quieren matrículas reales.
+4. Encender micros / Hik-Connect alarms — decisión Adam.
+5. Desplegar este turno (api+web) y hard-refresh Personas/Video/Vehículos.
+6. TCPMSS / biblioteca init / empresas 1-2.
 
 ## No tocar
 

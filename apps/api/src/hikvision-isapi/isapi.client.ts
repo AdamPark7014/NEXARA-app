@@ -166,13 +166,14 @@ export class HikvisionIsapiClient {
   private raw(
     method: string,
     path: string,
-    body?: string,
+    body?: string | Buffer,
     authorization?: string,
     contentType = 'application/xml',
   ): Promise<RawResponse> {
     const url = new URL(path, this.host);
     const isHttps = url.protocol === 'https:';
     const send = isHttps ? httpsRequest : httpRequest;
+    const payload = body == null ? undefined : Buffer.isBuffer(body) ? body : Buffer.from(body);
 
     return new Promise((resolve, reject) => {
       const req = send(
@@ -184,8 +185,8 @@ export class HikvisionIsapiClient {
           method,
           headers: {
             Accept: 'application/json, application/xml, text/xml, */*',
-            ...(body ? { 'Content-Type': contentType } : {}),
-            ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {}),
+            ...(payload ? { 'Content-Type': contentType } : {}),
+            ...(payload ? { 'Content-Length': payload.length } : {}),
             ...(authorization ? { Authorization: authorization } : {}),
           },
           agent: isHttps ? this.httpsAgent : this.httpAgent,
@@ -203,7 +204,7 @@ export class HikvisionIsapiClient {
       );
       req.on('timeout', () => req.destroy(new Error(`Timeout hablando con ${this.host}${path}`)));
       req.on('error', reject);
-      if (body) req.write(body);
+      if (payload) req.write(payload);
       req.end();
     });
   }
@@ -270,7 +271,7 @@ export class HikvisionIsapiClient {
   async request(
     method: string,
     path: string,
-    body?: string,
+    body?: string | Buffer,
     contentType = 'application/xml',
   ): Promise<string> {
     if (!this.configured) throw new IsapiNotConfiguredError(this.scope);
@@ -447,6 +448,46 @@ export class HikvisionIsapiClient {
   async postJson(path: string, payload: unknown): Promise<Record<string, XmlValue>> {
     return decode(
       await this.request('POST', path, JSON.stringify(payload), 'application/json'),
+    );
+  }
+
+  /** PUT JSON — UserInfo/Modify, UserInfoDetail/Delete, FDSearch/Delete. */
+  async putJson(path: string, payload: unknown): Promise<Record<string, XmlValue>> {
+    return decode(
+      await this.request('PUT', path, JSON.stringify(payload), 'application/json'),
+    );
+  }
+
+  /**
+   * POST multipart (FaceDataRecord, pictureUpload).
+   * Digest firma la URI completa; el cuerpo binario no entra en el hash.
+   */
+  async postMultipart(
+    path: string,
+    parts: Array<{ name: string; contentType: string; body: string | Buffer; filename?: string }>,
+  ): Promise<Record<string, XmlValue>> {
+    const boundary = `----NexaraIsapi${Date.now().toString(36)}`;
+    const chunks: Buffer[] = [];
+    for (const part of parts) {
+      const disposition = part.filename
+        ? `form-data; name="${part.name}"; filename="${part.filename}"`
+        : `form-data; name="${part.name}"`;
+      chunks.push(
+        Buffer.from(
+          `--${boundary}\r\nContent-Disposition: ${disposition}\r\nContent-Type: ${part.contentType}\r\n\r\n`,
+        ),
+      );
+      chunks.push(Buffer.isBuffer(part.body) ? part.body : Buffer.from(part.body));
+      chunks.push(Buffer.from('\r\n'));
+    }
+    chunks.push(Buffer.from(`--${boundary}--\r\n`));
+    return decode(
+      await this.request(
+        'POST',
+        path,
+        Buffer.concat(chunks),
+        `multipart/form-data; boundary=${boundary}`,
+      ),
     );
   }
 

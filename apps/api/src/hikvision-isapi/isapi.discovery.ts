@@ -45,6 +45,8 @@ export type IsapiVideoChannel = {
   /** El id sin sufijo de stream — `null` si el equipo usa otra numeración. */
   streamIndex: number | null;
   ptz: boolean | null;
+  /** El canal declara ANPR / Traffic plate (ITC). False en AcuSense/PTZ DarkFighter. */
+  anprCapable: boolean | null;
   /**
    * El canal trae pista de audio. Las cámaras de este parque salen de fábrica
    * con `<Audio><enabled>false</enabled>` aunque el micrófono exista; los
@@ -150,6 +152,7 @@ export async function listVideoChannels(
         channelNumber: numeric && id.length >= 3 ? Math.floor(numeric / 100) : numeric,
         streamIndex: numeric && id.length >= 3 ? numeric % 100 : null,
         ptz: null,
+        anprCapable: null,
         audio: audioEnabled === null ? null : audioEnabled === 'true',
         audioCodec: pick(node, 'Audio.audioCompressionType'),
         rtsp: client.rtspUrl(id),
@@ -260,6 +263,29 @@ export async function supportsPtz(
 ): Promise<boolean> {
   try {
     await client.get(`/ISAPI/PTZCtrl/channels/${channelNumber}/presets`);
+    return true;
+  } catch (e) {
+    if (e instanceof IsapiAuthRejectedError) throw e;
+    return false;
+  }
+}
+
+/**
+ * ANPR / detección de vehículos con placa.
+ * En Oficinas NEXARA: NVR y PTZ responden 403 / notSupport — se marca false.
+ */
+export async function supportsAnpr(
+  client: HikvisionIsapiClient,
+  channelNumber: number,
+): Promise<boolean> {
+  try {
+    await client.get(`/ISAPI/Traffic/channels/${channelNumber}/licensePlateAuditData/capabilities`);
+    return true;
+  } catch (e) {
+    if (e instanceof IsapiAuthRejectedError) throw e;
+  }
+  try {
+    await client.get(`/ISAPI/Smart/vehicleDetection/${channelNumber}`);
     return true;
   } catch (e) {
     if (e instanceof IsapiAuthRejectedError) throw e;
@@ -416,6 +442,7 @@ export async function describeDevice(
     ];
     for (const n of physical) {
       let ptz = false;
+      let anpr = false;
       try {
         ptz = await supportsPtz(client, n);
       } catch (e) {
@@ -423,8 +450,20 @@ export async function describeDevice(
           return { ...base, identity, reachable: true, error: describe(e), authRejected: true };
         }
       }
+      try {
+        anpr = await supportsAnpr(client, n);
+      } catch (e) {
+        if (e instanceof IsapiAuthRejectedError) {
+          return { ...base, identity, reachable: true, error: describe(e), authRejected: true };
+        }
+      }
       if (ptz) anyPtz = true;
-      for (const c of channels) if (c.channelNumber === n) c.ptz = ptz;
+      for (const c of channels) {
+        if (c.channelNumber === n) {
+          c.ptz = ptz;
+          c.anprCapable = anpr;
+        }
+      }
     }
   }
 

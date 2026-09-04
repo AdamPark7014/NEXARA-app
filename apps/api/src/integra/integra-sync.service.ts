@@ -494,6 +494,7 @@ export class IntegraSyncService {
           // La domo se sondea en el descubrimiento; guardarlo evita volver a
           // preguntárselo al equipo cada vez que alguien abre el foco.
           ptz: ch.ptz === true,
+          anprCapable: ch.anprCapable === true,
           source: proxy
             ? {
                 ipAddress: proxy.ipAddress,

@@ -268,6 +268,170 @@ export class IntegraPushService {
   }
 
   /**
+   * Quién está «en sitio» hoy: último acceso concedido del día sin un
+   * denegado/salida que lo cierre. No es PeopleCounting VCA (firmware false).
+   */
+  async occupancy(
+    companyId: number,
+    opts: { siteId?: number | null; tz?: string } = {},
+  ) {
+    const tz = opts.tz || 'America/Mexico_City';
+    const now = new Date();
+    // Ventana local aproximada: últimas 18 h cubre el día laboral MX.
+    const from = new Date(now.getTime() - 18 * 3600_000);
+    const rows = await this.prisma.integraPushEvent.findMany({
+      where: {
+        companyId,
+        ...(opts.siteId ? { siteId: opts.siteId } : {}),
+        major: 5,
+        personId: { not: null },
+        occurredAt: { gte: from },
+      },
+      orderBy: { occurredAt: 'asc' },
+      select: {
+        personId: true,
+        personName: true,
+        occurredAt: true,
+        deviceName: true,
+        deviceIp: true,
+        photoPath: true,
+        minor: true,
+        verifyMode: true,
+      },
+    });
+
+    const today = dayIn(now, tz);
+    type Occ = {
+      personId: string;
+      personName: string | null;
+      lastAt: Date;
+      lastDoor: string | null;
+      lastPhoto: string | null;
+      verifyMode: string | null;
+      inside: boolean;
+      passes: number;
+    };
+    const byPerson = new Map<string, Occ>();
+
+    for (const r of rows) {
+      if (dayIn(r.occurredAt, tz) !== today) continue;
+      const personId = r.personId as string;
+      const granted = r.minor === 75 || r.minor === 76 || r.minor === 1;
+      const cur = byPerson.get(personId);
+      if (!cur) {
+        byPerson.set(personId, {
+          personId,
+          personName: r.personName,
+          lastAt: r.occurredAt,
+          lastDoor: r.deviceName,
+          lastPhoto: r.photoPath,
+          verifyMode: r.verifyMode,
+          inside: granted,
+          passes: granted ? 1 : 0,
+        });
+        continue;
+      }
+      cur.lastAt = r.occurredAt;
+      cur.lastDoor = r.deviceName;
+      if (r.photoPath) cur.lastPhoto = r.photoPath;
+      if (r.verifyMode) cur.verifyMode = r.verifyMode;
+      if (!cur.personName && r.personName) cur.personName = r.personName;
+      if (granted) {
+        cur.inside = true;
+        cur.passes += 1;
+      } else {
+        // Denegado no saca; minor 76 suele ser salida concedida en algunos firmwares.
+        if (r.minor === 76) cur.inside = false;
+      }
+    }
+
+    const items = [...byPerson.values()]
+      .filter((p) => p.inside)
+      .map((p) => ({
+        ...p,
+        lastAt: p.lastAt.toISOString(),
+      }))
+      .sort((a, b) => b.lastAt.localeCompare(a.lastAt));
+
+    return {
+      day: today,
+      total: items.length,
+      items,
+      note: 'Ocupación deducida de accesos concedidos hoy. No es conteo óptico de cámaras.',
+    };
+  }
+
+  /**
+   * Eventos de vehículo (fielddetection target=vehicle). Sin texto de placa:
+   * este hardware no hace OCR. Contrato listo para cámaras ITC.
+   */
+  async plateEvents(
+    companyId: number,
+    opts: { siteId?: number | null; limit?: number } = {},
+  ) {
+    const take = Math.min(Math.max(opts.limit ?? 40, 1), 100);
+    const rows = await this.prisma.integraPushEvent.findMany({
+      where: {
+        companyId,
+        ...(opts.siteId ? { siteId: opts.siteId } : {}),
+        occurredAt: { gte: new Date(Date.now() - 30 * 60_000) },
+      },
+      orderBy: { id: 'desc' },
+      take: take * 3,
+      select: {
+        id: true,
+        deviceIp: true,
+        deviceName: true,
+        eventType: true,
+        label: true,
+        occurredAt: true,
+        targets: true,
+        photoPath: true,
+        raw: true,
+      },
+    });
+
+    const items: Array<{
+      id: number;
+      deviceIp: string;
+      deviceName: string | null;
+      occurredAt: string;
+      plate: string | null;
+      label: string | null;
+      photoPath: string | null;
+      anpr: boolean;
+    }> = [];
+
+    for (const r of rows) {
+      const targets = Array.isArray(r.targets) ? (r.targets as Array<{ type?: string }>) : [];
+      const hasVehicle = targets.some((t) => String(t?.type || '').toLowerCase() === 'vehicle');
+      const raw = (r.raw && typeof r.raw === 'object' ? r.raw : {}) as Record<string, unknown>;
+      const plate =
+        (typeof raw.licensePlate === 'string' && raw.licensePlate) ||
+        (typeof raw.plateNo === 'string' && raw.plateNo) ||
+        null;
+      if (!hasVehicle && !plate) continue;
+      items.push({
+        id: r.id,
+        deviceIp: r.deviceIp,
+        deviceName: r.deviceName,
+        occurredAt: r.occurredAt.toISOString(),
+        plate,
+        label: r.label || (plate ? 'Placa' : 'Vehículo'),
+        photoPath: r.photoPath,
+        anpr: Boolean(plate),
+      });
+      if (items.length >= take) break;
+    }
+
+    return {
+      items,
+      total: items.length,
+      note: 'Sin OCR en este parque: solo detecciones vehicle. plate llega cuando haya cámara ITC.',
+    };
+  }
+
+  /**
    * Deja a todos los equipos del sitio avisando a NEXARA.
    *
    * Se emite un token nuevo en cada pasada: si el anterior se filtró en un log
