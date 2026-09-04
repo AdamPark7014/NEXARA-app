@@ -1,36 +1,60 @@
 #!/bin/bash
-set -euo pipefail
+set -eu
 cd /var/www/nexara-app
+COMPOSE="docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml"
 
-echo "=== AUDIT recent person ops ==="
-docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml exec -T db \
-  psql -U nexara_user -d nexara_db -c \
-  "SELECT id, action, \"createdAt\", left(meta::text, 500) AS meta FROM audit_logs WHERE action LIKE '%person%' ORDER BY id DESC LIMIT 25;"
+echo "=== AUDIT ==="
+$COMPOSE exec -T db psql -U nexara_user -d nexara_db -c "SELECT id, action, \"createdAt\", left(changes::text, 700) AS changes FROM audit_logs WHERE action ILIKE '%person%' OR changes::text ILIKE '%2632768193%' ORDER BY id DESC LIMIT 25;"
 
-echo "=== Ariadna row ==="
-docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml exec -T db \
-  psql -U nexara_user -d nexara_db -c \
-  "SELECT id, \"personId\", \"personName\", raw::text FROM integra_people WHERE \"personId\"='2632768193';"
+echo "=== RAW person ==="
+$COMPOSE exec -T db psql -U nexara_user -d nexara_db -c "SELECT \"personId\", \"personName\", left(raw::text, 900) FROM integra_people WHERE \"personId\"='2632768193';"
 
-EMP=2632768193
-IPS="192.168.9.160 192.168.9.161 192.168.9.162 192.168.9.163 192.168.9.155"
+echo "=== Write probe JS into api container ==="
+$COMPOSE exec -T api sh -c 'cat > /tmp/probe-ariadna.js << "EOF"
+const path = require("path");
+const fs = require("fs");
 
-# Pull ACS creds from site raw / env inside api container
-echo "=== Probe UserInfo Search per IP for $EMP ==="
-docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml exec -T api \
-  node -e '
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+function walk(dir, pred, out=[]) {
+  if (!fs.existsSync(dir)) return out;
+  for (const f of fs.readdirSync(dir)) {
+    const p = path.join(dir, f);
+    try {
+      const st = fs.statSync(p);
+      if (st.isDirectory()) walk(p, pred, out);
+      else if (pred(f, p)) out.push(p);
+    } catch {}
+  }
+  return out;
+}
+
 (async () => {
-  const site = await prisma.integraSite.findFirst({ where: { id: 1 } });
-  const devices = await prisma.integraDevice.findMany({ where: { siteId: 1, kind: "ACS" }, select: { name: true, ip: true } });
-  console.log("site.host", site?.host, "provider", site?.provider);
-  console.log("devices", JSON.stringify(devices));
-  // credentials live in site config
-  const raw = site?.raw || {};
-  console.log("site keys", Object.keys(site||{}));
-  const cfg = await prisma.integraSite.findUnique({ where: { id: 1 } });
-  console.log(JSON.stringify({ username: cfg?.username, hasPass: !!(cfg?.passwordEncrypted||cfg?.password), host: cfg?.host }, null, 2));
-  await prisma.$disconnect();
-})().catch(e => { console.error(e); process.exit(1); });
-'
+  const distCandidates = ["/app/apps/api/dist", "/app/dist", "/usr/src/app/apps/api/dist", "/usr/src/app/dist"];
+  const dist = distCandidates.find((d) => fs.existsSync(d));
+  console.log("dist", dist, "cwd", process.cwd());
+  console.log("ls /app", fs.existsSync("/app") ? fs.readdirSync("/app").slice(0,30) : "no");
+  const prismaPaths = walk("/app", (f) => f === "prisma.service.js" || f === "index.js").slice(0, 20);
+  console.log("sample js", prismaPaths.slice(0,10));
+
+  // Prefer nest bootstrap via HTTP on localhost
+  const http = require("http");
+  function get(url) {
+    return new Promise((resolve, reject) => {
+      const req = http.get(url, (res) => {
+        let b = "";
+        res.on("data", (c) => (b += c));
+        res.on("end", () => resolve({ status: res.statusCode, body: b }));
+      });
+      req.on("error", reject);
+    });
+  }
+  for (const port of [3000, 4000, 8080]) {
+    try {
+      const r = await get("http://127.0.0.1:" + port + "/api/health");
+      console.log("health", port, r.status, r.body.slice(0,120));
+    } catch (e) {
+      console.log("health", port, e.message);
+    }
+  }
+})().catch((e) => { console.error(e); process.exit(1); });
+EOF
+node /tmp/probe-ariadna.js'

@@ -1,8 +1,11 @@
 import {
   acsIdentityKeys,
+  buildAcsCheckInSuggestion,
   erpIdentityKeys,
+  expectedStartHm,
   findAcsMatchKey,
   hybridTimeFlags,
+  isLateVsSchedule,
   normalizeIdentityKey,
 } from './attendance-hybrid.match';
 
@@ -53,5 +56,58 @@ describe('attendance-hybrid.match', () => {
         acsMinutes: 420,
       }),
     ).toEqual(expect.arrayContaining(['desfase_entrada', 'desfase_salida']));
+  });
+
+  it('sugiere checador solo si hay ACS, usuario y falta ERP', () => {
+    expect(
+      buildAcsCheckInSuggestion({
+        hasErp: false,
+        hasUser: true,
+        acsFirstAt: '2026-09-04T15:10:00.000Z',
+        acsFirstDoor: 'Acceso General',
+      }),
+    ).toMatchObject({
+      action: 'aplicar_entrada_acs',
+      at: '2026-09-04T15:10:00.000Z',
+      door: 'Acceso General',
+    });
+    expect(
+      buildAcsCheckInSuggestion({
+        hasErp: true,
+        hasUser: true,
+        acsFirstAt: '2026-09-04T15:10:00.000Z',
+      }),
+    ).toBeNull();
+    expect(
+      buildAcsCheckInSuggestion({
+        hasErp: false,
+        hasUser: false,
+        acsFirstAt: '2026-09-04T15:10:00.000Z',
+      }),
+    ).toBeNull();
+  });
+
+  it('marca retardo vs horario de oficina (09:00 MX + 15 min gracia)', () => {
+    expect(expectedStartHm('office_hours')).toBe('09:00');
+    expect(expectedStartHm('contractor')).toBe('08:00');
+    expect(expectedStartHm('always_on')).toBeNull();
+
+    // 09:20 MX = 15:20 UTC en septiembre (UTC-6)
+    expect(
+      isLateVsSchedule('2026-09-04T15:20:00.000Z', 'office_hours', { graceMinutes: 15 }),
+    ).toBe(true);
+    // 09:10 MX = dentro de gracia
+    expect(
+      isLateVsSchedule('2026-09-04T15:10:00.000Z', 'office_hours', { graceMinutes: 15 }),
+    ).toBe(false);
+
+    expect(
+      hybridTimeFlags({
+        acsFirstAt: '2026-09-04T15:30:00.000Z',
+        acsPasses: 2,
+        acsMinutes: 400,
+        scheduleKey: 'office_hours',
+      }),
+    ).toEqual(expect.arrayContaining(['retardo', 'acs_sin_checador']));
   });
 });
