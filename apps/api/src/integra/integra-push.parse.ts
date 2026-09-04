@@ -73,36 +73,51 @@ function asList<T>(v: T | T[] | undefined | null): T[] {
 }
 
 /**
- * Recuadros de detección, normalizados a 0..1.
+ * Recuadro de lo detectado, normalizado a 0..1.
  *
- * El equipo los da sobre una rejilla propia (`normalizedScreenSize`, 1000×1000
- * en estas cámaras), no en píxeles del video: hay que dividir por ella o los
- * recuadros salen fuera del cuadro.
+ * Cuidado con no confundir las dos cajas que trae el aviso:
+ *
+ * - `TargetRect` es **la persona**, ya en 0..1 sobre el encuadre.
+ * - `RegionCoordinatesList` es **la zona vigilada** que se configuró, en la
+ *   rejilla propia del equipo (`normalizedScreenSize`, 1000×1000 aquí).
+ *
+ * Se leía la segunda, y como la zona es el cuadro entero todos los recuadros
+ * salían `0,0,1,1`: una caja del tamaño de la pantalla en vez de una alrededor
+ * de la persona. Se usa `TargetRect` y la zona solo queda de recurso por si un
+ * firmware no la manda.
  */
 function targetsFrom(alert: Record<string, any>): NormalizedEvent['targets'] {
-  const w = Number(alert?.normalizedScreenSize?.normalizedScreenWidth) || 1000;
-  const h = Number(alert?.normalizedScreenSize?.normalizedScreenHeight) || 1000;
+  const gridW = Number(alert?.normalizedScreenSize?.normalizedScreenWidth) || 1000;
+  const gridH = Number(alert?.normalizedScreenSize?.normalizedScreenHeight) || 1000;
   const entries = asList(alert?.DetectionRegionList?.DetectionRegionEntry);
   const out: NonNullable<NormalizedEvent['targets']> = [];
 
   for (const e of entries) {
+    const type = str(e?.detectionTarget) || str(e?.targetType) || 'unknown';
+    const t = e?.TargetRect;
+    const tx = Number(t?.X);
+    const ty = Number(t?.Y);
+    const tw = Number(t?.width);
+    const th = Number(t?.height);
+    if ([tx, ty, tw, th].every(Number.isFinite) && tw > 0 && th > 0) {
+      out.push({ type, x: tx, y: ty, w: tw, h: th });
+      continue;
+    }
+
     const pts = asList(e?.RegionCoordinatesList?.RegionCoordinates)
       .map((c: any) => ({ x: Number(c?.positionX), y: Number(c?.positionY) }))
       .filter((c) => Number.isFinite(c.x) && Number.isFinite(c.y));
     if (pts.length === 0) continue;
     const xs = pts.map((p) => p.x);
     const ys = pts.map((p) => p.y);
-    const x0 = Math.min(...xs) / w;
-    const y0 = Math.min(...ys) / h;
-    const x1 = Math.max(...xs) / w;
-    const y1 = Math.max(...ys) / h;
-    out.push({
-      type: str(e?.detectionTarget) || str(e?.targetType) || 'unknown',
-      x: x0,
-      y: y0,
-      w: Math.max(0, x1 - x0),
-      h: Math.max(0, y1 - y0),
-    });
+    const x0 = Math.min(...xs) / gridW;
+    const y0 = Math.min(...ys) / gridH;
+    const x1 = Math.max(...xs) / gridW;
+    const y1 = Math.max(...ys) / gridH;
+    // Una caja que ocupa el encuadre entero es la zona, no un objetivo: no
+    // aporta nada dibujarla y estorba encima del video.
+    if (x1 - x0 > 0.98 && y1 - y0 > 0.98) continue;
+    out.push({ type, x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) });
   }
   return out.length ? out : null;
 }
