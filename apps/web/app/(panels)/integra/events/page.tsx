@@ -354,6 +354,10 @@ export default function IntegraEventsPage() {
         )}
       </div>
 
+      <div style={{ marginBottom: 12 }}>
+        <EnSitioStrip variant="compact" title="En sitio · ACS" pollMs={15_000} />
+      </div>
+
       <IgNotice>
         Solo los <strong>terminales ACS</strong> dan nombre + foto del pase. El ruido de cámara
         (heartBeat / VMD) queda fuera salvo «Ruido». Si falta alguien, da de alta en Personas —
