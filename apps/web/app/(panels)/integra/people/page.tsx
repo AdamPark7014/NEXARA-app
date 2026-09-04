@@ -398,10 +398,15 @@ export default function IntegraPeoplePage() {
     () =>
       people.filter((p) => {
         if (orgFilter && p.orgId !== orgFilter) return false;
+        const erp = findErpForPerson(p, erpByKey);
         if (validityFilter === "face") {
           if (!p.hasFace && !p.hasLocalFace && !(p.numOfFace && p.numOfFace > 0)) return false;
         } else if (validityFilter === "noface") {
           if (p.hasFace || p.hasLocalFace || (p.numOfFace && p.numOfFace > 0)) return false;
+        } else if (validityFilter === "erp") {
+          if (!erp) return false;
+        } else if (validityFilter === "noerp") {
+          if (erp) return false;
         } else if (validityFilter) {
           if (validityOf(p).key !== validityFilter) return false;
         }
@@ -410,10 +415,13 @@ export default function IntegraPeoplePage() {
         return (
           p.name.toLowerCase().includes(qq) ||
           (p.code || "").toLowerCase().includes(qq) ||
-          p.id.toLowerCase().includes(qq)
+          p.id.toLowerCase().includes(qq) ||
+          (erp?.nombre || "").toLowerCase().includes(qq) ||
+          (erp?.email || "").toLowerCase().includes(qq) ||
+          (erp?.role?.nombre || "").toLowerCase().includes(qq)
         );
       }),
-    [people, q, orgFilter, validityFilter],
+    [people, q, orgFilter, validityFilter, erpByKey],
   );
 
   const openDetail = async (p: Person) => {
@@ -432,7 +440,7 @@ export default function IntegraPeoplePage() {
           person: p,
         });
       } else {
-        setDetail({ error: e instanceof Error ? e.message : "Sin detalle" });
+        setDetail({ error: formatApiError(e, "Sin detalle") });
       }
     } finally {
       setBusy(false);
@@ -441,6 +449,9 @@ export default function IntegraPeoplePage() {
 
   const resetAlta = () => {
     setName("");
+    setEmail("");
+    setLinkUserId("");
+    setTempPassword(generateTempPassword());
     setCode("");
     setAutoCode(true);
     setAltaStep(1);
@@ -449,15 +460,27 @@ export default function IntegraPeoplePage() {
     setAltaPreview(null);
   };
 
-  const startAlta = () => {
+  const startAlta = (preferredMode: AltaMode = "unified") => {
     setSelected(null);
     setDetail(null);
     setMode("alta");
+    setAltaMode(preferredMode);
     setOpNote(null);
     setOpOk(null);
     setOpResults(null);
     setError(null);
     resetAlta();
+    void loadErpDirectory();
+  };
+
+  const startLinkFromErp = (u: ApiUserRow) => {
+    startAlta("link");
+    setLinkUserId(String(u.id));
+    setName(u.nombre);
+    setEmail(u.email);
+    setCode(u.employeeNumber || "");
+    setAutoCode(!u.employeeNumber);
+    setAltaStep(u.employeeNumber ? 3 : 2);
   };
 
   const syncNow = async () => {
@@ -467,9 +490,9 @@ export default function IntegraPeoplePage() {
       // Sync no bloquea el listado más de lo necesario: fire + refresh.
       await integraApi("integra/sync", { method: "POST" });
       await load();
-      toast.success("Directorio sincronizado desde los terminales");
+      toast.success("Directorio reconciliado (recuperación). Los cambios van en vivo a terminales.");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Error al sincronizar personas";
+      const msg = formatApiError(e, "Error al sincronizar personas");
       setError(msg);
       toast.error(msg);
     } finally {
@@ -483,7 +506,9 @@ export default function IntegraPeoplePage() {
     return d.person || selected;
   }, [detail, selected]);
 
+  const selectedErp = selected ? findErpForPerson(selected, erpByKey) : null;
   const withFace = people.filter((p) => p.hasFace || p.hasLocalFace || (p.numOfFace ?? 0) > 0).length;
+  const linkedCount = people.filter((p) => findErpForPerson(p, erpByKey)).length;
 
   const applyOp = (r: { success?: boolean; note?: string; results?: OpResult[] }) => {
     setOpResults(r.results || null);
@@ -499,60 +524,154 @@ export default function IntegraPeoplePage() {
     );
   };
 
+  const createAcsWithFace = async (personName: string, employeeNo: string | null, useAuto: boolean) => {
+    const r = await integraApi<{
+      success?: boolean;
+      note?: string;
+      employeeNo?: string;
+      results?: OpResult[];
+    }>("integra/people", {
+      method: "POST",
+      body: JSON.stringify({
+        personName,
+        autoCode: useAuto,
+        ...(useAuto || !employeeNo
+          ? {}
+          : { employeeNo, personCode: employeeNo }),
+      }),
+    });
+    if (!r.success || !r.employeeNo) {
+      applyOp(r);
+      return null;
+    }
+    if (!altaJpegB64) {
+      applyOp({ success: false, note: "Falta la foto JPEG", results: r.results });
+      return null;
+    }
+    const face = await uploadFaceFor(r.employeeNo, altaJpegB64);
+    invalidatePersonFaceCache(r.employeeNo);
+    setFaceBust((n) => n + 1);
+    applyOp({
+      success: Boolean(r.success && face.success !== false),
+      note: `${r.note || "Alta ACS OK"} · ${face.note || "Foto empujada."}`,
+      results: [...(r.results || []), ...(face.results || [])],
+    });
+    return r.employeeNo;
+  };
+
   const runAlta = async () => {
-    if (!name.trim()) {
+    if (altaMode === "unified") {
+      if (!name.trim() || !email.trim() || !roleId) {
+        setError("Nombre, correo y rol ERP son obligatorios.");
+        setAltaStep(1);
+        return;
+      }
+      if (!departmentId) {
+        setError("Falta departamento ERP. Crea uno en Usuarios o recarga.");
+        setAltaStep(1);
+        return;
+      }
+      if (!token) {
+        setError("Sesión requerida para crear usuario ERP.");
+        return;
+      }
+    } else if (altaMode === "link") {
+      if (!linkUserId) {
+        setError("Elige un usuario ERP para vincular.");
+        setAltaStep(1);
+        return;
+      }
+    } else if (!name.trim()) {
       setError("Nombre requerido");
       setAltaStep(1);
       return;
     }
+
     if (!autoCode && !code.trim()) {
-      setError("Código requerido o activa auto");
+      setError("Código requerido o activa automático");
       setAltaStep(2);
       return;
     }
     if (!altaJpegB64) {
-      setError("La foto JPEG es obligatoria en el alta (Face ID en terminales).");
+      setError("La foto JPEG es obligatoria (Face ID en terminales).");
       setAltaStep(3);
       return;
     }
+
     setMutKind("create");
     setError(null);
     setOpOk(null);
     try {
-      const r = await integraApi<{
-        success?: boolean;
-        note?: string;
-        employeeNo?: string;
-        results?: OpResult[];
-      }>("integra/people", {
-        method: "POST",
-        body: JSON.stringify({
-          personName: name.trim(),
-          autoCode,
-          ...(autoCode ? {} : { employeeNo: code.trim(), personCode: code.trim() }),
-        }),
-      });
-      if (!r.success || !r.employeeNo) {
-        applyOp(r);
-        return;
+      let employeeNo: string | null = autoCode ? null : code.trim();
+      let useAuto = autoCode;
+      let notePrefix = "";
+
+      if (altaMode === "unified") {
+        const password = tempPassword || generateTempPassword();
+        const created = await erpApiFetch<ApiUserRow>("users", token, {
+          method: "POST",
+          body: JSON.stringify({
+            nombre: name.trim(),
+            email: email.trim(),
+            password,
+            roleId: Number(roleId),
+            departmentId: Number(departmentId),
+            ...(!autoCode && code.trim() ? { employeeNumber: code.trim() } : {}),
+          }),
+        });
+        employeeNo = created.employeeNumber || code.trim() || null;
+        useAuto = !employeeNo;
+        notePrefix = `ERP OK (${created.email}${created.employeeNumber ? ` · ${created.employeeNumber}` : ""}). Contraseña temporal: ${password}. `;
+        setTempPassword(password);
+        toast.success(`Usuario ERP creado · ${created.employeeNumber || created.email}`);
+        await loadErpDirectory();
+      } else if (altaMode === "link") {
+        const linked = erpUsers.find((u) => String(u.id) === linkUserId);
+        if (!linked) throw new Error("Usuario ERP no encontrado");
+        employeeNo = linked.employeeNumber || code.trim() || null;
+        if (!employeeNo) {
+          if (!token) throw new Error("Sesión requerida para asignar nº de empleado");
+          const patched = await erpApiFetch<ApiUserRow>(`users/${linked.id}`, token, {
+            method: "PATCH",
+            body: JSON.stringify({
+              employeeNumber: code.trim() || undefined,
+            }),
+          });
+          employeeNo = patched.employeeNumber || code.trim() || null;
+        }
+        if (!employeeNo) {
+          setError("El usuario ERP no tiene nº de empleado. Indica uno manual.");
+          setAltaStep(2);
+          return;
+        }
+        useAuto = false;
+        setName(linked.nombre);
+        notePrefix = `Vinculado a ERP · ${linked.nombre}. `;
       }
-      const face = await uploadFaceFor(r.employeeNo, altaJpegB64);
-      invalidatePersonFaceCache(r.employeeNo);
-      setFaceBust((n) => n + 1);
-      applyOp({
-        success: Boolean(r.success && face.success !== false),
-        note: `${r.note || "Alta OK"} · ${face.note || "Foto empujada."}`,
-        results: [...(r.results || []), ...(face.results || [])],
-      });
+
+      const createdId = await createAcsWithFace(
+        name.trim() || erpUsers.find((u) => String(u.id) === linkUserId)?.nombre || "",
+        employeeNo,
+        useAuto,
+      );
+      if (!createdId) return;
+
+      if (notePrefix) {
+        setOpNote((prev) => `${notePrefix}${prev || ""}`);
+      }
       resetAlta();
       await load();
+      await loadErpDirectory();
       const created = (await integraApi<{ items: Person[] }>("integra/people")).items.find(
-        (p) => p.id === r.employeeNo,
+        (p) => p.id === createdId,
       );
       if (created) void openDetail(created);
+      toast.success("Persona unificada lista");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al dar de alta");
+      const msg = formatApiError(e, "Error al dar de alta");
+      setError(msg);
       setOpOk(false);
+      toast.error(msg);
     } finally {
       setMutKind(null);
     }
