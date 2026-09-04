@@ -350,6 +350,9 @@ export class IntegraArtemisService {
               hasAudio?: boolean;
               deviceKind?: string;
               doorIndexCode?: string;
+              channelNumber?: number;
+              ptz?: boolean;
+              source?: { ipAddress?: string | null; model?: string | null } | null;
             };
             return {
               id: c.cameraIndexCode,
@@ -363,6 +366,12 @@ export class IntegraArtemisService {
               // a quien pasa por esa puerta.
               doorIndexCode: raw.doorIndexCode ?? null,
               isDoorCamera: raw.deviceKind === 'ACS',
+              // IP del equipo que de verdad ve la escena: los eventos que
+              // empuja vienen firmados con ella, no con la del grabador.
+              sourceIp: raw.source?.ipAddress ?? null,
+              model: raw.source?.model ?? null,
+              channelNumber: raw.channelNumber ?? null,
+              isPtz: raw.ptz === true,
             };
           }),
         };
@@ -409,6 +418,45 @@ export class IntegraArtemisService {
     opts?: { audio?: boolean },
   ) {
     return this.media.liveStream(companyId, cameraIndexCode, siteId, opts);
+  }
+
+  /**
+   * Mover la domo es una acción operativa, no una consulta: va con el mismo
+   * permiso que abrir una puerta. No se audita cada pulsación —serían cientos
+   * por minuto— pero sí ir a una posición memorizada, que es la que cambia
+   * a dónde mira la cámara del estacionamiento y se queda así.
+   */
+  ptzMove(
+    companyId: number | null,
+    cameraIndexCode: string,
+    v: { pan?: number; tilt?: number; zoom?: number; durationMs?: number },
+    siteId?: number | null,
+  ) {
+    return this.media.ptzMove(companyId, cameraIndexCode, v, siteId);
+  }
+
+  ptzStop(companyId: number | null, cameraIndexCode: string, siteId?: number | null) {
+    return this.media.ptzStop(companyId, cameraIndexCode, siteId);
+  }
+
+  ptzPresets(companyId: number | null, cameraIndexCode: string, siteId?: number | null) {
+    return this.media.ptzPresets(companyId, cameraIndexCode, siteId);
+  }
+
+  async ptzGoTo(
+    companyId: number | null,
+    cameraIndexCode: string,
+    preset: number,
+    actor?: Actor,
+    siteId?: number | null,
+  ) {
+    const r = await this.media.ptzGoTo(companyId, cameraIndexCode, preset, siteId);
+    await this.auditMut('integra.ptz.preset', actor, companyId, siteId ?? 0, {
+      cameraIndexCode,
+      preset,
+      email: actor?.email,
+    });
+    return r;
   }
 
   /** Enciende/apaga el micrófono en el equipo. Queda escrito allí: se audita. */

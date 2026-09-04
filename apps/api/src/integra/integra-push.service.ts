@@ -1,7 +1,8 @@
 import { randomBytes, createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { Subject } from 'rxjs';
 import {
   clearHttpNotificationHost,
@@ -27,6 +28,12 @@ import { IntegraSiteService } from './integra-site.service';
  * sitio en la propia URL (`urlLen max=128` en el firmware, así que va corto) y
  * en la base solo queda su sha256.
  */
+
+/** Ruido: dice algo mientras pasa y nada al día siguiente. */
+const NOISE_TYPES = ['heartBeat', 'duration', 'VMD', 'videoloss'];
+const NOISE_TTL_DAYS = 3;
+/** Todo lo demás —accesos, detecciones— aguanta un trimestre. */
+const EVENT_TTL_DAYS = 90;
 
 /** Un evento ya normalizado, venga en XML de cámara o en JSON de terminal. */
 export type NormalizedEvent = {
@@ -84,6 +91,54 @@ export class IntegraPushService {
     if (!site?.pushTokenHash) throw new NotFoundException('Sitio sin token de eventos');
     if (site.pushTokenHash !== sha256(token)) throw new NotFoundException('Token no válido');
     return site;
+  }
+
+  /**
+   * Poda nocturna.
+   *
+   * El ruido y lo que importa envejecen distinto. Un latido o un aviso de
+   * movimiento no dice nada al día siguiente, y entran a cientos por hora: sin
+   * podarlos la tabla se come el disco de un servidor que además aloja a otros
+   * siete negocios. Un acceso, en cambio, es el registro de quién entró y
+   * cuándo, y eso se guarda.
+   *
+   * Las fotos huérfanas se van con su fila: una foto de una cara sin el evento
+   * que la explica no es un dato, es un archivo de gente suelto.
+   */
+  @Cron('27 4 * * *')
+  async purgeOldEvents() {
+    const now = Date.now();
+    const noiseBefore = new Date(now - NOISE_TTL_DAYS * 86_400_000);
+    const anyBefore = new Date(now - EVENT_TTL_DAYS * 86_400_000);
+
+    const doomed = await this.prisma.integraPushEvent.findMany({
+      where: {
+        OR: [
+          { eventType: { in: NOISE_TYPES }, occurredAt: { lt: noiseBefore } },
+          { occurredAt: { lt: anyBefore } },
+        ],
+      },
+      select: { id: true, photoPath: true },
+    });
+    if (doomed.length === 0) return { deleted: 0, photos: 0 };
+
+    let photos = 0;
+    for (const row of doomed) {
+      if (!row.photoPath) continue;
+      const rel = row.photoPath.replace(/^\/uploads\//, '');
+      try {
+        await rm(resolveUploadsDir(rel), { force: true });
+        photos += 1;
+      } catch {
+        // Un fichero que ya no está no impide borrar la fila.
+      }
+    }
+
+    const { count } = await this.prisma.integraPushEvent.deleteMany({
+      where: { id: { in: doomed.map((d) => d.id) } },
+    });
+    this.logger.log(`Poda de eventos: ${count} filas, ${photos} fotos`);
+    return { deleted: count, photos };
   }
 
   /** Lo que ya llegó, del más reciente al más antiguo. */

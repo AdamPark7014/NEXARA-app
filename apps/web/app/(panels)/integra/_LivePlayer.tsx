@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "./integra.module.css";
 
-type StreamMode = "mse" | "mjpeg";
+type StreamMode = "mse" | "mjpeg" | "auto";
 
 type Props = {
   /** URL HLS que devuelve la API. De ella se deriva WS / frame.jpeg. */
@@ -14,9 +14,14 @@ type Props = {
   startDelayMs?: number;
   enabled?: boolean;
   /**
-   * `mjpeg` en el muro = snapshots HTTP `frame.jpeg` (probado en prod).
-   * El mode=mjpeg del `<video-stream>` no entrega frames con estos RTSP.
-   * `mse` = Foco.
+   * `mse` = video de verdad por WebSocket. `mjpeg` = snapshots HTTP
+   * `frame.jpeg` — el `mode=mjpeg` del `<video-stream>` no entrega frames con
+   * estos RTSP, por eso son snapshots y no su modo nativo.
+   *
+   * `auto` es lo que usa el muro: intenta MSE y, si ese mosaico no da imagen a
+   * tiempo, cae a snapshots él solo. Antes el muro entero iba a un JPEG por
+   * segundo para que no se quedara ninguno colgado; así solo paga ese precio
+   * el que de verdad falla.
    */
   mode?: StreamMode;
   /**
@@ -226,7 +231,8 @@ function MseFocusPlayer({
   startDelayMs = 0,
   enabled = true,
   audio = false,
-}: ShellProps) {
+  onLive,
+}: ShellProps & { onLive?: (live: boolean) => void }) {
   const shellRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const nodeRef = useRef<VideoStreamEl | null>(null);
@@ -312,7 +318,10 @@ function MseFocusPlayer({
             const v = hardenVideo(node);
             if (!v) return;
             if (v.paused || v.ended) kickPlay(node);
-            if (v.readyState >= 2 && !v.paused) setState("live");
+            if (v.readyState >= 2 && !v.paused) {
+              setState("live");
+              onLive?.(true);
+            }
           }, 1200);
         })
         .catch(() => {
@@ -400,10 +409,41 @@ function MseFocusPlayer({
   );
 }
 
+/** Cuánto se le da a MSE antes de dar ese mosaico por perdido. */
+const MSE_GIVE_UP_MS = 7000;
+
+function AutoPlayer(props: ShellProps) {
+  const [fallback, setFallback] = useState(false);
+  const [live, setLive] = useState(false);
+
+  // Cada cámara tiene su propia suerte: al cambiar de stream se vuelve a
+  // intentar MSE en vez de arrastrar el respaldo del anterior.
+  useEffect(() => {
+    setFallback(false);
+    setLive(false);
+  }, [props.src]);
+
+  useEffect(() => {
+    if (fallback || live || !props.src || !props.enabled) return;
+    const t = window.setTimeout(
+      () => setFallback(true),
+      MSE_GIVE_UP_MS + (props.startDelayMs ?? 0),
+    );
+    return () => window.clearTimeout(t);
+  }, [fallback, live, props.src, props.enabled, props.startDelayMs]);
+
+  if (fallback) {
+    const { audio: _audio, ...wall } = props;
+    return <SnapshotWallPlayer {...wall} />;
+  }
+  return <MseFocusPlayer {...props} onLive={setLive} />;
+}
+
 export function IntegraLivePlayer({ mode = "mse", ...rest }: Props) {
   if (mode === "mjpeg") {
     const { audio: _audio, ...wall } = rest;
     return <SnapshotWallPlayer {...wall} />;
   }
+  if (mode === "auto") return <AutoPlayer {...rest} />;
   return <MseFocusPlayer {...rest} />;
 }

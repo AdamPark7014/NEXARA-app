@@ -14,7 +14,9 @@ import {
   IgToolbar,
 } from "../_Console";
 import { IntegraEzuiKitPlayer } from "../_EzuiKitPlayer";
+import { IntegraDetectionOverlay } from "../_DetectionOverlay";
 import { IntegraLivePlayer } from "../_LivePlayer";
+import { IntegraPtzPad } from "../_PtzPad";
 import {
   defaultRangeHours,
   fromDatetimeLocalValue,
@@ -37,6 +39,12 @@ type Cam = {
   region?: string;
   status?: string | number;
   encodeDevIndexCode?: string | null;
+  /** IP del equipo que ve la escena: con ella se casan sus detecciones. */
+  sourceIp?: string | null;
+  model?: string | null;
+  hasAudio?: boolean;
+  isDoorCamera?: boolean;
+  isPtz?: boolean;
 };
 
 type StreamSlot = {
@@ -488,14 +496,19 @@ export default function IntegraVideoPage() {
                         height={layout <= 4 ? 280 : 160}
                       />
                     ) : (
-                      <IntegraLivePlayer
-                        src={s.hls}
-                        compact
-                        showLiveBadge
-                        mode="mjpeg"
-                        enabled={liveWallIds.has(s.id)}
-                        startDelayMs={(liveWallOrder.get(s.id) ?? i) * STAGGER_MS}
-                      />
+                      <>
+                        <IntegraDetectionOverlay
+                          deviceIp={items.find((c) => c.id === s.id)?.sourceIp ?? null}
+                        />
+                        <IntegraLivePlayer
+                          src={s.hls}
+                          compact
+                          showLiveBadge
+                            mode="auto"
+                          enabled={liveWallIds.has(s.id)}
+                          startDelayMs={(liveWallOrder.get(s.id) ?? i) * STAGGER_MS}
+                        />
+                      </>
                     )}
                   </div>
                 </div>
@@ -619,7 +632,17 @@ export default function IntegraVideoPage() {
                     {focus.provider === "HCT" ? (
                       <IntegraEzuiKitPlayer stream={focus.stream} cameraId={focus.id} height={420} />
                     ) : (
-                      <IntegraLivePlayer src={focus.hls} enabled={mode === "focus"} mode="mse" />
+                      <div className={styles.focusStage}>
+                        <IntegraDetectionOverlay
+                          deviceIp={items.find((c) => c.id === focus.id)?.sourceIp ?? null}
+                        />
+                        <IntegraLivePlayer
+                          src={focus.hls}
+                          enabled={mode === "focus"}
+                          mode="mse"
+                          audio={Boolean(focus.audio)}
+                        />
+                      </div>
                     )}
                     {note && (
                       <p className={styles.videoNote}>
@@ -634,6 +657,12 @@ export default function IntegraVideoPage() {
                       </p>
                     )}
                   </>
+                )}
+                {focus && items.find((c) => c.id === focus.id)?.isPtz && (
+                  <IntegraPtzPad
+                    cameraId={focus.id}
+                    canControl={Boolean(caps?.canControlDoors)}
+                  />
                 )}
                 <div className={styles.focusActions}>
                   {focus && !focus.hasAudio && caps?.canControlDoors && (

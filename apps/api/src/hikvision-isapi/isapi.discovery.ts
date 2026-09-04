@@ -601,3 +601,66 @@ export async function disableFieldDetection(
   await client.put(path, xml.replace(region[0], patched));
   return true;
 }
+
+/**
+ * Movimiento continuo de una domo: se mueve mientras dure `durationMs` y para
+ * sola.
+ *
+ * Se usa el modo continuo y no el absoluto porque una consola se maneja a
+ * pulsaciones —«un poco a la izquierda»—, no a coordenadas. Los tres ejes van
+ * en -100..100 según declara el propio equipo en `ContinuousPanTiltSpace`.
+ *
+ * El `momentary` lleva la parada dentro: si se cae la red a mitad, la cámara
+ * se detiene sola en vez de quedarse girando contra el tope.
+ */
+export async function ptzMove(
+  client: HikvisionIsapiClient,
+  channel: number | string,
+  v: { pan?: number; tilt?: number; zoom?: number; durationMs?: number },
+): Promise<void> {
+  const clamp = (n: number | undefined) =>
+    Math.max(-100, Math.min(100, Math.round(Number(n) || 0)));
+  const duration = Math.max(100, Math.min(5000, Math.round(v.durationMs ?? 500)));
+  await client.put(
+    `/ISAPI/PTZCtrl/channels/${channel}/momentary`,
+    `<PTZData><pan>${clamp(v.pan)}</pan><tilt>${clamp(v.tilt)}</tilt>` +
+      `<zoom>${clamp(v.zoom)}</zoom><Momentary><duration>${duration}</duration></Momentary></PTZData>`,
+  );
+}
+
+/** Para en seco. Por si un `momentary` se quedó colgado. */
+export async function ptzStop(
+  client: HikvisionIsapiClient,
+  channel: number | string,
+): Promise<void> {
+  await client.put(
+    `/ISAPI/PTZCtrl/channels/${channel}/continuous`,
+    '<PTZData><pan>0</pan><tilt>0</tilt><zoom>0</zoom></PTZData>',
+  );
+}
+
+/** Va a una posición memorizada. */
+export async function ptzGoToPreset(
+  client: HikvisionIsapiClient,
+  channel: number | string,
+  preset: number,
+): Promise<void> {
+  await client.put(`/ISAPI/PTZCtrl/channels/${channel}/presets/${preset}/goto`, '');
+}
+
+export type PtzPreset = { id: number; name: string };
+
+/** Posiciones memorizadas, sin las vacías que el equipo devuelve igual. */
+export async function ptzPresets(
+  client: HikvisionIsapiClient,
+  channel: number | string,
+): Promise<PtzPreset[]> {
+  const xml = await client.get(`/ISAPI/PTZCtrl/channels/${channel}/presets`);
+  const list = (xml.PTZPresetList ?? xml) as Record<string, unknown>;
+  return asList(list.PTZPreset)
+    .map((p) => ({
+      id: Number(pick(p, 'id')),
+      name: (pick(p, 'presetName') || '').trim(),
+    }))
+    .filter((p) => Number.isFinite(p.id) && p.name.length > 0);
+}

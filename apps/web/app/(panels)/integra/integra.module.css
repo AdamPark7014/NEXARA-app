@@ -2254,3 +2254,124 @@
   border-color: var(--ig-accent);
   box-shadow: 0 0 0 1px var(--ig-accent) inset;
 }
+
+/* ── Recuadros de detección ─────────────────────────────────────────────
+ * Se posicionan en porcentaje porque el equipo los manda normalizados 0..1:
+ * así cuadran igual en un mosaico de 4×4 que en el foco a pantalla completa.
+ * `pointer-events: none` para que no se coman el clic del mosaico de debajo.
+ */
+.detOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.detBox {
+  position: absolute;
+  border: 2px solid var(--ig-accent, #22d3ee);
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.45);
+  animation: detFade 4s ease-out forwards;
+}
+
+.detBox[data-kind="vehicle"] {
+  border-color: #f59e0b;
+}
+
+.detBox[data-kind="face"] {
+  border-color: #a78bfa;
+}
+
+.detTag {
+  position: absolute;
+  bottom: 100%;
+  left: -2px;
+  margin-bottom: 2px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--ig-accent, #22d3ee);
+  color: #04121a;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.detBox[data-kind="vehicle"] .detTag {
+  background: #f59e0b;
+}
+
+.detBox[data-kind="face"] .detTag {
+  background: #a78bfa;
+  color: #1a0b2e;
+}
+
+/* El aviso es puntual: el recuadro se apaga solo en vez de quedarse clavado
+   donde ya no hay nadie. */
+@keyframes detFade {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Contenedor del foco: da el marco de referencia a los recuadros, que se
+   posicionan en porcentaje sobre el video. */
+.focusStage {
+  position: relative;
+}
+
+/* ── Mando de la domo ───────────────────────────────────────────────── */
+.ptzPad {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--ig-line);
+  border-radius: 10px;
+  background: var(--ig-panel);
+}
+
+.ptzGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 40px);
+  gap: 4px;
+  justify-content: center;
+}
+
+.ptzZoom {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.ptzPresets {
+  display: grid;
+  gap: 3px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+}
+
+.ptzPresets select {
+  padding: 6px 8px;
+  border: 1px solid var(--ig-line);
+  border-radius: 6px;
+  background: var(--ig-bg, var(--ig-panel));
+  color: var(--ig-text);
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.ptzHint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--ig-muted);
+}
+
+.ptzHint[data-tone="error"] {
+  color: var(--ig-danger, #dc2626);
+}
