@@ -428,6 +428,17 @@ export class UsersController {
     stream.pipe(res);
   }
 
+  /** Vista previa «Horario de acceso Integra» (plantilla por rol → ACS). */
+  @Get(':id/integra-access-schedule')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.USERS_REVIEW] })
+  getIntegraAccessSchedule(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+  ) {
+    return this.usersService.getIntegraAccessSchedule(id, companyId);
+  }
+
   @Get(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })

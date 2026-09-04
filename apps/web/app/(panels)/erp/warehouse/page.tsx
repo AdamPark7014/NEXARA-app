@@ -1385,11 +1385,37 @@ export default function WarehousePage() {
         <Section
           title="Lotes y caducidad"
           subtitle="Trazabilidad por lote de fabricación, con alerta cuando se acerca la fecha de caducidad."
-          actions={cfg.canCreate ? (
-            <Button variant="primary" size="sm" iconLeft="+" onClick={() => { setLotForm({ lotNumber: "", productId: "", expirationDate: "", manufacturingDate: "", notes: "" }); setShowLotForm(true); }}>
-              Nuevo lote
-            </Button>
-          ) : undefined}
+          actions={
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {lots.length > 0 && (
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(
+                  lots.map((l) => ({
+                    lote: l.lotNumber,
+                    sku: l.product?.sku ?? "",
+                    producto: l.product?.name ?? "",
+                    fabricacion: l.manufacturingDate ? String(l.manufacturingDate).slice(0, 10) : "",
+                    caducidad: l.expirationDate ? String(l.expirationDate).slice(0, 10) : "",
+                    notas: l.notes ?? "",
+                  })),
+                  [
+                    { key: "lote", label: "Lote" },
+                    { key: "sku", label: "SKU" },
+                    { key: "producto", label: "Producto" },
+                    { key: "fabricacion", label: "Fabricación" },
+                    { key: "caducidad", label: "Caducidad" },
+                    { key: "notas", label: "Notas" },
+                  ],
+                  "lotes-inventario",
+                  "Lotes",
+                )}>Excel</Button>
+              )}
+              {cfg.canCreate ? (
+                <Button variant="primary" size="sm" iconLeft="+" onClick={() => { setLotForm({ lotNumber: "", productId: "", expirationDate: "", manufacturingDate: "", notes: "" }); setShowLotForm(true); }}>
+                  Nuevo lote
+                </Button>
+              ) : null}
+            </div>
+          }
         >
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 16 }}>
             <KpiCard label="Lotes registrados" value={lots.length} icon="🧾" />
@@ -1468,10 +1494,39 @@ export default function WarehousePage() {
           title="Valuación de inventario"
           subtitle="Costo unitario y valor total por producto y almacén, según el método de valuación configurado."
           actions={
-            <select value={valuationWarehouseFilter} onChange={(e) => setValuationWarehouseFilter(e.target.value)} style={{ ...inp, width: 200 }}>
-              <option value="">Todos los almacenes</option>
-              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-            </select>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <select value={valuationWarehouseFilter} onChange={(e) => setValuationWarehouseFilter(e.target.value)} style={{ ...inp, width: 200 }}>
+                <option value="">Todos los almacenes</option>
+                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+              {valuationWarehouseFilter && (
+                <Button variant="ghost" size="sm" onClick={() => setValuationWarehouseFilter("")}>Limpiar filtro</Button>
+              )}
+              {valuation.length > 0 && (
+                <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(
+                  valuation.map((v) => ({
+                    sku: v.product?.sku ?? "",
+                    producto: v.product?.name ?? "",
+                    almacen: v.warehouse?.name ?? "",
+                    cantidad: Number(v.quantity),
+                    disponible: Number(v.availableQty),
+                    costoUnit: Number(v.unitCost ?? 0),
+                    valor: v.totalValue,
+                  })),
+                  [
+                    { key: "sku", label: "SKU" },
+                    { key: "producto", label: "Producto" },
+                    { key: "almacen", label: "Almacén" },
+                    { key: "cantidad", label: "Cantidad" },
+                    { key: "disponible", label: "Disponible" },
+                    { key: "costoUnit", label: "Costo unit." },
+                    { key: "valor", label: "Valor total" },
+                  ],
+                  "valuacion-inventario",
+                  "Valuación",
+                )}>Excel</Button>
+              )}
+            </div>
           }
         >
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 16 }}>
