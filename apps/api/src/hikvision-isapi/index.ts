@@ -74,4 +74,35 @@ export {
 
 export { probeRtsp, type RtspProbeResult } from './rtsp-probe';
 
+export {
+  ACCESS_SCHEDULE_MODEL_ES,
+  INDEFINITE_VALID,
+  WEEKDAYS,
+  assignUserAccess,
+  buildAfterHoursWeekPlan,
+  buildAlwaysOnWeekPlan,
+  buildOfficeHoursWeekPlan,
+  buildWeekendWeekPlan,
+  buildWeekPlanCfg,
+  classifyValid,
+  ensurePresetTemplate,
+  getPlanTemplate,
+  getWeekPlan,
+  isHhMmSs,
+  listPlanTemplates,
+  listWeekPlanSummaries,
+  parseRightPlan,
+  putPlanTemplate,
+  putWeekPlan,
+  validFromMode,
+  type AccessPresetKey,
+  type PlanTemplate,
+  type RightPlanEntry,
+  type TimeSegment,
+  type ValidMode,
+  type WeekPlanCfg,
+  type WeekPlanSlot,
+  type Weekday,
+} from './isapi-schedules';
+
 export { asList, parseXml, pick, type XmlValue } from './xml';

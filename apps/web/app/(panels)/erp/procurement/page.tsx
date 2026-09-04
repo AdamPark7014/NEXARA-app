@@ -47,8 +47,27 @@ interface GoodsReceipt {
   receiptNumber: string;
   receiptDate?: string;
   purchaseOrderId: number;
-  purchaseOrder?: { id: number; poNumber: string };
+  warehouseId?: number | null;
+  notes?: string | null;
+  freightCost?: number | string;
+  insuranceCost?: number | string;
+  customsCost?: number | string;
+  otherLandedCost?: number | string;
+  purchaseOrder?: { id: number; poNumber: string; supplier?: { name?: string } | null };
+  warehouse?: { id: number; code?: string; name: string } | null;
   receivedBy?: { nombre?: string };
+  items?: Array<{
+    id: number;
+    quantityReceived: number | string;
+    quantityRejected?: number | string;
+    lotNumber?: string | null;
+    landedCostAllocated?: number | string;
+    purchaseOrderItem?: {
+      description?: string;
+      unitPrice?: number | string;
+      product?: { sku?: string; name?: string } | null;
+    } | null;
+  }>;
 }
 
 interface RfqLine {
