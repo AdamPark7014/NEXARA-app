@@ -278,7 +278,11 @@ export class IntegraMediaService {
       source?: { ipAddress?: string | null; reachableDirectly?: boolean } | null;
     };
 
-    const directIp = raw.source?.reachableDirectly ? raw.source.ipAddress : null;
+    const directIp =
+      raw.source?.ipAddress &&
+      (raw.source.reachableDirectly || !String(raw.source.ipAddress).startsWith('192.168.254.'))
+        ? raw.source.ipAddress
+        : null;
     if (directIp && resolved.isapiForHost) {
       const client = resolved.isapiForHost(directIp);
       if (client) return { client, channel: 1 };

@@ -41,15 +41,34 @@ type Box = PushTarget & {
 };
 
 /** Cuánto se queda pintado un recuadro desde que llega su evento. */
-const BOX_TTL_MS = 4000;
+const BOX_TTL_MS = 6000;
 /** Cada cuánto se pregunta por detecciones nuevas. */
-const POLL_MS = 2000;
+const POLL_MS = 1500;
 
 type Listener = (events: PushEvent[]) => void;
 
 const listeners = new Set<Listener>();
 let timer: number | null = null;
 let lastId = 0;
+
+function boxesFromEvents(events: PushEvent[], deviceIp: string, now = Date.now()): Box[] {
+  const fresh: Box[] = [];
+  for (const ev of events) {
+    if (ev.deviceIp !== deviceIp || !ev.targets?.length) continue;
+    const age = now - Date.parse(ev.occurredAt);
+    if (!Number.isFinite(age) || age > BOX_TTL_MS * 2) continue;
+    for (const [i, t] of ev.targets.entries()) {
+      fresh.push({
+        ...t,
+        key: `${ev.id}-${i}`,
+        at: now - Math.max(0, age),
+        personName: ev.personName,
+        personId: ev.personId,
+      });
+    }
+  }
+  return fresh;
+}
 
 async function pollOnce() {
   try {
@@ -67,8 +86,8 @@ async function pollOnce() {
 export function subscribePushEvents(fn: Listener): () => void {
   listeners.add(fn);
   if (timer == null) {
-    // La primera vez solo se toma la marca: sin esto, al abrir el muro
-    // aparecerían de golpe los recuadros de los últimos minutos.
+    // Marca inicial: sin esto, al abrir el muro aparecerían de golpe minutos
+    // de historia. Cada overlay además pide su semilla reciente por IP.
     void integraApi<{ items: PushEvent[] }>("integra/push/events?limit=1")
       .then((d) => {
         lastId = Math.max(lastId, d.items?.[0]?.id ?? 0);
@@ -111,24 +130,26 @@ export function IntegraDetectionOverlay({
     setBoxes([]);
   }, [deviceIp]);
 
+  // Semilla: últimos segundos de esta cámara (el poll compartido solo ve lo nuevo).
+  useEffect(() => {
+    if (!deviceIp) return;
+    let stop = false;
+    void integraApi<{ items: PushEvent[] }>("integra/push/events?limit=40")
+      .then((d) => {
+        if (stop) return;
+        const fresh = boxesFromEvents(d.items || [], deviceIp);
+        if (fresh.length) setBoxes(fresh);
+      })
+      .catch(() => undefined);
+    return () => {
+      stop = true;
+    };
+  }, [deviceIp]);
+
   useEffect(() => {
     if (!deviceIp) return;
     return subscribePushEvents((events) => {
-      const fresh: Box[] = [];
-      for (const ev of events) {
-        if (ev.deviceIp !== deviceIp || !ev.targets?.length) continue;
-        const age = Date.now() - Date.parse(ev.occurredAt);
-        if (!Number.isFinite(age) || age > BOX_TTL_MS * 2) continue;
-        for (const [i, t] of ev.targets.entries()) {
-          fresh.push({
-            ...t,
-            key: `${ev.id}-${i}`,
-            at: Date.now(),
-            personName: ev.personName,
-            personId: ev.personId,
-          });
-        }
-      }
+      const fresh = boxesFromEvents(events, deviceIp);
       if (fresh.length) setBoxes((prev) => [...prev, ...fresh]);
     });
   }, [deviceIp]);
