@@ -161,15 +161,32 @@ function num(v: unknown, fallback = 0): number {
 /** Página de usuarios del terminal. `position` es offset 0-based. */
 export async function searchUserInfo(
   client: HikvisionIsapiClient,
-  opts: { position?: number; maxResults?: number; searchID?: string } = {},
+  opts: {
+    position?: number;
+    maxResults?: number;
+    searchID?: string;
+    /**
+     * Filtro opcional por empleado. Está en capacidades Postman
+     * (`UserInfoSearchCond.EmployeeNoList`); si el firmware lo ignora,
+     * devolvemos página normal y el caller hace fallback.
+     */
+    employeeNos?: string[];
+  } = {},
 ): Promise<UserInfoPage> {
   const maxResults = Math.min(Math.max(1, opts.maxResults ?? 30), 30);
   const position = Math.max(0, opts.position ?? 0);
+  const nos = (opts.employeeNos || [])
+    .map((n) => String(n).trim())
+    .filter(Boolean)
+    .slice(0, 30);
   const body = {
     UserInfoSearchCond: {
       searchID: opts.searchID || randomUUID(),
       searchResultPosition: position,
       maxResults,
+      ...(nos.length
+        ? { EmployeeNoList: nos.map((employeeNo) => ({ employeeNo })) }
+        : {}),
     },
   };
   const raw = await client.postJson(
@@ -396,7 +413,12 @@ export async function deleteUserInfo(
   await waitUserInfoDeleteProcess(client);
 
   // Comprueba que ya no está en el directorio del terminal (si sigue, falló).
-  const still = await userStillOnDevice(client, no);
+  // Algunos firmwares tardan un poco tras DeleteProcess=success.
+  let still = await userStillOnDevice(client, no);
+  if (still) {
+    await sleep(700);
+    still = await userStillOnDevice(client, no);
+  }
   if (still) {
     throw new Error(`El terminal aún lista a ${no} tras Delete`);
   }
@@ -454,9 +476,32 @@ async function userStillOnDevice(
   client: HikvisionIsapiClient,
   employeeNo: string,
 ): Promise<boolean> {
+  const want = String(employeeNo).trim();
+
+  // 1) Búsqueda filtrada (EmployeeNoList en capacidades Postman HikGateway).
+  try {
+    const page = await searchUserInfo(client, {
+      position: 0,
+      maxResults: 30,
+      employeeNos: [want],
+    });
+    if (page.users.some((u) => String(u.employeeNo).trim() === want)) {
+      return true;
+    }
+    // Si el filtro aplicó (pocos matches / vacío / solo ese id), vacío = ya no está.
+    const looksFiltered =
+      page.total <= 1 ||
+      page.users.length === 0 ||
+      page.users.every((u) => String(u.employeeNo).trim() === want);
+    if (looksFiltered) return false;
+    // Página llena sin nuestro id → el firmware probablemente ignoró el filtro.
+  } catch {
+    // Seguir con listado completo.
+  }
+
   try {
     const users = await listAllUserInfo(client, 80);
-    return users.some((u) => String(u.employeeNo).trim() === employeeNo);
+    return users.some((u) => String(u.employeeNo).trim() === want);
   } catch {
     // Si no se puede listar, no inventamos éxito ni fracaso extra.
     return false;

@@ -41,13 +41,17 @@ type Box = PushTarget & {
   ttl: number;
 };
 
-const BOX_TTL_OPTICAL_MS = 45_000;
-const BOX_TTL_NAMED_MS = 30_000;
+/** AcuSense FieldDetection es puntual: la caja debe “pegarse” mientras
+ *  alguien sigue sentado y solo llega VMD / re-intrusiones esporádicas. */
+const BOX_TTL_OPTICAL_MS = 90_000;
+const BOX_TTL_NAMED_MS = 45_000;
 /** Sondeo incremental si SSE cae o aún no conectó. */
 const POLL_MS = 400;
-const SEED_MS = 45_000;
-/** VMD sin TargetRect: solo mantiene cajas ya pintadas (presencia). */
-const PRESENCE_HOLD_MS = 40_000;
+const SEED_MS = 90_000;
+/** VMD sin TargetRect: solo mantiene cajas ya pintadas (presencia sentada). */
+const PRESENCE_HOLD_MS = 75_000;
+/** Distancia de centros (0..1) bajo la cual dos humanos se consideran el mismo. */
+const SOFT_CENTER_DIST = 0.2;
 
 type Listener = (events: PushEvent[]) => void;
 
@@ -61,6 +65,14 @@ function ttlFor(ev: PushEvent, t: PushTarget): number {
   if (ev.personName?.trim()) return BOX_TTL_NAMED_MS;
   if (t.type === "face") return BOX_TTL_NAMED_MS;
   return BOX_TTL_OPTICAL_MS;
+}
+
+function sameTrackKind(a: PushTarget, b: PushTarget, namedA?: string | null, namedB?: string | null): boolean {
+  if (namedA?.trim() && namedB?.trim()) return true;
+  if (a.type === b.type) return true;
+  // AcuSense a veces alterna human / unknown en la misma persona sentada.
+  const soft = new Set(["human", "unknown", "face"]);
+  return soft.has(a.type) && soft.has(b.type);
 }
 
 function overlapScore(a: PushTarget, b: PushTarget): number {
@@ -77,21 +89,22 @@ function overlapScore(a: PushTarget, b: PushTarget): number {
     const bcx = b.x + b.w / 2;
     const bcy = b.y + b.h / 2;
     const d = Math.hypot(acx - bcx, acy - bcy);
-    return d < 0.12 ? 0.25 : 0;
+    // Personas sentadas: el TargetRect tiembla poco; unir por centro cercano.
+    return d < SOFT_CENTER_DIST ? 0.28 : 0;
   }
   const uni = a.w * a.h + b.w * b.h - inter;
   return uni > 0 ? inter / uni : 0;
 }
 
-/** Fusiona cajas solapadas para que el track “siga” en vez de apilar fantasmas. */
+/** Fusiona cajas solapadas / cercanas para que el track “siga” (sentados). */
 export function mergeBoxes(prev: Box[], incoming: Box[]): Box[] {
   const out = [...prev];
   for (const n of incoming) {
     let best = -1;
-    let bestScore = 0.22;
+    let bestScore = 0.18;
     for (let i = 0; i < out.length; i++) {
       const o = out[i];
-      if (o.type !== n.type && !(o.personName && n.personName)) continue;
+      if (!sameTrackKind(o, n, o.personName, n.personName)) continue;
       const s = overlapScore(o, n);
       if (s > bestScore) {
         bestScore = s;
@@ -100,13 +113,20 @@ export function mergeBoxes(prev: Box[], incoming: Box[]): Box[] {
     }
     if (best >= 0) {
       const prevBox = out[best];
+      // Suaviza posición: 65 % nueva + 35 % previa evita saltos de bbox.
+      const blend = (a: number, b: number) => a * 0.65 + b * 0.35;
       out[best] = {
         ...n,
+        x: blend(n.x, prevBox.x),
+        y: blend(n.y, prevBox.y),
+        w: blend(n.w, prevBox.w),
+        h: blend(n.h, prevBox.h),
+        type: n.type === "unknown" ? prevBox.type : n.type,
         key: prevBox.key,
         at: n.at,
         personName: n.personName || prevBox.personName,
         personId: n.personId || prevBox.personId,
-        ttl: Math.max(n.ttl, prevBox.ttl),
+        ttl: Math.max(n.ttl, prevBox.ttl, PRESENCE_HOLD_MS),
       };
     } else {
       out.push(n);
@@ -117,10 +137,11 @@ export function mergeBoxes(prev: Box[], incoming: Box[]): Box[] {
 
 function boxesFromEvents(events: PushEvent[], deviceIp: string, now = Date.now()): Box[] {
   const fresh: Box[] = [];
+  const maxAge = Math.max(BOX_TTL_OPTICAL_MS, BOX_TTL_NAMED_MS, PRESENCE_HOLD_MS);
   for (const ev of events) {
     if (ev.deviceIp !== deviceIp || !ev.targets?.length) continue;
     const age = now - Date.parse(ev.occurredAt);
-    if (!Number.isFinite(age) || age > BOX_TTL_NAMED_MS * 1.5) continue;
+    if (!Number.isFinite(age) || age > maxAge) continue;
     for (const [i, t] of ev.targets.entries()) {
       const ttl = ttlFor(ev, t);
       if (age > ttl) continue;
