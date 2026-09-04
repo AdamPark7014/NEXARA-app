@@ -248,9 +248,9 @@ function pad2(n: number) {
   return String(n).padStart(2, '0');
 }
 
-/** Fecha local México-ish ISO sin Z para Valid ISAPI. */
+/** ISO local sin Z en America/Mexico_City (el contenedor corre en UTC). */
 export function formatLocalValid(d: Date): string {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  return formatMexicoValidLocal(d);
 }
 
 export function resolveValidityWindow(
@@ -262,37 +262,30 @@ export function resolveValidityWindow(
     return { enable: false, beginTime: INDEFINITE_BEGIN, endTime: INDEFINITE_END };
   }
   if (validity === 'day') {
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-    return {
-      enable: true,
-      beginTime: formatLocalValid(start),
-      endTime: formatLocalValid(end),
-    };
+    const day = mexicoTodayBounds(now);
+    return { enable: true, beginTime: day.beginTime, endTime: day.endTime };
   }
   if (validity === 'dated') {
-    let begin: Date;
-    if (opts?.fechaIngreso) {
-      if (typeof opts.fechaIngreso === 'string' && /^\d{4}-\d{2}-\d{2}/.test(opts.fechaIngreso)) {
-        const [y, m, d] = opts.fechaIngreso.slice(0, 10).split('-').map(Number);
-        begin = new Date(y, m - 1, d, 0, 0, 0);
+    let y: number;
+    let m: number;
+    let d: number;
+    if (typeof opts?.fechaIngreso === 'string' && /^\d{4}-\d{2}-\d{2}/.test(opts.fechaIngreso)) {
+      [y, m, d] = opts.fechaIngreso.slice(0, 10).split('-').map(Number);
+    } else if (opts?.fechaIngreso) {
+      const ingress = new Date(opts.fechaIngreso);
+      if (Number.isNaN(ingress.getTime())) {
+        const day = mexicoTodayBounds(now).dayKey.split('-').map(Number);
+        [y, m, d] = day;
       } else {
-        const ingress = new Date(opts.fechaIngreso);
-        begin = Number.isNaN(ingress.getTime())
-          ? now
-          : new Date(ingress.getFullYear(), ingress.getMonth(), ingress.getDate(), 0, 0, 0);
+        const local = formatMexicoValidLocal(ingress, { startOfDay: true });
+        [y, m, d] = local.slice(0, 10).split('-').map(Number);
       }
     } else {
-      begin = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      [y, m, d] = mexicoTodayBounds(now).dayKey.split('-').map(Number);
     }
-    const end = new Date(begin);
-    end.setFullYear(end.getFullYear() + 1);
-    end.setHours(23, 59, 59, 0);
-    return {
-      enable: true,
-      beginTime: formatLocalValid(begin),
-      endTime: formatLocalValid(end),
-    };
+    const beginTime = `${y}-${pad2(m)}-${pad2(d)}T00:00:00`;
+    const endTime = `${y + 1}-${pad2(m)}-${pad2(d)}T23:59:59`;
+    return { enable: true, beginTime, endTime };
   }
   return { enable: true, beginTime: INDEFINITE_BEGIN, endTime: INDEFINITE_END };
 }
