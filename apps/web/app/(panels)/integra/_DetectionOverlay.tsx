@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { integraApi } from "./_lib";
 import styles from "./integra.module.css";
 
@@ -34,6 +34,53 @@ const BOX_TTL_MS = 4000;
 /** Cada cuánto se pregunta por detecciones nuevas. */
 const POLL_MS = 2000;
 
+/**
+ * Un solo sondeo para todo el muro.
+ *
+ * Cada mosaico monta su propia capa, y si cada uno preguntara por su cuenta,
+ * dieciséis mosaicos serían ocho peticiones por segundo contra la API para leer
+ * exactamente la misma lista. Se pregunta una vez y se reparte: los mosaicos se
+ * suscriben y cada uno se queda con lo suyo.
+ */
+type Listener = (events: PushEvent[]) => void;
+
+const listeners = new Set<Listener>();
+let timer: number | null = null;
+let lastId = 0;
+
+async function pollOnce() {
+  try {
+    const data = await integraApi<{ items: PushEvent[] }>("integra/push/events?limit=40");
+    const items = (data.items || []).filter((e) => e.id > lastId && e.targets?.length);
+    if (items.length === 0) return;
+    lastId = Math.max(lastId, ...items.map((e) => e.id));
+    for (const fn of listeners) fn(items);
+  } catch {
+    // Quedarse sin recuadros no debe romper el video que hay debajo.
+  }
+}
+
+function subscribe(fn: Listener): () => void {
+  listeners.add(fn);
+  if (timer == null) {
+    // La primera vez solo se toma la marca: sin esto, al abrir el muro
+    // aparecerían de golpe los recuadros de los últimos minutos.
+    void integraApi<{ items: PushEvent[] }>("integra/push/events?limit=1")
+      .then((d) => {
+        lastId = Math.max(lastId, d.items?.[0]?.id ?? 0);
+      })
+      .catch(() => undefined);
+    timer = window.setInterval(() => void pollOnce(), POLL_MS);
+  }
+  return () => {
+    listeners.delete(fn);
+    if (listeners.size === 0 && timer != null) {
+      window.clearInterval(timer);
+      timer = null;
+    }
+  };
+}
+
 function labelFor(type: string): string {
   if (type === "human") return "Persona";
   if (type === "vehicle") return "Vehículo";
@@ -43,57 +90,32 @@ function labelFor(type: string): string {
 
 export function IntegraDetectionOverlay({
   deviceIp,
-  siteId,
 }: {
   /** IP del equipo cuyo video se está viendo: las cajas son suyas. */
   deviceIp: string | null;
-  siteId?: number | null;
 }) {
   const [boxes, setBoxes] = useState<Box[]>([]);
-  const seen = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     setBoxes([]);
-    seen.current = new Set();
   }, [deviceIp]);
 
   useEffect(() => {
     if (!deviceIp) return;
-    let stop = false;
-
-    const tick = async () => {
-      try {
-        const qs = new URLSearchParams({ limit: "20" });
-        if (siteId) qs.set("siteId", String(siteId));
-        const data = await integraApi<{ items: PushEvent[] }>(
-          `integra/push/events?${qs.toString()}`,
-        );
-        if (stop) return;
-        const fresh: Box[] = [];
-        for (const ev of data.items) {
-          if (ev.deviceIp !== deviceIp || !ev.targets?.length) continue;
-          if (seen.current.has(ev.id)) continue;
-          // Un evento de hace un minuto ya no dice dónde está nadie.
-          const age = Date.now() - Date.parse(ev.occurredAt);
-          if (!Number.isFinite(age) || age > BOX_TTL_MS * 2) continue;
-          seen.current.add(ev.id);
-          for (const [i, t] of ev.targets.entries()) {
-            fresh.push({ ...t, key: `${ev.id}-${i}`, at: Date.now() });
-          }
+    return subscribe((events) => {
+      const fresh: Box[] = [];
+      for (const ev of events) {
+        if (ev.deviceIp !== deviceIp || !ev.targets?.length) continue;
+        // Un evento de hace un minuto ya no dice dónde está nadie.
+        const age = Date.now() - Date.parse(ev.occurredAt);
+        if (!Number.isFinite(age) || age > BOX_TTL_MS * 2) continue;
+        for (const [i, t] of ev.targets.entries()) {
+          fresh.push({ ...t, key: `${ev.id}-${i}`, at: Date.now() });
         }
-        if (fresh.length) setBoxes((prev) => [...prev, ...fresh]);
-      } catch {
-        // Quedarse sin recuadros no debe romper el video que hay debajo.
       }
-    };
-
-    void tick();
-    const id = window.setInterval(tick, POLL_MS);
-    return () => {
-      stop = true;
-      window.clearInterval(id);
-    };
-  }, [deviceIp, siteId]);
+      if (fresh.length) setBoxes((prev) => [...prev, ...fresh]);
+    });
+  }, [deviceIp]);
 
   // Barrido de los caducados, aparte del sondeo: si no, un recuadro se quedaría
   // pintado hasta que llegara el siguiente evento.
