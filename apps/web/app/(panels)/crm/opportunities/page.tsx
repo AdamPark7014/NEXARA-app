@@ -278,10 +278,15 @@ export default function OpportunitiesPage() {
     <>
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
       <PageHeader
-        eyebrow="CRM · Pipeline"
+        eyebrow="CRM · Oportunidades"
         title={cfg.title}
-        subtitle={cfg.subtitle}
-        actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva oportunidad</Button> : undefined}
+        subtitle={cfg.subtitle ?? "Pipeline comercial: monto, probabilidad y cierre estimado."}
+        actions={
+          <>
+            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
+            {cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva oportunidad</Button> : null}
+          </>
+        }
       />
 
       {!loading && visibleItems.length > 0 && (() => {
@@ -297,8 +302,8 @@ export default function OpportunitiesPage() {
               <KpiCard label="Ganadas" value={visibleItems.filter((o) => o.stage === "WON").length} variant="positive" icon="🏆" />
             </div>
             {byStage.length > 0 && (
-              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Pipeline por etapa</div>
+              <div className={chrome.distCard}>
+                <div className={chrome.distLabel}>Pipeline por etapa</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                   {byStage.map(({ label, count }) => (
                     <div key={label} style={{ display: "grid", gridTemplateColumns: "140px 1fr 32px", gap: 10, alignItems: "center" }}>
@@ -317,43 +322,42 @@ export default function OpportunitiesPage() {
       })()}
 
       {showForm && (
-        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Título</label>
-            <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Nombre de la oportunidad" style={inp} />
+        <div className={chrome.formPanel}>
+          <p className={chrome.formPanelTitle}>{editing ? "Editar oportunidad" : "Nueva oportunidad"}</p>
+          <div className={chrome.formFull}>
+            <label className={chrome.fieldLabel}>Título</label>
+            <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Nombre de la oportunidad" className={chrome.fieldInput} />
           </div>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Descripción</label>
-            <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Alcance o plan de acción" style={inp} />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Monto ($)</label>
-            <input type="number" min={0} value={form.value} onChange={(e) => setForm((f) => ({ ...f, value: +e.target.value }))} style={inp} />
+          <div className={chrome.formFull}>
+            <label className={chrome.fieldLabel}>Descripción</label>
+            <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Alcance o plan de acción" className={chrome.fieldInput} />
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Probabilidad (%)</label>
-            <input type="number" min={0} max={100} value={form.probability} onChange={(e) => setForm((f) => ({ ...f, probability: +e.target.value }))} style={inp} />
+            <label className={chrome.fieldLabel}>Monto ($)</label>
+            <input type="number" min={0} value={form.value} onChange={(e) => setForm((f) => ({ ...f, value: +e.target.value }))} className={chrome.fieldInput} />
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Etapa</label>
-            <select value={form.stage} onChange={(e) => setForm((f) => ({ ...f, stage: e.target.value }))} style={inp}>
+            <label className={chrome.fieldLabel}>Probabilidad (%)</label>
+            <input type="number" min={0} max={100} value={form.probability} onChange={(e) => setForm((f) => ({ ...f, probability: +e.target.value }))} className={chrome.fieldInput} />
+          </div>
+          <div>
+            <label className={chrome.fieldLabel}>Etapa</label>
+            <select value={form.stage} onChange={(e) => setForm((f) => ({ ...f, stage: e.target.value }))} className={chrome.fieldInput}>
               {STAGE_IDS.map((s) => (
-                <option key={s} value={s}>
-                  {formatOpportunityStage(s)}
-                </option>
+                <option key={s} value={s}>{formatOpportunityStage(s)}</option>
               ))}
             </select>
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Cierre esperado</label>
-            <input type="date" value={form.expectedCloseDate} onChange={(e) => setForm((f) => ({ ...f, expectedCloseDate: e.target.value }))} style={inp} />
+            <label className={chrome.fieldLabel}>Cierre esperado</label>
+            <input type="date" value={form.expectedCloseDate} onChange={(e) => setForm((f) => ({ ...f, expectedCloseDate: e.target.value }))} className={chrome.fieldInput} />
           </div>
           {form.clientId ? (
-            <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--text-secondary)" }}>
+            <div className={chrome.formFull} style={{ fontSize: 12, color: "var(--text-secondary)" }}>
               Cliente vinculado: <strong>#{form.clientId}</strong>
             </div>
           ) : null}
-          <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <div className={chrome.formActions}>
             <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
             <Button variant="primary" onClick={save}>{editing ? "Guardar" : "Crear oportunidad"}</Button>
           </div>
@@ -384,11 +388,31 @@ export default function OpportunitiesPage() {
         ) : undefined}
       />
 
-      <Section title={loading ? "Cargando…" : `${visibleItems.length} oportunidades`}>
-        {loading ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-        ) : (
-          <DataTable columns={columns} rows={visibleItems} rowKey={(o) => o.id} emptyTitle={loadError ? `⚠ ${loadError}` : "Sin oportunidades"} emptyDescription="Agrega la primera oportunidad al pipeline." />
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} oportunidad${visibleItems.length === 1 ? "" : "es"}`}>
+        {loading && (
+          <EmptyState icon="⏳" title="Cargando oportunidades…" description="Consultando el pipeline comercial." />
+        )}
+        {!loading && loadError && (
+          <EmptyState
+            icon="⚠️"
+            title="No se pudo cargar"
+            description={loadError}
+            action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>}
+          />
+        )}
+        {!loading && !loadError && (
+          <DataTable
+            columns={columns}
+            rows={visibleItems}
+            rowKey={(o) => o.id}
+            emptyTitle="Sin oportunidades"
+            emptyDescription="Agrega la primera oportunidad al pipeline."
+            emptyAction={
+              cfg.canCreate ? (
+                <Button size="sm" variant="primary" iconLeft="+" onClick={openNew}>Nueva oportunidad</Button>
+              ) : undefined
+            }
+          />
         )}
       </Section>
     </>
