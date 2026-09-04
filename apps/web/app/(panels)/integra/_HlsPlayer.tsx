@@ -100,12 +100,28 @@ export function IntegraHlsPlayer({
     };
 
     const onPlaying = () => {
-      if (!cancelled) setPhase("playing");
+      if (cancelled) return;
+      playAttempt = 0;
+      setPhase("playing");
     };
+    /**
+     * Un mosaico que se pausa solo no es una pausa: es una avería.
+     *
+     * Con nueve cámaras el buffer de alguna se vacía —los segmentos de go2rtc
+     * son de medio segundo— y Chrome pausa el elemento. Antes eso pintaba el
+     * botón de play y ahí se quedaba: la rejilla acababa con la mitad de los
+     * cuadros congelados con imagen pero detenidos, y había que ir clic por
+     * clic. `paused` sólo se muestra cuando de verdad se agotan los reintentos.
+     */
     const onPause = () => {
-      if (!cancelled && !video.ended) {
+      if (cancelled || video.ended) return;
+      if (!autoPlay) {
         setPhase((p) => (p === "loading" ? p : "paused"));
+        return;
       }
+      setPhase("loading");
+      if (playTimer) clearTimeout(playTimer);
+      playTimer = setTimeout(tryPlay, 400);
     };
     const onWaiting = () => {
       if (!cancelled && !video.paused) setPhase("loading");
