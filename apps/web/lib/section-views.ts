@@ -787,8 +787,8 @@ export function getAttendanceSectionConfig(
       canRegisterSelf: false,
       canManageTeam: true,
       title: 'Asistencia · Gestión',
-      subtitle: 'Supervisión de jornadas del equipo en tiempo real.',
-      visibilityHint: 'Dueño, Dirección y RRHH ven la asistencia de todo el equipo. Los colaboradores solo registran y consultan la suya.',
+      subtitle: 'Checador del equipo + contraste con puertas Integra (ACS).',
+      visibilityHint: 'Dueño, Dirección y RRHH ven la asistencia de todo el equipo. El panel híbrido contrasta fichajes app vs accesos de puerta; la nómina sigue el checador.',
     };
   }
   if (viewMode === 'manage_register') {
@@ -797,8 +797,8 @@ export function getAttendanceSectionConfig(
       canRegisterSelf: true,
       canManageTeam: true,
       title: 'Asistencia',
-      subtitle: 'Registra tu jornada y supervisa al equipo de campo.',
-      visibilityHint: 'Coordinadores y RRHH ven su equipo y registran su propia jornada. El resto del personal solo ve la suya.',
+      subtitle: 'Tu jornada, el equipo y contraste ACS Integra.',
+      visibilityHint: 'Coordinadores y RRHH ven su equipo y registran su propia jornada. Abajo: híbrido ERP↔puertas.',
     };
   }
   return {
@@ -806,8 +806,8 @@ export function getAttendanceSectionConfig(
     canRegisterSelf: true,
     canManageTeam: false,
     title: 'Mi asistencia',
-    subtitle: 'Registra tu entrada y salida diaria.',
-    visibilityHint: 'Solo puedes ver y registrar tu propia asistencia.',
+    subtitle: 'Registra tu entrada/salida y mira tu contraste ACS si hay vínculo.',
+    visibilityHint: 'Solo puedes ver y registrar tu propia asistencia. El ACS aparece si tu employeeNumber coincide con el personId del terminal.',
   };
 }
 

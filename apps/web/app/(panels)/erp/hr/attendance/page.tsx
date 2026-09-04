@@ -15,6 +15,7 @@ import { getAttendanceSectionConfig } from "@/lib/user-access";
 import { attendanceMapUrl } from "@/lib/gps-map-links";
 import AttendanceGpsDayPanel from "@/components/AttendanceGpsDayPanel";
 import HybridAttendancePanel from "@/components/HybridAttendancePanel";
+import HrModuleRail from "@/components/hr/HrModuleRail";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 
@@ -610,13 +611,23 @@ export default function AttendancePage() {
             value={dateFilter}
             onChange={e => setDateFilter(e.target.value)}
             max={new Date().toLocaleDateString("sv-SE")}
-            style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
+            style={{
+              padding: "7px 10px",
+              border: "1px solid var(--nx-panel-hairline)",
+              borderRadius: 8,
+              background: "var(--nx-panel-surface-overlay)",
+              color: "var(--text-primary)",
+              fontSize: 12.5,
+              fontFamily: "inherit",
+            }}
           />
         ) : undefined}
       />
 
+      <HrModuleRail />
+
       {highlightId && (
-        <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface-2)", fontSize: 13 }}>
+        <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 8, border: "1px solid var(--nx-panel-hairline)", background: "var(--nx-panel-surface-overlay)", fontSize: 12.5 }}>
           Destacando usuario <strong>#{highlightId}</strong> desde notificación.
         </div>
       )}
