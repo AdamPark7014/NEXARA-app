@@ -631,7 +631,8 @@ export default function IntegraPeoplePage() {
                     </header>
                     <p className={styles.personNote}>
                       Se guarda en NEXARA y se empuja a cada terminal (FaceDataRecord).
-                      Rostro frontal, buena luz, solo la cara.
+                      JPEG frontal, buena luz, cara llenando el cuadro (~480–720 px,
+                      ~50–400 KB). PNG no sirve; archivos enormes los rechaza el DS-K1T.
                     </p>
                     {altaPreview && (
                       <div className={styles.personAltaPreview}>
