@@ -58,11 +58,28 @@ const DENIED_MINORS = [21, 22, 23, 24, 27, 28, 29, 31, 32];
  * en la base solo queda su sha256.
  */
 
-/** Ruido: dice algo mientras pasa y nada al día siguiente. */
-const NOISE_TYPES = ['heartBeat', 'duration', 'VMD', 'videoloss'];
-const NOISE_TTL_DAYS = 3;
+/**
+ * Ruido medido en Oficinas (~205 evt/min): VMD ~83 %, duration ~14 %,
+ * heartBeat ~2 %, ACS <1 %. Sin filtrar, list/SSE/índices se ahogan y los
+ * accesos de negocio dejan de verse snappy.
+ *
+ * - DROP: ni fila ni SSE (latidos / duración del firmware).
+ * - SKIP_STORE: tampoco se persisten (VMD / videoloss); fielddetection ya
+ *   trae la caja útil para el overlay. Histórico se poda agresivo.
+ */
+const DROP_TYPES = new Set(['heartBeat', 'duration']);
+const SKIP_STORE_TYPES = new Set(['heartBeat', 'duration', 'VMD', 'videoloss']);
+const NOISE_TYPES = ['heartBeat', 'duration', 'VMD', 'videoloss'] as const;
+/** Histórico de ruido: horas, no días. */
+const NOISE_TTL_HOURS = 6;
 /** Todo lo demás —accesos, detecciones— aguanta un trimestre. */
 const EVENT_TTL_DAYS = 90;
+/** Caché corta del token de empuje (evita 1 SELECT/evento a 200/min). */
+const TOKEN_CACHE_MS = 30_000;
+
+/** ACS concedido / denegado (major 5). */
+const ACS_GRANTED = new Set([1, 75, 76]);
+const ACS_DENIED = new Set([21, 22, 23, 24]);
 
 /** Un evento ya normalizado, venga en XML de cámara o en JSON de terminal. */
 export type NormalizedEvent = {
@@ -86,6 +103,11 @@ export class IntegraPushService {
   private readonly logger = new Logger(IntegraPushService.name);
   /** Un canal por sitio: la consola se engancha y ve los eventos al vuelo. */
   private readonly streams = new Map<number, Subject<PushEventDto>>();
+  /** siteId:tokenHash → sitio resuelto (TTL corto). */
+  private readonly tokenCache = new Map<
+    string,
+    { site: { id: number; companyId: number; pushTokenHash: string | null }; expires: number }
+  >();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -101,13 +123,13 @@ export class IntegraPushService {
     return s.asObservable();
   }
 
-  /** Publica a SSE; crea el Subject si aún no hay oyentes (no se pierde el evento). */
+  /**
+   * Publica solo si hay oyentes SSE. No crear Subject «por si acaso»: bajo
+   * carga de VMD eso retenía Subjects muertos y seguía encolando trabajo.
+   */
   private publish(siteId: number, dto: PushEventDto) {
-    let s = this.streams.get(siteId);
-    if (!s) {
-      s = new Subject<PushEventDto>();
-      this.streams.set(siteId, s);
-    }
+    const s = this.streams.get(siteId);
+    if (!s || !s.observed) return;
     s.next(dto);
   }
 

@@ -214,6 +214,9 @@ Todas documentadas en `HIKVISION-apps/docs/API-DOCS/HIKVISION/` (salvo InputProx
 | `POST /ISAPI/AccessControl/AcsEvent?format=json` | eventos de acceso (live, tope 30/página) |
 | `PUT /ISAPI/AccessControl/UserInfoDetail/Delete` + `DeleteProcess` | baja de persona en ACS |
 | `POST /ISAPI/ContentMgmt/search` (XML) | segmentos de grabación NVR → playbackURI |
+| `PUT /ISAPI/Event/notification/httpHosts/{id}` | empuje de eventos a NEXARA |
+| `GET/PUT /ISAPI/Smart/FieldDetection/{ch}` | intrusión AcuSense/NVR (no PTZ) |
+| `GET/PUT .../motionDetection` | VMD clásico (sí en PTZ) |
 
 Más `/ISAPI/ContentMgmt/InputProxy/channels[/status]`, que **no** está en el doc
 set de SYSCOM. Da el nombre real de cada cámara, su IP de origen y si está en
