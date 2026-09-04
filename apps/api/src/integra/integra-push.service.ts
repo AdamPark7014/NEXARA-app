@@ -10,6 +10,7 @@ import {
   enableMaxSmartDetection,
   enableMotionDetection,
   enableNvrParkingVehicleDetection,
+  ensureSmartEventTriggersCenter,
   readHttpNotificationHosts,
   setHttpNotificationHost,
 } from '../hikvision-isapi';
@@ -1020,9 +1021,12 @@ export class IntegraPushService {
       };
 
       try {
-        // Solo las cámaras declaran `uploadImagesDataType`: pedírselo a un
-        // terminal es mandarle un campo que no conoce.
-        await setHttpNotificationHost(client, { url, withImages: isCamera });
+        // NVR: XML host sin uploadImages (badXmlContent). AcuSense: JSON+binary.
+        // ACS: sin imágenes.
+        await setHttpNotificationHost(client, {
+          url,
+          withImages: isCamera && !isNvrHead,
+        });
       } catch (e) {
         entry.push = describeErr(e);
       }
@@ -1031,10 +1035,11 @@ export class IntegraPushService {
         try {
           if (isNvrHead) {
             const nvr = await enableNvrParkingVehicleDetection(client);
+            const triggers = await ensureSmartEventTriggersCenter(client);
             const ok = nvr.filter((r) => r.ok).length;
             entry.detection =
               ok > 0
-                ? `nvr-vehicle-ok:${ok}/${nvr.length}`
+                ? `nvr-vehicle-ok:${ok}/${nvr.length}/tr=${triggers}`
                 : nvr.map((r) => r.error || 'fail').join(';') || 'no-soportado';
           } else if (isPtz) {
             // DarkFighter: FieldDetection 403; motion sí (sensibilidad > 0).

@@ -532,9 +532,9 @@ function describe(e: unknown): string {
  * firmware limita la URL a 128 caracteres (`urlLen max="128"`), de ahí que el
  * token sea corto.
  *
- * `uploadImagesDataType` solo lo aceptan las cámaras; los terminales no lo
- * declaran en sus capacidades y se lo tragan como campo desconocido, así que
- * se manda únicamente donde sirve.
+ * Preferimos GET de la ranura y parchear campos: el NVR Oficinas exige
+ * `parameterFormatType=XML` + Extensions y rechaza JSON/`uploadImagesDataType`
+ * con `badXmlContent`. AcuSense sigue con JSON + binary images.
  */
 export async function setHttpNotificationHost(
   client: HikvisionIsapiClient,
@@ -549,12 +549,60 @@ export async function setHttpNotificationHost(
   const id = opts.id ?? 1;
   const https = u.protocol === 'https:';
   const port = u.port || (https ? '443' : '80');
-  // El equipo quiere host y ruta por separado, no la URL entera.
-  // AcuSense Cap: uploadImagesDataType opt=URL,binary — sin el tag no manda JPEG.
+  const pathAndQuery = `${u.pathname}${u.search}`;
+
+  const setTag = (src: string, tag: string, value: string): string => {
+    if (new RegExp(`<${tag}>[\\s\\S]*?</${tag}>`, 'i').test(src)) {
+      return src.replace(
+        new RegExp(`(<${tag}>)[\\s\\S]*?(</${tag}>)`, 'i'),
+        `$1${value}$2`,
+      );
+    }
+    return src.replace(
+      /<\/HttpHostNotification>/i,
+      `<${tag}>${value}</${tag}></HttpHostNotification>`,
+    );
+  };
+
+  let existing: string | null = null;
+  try {
+    const { buffer } = await client.getBinary(
+      `/ISAPI/Event/notification/httpHosts/${id}`,
+    );
+    const xml = buffer.toString('utf8');
+    if (/<HttpHostNotification\b/i.test(xml)) existing = xml;
+  } catch {
+    existing = null;
+  }
+
+  if (existing) {
+    let body = existing;
+    body = setTag(body, 'id', String(id));
+    body = setTag(body, 'url', pathAndQuery);
+    body = setTag(body, 'protocolType', https ? 'HTTPS' : 'HTTP');
+    body = setTag(body, 'addressingFormatType', 'hostname');
+    body = setTag(body, 'hostName', u.hostname);
+    // Algunos firmwares usan ipAddress si addressing=ipaddress; forzar hostname.
+    if (/<ipAddress>/i.test(body) && /hostname/i.test(body)) {
+      /* dejar ipAddress si existe; hostName es el canónico aquí */
+    }
+    body = setTag(body, 'portNo', port);
+    body = setTag(body, 'httpAuthenticationMethod', 'none');
+    const isXmlFormat =
+      /<parameterFormatType>\s*XML\s*<\/parameterFormatType>/i.test(body);
+    // NVR XML: no meter uploadImagesDataType (badXmlContent). AcuSense JSON: sí.
+    if (opts.withImages && !isXmlFormat) {
+      body = setTag(body, 'uploadImagesDataType', 'binary');
+    }
+    await client.put(`/ISAPI/Event/notification/httpHosts/${id}`, body);
+    return;
+  }
+
+  // Fallback: plantilla AcuSense (JSON + imágenes opcionales).
   const body =
     `<HttpHostNotification>` +
     `<id>${id}</id>` +
-    `<url>${u.pathname}${u.search}</url>` +
+    `<url>${pathAndQuery}</url>` +
     `<protocolType>${https ? 'HTTPS' : 'HTTP'}</protocolType>` +
     `<parameterFormatType>JSON</parameterFormatType>` +
     `<addressingFormatType>hostname</addressingFormatType>` +
