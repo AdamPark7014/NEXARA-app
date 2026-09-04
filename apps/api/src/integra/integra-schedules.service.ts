@@ -350,7 +350,7 @@ export class IntegraSchedulesService {
       : null;
 
     const devices = await this.acsDevices(resolved.siteId);
-    const doors = [];
+    const doors: Array<Record<string, unknown>> = [];
     let anyValid: {
       enable?: boolean;
       beginTime?: string;
