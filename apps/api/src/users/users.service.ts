@@ -1078,7 +1078,7 @@ export class UsersService {
     try {
       const before = await this.prisma['user'].findUnique({
         where: { id },
-        select: { nombre: true, employeeNumber: true, isActive: true },
+        select: { nombre: true, employeeNumber: true, isActive: true, roleId: true },
       });
       const user = await this.prisma['user'].update({
         where: { id },
@@ -1097,12 +1097,18 @@ export class UsersService {
       const shouldPushAcs =
         updateUserDto.nombre !== undefined ||
         updateUserDto.employeeNumber !== undefined ||
+        updateUserDto.isActive !== undefined ||
+        updateUserDto.roleId !== undefined ||
         (before &&
-          (before.nombre !== user.nombre || before.employeeNumber !== user.employeeNumber));
+          (before.nombre !== user.nombre ||
+            before.employeeNumber !== user.employeeNumber ||
+            before.isActive !== user.isActive ||
+            before.roleId !== user.roleId));
 
       if (shouldPushAcs) {
         const acsPush = await this.pushAcsFromErp({
           companyId,
+          userId: id,
           employeeNumber: enriched.employeeNumber,
           name: enriched.nombre,
           enable: enriched.isActive !== false,
