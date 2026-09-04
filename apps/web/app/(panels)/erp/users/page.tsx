@@ -1152,6 +1152,32 @@ export default function UsersPage() {
               <Button variant="ghost" size="sm" onClick={() => setDrawerUser(null)}>Cerrar</Button>
             </div>
 
+            {integraSchedule?.schedule && (
+              <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", marginBottom: 6 }}>
+                  HORARIO DE ACCESO INTEGRA
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>
+                  {integraSchedule.schedule.label}
+                </div>
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                  {integraSchedule.schedule.hint}
+                </p>
+                <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                  Nº empleado ACS: <code>{integraSchedule.employeeNumber || "—"}</code>
+                  {integraSchedule.targetIps && integraSchedule.targetIps.length > 0
+                    ? ` · terminales ${integraSchedule.targetIps.join(", ")}`
+                    : ""}
+                </p>
+                <Link
+                  href={integraSchedule.schedule.integraEditorPath || "/integra/people"}
+                  style={{ display: "inline-block", marginTop: 8, fontSize: 12, color: "var(--primary)" }}
+                >
+                  Abrir Personas Integra (editor semanal) →
+                </Link>
+              </div>
+            )}
+
             {drawerUser.riskFactors && drawerUser.riskFactors.length > 0 && (
               <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", marginBottom: 6 }}>FACTORES DE RIESGO</div>
