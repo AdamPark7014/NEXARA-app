@@ -614,6 +614,21 @@ export async function enableHumanFieldDetection(
   let patched = region[0]
     .replace(/<enabled>\s*false\s*<\/enabled>/, '<enabled>true</enabled>')
     .replace(/<detectionTarget>[^<]*<\/detectionTarget>/, '<detectionTarget>human</detectionTarget>');
+
+  // Disparar más a menudo: umbral de tiempo mínimo y sensibilidad alta
+  // (valores típicos ISAPI FieldDetectionRegion; si el tag no existe, se inserta).
+  const bump = (xml: string, tag: string, value: string) => {
+    if (new RegExp(`<${tag}>`, 'i').test(xml)) {
+      return xml.replace(new RegExp(`<${tag}>[^<]*</${tag}>`, 'i'), `<${tag}>${value}</${tag}>`);
+    }
+    return xml.replace(
+      /<\/FieldDetectionRegion>/i,
+      `<${tag}>${value}</${tag}></FieldDetectionRegion>`,
+    );
+  };
+  patched = bump(patched, 'sensitivity', '90');
+  patched = bump(patched, 'timeThreshold', '0');
+
   if (!/<RegionCoordinatesList>/.test(patched)) {
     // El polígono va antes de cerrar la región, después de los umbrales.
     patched = patched.replace(

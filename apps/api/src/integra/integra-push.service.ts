@@ -3,7 +3,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { Subject } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import {
   clearHttpNotificationHost,
   disableFieldDetection,
@@ -13,6 +13,22 @@ import {
 import { resolveUploadsDir } from '../common/uploads-path';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { IntegraSiteService } from './integra-site.service';
+
+/** Fila lista para consola / SSE (ISO dates, sin `raw`). */
+export type PushEventDto = {
+  id: number;
+  deviceIp: string;
+  deviceName: string | null;
+  eventType: string;
+  label: string | null;
+  occurredAt: string;
+  personId: string | null;
+  personName: string | null;
+  doorNo: number | null;
+  verifyMode: string | null;
+  photoPath: string | null;
+  targets: Array<{ type: string; x: number; y: number; w: number; h: number }> | null;
+};
 
 /**
  * Recepción de eventos **empujados** por los equipos.
@@ -56,20 +72,60 @@ export type NormalizedEvent = {
 export class IntegraPushService {
   private readonly logger = new Logger(IntegraPushService.name);
   /** Un canal por sitio: la consola se engancha y ve los eventos al vuelo. */
-  private readonly streams = new Map<number, Subject<NormalizedEvent & { photoUrl: string | null }>>();
+  private readonly streams = new Map<number, Subject<PushEventDto>>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly sites: IntegraSiteService,
   ) {}
 
-  stream(siteId: number) {
+  stream(siteId: number): Observable<PushEventDto> {
     let s = this.streams.get(siteId);
     if (!s) {
-      s = new Subject();
+      s = new Subject<PushEventDto>();
       this.streams.set(siteId, s);
     }
     return s.asObservable();
+  }
+
+  /** Publica a SSE; crea el Subject si aún no hay oyentes (no se pierde el evento). */
+  private publish(siteId: number, dto: PushEventDto) {
+    let s = this.streams.get(siteId);
+    if (!s) {
+      s = new Subject<PushEventDto>();
+      this.streams.set(siteId, s);
+    }
+    s.next(dto);
+  }
+
+  private toDto(row: {
+    id: number;
+    deviceIp: string;
+    deviceName: string | null;
+    eventType: string;
+    label: string | null;
+    occurredAt: Date;
+    personId: string | null;
+    personName: string | null;
+    doorNo: number | null;
+    verifyMode: string | null;
+    photoPath: string | null;
+    targets: unknown;
+  }): PushEventDto {
+    return {
+      id: row.id,
+      deviceIp: row.deviceIp,
+      deviceName: row.deviceName,
+      eventType: row.eventType,
+      label: row.label,
+      occurredAt: row.occurredAt.toISOString(),
+      personId: row.personId,
+      personName: row.personName,
+      doorNo: row.doorNo,
+      verifyMode: row.verifyMode,
+      photoPath: row.photoPath,
+      targets: (Array.isArray(row.targets) ? row.targets : null) as PushEventDto['targets'],
+    };
   }
 
   /** Token nuevo para un sitio. Se devuelve en claro una sola vez. */
@@ -144,15 +200,37 @@ export class IntegraPushService {
   /** Lo que ya llegó, del más reciente al más antiguo. */
   async listEvents(
     companyId: number,
-    opts: { siteId?: number | null; personId?: string | null; take: number },
+    opts: {
+      siteId?: number | null;
+      personId?: string | null;
+      take: number;
+      /** Solo filas nuevas tras este id (sondeo incremental barato). */
+      afterId?: number | null;
+      /** Ventana reciente en ms (semilla de overlay / badges). */
+      sinceMs?: number | null;
+      /** Solo eventos con caja o con nombre (live UI). */
+      liveOnly?: boolean;
+    },
   ) {
-    return this.prisma.integraPushEvent.findMany({
+    const afterId =
+      opts.afterId != null && Number.isFinite(opts.afterId) && opts.afterId > 0
+        ? Math.floor(opts.afterId)
+        : null;
+    const sinceMs =
+      opts.sinceMs != null && Number.isFinite(opts.sinceMs) && opts.sinceMs > 0
+        ? Math.min(Math.floor(opts.sinceMs), 120_000)
+        : null;
+
+    const rows = await this.prisma.integraPushEvent.findMany({
       where: {
         companyId,
         ...(opts.siteId ? { siteId: opts.siteId } : {}),
         ...(opts.personId ? { personId: opts.personId } : {}),
+        ...(afterId ? { id: { gt: afterId } } : {}),
+        ...(sinceMs ? { occurredAt: { gte: new Date(Date.now() - sinceMs) } } : {}),
       },
-      orderBy: { occurredAt: 'desc' },
+      // Incremental: id ASC para no saltar huecos. Semilla/listado: lo más nuevo.
+      orderBy: afterId ? { id: 'asc' } : { occurredAt: 'desc' },
       take: opts.take,
       select: {
         id: true,
@@ -169,6 +247,15 @@ export class IntegraPushService {
         targets: true,
       },
     });
+
+    if (!opts.liveOnly || afterId) return rows.map((r) => this.toDto(r));
+
+    return rows
+      .filter((r) => {
+        const hasTargets = Array.isArray(r.targets) && r.targets.length > 0;
+        return hasTargets || Boolean(r.personName);
+      })
+      .map((r) => this.toDto(r));
   }
 
   /**
@@ -591,7 +678,8 @@ export class IntegraPushService {
       },
     });
 
-    this.streams.get(site.id)?.next({ ...ev, photoUrl: photoPath });
+    // SSE al instante (antes el sondeo UI esperaba hasta 1.5 s).
+    this.publish(site.id, this.toDto(row));
     return row;
   }
 

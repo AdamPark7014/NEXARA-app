@@ -8,29 +8,28 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — fix PTZ + detecciones
+## Este turno — mega-opt live detecciones / identidad
 
-**Bug PTZ:** en sync del NVR se anulaba `ptz` en todos los canales
-(`c.ptz = null` porque PTZCtrl del grabador miente). La cámara «PTZ»
-(`.179`) quedaba `ptz:false` → **no salía el mando** en Foco.
+**Límite de hardware (sigue igual):** AcuSense = cajas `human`/`vehicle` **sin
+nombre**. Identidad real solo en terminales ACS (`personName` + FaceRect).
 
-**Arreglo:** sondear PTZ/ANPR en la IP directa de cada cámara LAN; heurística
-por nombre/modelo; listCameras y UI también reconocen «PTZ»/DF8. `ptzTarget`
-habla a `.179` canal 1 aunque `reachableDirectly` viniera mal.
+**Qué se optimizó:**
 
-**Detecciones:** eventos `fielddetection` sí llegan (p.ej. `.173`). Overlay
-ahora **siembra** los últimos ~6 s al abrir la cámara (antes solo veía lo
-nuevo tras montar). TTL 6 s, poll 1.5 s. Etiqueta `Humano · sin ID` (no Face ID).
+1. **SSE `GET integra/push/stream`** + poll incremental `afterId` cada **400 ms**
+   (antes solo poll 1.5 s). Entrega casi al instante vía Subject en ingest.
+2. **listEvents** acepta `afterId` / `sinceMs` / `live=1`.
+3. Overlay: TTL 10–14 s, **fusión IoU** de cajas (track continuo), semilla
+   `sinceMs`, fade CSS alineado, transición de posición.
+4. Banner sitio **LiveAccess** cuando alguien pasa por ACS (aunque mires oficina).
+5. Occupancy se refresca al vuelo con accesos; RecentAccess 60 s + semilla.
+6. FieldDetection wire: `sensitivity=90`, `timeThreshold=0`.
 
 SSH: `-p 2222 root@5.78.215.109` → `/var/www/nexara-app`
 
-Tras deploy: hard-refresh Video → Foco «PTZ» (debe verse el pad) → mover;
-Foco Support (cajas al haber movimiento).
-
-## Personas / placas / ocupación
-
-Ver commit `9308b92`. CRUD ISAPI + foto FaceDataRecord; occupancy; vehicles
-sin OCR falso.
+Tras deploy: hard-refresh Video → caminar frente a Support (cajas más rápidas);
+pasar por puerta (banner + nameplate en cámara-puerta). Re-wire detección en
+Sitios si las cámaras aún tienen umbrales viejos:
+`POST .../sites/:id/push/wire` con `{ detection: true }`.
 
 ## A medias
 
@@ -43,3 +42,4 @@ sin OCR falso.
 ## No tocar
 
 Puente NAS, Traefik, credenciales en repo, rutas ISAPI no verificadas.
+Face ID óptico sobre AcuSense (no inventar matching).
