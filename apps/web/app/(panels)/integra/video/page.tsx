@@ -136,6 +136,9 @@ export default function IntegraVideoPage() {
 
   useEffect(() => subscribeProvider(setProvider), []);
   useEffect(() => subscribeCapabilities(setCaps), []);
+  useEffect(() => {
+    preloadGo2rtcPlayer();
+  }, []);
 
   useEffect(() => {
     return subscribePushEvents((events) => {

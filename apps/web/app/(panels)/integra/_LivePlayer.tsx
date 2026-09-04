@@ -442,7 +442,7 @@ function MseFocusPlayer({
 }
 
 /** Cuánto se le da a MSE antes de dar ese mosaico por perdido. */
-const MSE_GIVE_UP_MS = 7000;
+const MSE_GIVE_UP_MS = 4500;
 
 function AutoPlayer(props: ShellProps) {
   const [fallback, setFallback] = useState(false);

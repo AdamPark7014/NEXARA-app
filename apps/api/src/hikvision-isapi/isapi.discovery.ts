@@ -589,7 +589,10 @@ export async function readHttpNotificationHosts(
     const list = (xml.HttpHostNotificationList ?? xml) as Record<string, unknown>;
     return asList(list.HttpHostNotification)
       .map((n) => {
-        const id = Number(pick(n, 'id'));
+        const idRaw = n.id;
+        const id = Number(
+          typeof idRaw === 'string' || typeof idRaw === 'number' ? idRaw : pick(n, 'id'),
+        );
         const path = pick(n, 'url') || '';
         const host = pick(n, 'hostName') || pick(n, 'ipAddress') || '';
         const protocol = (pick(n, 'protocolType') || 'HTTP').toLowerCase();
