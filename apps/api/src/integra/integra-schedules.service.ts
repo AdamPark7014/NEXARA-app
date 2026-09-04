@@ -433,14 +433,11 @@ export class IntegraSchedulesService {
         ? (mirror.raw as { Valid?: typeof anyValid }).Valid
         : null;
     const valid = anyValid || fromMirror || null;
-    const namedDoor = doors.find(
-      (d): d is (typeof doors)[number] & { name?: string } =>
-        Boolean((d as { present?: boolean }).present) && 'name' in d,
-    );
+    const namedDoor = doors.find((d) => d.present === true && typeof d.name === 'string');
 
     return {
       personId: employeeNo,
-      name: mirror?.personName || namedDoor?.name || employeeNo,
+      name: mirror?.personName || (namedDoor?.name as string | undefined) || employeeNo,
       valid,
       validMode: classifyValid(valid),
       doors,

@@ -45,6 +45,8 @@ SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
 3. Asistencia híbrida: `linked` si códigos iguales.
 4. (Sibling) Alta ACS → push vivo sin Reconciliar.
 
+Hard-refresh tras deploy.
+
 ## A medias
 
 1. ANPR ITC · micros · TCPMSS · NVR httpHost.

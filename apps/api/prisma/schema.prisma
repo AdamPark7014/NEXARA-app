@@ -551,6 +551,7 @@ model User {
   perfilesRevisados         UserProfile[]              @relation("UserProfileReviewer")
   actividadesCreadas        Activity[]                 @relation("CreadorActividades")
   actividadesAsignadas      Activity[]                 @relation("ResponsableActividades")
+  actividadesAcsEntrada     Activity[]                 @relation("ActivityAcsEnteredBy")
   evidencias                Evidence[]
   evidenciasAprobadas       Evidence[]                 @relation("EvidenceApprover")
   vehiculosRevisados        VehicleControl[]           @relation("VehicleDeliveryReviewer")
