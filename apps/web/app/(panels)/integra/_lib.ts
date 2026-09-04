@@ -92,7 +92,7 @@ export const INTEGRA_MODULE_CARDS: IntegraModuleCard[] = [
   { href: "/integra/espacios", title: "Espacios", sub: "Indefinido vs temporal · uso · vivo", capability: "access" },
   { href: "/integra/events", title: "Eventos ACS", sub: "Accesos · foto · KPIs hoy", capability: "events" },
   { href: "/integra/alarms", title: "Alarmas", sub: "Abiertas · histórico · tickets", capability: "alarms" },
-  { href: "/integra/visitors", title: "Visitas", sub: "Citas · QR", capability: "visitors" },
+  { href: "/integra/visitors", title: "Visitas", sub: "Única · recurrente · ACS", capability: "visitors" },
   { href: "/integra/vehicles", title: "Vehículos", sub: "CRUD flota", capability: "vehicles" },
   { href: "/integra/anpr", title: "ANPR / PMS", sub: "Cruces de placa", capability: "anpr" },
   { href: "/integra/settings", title: "Sitios", sub: "Conexión · sync", capability: "settings" },

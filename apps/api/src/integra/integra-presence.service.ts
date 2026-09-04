@@ -75,8 +75,7 @@ export class IntegraPresenceService {
           personId: true,
           personName: true,
           personCode: true,
-          gender: true,
-          userType: true,
+          raw: true,
         },
       }),
     ]);
