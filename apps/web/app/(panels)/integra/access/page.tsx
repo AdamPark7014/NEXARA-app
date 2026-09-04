@@ -7,6 +7,7 @@ import {
   IgError,
   IgField,
   IgFilters,
+  IgNotice,
   IgPage,
   IgPanel,
   IgSplit,
@@ -193,19 +194,19 @@ export default function IntegraAccessPage() {
     <IgPage>
       <IgToolbar
         title="Control de acceso"
-        meta={`${onlineN}/${doors.length} puertas online · ${devices.length} devices · ${groups.length} grupos`}
+        meta={`${onlineN}/${doors.length} puertas online · ${devices.length} equipos · ${groups.length} grupos`}
         actions={
           <>
             <IgBtn onClick={() => setLiveDoors((v) => !v)}>{liveDoors ? "Live ON" : "Espejo"}</IgBtn>
-            <IgBtn onClick={() => void load()}>Refresh</IgBtn>
+            <IgBtn onClick={() => void load()}>Actualizar</IgBtn>
           </>
         }
       />
       <IgError>{error}</IgError>
       {!canControl && (
-        <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 8 }}>
+        <IgNotice tone="warn">
           Modo consulta: no puedes abrir ni cerrar puertas con esta cuenta.
-        </p>
+        </IgNotice>
       )}
 
       <IgFilters>
@@ -232,7 +233,7 @@ export default function IntegraAccessPage() {
             placeholder="nombre / región / id"
           />
         </IgField>
-        <IgField label="Devices">
+        <IgField label="Equipos">
           <select
             value={kindFilter}
             onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}
@@ -274,6 +275,16 @@ export default function IntegraAccessPage() {
           </button>
         ))}
       </div>
+      {filteredDoors.length === 0 && (
+        <div className={styles.igEmpty}>
+          <strong className={styles.igEmptyTitle}>Sin puertas</strong>
+          <span className={styles.igEmptyHint}>
+            {doors.length === 0
+              ? "Sincroniza el sitio para cargar el inventario ACS."
+              : "Ninguna puerta coincide con el filtro."}
+          </span>
+        </div>
+      )}
 
       {selectedDoor && (
         <IgPanel
@@ -332,7 +343,7 @@ export default function IntegraAccessPage() {
 
       <IgSplit
         left={
-          <IgPanel title="Devices">
+          <IgPanel title="Equipos">
             <IgTable
               columns={[
                 { key: "name", label: "Nombre" },
@@ -348,8 +359,9 @@ export default function IntegraAccessPage() {
                   ip: d.ip || "—",
                   on: d.online === false ? "off" : "online",
                 },
+                tone: d.online === false ? "warn" : "ok",
               }))}
-              empty="Sin devices"
+              empty="Sin equipos"
             />
           </IgPanel>
         }
@@ -378,9 +390,9 @@ export default function IntegraAccessPage() {
                 />
               </IgField>
             </IgFilters>
-            <div style={{ maxHeight: 200, overflow: "auto", fontSize: 12 }}>
+            <div className={styles.igCheckList}>
               {filteredPeople.slice(0, 80).map((p) => (
-                <label key={p.id} style={{ display: "flex", gap: 6, marginBottom: 4 }}>
+                <label key={p.id} className={styles.igCheckRow}>
                   <input
                     type="checkbox"
                     checked={selectedPeople.includes(p.id)}
@@ -390,9 +402,17 @@ export default function IntegraAccessPage() {
                       )
                     }
                   />
-                  {p.name} {p.code ? `(${p.code})` : ""}
+                  <span>
+                    {p.name} {p.code ? `(${p.code})` : ""}
+                  </span>
                 </label>
               ))}
+              {filteredPeople.length === 0 && (
+                <div className={styles.igEmpty}>
+                  <strong className={styles.igEmptyTitle}>Sin personas</strong>
+                  <span className={styles.igEmptyHint}>Ajusta el filtro o sincroniza el sitio.</span>
+                </div>
+              )}
             </div>
             <IgBtn
               variant="primary"

@@ -500,10 +500,18 @@ export class IntegraArtemisService {
     beginTime: string,
     endTime: string,
     siteId?: number | null,
+    segmentIndex = 0,
   ) {
     const resolved = await this.sites.resolveClient({ companyId, siteId });
     if (resolved.provider === 'ISAPI') {
-      return this.media.playbackIsapi(companyId, cameraIndexCode, beginTime, endTime, siteId);
+      return this.media.playbackIsapi(
+        companyId,
+        cameraIndexCode,
+        beginTime,
+        endTime,
+        siteId,
+        segmentIndex,
+      );
     }
     if (resolved.provider === 'HCT') {
       throw new BadRequestException('Playback histórico no aplica en sitios HCT');
@@ -1152,6 +1160,8 @@ export class IntegraArtemisService {
       personCode?: string;
       orgIndexCode?: string;
       employeeNo?: string;
+      /** Si true (default ISAPI), asigna employeeNo libre cuando no viene código. */
+      autoCode?: boolean;
       gender?: string;
       userType?: string;
       validFrom?: string;
@@ -1164,11 +1174,22 @@ export class IntegraArtemisService {
   ) {
     const resolved = await this.client(companyId, siteId);
     if (resolved.provider === 'ISAPI' && resolved.isapiForHost && resolved.siteId && companyId) {
-      const employeeNo = String(input.employeeNo || input.personCode || '').trim();
+      const name = String(input.personName || '').trim();
+      if (!name) throw new BadRequestException('Nombre requerido');
+
+      let employeeNo = String(input.employeeNo || input.personCode || '').trim();
+      const wantAuto = input.autoCode !== false && !employeeNo;
+      if (wantAuto) {
+        employeeNo = await this.allocateEmployeeNo(companyId, resolved.siteId);
+      }
       if (!employeeNo) throw new BadRequestException('Código de empleado requerido');
+      if (employeeNo.length > 32) {
+        throw new BadRequestException('Código de empleado demasiado largo (máx 32)');
+      }
+
       const user: UserInfoWrite = {
         employeeNo,
-        name: input.personName.trim() || employeeNo,
+        name,
         userType: input.userType || 'normal',
         gender: input.gender,
         doorRight: input.doorRight,
@@ -1184,6 +1205,7 @@ export class IntegraArtemisService {
       await this.auditMut('integra.person.add', actor, companyId, resolved.siteId, {
         employeeNo,
         results,
+        autoCode: wantAuto,
       });
       const allOk = results.length > 0 && results.every((r) => r.ok);
       const anyOk = results.some((r) => r.ok);
@@ -1193,12 +1215,14 @@ export class IntegraArtemisService {
       return {
         success: allOk,
         partial: anyOk && !allOk,
+        employeeNo,
+        autoCode: wantAuto,
         results,
         provider: 'ISAPI' as const,
         note: allOk
-          ? 'Alta en todos los terminales.'
+          ? `Alta OK · código ${employeeNo}${wantAuto ? ' (auto)' : ''}.`
           : anyOk
-            ? 'Alta parcial: revisa el detalle por IP.'
+            ? `Alta parcial · código ${employeeNo}: revisa el detalle por IP.`
             : 'No se pudo crear en ningún terminal.',
       };
     }
@@ -1217,6 +1241,30 @@ export class IntegraArtemisService {
     } catch (error) {
       rethrowArtemis(error, 'No se pudo crear la persona');
     }
+  }
+
+  /**
+   * Código libre para DS-K1T: numérico corto (≤32). Toma el máximo del espejo
+   * +1; si no hay numéricos, usa marca de tiempo truncada.
+   */
+  private async allocateEmployeeNo(companyId: number, siteId: number): Promise<string> {
+    const rows = await this.prisma.integraPerson.findMany({
+      where: { companyId, siteId },
+      select: { personId: true },
+    });
+    let max = 0;
+    for (const r of rows) {
+      const id = String(r.personId).trim();
+      if (/^\d{1,10}$/.test(id)) {
+        const n = Number(id);
+        if (Number.isFinite(n) && n > max) max = n;
+      }
+    }
+    if (max > 0 && max < 2_000_000_000) {
+      return String(max + 1);
+    }
+    // Prefijo corto + segundos: cabe en 32 y evita colisión con cédulas largas.
+    return `9${String(Date.now()).slice(-9)}`;
   }
 
   async updatePerson(

@@ -568,8 +568,3 @@ function toUtcIsapi(iso: string): string | null {
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
-
-function asList<T>(v: T | T[] | null | undefined): T[] {
-  if (v == null) return [];
-  return Array.isArray(v) ? v : [v];
-}

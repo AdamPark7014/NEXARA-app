@@ -107,12 +107,20 @@ export default function IntegraVideoPage() {
   });
   const pb0 = useMemo(() => {
     const end = new Date();
-    const start = new Date(end.getTime() - 60 * 60 * 1000);
+    const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
     return { begin: toDatetimeLocalValue(start), end: toDatetimeLocalValue(end) };
   }, []);
   const [begin, setBegin] = useState(pb0.begin);
   const [end, setEnd] = useState(pb0.end);
-  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
+  type PbSegment = { startTime?: string | null; endTime?: string | null; name?: string | null };
+  type PlaybackState = {
+    cameraId: string;
+    hls: string;
+    note?: string | null;
+    segments: PbSegment[];
+    segmentIndex: number;
+  };
+  const [playback, setPlayback] = useState<PlaybackState | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [showTech, setShowTech] = useState(false);
   const [railOpen, setRailOpen] = useState(true);
@@ -260,7 +268,7 @@ export default function IntegraVideoPage() {
       setBusy(cam.id);
       setError(null);
       setSelected(cam.id);
-      setPlaybackUrl(null);
+      setPlayback(null);
       try {
         // Si el espejo ya marca micrófono, abrir con audio (antes había que
         // pulsar «Escuchar» y parecía que no había canal).
@@ -293,7 +301,7 @@ export default function IntegraVideoPage() {
       if (fallback.length === 0) return;
       setFilling(true);
       setError(null);
-      setPlaybackUrl(null);
+      setPlayback(null);
       try {
         const results = await Promise.allSettled(fallback.map((c) => fetchStream(c)));
         const next: StreamSlot[] = [];
@@ -338,6 +346,9 @@ export default function IntegraVideoPage() {
     () => slots.find((s) => s.id === selected) || slots[0] || null,
     [slots, selected],
   );
+  const playbackActive =
+    Boolean(playback && focus && playback.cameraId === focus.id && playback.hls);
+  const focusSrc = playbackActive && playback ? playback.hls : focus?.hls ?? null;
 
   const setViewMode = (m: ViewMode) => {
     setMode(m);
@@ -353,10 +364,79 @@ export default function IntegraVideoPage() {
     setSlots([]);
     setSelected(null);
     setNote(null);
-    setPlaybackUrl(null);
+    setPlayback(null);
     autoOpened.current = true;
     window.sessionStorage.setItem(AUTOOPEN_KEY, "0");
   };
+
+  const formatSegRange = (start?: string | null, end?: string | null) => {
+    const fmt = (iso?: string | null) => {
+      if (!iso) return "—";
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso;
+      return d.toLocaleString("es-MX", { hour12: false });
+    };
+    return `${fmt(start)} → ${fmt(end)}`;
+  };
+
+  const requestPlayback = useCallback(
+    async (segmentIndex = 0) => {
+      if (!selected) return;
+      const beginTime = fromDatetimeLocalValue(begin);
+      const endTime = fromDatetimeLocalValue(end);
+      if (!beginTime || !endTime) {
+        setError("Rango de fechas inválido");
+        return;
+      }
+      if (new Date(beginTime).getTime() >= new Date(endTime).getTime()) {
+        setError("El inicio debe ser anterior al fin");
+        return;
+      }
+      setBusy("pb");
+      setError(null);
+      try {
+        const data = await integraApi<{
+          url: string | null;
+          hls?: string | null;
+          note?: string;
+          segmentIndex?: number;
+          segments?: PbSegment[];
+        }>(`integra/cameras/${encodeURIComponent(selected)}/playback`, {
+          method: "POST",
+          body: JSON.stringify({ beginTime, endTime, segmentIndex }),
+        });
+        const play = data.hls || data.url;
+        const segs = Array.isArray(data.segments) ? data.segments : [];
+        if (!play) {
+          setPlayback(null);
+          setError(data.note || "Sin grabaciones en ese rango");
+          setNote(data.note || null);
+          setShowTech(true);
+          return;
+        }
+        // Solo el foco: el muro conserva el vivo en `slots`.
+        setPlayback({
+          cameraId: selected,
+          hls: play,
+          note: data.note || null,
+          segments: segs,
+          segmentIndex: data.segmentIndex ?? segmentIndex,
+        });
+        setViewMode("focus");
+        setNote(
+          data.note ||
+            `Playback listo · ${segs.length || 1} segmento(s)`,
+        );
+        setShowTech(true);
+      } catch (e) {
+        setPlayback(null);
+        setError(e instanceof Error ? e.message : "Error playback");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [selected, begin, end],
+  );
 
   const openFocus = (camId: string) => {
     setSelected(camId);
@@ -712,7 +792,10 @@ export default function IntegraVideoPage() {
               </IgPanel>
             }
             right={
-              <IgPanel title={focus ? focus.name : "Vista principal"} count={focus ? "EN VIVO" : "—"}>
+              <IgPanel
+                title={focus ? focus.name : "Vista principal"}
+                count={focus ? (playbackActive ? "PLAYBACK" : "EN VIVO") : "—"}
+              >
                 {busy && !focus && (
                   <div className={styles.videoFocusEmpty}>
                     <div className={styles.playerSpinner} />
@@ -759,10 +842,10 @@ export default function IntegraVideoPage() {
                           deviceIp={focusCam?.sourceIp ?? null}
                         />
                         <IntegraLivePlayer
-                          src={focus.hls}
+                          src={focusSrc}
                           enabled={mode === "focus"}
                           mode="mse"
-                          audio={Boolean(focus.audio)}
+                          audio={Boolean(focus.audio) && !playbackActive}
                         />
                       </div>
                     )}
@@ -898,6 +981,10 @@ export default function IntegraVideoPage() {
                   {!isHct ? (
                     <>
                       <strong className={styles.focusPlaybackLabel}>Playback histórico</strong>
+                      <p className={styles.doorCellMeta} style={{ margin: 0 }}>
+                        Solo en el foco (el muro sigue en vivo). Track NVR = canal principal
+                        (101, 501…). Retención según disco del grabador.
+                      </p>
                       <IgField label="Inicio">
                         <input
                           type="datetime-local"
@@ -925,57 +1012,54 @@ export default function IntegraVideoPage() {
                           Última 1h
                         </IgBtn>
                         <IgBtn
+                          onClick={() => {
+                            const r = defaultRangeHours(24);
+                            setBegin(r.start);
+                            setEnd(r.end);
+                          }}
+                        >
+                          Últimas 24h
+                        </IgBtn>
+                        <IgBtn
                           variant="primary"
                           disabled={!selected || busy === "pb"}
-                          onClick={async () => {
-                            if (!selected) return;
-                            const beginTime = fromDatetimeLocalValue(begin);
-                            const endTime = fromDatetimeLocalValue(end);
-                            if (!beginTime || !endTime) return;
-                            setBusy("pb");
-                            try {
-                              const data = await integraApi<{
-                                url: string | null;
-                                hls?: string | null;
-                                note?: string;
-                                segments?: unknown[];
-                              }>(
-                                `integra/cameras/${encodeURIComponent(selected)}/playback`,
-                                { method: "POST", body: JSON.stringify({ beginTime, endTime }) },
-                              );
-                              const play = data.hls || data.url;
-                              setPlaybackUrl(play);
-                              if (play) {
-                                // Sustituye el vivo por el segmento de grabación.
-                                setSlots((prev) => {
-                                  const cur = prev.find((s) => s.id === selected);
-                                  if (!cur) return prev;
-                                  return prev.map((s) =>
-                                    s.id === selected
-                                      ? { ...s, hls: play, note: data.note || "Playback", audio: false }
-                                      : s,
-                                  );
-                                });
-                              }
-                              setNote(
-                                data.note ||
-                                  (play
-                                    ? `Playback listo${Array.isArray(data.segments) ? ` · ${data.segments.length} seg.` : ""}`
-                                    : "Sin URL de playback"),
-                              );
-                              setShowTech(true);
-                            } catch (e) {
-                              setError(e instanceof Error ? e.message : "Error playback");
-                            } finally {
-                              setBusy(null);
-                            }
-                          }}
+                          onClick={() => void requestPlayback(0)}
                         >
                           Obtener
                         </IgBtn>
+                        {playbackActive && (
+                          <IgBtn
+                            onClick={() => {
+                              setPlayback(null);
+                              setNote(null);
+                              setError(null);
+                            }}
+                          >
+                            Volver a vivo
+                          </IgBtn>
+                        )}
                       </div>
-                      {playbackUrl && (
-                        <code className={styles.playbackUrl}>{playbackUrl}</code>
+                      {playback && playback.cameraId === selected && playback.segments.length > 0 && (
+                        <ul className={styles.playbackSegments}>
+                          {playback.segments.map((seg, i) => {
+                            const label = formatSegRange(seg.startTime, seg.endTime);
+                            const active = i === playback.segmentIndex;
+                            return (
+                              <li key={`${seg.startTime || i}-${seg.endTime || i}`}>
+                                <button
+                                  type="button"
+                                  className={styles.playbackSegBtn}
+                                  data-active={active ? "1" : "0"}
+                                  disabled={busy === "pb"}
+                                  onClick={() => void requestPlayback(i)}
+                                >
+                                  {active ? "▶ " : ""}
+                                  {label}
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
                       )}
                     </>
                   ) : (

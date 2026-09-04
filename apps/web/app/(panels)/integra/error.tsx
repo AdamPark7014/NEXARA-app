@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import styles from "./integra.module.css";
 
 export default function IntegraError({
   error,
@@ -15,21 +16,21 @@ export default function IntegraError({
   }, [error]);
 
   return (
-    <div style={{ padding: "40px 32px", maxWidth: 720, margin: "0 auto", fontFamily: "var(--nx-font-ui, system-ui)" }}>
-      <div style={{ padding: 24, borderRadius: 14, background: "color-mix(in srgb, #ef4444 8%, #fff)", border: "1px solid color-mix(in srgb, #ef4444 25%, #e5e7eb)" }}>
-        <h2 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700, color: "#b91c1c" }}>Error en Integra</h2>
-        <p style={{ margin: "0 0 16px", fontSize: 14, color: "#6b7280" }}>
-          No se pudo cargar esta sección de seguridad. Puedes reintentar o volver a la consola Ops.
+    <div className={styles.igBoundary}>
+      <div className={styles.igBoundaryCard} role="alert">
+        <h2 className={styles.igBoundaryTitle}>Error en Integra</h2>
+        <p className={styles.igBoundaryCopy}>
+          No se pudo cargar esta sección. Reintenta o vuelve a la consola Ops.
         </p>
-        <pre style={{ margin: "0 0 16px", padding: "12px 14px", borderRadius: 8, background: "#f9fafb", border: "1px solid #e5e7eb", fontSize: 12, whiteSpace: "pre-wrap", wordBreak: "break-all", maxHeight: 240, overflow: "auto" }}>
+        <pre className={styles.igBoundaryDetail}>
           {error.message}
           {error.digest ? `\n\nDigest: ${error.digest}` : ""}
         </pre>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button type="button" onClick={reset} style={{ padding: "8px 18px", borderRadius: 8, background: "#0f6ad6", color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+        <div className={styles.igBoundaryActions}>
+          <button type="button" className={styles.btnPrimary} onClick={reset}>
             Reintentar
           </button>
-          <Link href="/integra" style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #0f6ad6", color: "#0f6ad6", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+          <Link href="/integra" className={styles.igBoundaryLink}>
             Ir a Ops
           </Link>
         </div>

@@ -58,6 +58,8 @@ class AddPersonDto {
   @IsOptional() @IsString() orgIndexCode?: string;
   @IsOptional() @IsString() personCode?: string;
   @IsOptional() @IsString() employeeNo?: string;
+  /** ISAPI: genera employeeNo si no viene código. Default true en servicio. */
+  @IsOptional() @IsBoolean() autoCode?: boolean;
   @IsOptional() @IsString() gender?: string;
   @IsOptional() @IsString() userType?: string;
   @IsOptional() @IsString() validFrom?: string;
@@ -157,6 +159,7 @@ class VehicleDto {
 class PlaybackDto {
   @IsString() beginTime!: string;
   @IsString() endTime!: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) segmentIndex?: number;
 }
 
 @ApiTags('Integra · Artemis')
@@ -435,6 +438,7 @@ export class IntegraController {
       dto.beginTime,
       dto.endTime,
       siteId ? parseInt(siteId, 10) : null,
+      dto.segmentIndex,
     );
   }
 

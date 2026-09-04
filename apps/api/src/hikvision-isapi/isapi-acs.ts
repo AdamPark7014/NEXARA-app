@@ -396,32 +396,60 @@ export async function deleteUserInfo(
   const no = String(employeeNo).trim();
   if (!no) throw new Error('employeeNo vacío');
 
+  // Idempotente: si ya no está, listo (reintento / terminal que nunca la tuvo).
+  if (!(await userStillOnDevice(client, no))) {
+    return;
+  }
+
   // Rostro primero: algunos firmwares dejan el UserInfo “pegado” si queda FaceData.
   try {
     await deleteFaceData(client, no);
-  } catch {
-    // Sin rostro o sin FDLib: seguir con la baja de UserInfo.
+  } catch (e) {
+    if (!isBenignMissingError(e)) {
+      // Seguir igual: el Delete de UserInfo a veces limpia el rostro.
+    }
   }
 
-  await client.putJson('/ISAPI/AccessControl/UserInfoDetail/Delete?format=json', {
-    UserInfoDetail: {
-      mode: 'byEmployeeNo',
-      EmployeeNoList: [{ employeeNo: no }],
-    },
-  });
-
+  await putDeleteByEmployeeNo(client, no);
   await waitUserInfoDeleteProcess(client);
 
-  // Comprueba que ya no está en el directorio del terminal (si sigue, falló).
-  // Algunos firmwares tardan un poco tras DeleteProcess=success.
+  // Algunos firmwares tardan; reintenta Delete una vez si sigue listada.
   let still = await userStillOnDevice(client, no);
   if (still) {
+    await sleep(900);
+    await putDeleteByEmployeeNo(client, no);
+    await waitUserInfoDeleteProcess(client);
     await sleep(700);
     still = await userStillOnDevice(client, no);
   }
   if (still) {
     throw new Error(`El terminal aún lista a ${no} tras Delete`);
   }
+}
+
+async function putDeleteByEmployeeNo(
+  client: HikvisionIsapiClient,
+  employeeNo: string,
+): Promise<void> {
+  try {
+    await client.putJson('/ISAPI/AccessControl/UserInfoDetail/Delete?format=json', {
+      UserInfoDetail: {
+        mode: 'byEmployeeNo',
+        EmployeeNoList: [{ employeeNo }],
+      },
+    });
+  } catch (e) {
+    // Ya no existe en ese terminal → OK para fan-out.
+    if (isBenignMissingError(e)) return;
+    throw e;
+  }
+}
+
+function isBenignMissingError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /notExist|not.?exist|noExist|employeeNoNotExist|UserNotExist|does not exist|no such|not found|404/i.test(
+    msg,
+  );
 }
 
 /** Progreso async del borrado. Doc HikGateway §4.3.2 / DeleteProcess. */
@@ -478,7 +506,7 @@ async function userStillOnDevice(
 ): Promise<boolean> {
   const want = String(employeeNo).trim();
 
-  // 1) Búsqueda filtrada (EmployeeNoList en capacidades Postman HikGateway).
+  // Rápido: si EmployeeNoList la encuentra, sigue ahí.
   try {
     const page = await searchUserInfo(client, {
       position: 0,
@@ -488,23 +516,19 @@ async function userStillOnDevice(
     if (page.users.some((u) => String(u.employeeNo).trim() === want)) {
       return true;
     }
-    // Si el filtro aplicó (pocos matches / vacío / solo ese id), vacío = ya no está.
-    const looksFiltered =
-      page.total <= 1 ||
-      page.users.length === 0 ||
-      page.users.every((u) => String(u.employeeNo).trim() === want);
-    if (looksFiltered) return false;
-    // Página llena sin nuestro id → el firmware probablemente ignoró el filtro.
   } catch {
     // Seguir con listado completo.
   }
 
+  // Autoritativo: drenar UserInfo. Si no podemos listar, NO fingimos éxito
+  // (eso borraba el espejo y el sync 15 min «reaparecía» a la persona).
   try {
     const users = await listAllUserInfo(client, 80);
     return users.some((u) => String(u.employeeNo).trim() === want);
-  } catch {
-    // Si no se puede listar, no inventamos éxito ni fracaso extra.
-    return false;
+  } catch (e) {
+    throw new Error(
+      `No se pudo verificar baja de ${want}: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
 }
 
