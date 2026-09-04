@@ -317,9 +317,10 @@ export class UsersService {
     } else if (body.isActive === true) {
       await this.chat.addUserToOrgChannels(id);
     }
-    if (body.isActive !== undefined || body.puesto !== undefined) {
+    if (body.isActive !== undefined || body.puesto !== undefined || body.tipoContrato !== undefined) {
       const acsPush = await this.pushAcsFromErp({
         companyId,
+        userId: id,
         employeeNumber: updated.employeeNumber,
         name: updated.nombre,
         enable: updated.isActive !== false,
