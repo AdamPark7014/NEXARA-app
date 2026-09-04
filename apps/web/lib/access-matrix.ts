@@ -941,7 +941,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "integra-visitors": {
     id: "integra-visitors", panel: PANELS.INTEGRA, path: "/visitors",
-    label: "Visitas", description: "Citas y códigos QR",
+    label: "Visitas", description: "Única · recurrente · acceso ACS limitado",
     icon: "🎫", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD],
     group: "Acceso", visible: true,
   },
