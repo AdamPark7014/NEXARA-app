@@ -6,9 +6,10 @@ import { AuthModule } from '../auth/auth.module.js';
 import { RbacGuard } from '../common/rbac.guard.js';
 import { RolesController } from './roles.controller.js';
 import { ChatModule } from '../chat/chat.module.js';
+import { IntegraModule } from '../integra/integra.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, forwardRef(() => ChatModule)],
+  imports: [PrismaModule, AuthModule, forwardRef(() => ChatModule), IntegraModule],
   controllers: [UsersController, RolesController],
   providers: [UsersService, RbacGuard],
   exports: [UsersService],

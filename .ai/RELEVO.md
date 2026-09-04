@@ -8,46 +8,40 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Live detection hotpath + AcuSense max (sibling wire)
+## Este turno — Asistencia híbrida Integra ↔ ERP (desplegado)
 
-Adam: UX detección en vivo al límite bajo ráfagas (sibling reconfigura
-cámaras `.171–.178`). Sin inventar Face ID óptico.
+**ACS = puertas** (eventos push). **ERP = checador / nómina**. Contraste
+read-only: no inventa fichajes ni biometría.
 
-### Live detection hotpath (UI/SSE — este agente)
+### Entregado
 
-1. **Bus SSE/poll**: fan-out coalescido 32 ms + dedupe por id; poll 1.2 s
-   con SSE sano / 280 ms degradado; reconnect 800 ms.
-2. **Paint ~30 fps** (rAF + refs): merge sticky; edad placa 1 Hz — no se
-   frena el poll con FieldDetection a tope.
-3. **Multi-caja**: nombres distintos no se fusionan; tope 12; VMD 90 s.
-4. **Stream**: `preloadGo2rtcPlayer`; kicks densos; remount 2.6 s;
-   stagger muro 90 ms; fallback MSE 4.5 s.
-5. Índices `integra_push_events_*`; placa óptica «Humano · sin ID».
+1. **API** `GET /api/attendance/hybrid?date=YYYY-MM-DD`
+   - Match `employeeNumber` / `UserCompany.employeeNumber` ↔ `personId` / `personCode`
+   - Estados `linked` | `erp_only` | `acs_only` + flags (desfase, sin salida…)
+2. **UI** `/erp/hr/attendance` — panel **Híbrido Integra ↔ ERP** + rail RRHH
+3. **UI** `/integra/attendance` — badge/link ERP si hay match
+4. Commit UI/copy `5801d73`; build+deploy `--force-all` con hybrid en
+   `dist/attendance/attendance-hybrid*.js` y `HybridAttendancePanel.tsx`
 
-### AcuSense max wire (sibling — hardware)
+### Cómo usarlo (Adam)
 
-1. `enableMaxSmartDetection`: Field todas regiones, poly full-frame,
-   `sensitivityLevel=100`, Line/FaceDetect/Motion; triggers → center.
-2. Bugfix: tag real `sensitivityLevel` (antes `sensitivity` ignorado).
-3. Parser `facedetection` usa FaceRect raíz; docs INTEGRA-LAN.
+1. Mismo código en ficha RRHH y en `employeeNo` del terminal.
+2. **ERP → Asistencia** (rail «Asistencia · híbrido»): checador + contraste.
+3. Alertas = contraste. **Nómina solo del checador app.**
 
-SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` → `./deploy/update.sh --force-all --with-migrate`
+### Concurrente (siblings — no pisar)
 
-### Verificar (hard refresh)
+Integra Eventos ACS UI · identity-link WIP · CRM · stock · PTZ · Personas · OC PDF.
 
-1. Video: sticky multi-caja Meeting Room sin lag bajo ráfagas.
-2. ACS banner &lt;1 s; Eventos cards / En vivo.
-3. Tras wire: FieldDetection enabled sens 100; httpHosts binary.
-4. Óptica: «Humano · sin ID» — no Face ID de oficina.
+SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109`
 
 ## A medias
 
-1. Portal empleado · ANPR ITC · micros · TCPMSS.
-2. Confirmar tasa de eventos tras wire+deploy.
-3. Migración índices push si no aplica sola.
+1. Portal empleado · alinear códigos Oficinas employeeNumber↔personId.
+2. `identity-link` / `identity._wip_sibling` (rescate) — no cableado a AppModule.
+3. httpHost NVR · ANPR · FieldDetection re-apply.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales, Face ID inventado sobre AcuSense.
-Personas enroll CRUD del face sibling.
+Puente NAS, Traefik, credenciales, ISAPI no verificada.
+Face ID óptico inventado. No CRM / stock / PTZ / Eventos ACS del sibling.
