@@ -36,7 +36,18 @@ interface CrmActivity {
   subject: string;
   dueDate: string;
   lead?: { name: string } | null;
-  opportunity?: { title: string } | null;
+  opportunity?: { title: string; id?: number } | null;
+}
+
+interface SalesNotif {
+  id: number;
+  title: string;
+  message: string;
+  category: string;
+  priority: string | null;
+  isRead: boolean;
+  relatedUrl?: string | null;
+  createdAt: string;
 }
 
 interface Metrics {

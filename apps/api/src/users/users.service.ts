@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
@@ -9,6 +9,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { ChatService } from '../chat/chat.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { withTenantBypassAsync } from '../common/tenant/tenant-context.js';
+import { IntegraAcsFanoutService } from '../integra/integra-acs-fanout.service.js';
 
 /** Roles que reciben OT, kits de herramientas y asignaciones de campo. */
 const FIELD_ASSIGNEE_ROLE_KEYS = ['ing_campo', 'ing_soporte'] as const;
