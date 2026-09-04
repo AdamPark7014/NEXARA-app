@@ -46,18 +46,19 @@ type Box = PushTarget & {
   ttl: number;
 };
 
-/** AcuSense FieldDetection es puntual: la caja debe “pegarse” mientras
- *  alguien sigue sentado y solo llega VMD / re-intrusiones esporádicas. */
-const BOX_TTL_OPTICAL_MS = 90_000;
-/** ACS FaceRect + nombre: sticky más largo — el pase es un flash, la placa no. */
-const BOX_TTL_NAMED_MS = 75_000;
+/** AcuSense FieldDetection: caduca rápido si no llega rect fresco.
+ *  Sticky 90s dejó fantasmas en sillas vacías (68–89s) — ver Video 24h. */
+const BOX_TTL_OPTICAL_MS = 3_500;
+/** ACS FaceRect + nombre: un poco más (pase es flash), nunca ~90s. */
+const BOX_TTL_NAMED_MS = 10_000;
 /** Poll de respaldo cuando SSE está sano (ráfagas las come SSE). */
 const POLL_HEALTHY_MS = 1200;
 /** Poll agresivo si SSE cayó. */
 const POLL_DEGRADED_MS = 280;
-const SEED_MS = 120_000;
-/** VMD sin TargetRect: solo mantiene cajas ya pintadas (presencia sentada). */
-const PRESENCE_HOLD_MS = 90_000;
+/** Semilla: solo eventos dentro del TTL útil (no pintar fantasmas de 2 min). */
+const SEED_MS = 12_000;
+/** Chip «Movimiento» sin caja: VMD no debe resucitar tracks ópticos. */
+const MOTION_CHIP_MS = 4_000;
 /** Distancia de centros (0..1) bajo la cual dos humanos se consideran el mismo.
  *  Conservador: Meeting Room tres sentados lejos → no fusionar. */
 const SOFT_CENTER_DIST = 0.1;
@@ -67,8 +68,8 @@ const MAX_TRACKS = 12;
 const FANOUT_COALESCE_MS = 32;
 /** Paint del overlay: máx ~30 fps aunque lleguen 200 eventos/s. */
 const PAINT_MIN_MS = 33;
-/** Reloj de edad en placa (no hace falta 4 Hz). */
-const AGE_TICK_MS = 1000;
+/** Reloj de caducidad + edad en placa (~2 Hz). */
+const AGE_TICK_MS = 500;
 
 type Listener = (events: PushEvent[]) => void;
 
@@ -163,7 +164,8 @@ function mergeOne(out: Box[], n: Box): Box[] {
     return next;
   }
   const prevBox = next[best];
-  const blend = (a: number, b: number) => a * 0.65 + b * 0.35;
+  // Preferir el rect más reciente (FieldDetection) sobre ghost sticky.
+  const blend = (a: number, b: number) => a * 0.88 + b * 0.12;
   next[best] = {
     ...n,
     x: blend(n.x, prevBox.x),
@@ -181,14 +183,14 @@ function mergeOne(out: Box[], n: Box): Box[] {
     personName: n.personName || prevBox.personName,
     personId: n.personId || prevBox.personId,
     photoPath: n.photoPath || prevBox.photoPath,
-    ttl: Math.max(n.ttl, prevBox.ttl, PRESENCE_HOLD_MS),
+    ttl: n.ttl,
   };
   return next;
 }
 
 function boxesFromEvents(events: PushEvent[], deviceIp: string, now = Date.now()): Box[] {
   const fresh: Box[] = [];
-  const maxAge = Math.max(BOX_TTL_OPTICAL_MS, BOX_TTL_NAMED_MS, PRESENCE_HOLD_MS);
+  const maxAge = Math.max(BOX_TTL_OPTICAL_MS, BOX_TTL_NAMED_MS);
   for (const ev of events) {
     if (ev.deviceIp !== deviceIp || !ev.targets?.length) continue;
     const age = now - Date.parse(ev.occurredAt);
@@ -490,7 +492,7 @@ export function IntegraDetectionOverlay({
           (e) =>
             e.deviceIp === deviceIp &&
             (e.eventType === "VMD" || e.eventType === "fielddetection") &&
-            Date.now() - Date.parse(e.occurredAt) < PRESENCE_HOLD_MS,
+            Date.now() - Date.parse(e.occurredAt) < MOTION_CHIP_MS,
         );
         if (motion) {
           const at = Date.parse(motion.occurredAt) || Date.now();
@@ -515,6 +517,8 @@ export function IntegraDetectionOverlay({
         applyBoxes(merged);
       }
 
+      // VMD / fielddetection sin TargetRect solo alimentan el chip de movimiento.
+      // No reiniciar `at` ni alargar TTL: eso dejaba fantasmas 60–90s en sillas.
       let sawMotion = false;
       for (const ev of events) {
         if (ev.deviceIp !== deviceIp) continue;
@@ -523,16 +527,8 @@ export function IntegraDetectionOverlay({
         }
       }
       if (sawMotion) {
-        const now = Date.now();
-        motionRef.current = now;
-        applyMotion(now);
-        const held = boxesRef.current.map((b) => ({
-          ...b,
-          at: now,
-          ttl: Math.max(b.ttl, PRESENCE_HOLD_MS),
-        }));
-        boxesRef.current = held;
-        applyBoxes(held);
+        motionRef.current = Date.now();
+        applyMotion(motionRef.current);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -548,7 +544,7 @@ export function IntegraDetectionOverlay({
         applyBoxes(next);
       }
       const m = motionRef.current;
-      if (m != null && now - m > PRESENCE_HOLD_MS) {
+      if (m != null && now - m > MOTION_CHIP_MS) {
         motionRef.current = null;
         applyMotion(null);
       }
