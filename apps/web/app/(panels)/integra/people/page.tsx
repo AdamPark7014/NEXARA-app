@@ -315,7 +315,7 @@ export default function IntegraPeoplePage() {
       setRoleId((prev) => {
         if (prev) return prev;
         const preferred =
-          roles.find((r) => /empleado|staff|operador/i.test(r.nombre))?.id ?? roles[0]?.id;
+          roles.find((r: ErpRole) => /empleado|staff|operador/i.test(r.nombre))?.id ?? roles[0]?.id;
         return preferred != null ? String(preferred) : "";
       });
       setDepartmentId((prev) => prev || (depts[0] ? String(depts[0].id) : ""));

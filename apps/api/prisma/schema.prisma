@@ -5049,6 +5049,7 @@ model CompanyProfile {
   integraPushEvents         IntegraPushEvent[]
   integraRoomBookings       IntegraRoomBooking[]
   integraSpacePolicies      IntegraSpacePolicy[]
+  integraRecurringVisitors  IntegraRecurringVisitor[]
 
   @@map("company_profile")
 }

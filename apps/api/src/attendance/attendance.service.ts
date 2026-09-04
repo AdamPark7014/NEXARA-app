@@ -337,6 +337,115 @@ export class AttendanceService {
     return day;
   }
 
+  /**
+   * Entrada ERP sugerida desde el primer acceso ACS del día.
+   * Solo RH/admin: no inventa nómina sola — el híbrido pide confirmación.
+   */
+  async registerSuggestedAcsEntry(opts: {
+    targetUserId: number;
+    timestamp: Date;
+    photoUrl?: string | null;
+    door?: string | null;
+    actorUserId: number;
+    companyId?: number | null;
+  }) {
+    const tenantId = requireCompanyId(opts.companyId);
+    const now = opts.timestamp;
+    if (Number.isNaN(now.getTime())) {
+      throw new BadRequestException('Timestamp ACS inválido');
+    }
+    const today = this.getDateOnly(now);
+    const doorBit = opts.door ? ` · ${opts.door}` : '';
+    const deviceInfo = `ACS Integra (sugerido RH #${opts.actorUserId})${doorBit}`;
+
+    const existingEntry = await this.findAttendanceOnDate(
+      opts.targetUserId,
+      'entrada',
+      now,
+      tenantId,
+    );
+    if (existingEntry) {
+      throw new BadRequestException('Ya existe una entrada registrada para ese día');
+    }
+
+    const openDay = await this.prisma.attendanceDay.findFirst({
+      where: { userId: opts.targetUserId, isOpen: true, ...companyWhere(tenantId) },
+    });
+    if (openDay) {
+      throw new BadRequestException(
+        'El empleado tiene una jornada abierta. Cierra salida antes de aplicar la sugerencia.',
+      );
+    }
+
+    const attendance = await this.createAttendanceRecord({
+      data: {
+        userId: opts.targetUserId,
+        type: 'entrada',
+        timestamp: now,
+        workDate: today,
+        deviceInfo,
+        photoUrl: opts.photoUrl || null,
+        companyId: tenantId,
+      },
+      include: { user: true },
+    });
+
+    const day = await this.prisma.attendanceDay.upsert({
+      where: {
+        companyId_userId_date: {
+          companyId: tenantId,
+          userId: opts.targetUserId,
+          date: today,
+        },
+      },
+      create: {
+        userId: opts.targetUserId,
+        date: today,
+        totalMinutes: 0,
+        lastEntryAt: now,
+        isOpen: true,
+        companyId: tenantId,
+      },
+      update: {
+        lastEntryAt: now,
+        isOpen: true,
+      },
+    });
+
+    this.emitAttendanceUpdate(opts.targetUserId, 'entrada', now, attendance.user);
+
+    try {
+      await this.prisma.notification.create({
+        data: {
+          userId: opts.targetUserId,
+          type: 'ATTENDANCE_CHECKIN',
+          category: 'attendance',
+          title: 'Entrada sugerida desde ACS',
+          message: `RH aplicó tu entrada desde puerta Integra${doorBit}.`,
+          relatedEntityId: attendance.id,
+          entityType: 'Attendance',
+          priority: 'normal',
+        },
+      });
+    } catch {
+      /* notificación best-effort */
+    }
+
+    await this.notificationHierarchy.notifyAttendanceChange(
+      opts.targetUserId,
+      'ATTENDANCE_CHECKIN',
+      attendance.user.nombre || 'Usuario',
+      deviceInfo,
+    );
+
+    return {
+      message: 'Entrada ERP aplicada desde ACS',
+      data: attendance,
+      day,
+      source: 'acs_suggestion',
+    };
+  }
+
   async register(dto: CreateAttendanceDto, userId: number, req?: any, companyId?: number | null) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
     const tenantId = requireCompanyId(companyId);

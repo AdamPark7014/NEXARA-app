@@ -15,6 +15,7 @@ import { getAttendanceSectionConfig } from "@/lib/user-access";
 import { attendanceMapUrl } from "@/lib/gps-map-links";
 import AttendanceGpsDayPanel from "@/components/AttendanceGpsDayPanel";
 import HybridAttendancePanel from "@/components/HybridAttendancePanel";
+import { EnSitioStrip } from "@/components/presence/EnSitioStrip";
 import HrModuleRail from "@/components/hr/HrModuleRail";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";

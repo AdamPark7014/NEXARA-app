@@ -28,6 +28,7 @@ import {
 import type { ActivityEvidenceSummary } from "@/lib/evidence-lock";
 import { filterRowsByScope, getActivitiesCanonicalPath, getOpsDashboardSectionConfig } from "@/lib/section-views";
 import { CommandCenterRail } from "@/components/command-center/CommandCenterRail";
+import { EnSitioStrip } from "@/components/presence/EnSitioStrip";
 
 interface ActivityRow {
   id: number;
@@ -239,6 +240,8 @@ export default function OpsDashboardPage() {
 
       <CommandCenterRail panel="ops" />
 
+      <EnSitioStrip variant="compact" title="En sitio · oficina" />
+
       {error && !loading && (
         <DashPanel title="No se pudo cargar" subtitle={error}>
           <Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>
@@ -439,9 +442,4 @@ export default function OpsDashboardPage() {
                 ))}
               </DashPanel>
             )}
-          </div>
-        </DashCol>
-      </DashGrid>
-    </DashPage>
-  );
-}
+          <
