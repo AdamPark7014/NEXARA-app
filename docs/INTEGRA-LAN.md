@@ -159,9 +159,14 @@ sobre la IP de la terminal. Los cuatro `controlType` de Artemis mapean a
 
 ## Lo que ISAPI no da
 
-Personas, vehículos, ANPR, visitas y playback de Artemis responden **400** en un
-sitio ISAPI, igual que en uno HCT. No es un hueco por rellenar: son capacidades
-de plataforma que un equipo suelto no tiene.
+Vehículos/ANPR (sin ITC), visitas y **playback Artemis** responden 400 en un
+sitio ISAPI. El playback **local del NVR** sí está soportado vía
+`POST /ISAPI/ContentMgmt/search` → RTSP `playbackURI` → go2rtc HLS
+(`POST /integra/cameras/:id/playback`).
+
+Personas ISAPI: CRUD UserInfo + FaceDataRecord; el delete espera
+`UserInfoDetail/DeleteProcess` y solo limpia el espejo si **todos** los
+terminales ACS confirman.
 
 ## Rutas ISAPI empleadas
 
@@ -176,6 +181,8 @@ Todas documentadas en `HIKVISION-apps/docs/API-DOCS/HIKVISION/` (salvo InputProx
 | `PUT /ISAPI/AccessControl/RemoteControl/door/{id}` | apertura remota |
 | `POST /ISAPI/AccessControl/UserInfo/Search?format=json` | personas del terminal → espejo `IntegraPerson` |
 | `POST /ISAPI/AccessControl/AcsEvent?format=json` | eventos de acceso (live, tope 30/página) |
+| `PUT /ISAPI/AccessControl/UserInfoDetail/Delete` + `DeleteProcess` | baja de persona en ACS |
+| `POST /ISAPI/ContentMgmt/search?format=json` | segmentos de grabación NVR → playbackURI |
 
 Más `/ISAPI/ContentMgmt/InputProxy/channels[/status]`, que **no** está en el doc
 set de SYSCOM. Da el nombre real de cada cámara, su IP de origen y si está en

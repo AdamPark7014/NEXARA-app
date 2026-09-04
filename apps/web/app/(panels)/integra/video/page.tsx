@@ -17,6 +17,7 @@ import { IntegraEzuiKitPlayer } from "../_EzuiKitPlayer";
 import { IntegraDetectionOverlay, subscribePushEvents } from "../_DetectionOverlay";
 import { IntegraLivePlayer } from "../_LivePlayer";
 import { IntegraLiveAccessBanner } from "../_LiveAccessBanner";
+import { IntegraAcsIdentityStrip } from "../_AcsIdentityStrip";
 import { IntegraOccupancyPanel } from "../_OccupancyPanel";
 import { IntegraPtzPad } from "../_PtzPad";
 import { IntegraRecentAccess } from "../_RecentAccess";
@@ -744,7 +745,10 @@ export default function IntegraVideoPage() {
                     )}
                     <div className={styles.focusSide}>
                       {!focusCam?.isDoorCamera && (
-                        <IntegraOccupancyPanel enabled={mode === "focus"} />
+                        <>
+                          <IntegraOccupancyPanel enabled={mode === "focus"} />
+                          <IntegraAcsIdentityStrip enabled={mode === "focus"} />
+                        </>
                       )}
                       {focusCam?.isDoorCamera && (
                         <IntegraRecentAccess
@@ -924,12 +928,35 @@ export default function IntegraVideoPage() {
                             if (!beginTime || !endTime) return;
                             setBusy("pb");
                             try {
-                              const data = await integraApi<{ url: string | null }>(
+                              const data = await integraApi<{
+                                url: string | null;
+                                hls?: string | null;
+                                note?: string;
+                                segments?: unknown[];
+                              }>(
                                 `integra/cameras/${encodeURIComponent(selected)}/playback`,
                                 { method: "POST", body: JSON.stringify({ beginTime, endTime }) },
                               );
-                              setPlaybackUrl(data.url);
-                              setNote(data.url ? "Playback listo" : "Sin URL de playback");
+                              const play = data.hls || data.url;
+                              setPlaybackUrl(play);
+                              if (play) {
+                                // Sustituye el vivo por el segmento de grabación.
+                                setSlots((prev) => {
+                                  const cur = prev.find((s) => s.id === selected);
+                                  if (!cur) return prev;
+                                  return prev.map((s) =>
+                                    s.id === selected
+                                      ? { ...s, hls: play, note: data.note || "Playback", audio: false }
+                                      : s,
+                                  );
+                                });
+                              }
+                              setNote(
+                                data.note ||
+                                  (play
+                                    ? `Playback listo${Array.isArray(data.segments) ? ` · ${data.segments.length} seg.` : ""}`
+                                    : "Sin URL de playback"),
+                              );
                               setShowTech(true);
                             } catch (e) {
                               setError(e instanceof Error ? e.message : "Error playback");

@@ -511,6 +511,22 @@ export class HikvisionIsapiClient {
     const port = opts?.port ?? 554;
     return `rtsp://${this.username}:***@${hostname}:${port}/Streaming/Channels/${channelId}`;
   }
+
+  /**
+   * Inyecta usuario/clave en un `playbackURI` del NVR si viene sin auth
+   * (`ContentMgmt/search`).
+   */
+  authorizeRtsp(uri: string): string {
+    const s = String(uri || '').trim();
+    if (!/^rtsp:\/\//i.test(s)) return s;
+    if (/^rtsp:\/\/[^/@]+@/i.test(s)) return s;
+    const cred = `${encodeURIComponent(this.username)}:${encodeURIComponent(this.password)}`;
+    return s.replace(/^rtsp:\/\//i, `rtsp://${cred}@`);
+  }
+
+  authorizeRtspRedacted(uri: string): string {
+    return this.authorizeRtsp(uri).replace(/\/\/([^:/@]+):([^@]+)@/i, '//$1:***@');
+  }
 }
 
 function decode(text: string): Record<string, XmlValue> {

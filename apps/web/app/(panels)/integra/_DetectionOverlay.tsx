@@ -41,13 +41,13 @@ type Box = PushTarget & {
   ttl: number;
 };
 
-const BOX_TTL_OPTICAL_MS = 25_000;
-const BOX_TTL_NAMED_MS = 20_000;
+const BOX_TTL_OPTICAL_MS = 45_000;
+const BOX_TTL_NAMED_MS = 30_000;
 /** Sondeo incremental si SSE cae o aún no conectó. */
 const POLL_MS = 400;
-const SEED_MS = 20_000;
+const SEED_MS = 45_000;
 /** VMD sin TargetRect: solo mantiene cajas ya pintadas (presencia). */
-const PRESENCE_HOLD_MS = 18_000;
+const PRESENCE_HOLD_MS = 40_000;
 
 type Listener = (events: PushEvent[]) => void;
 
