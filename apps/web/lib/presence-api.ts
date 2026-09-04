@@ -105,14 +105,11 @@ async function presenceFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export function fetchOccupancy(siteId?: number | null): Promise<PresenceOccupancy> {
+export function fetchOccupancy(): Promise<PresenceOccupancy> {
   return presenceFetch<PresenceOccupancy>("integra/occupancy");
 }
 
-export function fetchPersonPresence(
-  personId: string,
-  siteId?: number | null,
-): Promise<PersonPresenceDetail> {
+export function fetchPersonPresence(personId: string): Promise<PersonPresenceDetail> {
   return presenceFetch<PersonPresenceDetail>(
     `integra/presence/${encodeURIComponent(personId)}`,
   );
