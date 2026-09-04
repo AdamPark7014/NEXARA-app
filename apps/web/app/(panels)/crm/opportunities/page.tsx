@@ -14,6 +14,7 @@ import { useUser } from "@/components/UserContext";
 import { filterRowsByScope, getCrmSalesSectionConfig } from "@/lib/section-views";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import EmptyState from "@/components/ui/EmptyState";
 import {
   ALL_OPPORTUNITY_STAGES,
   createSalesOpportunity,
@@ -26,6 +27,7 @@ import {
   updateSalesOpportunityStage,
   type SalesOpportunity,
 } from "@/lib/sales-api";
+import chrome from "@/components/crm/crm-chrome.module.css";
 
 const STAGE_IDS = ALL_OPPORTUNITY_STAGES.map((s) => s.id);
 
@@ -171,19 +173,8 @@ export default function OpportunitiesPage() {
   const weighted = active.reduce((s, o) => s + Number(o.value ?? 0) * ((o.probability ?? 0) / 100), 0);
   const enCierre = visibleItems.filter((o) => isHotOpportunityStage(o.stage)).length;
 
-  const inp: React.CSSProperties = {
-    width: "100%",
-    padding: "8px 10px",
-    border: "1px solid var(--border)",
-    borderRadius: 8,
-    background: "var(--surface)",
-    color: "var(--foreground)",
-    fontSize: 13,
-    boxSizing: "border-box",
-  };
-
-  const stageVariant = (stage?: string): "accent" | "warning" | "neutral" | "danger" =>
-    stage === "WON" ? "neutral" : stage === "LOST" ? "danger" : isHotOpportunityStage(stage) ? "accent" : "warning";
+  const stageVariant = (stage?: string): "accent" | "warning" | "neutral" | "danger" | "positive" =>
+    stage === "WON" ? "positive" : stage === "LOST" ? "danger" : isHotOpportunityStage(stage) ? "accent" : "warning";
 
   const columns: Column<SalesOpportunity>[] = [
     {
