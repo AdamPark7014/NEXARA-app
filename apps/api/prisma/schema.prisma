@@ -5038,6 +5038,7 @@ model CompanyProfile {
   integraCameras            IntegraCamera[]
   integraDoors              IntegraDoor[]
   integraPeople             IntegraPerson[]
+  integraPersonDeletePending IntegraPersonDeletePending[]
   integraDevices            IntegraDevice[]
   integraVehicles           IntegraVehicle[]
   integraRegions            IntegraRegion[]
@@ -5737,6 +5738,7 @@ model IntegraSite {
   cameras  IntegraCamera[]
   doors    IntegraDoor[]
   people   IntegraPerson[]
+  personDeletePending IntegraPersonDeletePending[]
   devices  IntegraDevice[]
   vehicles IntegraVehicle[]
   regions    IntegraRegion[]
@@ -6091,6 +6093,29 @@ model IntegraPerson {
   @@unique([siteId, personId])
   @@index([companyId])
   @@map("integra_people")
+}
+
+/// Baja forzada / parcial: el sync ISAPI NO reimporta estos personId mientras
+/// queden IPs huérfanas. El retry de fan-out sigue intentando Delete en ellas.
+model IntegraPersonDeletePending {
+  id         Int      @id @default(autoincrement())
+  companyId  Int
+  siteId     Int
+  personId   String   @db.VarChar(120)
+  personName String?  @db.VarChar(220)
+  /// IPs ACS donde el Delete falló o quedó pendiente
+  failedIps  Json
+  force      Boolean  @default(false)
+  note       String?  @db.VarChar(500)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, personId])
+  @@index([companyId, siteId])
+  @@map("integra_person_delete_pending")
 }
 
 /// Evento que el equipo **empuja** a NEXARA, no que NEXARA le pregunta.
