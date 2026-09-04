@@ -186,8 +186,8 @@ export function decideAcsRoutes(ev: AcsRouteEvent): AcsRouteDecision {
     }
   }
 
-  // 4) Empleado entrada/salida (no en restringida)
-  if (personKind === 'employee' && doorRole !== 'restricted') {
+  // 4) Empleado entrada/salida (restricted ya retornó arriba)
+  if (personKind === 'employee') {
     const isExit =
       direction === 'exit' ||
       (ev.wasOnSite === true && (ACS_ENTRY_MINORS as readonly number[]).includes(ev.minor ?? -1));

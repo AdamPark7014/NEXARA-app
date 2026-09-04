@@ -374,7 +374,7 @@ export class IntegraSpacesService {
           sourceIp: ip,
         };
       })
-      .filter(Boolean);
+      .filter((p): p is NonNullable<typeof p> => p != null);
 
     const windows = await this.prisma.integraRoomBooking.findMany({
       where: {

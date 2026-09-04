@@ -1390,12 +1390,19 @@ export class IntegraController {
     const templateMap = new Map<string, { id: string; name: string; summary?: string }>();
     for (const d of raw.devices || []) {
       for (const t of d.templates || []) {
-        const id = String(t.id ?? t.planTemplateNo ?? '');
+        const row = t as {
+          id?: number | string;
+          planTemplateNo?: number | string;
+          templateName?: string;
+          name?: string;
+          summary?: string | null;
+        };
+        const id = String(row.id ?? row.planTemplateNo ?? '');
         if (!id || templateMap.has(id)) continue;
         templateMap.set(id, {
           id,
-          name: String(t.templateName || t.name || `Plantilla ${id}`),
-          summary: t.summary != null ? String(t.summary) : undefined,
+          name: String(row.templateName || row.name || `Plantilla ${id}`),
+          summary: row.summary != null ? String(row.summary) : undefined,
         });
       }
     }
@@ -1479,16 +1486,20 @@ export class IntegraController {
         location: detail.regionName || undefined,
         online: detail.online,
       },
-      people: (detail.people || []).map((p) => ({
-        personId: p.personId,
-        name: p.personName,
-        planTemplateNo: '1',
-        planName: p.kindLabel,
-        validEnable: p.validEnable !== false,
-        validFrom: p.validFrom,
-        validTo: p.validTo,
-        indefinite: p.kind === 'indefinite',
-      })),
+      people: (detail.people || [])
+        .filter(
+          (p): p is NonNullable<(typeof detail.people)[number]> => p != null,
+        )
+        .map((p) => ({
+          personId: p.personId,
+          name: p.personName,
+          planTemplateNo: '1',
+          planName: p.kindLabel,
+          validEnable: p.validEnable !== false,
+          validFrom: p.validFrom,
+          validTo: p.validTo,
+          indefinite: p.kind === 'indefinite',
+        })),
       source: 'mirror',
       note: 'Listado desde espejo RightPlan/Valid; empujar cambios en Horarios o Personas.',
     };
