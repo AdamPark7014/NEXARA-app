@@ -279,8 +279,9 @@ export default function WarehousePage() {
     }
     setSavingMovement(true);
     try {
+      const apiType = movement.type === "ADJUSTMENT_OUT" ? "ADJUSTMENT" : movement.type;
       const payload: Parameters<typeof createStockMovement>[1] = {
-        type: movement.type,
+        type: apiType,
         productId: Number(movement.productId),
         quantity: movement.quantity,
         unitCost: movement.unitCost ? Number(movement.unitCost) : undefined,
@@ -289,7 +290,7 @@ export default function WarehousePage() {
       };
       if (movement.type === "RECEIPT" || movement.type === "ADJUSTMENT") {
         payload.toWarehouseId = Number(movement.warehouseId);
-      } else if (movement.type === "DISPATCH") {
+      } else if (movement.type === "DISPATCH" || movement.type === "ADJUSTMENT_OUT") {
         payload.fromWarehouseId = Number(movement.warehouseId);
       } else if (movement.type === "TRANSFER") {
         payload.fromWarehouseId = Number(movement.warehouseId);
@@ -309,6 +310,47 @@ export default function WarehousePage() {
       toast.error(e instanceof Error ? e.message : "Error al registrar movimiento");
     } finally {
       setSavingMovement(false);
+    }
+  };
+
+  const clearMovementFilters = () => {
+    setMovementTypeFilter("");
+    setMovementWarehouseFilter("");
+    setMovementProductFilter("");
+    setMovementFromDate("");
+    setMovementToDate("");
+  };
+
+  const hasMovementFilters = Boolean(
+    movementTypeFilter || movementWarehouseFilter || movementProductFilter || movementFromDate || movementToDate,
+  );
+
+  const downloadMovementsPdf = async (opts?: { productId?: number }) => {
+    if (!token) return;
+    setExportingPdf(true);
+    try {
+      await downloadStockMovementsPdf(token, {
+        productId: opts?.productId ?? (movementProductFilter ? Number(movementProductFilter) : undefined),
+        warehouseId: movementWarehouseFilter ? Number(movementWarehouseFilter) : undefined,
+        type: movementTypeFilter || undefined,
+        from: movementFromDate || undefined,
+        to: movementToDate || undefined,
+      });
+      toast.success("PDF de movimientos descargado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo generar el PDF");
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
+  const downloadMovementSlip = async (id: number) => {
+    if (!token) return;
+    try {
+      await downloadStockMovementSlipPdf(token, id);
+      toast.success("Comprobante PDF descargado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo generar el comprobante");
     }
   };
 
