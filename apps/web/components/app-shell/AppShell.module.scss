@@ -417,43 +417,49 @@
   transition: color 180ms var(--nx-ease-out), transform 180ms var(--nx-ease-out), background 180ms var(--nx-ease-out);
 }
 
-/* Integra: iconos en pastilla (densidad visual tipo CRM) */
+/* Integra: iconos densos, sin pastilla suave de marketing */
 .shell[data-panel="integra"] .menuItemIcon {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  font-size: 14px;
-  background: color-mix(in srgb, var(--panel-accent, #0e7490) 12%, var(--surface-2, #f1f5f9));
-  border: 1px solid color-mix(in srgb, var(--panel-accent, #0e7490) 18%, transparent);
+  border-radius: 6px;
+  font-size: 13px;
+  background: color-mix(in srgb, var(--panel-accent, #0e7490) 10%, var(--surface-2, #f1f5f9));
+  border: 1px solid color-mix(in srgb, var(--panel-accent, #0e7490) 16%, transparent);
   color: var(--panel-accent, #0e7490);
 }
 
 .shell[data-panel="integra"] .menuItem:hover .menuItemIcon {
-  background: color-mix(in srgb, var(--panel-accent, #0e7490) 18%, var(--surface));
-  border-color: color-mix(in srgb, var(--panel-accent, #0e7490) 35%, transparent);
+  background: color-mix(in srgb, var(--panel-accent, #0e7490) 16%, var(--surface));
+  border-color: color-mix(in srgb, var(--panel-accent, #0e7490) 32%, transparent);
 }
 
 .shell[data-panel="integra"] .menuItem.active .menuItemIcon {
-  background: color-mix(in srgb, var(--panel-accent, #0e7490) 22%, var(--surface));
-  border-color: color-mix(in srgb, var(--panel-accent, #0e7490) 40%, transparent);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--panel-accent, #0e7490) 22%, transparent);
+  background: color-mix(in srgb, var(--panel-accent, #0e7490) 20%, var(--surface));
+  border-color: color-mix(in srgb, var(--panel-accent, #0e7490) 42%, transparent);
+  box-shadow: none;
 }
 
 .shell[data-panel="integra"] .groupTitle {
-  padding-top: 6px;
+  padding-top: 4px;
+  letter-spacing: 0.08em;
 }
 
 .shell[data-panel="integra"] .menu {
-  gap: 14px;
-  padding-top: 10px;
+  gap: 10px;
+  padding-top: 8px;
 }
 
 .shell[data-panel="integra"] .menuItem {
-  padding: 8px 10px;
-  border-radius: 10px;
+  padding: 7px 9px;
+  border-radius: 6px;
+}
+
+.shell[data-panel="integra"] .menuItem.active {
+  background: color-mix(in srgb, var(--panel-accent, #0e7490) 10%, var(--surface));
+  box-shadow: inset 2px 0 0 var(--panel-accent, #0e7490);
 }
 
 .menuItemLabel {

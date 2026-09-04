@@ -161,8 +161,18 @@ sobre la IP de la terminal. Los cuatro `controlType` de Artemis mapean a
 
 Vehículos/ANPR (sin ITC), visitas y **playback Artemis** responden 400 en un
 sitio ISAPI. El playback **local del NVR** sí está soportado vía
-`POST /ISAPI/ContentMgmt/search` → RTSP `playbackURI` → go2rtc HLS
-(`POST /integra/cameras/:id/playback`).
+`POST /ISAPI/ContentMgmt/search` (**cuerpo XML** — el DS-7616 rechaza JSON con
+`badXmlFormat`) → RTSP `playbackURI` (`/Streaming/tracks/{trackID}/?starttime…`)
+→ go2rtc (registro JSON; el PUT `?src=` falla si la URI lleva query) → MSE en el
+foco (`POST /integra/cameras/:id/playback`).
+
+Límites verificados en Oficinas NEXARA (`192.168.9.34`):
+
+- `trackID` = canal principal del espejo (`101`, `501`…). El vivo usa sub (`102`).
+- Retención = disco/política del NVR (hay segmentos de días; la última 1 h a
+  veces sale vacía — conviene «Últimas 24h»).
+- El muro sigue en vivo; solo el foco cambia a playback.
+- Sin segmentos: la API devuelve `url: null` y nota clara (no inventa video).
 
 Personas ISAPI: CRUD UserInfo + FaceDataRecord; el delete espera
 `UserInfoDetail/DeleteProcess` y solo limpia el espejo si **todos** los
@@ -182,7 +192,7 @@ Todas documentadas en `HIKVISION-apps/docs/API-DOCS/HIKVISION/` (salvo InputProx
 | `POST /ISAPI/AccessControl/UserInfo/Search?format=json` | personas del terminal → espejo `IntegraPerson` |
 | `POST /ISAPI/AccessControl/AcsEvent?format=json` | eventos de acceso (live, tope 30/página) |
 | `PUT /ISAPI/AccessControl/UserInfoDetail/Delete` + `DeleteProcess` | baja de persona en ACS |
-| `POST /ISAPI/ContentMgmt/search?format=json` | segmentos de grabación NVR → playbackURI |
+| `POST /ISAPI/ContentMgmt/search` (XML) | segmentos de grabación NVR → playbackURI |
 
 Más `/ISAPI/ContentMgmt/InputProxy/channels[/status]`, que **no** está en el doc
 set de SYSCOM. Da el nombre real de cada cámara, su IP de origen y si está en

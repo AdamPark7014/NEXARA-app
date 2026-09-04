@@ -97,12 +97,11 @@ export const INTEGRA_MODULE_CARDS: IntegraModuleCard[] = [
 ];
 
 export const btnPrimary: React.CSSProperties = {
-  border: "1px solid color-mix(in srgb, #155e75 70%, transparent)",
-  background:
-    "linear-gradient(180deg, color-mix(in srgb, #0e7490 88%, white) 0%, #0e7490 55%, #155e75 100%)",
+  border: "1px solid color-mix(in srgb, #155e75 55%, transparent)",
+  background: "#0e7490",
   color: "#fff",
-  borderRadius: 8,
-  padding: "9px 14px",
+  borderRadius: 6,
+  padding: "7px 12px",
   fontSize: 12,
   fontWeight: 650,
   cursor: "pointer",
@@ -112,22 +111,24 @@ export const btnGhost: React.CSSProperties = {
   border: "1px solid color-mix(in srgb, #0b1524 12%, transparent)",
   background: "var(--surface, #fff)",
   color: "#243247",
-  borderRadius: 8,
-  padding: "9px 12px",
+  borderRadius: 6,
+  padding: "7px 12px",
   fontSize: 12,
   fontWeight: 650,
   cursor: "pointer",
 };
 
+/** Controles de filtro/form — densidad SOC; Personas y módulos la comparten. */
 export const inputStyle: React.CSSProperties = {
-  border: "1px solid color-mix(in srgb, #0b1524 14%, transparent)",
-  borderRadius: 8,
-  padding: "8px 10px",
-  fontSize: 13,
+  border: "1px solid color-mix(in srgb, #0b1524 12%, transparent)",
+  borderRadius: 6,
+  padding: "6px 9px",
+  fontSize: 12.5,
   width: "100%",
   maxWidth: 280,
   background: "var(--surface, #fff)",
   color: "var(--text-primary, #0b1524)",
+  lineHeight: 1.3,
 };
 
 export const selectStyle: React.CSSProperties = {

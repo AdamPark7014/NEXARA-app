@@ -145,7 +145,9 @@ export function IgTable({
         </tbody>
       </table>
       {rows.length === 0 && (
-        <p className={styles.igEmpty}>{empty || "Sin datos"}</p>
+        <div className={styles.igEmpty}>
+          <strong className={styles.igEmptyTitle}>{empty || "Sin datos"}</strong>
+        </div>
       )}
     </div>
   );
@@ -163,7 +165,40 @@ export function IgBadge({
 
 export function IgError({ children }: { children: ReactNode }) {
   if (!children) return null;
-  return <p className={styles.error}>{children}</p>;
+  return <p className={styles.error} role="alert">{children}</p>;
+}
+
+export function IgNotice({
+  children,
+  tone = "info",
+}: {
+  children: ReactNode;
+  tone?: "info" | "warn";
+}) {
+  if (!children) return null;
+  return (
+    <p className={styles.igNotice} data-tone={tone === "warn" ? "warn" : undefined}>
+      {children}
+    </p>
+  );
+}
+
+export function IgEmptyState({
+  title,
+  hint,
+  children,
+}: {
+  title?: string;
+  hint?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className={styles.igEmpty}>
+      {title ? <strong className={styles.igEmptyTitle}>{title}</strong> : null}
+      {hint ? <span className={styles.igEmptyHint}>{hint}</span> : null}
+      {!title && !hint ? children || "Sin datos" : children}
+    </div>
+  );
 }
 
 export function IgBtn({
@@ -268,7 +303,12 @@ export function IgTree({
   };
 
   if (!nodes.length) {
-    return <p className={styles.igEmpty}>{empty || "Sin recursos"}</p>;
+    return (
+      <div className={styles.igEmpty}>
+        <strong className={styles.igEmptyTitle}>{empty || "Sin recursos"}</strong>
+        <span className={styles.igEmptyHint}>Sincroniza el sitio o elige otro en la barra superior.</span>
+      </div>
+    );
   }
 
   return <div className={styles.igTree}>{nodes.map((n) => renderNode(n, 0))}</div>;
@@ -356,7 +396,11 @@ export function IgFeed({
             </span>
           </button>
         ))}
-        {items.length === 0 && <p className={styles.igEmpty}>{empty || "Sin eventos"}</p>}
+        {items.length === 0 && (
+          <div className={styles.igEmpty}>
+            <strong className={styles.igEmptyTitle}>{empty || "Sin eventos"}</strong>
+          </div>
+        )}
       </div>
     </div>
   );

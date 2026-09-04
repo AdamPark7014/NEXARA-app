@@ -205,7 +205,7 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
           {showKpis && (
             <div className={styles.contextKpis} aria-label="Resumen del sitio">
               <span className={styles.kpiChip}>
-                <strong>{dash?.cameras ?? 0}</strong> cam
+                <strong>{dash?.cameras ?? 0}</strong> cámaras
               </span>
               <span className={styles.kpiChip}>
                 <strong>
@@ -213,10 +213,10 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
                     ? `${dash.doorsOnline}/${dash.doors ?? 0}`
                     : dash?.doors ?? 0}
                 </strong>{" "}
-                pta
+                puertas
               </span>
               <span className={styles.kpiChip}>
-                <strong>{dash?.people ?? 0}</strong> pers
+                <strong>{dash?.people ?? 0}</strong> personas
               </span>
             </div>
           )}
