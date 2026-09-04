@@ -295,7 +295,7 @@ export default function IntegraEventsPage() {
   return (
     <IgPage>
       <IgToolbar
-        title="Eventos ACS"
+        title="Eventos Face ACS"
         meta={
           busy
             ? "Cargando…"
@@ -303,6 +303,16 @@ export default function IntegraEventsPage() {
         }
         actions={
           <>
+            <IgBtn
+              variant="primary"
+              onClick={() => setQuick("hoy")}
+              title="Accesos de hoy (default de negocio)"
+            >
+              Hoy
+            </IgBtn>
+            <IgBtn onClick={() => router.push("/integra/people")} title="Alta y Face ID en terminales">
+              Alta persona
+            </IgBtn>
             <IgBtn onClick={() => setAuto((v) => !v)}>
               Vivo {auto ? "ON" : "OFF"}
             </IgBtn>
@@ -310,7 +320,6 @@ export default function IntegraEventsPage() {
               Exportar CSV
             </IgBtn>
             <IgBtn
-              variant="primary"
               disabled={busy}
               onClick={() => {
                 void load();
@@ -344,11 +353,11 @@ export default function IntegraEventsPage() {
         )}
       </div>
 
-      <p className={styles.attNote}>
-        Vista de negocio: accesos concedidos/denegados con foto del pase, puerta y
-        hora. El ruido de cámara (heartBeat / VMD) queda fuera salvo el filtro
-        «Ruido». Misma fuente que asistencia híbrida.
-      </p>
+      <IgNotice>
+        Solo los <strong>terminales ACS</strong> dan nombre + foto del pase. El ruido de cámara
+        (heartBeat / VMD) queda fuera salvo «Ruido». Si falta alguien, da de alta en Personas —
+        no es Face ID sobre cámaras de oficina.
+      </IgNotice>
 
       <IgFilters>
         <IgField label="Vista">
