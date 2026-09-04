@@ -53,7 +53,15 @@ interface CrmLead {
   createdAt?: string | null;
 }
 
-const TYPE_COLOR: Record<string, string> = { CALL: "#10b981", MEETING: "#f59e0b", VISIT: "#0ea5e9", EMAIL: "#6366f1", TASK: "#94a3b8", WHATSAPP: "#22c55e", NOTE: "#a855f7" };
+const TYPE_COLOR: Record<string, string> = {
+  CALL: "#15803d",
+  MEETING: "#d97706",
+  VISIT: "#0284c7",
+  EMAIL: "#475569",
+  TASK: "#94a3b8",
+  WHATSAPP: "#16a34a",
+  NOTE: "#0f766e",
+};
 
 async function apiFetch(path: string, token: string) {
   const res = await fetch(buildApiUrl(path), { headers: { Authorization: `Bearer ${token}` } });

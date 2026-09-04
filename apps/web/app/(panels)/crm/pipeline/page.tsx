@@ -132,10 +132,10 @@ export default function PipelinePage() {
           .filter((s) => (byStageCount.get(s.id) ?? 0) > 0)
           .map((s) => ({ label: s.label, count: byStageCount.get(s.id) ?? 0 }));
         const total = active.length || 1;
-        const stageColors = ["var(--primary)", "var(--warning)", "var(--success)", "#a855f7", "#f97316", "#0ea5e9"];
+        const stageColors = PIPELINE_STAGES.map((s) => s.color);
         return (
-          <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Distribución por etapa</div>
+          <div className={chrome.distCard}>
+            <div className={chrome.distLabel}>Distribución por etapa</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               {stageRows.map((s, i) => (
                 <div key={s.label} style={{ display: "grid", gridTemplateColumns: "130px 1fr 36px", gap: 10, alignItems: "center" }}>
@@ -178,42 +178,42 @@ export default function PipelinePage() {
       )}
 
       {!loading && !error && (
-        <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 12 }}>
+        <div className={chrome.pipelineBoard}>
           {PIPELINE_STAGES.map((stage) => {
             const opps = byStage.get(stage.id) ?? [];
             const stageTotal = opps.reduce((s, o) => s + Number(o.value ?? 0), 0);
             return (
               <div
                 key={stage.id}
+                className={chrome.pipelineCol}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => {
                   if (cfg.canEdit && dragId != null) void moveStage(dragId, stage.id);
                   setDragId(null);
                 }}
-                style={{ minWidth: 270, flex: "1 0 270px", background: "color-mix(in srgb, var(--surface-2) 50%, transparent)", border: "1px solid var(--border)", borderRadius: 14, padding: 12 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 999, background: stage.color }} />
-                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{stage.label}</div>
+                <div className={chrome.pipelineColHead}>
+                  <span className={chrome.pipelineDot} style={{ background: stage.color }} />
+                  <div className={chrome.pipelineColTitle}>{stage.label}</div>
                   <Tag variant="default">{opps.length}</Tag>
                 </div>
-                <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginBottom: 10 }}>{stage.description}</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", marginBottom: 10 }}>
+                <p className={chrome.pipelineColDesc}>{stage.description}</p>
+                <div className={chrome.pipelineColTotal}>
                   <Money value={stageTotal} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 60 }}>
                   {opps.map((o) => (
-                    <Link key={o.id} href={`/crm/opportunities/${o.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                    <Link key={o.id} href={`/crm/opportunities/${o.id}`} className={chrome.pipelineCard}>
                       <article
                         draggable={cfg.canEdit}
                         onDragStart={(e) => {
                           e.stopPropagation();
                           setDragId(o.id);
                         }}
-                        style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, cursor: cfg.canEdit ? "grab" : "pointer" }}
+                        style={{ cursor: cfg.canEdit ? "grab" : "pointer" }}
                       >
-                        <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 4 }}>{o.client?.name ?? o.clientName ?? o.title}</div>
-                        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginBottom: 8 }}>{o.title}</div>
+                        <div className={chrome.pipelineCardClient}>{o.client?.name ?? o.clientName ?? o.title}</div>
+                        <div className={chrome.pipelineCardTitle}>{o.title}</div>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <span style={{ fontWeight: 700, fontSize: 13 }}>
                             <Money value={Number(o.value ?? 0)} />
@@ -232,7 +232,11 @@ export default function PipelinePage() {
                       </article>
                     </Link>
                   ))}
-                  {opps.length === 0 && <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "center", padding: 12 }}>Sin oportunidades</div>}
+                  {opps.length === 0 && (
+                    <div className={chrome.pipelineEmpty}>
+                      {cfg.canCreate ? "Arrastra aquí o crea una oportunidad" : "Sin oportunidades"}
+                    </div>
+                  )}
                 </div>
               </div>
             );

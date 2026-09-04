@@ -14,6 +14,8 @@ import { buildApiUrl } from "@/lib/api-base";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
 import { DetailField, DetailFieldGrid, DetailSection, formatDate, DetailError } from "@/components/detail/DetailFrame";
 import CtOrderPanel from "../components/CtOrderPanel";
+import chrome from "@/components/crm/crm-chrome.module.css";
+import styles from "../quotes.module.css";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
