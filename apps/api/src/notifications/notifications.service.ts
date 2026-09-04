@@ -679,4 +679,13 @@ export class NotificationsService {
         type: 'VIATICO_REJECTED',
         category: 'viatics',
         title: 'Viático rechazado',
-        message: reason || 'Tu viático ha sido rechazado. Contact
+        message: reason || 'Tu viático ha sido rechazado. Contacta a tu supervisor para más información.',
+        relatedEntityId: viaticId,
+        entityType: 'Viatico',
+        relatedUrl: `/erp/finance/viatics?highlight=${viaticId}`,
+      });
+    } catch (error) {
+      this.logger.error('Error notifying viatico rejected:', error);
+    }
+  }
+}
