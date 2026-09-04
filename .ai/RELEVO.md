@@ -211,14 +211,39 @@ zona vigilada**, en la rejilla del equipo. Se leía la segunda y, como la zona
 es el encuadre entero, todos los recuadros salían `0,0,1,1`. Se usa
 `TargetRect`; la zona queda de recurso, descartando la caja que ocupa todo.
 
+## Calidad del muro
+
+Los sub-streams estaban a **64 kbps** (algunos 96) en 640×360: de ahí que se
+vieran pixeladas. La resolución del sub está bloqueada por firmware
+(`opt="640,640"`) pero el bitrate admite 32-8192. Se subieron los 13 a **768**.
+Coste: hasta ~10 Mbps de subida de la oficina si se miran todas a la vez.
+
+El muro pasó de un JPEG por segundo a **`mode="auto"`**: intenta MSE y, si un
+mosaico concreto no da imagen en 7 s, cae a snapshots él solo. Antes el muro
+entero pagaba el precio del peor.
+
+## Placas: no se puede con este hardware
+
+`Smart/vehicleDetection` → **403 en todos los canales** del NVR;
+`Traffic/channels/13/licensePlateAuditData` → `notSupport`. La PTZ
+(DS-2DF8C442IXG-ELW) declara `isSupportFaceDetect/LineDetection/FieldDetection`
+= **false**: es una DarkFighter, no una ANPR. El NVR anuncia `plateCap` con
+lista de 10 000, pero es capacidad de firmware sin canal que la ejerza.
+Hace falta cámara dedicada (serie ITC/checkpoint).
+
+## PTZ
+
+`PTZCtrl/channels/1/{capabilities,presets,status}` → 200. Rango continuo
+-100..100, 300 presets, 8 patrullas. Se usa **`momentary`**, que lleva la
+parada dentro: con el modo continuo, si se cae la red entre el «muévete» y el
+«para», la domo se queda girando contra el tope.
+
 ## A medias
 
 1. Asistencia y portal del empleado (Adam: asistencia + credencial).
-2. Dibujar los recuadros sobre el video en el muro con `targets`.
-3. El `httpHost` del grabador (ver arriba).
-4. Purgar eventos viejos: la tabla crece rápido con VMD y heartBeat.
-5. Decidir si se encienden los micros de las cámaras (el botón ya está).
-6. TCPMSS / biblioteca `init: true` / empresas 1-2.
+2. El `httpHost` del grabador (ver arriba).
+3. Decidir si se encienden los micros de las cámaras (el botón ya está).
+4. TCPMSS / biblioteca `init: true` / empresas 1-2.
 
 ## No tocar
 

@@ -22,6 +22,8 @@ import {
   ArrayNotEmpty,
   IsArray,
   IsBoolean,
+  Max,
+  Min,
   IsIn,
   IsInt,
   IsObject,
@@ -96,6 +98,16 @@ class DoorControlDto {
 
   @IsString()
   reason!: string;
+}
+
+class PtzMoveDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(-100) @Max(100) pan?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(-100) @Max(100) tilt?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(-100) @Max(100) zoom?: number;
+  /** Tope de 5 s: una orden más larga deja la domo girando si se corta la red. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(100) @Max(5000) durationMs?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(300) preset?: number;
+  @IsOptional() @IsBoolean() stop?: boolean;
 }
 
 class AlarmAckDto {
@@ -345,6 +357,43 @@ export class IntegraController {
       { id: user?.id, email: user?.email },
       siteId ? parseInt(siteId, 10) : null,
     );
+  }
+
+  // ── PTZ ────────────────────────────────────────────────────────────
+  @Post('cameras/:id/ptz')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mover la domo (pan/tilt/zoom en -100..100)' })
+  ptz(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() dto: PtzMoveDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!integraCanControlDoors(user)) {
+      throw new BadRequestException('Sin permiso para mover cámaras');
+    }
+    const site = siteId ? parseInt(siteId, 10) : null;
+    if (dto.stop) return this.integra.ptzStop(companyId, id, site);
+    if (dto.preset != null) {
+      return this.integra.ptzGoTo(companyId, id, dto.preset, { id: user?.id, email: user?.email }, site);
+    }
+    return this.integra.ptzMove(
+      companyId,
+      id,
+      { pan: dto.pan, tilt: dto.tilt, zoom: dto.zoom, durationMs: dto.durationMs },
+      site,
+    );
+  }
+
+  @Get('cameras/:id/ptz/presets')
+  @ApiOperation({ summary: 'Posiciones memorizadas de la domo' })
+  ptzPresetList(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.integra.ptzPresets(companyId, id, siteId ? parseInt(siteId, 10) : null);
   }
 
   @Post('cameras/:id/playback')

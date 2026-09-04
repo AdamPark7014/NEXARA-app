@@ -1,5 +1,11 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { setChannelAudio } from '../hikvision-isapi';
+import {
+  ptzGoToPreset,
+  ptzMove,
+  ptzPresets,
+  ptzStop,
+  setChannelAudio,
+} from '../hikvision-isapi';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { IntegraSiteService } from './integra-site.service';
@@ -247,6 +253,71 @@ export class IntegraMediaService {
         ? 'Micrófono encendido en el equipo. Abre el stream con audio para oírlo.'
         : 'Micrófono apagado en el equipo.',
     };
+  }
+
+  /**
+   * Resuelve contra qué equipo y qué canal se manda una orden PTZ.
+   *
+   * Si la cámara tiene IP propia se le habla directo y su canal es el 1: el
+   * número que lleva en el grabador —13 para la del estacionamiento— solo vale
+   * dentro del grabador.
+   */
+  private async ptzTarget(companyId: number | null, cameraIndexCode: string, siteId?: number | null) {
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
+    if (resolved.provider !== 'ISAPI' || !resolved.siteId) {
+      throw new BadRequestException('El control PTZ solo aplica a sitios ISAPI');
+    }
+    const camera = await this.prisma.integraCamera.findUnique({
+      where: { siteId_cameraIndexCode: { siteId: resolved.siteId, cameraIndexCode } },
+      select: { raw: true },
+    });
+    if (!camera) throw new NotFoundException(`Cámara ${cameraIndexCode} no está en el espejo`);
+    const raw = (camera.raw ?? {}) as {
+      channelId?: string;
+      channelNumber?: number;
+      source?: { ipAddress?: string | null; reachableDirectly?: boolean } | null;
+    };
+
+    const directIp = raw.source?.reachableDirectly ? raw.source.ipAddress : null;
+    if (directIp && resolved.isapiForHost) {
+      const client = resolved.isapiForHost(directIp);
+      if (client) return { client, channel: 1 };
+    }
+    if (!resolved.isapi) throw new BadRequestException('Cliente ISAPI no disponible');
+    return { client: resolved.isapi, channel: raw.channelNumber ?? 1 };
+  }
+
+  async ptzMove(
+    companyId: number | null,
+    cameraIndexCode: string,
+    v: { pan?: number; tilt?: number; zoom?: number; durationMs?: number },
+    siteId?: number | null,
+  ) {
+    const { client, channel } = await this.ptzTarget(companyId, cameraIndexCode, siteId);
+    await ptzMove(client, channel, v);
+    return { ok: true };
+  }
+
+  async ptzStop(companyId: number | null, cameraIndexCode: string, siteId?: number | null) {
+    const { client, channel } = await this.ptzTarget(companyId, cameraIndexCode, siteId);
+    await ptzStop(client, channel);
+    return { ok: true };
+  }
+
+  async ptzPresets(companyId: number | null, cameraIndexCode: string, siteId?: number | null) {
+    const { client, channel } = await this.ptzTarget(companyId, cameraIndexCode, siteId);
+    return { items: await ptzPresets(client, channel) };
+  }
+
+  async ptzGoTo(
+    companyId: number | null,
+    cameraIndexCode: string,
+    preset: number,
+    siteId?: number | null,
+  ) {
+    const { client, channel } = await this.ptzTarget(companyId, cameraIndexCode, siteId);
+    await ptzGoToPreset(client, channel, preset);
+    return { ok: true, preset };
   }
 
   /**

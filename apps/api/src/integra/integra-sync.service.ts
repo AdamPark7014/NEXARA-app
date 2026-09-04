@@ -491,6 +491,9 @@ export class IntegraSyncService {
           // guarda lo que el equipo reporta para no prometer sonido que no hay.
           hasAudio: ch.audio === true,
           audioCodec: ch.audioCodec,
+          // La domo se sondea en el descubrimiento; guardarlo evita volver a
+          // preguntárselo al equipo cada vez que alguien abre el foco.
+          ptz: ch.ptz === true,
           source: proxy
             ? {
                 ipAddress: proxy.ipAddress,
