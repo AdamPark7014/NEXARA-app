@@ -16,6 +16,7 @@ import {
 import { resolveUploadsDir } from '../common/uploads-path';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { IntegraSiteService } from './integra-site.service';
+import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
 import { readLocalPersonFace } from './integra-person-media';
 
 /** Fila lista para consola / SSE (ISO dates, sin `raw`). */

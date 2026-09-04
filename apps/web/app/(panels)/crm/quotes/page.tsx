@@ -338,7 +338,7 @@ export default function QuotesPage() {
             onClick={() => void downloadQuotePdf(q)}
             title={`Descargar PDF de ${q.quoteNumber}`}
           >
-            PDF
+            Descargar PDF
           </Button>
         </div>
       ),

@@ -8,49 +8,44 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — AcuSense al límite (Field/Line/Face/Motion + push)
+## Este turno — Stock: historial hiper-detallado por producto
 
-Adam: maximizar cajas y tasa de eventos en cámaras LAN `.171–.178`
-(DS-2CD2123G2-LIS2U). Sin Face ID óptico inventado.
+Seguimiento auditado de movimientos (quién / cuándo / por qué / origen-destino /
+saldo antes→después / documento OC·OP·AN·referencia / notas). **Desplegado.**
 
-### Qué cambió (código)
+### Qué cambió
 
-1. **`enableMaxSmartDetection`** (hikvision-isapi): FieldDetection todas las
-   regiones, polígono full-frame, `sensitivityLevel=100`, `timeThreshold=0`,
-   `alarmConfidence=low`, `detectionTarget=human` (Almacén → `human,vehicle`).
-2. **Bugfix**: el tag real es `sensitivityLevel` (antes `sensitivity` —
-   firmware lo ignoraba; regiones off / sens 50).
-3. **LineDetection** mid-frame; **FaceDetect** (cajas, no ID); **Motion** 80;
-   substream H.264; audio ON si hay mic.
-4. **`ensureSmartEventTriggersCenter`**: field/line/face/VMD → center/httpHosts.
-   `uploadImagesDataType=binary` + `httpBroken=false`.
-5. **`wireDevices(detection)`** → enableMaxSmartDetection en AcuSense;
-   NVR PoE vehicle y PTZ motion intactos.
-6. Parser facedetection → FaceRect raíz. Docs INTEGRA-LAN Smart verificadas.
+1. **Schema** `StockMovement`: `fromQtyBefore/After`, `toQtyBefore/After`
+   + migración `20260904180000_stock_movement_qty_audit` (aplicada en prod).
+2. **API** `createStockMovement`: captura saldos en la misma tx; propaga
+   `productionOrderId` / `activityId`; include de docs.
+3. **API** `listStockMovements`: PO, OP, actividad, lote, createdBy; tope 500.
+4. **Web** helpers en `stock-api` + UI warehouse:
+   - Tabla con saldo y documento
+   - Filtros producto / almacén / tipo / fechas
+   - Form entrada / salida / traspaso / ajuste + notas
+   - Drawer timeline por producto + export Excel
 
-### Probe (.178)
+Commit base: `8a17b9f`. Build sibling: `3621b00` (import asistencia).
 
-SmartCap Field+Line+FaceDetect; Intrusion 404. Antes: FD regions disabled,
-httpHosts sin binary. Sub ya H.264 640x360.
+### Deploy
 
-SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109`
-`./deploy/update.sh --force-all` luego wire detection site 1.
+SSH Hetzner → `/var/www/nexara-app`. Imágenes api/web recreadas; migrate OK
+(columnas `fromQty*`/`toQty*` presentes). Contenedores Up.
 
-### Verificar
+Verificar: ERP → Almacén → Movimientos (filtros + Excel); click producto →
+drawer con saldo antes→después; registrar traspaso escribe auditoría.
 
-1. FieldDetection/1: 4 regiones on, sens 100, poly full.
-2. httpHosts binary. Eventos fielddetection↑. Meeting Room multi-caja.
+### Concurrente (siblings — no pisar)
 
-## Concurrente (no pisar)
-
-Asistencia híbrida · Eventos ACS UI · CRM/ops notifications · stock · Personas.
+- OC PDF compras, asistencia híbrida, Integra Eventos ACS, PTZ, Personas, CRM.
 
 ## A medias
 
-1. Portal · ANPR · micros · TCPMSS.
-2. Confirmar wire+event rate post-deploy.
-3. employeeNumber↔personId Oficinas.
+1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
+2. Re-aplicar FieldDetection; alinear employeeNumber↔personId Oficinas.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales, Face ID inventado. CRM/stock/asistencia siblings.
+Puente NAS, Traefik, credenciales, ISAPI no verificada.
+No pelear pad PTZ / Personas CRUD / OC PDF / asistencia híbrida del sibling.
