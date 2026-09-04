@@ -1053,12 +1053,10 @@ export default function AccountingPage() {
       <PageHeader
         eyebrow="ERP · Finanzas"
         title="Contabilidad"
-        subtitle="Pólizas, catálogo de cuentas, balanza, estados financieros y control presupuestal."
+        subtitle="Pólizas, catálogo, balanza, estados financieros y presupuesto."
+        density="ops"
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link href="/erp/finance/viatics?tab=analytics" style={{ textDecoration: "none" }}>
-              <Button variant="ghost" iconLeft="💸">Viáticos / control de gastos</Button>
-            </Link>
             <Button variant="ghost" iconLeft="📄" onClick={() => void downloadFinancialPdf()} disabled={pdfDownloading}>
               {pdfDownloading ? "Generando…" : "Reporte PDF"}
             </Button>
@@ -1068,6 +1066,7 @@ export default function AccountingPage() {
           </div>
         }
       />
+      <FinanceModuleRail />
 
       <div
         style={{
