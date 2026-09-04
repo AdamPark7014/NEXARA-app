@@ -14,7 +14,18 @@ import {
   pickTodayActivityId,
   type AcsOpsDirection,
 } from './acs-ops-bridge.match';
-import type { NormalizedEvent } from './integra-push.service';
+
+/** Subconjunto del evento normalizado del push (evita ciclo con IntegraPushService). */
+export type AcsOpsEventInput = {
+  eventType: string;
+  major: number | null;
+  minor: number | null;
+  occurredAt: Date;
+  personId: string | null;
+  personName: string | null;
+  deviceName: string | null;
+  doorNo: number | null;
+};
 
 export type AcsOpsBridgeResult = {
   handled: boolean;
@@ -56,7 +67,7 @@ export class AcsOpsBridgeService {
 
   async handlePushEvent(
     site: { id: number; companyId: number },
-    ev: NormalizedEvent,
+    ev: AcsOpsEventInput,
   ): Promise<AcsOpsBridgeResult> {
     if (!this.enabled()) {
       return { handled: false, direction: null, reason: 'bridge_off' };
@@ -90,7 +101,7 @@ export class AcsOpsBridgeService {
 
   private async onEntry(
     site: { companyId: number },
-    ev: NormalizedEvent,
+    ev: AcsOpsEventInput,
   ): Promise<AcsOpsBridgeResult> {
     const user = await this.resolveUser(site.companyId, ev.personId);
     if (!user) {
@@ -179,7 +190,7 @@ export class AcsOpsBridgeService {
 
   private async onExit(
     site: { companyId: number },
-    ev: NormalizedEvent,
+    ev: AcsOpsEventInput,
   ): Promise<AcsOpsBridgeResult> {
     const user = await this.resolveUser(site.companyId, ev.personId);
     if (!user) {
