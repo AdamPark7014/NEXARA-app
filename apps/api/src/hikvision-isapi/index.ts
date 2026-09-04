@@ -54,6 +54,7 @@ export {
   searchUserInfo,
   uploadFaceData,
   uploadFingerPrint,
+  searchFaceInfo,
   type AcsEventPage,
   type CapturedFingerPrint,
   type DeviceOpResult,
