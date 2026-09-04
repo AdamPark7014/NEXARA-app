@@ -42,6 +42,7 @@ import { IntegraSiteService } from './integra-site.service';
 import { IntegraPushService } from './integra-push.service';
 import { IntegraSyncService } from './integra-sync.service';
 import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
+import { IdentityLinkService } from '../identity/identity-link.service';
 
 export function integraCanSettings(user: { roleKey?: string; isSuperAdmin?: boolean } | null) {
   if (!user) return false;

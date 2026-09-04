@@ -6,6 +6,12 @@ import { AccountingService } from '../accounting/accounting.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { FolioService } from '../common/folio/folio.service.js';
 import { DomainEventBusService } from '../domain-events/domain-event-bus.service.js';
+import {
+  generateStockMovementSlipPdf,
+  generateStockMovementsPdf,
+  stockMovementTypeLabel,
+  type StockMovementPdfRow,
+} from './stock-movement-pdf.js';
 
 const COGS_MOVEMENT_TYPES = new Set(['DISPATCH', 'SCRAP', 'PRODUCTION_OUT']);
 
@@ -542,6 +548,153 @@ export class WarehouseService {
       orderBy: { createdAt: 'desc' },
       take: 500,
     });
+  }
+
+  private mapMovementToPdfRow(m: {
+    movementNumber: string;
+    type: string;
+    quantity: unknown;
+    fromQtyBefore?: unknown;
+    fromQtyAfter?: unknown;
+    toQtyBefore?: unknown;
+    toQtyAfter?: unknown;
+    unitCost?: unknown;
+    totalCost?: unknown;
+    reference?: string | null;
+    notes?: string | null;
+    createdAt: Date;
+    product?: { name?: string | null; sku?: string | null } | null;
+    fromWarehouse?: { name?: string | null; code?: string | null } | null;
+    toWarehouse?: { name?: string | null; code?: string | null } | null;
+    createdBy?: { nombre?: string | null } | null;
+    purchaseOrder?: { poNumber?: string | null } | null;
+    productionOrder?: { orderNumber?: string | null } | null;
+    activity?: { anNumber?: string | null } | null;
+  }): StockMovementPdfRow {
+    const parts: string[] = [];
+    if (m.purchaseOrder?.poNumber) parts.push(`OC ${m.purchaseOrder.poNumber}`);
+    if (m.productionOrder?.orderNumber) parts.push(`OP ${m.productionOrder.orderNumber}`);
+    if (m.activity?.anNumber) parts.push(`AN ${m.activity.anNumber}`);
+    if (m.reference?.trim()) parts.push(m.reference.trim());
+
+    const fmt = (v: unknown) => (v == null || v === '' ? null : Number(v));
+    const fromB = fmt(m.fromQtyBefore);
+    const fromA = fmt(m.fromQtyAfter);
+    const toB = fmt(m.toQtyBefore);
+    const toA = fmt(m.toQtyAfter);
+    let balanceLabel = '—';
+    if (fromB != null && fromA != null) balanceLabel = `${fromB} → ${fromA}`;
+    else if (toB != null && toA != null) balanceLabel = `${toB} → ${toA}`;
+
+    const whLabel = (w?: { name?: string | null; code?: string | null } | null) => {
+      if (!w) return null;
+      return [w.code, w.name].filter(Boolean).join(' ') || null;
+    };
+
+    return {
+      movementNumber: m.movementNumber,
+      type: m.type,
+      typeLabel: stockMovementTypeLabel(m.type),
+      sku: m.product?.sku ?? null,
+      productName: m.product?.name ?? null,
+      fromWarehouse: whLabel(m.fromWarehouse),
+      toWarehouse: whLabel(m.toWarehouse),
+      quantity: Number(m.quantity),
+      balanceLabel,
+      documentLabel: parts.length ? parts.join(' · ') : null,
+      reference: m.reference ?? null,
+      notes: m.notes ?? null,
+      unitCost: m.unitCost != null ? Number(m.unitCost) : null,
+      totalCost: m.totalCost != null ? Number(m.totalCost) : null,
+      createdAt: m.createdAt.toISOString(),
+      createdByName: m.createdBy?.nombre ?? null,
+    };
+  }
+
+  async getStockMovementsPdfBuffer(
+    filters?: { productId?: number; warehouseId?: number; type?: string; from?: string; to?: string },
+    companyId?: number | null,
+  ) {
+    const tenantId = requireCompanyId(companyId);
+    const [movements, company, product, warehouse] = await Promise.all([
+      this.listStockMovements(filters, tenantId),
+      this.prisma.companyProfile.findFirst({
+        where: { id: tenantId },
+        select: { legalName: true, tradeName: true },
+      }),
+      filters?.productId
+        ? this.prisma.product.findFirst({
+            where: { id: filters.productId, ...companyWhere(tenantId) },
+            select: { sku: true, name: true },
+          })
+        : Promise.resolve(null),
+      filters?.warehouseId
+        ? this.prisma.warehouse.findFirst({
+            where: { id: filters.warehouseId, ...companyWhere(tenantId) },
+            select: { code: true, name: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    const filterLines: Array<{ label: string; value: string }> = [];
+    if (filters?.type) filterLines.push({ label: 'Tipo', value: stockMovementTypeLabel(filters.type) });
+    if (warehouse) filterLines.push({ label: 'Almacén', value: [warehouse.code, warehouse.name].filter(Boolean).join(' — ') });
+    if (filters?.from) filterLines.push({ label: 'Desde', value: filters.from.slice(0, 10) });
+    if (filters?.to) filterLines.push({ label: 'Hasta', value: filters.to.slice(0, 10) });
+
+    const title = product
+      ? `Historial · ${product.sku}`
+      : filters?.type === 'TRANSFER'
+        ? 'Traspasos de almacén'
+        : filters?.type === 'ADJUSTMENT'
+          ? 'Ajustes de inventario'
+          : 'Kardex de movimientos';
+
+    const pdf = await generateStockMovementsPdf({
+      title,
+      subtitle: product ? product.name : 'Movimientos de inventario (máx. 500)',
+      companyName: company?.tradeName || company?.legalName || 'NEXARA',
+      generatedAt: new Date().toISOString(),
+      filters: filterLines,
+      productSku: product?.sku ?? null,
+      productName: product?.name ?? null,
+      rows: movements.map((m) => this.mapMovementToPdfRow(m)),
+    });
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    const fileHint = product?.sku
+      ? `historial-${product.sku}`
+      : filters?.type
+        ? `movimientos-${filters.type.toLowerCase()}`
+        : 'kardex-movimientos';
+    return { pdf, filename: `${fileHint}-${stamp}.pdf` };
+  }
+
+  async getStockMovementSlipPdfBuffer(id: number, companyId?: number | null) {
+    const tenantId = requireCompanyId(companyId);
+    const movement = await this.prisma.stockMovement.findFirst({
+      where: { id, ...companyWhere(tenantId) },
+      include: {
+        product: { select: { id: true, name: true, sku: true } },
+        fromWarehouse: { select: { id: true, code: true, name: true } },
+        toWarehouse: { select: { id: true, code: true, name: true } },
+        createdBy: { select: { id: true, nombre: true } },
+        purchaseOrder: { select: { id: true, poNumber: true } },
+        productionOrder: { select: { id: true, orderNumber: true } },
+        activity: { select: { id: true, anNumber: true, titulo: true } },
+        company: { select: { legalName: true, tradeName: true } },
+      },
+    });
+    if (!movement) throw new NotFoundException('Movimiento no encontrado');
+
+    const row = this.mapMovementToPdfRow(movement);
+    const pdf = await generateStockMovementSlipPdf({
+      ...row,
+      companyName: movement.company?.tradeName || movement.company?.legalName || 'NEXARA',
+      notes: movement.notes,
+    });
+    const safe = String(movement.movementNumber).replace(/[^\w.-]+/g, '_');
+    return { pdf, filename: `MOV-${safe}.pdf`, movementNumber: movement.movementNumber };
   }
 
   // ── Lots ──────────────────────────────────────────────────────────

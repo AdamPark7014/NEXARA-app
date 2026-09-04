@@ -1,4 +1,5 @@
 import { buildApiUrl } from "@/lib/api-base";
+import { triggerBlobDownload } from "@/lib/file-download";
 
 export const VIATIC_CATEGORIES = [
   "COMBUSTIBLE",
@@ -209,10 +210,7 @@ export async function downloadViaticsReportPdf(
   });
   if (!res.ok) throw new Error(await parseError(res));
   const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `viaticos-${filters.from || "inicio"}-${filters.to || "hoy"}.pdf`;
-  a.click();
-  URL.revokeObjectURL(url);
+  await triggerBlobDownload(blob, `viaticos-${filters.from || "inicio"}-${filters.to || "hoy"}.pdf`, {
+    mimeType: "application/pdf",
+  });
 }

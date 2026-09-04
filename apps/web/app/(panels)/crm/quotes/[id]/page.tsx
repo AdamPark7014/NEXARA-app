@@ -11,6 +11,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
+import { exportToExcel } from "@/lib/export-excel";
 import { DetailField, DetailFieldGrid, formatDate, DetailError } from "@/components/detail/DetailFrame";
 import CtOrderPanel from "../components/CtOrderPanel";
 import chrome from "@/components/crm/crm-chrome.module.css";
@@ -245,7 +246,6 @@ export default function QuoteDetailPage() {
                 variant="ghost"
                 iconLeft="⬇"
                 onClick={() => {
-                  const { exportToExcel } = require("@/lib/export-excel") as typeof import("@/lib/export-excel");
                   exportToExcel(
                     quote.items.map((it, idx) => ({
                       num: idx + 1,
