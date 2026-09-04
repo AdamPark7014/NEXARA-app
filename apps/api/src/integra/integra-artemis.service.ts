@@ -1592,9 +1592,20 @@ export class IntegraArtemisService {
     if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost || !resolved.siteId || !companyId) {
       throw new BadRequestException('Borrado de rostro solo en sitios ISAPI');
     }
-    const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
-      await deleteFaceData(client, personId);
-    });
+    const results = await this.fanoutAcs(
+      companyId,
+      resolved.siteId,
+      personId,
+      'person.faceDel',
+      resolved.isapiForHost,
+      async (client) => {
+        await deleteFaceData(client, personId);
+      },
+      {
+        op: 'faceDelete',
+        user: { employeeNo: personId, name: personId },
+      },
+    );
     deleteLocalPersonFace(companyId, personId);
     await this.auditMut('integra.person.face.delete', actor, companyId, resolved.siteId, {
       personId,
@@ -1654,14 +1665,21 @@ export class IntegraArtemisService {
 
     writeLocalFingerData(companyId, employeeNo, fingerPrintID, fingerData);
 
-    const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
-      await downloadFingerPrint(client, {
-        employeeNo,
-        fingerPrintID,
-        fingerData,
-        fingerType: input.fingerType,
-      });
-    });
+    const results = await this.fanoutAcs(
+      companyId,
+      resolved.siteId,
+      employeeNo,
+      'person.fp',
+      resolved.isapiForHost,
+      async (client) => {
+        await downloadFingerPrint(client, {
+          employeeNo,
+          fingerPrintID,
+          fingerData,
+          fingerType: input.fingerType,
+        });
+      },
+    );
     await this.auditMut('integra.person.fp.enroll', actor, companyId, resolved.siteId, {
       personId: employeeNo,
       fingerPrintID,
@@ -1759,9 +1777,16 @@ export class IntegraArtemisService {
       throw new BadRequestException('Huella solo en sitios ISAPI');
     }
     const employeeNo = String(personId).trim();
-    const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
-      await deleteFingerPrint(client, employeeNo, input.fingerPrintIDs);
-    });
+    const results = await this.fanoutAcs(
+      companyId,
+      resolved.siteId,
+      employeeNo,
+      'person.fpDel',
+      resolved.isapiForHost,
+      async (client) => {
+        await deleteFingerPrint(client, employeeNo, input.fingerPrintIDs);
+      },
+    );
     if (input.fingerPrintIDs?.length) {
       for (const id of input.fingerPrintIDs) deleteLocalFingerData(companyId, employeeNo, id);
     } else {
