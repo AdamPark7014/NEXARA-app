@@ -44,6 +44,7 @@ import { IntegraPushService } from './integra-push.service';
 import { IntegraSyncService } from './integra-sync.service';
 import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
 import { IntegraSpacesService } from './integra-spaces.service';
+import { IntegraSchedulesService } from './integra-schedules.service';
 import { IdentityLinkService } from '../identity/identity-link.service';
 
 export function integraCanSettings(user: { roleKey?: string; isSuperAdmin?: boolean } | null) {
