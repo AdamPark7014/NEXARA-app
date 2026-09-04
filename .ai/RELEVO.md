@@ -8,37 +8,49 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — PTZ snappy arriba + presencia multi-caja
+## Este turno — Personas: delete real + alta auto-código + UI prod
 
-### PTZ (prioridad Adam)
+### Delete (bug «no borra / reaparece»)
 
-1. **Pad ARRIBA del video** (`ptzChrome`): no enterrado bajo ACS/Vehículos.
-   Visible aunque MSE diga «Conectando…».
-2. **Hold continuo** (`continuous: true` → ISAPI `/continuous`, vel. 92):
-   una orden al pulsar + `stop` al soltar (antes momentary cada ~320 ms).
-3. Mensaje honesto: PTZ sin ANPR/FieldDetection.
+- Idempotente: si ya no está en el ACS → OK.
+- Face → `UserInfoDetail/Delete` → `DeleteProcess` → **reintento** si sigue.
+- Verificación autoritativa con `listAllUserInfo` (si no se puede listar →
+  **falla**, no se limpia espejo; antes un falso OK reimportaba en sync 15 min).
+- Espejo solo si **todos** los ACS OK. UI: danger + confirm + fan-out por IP +
+  quita de la lista al instante si success.
 
-### Overlay Meeting Room
+### Alta con código auto
 
-- Label sin duplicar «sin ID» (`Humano` + `sin ID · Ns`).
-- Sticky 90 s / VMD 75 s / seed 120 s; máx 8 tracks.
-- Parser multi-TargetRect; FieldDetection todas las regiones sens. 95.
+- `autoCode` (default): siguiente numérico libre del espejo, o `9`+timestamp.
+- UI: «+ Nueva persona» abre panel Alta (ya no enterrado bajo editar).
+  Nombre obligatorio; código opcional (override manual).
 
-### Límite hardware
+### UX
 
-AcuSense empuja TargetRect por evento (a menudo 1 humano). Tres sentados
-sin re-disparo no inventan cajas nuevas — sticky/VMD conserva las ya vistas.
+- Título «Control de personal»; secciones 1 Datos / 2 Editar / 3 Face ID /
+  4 Eliminar; estados de carga; copy Face ID terminal ≠ video oficina.
+- Nav Acceso: Personas «Alta · Face ID · baja».
 
-SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109`
+### Sibling (ya en rama, no pisar)
 
-Verificar tras rebuild: Video→PTZ pad arriba + hold rápido; Meeting Room labels.
+PTZ pad arriba + continuous; overlay sticky Meeting Room — ver commits
+recientes de video/PTZ.
+
+SSH: `-p 2222 root@5.78.215.109` → `/var/www/nexara-app`
+
+Verificar: Personas → + Nueva (solo nombre) → aparece con código auto;
+Eliminar a alguien de prueba → fan-out OK → desaparece y no vuelve tras sync.
 
 ## A medias
 
-1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
-2. Re-aplicar FieldDetection en equipos tras sync/push install.
+1. Portal empleado (User↔employeeNo).
+2. httpHost NVR `.34`.
+3. Cámara ANPR ITC.
+4. Micros / Hik-Connect — decisión Adam.
+5. TCPMSS / biblioteca init / empresas 1-2.
+6. Re-aplicar FieldDetection tras sync (sibling overlay).
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales, Face ID óptico inventado.
-People CRUD / playback (siblings — hubo rescue d92bd7e).
+Puente NAS, Traefik, credenciales en repo, rutas ISAPI no verificadas.
+Face ID óptico inventado sobre AcuSense. Playback/PTZ de siblings.
