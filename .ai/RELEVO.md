@@ -8,43 +8,40 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Stock: historial hiper-detallado por producto
+## Este turno — PDF profesional de Órdenes de compra
 
-Seguimiento auditado de movimientos: quién, cuándo, por qué, origen/destino,
-saldo antes/después, documento (OC/OP/AN/referencia) y notas.
+Las OC formales con Excel estaban en **ERP Compras** (`/erp/procurement`),
+no en el panel CRM. Se añadió PDF de producción (familia visual cotizaciones)
+como acción principal; Excel de listado se conserva.
 
 ### Qué cambió
 
-1. **Schema** `StockMovement`: `fromQtyBefore/After`, `toQtyBefore/After`
-   + migración `20260904180000_stock_movement_qty_audit`.
-2. **API** `createStockMovement`: captura saldos en la misma tx; acepta
-   `productionOrderId` / `activityId`; create incluye docs ligados.
-3. **API** `listStockMovements`: incluye PO, OP, actividad, lot, createdBy;
-   tope 500.
-4. **Web** `stock-api`: tipos + helpers de documento/saldo.
-5. **UI warehouse**: tabla enriquecida; filtros producto/fecha/tipo/almacén;
-   export Excel; form con traspaso/ajuste/notas; drawer de historial por
-   producto (timeline + existencia por almacén).
+1. **`purchase-order-pdf.ts`**: letterhead tenant, proveedor / facturar-a /
+   enviar-a, pago, entrega, Incoterms (si aparecen en notas), partidas
+   (SKU, UdM, costo, IVA, importe), aprobaciones, firmas, multipágina.
+2. **API** `GET procurement/purchase-orders/:id/pdf`.
+3. **UI** Compras → tab Órdenes: botón **PDF** en fila, **Descargar PDF**
+   en detalle (primario); Excel sigue en la barra.
+
+Smoke: `apps/api/scripts/smoke-purchase-order-pdf.ts`.
 
 ### Concurrente en la rama (siblings — no pisar)
 
-- Integra ops chrome / Personas / PTZ / playback NVR.
-- CRM PO PDFs · Integra asistencia.
+- Playback NVR / UI Integra ops / PTZ / Personas CRUD.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
 `/var/www/nexara-app`
 
-Verificar: ERP → Almacén → Movimientos (filtros + Excel); click producto →
-drawer con saldo antes→después; entrada/salida/traspaso escriben auditoría.
+Verificar: ERP → Compras → Órdenes de compra → PDF en fila o detalle.
 
 ## A medias
 
 1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
 2. Re-aplicar FieldDetection en equipos tras sync/push install.
+3. Pedidos CT (`SupplierPurchaseOrder` en CRM cotizaciones) sin PDF propio
+   — solo OC ERP en este turno.
 
 ## No tocar
 
 Puente NAS, Traefik, credenciales en repo, rutas ISAPI no verificadas.
-Face ID óptico inventado sobre AcuSense.
-CRM PO PDFs · Integra asistencia (siblings).
-No pelear pad PTZ ni reescribir Personas CRUD del sibling.
+Face ID óptico inventado. No pelear pad PTZ ni reescribir Personas CRUD.
