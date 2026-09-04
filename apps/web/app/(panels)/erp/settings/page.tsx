@@ -13,6 +13,9 @@ import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog"
 import FilterToolbar from "@/components/FilterToolbar";
 import { toast } from "@/components/Toast";
 import KpiCard from "@/components/ui/KpiCard";
+import SettingsModuleRail from "@/components/erp/SettingsModuleRail";
+import ErpModuleCards from "@/components/erp/ErpModuleCards";
+import PageChrome from "@/components/ui/PageChrome";
 
 interface SettingRow {
   key: string;

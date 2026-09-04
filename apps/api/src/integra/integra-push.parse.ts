@@ -210,7 +210,11 @@ export function normalizeAlert(body: Record<string, any>, fallbackIp: string): N
     personName: null,
     doorNo: null,
     verifyMode: null,
-    targets: targetsFrom(alert),
+    // FaceDetect AcuSense manda FaceRect en la raíz (no AccessControllerEvent).
+    targets:
+      eventType === 'facedetection'
+        ? faceRectTargets(alert) || targetsFrom(alert)
+        : targetsFrom(alert),
     raw: alert,
   };
 }
