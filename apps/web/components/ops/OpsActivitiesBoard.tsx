@@ -7,13 +7,16 @@ import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import FilterToolbar from "@/components/FilterToolbar";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
+import ListExportActions from "@/components/ui/ListExportActions";
 import { exportToExcel } from "@/lib/export-excel";
+import { downloadActivitiesReportPdf } from "@/lib/activities-export-api";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { createRealtimeSocket } from "@/lib/realtime-socket";
 import { getSocketBaseUrl } from "@/lib/api-base";
 import OpsActivitiesImport from "@/components/ops/OpsActivitiesImport";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import { toast } from "@/components/Toast";
 
 type ActivityRow = {
   id: number;
@@ -67,6 +70,7 @@ export default function OpsActivitiesBoard() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterPriority, setFilterPriority] = useState("");
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -124,6 +128,37 @@ export default function OpsActivitiesBoard() {
     const set = new Set(rows.map((r) => r.prioridad).filter(Boolean) as string[]);
     return Array.from(set).map((v) => ({ value: v, label: v }));
   }, [rows]);
+
+  const exportExcel = () => {
+    exportToExcel(
+      visible,
+      [
+        { key: "anNumber", label: "AN" },
+        { key: "titulo", label: "Título" },
+        { key: "estatus", label: "Estatus" },
+        { key: "prioridad", label: "Prioridad" },
+        { key: "client", label: "Cliente", format: (v) => (v as ActivityRow["client"])?.name ?? "Interna" },
+        { key: "branchName", label: "Sucursal" },
+        { key: "responsable", label: "Responsable", format: (v) => (v as ActivityRow["responsable"])?.nombre ?? "—" },
+      ],
+      "ops-actividades",
+      { title: "Actividades OPS", subtitle: `${visible.length} OT visibles` },
+    );
+  };
+
+  const exportPdf = async () => {
+    if (!token) return;
+    setPdfBusy(true);
+    try {
+      const to = new Date().toISOString().slice(0, 10);
+      const from = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+      await downloadActivitiesReportPdf(token, { from, to });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo generar el PDF");
+    } finally {
+      setPdfBusy(false);
+    }
+  };
 
   const columns: Column<ActivityRow>[] = [
     {
@@ -211,23 +246,16 @@ export default function OpsActivitiesBoard() {
               <OpsActivitiesImport token={token} onImported={() => void load()} />
             )}
             <Button variant="ghost" size="sm" onClick={() => void load()}>Actualizar</Button>
-            <Link href="/ops/activities/new" style={{ textDecoration: "none" }}>
-              <Button variant="primary" size="sm">Nueva OT</Button>
-            </Link>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => exportToExcel(visible, [
-                { key: "anNumber", label: "AN" },
-                { key: "titulo", label: "Título" },
-                { key: "estatus", label: "Estatus" },
-                { key: "prioridad", label: "Prioridad" },
-              ], "ops-actividades")}
-            >
-              Excel
-            </Button>
+            <ListExportActions
+              onExcel={rows.length > 0 ? exportExcel : undefined}
+              onPdf={token ? () => void exportPdf() : undefined}
+              pdfBusy={pdfBusy}
+            />
             <Link href="/ops/dispatch" style={{ textDecoration: "none" }}>
               <Button variant="secondary" size="sm">Despacho</Button>
+            </Link>
+            <Link href="/ops/activities/new" style={{ textDecoration: "none" }}>
+              <Button variant="primary" size="sm">Nueva OT</Button>
             </Link>
           </>
         }
@@ -237,7 +265,17 @@ export default function OpsActivitiesBoard() {
         rows={visible}
         rowKey={(r) => r.id}
         emptyTitle="Sin actividades"
-        emptyDescription="No hay OT que coincidan con los filtros."
+        emptyDescription="No hay OT que coincidan con los filtros. Crea una nueva o limpia los filtros."
+        emptyAction={
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+            <Button size="sm" variant="secondary" onClick={() => { setSearch(""); setFilterStatus(""); setFilterPriority(""); }}>
+              Limpiar filtros
+            </Button>
+            <Link href="/ops/activities/new" style={{ textDecoration: "none" }}>
+              <Button size="sm" variant="primary">Nueva OT</Button>
+            </Link>
+          </div>
+        }
       />
     </>
   );

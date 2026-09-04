@@ -1215,6 +1215,7 @@ export class IntegraArtemisService {
       validTo?: string;
       validEnable?: boolean;
       doorRight?: string;
+      rightPlan?: unknown;
     },
     actor?: Actor,
     siteId?: number | null,
@@ -1240,15 +1241,16 @@ export class IntegraArtemisService {
         userType: input.userType || 'normal',
         gender: input.gender,
         doorRight: input.doorRight,
+        RightPlan: input.rightPlan,
         Valid: {
           enable: input.validEnable !== false,
           beginTime: input.validFrom || '2020-01-01T00:00:00',
           endTime: input.validTo || '2037-12-31T23:59:59',
         },
       };
-      const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
+      const results = await this.fanoutAcs(companyId, resolved.siteId, employeeNo, 'person.add', resolved.isapiForHost, async (client) => {
         await recordUserInfo(client, user);
-      });
+      }, { op: 'userUpsert', user });
       await this.auditMut('integra.person.add', actor, companyId, resolved.siteId, {
         employeeNo,
         results,
@@ -1257,7 +1259,15 @@ export class IntegraArtemisService {
       const allOk = results.length > 0 && results.every((r) => r.ok);
       const anyOk = results.some((r) => r.ok);
       if (anyOk) {
-        await this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
+        await this.acsFanout.upsertMirror({
+          companyId,
+          siteId: resolved.siteId,
+          employeeNo,
+          name,
+          raw: { ...user },
+        });
+        // Reconcile en background (conteos face/FP); el espejo ya tiene la ficha.
+        void this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
       }
       return {
         success: allOk,
@@ -1266,10 +1276,11 @@ export class IntegraArtemisService {
         autoCode: wantAuto,
         results,
         provider: 'ISAPI' as const,
+        livePush: true,
         note: allOk
-          ? `Alta OK · código ${employeeNo}${wantAuto ? ' (auto)' : ''}.`
+          ? `En vivo en terminales · código ${employeeNo}${wantAuto ? ' (auto)' : ''}.`
           : anyOk
-            ? `Alta parcial · código ${employeeNo}: revisa el detalle por IP.`
+            ? `Alta parcial · código ${employeeNo}: revisa el detalle por IP (reintento en cola).`
             : 'No se pudo crear en ningún terminal.',
       };
     }

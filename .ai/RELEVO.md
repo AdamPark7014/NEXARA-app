@@ -8,48 +8,40 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Live detection hotpath + (sibling) PTZ/NVR wire
+## Este turno — OC PDF profesional DESPLEGADO
 
-Adam: UX detección en vivo al límite bajo ráfagas (sibling reconfigura
-cámaras). Sin inventar Face ID óptico.
+Órdenes de compra formales = **ERP → Compras** (`/erp/procurement`).
+PDF (familia cotizaciones, más denso) es la salida principal; Excel de lista
+sigue.
 
-### Live detection hotpath (este agente)
+### Entrega
 
-1. **Bus SSE/poll**: fan-out coalescido 32 ms + dedupe por id; poll 1.2 s
-   con SSE sano / 280 ms degradado; reconnect 800 ms; lote por chunk.
-2. **Paint ~30 fps** (rAF + refs): merge sticky; edad placa 1 Hz — no se
-   frena el poll con FieldDetection a tope.
-3. **Multi-caja**: nombres distintos no se fusionan; tope 12; VMD 90 s.
-4. **Stream**: `preloadGo2rtcPlayer`; kicks densos; remount 2.6 s;
-   stagger muro 90 ms; fallback MSE 4.5 s.
-5. Índices `integra_push_events_*` (`20260904160000_*`);
-   `attachSnapshotLater` + JPEG enrolado al instante (face sibling).
-6. Placa óptica: «Humano · sin ID».
+1. `purchase-order-pdf.ts` + `GET procurement/purchase-orders/:id/pdf`
+2. UI: botón **PDF** en fila, **Descargar PDF** / **PDF profesional** en detalle
+3. Smoke: `apps/api/scripts/smoke-purchase-order-pdf.ts`
+4. Commit feature: `ab8ce5e`
+5. **Prod:** `nexara-api` + `nexara-web` up; `purchase-order-pdf.js` en dist;
+   bundle web con `Descargar PDF` + fetch `.../pdf`
 
-### PTZ/NVR wire (sibling — no pisar)
+### Dónde clic (Adam)
 
-PTZ `.179` sin vehicle/ANPR (403/404); motion sí. NVR PoE ch 1/2/9/10 FD
-`human,vehicle` + httpHosts. VehicleStrip sitio entero. Ver commits
-`wireDevices` / `plate-events`.
+1. Panel **ERP** → **Compras** (`/erp/procurement`)
+2. Tab **Órdenes de compra**
+3. En la fila: botón **PDF** — o abre detalle → **Descargar PDF**
+4. Excel sigue en la barra del filtro (lista)
 
-SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` → `./deploy/update.sh --force-all --with-migrate`
+### Concurrente (siblings — no pisar)
 
-### Verificar (hard refresh)
-
-1. Video: cajas sticky multi-persona sin lag bajo ráfagas.
-2. Pase ACS: banner &lt;1 s; Eventos «En vivo · ACS» + cards.
-3. PTZ no eterno en «Conectando…»; chips motion vs vehicle honestos.
-4. Óptica: «Humano · sin ID» — no Face ID de oficina.
+- PTZ/NVR/ACS al límite ISAPI (vehicle/motion/wire)
+- Asistencia híbrida, stock historial, Personas, CRM pages
 
 ## A medias
 
-1. Portal empleado · ANPR ITC (hardware) · micros · TCPMSS.
-2. Migración índices push en prod si no aplica sola.
-3. Motion PTZ push / Event triggers si sigue vacío.
+1. Portal empleado · ANPR ITC hardware · micros · TCPMSS
+2. Pedidos CT CRM (`SupplierPurchaseOrder`) sin PDF propio
+3. Si motion PTZ sin push: linkage Event/triggers
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales.
-Face ID óptico inventado sobre AcuSense.
-Personas enroll CRUD del face sibling.
+Puente NAS, Traefik, credenciales, ISAPI no verificada.
+No pelear pad PTZ / Personas / asistencia / stock del sibling.

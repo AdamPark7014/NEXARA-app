@@ -835,7 +835,10 @@ export default function UsersPage() {
         actions={cfg.canAssign ? (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Button variant="secondary" onClick={() => void openRoleCreate()}>Nuevo rol</Button>
-            <Button variant="primary" onClick={openCreate}>Nuevo usuario</Button>
+            <Button variant="ghost" onClick={() => { window.location.href = "/integra/people"; }}>
+              Personas ACS
+            </Button>
+            <Button variant="primary" onClick={openCreate}>+ Alta rápida</Button>
           </div>
         ) : undefined}
       />
@@ -1195,52 +1198,208 @@ export default function UsersPage() {
       {(modal === "create" || modal === "edit") && (
         <div style={overlay} onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
           <div style={box}>
-            <h2 style={{ margin: "0 0 20px", fontSize: 18, fontFamily: "var(--nx-font-display)", fontWeight: 700 }}>
-              {modal === "create" ? "Nuevo usuario" : `Editar · ${target?.nombre}`}
+            <h2 style={{ margin: "0 0 6px", fontSize: 18, fontFamily: "var(--nx-font-display)", fontWeight: 700 }}>
+              {modal === "create" ? "Alta rápida de usuario" : `Editar · ${target?.nombre}`}
             </h2>
+            <p style={{ margin: "0 0 18px", fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+              {modal === "create"
+                ? "Nombre, correo y rol. El nº de empleado se genera solo (mismo código que usará ACS / Integra Personas)."
+                : "Actualiza identidad, rol y nº de empleado (enlace canónico con terminales ACS)."}
+            </p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div style={{ gridColumn: "1 / -1" }}>
                 <Lbl text="Nombre completo *" />
-                <input value={form.nombre} onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))} style={inp} />
+                <input
+                  value={form.nombre}
+                  onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
+                  style={inp}
+                  placeholder="Ej. Ariadna Sierra"
+                  autoFocus={modal === "create"}
+                />
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
-                <Lbl text="Email *" />
-                <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} style={inp} />
+                <Lbl text="Correo *" />
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                  style={inp}
+                  placeholder="nombre@empresa.com"
+                />
               </div>
               {modal === "create" && (
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <Lbl text="Contraseña inicial *" />
-                  <input type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} style={inp} />
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: 12.5 }}>
+                    <input
+                      type="checkbox"
+                      checked={form.autoPassword}
+                      onChange={(e) => {
+                        const on = e.target.checked;
+                        setForm((f) => ({
+                          ...f,
+                          autoPassword: on,
+                          password: on ? generateTempPassword() : "",
+                        }));
+                      }}
+                    />
+                    Contraseña temporal automática
+                  </label>
+                  {!form.autoPassword && (
+                    <>
+                      <Lbl text="Contraseña inicial *" />
+                      <input
+                        type="password"
+                        value={form.password}
+                        onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                        style={inp}
+                      />
+                    </>
+                  )}
+                  {form.autoPassword && (
+                    <p style={{ margin: 0, fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                      Se mostrará una sola vez al crear. Mínimo 6 caracteres.
+                    </p>
+                  )}
                 </div>
               )}
               <div>
-                <Lbl text="Rol *" />
-                <select value={form.roleId} onChange={(e) => setForm((f) => ({ ...f, roleId: e.target.value }))} style={inp} disabled={roles.length === 0}>
+                <Lbl text="Rol ERP *" />
+                <select
+                  value={form.roleId}
+                  onChange={(e) => setForm((f) => ({ ...f, roleId: e.target.value }))}
+                  style={inp}
+                  disabled={roles.length === 0}
+                >
                   <option value="">— Seleccionar —</option>
-                  {roles.map((r) => <option key={r.id} value={String(r.id)}>{r.nombre}</option>)}
+                  {roles.map((r) => (
+                    <option key={r.id} value={String(r.id)}>{r.nombre}</option>
+                  ))}
                 </select>
               </div>
               <div>
                 <Lbl text="Departamento *" />
-                <select value={form.departmentId} onChange={(e) => setForm((f) => ({ ...f, departmentId: e.target.value }))} style={inp} disabled={depts.length === 0}>
+                <select
+                  value={form.departmentId}
+                  onChange={(e) => setForm((f) => ({ ...f, departmentId: e.target.value }))}
+                  style={inp}
+                  disabled={depts.length === 0}
+                >
                   <option value="">— Seleccionar —</option>
-                  {depts.map((d) => <option key={d.id} value={String(d.id)}>{d.nombre}</option>)}
-                </select>
-              </div>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <Lbl text="Reporta a (manager)" />
-                <select value={form.managerId} onChange={(e) => setForm((f) => ({ ...f, managerId: e.target.value }))} style={inp}>
-                  <option value="">— Sin manager —</option>
-                  {users.filter((u) => u.id !== target?.id && u.isActive).map((u) => (
-                    <option key={u.id} value={String(u.id)}>{u.nombre} · {u.role?.nombre}</option>
+                  {depts.map((d) => (
+                    <option key={d.id} value={String(d.id)}>{d.nombre}</option>
                   ))}
                 </select>
               </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: 12.5 }}>
+                  <input
+                    type="checkbox"
+                    checked={form.autoEmployeeNumber}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        autoEmployeeNumber: e.target.checked,
+                        employeeNumber: e.target.checked ? "" : f.employeeNumber,
+                      }))
+                    }
+                  />
+                  Nº empleado automático (NXR25SYS…)
+                </label>
+                {!form.autoEmployeeNumber && (
+                  <>
+                    <Lbl text="Nº empleado (código ACS)" />
+                    <input
+                      value={form.employeeNumber}
+                      onChange={(e) => setForm((f) => ({ ...f, employeeNumber: e.target.value }))}
+                      style={inp}
+                      placeholder="Mismo código en terminales"
+                    />
+                  </>
+                )}
+                {form.autoEmployeeNumber && (
+                  <p style={{ margin: 0, fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                    El backend asigna el siguiente libre del tenant. Ese código es el enlace con Integra / ACS.
+                  </p>
+                )}
+              </div>
+              {modal === "edit" && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <Lbl text="Reporta a (manager)" />
+                  <select
+                    value={form.managerId}
+                    onChange={(e) => setForm((f) => ({ ...f, managerId: e.target.value }))}
+                    style={inp}
+                  >
+                    <option value="">— Sin manager —</option>
+                    {users.filter((u) => u.id !== target?.id && u.isActive).map((u) => (
+                      <option key={u.id} value={String(u.id)}>{u.nombre} · {u.role?.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
-            {saveErr && <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--state-danger-bg)", borderRadius: 8, fontSize: 12.5, color: "var(--state-danger-text)" }}>{saveErr}</div>}
+            {saveErr && (
+              <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--state-danger-bg)", borderRadius: 8, fontSize: 12.5, color: "var(--state-danger-text)" }}>
+                {saveErr}
+              </div>
+            )}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 22 }}>
               <Button variant="ghost" onClick={closeModal}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void saveUser()} disabled={saving}>{saving ? "Guardando…" : modal === "create" ? "Crear usuario" : "Guardar cambios"}</Button>
+              <Button variant="primary" onClick={() => void saveUser()} disabled={saving || roles.length === 0 || depts.length === 0}>
+                {saving ? "Guardando…" : modal === "create" ? "Crear usuario" : "Guardar cambios"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {createdCreds && (
+        <div style={overlay} onClick={(e) => { if (e.target === e.currentTarget) setCreatedCreds(null); }}>
+          <div style={{ ...box, maxWidth: 440 }}>
+            <h2 style={{ margin: "0 0 6px", fontSize: 17, fontFamily: "var(--nx-font-display)", fontWeight: 700 }}>
+              Usuario listo
+            </h2>
+            <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--text-secondary)" }}>
+              Guarda la contraseña temporal ahora. Luego puedes enrolar Face ID en Integra → Personas con el mismo nº.
+            </p>
+            <dl style={{ margin: 0, display: "grid", gap: 10, fontSize: 13 }}>
+              <div>
+                <dt style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Nombre</dt>
+                <dd style={{ margin: 0, fontWeight: 600 }}>{createdCreds.nombre}</dd>
+              </div>
+              <div>
+                <dt style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Correo</dt>
+                <dd style={{ margin: 0 }}>{createdCreds.email}</dd>
+              </div>
+              <div>
+                <dt style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Nº empleado / ACS</dt>
+                <dd style={{ margin: 0 }}>
+                  <code>{createdCreds.employeeNumber || "auto (revisa el listado)"}</code>
+                </dd>
+              </div>
+              <div>
+                <dt style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Contraseña temporal</dt>
+                <dd style={{ margin: 0 }}>
+                  <code style={{ userSelect: "all" }}>{createdCreds.password}</code>
+                </dd>
+              </div>
+            </dl>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20, flexWrap: "wrap" }}>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(
+                    `${createdCreds.email}\n${createdCreds.password}\n${createdCreds.employeeNumber || ""}`,
+                  );
+                  toast.success("Copiado al portapapeles");
+                }}
+              >
+                Copiar
+              </Button>
+              <Button variant="secondary" onClick={() => { window.location.href = "/integra/people"; }}>
+                Ir a Personas
+              </Button>
+              <Button variant="primary" onClick={() => setCreatedCreds(null)}>Listo</Button>
             </div>
           </div>
         </div>
