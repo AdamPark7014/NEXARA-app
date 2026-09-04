@@ -8,55 +8,52 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — ERP rol → plantilla de acceso ACS
+## Este turno — Identidad ERP↔ACS + fan-out en vivo
 
-Unifiqué horarios de acceso con usuarios ERP vía `employeeNumber` =
-`employeeNo` ACS. Al crear/editar/activar/cambiar rol o contrato se
-empuja `UserInfo` + `RightPlan` + `Valid` a los terminales (fan-out
-ISAPI). **No** se duplicó el editor semanal (UI sibling en Integra
-Personas).
+**Una persona = un código.** Sin Face ID inventado ni sync biométrico manual.
 
-### Plantillas (roleKey / tipoContrato / isActive)
+### Clave canónica (identidad)
 
-| Caso | Clave | Puertas | Vigencia | planTemplateNo |
-|------|-------|---------|----------|----------------|
-| Empleado indefinido | `office_hours` | todas | indefinida | `2` (env `INTEGRA_PLAN_OFFICE`) |
-| CEO / super_admin / dir_ops / arquitecto | `always_on` | todas | indefinida 24/7 | `1` |
-| Contratista / ing_campo | `contractor` | General + Sala Juntas | ingreso → +12 meses | `3` |
-| Visitante / cliente | `visitor` | solo Sala de Juntas | día en curso | `1` |
-| Inactivo | `disabled` | — | `Valid.enable=false` | — |
+`User.employeeNumber` (y `UserCompany.employeeNumber` del tenant)
+**=** `IntegraPerson.personId` (ACS `employeeNo` / `employeeNoString` del push).
 
-- `GET /users/:id/integra-access-schedule` — vista previa.
-- UI ERP usuarios: bloque «Horario de acceso Integra» en drawer + hint en formulario.
-- Archivos: `access-schedule-defaults.ts` (+spec), `integra-acs-fanout.pushErpUser` ampliado, hooks en `users.service`.
+Roles en ERP (`User.role` / `roleKey`). Actividades y asistencia híbrida usan
+`User`; con el mismo código resuelven al mismo humano en puertas ACS.
 
-Las plantillas week 2/3 deben existir en el ACS (sibling calendarios /
-`UserRightWeekPlanCfg`). Sin ellas el terminal puede rechazar o ignorar
-el `planTemplateNo`.
+### Identidad — API / UI (este agente)
 
-### Concurrente (siblings — no pisar)
+1. `IdentityLinkService` + `IdentityModule`
+2. `GET integra/identity/me` · `GET integra/identity/candidates`
+3. `POST/DELETE integra/people/:id/link`
+4. `listPeople` / `getPerson` → `erpUser` (nombre, rol, email)
+5. Users: códigos ACS literales (ya no se expanden dígitos a NXR)
+6. Personas: badges En ERP + Vincular/Desvincular; alta unificada llama link
+7. Portal empleado `/erp/my-profile`: nº ACS, estado Integra, híbrido del día
 
-Editor semanal Personas · fan-out identity · business events ROI ·
-asistencia ACS · hybrid attendance · PTZ.
+### Fan-out en vivo (sibling push — no pisar)
+
+1. Personas alta/editar/Face/baja → UserInfo + FaceDataRecord a todos los ACS
+2. ERP create/update employeeNumber / HR isActive → push ISAPI
+3. `IntegraAcsFanoutService` + cola retry + `GET integra/acs-fanout/status`
+4. Sync UI → «Reconciliar» (no es paso obligatorio)
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` · `./deploy/update.sh --force-all --with-migrate`
+`/var/www/nexara-app` → `./deploy/update.sh`
 
 ### Verificar
 
-1. ERP usuarios → abrir IAM: bloque Horario de acceso Integra.
-2. Activar/desactivar empleado → ACS `Valid.enable`.
-3. Rol CEO → plan 1 todas las puertas; cliente → solo Sala Juntas.
-4. Mismo `employeeNumber` en ficha ERP y terminal.
+1. Personas → Vincular ERP → badge «En ERP» + rol; Desvincular limpia código.
+2. Mi perfil → estado Integra + checador vs pases ACS.
+3. Alta/foto persona → OK por IP sin Reconciliar (fan-out).
+4. Asistencia híbrida: `linked` cuando códigos coinciden.
 
 ## A medias
 
-1. Portal empleado · ANPR ITC · micros · TCPMSS.
-2. Asegurar plantillas week 2/3 en terminales Oficinas (sibling).
-3. Backfill masivo `notifications.companyId`.
-4. FieldDetection re-apply tras sync.
+1. ANPR ITC · micros · TCPMSS · NVR httpHost.
+2. FieldDetection re-wire si cambia PUBLIC_API_URL.
+3. CaptureFaceData en sensor (si firmware Oficinas lo expone).
 
 ## No tocar
 
 Puente NAS, Traefik, credenciales.
-Face ID óptico inventado. Editor semanal UI (sibling).
+**No** Face ID óptico inventado sobre AcuSense/RTSP.
