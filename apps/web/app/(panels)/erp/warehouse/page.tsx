@@ -939,7 +939,8 @@ export default function WarehousePage() {
             {movement.type === "RECEIPT" ? "Entrada de inventario"
               : movement.type === "DISPATCH" ? "Salida de inventario"
               : movement.type === "TRANSFER" ? "Traspaso entre almacenes"
-              : "Ajuste de inventario"}
+              : movement.type === "ADJUSTMENT_OUT" ? "Ajuste de inventario (baja)"
+              : "Ajuste de inventario (alta)"}
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <label style={{ display: "grid", gap: 4 }}>
@@ -953,6 +954,7 @@ export default function WarehousePage() {
                 <option value="DISPATCH">Salida (despacho)</option>
                 <option value="TRANSFER">Traspaso</option>
                 <option value="ADJUSTMENT">Ajuste (alta)</option>
+                <option value="ADJUSTMENT_OUT">Ajuste (baja)</option>
               </select>
             </label>
             <label style={{ display: "grid", gap: 4 }}>
@@ -1673,6 +1675,14 @@ export default function WarehousePage() {
                 <code style={{ fontSize: 12, color: "var(--text-secondary)" }}>{productTrace.sku}</code>
               </div>
               <div style={{ display: "flex", gap: 6 }}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void downloadMovementsPdf({ productId: productTrace.productId })}
+                  disabled={exportingPdf}
+                >
+                  {exportingPdf ? "PDF…" : "PDF"}
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"

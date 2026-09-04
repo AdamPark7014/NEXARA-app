@@ -815,6 +815,7 @@ export default function IntegraPeoplePage() {
                         {(p.userType || p.orgName) && <span>{p.userType || p.orgName}</span>}
                         {genderLabel(p.gender) && <span>{genderLabel(p.gender)}</span>}
                       </div>
+                      <IdentityStatusBadges person={p} erp={findErpForPerson(p, erpByKey)} />
                       {isIsapi && <CredChips person={p} />}
                     </div>
                   </button>
