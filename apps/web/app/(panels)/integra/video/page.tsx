@@ -443,7 +443,14 @@ export default function IntegraVideoPage() {
                         height={layout <= 4 ? 280 : 160}
                       />
                     ) : (
-                      <IntegraHlsPlayer src={s.hls} compact showLiveBadge />
+                      <IntegraHlsPlayer
+                        src={s.hls}
+                        compact
+                        showLiveBadge
+                        // Un turno por mosaico: entran de uno en uno en vez de
+                        // pelearse por el decodificador todos a la vez.
+                        startDelayMs={i * 700}
+                      />
                     )}
                   </div>
                 </div>

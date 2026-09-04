@@ -12,6 +12,12 @@ type Props = {
   showLiveBadge?: boolean;
   compact?: boolean;
   className?: string;
+  /**
+   * Espera antes de conectar. En un muro los mosaicos se escalonan: si los
+   * nueve montan su decodificador y piden el manifiesto en el mismo instante,
+   * el navegador no da abasto y parte se queda pausada con el botón de play.
+   */
+  startDelayMs?: number;
 };
 
 type Phase = "idle" | "loading" | "playing" | "paused" | "error";
@@ -30,6 +36,7 @@ export function IntegraHlsPlayer({
   showLiveBadge = true,
   compact = false,
   className,
+  startDelayMs = 0,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [phase, setPhase] = useState<Phase>(src ? "loading" : "idle");
@@ -54,6 +61,7 @@ export function IntegraHlsPlayer({
     let usingHls = false;
     let cancelled = false;
     let playTimer: ReturnType<typeof setTimeout> | null = null;
+    let startTimer: ReturnType<typeof setTimeout> | null = null;
     setPhase("loading");
     setErrMsg(null);
 
@@ -201,16 +209,28 @@ export function IntegraHlsPlayer({
       hls = instance;
     };
 
-    void attach().catch(() => {
-      if (cancelled || !video) return;
-      usingHls = false;
-      video.src = src;
-      video.addEventListener("loadedmetadata", tryPlay, { once: true });
-    });
+    // El arranque va escalonado: el muro le da a cada mosaico un turno. Nueve
+    // decodificadores montándose a la vez es lo que dejaba media rejilla con el
+    // botón de play, y reintentar tampoco servía porque todos reintentaban
+    // juntos otra vez.
+    const start = () =>
+      void attach().catch(() => {
+        if (cancelled || !video) return;
+        usingHls = false;
+        video.src = src;
+        video.addEventListener("loadedmetadata", tryPlay, { once: true });
+      });
+
+    if (startDelayMs > 0) {
+      startTimer = setTimeout(start, startDelayMs);
+    } else {
+      start();
+    }
 
     return () => {
       cancelled = true;
       if (playTimer) clearTimeout(playTimer);
+      if (startTimer) clearTimeout(startTimer);
       video.removeEventListener("playing", onPlaying);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("waiting", onWaiting);
@@ -227,7 +247,7 @@ export function IntegraHlsPlayer({
         /* ignore */
       }
     };
-  }, [src, autoPlay, retryTick]);
+  }, [src, autoPlay, retryTick, startDelayMs]);
 
   useEffect(() => {
     const video = videoRef.current;
