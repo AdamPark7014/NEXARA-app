@@ -86,7 +86,7 @@ export function subscribePushEvents(fn: Listener): () => void {
 }
 
 function labelFor(type: string): string {
-  if (type === "human") return "Persona";
+  if (type === "human") return "Humano";
   if (type === "vehicle") return "Vehículo";
   if (type === "face") return "Rostro";
   return type;
@@ -165,7 +165,9 @@ export function IntegraDetectionOverlay({
           >
             <span className={styles.detTag} data-named={name ? "1" : undefined}>
               <span className={styles.detTagName}>{tag}</span>
-              <span className={styles.detTagAge}>{relAge(b.at)}</span>
+              <span className={styles.detTagAge}>
+                {name ? relAge(b.at) : `sin ID · ${relAge(b.at)}`}
+              </span>
             </span>
           </div>
         );

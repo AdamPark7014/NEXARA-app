@@ -16,8 +16,10 @@ import {
 import { IntegraEzuiKitPlayer } from "../_EzuiKitPlayer";
 import { IntegraDetectionOverlay, subscribePushEvents } from "../_DetectionOverlay";
 import { IntegraLivePlayer } from "../_LivePlayer";
+import { IntegraOccupancyPanel } from "../_OccupancyPanel";
 import { IntegraPtzPad } from "../_PtzPad";
 import { IntegraRecentAccess } from "../_RecentAccess";
+import { IntegraVehicleStrip } from "../_VehicleStrip";
 import {
   defaultRangeHours,
   fromDatetimeLocalValue,
@@ -46,6 +48,7 @@ type Cam = {
   hasAudio?: boolean;
   isDoorCamera?: boolean;
   isPtz?: boolean;
+  anprCapable?: boolean;
 };
 
 type StreamSlot = {
@@ -119,6 +122,8 @@ export default function IntegraVideoPage() {
   const [caps, setCaps] = useState(() => getCachedCapabilities());
   /** Última detección / acceso por IP de equipo (rail + contador toolbar). */
   const [detByIp, setDetByIp] = useState<Record<string, number>>({});
+  const [namedDetCount, setNamedDetCount] = useState(0);
+  const [opticalDetCount, setOpticalDetCount] = useState(0);
 
   useEffect(() => subscribeProvider(setProvider), []);
   useEffect(() => subscribeCapabilities(setCaps), []);
@@ -126,6 +131,8 @@ export default function IntegraVideoPage() {
   useEffect(() => {
     return subscribePushEvents((events) => {
       const now = Date.now();
+      let named = 0;
+      let optical = 0;
       setDetByIp((prev) => {
         let next: Record<string, number> | null = null;
         for (const ev of events) {
@@ -135,9 +142,15 @@ export default function IntegraVideoPage() {
           if (!Number.isFinite(age) || age > 8_000) continue;
           if (!next) next = { ...prev };
           next[ev.deviceIp] = now;
+          if (ev.personName) named += 1;
+          else if (ev.targets?.length) optical += 1;
         }
         return next ?? prev;
       });
+      if (named || optical) {
+        setNamedDetCount((n) => n + named);
+        setOpticalDetCount((n) => n + optical);
+      }
     });
   }, []);
 
@@ -352,6 +365,12 @@ export default function IntegraVideoPage() {
   const liveCount = liveWallIds.size;
   const activeDetCount = Object.keys(detByIp).length;
   const focusCam = focus ? items.find((c) => c.id === focus.id) : undefined;
+  const detMeta =
+    activeDetCount || namedDetCount || opticalDetCount
+      ? ` · ${activeDetCount} det.${namedDetCount ? ` · ${namedDetCount} con nombre` : ""}${
+          opticalDetCount ? ` · ${opticalDetCount} ópticas` : ""
+        }`
+      : "";
 
   return (
     <IgPage>
@@ -361,10 +380,8 @@ export default function IntegraVideoPage() {
           filling
             ? "Abriendo cámaras…"
             : mode === "wall"
-              ? `${filtered.length} cámaras · ${slots.length}/${layout} en muro · ${liveCount} vivas${
-                  activeDetCount ? ` · ${activeDetCount} det.` : ""
-                }`
-              : `${filtered.length} cámaras · foco${activeDetCount ? ` · ${activeDetCount} det.` : ""}`
+              ? `${filtered.length} cámaras · ${slots.length}/${layout} en muro · ${liveCount} vivas${detMeta}`
+              : `${filtered.length} cámaras · foco${detMeta}`
         }
         actions={
           <>
@@ -696,17 +713,34 @@ export default function IntegraVideoPage() {
                       </div>
                     )}
                     <div className={styles.focusSide}>
+                      {!focusCam?.isDoorCamera && (
+                        <IntegraOccupancyPanel enabled={mode === "focus"} />
+                      )}
                       {focusCam?.isDoorCamera && (
                         <IntegraRecentAccess
                           deviceIp={focusCam.sourceIp ?? null}
                           enabled={mode === "focus"}
                         />
                       )}
-                      {focusCam?.isPtz && (
-                        <IntegraPtzPad
-                          cameraId={focus.id}
-                          canControl={Boolean(caps?.canControlDoors)}
+                      {(focusCam?.isPtz || focusCam?.anprCapable === false) && (
+                        <IntegraVehicleStrip
+                          deviceIp={focusCam?.sourceIp ?? null}
+                          enabled={mode === "focus"}
                         />
+                      )}
+                      {focusCam?.isPtz && (
+                        <>
+                          {focusCam.anprCapable === false && (
+                            <p className={styles.ptzHint}>
+                              Esta PTZ no tiene ANPR: se mueve y hace zoom, pero no lee
+                              matrículas. Hace falta cámara serie ITC.
+                            </p>
+                          )}
+                          <IntegraPtzPad
+                            cameraId={focus.id}
+                            canControl={Boolean(caps?.canControlDoors)}
+                          />
+                        </>
                       )}
                     </div>
                     {note && (

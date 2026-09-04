@@ -170,6 +170,13 @@ export default function IntegraPeoplePage() {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [orgId, setOrgId] = useState("");
+  const [editName, setEditName] = useState("");
+  const [editValidFrom, setEditValidFrom] = useState("");
+  const [editValidTo, setEditValidTo] = useState("");
+  const [editValidEnable, setEditValidEnable] = useState(true);
+  const [opNote, setOpNote] = useState<string | null>(null);
+  const [opResults, setOpResults] = useState<Array<{ deviceIp: string; ok: boolean; error?: string }> | null>(null);
+  const [mutating, setMutating] = useState(false);
   const [orgFilter, setOrgFilter] = useState("");
   const [validityFilter, setValidityFilter] = useState<ValidityFilter>("");
   const [error, setError] = useState<string | null>(null);
@@ -182,6 +189,16 @@ export default function IntegraPeoplePage() {
   const isIsapi = provider === "ISAPI";
 
   useEffect(() => subscribeProvider(setProvider), []);
+
+  useEffect(() => {
+    if (!selected) return;
+    setEditName(selected.name);
+    setEditValidFrom(selected.validFrom?.slice(0, 19) || "");
+    setEditValidTo(selected.validTo?.slice(0, 19) || "");
+    setEditValidEnable(selected.validEnable !== false);
+    setOpNote(null);
+    setOpResults(null);
+  }, [selected?.id]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -424,14 +441,174 @@ export default function IntegraPeoplePage() {
                     {faceState === "unavailable" && (
                       <p className={styles.personNote} data-tone="warn">
                         El rostro está dado de alta, pero el terminal no entrega la foto: la
-                        guarda como modelo biométrico, no como imagen. Para ver caras hay que
-                        cargarlas desde aquí, o mirar la cámara de la puerta en vivo.
+                        guarda como modelo biométrico, no como imagen. Sube un JPEG desde aquí
+                        para actualizarlo en todos los terminales.
                       </p>
                     )}
-                    <p className={styles.personNote}>
-                      Alta y edición facial/tarjeta se hacen en el terminal. Esta ficha es el
-                      espejo ISAPI del sitio.
-                    </p>
+
+                    <div className={styles.personCreate}>
+                      <IgField label="Nombre">
+                        <input
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          style={{ ...inputStyle, maxWidth: "100%" }}
+                        />
+                      </IgField>
+                      <IgField label="Vigencia desde">
+                        <input
+                          value={editValidFrom}
+                          onChange={(e) => setEditValidFrom(e.target.value)}
+                          style={{ ...inputStyle, maxWidth: "100%" }}
+                          placeholder="2020-01-01T00:00:00"
+                        />
+                      </IgField>
+                      <IgField label="Vigencia hasta">
+                        <input
+                          value={editValidTo}
+                          onChange={(e) => setEditValidTo(e.target.value)}
+                          style={{ ...inputStyle, maxWidth: "100%" }}
+                          placeholder="2037-12-31T23:59:59"
+                        />
+                      </IgField>
+                      <label className={styles.personCheck}>
+                        <input
+                          type="checkbox"
+                          checked={editValidEnable}
+                          onChange={(e) => setEditValidEnable(e.target.checked)}
+                        />
+                        Vigencia activa
+                      </label>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        <IgBtn
+                          variant="primary"
+                          disabled={mutating || !editName.trim()}
+                          onClick={async () => {
+                            setMutating(true);
+                            setError(null);
+                            try {
+                              const r = await integraApi<{
+                                results?: Array<{ deviceIp: string; ok: boolean; error?: string }>;
+                              }>(`integra/people/${encodeURIComponent(selected.id)}`, {
+                                method: "PATCH",
+                                body: JSON.stringify({
+                                  personName: editName.trim(),
+                                  validFrom: editValidFrom || undefined,
+                                  validTo: editValidTo || undefined,
+                                  validEnable: editValidEnable,
+                                }),
+                              });
+                              setOpResults(r.results || null);
+                              setOpNote("Ficha actualizada en terminales");
+                              await load();
+                            } catch (e) {
+                              setError(e instanceof Error ? e.message : "Error al guardar");
+                            } finally {
+                              setMutating(false);
+                            }
+                          }}
+                        >
+                          {mutating ? "…" : "Guardar en terminales"}
+                        </IgBtn>
+                        <label className={styles.personFileBtn}>
+                          Subir foto
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png"
+                            hidden
+                            disabled={mutating}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              e.target.value = "";
+                              if (!file) return;
+                              setMutating(true);
+                              setError(null);
+                              try {
+                                const buf = await file.arrayBuffer();
+                                const bytes = new Uint8Array(buf);
+                                let binary = "";
+                                for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+                                const imageBase64 = btoa(binary);
+                                const r = await integraApi<{
+                                  results?: Array<{ deviceIp: string; ok: boolean; error?: string }>;
+                                  note?: string;
+                                }>(`integra/people/${encodeURIComponent(selected.id)}/face`, {
+                                  method: "POST",
+                                  body: JSON.stringify({ imageBase64 }),
+                                });
+                                setOpResults(r.results || null);
+                                setOpNote(r.note || "Foto empujada a terminales");
+                                await load();
+                              } catch (err) {
+                                setError(err instanceof Error ? err.message : "Error foto");
+                              } finally {
+                                setMutating(false);
+                              }
+                            }}
+                          />
+                        </label>
+                        <IgBtn
+                          disabled={mutating}
+                          onClick={async () => {
+                            if (!confirm("¿Quitar el rostro biométrico en todos los terminales?")) return;
+                            setMutating(true);
+                            try {
+                              const r = await integraApi<{
+                                results?: Array<{ deviceIp: string; ok: boolean; error?: string }>;
+                              }>(`integra/people/${encodeURIComponent(selected.id)}/face`, {
+                                method: "DELETE",
+                              });
+                              setOpResults(r.results || null);
+                              setOpNote("Rostro eliminado");
+                              await load();
+                            } catch (err) {
+                              setError(err instanceof Error ? err.message : "Error");
+                            } finally {
+                              setMutating(false);
+                            }
+                          }}
+                        >
+                          Quitar foto
+                        </IgBtn>
+                        <IgBtn
+                          disabled={mutating}
+                          onClick={async () => {
+                            if (!confirm(`¿Eliminar ${selected.name} de todos los terminales?`)) return;
+                            setMutating(true);
+                            try {
+                              const r = await integraApi<{
+                                results?: Array<{ deviceIp: string; ok: boolean; error?: string }>;
+                              }>(`integra/people/${encodeURIComponent(selected.id)}`, {
+                                method: "DELETE",
+                              });
+                              setOpResults(r.results || null);
+                              setSelected(null);
+                              setDetail(null);
+                              await load();
+                            } catch (err) {
+                              setError(err instanceof Error ? err.message : "Error");
+                            } finally {
+                              setMutating(false);
+                            }
+                          }}
+                        >
+                          Eliminar persona
+                        </IgBtn>
+                      </div>
+                      {opNote && <p className={styles.personNote}>{opNote}</p>}
+                      {opResults && (
+                        <ul className={styles.personOpList}>
+                          {opResults.map((r) => (
+                            <li key={r.deviceIp} data-ok={r.ok ? "1" : "0"}>
+                              {r.deviceIp}: {r.ok ? "OK" : r.error || "falló"}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <p className={styles.personNote}>
+                        La foto se empuja al terminal con FaceDataRecord; no se puede
+                        descargar el modelo biométrico de vuelta.
+                      </p>
+                    </div>
                   </>
                 )}
 
@@ -465,6 +642,52 @@ export default function IntegraPeoplePage() {
                   ? "Selecciona una persona del directorio"
                   : "Selecciona una persona para ver foto, vigencia y credenciales del terminal."}
               </p>
+            )}
+
+            {isIsapi && (
+              <>
+                <hr className={styles.personDivider} />
+                <div className={styles.personCreate}>
+                  <strong>Alta en terminales</strong>
+                  <IgField label="Nombre">
+                    <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
+                  </IgField>
+                  <IgField label="Código empleado">
+                    <input value={code} onChange={(e) => setCode(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
+                  </IgField>
+                  <IgBtn
+                    variant="primary"
+                    disabled={!name.trim() || !code.trim() || mutating}
+                    onClick={async () => {
+                      setMutating(true);
+                      setError(null);
+                      try {
+                        const r = await integraApi<{
+                          results?: Array<{ deviceIp: string; ok: boolean; error?: string }>;
+                        }>("integra/people", {
+                          method: "POST",
+                          body: JSON.stringify({
+                            personName: name.trim(),
+                            employeeNo: code.trim(),
+                            personCode: code.trim(),
+                          }),
+                        });
+                        setOpResults(r.results || null);
+                        setOpNote("Persona creada");
+                        setName("");
+                        setCode("");
+                        await load();
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "Error");
+                      } finally {
+                        setMutating(false);
+                      }
+                    }}
+                  >
+                    Alta persona
+                  </IgBtn>
+                </div>
+              </>
             )}
 
             {isArtemis && (

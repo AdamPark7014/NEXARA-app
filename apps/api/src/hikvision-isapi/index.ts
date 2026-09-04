@@ -24,6 +24,7 @@ export {
   listProxyChannels,
   listVideoChannels,
   supportsAccessControl,
+  supportsAnpr,
   supportsPtz,
   type IsapiDeviceIdentity,
   type IsapiDeviceKind,
@@ -34,17 +35,24 @@ export {
 
 export {
   describeAcsEvent,
+  deleteFaceData,
+  deleteUserInfo,
   listAcsEvents,
   listAllUserInfo,
   mapIsapiUserToPersonDto,
   mapMirrorPersonToDto,
+  modifyUserInfo,
+  recordUserInfo,
   searchAcsEvents,
   searchUserInfo,
+  uploadFaceData,
   type AcsEventPage,
+  type DeviceOpResult,
   type IntegraPersonDto,
   type IsapiAcsEvent,
   type IsapiUserInfo,
   type UserInfoPage,
+  type UserInfoWrite,
 } from './isapi-acs';
 
 export { probeRtsp, type RtspProbeResult } from './rtsp-probe';

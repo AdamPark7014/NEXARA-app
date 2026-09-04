@@ -2131,6 +2131,36 @@
   color: var(--ig-text);
 }
 
+.personCheck {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ig-text);
+}
+
+.personFileBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid var(--ig-line);
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  background: var(--ig-panel);
+}
+
+.personOpList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+}
+
+.personOpList li[data-ok="1"] { color: var(--ig-ok); }
+.personOpList li[data-ok="0"] { color: var(--ig-danger, #dc2626); }
+
 /* La IP del terminal, debajo de su nombre: dato de instalación, no titular. */
 .personFactSub {
   display: block;

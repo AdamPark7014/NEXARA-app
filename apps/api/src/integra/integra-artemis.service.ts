@@ -4,13 +4,19 @@ import { AuditService } from '../audit/audit.service.js';
 import { rethrowArtemis, toArtemisOffsetIso } from '../hikvision-artemis/index';
 import {
   controlDoor,
+  deleteFaceData,
+  deleteUserInfo,
   describeAcsEvent,
   identifyDevice,
   listAcsEvents,
   listAllUserInfo,
   mapIsapiUserToPersonDto,
   mapMirrorPersonToDto,
+  modifyUserInfo,
+  recordUserInfo,
+  uploadFaceData,
   type IsapiAcsEvent,
+  type UserInfoWrite,
 } from '../hikvision-isapi/index';
 import { IntegraSiteService } from './integra-site.service';
 import { IntegraMediaService } from './integra-media.service';
@@ -352,6 +358,7 @@ export class IntegraArtemisService {
               doorIndexCode?: string;
               channelNumber?: number;
               ptz?: boolean;
+              anprCapable?: boolean;
               source?: { ipAddress?: string | null; model?: string | null } | null;
             };
             return {
@@ -372,6 +379,7 @@ export class IntegraArtemisService {
               model: raw.source?.model ?? null,
               channelNumber: raw.channelNumber ?? null,
               isPtz: raw.ptz === true,
+              anprCapable: raw.anprCapable === true,
             };
           }),
         };
@@ -1058,7 +1066,7 @@ export class IntegraArtemisService {
         personId,
         source: 'mirror' as const,
         provider: 'ISAPI',
-        note: 'Alta y edición se hacen en el terminal. Aquí se muestra el espejo ISAPI.',
+        note: 'Edita y sube foto desde esta ficha; se propaga a los terminales DS-K1T.',
         person: {
           ...dto,
           sourceName: label.name(dto.sourceIp),
@@ -1124,12 +1132,49 @@ export class IntegraArtemisService {
 
   async addPerson(
     companyId: number | null,
-    input: { personName: string; personCode?: string; orgIndexCode: string },
+    input: {
+      personName: string;
+      personCode?: string;
+      orgIndexCode?: string;
+      employeeNo?: string;
+      gender?: string;
+      userType?: string;
+      validFrom?: string;
+      validTo?: string;
+      validEnable?: boolean;
+      doorRight?: string;
+    },
     actor?: Actor,
     siteId?: number | null,
   ) {
+    const resolved = await this.client(companyId, siteId);
+    if (resolved.provider === 'ISAPI' && resolved.isapiForHost && resolved.siteId && companyId) {
+      const employeeNo = String(input.employeeNo || input.personCode || '').trim();
+      if (!employeeNo) throw new BadRequestException('Código de empleado requerido');
+      const user: UserInfoWrite = {
+        employeeNo,
+        name: input.personName.trim() || employeeNo,
+        userType: input.userType || 'normal',
+        gender: input.gender,
+        doorRight: input.doorRight,
+        Valid: {
+          enable: input.validEnable !== false,
+          beginTime: input.validFrom || '2020-01-01T00:00:00',
+          endTime: input.validTo || '2037-12-31T23:59:59',
+        },
+      };
+      const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
+        await recordUserInfo(client, user);
+      });
+      await this.auditMut('integra.person.add', actor, companyId, resolved.siteId, {
+        employeeNo,
+        results,
+      });
+      await this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
+      return { success: results.some((r) => r.ok), results, provider: 'ISAPI' as const };
+    }
     try {
-      const resolved = await this.client(companyId, siteId);
+      if (!input.orgIndexCode) throw new BadRequestException('orgIndexCode requerido en Artemis');
       const data = await resolved.client.personAdd({
         personName: input.personName,
         personCode: input.personCode,
@@ -1145,14 +1190,84 @@ export class IntegraArtemisService {
     }
   }
 
+  async updatePerson(
+    companyId: number | null,
+    personId: string,
+    input: {
+      personName?: string;
+      gender?: string;
+      userType?: string;
+      validFrom?: string;
+      validTo?: string;
+      validEnable?: boolean;
+      doorRight?: string;
+    },
+    actor?: Actor,
+    siteId?: number | null,
+  ) {
+    const resolved = await this.client(companyId, siteId);
+    if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost || !resolved.siteId || !companyId) {
+      throw new BadRequestException('Edición de ficha solo disponible en sitios ISAPI');
+    }
+    const employeeNo = String(personId).trim();
+    const existing = await this.prisma.integraPerson.findFirst({
+      where: { companyId, personId: employeeNo, ...(siteId ? { siteId } : {}) },
+    });
+    const raw = (existing?.raw && typeof existing.raw === 'object' ? existing.raw : {}) as Record<
+      string,
+      unknown
+    >;
+    const user: UserInfoWrite = {
+      employeeNo,
+      name: (input.personName || existing?.personName || employeeNo).trim(),
+      userType: input.userType || (raw.userType != null ? String(raw.userType) : 'normal'),
+      gender: input.gender ?? (raw.gender != null ? String(raw.gender) : undefined),
+      doorRight:
+        input.doorRight ?? (raw.doorRight != null ? String(raw.doorRight) : undefined),
+      Valid: {
+        enable: input.validEnable !== false,
+        beginTime:
+          input.validFrom ||
+          (raw.Valid as { beginTime?: string } | undefined)?.beginTime ||
+          '2020-01-01T00:00:00',
+        endTime:
+          input.validTo ||
+          (raw.Valid as { endTime?: string } | undefined)?.endTime ||
+          '2037-12-31T23:59:59',
+      },
+    };
+    const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
+      await modifyUserInfo(client, user);
+    });
+    await this.auditMut('integra.person.update', actor, companyId, resolved.siteId, {
+      employeeNo,
+      results,
+    });
+    await this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
+    return { success: results.some((r) => r.ok), results, provider: 'ISAPI' as const };
+  }
+
   async deletePerson(
     companyId: number | null,
     personId: string,
     actor?: Actor,
     siteId?: number | null,
   ) {
+    const resolved = await this.client(companyId, siteId);
+    if (resolved.provider === 'ISAPI' && resolved.isapiForHost && resolved.siteId && companyId) {
+      const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
+        await deleteUserInfo(client, personId);
+      });
+      await this.auditMut('integra.person.delete', actor, companyId, resolved.siteId, {
+        personId,
+        results,
+      });
+      await this.prisma.integraPerson.deleteMany({
+        where: { companyId, personId, siteId: resolved.siteId },
+      });
+      return { success: results.some((r) => r.ok), results, provider: 'ISAPI' as const };
+    }
     try {
-      const resolved = await this.client(companyId, siteId);
       await resolved.client.personDelete(personId);
       await this.auditMut('integra.person.delete', actor, companyId, resolved.siteId ?? 0, {
         personId,
@@ -1164,6 +1279,88 @@ export class IntegraArtemisService {
     } catch (error) {
       rethrowArtemis(error, `No se pudo eliminar persona ${personId}`);
     }
+  }
+
+  async uploadPersonFace(
+    companyId: number | null,
+    personId: string,
+    jpeg: Buffer,
+    actor?: Actor,
+    siteId?: number | null,
+  ) {
+    if (!jpeg?.length) throw new BadRequestException('Imagen JPEG requerida');
+    if (jpeg.length > 2_000_000) throw new BadRequestException('Foto demasiado grande (máx ~2 MB)');
+    const resolved = await this.client(companyId, siteId);
+    if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost || !resolved.siteId || !companyId) {
+      throw new BadRequestException('Subida de rostro solo en sitios ISAPI');
+    }
+    const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
+      await uploadFaceData(client, { employeeNo: personId, jpeg });
+    });
+    await this.auditMut('integra.person.face.upload', actor, companyId, resolved.siteId, {
+      personId,
+      results,
+    });
+    await this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
+    return {
+      success: results.some((r) => r.ok),
+      results,
+      note: 'El terminal guarda un modelo biométrico; no se puede volver a descargar el JPEG.',
+    };
+  }
+
+  async deletePersonFace(
+    companyId: number | null,
+    personId: string,
+    actor?: Actor,
+    siteId?: number | null,
+  ) {
+    const resolved = await this.client(companyId, siteId);
+    if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost || !resolved.siteId || !companyId) {
+      throw new BadRequestException('Borrado de rostro solo en sitios ISAPI');
+    }
+    const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
+      await deleteFaceData(client, personId);
+    });
+    await this.auditMut('integra.person.face.delete', actor, companyId, resolved.siteId, {
+      personId,
+      results,
+    });
+    await this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
+    return { success: results.some((r) => r.ok), results };
+  }
+
+  /** Propaga una operación a todos los terminales ACS del sitio. */
+  private async fanoutAcs(
+    siteId: number,
+    isapiForHost: (ip: string) => import('../hikvision-isapi/index').HikvisionIsapiClient | null,
+    fn: (client: import('../hikvision-isapi/index').HikvisionIsapiClient) => Promise<void>,
+  ): Promise<Array<{ deviceIp: string; ok: boolean; error?: string }>> {
+    const acs = await this.prisma.integraDevice.findMany({
+      where: { siteId, kind: 'ACS', ip: { not: null } },
+      select: { ip: true },
+    });
+    if (acs.length === 0) throw new BadRequestException('Sin terminales ACS en el sitio');
+    const results: Array<{ deviceIp: string; ok: boolean; error?: string }> = [];
+    for (const d of acs) {
+      const ip = d.ip as string;
+      const client = isapiForHost(ip);
+      if (!client) {
+        results.push({ deviceIp: ip, ok: false, error: 'Sin cliente ISAPI' });
+        continue;
+      }
+      try {
+        await fn(client);
+        results.push({ deviceIp: ip, ok: true });
+      } catch (e) {
+        results.push({
+          deviceIp: ip,
+          ok: false,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+    return results;
   }
 
   async listPrivilegeGroups(companyId: number | null, siteId?: number | null) {
@@ -1223,6 +1420,28 @@ export class IntegraArtemisService {
       return {
         total: items.length,
         source: 'mirror' as const,
+        syncNote:
+          'Lista NEXARA. El NVR/PTZ de Oficinas no acepta OCR ANPR (403); las placas no se empujan al equipo.',
+        items: items.map((v) => ({
+          id: v.vehicleId,
+          plate: v.plateNo,
+          personId: v.personId,
+          personName: v.personName,
+        })),
+      };
+    }
+    const resolved = await this.client(companyId, siteId);
+    if (resolved.provider === 'ISAPI' && companyId) {
+      const sid = siteId ?? resolved.siteId;
+      const items = await this.prisma.integraVehicle.findMany({
+        where: { companyId, ...(sid ? { siteId: sid } : {}) },
+        orderBy: { plateNo: 'asc' },
+      });
+      return {
+        total: items.length,
+        source: 'mirror' as const,
+        syncNote:
+          'Lista NEXARA. El NVR/PTZ de Oficinas no acepta OCR ANPR (403); las placas no se empujan al equipo.',
         items: items.map((v) => ({
           id: v.vehicleId,
           plate: v.plateNo,
@@ -1255,8 +1474,48 @@ export class IntegraArtemisService {
     actor?: Actor,
     siteId?: number | null,
   ) {
+    const resolved = await this.client(companyId, siteId);
+    if (resolved.provider === 'ISAPI' && companyId && resolved.siteId) {
+      const plate = body.plateNo.trim().toUpperCase();
+      if (!plate) throw new BadRequestException('Placa requerida');
+      let personName: string | null = null;
+      if (body.personId) {
+        const p = await this.prisma.integraPerson.findFirst({
+          where: { companyId, siteId: resolved.siteId, personId: body.personId },
+          select: { personName: true },
+        });
+        personName = p?.personName ?? null;
+      }
+      const vehicleId = `local-${plate.replace(/[^A-Z0-9]/gi, '')}`;
+      await this.prisma.integraVehicle.upsert({
+        where: { siteId_vehicleId: { siteId: resolved.siteId, vehicleId } },
+        create: {
+          companyId,
+          siteId: resolved.siteId,
+          vehicleId,
+          plateNo: plate,
+          personId: body.personId || null,
+          personName,
+          raw: { source: 'nexara', deviceSync: false },
+        },
+        update: {
+          plateNo: plate,
+          personId: body.personId || null,
+          personName,
+          syncedAt: new Date(),
+        },
+      });
+      await this.auditMut('integra.vehicle.add', actor, companyId, resolved.siteId, {
+        plate,
+        deviceSync: false,
+      });
+      return {
+        success: true,
+        deviceSync: false,
+        note: 'Guardada en NEXARA. Este parque no tiene cámara ANPR; no se empuja al NVR.',
+      };
+    }
     try {
-      const resolved = await this.client(companyId, siteId);
       const data = await resolved.client.vehicleAdd(body);
       await this.auditMut('integra.vehicle.add', actor, companyId, resolved.siteId ?? 0, body);
       if (resolved.siteId && companyId) {
@@ -1274,8 +1533,35 @@ export class IntegraArtemisService {
     actor?: Actor,
     siteId?: number | null,
   ) {
+    const resolved = await this.client(companyId, siteId);
+    if (resolved.provider === 'ISAPI' && companyId && resolved.siteId) {
+      const vehicleId = String(body.vehicleId || '');
+      const plate = String(body.plateNo || body.plate || '').trim().toUpperCase();
+      const personId = body.personId != null ? String(body.personId) : undefined;
+      const row = await this.prisma.integraVehicle.findFirst({
+        where: { companyId, siteId: resolved.siteId, vehicleId },
+      });
+      if (!row) throw new NotFoundException('Vehículo no encontrado');
+      let personName = row.personName;
+      if (personId) {
+        const p = await this.prisma.integraPerson.findFirst({
+          where: { companyId, siteId: resolved.siteId, personId },
+          select: { personName: true },
+        });
+        personName = p?.personName ?? null;
+      }
+      await this.prisma.integraVehicle.update({
+        where: { id: row.id },
+        data: {
+          ...(plate ? { plateNo: plate } : {}),
+          ...(personId !== undefined ? { personId: personId || null, personName } : {}),
+          syncedAt: new Date(),
+        },
+      });
+      await this.auditMut('integra.vehicle.update', actor, companyId, resolved.siteId, body);
+      return { success: true, deviceSync: false };
+    }
     try {
-      const resolved = await this.client(companyId, siteId);
       const data = await resolved.client.vehicleUpdate(body);
       await this.auditMut('integra.vehicle.update', actor, companyId, resolved.siteId ?? 0, body);
       return { success: true, data };
@@ -1290,8 +1576,17 @@ export class IntegraArtemisService {
     actor?: Actor,
     siteId?: number | null,
   ) {
+    const resolved = await this.client(companyId, siteId);
+    if (resolved.provider === 'ISAPI' && companyId) {
+      await this.prisma.integraVehicle.deleteMany({
+        where: { companyId, vehicleId, ...(resolved.siteId ? { siteId: resolved.siteId } : {}) },
+      });
+      await this.auditMut('integra.vehicle.delete', actor, companyId, resolved.siteId ?? 0, {
+        vehicleId,
+      });
+      return { success: true, deviceSync: false };
+    }
     try {
-      const resolved = await this.client(companyId, siteId);
       await resolved.client.vehicleDelete(vehicleId);
       await this.auditMut('integra.vehicle.delete', actor, companyId, resolved.siteId ?? 0, {
         vehicleId,

@@ -55,8 +55,25 @@ function integraCanControlDoors(user: { roleKey?: string; isSuperAdmin?: boolean
 
 class AddPersonDto {
   @IsString() personName!: string;
-  @IsString() orgIndexCode!: string;
+  @IsOptional() @IsString() orgIndexCode?: string;
   @IsOptional() @IsString() personCode?: string;
+  @IsOptional() @IsString() employeeNo?: string;
+  @IsOptional() @IsString() gender?: string;
+  @IsOptional() @IsString() userType?: string;
+  @IsOptional() @IsString() validFrom?: string;
+  @IsOptional() @IsString() validTo?: string;
+  @IsOptional() @IsBoolean() validEnable?: boolean;
+  @IsOptional() @IsString() doorRight?: string;
+}
+
+class UpdatePersonDto {
+  @IsOptional() @IsString() personName?: string;
+  @IsOptional() @IsString() gender?: string;
+  @IsOptional() @IsString() userType?: string;
+  @IsOptional() @IsString() validFrom?: string;
+  @IsOptional() @IsString() validTo?: string;
+  @IsOptional() @IsBoolean() validEnable?: boolean;
+  @IsOptional() @IsString() doorRight?: string;
 }
 
 class AssignPrivilegeDto {
@@ -583,8 +600,31 @@ export class IntegraController {
     @CurrentUser() user: any,
     @Query('siteId') siteId?: string,
   ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para gestionar personas');
+    }
     return this.integra.addPerson(
       companyId,
+      dto,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Patch('people/:id')
+  updatePerson(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() dto: UpdatePersonDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para gestionar personas');
+    }
+    return this.integra.updatePerson(
+      companyId,
+      id,
       dto,
       { id: user?.id, email: user?.email },
       siteId ? parseInt(siteId, 10) : null,
@@ -598,7 +638,54 @@ export class IntegraController {
     @CurrentUser() user: any,
     @Query('siteId') siteId?: string,
   ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para gestionar personas');
+    }
     return this.integra.deletePerson(
+      companyId,
+      id,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Post('people/:id/face')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Empuja JPEG de rostro a los terminales (FaceDataRecord)' })
+  async uploadPersonFace(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() body: { imageBase64?: string },
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para gestionar personas');
+    }
+    const b64 = String(body?.imageBase64 || '').replace(/^data:image\/\w+;base64,/, '');
+    if (!b64) throw new BadRequestException('imageBase64 requerido');
+    const jpeg = Buffer.from(b64, 'base64');
+    return this.integra.uploadPersonFace(
+      companyId,
+      id,
+      jpeg,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Delete('people/:id/face')
+  @ApiOperation({ summary: 'Quita el rostro biométrico de los terminales' })
+  deletePersonFace(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para gestionar personas');
+    }
+    return this.integra.deletePersonFace(
       companyId,
       id,
       { id: user?.id, email: user?.email },
@@ -900,6 +987,32 @@ export class IntegraController {
       from: start,
       to: end,
       personId: personId || null,
+    });
+  }
+
+  @Get('occupancy')
+  @ApiOperation({ summary: 'Quién está en sitio hoy (accesos, no conteo óptico)' })
+  async occupancy(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    return this.push.occupancy(companyId, {
+      siteId: siteId ? parseInt(siteId, 10) : null,
+    });
+  }
+
+  @Get('plate-events')
+  @ApiOperation({ summary: 'Detecciones de vehículo / placas (OCR solo si hay ANPR)' })
+  async plateEvents(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    return this.push.plateEvents(companyId, {
+      siteId: siteId ? parseInt(siteId, 10) : null,
+      limit: limit ? parseInt(limit, 10) : 40,
     });
   }
 
