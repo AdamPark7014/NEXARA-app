@@ -100,12 +100,12 @@ export function IntegraAcsIdentityStrip({ enabled }: { enabled: boolean }) {
   return (
     <aside className={styles.accessStrip} aria-label="Identidad ACS">
       <header className={styles.accessStripHead}>
-        <strong>Identidad ACS</strong>
-        <span>{items.length ? `${items.length} en sitio` : "ocupación"}</span>
+        <strong>En sitio · ACS</strong>
+        <span>{items.length ? `${items.length} hoy` : "ocupación"}</span>
       </header>
       <p className={styles.ptzHint}>
-        Fotos y nombres de terminales / pases. Las cajas del video solo marcan
-        humano sin ID — no hay Face ID sobre AcuSense.
+        Face ID en terminal / pases — no en video de oficina. Las cajas ópticas
+        solo marcan «Humano · sin ID».
       </p>
       {error && (
         <p className={styles.ptzHint} data-tone="error">
