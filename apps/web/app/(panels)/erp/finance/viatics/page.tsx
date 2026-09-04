@@ -455,29 +455,9 @@ export default function ViaticosPage() {
       subtitle={cfg.subtitle}
       actions={
         <>
-          <ListExportActions
-            size="md"
-            onPdf={token ? () => void downloadPdf() : undefined}
-            pdfBusy={pdfBusy}
-            onExcel={
-              filtered.length > 0 && tab !== "analytics"
-                ? () =>
-                    exportToExcel(
-                      filtered,
-                      [
-                        { key: "id", label: "ID" },
-                        { key: "concepto", label: "Concepto" },
-                        { key: "usuario", label: "Solicitante", format: (v) => (v as Viatico["usuario"])?.nombre ?? "—" },
-                        { key: "montoSolicitado", label: "Monto" },
-                        { key: "estatus", label: "Estatus" },
-                        { key: "fechaSolicitud", label: "Fecha", format: (v) => (v ? String(v).slice(0, 10) : "") },
-                      ],
-                      "viaticos",
-                      { title: "Control de viáticos" },
-                    )
-                : undefined
-            }
-          />
+          <Button variant="ghost" iconLeft="📄" disabled={pdfBusy} onClick={() => void downloadPdf()}>
+            {pdfBusy ? "Generando…" : "Exportar PDF"}
+          </Button>
           <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
           {cfg.canCreate && (
             <Button variant="primary" iconLeft="💸" onClick={openCreate}>Solicitar viático</Button>

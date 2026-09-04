@@ -209,7 +209,14 @@ export default function OpsDashboardPage() {
   }, [scopedActivities]);
 
   const sevColor: Record<string, string> = { critical: "var(--danger)", warning: "var(--warning)", info: "var(--text-tertiary)" };
-  const ticketPriorityColor: Record<string, string> = { CRITICA: "var(--danger)", ALTA: "#f97316", MEDIA: "var(--warning)", BAJA: "var(--text-tertiary)" };
+  const ticketPriorityColor: Record<string, string> = {
+    CRITICA: "var(--danger)", ALTA: "#f97316", MEDIA: "var(--warning)", BAJA: "var(--text-tertiary)",
+    HIGH: "var(--danger)", MEDIUM: "var(--warning)", LOW: "var(--text-tertiary)",
+  };
+  const slaResponse = slaBrief?.responseSla?.compliancePct;
+  const slaResolution = slaBrief?.resolutionSla?.compliancePct;
+  const inboxNew = slaBrief?.inboxByStatus?.NEW ?? 0;
+  const breachCount = slaBrief?.breaches?.length ?? 0;
 
   return (
     <DashPage>
