@@ -234,3 +234,13 @@ equipo ACS del sitio y escribe el espejo. `GET /integra/events` consulta
   `192.168.9.34`. La columna `mask` de esa hoja (`255.255.255.1`, `.2`, `.3`…)
   no es una máscara de red — la real es `255.255.255.0`.
 - El domo PTZ (`.179`) es el único con audio (`PCMU`).
+- **PTZ DarkFighter (medido 2026-09-04):** `Smart/FieldDetection|LineDetection`
+  → HTTP 403 `notSupport`; `vehicleDetection`/ITC/Traffic → 403/404;
+  `SmartCap.isSupportFieldDetection=false`. Sí: `motionDetection` (200) y
+  `httpHosts`. **No clasifica vehículos ni lee placas.**
+- **NVR FieldDetection:** OK en canales PoE 1/2/9/10 con
+  `detectionTarget=human,vehicle` (Escalera, Office Entrance, Escaleras 02,
+  Azotea). Canal 13 (PTZ) → 403. El NVR debe tener `httpHosts` a NEXARA o
+  esos eventos no llegan.
+- **AcuSense LAN** admiten `human,vehicle` en FieldDetection; en oficinas se
+  deja `human` para no ensuciar con falsos vehicle.

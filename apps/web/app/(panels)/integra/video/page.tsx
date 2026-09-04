@@ -383,10 +383,15 @@ export default function IntegraVideoPage() {
   };
 
   const requestPlayback = useCallback(
-    async (segmentIndex = 0) => {
-      if (!selected) return;
-      const beginTime = fromDatetimeLocalValue(begin);
-      const endTime = fromDatetimeLocalValue(end);
+    async (segmentIndex = 0, rangeOverride?: { start: string; end: string }) => {
+      if (!selected) {
+        setError("Elige una cámara en el inventario o el muro antes de pedir grabación.");
+        return;
+      }
+      const beginLocal = rangeOverride?.start ?? begin;
+      const endLocal = rangeOverride?.end ?? end;
+      const beginTime = fromDatetimeLocalValue(beginLocal);
+      const endTime = fromDatetimeLocalValue(endLocal);
       if (!beginTime || !endTime) {
         setError("Rango de fechas inválido");
         return;
@@ -412,7 +417,10 @@ export default function IntegraVideoPage() {
         const segs = Array.isArray(data.segments) ? data.segments : [];
         if (!play) {
           setPlayback(null);
-          setError(data.note || "Sin grabaciones en ese rango");
+          setError(
+            data.note ||
+              "Sin grabaciones en ese rango. El NVR solo guarda lo que cabe en disco; prueba otra cámara o un rango más corto.",
+          );
           setNote(data.note || null);
           setShowTech(true);
           return;
@@ -433,12 +441,83 @@ export default function IntegraVideoPage() {
         setShowTech(true);
       } catch (e) {
         setPlayback(null);
-        setError(e instanceof Error ? e.message : "Error playback");
+        setError(e instanceof Error ? e.message : "Error al pedir playback");
       } finally {
         setBusy(null);
       }
     },
     [selected, begin, end],
+  );
+
+  /** Un clic: fija rango y reproduce (evita el callejón «solo cambió fechas»). */
+  const playLastHours = useCallback(
+    async (hours: number) => {
+      const r = defaultRangeHours(hours);
+      setBegin(r.start);
+      setEnd(r.end);
+      let camId = selected;
+      if (!camId) {
+        const first = filtered.find((c) => onlineish(c.status)) || filtered[0];
+        if (!first) {
+          setError("No hay cámaras en el inventario para reproducir.");
+          return;
+        }
+        camId = first.id;
+        setSelected(camId);
+        try {
+          await playLive(first, false);
+        } catch {
+          /* requestPlayback igual intentará con el id */
+        }
+      }
+      setViewMode("focus");
+      // requestPlayback lee `selected` del closure — forzar con override tras setState
+      // reutilizando la misma API inline si selected aún no actualizó.
+      const beginTime = fromDatetimeLocalValue(r.start);
+      const endTime = fromDatetimeLocalValue(r.end);
+      if (!beginTime || !endTime || !camId) return;
+      setBusy("pb");
+      setError(null);
+      try {
+        const data = await integraApi<{
+          url: string | null;
+          hls?: string | null;
+          note?: string;
+          segmentIndex?: number;
+          segments?: PbSegment[];
+        }>(`integra/cameras/${encodeURIComponent(camId)}/playback`, {
+          method: "POST",
+          body: JSON.stringify({ beginTime, endTime, segmentIndex: 0 }),
+        });
+        const play = data.hls || data.url;
+        const segs = Array.isArray(data.segments) ? data.segments : [];
+        if (!play) {
+          setPlayback(null);
+          setError(
+            data.note ||
+              "Sin grabaciones en las últimas horas. Retención según disco del NVR.",
+          );
+          setNote(data.note || null);
+          setShowTech(true);
+          return;
+        }
+        setPlayback({
+          cameraId: camId,
+          hls: play,
+          note: data.note || null,
+          segments: segs,
+          segmentIndex: data.segmentIndex ?? 0,
+        });
+        setNote(data.note || `Últimas ${hours}h · ${segs.length || 1} segmento(s)`);
+        setShowTech(true);
+      } catch (e) {
+        setPlayback(null);
+        setError(e instanceof Error ? e.message : "Error al pedir playback");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [selected, filtered, playLive],
   );
 
   const openFocus = (camId: string) => {
@@ -488,13 +567,13 @@ export default function IntegraVideoPage() {
     <IgPage>
       <IntegraLiveAccessBanner enabled />
       <IgToolbar
-        title="Video en vivo"
+        title="Video · vivo y 24h"
         meta={
           filling
             ? "Abriendo cámaras…"
             : mode === "wall"
               ? `${filtered.length} cámaras · ${slots.length}/${layout} en muro · ${liveCount} vivas${detMeta}`
-              : `${filtered.length} cámaras · foco${detMeta}`
+              : `${filtered.length} cámaras · foco${playbackActive ? " · playback" : ""}${detMeta}`
         }
         actions={
           <>
@@ -530,8 +609,17 @@ export default function IntegraVideoPage() {
                 </button>
               ))}
             </div>
+            {!isHct && (
+              <IgBtn
+                variant="primary"
+                disabled={filling || filtered.length === 0 || busy === "pb"}
+                title="Abre el foco y reproduce las últimas 24 h del NVR"
+                onClick={() => void playLastHours(24)}
+              >
+                {busy === "pb" ? "Buscando…" : "Playback 24h"}
+              </IgBtn>
+            )}
             <IgBtn
-              variant="primary"
               disabled={filling || filtered.length === 0}
               onClick={() => void fillWall(filtered)}
             >
@@ -543,6 +631,12 @@ export default function IntegraVideoPage() {
         }
       />
       <IgError>{error}</IgError>
+      {!isHct && (
+        <p className={styles.attNote}>
+          El vivo sale por sub-stream H.264. El playback 24h lee el NVR (canal principal);
+          si no hay disco o retención, verás el aviso — no es un fallo de la consola.
+        </p>
+      )}
 
       {/* Ambos montados: al ir a Foco el muro solo se oculta (cierra WS por IO),
           así volver no reconstruye toda la rejilla desde cero. */}

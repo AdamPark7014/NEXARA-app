@@ -105,7 +105,7 @@ export class NotificationsService {
       where: {
         ...(isSalesAdmin ? { userId: { in: sellerIds } } : { userId }),
         NOT: { category: 'security' },
-        ...companyWhere(companyId),
+        ...this.inboxScope(companyId),
       },
       include: {
         triggerUser: {
@@ -117,7 +117,7 @@ export class NotificationsService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
       take: limit,
       skip: offset,
     });
@@ -129,9 +129,16 @@ export class NotificationsService {
     companyId?: number | null,
   ) {
     const notification = await this.prisma.notification.findFirst({
-      where: { id: notificationId, ...companyWhere(companyId) },
+      where: { id: notificationId, ...this.inboxScope(companyId) },
     });
-    assertCompanyAccess(notification, companyId, 'Notificación');
+    if (!notification) throw new NotFoundException('Notificación no encontrada');
+    if (
+      notification.companyId != null &&
+      companyId != null &&
+      Number(notification.companyId) !== Number(companyId)
+    ) {
+      throw new NotFoundException('Notificación no encontrada');
+    }
 
     const userId = Number(user?.id || 0);
     const sellerIds = await this.getSellerUserIds(companyId);
@@ -186,7 +193,7 @@ export class NotificationsService {
       where: {
         userId: { in: targetUserIds },
         isRead: false,
-        ...companyWhere(companyId),
+        ...this.inboxScope(companyId),
       },
       data: { isRead: true, readAt: new Date() },
     });
