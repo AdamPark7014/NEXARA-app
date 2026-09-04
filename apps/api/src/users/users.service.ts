@@ -687,6 +687,7 @@ export class UsersService {
       await this.chat.addUserToOrgChannels(created.id);
       const acsPush = await this.pushAcsFromErp({
         companyId: tenantId,
+        userId: created.id,
         employeeNumber: created.employeeNumber,
         name: created.nombre,
         enable: true,
