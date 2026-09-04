@@ -51,8 +51,8 @@ const LAYOUT_KEY = "nexara_integra_video_layout";
 const MODE_KEY = "nexara_integra_video_mode";
 const AUTOOPEN_KEY = "nexara_integra_video_autoopen";
 /** Tope de decodificadores MSE vivos en el muro (el resto queda en cola). */
-const MAX_LIVE_WALL = 6;
-const STAGGER_MS = 650;
+const MAX_LIVE_WALL = 4;
+const STAGGER_MS = 900;
 
 function colsFor(layout: LayoutN): number {
   if (layout === 1) return 1;

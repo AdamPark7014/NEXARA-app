@@ -10,91 +10,55 @@
 git fetch origin && git log --oneline HEAD..origin/mejora/calidad-y-web
 ```
 
-Este turno empezó **7 commits detrás de origin** (MSE LivePlayer + stagger HLS +
-CSP). Se hizo merge limpio antes de tocar nada. Los `.tmp-*.sh` del turno
-anterior se salvaron con `relevo.ps1 salvar`.
-
 ## Puente — no cambiar
 
 **NAS Synology `192.168.9.32`** / Tailscale `nas-nexara` (`100.71.203.3`)
-anuncia `192.168.9.0/24`. **No volver a anunciar la misma ruta desde la
-laptop.** Sitio `#1 Oficinas NEXARA`, empresa **2**, provider ISAPI,
-`host http://192.168.9.34`.
+anuncia `192.168.9.0/24`. No anunciar la misma ruta desde la laptop.
 
-## Qué se hizo en este turno (cursor)
+Sitio `#1 Oficinas NEXARA`, empresa **2**, ISAPI `http://192.168.9.34`.
 
-### 1. Muro anti-trabado sobre MSE
+## Qué pasó con el muro (captura 23:20)
 
-Claude ya dejó `_LivePlayer.tsx` (MSE / `<video-stream>` de go2rtc). El stagger
-`startDelayMs` se había perdido al cambiar de HLS → MSE. Ahora:
+Producción en el servidor estaba en `dd25400` (stagger HLS) — **sin** MSE ni
+los fixes de cupo/cola. Por eso la captura seguía con badges «MURO» y 4/9
+mosaicos con el play azul nativo.
 
-- `startDelayMs` + cupo **máx. 6 vivos** en muro (resto «En cola»; clic en
-  mosaico lo prioriza al seleccionar).
-- `IntersectionObserver`: fuera de viewport cierra el WebSocket.
-- Muro y Foco **ambos montados**; al cambiar de vista solo se oculta (`hidden`),
-  así no se reconstruyen 9 WS al volver.
-- Home console también usa `IntegraLivePlayer` para live (playback histórico
-  sigue en HLS empaquetado).
+Causa del play azul (además del deploy atrasado): go2rtc `video-rtc` crea el
+`<video>` con `controls=true` y `media=video,audio`. Con audio, Chrome bloquea
+autoplay; el control nativo aparece. Con 9 MSE a la vez el decodificador se
+satura.
 
-Archivos: `_LivePlayer.tsx`, `video/page.tsx`, `page.tsx`, `integra.module.css`.
+### Arreglo (este turno, por desplegar)
 
-### 2. Personas: más datos en API + UI profesional
+- `media="video"` + `muted` forzado + `controls=false` + reintentos de `play()`
+- Tope de vivos en muro bajado a **4** (stagger 900 ms); el resto «En cola»
+- CSS oculta controles nativos de go2rtc
+- Personas: DTO rico + proxy face + UI ficha (commits previos en la rama)
 
-`listPeople` (espejo y live ISAPI) ahora expone: `gender`, vigencia
-(`validEnable/From/To`), `doorRight`, `rightPlan`, contadores face/FP/card,
-`faceUrl`, `userType`, `sourceIp` — mapeados desde `UserInfo` / `raw` sin
-inventar rutas ISAPI.
-
-- `GET /api/integra/people/:id` en ISAPI lee el espejo (ficha completa).
-- `GET /api/integra/people/:id/face` — proxy Digest de `faceURL` (bytes, sin
-  guardar biométricos en DB). El front descarga con `X-Company-Id` vía blob.
-- UI `/integra/people`: directorio con avatar, chips de credenciales, vigencia,
-  filtros; ficha ISAPI con foto y hechos (no JSON crudo).
-
-**Legal (sigue vigente):** mostrar foto por proxy sí; **no** copiar plantillas
-biométricas (`modelData`) a nuestra base.
-
-## Contexto previo que sigue valiendo
-
-- Cliente ISAPI con pooling `maxSockets: 1` por túnel (`7270143`).
-- go2rtc config en `/var/lib/nexara/go2rtc` (no en git) (`ef22944`).
-- Sub-stream H.264 para el muro; principal H.265 no se tocó (`0a53899`).
-- MSE reproduce solo; HLS no autoplayeaba bien en Chrome (`aed6c6c`).
-- Personas/eventos sync ISAPI ya existía (`981f1e1`); lo que faltaba era el DTO
-  rico y la UI.
+SSH deploy: `ssh -i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109`
+ruta `/var/www/nexara-app`.
 
 ## A medias
 
-- **Desplegar** este turno a producción y verificar muro 4/9 + fotos de las ~21
-  personas.
-- Eventos ACS en consola: sync existe; pulir UI de eventos si hace falta.
-- Quitar reglas TCPMSS sobrantes en el servidor (no persistentes).
-- `init: true` en compose de biblioteca (zombis).
-- Actualizar Tailscale del NAS (1.58.2).
-- Renombrar empresas 1/2 en prod — falta confirmación de Adam.
-- TwoWayAudio / FaceData Search / CardInfo Search: **no implementados**; no
-  inventar rutas fuera de `docs/INTEGRA-LAN.md`.
+- **Desplegar** esta rama a producción (web + api) y verificar muro 4 vivos
+  sin play button; Personas con fotos.
+- TCPMSS sobrantes / biblioteca `init: true` / Tailscale NAS 1.58.2
+- Renombrar empresas 1/2 — confirmación Adam
+- No inventar FaceData/CardInfo/TwoWayAudio fuera de `docs/INTEGRA-LAN.md`
 
 ## No tocar
 
 - tickets layout, seed-demo-users, package-lock, xlsx
-- Oficinas ACS, PortalShell rewrite, Meta/ESP, OFX
-- `key.properties` / keystore
+- Oficinas ACS, PortalShell, Meta/ESP, OFX, keystore
 - `ModuleEntry.webPath`
-- **No inventar rutas ISAPI** — verificadas en `docs/INTEGRA-LAN.md`
-- **No meter credenciales de equipos en el repo**
-- **No mover Traefik de puerto** (ADR-0020)
-- **No cambiar el puente NAS** por la laptop u otro nodo
-- Disco del servidor compartido con ~28 contenedores ajenos
+- Credenciales de equipos en el repo; Traefik ports; puente NAS
 
 ## Siguiente paso
 
-1. Deploy + smoke: muro 4 vivos fluidos; muro 9 con ≤6 vivos y cola; Personas
-   con fotos tras «Sincronizar terminales».
-2. TCPMSS / biblioteca `init: true` / Tailscale NAS.
-3. Decidir empresas 1 vs 2 con Adam.
+1. Push + `deploy/update.sh` (o build web+api) en Hetzner.
+2. Soft refresh en `/integra/video` con layout 2×2; luego probar 3×3 (4 vivos + cola).
+3. Sync personas y abrir ficha con foto.
 
-## Mobile / Play — ENVIADO A REVISIÓN (31-08-2026)
+## Mobile / Play
 
-Sin cambios. Producción 5 (1.0.0) `c8bccea`. Cuidado con
-`seed:play-reviewer` sin `PLAY_REVIEWER_PASSWORD` (rota la clave de Play).
+Sin cambios. Producción 5 `c8bccea`.
