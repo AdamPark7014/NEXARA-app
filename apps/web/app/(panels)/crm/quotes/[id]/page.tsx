@@ -180,7 +180,7 @@ export default function QuoteDetailPage() {
   };
 
   if (loading) return <EmptyState icon="⏳" title="Cargando cotización…" description="Consultando detalle." />;
-  if (error || !quote) return <DetailError message={error ?? "Cotización no encontrada"} onRetry={load}; />;
+  if (error || !quote) return <DetailError message={error ?? "Cotización no encontrada"} onRetry={load} />;
 
   const linkedOpportunity = quote.salesQuotes?.[0]?.opportunity;
   const totalNum = Number(quote.total);

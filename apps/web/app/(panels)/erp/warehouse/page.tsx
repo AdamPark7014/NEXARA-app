@@ -810,48 +810,40 @@ export default function WarehousePage() {
     <>
       <PageHeader
         eyebrow="ERP · Almacén"
-        title="Inteligencia de inventario"
-        subtitle="Rotación, aging, dead stock, ABC, cobertura proyectada, reorden y valuación — no solo existencia."
+        title="Inventario y stock"
+        subtitle="Existencias, reorden y valuación por almacén — con inteligencia de rotación cuando hay historial."
         actions={
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {cfg.canCreate && (
               <>
-                <Button variant="secondary" iconLeft="+" onClick={() => setShowWarehouseForm(true)}>Nuevo almacén</Button>
-                <Button variant="primary" iconLeft="+" onClick={() => setShowMovementForm(true)}>Entrada de stock</Button>
+                <Button variant="secondary" size="sm" onClick={() => setShowWarehouseForm(true)}>Nuevo almacén</Button>
+                <Button variant="primary" size="sm" onClick={() => setShowMovementForm(true)}>Entrada de stock</Button>
               </>
             )}
-            <Button variant="ghost" onClick={load}>Actualizar</Button>
+            <Button variant="ghost" size="sm" onClick={load}>Actualizar</Button>
           </div>
         }
       />
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
-        <span style={{ padding: "8px 14px", borderRadius: 999, background: "var(--primary)", color: "#fff", fontSize: 12, fontWeight: 700 }}>
-          Stock productos
-        </span>
-        <CrossPanelLink href="/crm/products" style={{ textDecoration: "none" }}>
-          <span style={{ padding: "8px 14px", borderRadius: 999, background: "var(--surface-2)", border: "1px solid var(--border)", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "inline-block" }}>
-            Catálogo productos
-          </span>
-        </CrossPanelLink>
-        <CrossPanelLink href="/ops/tools?tab=inventory" style={{ textDecoration: "none" }}>
-          <span style={{ padding: "8px 14px", borderRadius: 999, background: "var(--surface-2)", border: "1px solid var(--border)", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "inline-block" }}>
-            Stock herramientas
-          </span>
-        </CrossPanelLink>
-      </div>
+      <ContextRail
+        ariaLabel="Catálogos de inventario"
+        items={[
+          { id: "stock", label: "Stock productos", active: true },
+          { id: "catalog", label: "Catálogo productos", href: "/crm/products" },
+          { id: "tools", label: "Stock herramientas", href: "/ops/tools?tab=inventory" },
+        ]}
+      />
 
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18, borderBottom: "1px solid var(--border)", paddingBottom: 12 }}>
-        {TABS.map((t) => (
-          <Button key={t.key} size="sm" variant={tab === t.key ? "primary" : "secondary"} onClick={() => setTab(t.key)}>
-            {t.label}
-          </Button>
-        ))}
-      </div>
+      <PanelTabs
+        ariaLabel="Vistas de almacén"
+        value={tab}
+        onChange={setTab}
+        tabs={TABS.map((t) => ({ key: t.key, label: t.label }))}
+      />
 
       {/* ── Nuevo almacén (disponible desde cualquier pestaña) ── */}
       {showWarehouseForm && (
-        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+        <div style={{ background: "var(--nx-panel-surface-overlay)", border: "1px solid var(--nx-panel-hairline)", borderRadius: "var(--nx-panel-radius-sm)", padding: 18, marginBottom: 18, boxShadow: "var(--nx-panel-elev-1)" }}>
           <p style={{ margin: "0 0 14px", fontWeight: 700, fontSize: 13 }}>Nuevo almacén</p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <label style={{ display: "grid", gap: 4, gridColumn: "1 / -1" }}>
@@ -1117,11 +1109,11 @@ export default function WarehousePage() {
 
       {tab === "inventario" && (
       <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 20 }}>
-        <KpiCard label="Sin stock" value={sinStock} variant={sinStock > 0 ? "danger" : "positive"} hint={sinStock > 0 ? "Requieren reposición urgente" : "Todo disponible"} icon="📦" />
-        <KpiCard label="Bajo mínimo" value={bajoMinimo} variant={bajoMinimo > 0 ? "warning" : "positive"} hint={bajoMinimo > 0 ? "Por debajo del punto de reorden" : "Niveles OK"} icon="⚠️" />
-        <KpiCard label="Valor inventario" value={<Money value={valorTotal} compact />} hint={`${items.length} SKUs en catálogo`} variant="accent" icon="💰" />
-        <KpiCard label="Almacenes" value={warehouses.length} hint="Ubicaciones configuradas" icon="🏭" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 16 }}>
+        <KpiCard label="Sin stock" value={sinStock} variant={sinStock > 0 ? "danger" : "positive"} hint={sinStock > 0 ? "Requieren reposición urgente" : "Todo disponible"} />
+        <KpiCard label="Bajo mínimo" value={bajoMinimo} variant={bajoMinimo > 0 ? "warning" : "positive"} hint={bajoMinimo > 0 ? "Por debajo del punto de reorden" : "Niveles OK"} />
+        <KpiCard label="Valor inventario" value={<Money value={valorTotal} compact />} hint={`${items.length} SKUs en catálogo`} variant="accent" />
+        <KpiCard label="Almacenes" value={warehouses.length} hint="Ubicaciones configuradas" />
       </div>
 
       {items.length > 0 && (() => {
@@ -1129,16 +1121,16 @@ export default function WarehousePage() {
           items.reduce<Record<string, number>>((acc, s) => { const k = s.categoria || "Sin categoría"; acc[k] = (acc[k] ?? 0) + 1; return acc; }, {})
         ).sort((a, b) => b[1] - a[1]).slice(0, 6);
         return (
-          <div style={{ marginBottom: 20, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>SKUs por categoría</div>
+          <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--nx-panel-surface-overlay)", border: "1px solid var(--nx-panel-hairline)", borderRadius: "var(--nx-panel-radius-sm)", boxShadow: "var(--nx-panel-elev-1)" }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>SKUs por categoría</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               {byCategory.map(([cat, count]) => (
                 <div key={cat} style={{ display: "grid", gridTemplateColumns: "130px 1fr 36px", gap: 10, alignItems: "center" }}>
                   <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{cat}</span>
-                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${(count / items.length) * 100}%`, background: "var(--primary)", borderRadius: 3, transition: "width .4s" }} />
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(count / items.length) * 100}%`, background: "var(--panel-accent, var(--primary))", borderRadius: 3, transition: "width .35s ease" }} />
                   </div>
-                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right" }}>{count}</span>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{count}</span>
                 </div>
               ))}
             </div>

@@ -136,9 +136,10 @@ async function main() {
 
   async function probeHost(label, host, channel) {
     const client = new HikvisionIsapiClient({
-      baseUrl: `http://${host}`,
+      host: `http://${host}`,
       username: user,
       password: pass,
+      scope: `probe-${host}`,
     });
     const results = [];
     for (const pth of PATHS_CH(channel)) {
