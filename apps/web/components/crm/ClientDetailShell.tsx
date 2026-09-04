@@ -7,6 +7,8 @@ import { ROLES } from "@/lib/rbac";
 import { useUser } from "@/components/UserContext";
 import { getSalesClient, type SalesClient } from "@/lib/sales-api";
 import { DetailLoading } from "@/components/detail/DetailFrame";
+import { Tag } from "@/components/ui/DataTable";
+import chrome from "@/components/crm/crm-chrome.module.css";
 
 type ClientDetail = SalesClient & {
   opportunities?: Array<{ id: number; title: string; stage: string; value: number | string }>;
@@ -83,14 +85,30 @@ export default function ClientDetailShell({ id, children }: { id: string; childr
 
   return (
     <ClientDetailContext.Provider value={ctx}>
-      <div style={{ padding: "24px 32px", maxWidth: 1200, margin: "0 auto" }}>
-        <header style={{ marginBottom: 16 }}>
-          <Link href="/crm/clients" style={{ fontSize: 13, color: "var(--text-secondary, #64748b)", textDecoration: "none" }}>
+      <div className={chrome.detailShell}>
+        <header style={{ marginBottom: 14 }}>
+          <Link href="/crm/clients" className={chrome.detailBack}>
             ← Clientes
           </Link>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: "6px 0 0" }}>
+          <h1 className={chrome.detailTitle}>
             {loading ? `Cliente #${id}` : title}
           </h1>
+          {!loading && client && (
+            <div className={chrome.detailMeta}>
+              {client.status && (
+                <Tag variant={client.status === "Activo" ? "accent" : client.status === "Prospecto" ? "warning" : "neutral"}>
+                  {client.status}
+                </Tag>
+              )}
+              {client.industry && <span className={chrome.metaChip}>{client.industry}</span>}
+              {client.taxId && <span className={chrome.metaChip}>{client.taxId}</span>}
+              {client.serviceClientId ? (
+                <span className={`${chrome.metaChip} ${chrome.metaChipStrong}`}>OPS vinculado</span>
+              ) : (
+                <span className={chrome.metaChip}>Solo CRM</span>
+              )}
+            </div>
+          )}
         </header>
         <TabBar tabs={tabs} />
         <section style={{ marginTop: 8 }}>

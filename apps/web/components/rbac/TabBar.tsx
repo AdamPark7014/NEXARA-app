@@ -3,12 +3,8 @@
 /**
  * NEXARA · TabBar
  * ----------------
- * Barra de pestañas accesible reutilizable para los layouts tabulados
- * Barra de pestañas para layouts con rutas dinámicas (p. ej. detalle de oportunidad).
- *
- * - Detecta la pestaña activa por `pathname` (match exacto o prefijo).
- * - Mantiene navegación con `next/link` para no romper streaming.
- * - Soporta filtrado por rol (mismo patrón que `useCanAccess`).
+ * Barra de pestañas para layouts con rutas dinámicas (detalle OT, cliente, etc.).
+ * Tokens `--nx-panel-*` + acento del panel — misma densidad que PanelTabs.
  */
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -52,8 +48,8 @@ export function TabBar({ tabs, baseHref = '' }: TabBarProps) {
       role="tablist"
       style={{
         display: 'flex',
-        gap: 4,
-        borderBottom: '1px solid #e5e7eb',
+        gap: 2,
+        borderBottom: '1px solid var(--nx-panel-hairline)',
         overflowX: 'auto',
         marginBottom: 16,
       }}
@@ -68,29 +64,38 @@ export function TabBar({ tabs, baseHref = '' }: TabBarProps) {
             role="tab"
             aria-selected={active}
             style={{
-              padding: '10px 16px',
-              fontSize: 14,
-              fontWeight: active ? 600 : 500,
-              color: active ? '#0f172a' : '#64748b',
-              borderBottom: active ? '2px solid #2563eb' : '2px solid transparent',
+              padding: '9px 14px',
+              marginBottom: -1,
+              fontSize: 12.5,
+              fontWeight: active ? 700 : 550,
+              color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+              borderBottom: active
+                ? '2px solid var(--panel-accent, var(--primary))'
+                : '2px solid transparent',
               textDecoration: 'none',
               whiteSpace: 'nowrap',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 8,
-              transition: 'color 120ms, border-color 120ms',
+              gap: 7,
+              transition: 'color 140ms ease, border-color 140ms ease',
             }}
           >
             {t.label}
             {t.badge !== undefined && t.badge !== '' && (
               <span
                 style={{
-                  background: active ? '#2563eb' : '#e2e8f0',
-                  color: active ? '#fff' : '#475569',
-                  borderRadius: 10,
-                  padding: '1px 8px',
-                  fontSize: 11,
-                  fontWeight: 600,
+                  background: active
+                    ? 'color-mix(in srgb, var(--panel-accent, var(--primary)) 16%, transparent)'
+                    : 'var(--surface-2)',
+                  color: active
+                    ? 'var(--panel-accent, var(--primary))'
+                    : 'var(--text-tertiary)',
+                  border: '1px solid var(--nx-panel-hairline-soft)',
+                  borderRadius: 999,
+                  padding: '1px 6px',
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  fontVariantNumeric: 'tabular-nums',
                 }}
               >
                 {t.badge}

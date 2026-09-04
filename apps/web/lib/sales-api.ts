@@ -58,11 +58,11 @@ export type SalesOpportunity = {
 
 /** Etapas activas del pipeline (sin WON/LOST). */
 export const PIPELINE_STAGES = [
-  { id: "DISCOVERY", label: "Discovery", color: "#94a3b8", description: "Detectar necesidad real" },
+  { id: "DISCOVERY", label: "Descubrimiento", color: "#64748b", description: "Detectar necesidad real" },
   { id: "QUALIFICATION", label: "Calificado", color: "#0ea5e9", description: "Presupuesto y autoridad confirmados" },
-  { id: "PROPOSAL", label: "Cotización", color: "#6366f1", description: "Propuesta formal enviada" },
-  { id: "NEGOTIATION", label: "Negociación", color: "#f59e0b", description: "Ajustando precio o alcance" },
-  { id: "CLOSING", label: "Cierre", color: "#10b981", description: "Firma o PO en proceso" },
+  { id: "PROPOSAL", label: "Cotización", color: "#0f766e", description: "Propuesta formal enviada" },
+  { id: "NEGOTIATION", label: "Negociación", color: "#d97706", description: "Ajustando precio o alcance" },
+  { id: "CLOSING", label: "Cierre", color: "#15803d", description: "Firma o PO en proceso" },
 ] as const;
 
 export const ALL_OPPORTUNITY_STAGES = [

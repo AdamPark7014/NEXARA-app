@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { IgBadge, IgBtn, IgError, IgField, IgFilters, IgPage, IgPanel, IgToolbar } from "../_Console";
 import { inputStyle, integraApi } from "../_lib";
 import styles from "../integra.module.css";
+import { buildApiUrl, parseResponseJson } from "@/lib/api-base";
+import { useUser } from "@/components/UserContext";
 
 /**
  * Asistencia deducida del control de acceso.
@@ -15,6 +18,9 @@ import styles from "../integra.module.css";
  *
  * La foto es la que NEXARA tomó del terminal al llegar el evento. El equipo no
  * entrega la suya: guarda el rostro como modelo biométrico, no como imagen.
+ *
+ * El vínculo con ERP (nómina) vive en /erp/hr/attendance · híbrido: mismo
+ * employeeNumber ↔ personId/personCode. Aquí solo se muestra si hay match.
  */
 
 type Row = {
@@ -28,6 +34,12 @@ type Row = {
   passes: number;
   denied: number;
   minutes: number | null;
+};
+
+type ErpLink = {
+  userId: number;
+  nombre: string;
+  employeeNumber: string | null;
 };
 
 function hhmm(iso: string): string {
@@ -58,7 +70,10 @@ function todayInput(offsetDays = 0): string {
 }
 
 export default function IntegraAttendancePage() {
+  const { user } = useUser();
+  const token = user?.token ?? "";
   const [rows, setRows] = useState<Row[]>([]);
+  const [erpByPerson, setErpByPerson] = useState<Record<string, ErpLink>>({});
   const [from, setFrom] = useState(() => todayInput(6));
   const [to, setTo] = useState(() => todayInput(0));
   const [q, setQ] = useState("");
@@ -75,12 +90,44 @@ export default function IntegraAttendancePage() {
       });
       const data = await integraApi<{ items: Row[] }>(`integra/attendance?${qs.toString()}`);
       setRows(data.items || []);
+
+      // Enriquecer con vínculo ERP del día «hasta» (híbrido; no bloquea si falla).
+      if (token) {
+        try {
+          const hybridRes = await fetch(
+            buildApiUrl(`attendance/hybrid?date=${encodeURIComponent(to)}`),
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          if (hybridRes.ok) {
+            const hybrid = await parseResponseJson<{
+              items: Array<{
+                linkStatus: string;
+                acs?: { personId: string } | null;
+                user?: { id: number; nombre: string; employeeNumber: string | null } | null;
+              }>;
+            }>(hybridRes);
+            const map: Record<string, ErpLink> = {};
+            for (const item of hybrid.items || []) {
+              if (item.linkStatus === "linked" && item.acs?.personId && item.user) {
+                map[item.acs.personId] = {
+                  userId: item.user.id,
+                  nombre: item.user.nombre,
+                  employeeNumber: item.user.employeeNumber,
+                };
+              }
+            }
+            setErpByPerson(map);
+          }
+        } catch {
+          /* opcional */
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
     } finally {
       setBusy(false);
     }
-  }, [from, to]);
+  }, [from, to, token]);
 
   useEffect(() => {
     void load();
@@ -117,7 +164,17 @@ export default function IntegraAttendancePage() {
             ? "Cargando…"
             : `${filtered.length} jornadas · ${people} personas`
         }
-        actions={<IgBtn onClick={() => void load()}>Actualizar</IgBtn>}
+        actions={
+          <>
+            <Link
+              href="/erp/hr/attendance"
+              style={{ fontSize: 12, marginRight: 8, color: "var(--ig-accent, #38bdf8)", textDecoration: "none" }}
+            >
+              Híbrido ERP
+            </Link>
+            <IgBtn onClick={() => void load()}>Actualizar</IgBtn>
+          </>
+        }
       />
       <IgError>{error}</IgError>
 
@@ -150,40 +207,51 @@ export default function IntegraAttendancePage() {
       {byDay.map(([day, list]) => (
         <IgPanel key={day} title={dayLabel(day)} count={`${list.length}`}>
           <div className={styles.attGrid}>
-            {list.map((r) => (
-              <article key={`${r.day}-${r.personId}`} className={styles.attCard}>
-                <div className={styles.attPhoto} data-empty={!r.firstPhoto ? "1" : undefined}>
-                  {r.firstPhoto ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={r.firstPhoto} alt="" />
-                  ) : (
-                    <span aria-hidden>{(r.personName || "?").slice(0, 1).toUpperCase()}</span>
-                  )}
-                </div>
-                <div className={styles.attBody}>
-                  <strong className={styles.attName}>{r.personName || r.personId}</strong>
-                  <span className={styles.attCode}>{r.personId}</span>
-                  <div className={styles.attTimes}>
-                    <span>
-                      <b>{hhmm(r.firstAt)}</b> entrada
-                    </span>
-                    {r.passes > 1 && (
-                      <span>
-                        <b>{hhmm(r.lastAt)}</b> último paso
-                      </span>
+            {list.map((r) => {
+              const erp = erpByPerson[r.personId];
+              return (
+                <article key={`${r.day}-${r.personId}`} className={styles.attCard}>
+                  <div className={styles.attPhoto} data-empty={!r.firstPhoto ? "1" : undefined}>
+                    {r.firstPhoto ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={r.firstPhoto} alt="" />
+                    ) : (
+                      <span aria-hidden>{(r.personName || "?").slice(0, 1).toUpperCase()}</span>
                     )}
                   </div>
-                  <div className={styles.attChips}>
-                    <IgBadge tone={r.minutes == null ? "warn" : "ok"}>
-                      {durationLabel(r.minutes)}
-                    </IgBadge>
-                    <IgBadge tone="neutral">{r.passes} pasos</IgBadge>
-                    {r.denied > 0 && <IgBadge tone="warn">{r.denied} denegados</IgBadge>}
+                  <div className={styles.attBody}>
+                    <strong className={styles.attName}>{r.personName || r.personId}</strong>
+                    <span className={styles.attCode}>{r.personId}</span>
+                    <div className={styles.attTimes}>
+                      <span>
+                        <b>{hhmm(r.firstAt)}</b> entrada
+                      </span>
+                      {r.passes > 1 && (
+                        <span>
+                          <b>{hhmm(r.lastAt)}</b> último paso
+                        </span>
+                      )}
+                    </div>
+                    <div className={styles.attChips}>
+                      <IgBadge tone={r.minutes == null ? "warn" : "ok"}>
+                        {durationLabel(r.minutes)}
+                      </IgBadge>
+                      <IgBadge tone="neutral">{r.passes} pasos</IgBadge>
+                      {r.denied > 0 && <IgBadge tone="warn">{r.denied} denegados</IgBadge>}
+                      {erp && day === to && (
+                        <IgBadge tone="ok">ERP · {erp.nombre.split(" ")[0]}</IgBadge>
+                      )}
+                    </div>
+                    {erp && day === to && (
+                      <Link href={`/erp/hr/${erp.userId}`} className={styles.attDoor}>
+                        Ficha ERP #{erp.userId}
+                      </Link>
+                    )}
+                    {r.firstDoor && <span className={styles.attDoor}>{r.firstDoor}</span>}
                   </div>
-                  {r.firstDoor && <span className={styles.attDoor}>{r.firstDoor}</span>}
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         </IgPanel>
       ))}
@@ -191,7 +259,8 @@ export default function IntegraAttendancePage() {
       <p className={styles.attNote}>
         Las horas salen del primer y el último acceso concedido de cada día: estos terminales
         no distinguen entrada de salida. Un solo paso se marca «sin salida» en vez de contarlo
-        como jornada de cero minutos.
+        como jornada de cero minutos. La nómina sigue el checador ERP; aquí solo se contrastan
+        puertas. Vincula con el mismo código en employeeNumber y personId.
       </p>
     </IgPage>
   );

@@ -1,0 +1,371 @@
+/* CRM shared production chrome — dense B2B, no purple slop */
+
+.detailShell {
+  padding: 20px 28px 32px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.detailBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+
+.detailBack:hover {
+  color: var(--primary);
+}
+
+.detailTitle {
+  font-family: var(--nx-font-display, inherit);
+  font-size: 22px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  margin: 8px 0 0;
+  color: var(--text-primary, var(--foreground));
+  line-height: 1.2;
+}
+
+.detailMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
+.metaChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 650;
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}
+
+.metaChipStrong {
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+  color: var(--primary);
+}
+
+.distCard {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  border-radius: var(--nx-panel-radius-sm, 12px);
+}
+
+.distLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+.formPanel {
+  background: var(--surface);
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  border-radius: var(--nx-panel-radius-sm, 12px);
+  padding: 18px 20px;
+  margin-bottom: 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  box-shadow: var(--nx-panel-elev-1, 0 8px 24px rgba(15, 23, 42, 0.04));
+}
+
+.formPanelTitle {
+  grid-column: 1 / -1;
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.formFull {
+  grid-column: 1 / -1;
+}
+
+.formActions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.fieldLabel {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 5px;
+}
+
+.fieldInput {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--foreground);
+  font-size: 13px;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.fieldInput:focus {
+  outline: 2px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+}
+
+.pipelineBoard {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  scrollbar-width: thin;
+}
+
+.pipelineCol {
+  min-width: 260px;
+  flex: 1 0 260px;
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  border-radius: 14px;
+  padding: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pipelineColHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pipelineDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.pipelineColTitle {
+  font-weight: 750;
+  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pipelineColDesc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  line-height: 1.35;
+  margin: 0;
+}
+
+.pipelineColTotal {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.pipelineCard {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  border-radius: 10px;
+  padding: 11px 12px;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.pipelineCard:hover {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+}
+
+.pipelineCardClient {
+  font-weight: 750;
+  font-size: 12.5px;
+  margin-bottom: 3px;
+  line-height: 1.3;
+}
+
+.pipelineCardTitle {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+  line-height: 1.35;
+}
+
+.pipelineEmpty {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  text-align: center;
+  padding: 18px 10px;
+  border: 1px dashed var(--nx-panel-hairline, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 50%, transparent);
+}
+
+.quoteDoc {
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--nx-panel-elev-1, 0 8px 24px rgba(15, 23, 42, 0.04));
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.quoteDocHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--nx-panel-hairline-soft, var(--border));
+  background: color-mix(in srgb, var(--surface-2) 60%, var(--surface));
+}
+
+.quoteDocTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.quoteDocHint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.quoteTotals {
+  min-width: 300px;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  border-radius: 12px;
+  box-shadow: var(--nx-panel-elev-1, 0 8px 24px rgba(15, 23, 42, 0.04));
+}
+
+.poDetail {
+  background: var(--surface);
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--nx-panel-elev-1, 0 8px 24px rgba(15, 23, 42, 0.04));
+}
+
+.poDetailHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.poDetailTitle {
+  margin: 0;
+  font-weight: 750;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+
+.poMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.poMetaItem {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--nx-panel-hairline-soft, var(--border));
+}
+
+.poMetaLabel {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+}
+
+.poMetaValue {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--foreground);
+}
+
+.poTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  margin-bottom: 14px;
+}
+
+.poTable th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+.poTable td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--nx-panel-hairline-soft, var(--border));
+}
+
+.poTable tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--surface-2) 35%, transparent);
+}
+
+.folioLink {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.folioLink:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .detailShell {
+    padding: 16px 14px 28px;
+  }
+
+  .formPanel {
+    grid-template-columns: 1fr;
+  }
+}
