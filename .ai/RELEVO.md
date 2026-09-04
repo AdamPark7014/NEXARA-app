@@ -54,4 +54,3 @@ SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
 
 Puente NAS, Traefik, credenciales, Face ID inventado sobre AcuSense.
 CRM/stock/asistencia siblings.
-`}

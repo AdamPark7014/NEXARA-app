@@ -307,6 +307,10 @@ export class IntegraController {
 
   @Post('sync')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Reconciliar espejo desde terminales (recuperación). Los cambios de ficha/cara/ERP ya van en vivo.',
+  })
   async runSync(
     @CurrentCompanyId() companyId: number | null,
     @Query('siteId') siteId?: string,
@@ -318,6 +322,21 @@ export class IntegraController {
         (await this.sites.list(companyId))[0]?.id;
     if (!sid) throw new BadRequestException('Sin sitio para sincronizar');
     return this.sync.syncSite(companyId, sid);
+  }
+
+  @Get('acs-fanout/status')
+  @ApiOperation({ summary: 'Estado reciente de pushes ACS por IP (fallos / reintentos)' })
+  acsFanoutStatus(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!companyId) return { items: [] };
+    return {
+      items: this.acsFanout.listRecent(
+        companyId,
+        siteId ? parseInt(siteId, 10) : null,
+      ),
+    };
   }
 
   @Get('sync/last')
