@@ -340,18 +340,24 @@ export async function listRecurringVisitors(): Promise<RecurringListResult> {
 export async function createRecurringVisitor(
   input: CreateRecurringVisitorInput,
 ): Promise<RecurringVisitor> {
+  const timeFrom = /^\d{2}:\d{2}$/.test(input.timeFrom)
+    ? `${input.timeFrom}:00`
+    : input.timeFrom;
+  const timeTo = /^\d{2}:\d{2}$/.test(input.timeTo)
+    ? `${input.timeTo}:00`
+    : input.timeTo;
+  // Contrato alineado a IntegraRecurringVisitor (Prisma sibling).
   const body = {
     visitorName: input.visitorName.trim(),
     phone: input.phone?.trim() || undefined,
+    hostPersonId: input.hostEmployeeId || undefined,
+    hostName: input.hostEmployeeName || undefined,
     hostEmployeeId: input.hostEmployeeId || undefined,
     hostEmployeeName: input.hostEmployeeName || undefined,
-    hostPersonId: input.hostEmployeeId || undefined,
-    doorIds: input.doorIds,
     doorIndexCodes: input.doorIds,
-    timeFrom: input.timeFrom,
-    timeTo: input.timeTo,
-    beginTime: `${input.timeFrom}:00`,
-    endTime: `${input.timeTo}:00`,
+    doorIds: input.doorIds,
+    timeFrom,
+    timeTo,
     weekdays: input.weekdays,
     validFrom: input.validFrom,
     validTo: input.validTo,
