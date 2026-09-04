@@ -14,6 +14,7 @@ import {
   IgToolbar,
 } from "../_Console";
 import { DoorConfirmModal } from "../_DoorConfirmModal";
+import { IntegraLivePlayer } from "../_LivePlayer";
 import { getCachedCapabilities, subscribeCapabilities } from "../_caps";
 import {
   DOOR_CONTROL_OPTIONS,
@@ -36,6 +37,13 @@ type Door = {
 type Group = { id: string; name: string };
 type Person = { id: string; name: string; code?: string };
 type Device = { id: string; name: string; kind: string; ip?: string; online?: boolean };
+type Cam = {
+  id: string;
+  name: string;
+  hasAudio?: boolean;
+  doorIndexCode?: string | null;
+  isDoorCamera?: boolean;
+};
 
 export default function IntegraAccessPage() {
   const [doors, setDoors] = useState<Door[]>([]);
@@ -54,6 +62,10 @@ export default function IntegraAccessPage() {
   const [selectedDoor, setSelectedDoor] = useState<Door | null>(null);
   const [confirmDoor, setConfirmDoor] = useState<Door | null>(null);
   const [caps, setCaps] = useState<IntegraCapabilities | null>(null);
+  const [cams, setCams] = useState<Cam[]>([]);
+  const [doorFeed, setDoorFeed] = useState<{ id: string; hls: string | null; audio: boolean } | null>(
+    null,
+  );
 
   useEffect(() => {
     setCaps(getCachedCapabilities());
@@ -66,16 +78,18 @@ export default function IntegraAccessPage() {
     setError(null);
     try {
       const doorPath = liveDoors ? "integra/doors?live=1" : "integra/doors";
-      const [d, g, p, dev] = await Promise.all([
+      const [d, g, p, dev, c] = await Promise.all([
         integraApi<{ items: Door[] }>(doorPath),
         integraApi<{ items: Group[] }>("integra/privilege-groups").catch(() => ({ items: [] })),
         integraApi<{ items: Person[] }>("integra/people").catch(() => ({ items: [] })),
         integraApi<{ items: Device[] }>("integra/devices").catch(() => ({ items: [] })),
+        integraApi<{ items: Cam[] }>("integra/cameras").catch(() => ({ items: [] })),
       ]);
       setDoors(d.items);
       setGroups(g.items);
       setPeople(p.items);
       setDevices(dev.items);
+      setCams(c.items);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
     }
@@ -134,6 +148,46 @@ export default function IntegraAccessPage() {
   );
 
   const onlineN = doors.filter((d) => d.online !== false).length;
+
+  /** La cámara de la terminal que gobierna esa puerta, si la tiene. */
+  const doorCam = useMemo(
+    () => (selectedDoor ? cams.find((c) => c.doorIndexCode === selectedDoor.id) || null : null),
+    [cams, selectedDoor],
+  );
+
+  // Abrir el video de la puerta seleccionada. Se pide con audio: las terminales
+  // llevan micrófono y por ahí se oye a quien está llamando.
+  useEffect(() => {
+    if (!doorCam) {
+      setDoorFeed(null);
+      return;
+    }
+    let cancelled = false;
+    setDoorFeed(null);
+    void integraApi<{ hls: string | null; audio?: boolean }>(
+      `integra/cameras/${encodeURIComponent(doorCam.id)}/stream${doorCam.hasAudio ? "?audio=1" : ""}`,
+      { method: "POST" },
+    )
+      .then((r) => {
+        if (!cancelled) setDoorFeed({ id: doorCam.id, hls: r.hls, audio: Boolean(r.audio) });
+      })
+      .catch(() => {
+        if (!cancelled) setDoorFeed({ id: doorCam.id, hls: null, audio: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [doorCam]);
+
+  const runAction = (d: Door, type: DoorControlType) => {
+    if (!canControl) {
+      setError("Sin permiso para controlar puertas");
+      return;
+    }
+    setSelectedDoor(d);
+    setControlType(type);
+    setConfirmDoor(d);
+  };
 
   return (
     <IgPage>
@@ -209,10 +263,8 @@ export default function IntegraAccessPage() {
             type="button"
             className={styles.doorCell}
             data-online={d.online === false ? "0" : "1"}
-            onClick={() => {
-              setSelectedDoor(d);
-              if (canControl) requestControl(d);
-            }}
+            onClick={() => setSelectedDoor(d)}
+            data-selected={selectedDoor?.id === d.id ? "1" : undefined}
           >
             <span className={styles.doorCellName}>{d.name}</span>
             <span className={styles.doorCellMeta}>{d.location || d.id}</span>
@@ -222,6 +274,61 @@ export default function IntegraAccessPage() {
           </button>
         ))}
       </div>
+
+      {selectedDoor && (
+        <IgPanel
+          title={`Puerta · ${selectedDoor.name}`}
+          count={selectedDoor.online === false ? "OFFLINE" : "ONLINE"}
+        >
+          <div className={styles.doorConsole}>
+            <div className={styles.doorConsoleVideo}>
+              {doorCam ? (
+                <IntegraLivePlayer
+                  src={doorFeed?.id === doorCam.id ? doorFeed.hls : null}
+                  mode="mse"
+                  audio={Boolean(doorFeed?.audio)}
+                />
+              ) : (
+                <div className={styles.doorConsoleNoCam}>
+                  <strong>Esta puerta no tiene cámara</strong>
+                  <span>
+                    Las terminales con cámara aparecen aquí en vivo tras sincronizar el sitio.
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className={styles.doorConsoleSide}>
+              <p className={styles.doorConsoleHint}>
+                {canControl
+                  ? "Cada acción pide un motivo y queda en auditoría."
+                  : "Modo consulta: esta cuenta no puede accionar la puerta."}
+              </p>
+              <div className={styles.doorConsoleActions}>
+                {DOOR_CONTROL_OPTIONS.map((o) => (
+                  <IgBtn
+                    key={o.value}
+                    variant={o.value === "2" ? "primary" : undefined}
+                    disabled={!canControl || busy === selectedDoor.id}
+                    onClick={() => runAction(selectedDoor, o.value)}
+                  >
+                    {o.label}
+                  </IgBtn>
+                ))}
+              </div>
+              <dl className={styles.doorConsoleFacts}>
+                <div>
+                  <dt>Terminal</dt>
+                  <dd>{selectedDoor.location || selectedDoor.id}</dd>
+                </div>
+                <div>
+                  <dt>Con acceso</dt>
+                  <dd>{people.length} personas dadas de alta en el sitio</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </IgPanel>
+      )}
 
       <IgSplit
         left={
