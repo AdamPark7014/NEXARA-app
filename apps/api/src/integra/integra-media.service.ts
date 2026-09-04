@@ -523,15 +523,14 @@ export class IntegraMediaService {
     const streamName = withAudio ? `${base}_a` : base;
     const src = withAudio ? audioSourceFor(rtsp) : rtsp;
     try {
-      // JSON body: el PUT `?name=&src=` de go2rtc rompe con playbackURI que
-      // llevan `?starttime=&endtime=` (YAML "did not find expected key").
-      const res = await fetch(`${internal}/api/streams`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [streamName]: [src] }),
-      });
+      // Query PUT: registra en memoria aunque go2rtc responda 400 al persistir
+      // YAML (URLs con `?starttime=` o claves con caracteres raros). El PUT JSON
+      // de /api/streams NO añade el stream en go2rtc 1.9.7.
+      const url = `${internal}/api/streams?name=${encodeURIComponent(streamName)}&src=${encodeURIComponent(src)}`;
+      const res = await fetch(url, { method: 'PUT' });
       if (!res.ok) {
-        const detail = (await res.text().catch(() => '')).slice(0, 200);
+        const detail = (await res.text().catch(() => '')).slice(0, 160);
+        // yaml persist error is noisy but the stream is usually live anyway
         this.logger.warn(`go2rtc PUT ${res.status}: ${detail}`);
       }
       const publicBase = this.go2rtcPublic() || internal;
