@@ -579,20 +579,22 @@ export async function setHttpNotificationHost(
     let body = existing;
     body = setTag(body, 'id', String(id));
     body = setTag(body, 'url', pathAndQuery);
-    body = setTag(body, 'protocolType', https ? 'HTTPS' : 'HTTP');
     body = setTag(body, 'addressingFormatType', 'hostname');
     body = setTag(body, 'hostName', u.hostname);
-    // Algunos firmwares usan ipAddress si addressing=ipaddress; forzar hostname.
-    if (/<ipAddress>/i.test(body) && /hostname/i.test(body)) {
-      /* dejar ipAddress si existe; hostName es el canónico aquí */
-    }
-    body = setTag(body, 'portNo', port);
     body = setTag(body, 'httpAuthenticationMethod', 'none');
     const isXmlFormat =
       /<parameterFormatType>\s*XML\s*<\/parameterFormatType>/i.test(body);
-    // NVR XML: no meter uploadImagesDataType (badXmlContent). AcuSense JSON: sí.
-    if (opts.withImages && !isXmlFormat) {
-      body = setTag(body, 'uploadImagesDataType', 'binary');
+    // NVR Oficinas: HTTPS en httpHosts → badXmlContent. Solo HTTP:80.
+    // AcuSense JSON sigue con HTTPS.
+    if (isXmlFormat) {
+      body = setTag(body, 'protocolType', 'HTTP');
+      body = setTag(body, 'portNo', '80');
+    } else {
+      body = setTag(body, 'protocolType', https ? 'HTTPS' : 'HTTP');
+      body = setTag(body, 'portNo', port);
+      if (opts.withImages) {
+        body = setTag(body, 'uploadImagesDataType', 'binary');
+      }
     }
     await client.put(`/ISAPI/Event/notification/httpHosts/${id}`, body);
     return;
