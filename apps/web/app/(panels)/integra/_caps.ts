@@ -9,6 +9,9 @@ export const MODULE_CAPABILITY: Record<string, keyof IntegraCapabilities | "alwa
   "integra-access": "access",
   "integra-people": "people",
   "integra-events": "events",
+  // La asistencia sale de los eventos de acceso: si el sitio no los tiene,
+  // no hay nada que enseñar.
+  "integra-attendance": "events",
   "integra-vehicles": "vehicles",
   "integra-alarms": "alarms",
   "integra-visitors": "visitors",
@@ -81,6 +84,7 @@ const PROVIDER_EVENT = "nexara-integra-provider";
 /** Módulos Artemis-only (ADR-0019) — ocultos en sitios HCT. */
 export const HCT_HIDDEN_MODULES = new Set([
   "integra-people",
+  "integra-attendance",
   "integra-visitors",
   "integra-vehicles",
   "integra-anpr",

@@ -238,9 +238,21 @@ Hace falta cámara dedicada (serie ITC/checkpoint).
 parada dentro: con el modo continuo, si se cae la red entre el «muévete» y el
 «para», la domo se queda girando contra el tope.
 
+## Asistencia
+
+Módulo nuevo `integra-attendance` en `/integra/attendance` (alta en
+`access-matrix.ts`, `_caps.ts` → capacidad `events`, y `_IntegraChrome`).
+Fichas con foto, no tabla: lo que se busca es la cara y la hora.
+
+Las fotos van a `/uploads/integra/...`, que **no** está en
+`PUBLIC_UPLOAD_PREFIXES`: se sirven solo con sesión, y `next.config.js` ya
+reescribe `/uploads/:path*` a la API, así que la cookie viaja. Son caras de
+empleados; que sigan detrás de sesión es deliberado.
+
 ## A medias
 
-1. Asistencia y portal del empleado (Adam: asistencia + credencial).
+1. Portal del empleado (Adam pidió asistencia + credencial: falta que el
+   empleado entre y vea lo suyo).
 2. El `httpHost` del grabador (ver arriba).
 3. Decidir si se encienden los micros de las cámaras (el botón ya está).
 4. TCPMSS / biblioteca `init: true` / empresas 1-2.

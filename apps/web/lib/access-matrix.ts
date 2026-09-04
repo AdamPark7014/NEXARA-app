@@ -240,6 +240,7 @@ export type ModuleId =
   | "integra-vehicles"
   | "integra-alarms"
   | "integra-visitors"
+  | "integra-attendance"
   | "integra-anpr"
   | "integra-settings"
   | "integra-audit"
@@ -918,6 +919,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     icon: "👤", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD],
     group: "Acceso", visible: true,
   },
+  "integra-attendance": {
+    id: "integra-attendance", panel: PANELS.INTEGRA, path: "/attendance",
+    label: "Asistencia", description: "Entradas y salidas con foto",
+    icon: "🕘", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD],
+    group: "Acceso", visible: true,
+  },
   "integra-visitors": {
     id: "integra-visitors", panel: PANELS.INTEGRA, path: "/visitors",
     label: "Visitas", description: "Citas y códigos QR",
@@ -994,6 +1001,7 @@ export const CLIENTE_INTEGRA_MODULE_IDS: ModuleId[] = [
   "integra-events",
   "integra-alarms",
   "integra-visitors",
+  "integra-attendance",
   "integra-vehicles",
   "integra-anpr",
   "integra-map",
