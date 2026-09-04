@@ -442,4 +442,9 @@ export default function OpsDashboardPage() {
                 ))}
               </DashPanel>
             )}
-          <
+          </div>
+        </DashCol>
+      </DashGrid>
+    </DashPage>
+  );
+}
