@@ -311,7 +311,7 @@ export default function MyViaticsPage() {
       <Section title={loading ? "Cargando…" : `${visibleItems.length} solicitudes`}>
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando tus viáticos." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && <DataTable columns={columns} rows={visibleItems} rowKey={(v) => v.id} emptyTitle="Sin solicitudes" emptyDescription="Solicita tu primer viático con el botón de arriba." />}
+        {!loading && !error && <DataTable columns={columns} rows={visibleItems} rowKey={(v) => v.id} emptyTitle="Sin solicitudes" emptyDescription="Solicita tu primer viático con el botón de arriba." emptyAction={cfg.canCreate ? <Button size="sm" variant="primary" onClick={openCreate}>Solicitar viático</Button> : undefined} />}
       </Section>
 
       {showForm && (
