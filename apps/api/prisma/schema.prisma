@@ -5723,6 +5723,7 @@ model IntegraSite {
   regions    IntegraRegion[]
   syncRuns   IntegraSyncRun[]
   alarmAcks  IntegraAlarmAck[]
+  socAlarms  IntegraSocAlarm[]
   floorplans IntegraFloorplan[]
   edgeAgent  IntegraEdgeAgent?
   pushEvents IntegraPushEvent[]
@@ -5736,6 +5737,10 @@ model IntegraSite {
   serviceClientId Int?
   /// Override de módulos visibles: { "video": true, "anpr": false, ... }
   modulesOverride Json?
+  /// Política SOC ACS: umbral escalado ticket + horario oficina (America/Mexico_City).
+  /// Ej: { "denialThreshold": 3, "windowMinutes": 60, "afterHoursEnabled": true,
+  ///       "officeWeekdays": [1,2,3,4,5], "officeStart": "08:00", "officeEnd": "19:00" }
+  alarmPolicy     Json?
   label           String?  @db.VarChar(120)
   notes           String?  @db.Text
   /// ARTEMIS (HikCentral on-prem) | HCT (Hik-Connect for Teams cloud) — ADR-0019
@@ -5925,6 +5930,46 @@ model IntegraAlarmAck {
   @@unique([siteId, externalAlarmId])
   @@index([companyId, status])
   @@map("integra_alarm_acks")
+}
+
+/// Cola SOC desde eventos push ACS (denegado / fuera de horario). No Artemis.
+model IntegraSocAlarm {
+  id             Int       @id @default(autoincrement())
+  companyId      Int
+  siteId         Int
+  /// DENIED | AFTER_HOURS
+  kind           String    @db.VarChar(24)
+  /// OPEN | ACK | CLEARED | TICKETED
+  status         String    @default("OPEN") @db.VarChar(16)
+  /// Firma estable para abrir/actualizar la misma alarma (persona+puerta+kind).
+  fingerprint    String    @db.VarChar(180)
+  title          String    @db.VarChar(280)
+  severity       String    @default("alta") @db.VarChar(40)
+  personId       String?   @db.VarChar(64)
+  personName     String?   @db.VarChar(220)
+  doorNo         Int?
+  doorName       String?   @db.VarChar(220)
+  deviceIp       String?   @db.VarChar(64)
+  deviceName     String?   @db.VarChar(220)
+  photoPath      String?   @db.VarChar(300)
+  pushEventId    Int?
+  occurrenceCount Int      @default(1)
+  firstOccurredAt DateTime
+  lastOccurredAt  DateTime
+  ticketRequestId Int?
+  escalatedAt     DateTime?
+  note            String?  @db.Text
+  userId          Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId, status, lastOccurredAt])
+  @@index([siteId, fingerprint, status])
+  @@index([companyId, status])
+  @@map("integra_soc_alarms")
 }
 
 model IntegraFloorplan {
