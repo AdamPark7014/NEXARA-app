@@ -296,7 +296,8 @@ arranque. **No es de esto**: siembra definiciones que ya existen. Venía de ante
    Azotea y Office Entrance no empujan eventos; su video va bien.
 3. La PTZ `.179` no tiene `FieldDetection`: sin recuadros en el estacionamiento.
 4. Decidir si se encienden los micros de las cámaras (el botón ya está).
-5. Desplegar este turno (nameplates + PTZ hold) y hard-refresh del en vivo.
+5. Hard-refresh del en vivo en el navegador (web `6fdd7ac` ya en prod; smoke:
+   `/integra/video` 200; en 10 min: 13 ACS + 2 con `personName`, fielddetection OK).
 6. TCPMSS / biblioteca `init: true` / empresas 1-2.
 
 ## No tocar
