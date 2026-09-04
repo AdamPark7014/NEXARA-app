@@ -543,6 +543,9 @@ function sleep(ms: number): Promise<void> {
 /**
  * Empuja JPEG de cara al terminal. Doc HikGateway 5.9.1 — FaceDataRecord multipart.
  * `faceLibType` por defecto `blackFD` (lista ACS habitual).
+ *
+ * Calidad: DS-K1T enrola mejor con JPEG frontal ~50–400 KB (cara llena el
+ * cuadro). PNG/WebP fallan; >~1.5 MB a menudo se rechaza.
  */
 export async function uploadFaceData(
   client: HikvisionIsapiClient,
@@ -550,7 +553,7 @@ export async function uploadFaceData(
 ): Promise<void> {
   const meta = JSON.stringify({
     faceLibType: opts.faceLibType || 'blackFD',
-    FaceInfo: { employeeNo: opts.employeeNo },
+    FaceInfo: { employeeNo: opts.employeeNo, faceLibType: opts.faceLibType || 'blackFD' },
   });
   await client.postMultipart('/ISAPI/Intelligent/FDLib/FaceDataRecord?format=json', [
     { name: 'FaceDataRecord', contentType: 'application/json', body: meta },
@@ -575,6 +578,36 @@ export async function deleteFaceData(
       EmployeeNoList: [{ employeeNo }],
     },
   });
+}
+
+/**
+ * Busca registro de rostro por empleado. Postman «Buscar rostro» —
+ * FaceInfoSearchCond. Sirve para verificar enrolo tras FaceDataRecord.
+ */
+export async function searchFaceInfo(
+  client: HikvisionIsapiClient,
+  opts: { employeeNo: string; faceLibType?: string; maxResults?: number },
+): Promise<{ total: number; matches: Array<Record<string, unknown>> }> {
+  const employeeNo = String(opts.employeeNo || '').trim();
+  if (!employeeNo) return { total: 0, matches: [] };
+  const raw = await client.postJson('/ISAPI/Intelligent/FDLib/FDSearch?format=json', {
+    FaceInfoSearchCond: {
+      searchID: randomUUID(),
+      searchResultPosition: 0,
+      maxResults: Math.min(Math.max(1, opts.maxResults ?? 10), 30),
+      faceLibType: opts.faceLibType || 'blackFD',
+      employeeNo,
+    },
+  });
+  const block = (raw.FaceInfoSearch ?? raw.FaceInfoSearchResult ?? raw) as Record<string, unknown>;
+  const matches = asArray(
+    (block.FaceInfo as Record<string, unknown> | Record<string, unknown>[] | undefined) ??
+      (block.MatchList as Record<string, unknown> | Record<string, unknown>[] | undefined),
+  ).filter(Boolean);
+  return {
+    total: num(block.totalMatches ?? block.numOfMatches, matches.length),
+    matches,
+  };
 }
 
 /**
