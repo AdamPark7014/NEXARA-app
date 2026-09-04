@@ -2,13 +2,16 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { JobQueueService } from '../jobs/job-queue.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
+  deleteFaceData,
   deleteUserInfo,
   modifyUserInfo,
   recordUserInfo,
+  uploadFaceData,
   type HikvisionIsapiClient,
   type UserInfoWrite,
 } from '../hikvision-isapi/index';
 import { IntegraSiteService } from './integra-site.service';
+import { readLocalPersonFace } from './integra-person-media';
 
 export type AcsDeviceResult = {
   deviceIp: string;

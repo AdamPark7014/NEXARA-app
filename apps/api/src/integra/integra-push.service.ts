@@ -303,7 +303,7 @@ export class IntegraPushService {
         ? Math.min(Math.floor(opts.sinceMs), 180_000)
         : null;
 
-    const scope = opts.scope || 'all';
+    const scope = opts.scope || null;
     const personName = opts.personName?.trim() || null;
     const deviceIp = opts.deviceIp?.trim() || null;
 
@@ -331,7 +331,10 @@ export class IntegraPushService {
       where.eventType = 'AccessControllerEvent';
       where.major = 5;
     } else if (scope === 'noise') {
-      where.eventType = { in: NOISE_TYPES };
+      where.eventType = { in: [...NOISE_TYPES] };
+    } else if (scope !== 'all') {
+      // Default / overlay: sin VMD·heartBeat·duration (el 97 % del tráfico).
+      where.eventType = { notIn: [...NOISE_TYPES] };
     }
 
     if (opts.outcome === 'granted') {
