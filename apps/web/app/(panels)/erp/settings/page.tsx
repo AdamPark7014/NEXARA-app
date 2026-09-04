@@ -222,6 +222,6 @@ export default function SettingsPage() {
         </div>
       )}
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-    </>
+    </PageChrome>
   );
 }

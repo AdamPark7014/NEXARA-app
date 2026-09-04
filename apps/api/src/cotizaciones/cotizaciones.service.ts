@@ -304,7 +304,7 @@ export class CotizacionesService {
   async findOne(id: number, companyId?: number | null) {
     const quote = await this.db.cotizacion.findFirst({
       where: { id, ...companyWhere(companyId ?? null) },
-      include: { items: true, createdBy: true },
+      include: { items: true, createdBy: true, company: true },
     });
     assertCompanyAccess(quote, companyId, 'Cotizacion');
     return quote;
