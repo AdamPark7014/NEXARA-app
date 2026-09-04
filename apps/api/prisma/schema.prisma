@@ -5024,6 +5024,7 @@ model CompanyProfile {
   integraAlarmAcks          IntegraAlarmAck[]
   integraFloorplans         IntegraFloorplan[]
   integraEdgeAgents         IntegraEdgeAgent[]
+  integraPushEvents         IntegraPushEvent[]
 
   @@map("company_profile")
 }
@@ -5713,6 +5714,11 @@ model IntegraSite {
   alarmAcks  IntegraAlarmAck[]
   floorplans IntegraFloorplan[]
   edgeAgent  IntegraEdgeAgent?
+  pushEvents IntegraPushEvent[]
+  /// sha256 del token que los equipos llevan en la URL de notificacion.
+  /// Solo el hash: el token en claro se ensena una vez al configurarlos.
+  pushTokenHash String?  @db.VarChar(64)
+  pushTokenAt   DateTime?
   /// Cliente operativo ERP (opcional) — no confundir con CompanyProfile
   serviceClientId Int?
   /// Override de módulos visibles: { "video": true, "anpr": false, ... }
@@ -5910,6 +5916,47 @@ model IntegraPerson {
   @@unique([siteId, personId])
   @@index([companyId])
   @@map("integra_people")
+}
+
+/// Evento que el equipo **empuja** a NEXARA, no que NEXARA le pregunta.
+///
+/// El sondeo cada 4 s llega tarde y sin imagen. Con el empuje el evento entra
+/// en menos de un segundo, que es lo que permite tomarle la foto a quien acaba
+/// de pasar por la puerta: el terminal no entrega la suya —medido: 596 eventos
+/// del alertStream, cero JPEG— pero como camara responde en ~300 ms.
+model IntegraPushEvent {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  siteId    Int
+  /// IP del equipo que lo mando. Es lo unico que el aparato firma de si mismo.
+  deviceIp    String  @db.VarChar(64)
+  deviceName  String? @db.VarChar(220)
+  /// AccessControllerEvent | VMD | fielddetection | linedetection | facedetection…
+  eventType   String  @db.VarChar(64)
+  major       Int?
+  minor       Int?
+  /// Etiqueta legible ya resuelta, para no recalcularla en cada consulta.
+  label       String? @db.VarChar(160)
+  occurredAt  DateTime
+  receivedAt  DateTime @default(now())
+
+  personId    String? @db.VarChar(64)
+  personName  String? @db.VarChar(220)
+  doorNo      Int?
+  verifyMode  String? @db.VarChar(64)
+  /// Ruta bajo /uploads: la foto que NEXARA tomo del equipo al recibirlo.
+  photoPath   String? @db.VarChar(300)
+  /// Recuadros de deteccion normalizados 0..1, con su tipo (human/vehicle).
+  targets     Json?
+  raw         Json?
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId, occurredAt])
+  @@index([siteId, personId, occurredAt])
+  @@index([companyId, occurredAt])
+  @@map("integra_push_events")
 }
 
 model IntegraDevice {

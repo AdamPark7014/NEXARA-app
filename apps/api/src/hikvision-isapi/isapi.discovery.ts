@@ -482,3 +482,122 @@ function describe(e: unknown): string {
   if (e instanceof Error) return e.message;
   return String(e);
 }
+
+/**
+ * Apunta el «host de notificación» del equipo a una URL nuestra.
+ *
+ * Es lo que convierte el sondeo en empuje: a partir de aquí el aparato avisa
+ * él solo en cuanto pasa algo, en vez de esperar a que le preguntemos. El
+ * firmware limita la URL a 128 caracteres (`urlLen max="128"`), de ahí que el
+ * token sea corto.
+ *
+ * `uploadImagesDataType` solo lo aceptan las cámaras; los terminales no lo
+ * declaran en sus capacidades y se lo tragan como campo desconocido, así que
+ * se manda únicamente donde sirve.
+ */
+export async function setHttpNotificationHost(
+  client: HikvisionIsapiClient,
+  opts: {
+    /** Ranura del equipo. Tienen 2 o 3; la 1 estaba vacía en todos. */
+    id?: number;
+    url: string;
+    withImages?: boolean;
+  },
+): Promise<void> {
+  const u = new URL(opts.url);
+  const id = opts.id ?? 1;
+  const https = u.protocol === 'https:';
+  const port = u.port || (https ? '443' : '80');
+  // El equipo quiere host y ruta por separado, no la URL entera.
+  const body =
+    `<HttpHostNotification>` +
+    `<id>${id}</id>` +
+    `<url>${u.pathname}${u.search}</url>` +
+    `<protocolType>${https ? 'HTTPS' : 'HTTP'}</protocolType>` +
+    `<parameterFormatType>JSON</parameterFormatType>` +
+    `<addressingFormatType>hostname</addressingFormatType>` +
+    `<hostName>${u.hostname}</hostName>` +
+    `<portNo>${port}</portNo>` +
+    `<httpAuthenticationMethod>none</httpAuthenticationMethod>` +
+    (opts.withImages ? `<uploadImagesDataType>binary</uploadImagesDataType>` : '') +
+    `</HttpHostNotification>`;
+
+  await client.put(`/ISAPI/Event/notification/httpHosts/${id}`, body);
+}
+
+/** Deja la ranura vacía: el equipo deja de avisar. */
+export async function clearHttpNotificationHost(
+  client: HikvisionIsapiClient,
+  id = 1,
+): Promise<void> {
+  await client.put(
+    `/ISAPI/Event/notification/httpHosts/${id}`,
+    `<HttpHostNotification><id>${id}</id><url></url><protocolType>HTTP</protocolType>` +
+      `<addressingFormatType>ipaddress</addressingFormatType><ipAddress>0.0.0.0</ipAddress>` +
+      `<portNo>0</portNo><httpAuthenticationMethod>none</httpAuthenticationMethod>` +
+      `</HttpHostNotification>`,
+  );
+}
+
+/**
+ * Enciende la detección de intrusión sobre todo el encuadre, solo para personas.
+ *
+ * Las reglas vienen de fábrica presentes pero con las zonas apagadas **y sin
+ * polígono**: la región 1 no trae `RegionCoordinatesList`, así que no basta con
+ * poner `enabled` a true — hay que darle la zona. Se le da el cuadro entero en
+ * la rejilla normalizada que el propio equipo declara (1000×1000).
+ *
+ * `detectionTarget` se deja en `human`: con `vehicle` una oficina dispara con
+ * cualquier cosa que se mueva y el evento deja de significar nada.
+ */
+export async function enableHumanFieldDetection(
+  client: HikvisionIsapiClient,
+  channel = 1,
+): Promise<boolean> {
+  const path = `/ISAPI/Smart/FieldDetection/${channel}`;
+  const { buffer } = await client.getBinary(path);
+  const xml = buffer.toString('utf8');
+
+  const region = /<FieldDetectionRegion\b[\s\S]*?<\/FieldDetectionRegion>/.exec(xml);
+  if (!region) return false;
+
+  const w = Number(/<normalizedScreenWidth>(\d+)</.exec(xml)?.[1]) || 1000;
+  const h = Number(/<normalizedScreenHeight>(\d+)</.exec(xml)?.[1]) || 1000;
+  const corners = [
+    [0, 0],
+    [w, 0],
+    [w, h],
+    [0, h],
+  ]
+    .map(([x, y]) => `<RegionCoordinates><positionX>${x}</positionX><positionY>${y}</positionY></RegionCoordinates>`)
+    .join('');
+
+  let patched = region[0]
+    .replace(/<enabled>\s*false\s*<\/enabled>/, '<enabled>true</enabled>')
+    .replace(/<detectionTarget>[^<]*<\/detectionTarget>/, '<detectionTarget>human</detectionTarget>');
+  if (!/<RegionCoordinatesList>/.test(patched)) {
+    // El polígono va antes de cerrar la región, después de los umbrales.
+    patched = patched.replace(
+      /<\/FieldDetectionRegion>/,
+      `<RegionCoordinatesList>${corners}</RegionCoordinatesList></FieldDetectionRegion>`,
+    );
+  }
+
+  await client.put(path, xml.replace(region[0], patched));
+  return true;
+}
+
+/** Apaga la región 1 y deja de disparar. */
+export async function disableFieldDetection(
+  client: HikvisionIsapiClient,
+  channel = 1,
+): Promise<boolean> {
+  const path = `/ISAPI/Smart/FieldDetection/${channel}`;
+  const { buffer } = await client.getBinary(path);
+  const xml = buffer.toString('utf8');
+  const region = /<FieldDetectionRegion\b[\s\S]*?<\/FieldDetectionRegion>/.exec(xml);
+  if (!region) return false;
+  const patched = region[0].replace(/<enabled>\s*true\s*<\/enabled>/, '<enabled>false</enabled>');
+  await client.put(path, xml.replace(region[0], patched));
+  return true;
+}

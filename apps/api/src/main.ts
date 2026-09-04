@@ -46,6 +46,12 @@ async function bootstrap() {
   httpServer.disable('x-powered-by');
   httpServer.set('trust proxy', 1);
 
+  // Los equipos Hikvision empujan XML, JSON o multipart con el JPEG dentro, y
+  // ninguno con la cabecera que le corresponde. Se recoge en crudo y se decide
+  // por la forma del cuerpo — pero solo en esta ruta: al resto de la API le
+  // sigue haciendo falta el JSON ya parseado.
+  app.use('/api/integra/hik', express.raw({ type: () => true, limit: '20mb' }));
+
   // Límite de payload para fotos base64
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ limit: '10mb', extended: true }));

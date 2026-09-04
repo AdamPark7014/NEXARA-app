@@ -9,6 +9,10 @@ export {
 export {
   controlDoor,
   setChannelAudio,
+  setHttpNotificationHost,
+  clearHttpNotificationHost,
+  enableHumanFieldDetection,
+  disableFieldDetection,
   describeDevice,
   discoverDevice,
   identifyDevice,

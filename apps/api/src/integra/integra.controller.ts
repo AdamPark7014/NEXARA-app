@@ -8,6 +8,7 @@ import {
   HttpStatus,
   MessageEvent,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -35,6 +36,7 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 import { IntegraArtemisService } from './integra-artemis.service';
 import { ServiceClientsService } from '../service-clients/service-clients.service.js';
 import { IntegraSiteService } from './integra-site.service';
+import { IntegraPushService } from './integra-push.service';
 import { IntegraSyncService } from './integra-sync.service';
 
 export function integraCanSettings(user: { roleKey?: string; isSuperAdmin?: boolean } | null) {
@@ -136,6 +138,7 @@ export class IntegraController {
     private readonly sites: IntegraSiteService,
     private readonly sync: IntegraSyncService,
     private readonly serviceClients: ServiceClientsService,
+    private readonly push: IntegraPushService,
   ) {}
 
   @Get('health')
@@ -774,6 +777,57 @@ export class IntegraController {
       }),
       catchError(() => of({ data: { items: [], error: true } } as MessageEvent)),
     );
+  }
+
+  // ── Empuje de eventos ──────────────────────────────────────────────
+  @Post('sites/:siteId/push/wire')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Apunta los equipos del sitio a NEXARA (y opcionalmente enciende detección)' })
+  async wirePush(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('siteId', ParseIntPipe) siteId: number,
+    @Body() body: { detection?: boolean },
+    @CurrentUser() user: any,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para configurar equipos');
+    }
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    return this.push.wireDevices(companyId, siteId, { detection: body?.detection === true });
+  }
+
+  @Post('sites/:siteId/push/unwire')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Los equipos dejan de avisar (y de detectar)' })
+  async unwirePush(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('siteId', ParseIntPipe) siteId: number,
+    @Body() body: { detection?: boolean },
+    @CurrentUser() user: any,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para configurar equipos');
+    }
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    return this.push.unwireDevices(companyId, siteId, { detection: body?.detection === true });
+  }
+
+  @Get('push/events')
+  @ApiOperation({ summary: 'Eventos que los equipos empujaron, con su foto' })
+  async pushEvents(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+    @Query('personId') personId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    const take = Math.min(Math.max(parseInt(limit || '60', 10) || 60, 1), 300);
+    const items = await this.push.listEvents(companyId, {
+      siteId: siteId ? parseInt(siteId, 10) : null,
+      personId: personId || null,
+      take,
+    });
+    return { items, total: items.length };
   }
 
   @Get('floorplans')

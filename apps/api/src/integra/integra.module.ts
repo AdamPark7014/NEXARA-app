@@ -14,10 +14,17 @@ import {
   IntegraEdgeController,
   IntegraEdgeAdminController,
 } from './integra-edge.controller';
+import { IntegraPushService } from './integra-push.service';
+import { IntegraPushController } from './integra-push.controller';
 
 @Module({
   imports: [ConfigModule, PrismaModule, AuditModule, ServiceClientsModule],
-  controllers: [IntegraController, IntegraEdgeController, IntegraEdgeAdminController],
+  controllers: [
+    IntegraController,
+    IntegraEdgeController,
+    IntegraEdgeAdminController,
+    IntegraPushController,
+  ],
   providers: [
     IntegraArtemisService,
     IntegraSiteService,
@@ -25,6 +32,7 @@ import {
     IntegraMediaService,
     IntegraPortfolioService,
     IntegraEdgeService,
+    IntegraPushService,
   ],
   exports: [
     IntegraArtemisService,
@@ -32,6 +40,7 @@ import {
     IntegraSyncService,
     IntegraPortfolioService,
     IntegraEdgeService,
+    IntegraPushService,
   ],
 })
 export class IntegraModule {}

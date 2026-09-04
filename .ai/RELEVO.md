@@ -135,13 +135,39 @@ terminal localiza la cara, solo no manda los píxeles).
 empujado (<1 s) la persona sigue delante: la foto la toma NEXARA y se guarda
 en NEXARA. Eso además resuelve el rostro del directorio con el tiempo.
 
+## Eventos empujados (Adam dijo que sí a todo, 2026-09-04)
+
+`POST|PUT /api/integra/hik/:siteId/:token` — sin `RbacGuard`: quien llama es
+un aparato. El token va en la URL porque el firmware no sabe otra cosa
+(`urlLen max=128`, de ahí que sean 96 bits en hex); en la base solo el sha256.
+**Siempre responde 200**: un Hikvision que recibe un error deshabilita el host
+de notificación y se queda mudo hasta que alguien lo note.
+
+El cuerpo llega en tres formas y ninguna con la cabecera correcta, así que
+`main.ts` monta `express.raw` **solo** en `/api/integra/hik` y se decide por la
+forma del cuerpo. Multipart se trocea a mano: no es un formulario, son partes
+sin nombre de campo, y multer las tiraría.
+
+La foto: si el equipo la manda (solo las cámaras), esa. Si no, NEXARA se la
+pide al propio equipo por `Streaming/channels/101/picture` — ~300 ms, la
+persona sigue delante. Se guardan en `uploads/integra/<siteId>/<día>/`.
+
+`POST integra/sites/:id/push/wire {detection}` apunta los 17 equipos y
+enciende la detección; `/unwire` lo deshace. Cada `wire` emite token nuevo.
+
+**La detección de intrusión no basta con `enabled: true`**: la región 1 viene
+sin `RegionCoordinatesList`, hay que darle el polígono (cuadro entero sobre la
+rejilla 1000×1000 que declara el equipo). `detectionTarget` se fuerza a
+`human`: con `vehicle` una oficina dispara con cualquier cosa.
+
 ## A medias
 
-1. Decidir si se encienden las reglas de detección (avisan a Hik-Connect).
-2. Decidir si se apunta el `httpHost` de los equipos a NEXARA (ahora está en
-   `0.0.0.0`, no desplaza a nadie).
-3. Decidir si se encienden los micros de las cámaras (el botón ya está).
-4. TCPMSS / biblioteca `init: true` / empresas 1-2.
+1. Comprobar que los equipos alcanzan `integra.nexara.com.mx` (DNS + salida a
+   internet desde la LAN de la oficina). Es lo único que puede tumbar todo esto.
+2. Asistencia y portal del empleado (Adam: asistencia + credencial).
+3. Dibujar los recuadros sobre el video en el muro con `targets`.
+4. Decidir si se encienden los micros de las cámaras (el botón ya está).
+5. TCPMSS / biblioteca `init: true` / empresas 1-2.
 
 ## No tocar
 
