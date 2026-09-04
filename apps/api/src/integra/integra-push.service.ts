@@ -116,6 +116,102 @@ export class IntegraPushService {
   }
 
   /**
+   * Asistencia del día, deducida de los accesos.
+   *
+   * Estos terminales no marcan entrada ni salida —`AttendanceMode` responde
+   * `notSupport`—, así que no hay un dato «fichaje» que leer: se deduce del
+   * primer y el último acceso concedido de cada persona en el día, que es como
+   * funciona cualquier control de accesos usado como reloj checador.
+   *
+   * Las horas se cuentan en la zona del sitio, no en UTC: si no, todo lo de
+   * después de las 18:00 hora de México cae en el día siguiente.
+   */
+  async attendance(
+    companyId: number,
+    opts: { siteId?: number | null; from: Date; to: Date; personId?: string | null; tz?: string },
+  ) {
+    const tz = opts.tz || 'America/Mexico_City';
+    const rows = await this.prisma.integraPushEvent.findMany({
+      where: {
+        companyId,
+        ...(opts.siteId ? { siteId: opts.siteId } : {}),
+        ...(opts.personId ? { personId: opts.personId } : {}),
+        // major 5 = autenticación. Sin persona no hay a quién apuntarle nada.
+        major: 5,
+        personId: { not: null },
+        occurredAt: { gte: opts.from, lte: opts.to },
+      },
+      orderBy: { occurredAt: 'asc' },
+      select: {
+        personId: true,
+        personName: true,
+        occurredAt: true,
+        deviceName: true,
+        photoPath: true,
+        minor: true,
+        verifyMode: true,
+      },
+    });
+
+    const days = new Map<
+      string,
+      {
+        day: string;
+        personId: string;
+        personName: string | null;
+        firstAt: Date;
+        lastAt: Date;
+        firstDoor: string | null;
+        firstPhoto: string | null;
+        passes: number;
+        denied: number;
+      }
+    >();
+
+    for (const r of rows) {
+      const personId = r.personId as string;
+      const day = dayIn(r.occurredAt, tz);
+      const key = `${day}|${personId}`;
+      const granted = r.minor === 75 || r.minor === 76 || r.minor === 1;
+      const cur = days.get(key);
+      if (!cur) {
+        days.set(key, {
+          day,
+          personId,
+          personName: r.personName,
+          firstAt: r.occurredAt,
+          lastAt: r.occurredAt,
+          firstDoor: r.deviceName,
+          firstPhoto: r.photoPath,
+          passes: granted ? 1 : 0,
+          denied: granted ? 0 : 1,
+        });
+        continue;
+      }
+      cur.lastAt = r.occurredAt;
+      if (granted) cur.passes += 1;
+      else cur.denied += 1;
+      if (!cur.firstPhoto && r.photoPath) cur.firstPhoto = r.photoPath;
+      if (!cur.personName && r.personName) cur.personName = r.personName;
+    }
+
+    const items = [...days.values()]
+      .map((d) => ({
+        ...d,
+        firstAt: d.firstAt.toISOString(),
+        lastAt: d.lastAt.toISOString(),
+        // Un solo paso en el día no es una jornada: es una entrada sin salida.
+        minutes:
+          d.passes > 1
+            ? Math.round((new Date(d.lastAt).getTime() - new Date(d.firstAt).getTime()) / 60000)
+            : null,
+      }))
+      .sort((a, b) => (a.day === b.day ? a.firstAt.localeCompare(b.firstAt) : b.day.localeCompare(a.day)));
+
+    return { items, total: items.length };
+  }
+
+  /**
    * Deja a todos los equipos del sitio avisando a NEXARA.
    *
    * Se emite un token nuevo en cada pasada: si el anterior se filtró en un log
@@ -335,4 +431,15 @@ function worthAPhoto(ev: NormalizedEvent): boolean {
 
 function describeErr(e: unknown): string {
   return e instanceof Error ? e.message.slice(0, 160) : String(e).slice(0, 160);
+}
+
+/** Día natural en la zona del sitio, no en UTC. */
+function dayIn(d: Date, tz: string): string {
+  // `en-CA` da exactamente `YYYY-MM-DD`, que es lo que hace falta para ordenar.
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
 }
