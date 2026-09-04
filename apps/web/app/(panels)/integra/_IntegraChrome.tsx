@@ -105,14 +105,23 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
         if (!res.ok) return;
         const json = await res.json();
         const g = json?.info?.go2rtc || json?.error?.go2rtc || json?.details?.go2rtc;
-        // Solo marcar down si el indicador existe y dice explícitamente que no está up.
-        // Si el health no incluye go2rtc, no alarmar (evita falsos "Video offline").
+        // Sin indicador no se alarma: un health que no reporta video no es un
+        // video caído.
         if (!g || typeof g !== "object") {
           setMediaDown(false);
           return;
         }
-        const status = String(g.status || g.status?.status || "").toLowerCase();
-        setMediaDown(Boolean(status) && status !== "up" && status !== "ok");
+        // El health devuelve `status: 200` —el código HTTP— pero antes se
+        // comparaba contra los textos "up"/"ok". Como "200" no es ninguno, el
+        // aviso "Video offline" quedaba encendido de forma permanente mientras
+        // el video se veía perfectamente. Una alarma que siempre miente enseña
+        // a ignorar las alarmas, así que se aceptan las dos formas.
+        const raw = g.status ?? g.status?.status;
+        const asNumber = Number(raw);
+        const healthy = Number.isFinite(asNumber)
+          ? asNumber >= 200 && asNumber < 300
+          : ["up", "ok", "healthy"].includes(String(raw ?? "").toLowerCase());
+        setMediaDown(raw != null && !healthy);
       } catch {
         /* no tocar el estado anterior */
       }
