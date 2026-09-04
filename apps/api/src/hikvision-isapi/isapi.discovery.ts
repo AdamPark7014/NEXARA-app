@@ -580,6 +580,67 @@ export async function clearHttpNotificationHost(
   );
 }
 
+/** Lee las ranuras httpHosts (URL viva si ya están cableadas). */
+export async function readHttpNotificationHosts(
+  client: HikvisionIsapiClient,
+): Promise<Array<{ id: number; url: string; host: string; protocol: string }>> {
+  try {
+    const xml = await client.get('/ISAPI/Event/notification/httpHosts');
+    const list = (xml.HttpHostNotificationList ?? xml) as Record<string, unknown>;
+    return asList(list.HttpHostNotification)
+      .map((n) => {
+        const id = Number(pick(n, 'id'));
+        const path = pick(n, 'url') || '';
+        const host = pick(n, 'hostName') || pick(n, 'ipAddress') || '';
+        const protocol = (pick(n, 'protocolType') || 'HTTP').toLowerCase();
+        const port = pick(n, 'portNo') || (protocol === 'https' ? '443' : '80');
+        if (!path || path === '/' || !host || host === '0.0.0.0') {
+          return null;
+        }
+        return {
+          id: Number.isFinite(id) ? id : 0,
+          url: `${protocol}://${host}:${port}${path}`,
+          host,
+          protocol,
+        };
+      })
+      .filter((x): x is { id: number; url: string; host: string; protocol: string } => x !== null);
+  } catch (e) {
+    if (e instanceof IsapiAuthRejectedError) throw e;
+    return [];
+  }
+}
+
+/**
+ * Enciende motion detection (VMD clásico). La PTZ DarkFighter no tiene
+ * FieldDetection; sí responde 200 a motionDetection. Sube sensibilidad si
+ * viene en 0 (medido en .179: enabled=true pero sensitivityLevel=0 → sin push).
+ */
+export async function enableMotionDetection(
+  client: HikvisionIsapiClient,
+  channel = 1,
+  sensitivity = 60,
+): Promise<boolean> {
+  const path = `/ISAPI/System/Video/inputs/channels/${channel}/motionDetection`;
+  try {
+    const { buffer } = await client.getBinary(path);
+    let xml = buffer.toString('utf8');
+    if (!/<MotionDetection\b/i.test(xml)) return false;
+    xml = xml.replace(/<enabled>\s*false\s*<\/enabled>/i, '<enabled>true</enabled>');
+    if (/<sensitivityLevel>\s*\d+\s*<\/sensitivityLevel>/i.test(xml)) {
+      xml = xml.replace(
+        /<sensitivityLevel>\s*\d+\s*<\/sensitivityLevel>/i,
+        `<sensitivityLevel>${Math.max(1, Math.min(100, Math.round(sensitivity)))}</sensitivityLevel>`,
+      );
+    }
+    await client.put(path, xml);
+    return true;
+  } catch (e) {
+    if (e instanceof IsapiAuthRejectedError) throw e;
+    return false;
+  }
+}
+
 /**
  * Enciende la detección de intrusión sobre todo el encuadre, solo para personas.
  *
@@ -588,12 +649,13 @@ export async function clearHttpNotificationHost(
  * poner `enabled` a true — hay que darle la zona. Se le da el cuadro entero en
  * la rejilla normalizada que el propio equipo declara (1000×1000).
  *
- * `detectionTarget` se deja en `human`: con `vehicle` una oficina dispara con
- * cualquier cosa que se mueva y el evento deja de significar nada.
+ * `detectionTarget` por defecto `human`. En oficinas `vehicle` dispara ruido;
+ * en canales de entrada/azotea (NVR PoE) se usa `human,vehicle` (verificado).
  */
-export async function enableHumanFieldDetection(
+export async function enableFieldDetection(
   client: HikvisionIsapiClient,
   channel = 1,
+  target: 'human' | 'human,vehicle' | 'vehicle' = 'human',
 ): Promise<boolean> {
   const path = `/ISAPI/Smart/FieldDetection/${channel}`;
   const { buffer } = await client.getBinary(path);
@@ -613,8 +675,6 @@ export async function enableHumanFieldDetection(
     .map(([x, y]) => `<RegionCoordinates><positionX>${x}</positionX><positionY>${y}</positionY></RegionCoordinates>`)
     .join('');
 
-  // Disparar más a menudo: umbral de tiempo mínimo y sensibilidad alta
-  // (valores típicos ISAPI FieldDetectionRegion; si el tag no existe, se inserta).
   const bump = (regionXml: string, tag: string, value: string) => {
     if (new RegExp(`<${tag}>`, 'i').test(regionXml)) {
       return regionXml.replace(new RegExp(`<${tag}>[^<]*</${tag}>`, 'i'), `<${tag}>${value}</${tag}>`);
@@ -626,11 +686,13 @@ export async function enableHumanFieldDetection(
   };
 
   let out = xml;
-  // Todas las regiones del canal: una sola zona apagada deja huecos sin caja.
   for (const match of regions) {
     let patched = match[0]
       .replace(/<enabled>\s*false\s*<\/enabled>/, '<enabled>true</enabled>')
-      .replace(/<detectionTarget>[^<]*<\/detectionTarget>/, '<detectionTarget>human</detectionTarget>');
+      .replace(
+        /<detectionTarget>[^<]*<\/detectionTarget>/,
+        `<detectionTarget>${target}</detectionTarget>`,
+      );
     patched = bump(patched, 'sensitivity', '95');
     patched = bump(patched, 'timeThreshold', '0');
     if (!/<RegionCoordinatesList>/.test(patched)) {
@@ -644,6 +706,38 @@ export async function enableHumanFieldDetection(
 
   await client.put(path, out);
   return true;
+}
+
+/** Atajo: FieldDetection solo personas (oficinas AcuSense). */
+export async function enableHumanFieldDetection(
+  client: HikvisionIsapiClient,
+  channel = 1,
+): Promise<boolean> {
+  return enableFieldDetection(client, channel, 'human');
+}
+
+/**
+ * Canales PoE del NVR Oficinas con FieldDetection `human,vehicle` verificado
+ * (Escalera/Entrance/Escaleras/Azotea). El canal 13 (PTZ) responde 403.
+ */
+export async function enableNvrParkingVehicleDetection(
+  client: HikvisionIsapiClient,
+  channels: number[] = [1, 2, 9, 10],
+): Promise<Array<{ channel: number; ok: boolean; error?: string }>> {
+  const out: Array<{ channel: number; ok: boolean; error?: string }> = [];
+  for (const channel of channels) {
+    try {
+      const ok = await enableFieldDetection(client, channel, 'human,vehicle');
+      out.push({ channel, ok });
+    } catch (e) {
+      out.push({
+        channel,
+        ok: false,
+        error: e instanceof Error ? e.message.slice(0, 160) : String(e),
+      });
+    }
+  }
+  return out;
 }
 
 /** Apaga la región 1 y deja de disparar. */
