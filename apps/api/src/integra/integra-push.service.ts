@@ -263,7 +263,7 @@ export class IntegraPushService {
         : null;
     const sinceMs =
       opts.sinceMs != null && Number.isFinite(opts.sinceMs) && opts.sinceMs > 0
-        ? Math.min(Math.floor(opts.sinceMs), 86_400_000)
+        ? Math.min(Math.floor(opts.sinceMs), 180_000)
         : null;
 
     const scope = opts.scope || 'all';

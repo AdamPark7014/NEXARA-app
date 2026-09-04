@@ -1043,22 +1043,59 @@ export class IntegraController {
     @CurrentCompanyId() companyId: number | null,
     @Query('siteId') siteId?: string,
     @Query('personId') personId?: string,
+    @Query('personName') personName?: string,
+    @Query('deviceIp') deviceIp?: string,
     @Query('limit') limit?: string,
     @Query('afterId') afterId?: string,
+    @Query('beforeId') beforeId?: string,
     @Query('sinceMs') sinceMs?: string,
     @Query('live') live?: string,
+    @Query('scope') scope?: string,
+    @Query('outcome') outcome?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
     if (!companyId) throw new BadRequestException('Empresa requerida');
     const take = Math.min(Math.max(parseInt(limit || '60', 10) || 60, 1), 300);
-    const items = await this.push.listEvents(companyId, {
+    const scopeNorm =
+      scope === 'acs' || scope === 'noise' || scope === 'all' ? scope : 'all';
+    const outcomeNorm =
+      outcome === 'granted' || outcome === 'denied' ? outcome : null;
+    const fromDate = from ? new Date(from) : null;
+    const toDate = to ? new Date(to) : null;
+    if (fromDate && Number.isNaN(fromDate.getTime())) {
+      throw new BadRequestException('from inválido');
+    }
+    if (toDate && Number.isNaN(toDate.getTime())) {
+      throw new BadRequestException('to inválido');
+    }
+    return this.push.listEvents(companyId, {
       siteId: siteId ? parseInt(siteId, 10) : null,
       personId: personId || null,
+      personName: personName || null,
+      deviceIp: deviceIp || null,
       take,
       afterId: afterId ? parseInt(afterId, 10) : null,
+      beforeId: beforeId ? parseInt(beforeId, 10) : null,
       sinceMs: sinceMs ? parseInt(sinceMs, 10) : null,
       liveOnly: live === '1' || live === 'true',
+      scope: scopeNorm,
+      outcome: outcomeNorm,
+      from: fromDate,
+      to: toDate,
     });
-    return { items, total: items.length };
+  }
+
+  @Get('push/events/stats')
+  @ApiOperation({ summary: 'KPIs del día: entradas, denegados, únicos, en sitio' })
+  async pushEventStats(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    return this.push.eventStats(companyId, {
+      siteId: siteId ? parseInt(siteId, 10) : null,
+    });
   }
 
   @Sse('push/stream')
