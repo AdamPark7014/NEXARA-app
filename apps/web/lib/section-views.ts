@@ -513,8 +513,8 @@ export function adaptModulePresentation(
         : { label: 'Alarmas', description: 'Búsqueda de alarmas del sitio' },
     'integra-visitors':
       v2 === ROLES.CLIENTE
-        ? { label: 'Visitas', description: 'Citas y accesos de visitantes' }
-        : { label: 'Visitas', description: 'Citas y códigos QR' },
+        ? { label: 'Visitas', description: 'Citas únicas y recurrentes con acceso limitado' }
+        : { label: 'Visitas', description: 'Única · recurrente · QR · ACS' },
     'integra-vehicles':
       v2 === ROLES.CLIENTE
         ? { label: 'Vehículos', description: 'Flota autorizada' }
