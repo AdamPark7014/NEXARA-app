@@ -29,7 +29,7 @@ import {
   findErpForPerson,
   generateTempPassword,
   type AltaMode,
-} from "./_personIdentity";
+} from "../_personIdentity";
 
 type Person = {
   id: string;
