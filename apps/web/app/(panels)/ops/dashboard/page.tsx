@@ -271,8 +271,44 @@ export default function OpsDashboardPage() {
                 tone: (alerts.length > 0 ? "danger" : "positive") as "danger" | "positive",
               }]
             : []),
+          ...(showNoc && slaResponse != null
+            ? [{
+                label: "SLA respuesta",
+                value: `${slaResponse}%`,
+                tone: (slaResponse >= 90 ? "positive" : "warning") as "positive" | "warning",
+              }]
+            : []),
         ]}
       />
+
+      {!loading && showNoc && (actionNotifs.length > 0 || breachCount > 0 || inboxNew > 0) && (
+        <DashPanel
+          title="Decisiones ahora"
+          subtitle="SLA, tickets portal y alertas de alta prioridad"
+          action="Notificaciones"
+          actionHref="/ops/notifications-center"
+        >
+          {breachCount > 0 && (
+            <ListRow
+              href="/ops/support/sla"
+              accent="var(--danger)"
+              title={`${breachCount} incumplimientos SLA (30d)`}
+              sub={slaResolution != null ? `Resolución ${slaResolution}% · inbox NEW ${inboxNew}` : `Inbox NEW ${inboxNew}`}
+              trail={<DashPill tone="danger">SLA</DashPill>}
+            />
+          )}
+          {actionNotifs.map((n) => (
+            <ListRow
+              key={n.id}
+              href={n.relatedUrl || "/ops/notifications-center"}
+              accent={n.priority === "high" ? "var(--danger)" : "var(--warning)"}
+              title={n.title}
+              sub={n.message.slice(0, 90)}
+              trail={n.priority === "high" ? <DashPill tone="danger">Alta</DashPill> : undefined}
+            />
+          ))}
+        </DashPanel>
+      )}
 
       {!loading && overdueOts.length > 0 && (
         <DashPanel
@@ -383,20 +419,22 @@ export default function OpsDashboardPage() {
             {showNoc && tickets.length > 0 && (
               <DashPanel
                 title="Tickets abiertos"
-                subtitle="Soporte a clientes"
+                subtitle="Inbox del portal cliente"
                 action="Ver todos"
                 actionHref="/ops/support"
               >
                 {tickets.map((t) => (
                   <ListRow
                     key={t.id}
-                    href="/ops/support"
-                    accent={ticketPriorityColor[t.priority ?? "MEDIA"] ?? "var(--border)"}
-                    title={t.title}
-                    sub={[t.folio, t.client?.name].filter(Boolean).join(" · ")}
-                    trail={t.priority
-                      ? <DashPill tone={t.priority === "CRITICA" || t.priority === "ALTA" ? "danger" : "warning"}>{t.priority}</DashPill>
-                      : undefined}
+                    href={`/ops/support/${t.id}`}
+                    accent={ticketPriorityColor[t.urgency ?? t.priority ?? "MEDIUM"] ?? "var(--border)"}
+                    title={t.title || t.description?.slice(0, 80) || `Ticket #${t.id}`}
+                    sub={[t.folio, t.client?.name, t.status].filter(Boolean).join(" · ")}
+                    trail={
+                      (t.urgency || t.priority)
+                        ? <DashPill tone={(t.urgency === "HIGH" || t.priority === "CRITICA" || t.priority === "ALTA") ? "danger" : "warning"}>{t.urgency ?? t.priority}</DashPill>
+                        : undefined
+                    }
                   />
                 ))}
               </DashPanel>

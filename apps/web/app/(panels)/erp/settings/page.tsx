@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import PageHeader from "@/components/ui/PageHeader";
+import PageChrome from "@/components/ui/PageChrome";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
@@ -15,7 +15,6 @@ import { toast } from "@/components/Toast";
 import KpiCard from "@/components/ui/KpiCard";
 import SettingsModuleRail from "@/components/erp/SettingsModuleRail";
 import ErpModuleCards from "@/components/erp/ErpModuleCards";
-import PageChrome from "@/components/ui/PageChrome";
 
 interface SettingRow {
   key: string;

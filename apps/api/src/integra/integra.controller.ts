@@ -68,6 +68,7 @@ class AddPersonDto {
   @IsOptional() @IsString() validTo?: string;
   @IsOptional() @IsBoolean() validEnable?: boolean;
   @IsOptional() @IsString() doorRight?: string;
+  @IsOptional() @Allow() rightPlan?: unknown;
 }
 
 class UpdatePersonDto {
@@ -78,6 +79,8 @@ class UpdatePersonDto {
   @IsOptional() @IsString() validTo?: string;
   @IsOptional() @IsBoolean() validEnable?: boolean;
   @IsOptional() @IsString() doorRight?: string;
+  /** RightPlan ISAPI — puertas/plantillas del terminal. */
+  @IsOptional() @Allow() rightPlan?: unknown;
 }
 
 class AssignPrivilegeDto {
@@ -175,6 +178,7 @@ export class IntegraController {
     private readonly sync: IntegraSyncService,
     private readonly serviceClients: ServiceClientsService,
     private readonly push: IntegraPushService,
+    private readonly acsFanout: IntegraAcsFanoutService,
   ) {}
 
   @Get('health')
