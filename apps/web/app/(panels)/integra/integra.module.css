@@ -4194,3 +4194,332 @@ button.evCard {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Horarios ACS (`/integra/schedules`) ─────────────────────────── */
+.schedTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 4px;
+}
+
+.schedTab {
+  appearance: none;
+  border: 1px solid var(--ig-line);
+  background: var(--ig-panel);
+  color: var(--ig-ink-soft);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.schedTab[data-on="1"] {
+  background: color-mix(in srgb, var(--ig-accent) 14%, var(--ig-panel));
+  border-color: color-mix(in srgb, var(--ig-accent) 45%, var(--ig-line));
+  color: var(--ig-accent-deep);
+}
+
+.schedLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 12px;
+  align-items: start;
+}
+
+.schedMain {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.schedSide {
+  position: sticky;
+  top: 8px;
+  display: grid;
+  gap: 12px;
+}
+
+.schedPresets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.schedPreset {
+  appearance: none;
+  text-align: left;
+  border: 1px solid var(--ig-line);
+  background: var(--ig-panel);
+  border-radius: var(--ig-radius);
+  padding: 10px 12px;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  min-height: 72px;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.schedPreset strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ig-ink);
+}
+
+.schedPreset span {
+  font-size: 12px;
+  color: var(--ig-muted);
+  line-height: 1.35;
+}
+
+.schedPreset[data-tone="ok"] {
+  border-color: color-mix(in srgb, var(--ig-ok) 35%, var(--ig-line));
+}
+.schedPreset[data-tone="warn"] {
+  border-color: color-mix(in srgb, var(--ig-warn) 40%, var(--ig-line));
+}
+.schedPreset[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--ig-danger) 40%, var(--ig-line));
+}
+.schedPreset[data-tone="accent"] {
+  border-color: color-mix(in srgb, var(--ig-accent) 40%, var(--ig-line));
+}
+.schedPreset[data-on="1"] {
+  background: color-mix(in srgb, var(--ig-accent) 10%, var(--ig-panel));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ig-accent) 35%, transparent);
+}
+
+.schedValidGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  align-items: end;
+}
+
+.schedDoorList,
+.schedDoorPeople,
+.schedAllDoors,
+.schedOpList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.schedDoorRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(140px, 220px) minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius);
+  background: color-mix(in srgb, var(--ig-surface) 55%, var(--ig-panel));
+}
+
+.schedDoorRow[data-on="1"] {
+  border-color: color-mix(in srgb, var(--ig-ok) 35%, var(--ig-line));
+}
+
+.schedDoorRow[data-active="1"] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ig-accent) 40%, transparent);
+}
+
+.schedDoorName {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+}
+
+.schedDoorName strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.schedDoorName span {
+  font-size: 11px;
+  color: var(--ig-muted);
+  font-family: var(--ig-font-mono);
+}
+
+.schedWeekSummary,
+.schedWeekMuted {
+  font-size: 12px;
+  color: var(--ig-muted);
+  line-height: 1.35;
+}
+
+.schedWeekMuted {
+  font-style: italic;
+}
+
+.schedWeekGrid {
+  display: grid;
+  gap: 4px;
+}
+
+.schedWeekRow {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+}
+
+.schedWeekDay {
+  font-weight: 700;
+  color: var(--ig-ink-soft);
+}
+
+.schedWeekRanges {
+  color: var(--ig-ink);
+  font-family: var(--ig-font-mono);
+  font-size: 11px;
+}
+
+.schedWeekRanges[data-off="1"] {
+  color: var(--ig-muted);
+}
+
+.schedWeekEmpty {
+  font-size: 13px;
+  color: var(--ig-muted);
+  padding: 8px 0;
+}
+
+.schedSaveBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.schedOpList li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--ig-radius-sm);
+  border: 1px solid var(--ig-line);
+  font-size: 12px;
+}
+
+.schedOpList li[data-ok="1"] {
+  border-color: color-mix(in srgb, var(--ig-ok) 35%, var(--ig-line));
+  color: var(--ig-ok);
+}
+
+.schedOpList li[data-ok="0"] {
+  border-color: color-mix(in srgb, var(--ig-danger) 35%, var(--ig-line));
+  color: var(--ig-danger);
+}
+
+.schedOpIp {
+  font-family: var(--ig-font-mono);
+  color: var(--ig-ink-soft);
+}
+
+.schedDoorPeople li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius);
+}
+
+.schedDoorPeopleRight {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.schedMeta {
+  font-size: 12px;
+  color: var(--ig-muted);
+}
+
+.schedMatrixWrap {
+  overflow-x: auto;
+}
+
+.schedMatrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.schedMatrix th,
+.schedMatrix td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ig-line);
+  vertical-align: top;
+}
+
+.schedMatrix th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ig-muted);
+  font-weight: 700;
+}
+
+.schedAllDoorBtn {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--ig-line);
+  background: var(--ig-panel);
+  border-radius: var(--ig-radius);
+  padding: 10px 12px;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+  font: inherit;
+  color: inherit;
+}
+
+.schedAllDoorBtn[data-on="1"] {
+  border-color: color-mix(in srgb, var(--ig-accent) 45%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-accent) 10%, var(--ig-panel));
+}
+
+.schedAllDoorBtn strong {
+  font-size: 13px;
+}
+
+.schedAllDoorBtn span {
+  font-size: 11px;
+  font-family: var(--ig-font-mono);
+  color: var(--ig-muted);
+}
+
+@media (max-width: 960px) {
+  .schedLayout {
+    grid-template-columns: 1fr;
+  }
+  .schedSide {
+    position: static;
+  }
+  .schedDoorRow {
+    grid-template-columns: 1fr;
+  }
+  .schedValidGrid {
+    grid-template-columns: 1fr;
+  }
+}

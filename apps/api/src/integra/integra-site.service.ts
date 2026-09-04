@@ -218,8 +218,8 @@ export class IntegraSiteService {
       const site = await this.prisma.integraSite.findFirst({
         where: { id: opts.siteId, companyId, isActive: true },
       });
-      if (!site) throw new NotFoundException('Sitio Integra no encontrado');
-      return this.fromSite(site, companyId);
+      if (site) return this.fromSite(site, companyId);
+      // siteId stale (localStorage / otro tenant): caer al default del company.
     }
 
     if (companyId) {
@@ -228,6 +228,11 @@ export class IntegraSiteService {
         orderBy: [{ isDefault: 'desc' }, { id: 'asc' }],
       });
       if (site) return this.fromSite(site, companyId);
+      if (opts.siteId) {
+        throw new NotFoundException(
+          `Sitio Integra no encontrado (siteId=${opts.siteId})`,
+        );
+      }
     }
 
     const host = (this.config.get<string>('INTEGRA_HIK_HOST') || '').replace(/\/$/, '');

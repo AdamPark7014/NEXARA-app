@@ -8,9 +8,17 @@ import {
   isHhMmSs,
   parseRightPlan,
   validFromMode,
+  PRESET_TEMPLATE_SLOTS,
+  presetSlot,
 } from './isapi-schedules';
 
 describe('isapi-schedules builders (use cases)', () => {
+  it('slots de preset alineados con defaults UI (2/4/5)', () => {
+    expect(presetSlot('office_hours')).toBe(2);
+    expect(presetSlot('after_hours')).toBe(4);
+    expect(presetSlot('weekend')).toBe(5);
+    expect(PRESET_TEMPLATE_SLOTS.after_hours).not.toBe(3);
+  });
   it('24/7: 7 días enable 00:00–24:00', () => {
     const cfg = buildAlwaysOnWeekPlan();
     const on = cfg.WeekPlanCfg.filter((s) => s.enable);
