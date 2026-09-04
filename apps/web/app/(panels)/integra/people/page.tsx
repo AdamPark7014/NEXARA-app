@@ -585,8 +585,12 @@ export default function IntegraPeoplePage() {
               {live ? "Live ACS ON" : "Espejo sync"}
             </IgBtn>
             {isIsapi && (
-              <IgBtn disabled={syncing} onClick={() => void syncNow()}>
-                {syncing ? "Sincronizando…" : "Sincronizar"}
+              <IgBtn
+                disabled={syncing}
+                onClick={() => void syncNow()}
+                title="Solo si el espejo se desfasó — los cambios ya van en vivo a los terminales"
+              >
+                {syncing ? "Reconciliando…" : "Reconciliar"}
               </IgBtn>
             )}
             <IgBtn onClick={() => void load()}>Actualizar</IgBtn>
@@ -595,9 +599,10 @@ export default function IntegraPeoplePage() {
       />
       <IgError>{error}</IgError>
       <p className={styles.personLead}>
-        Face ID vive en los <strong>terminales ACS</strong> (p. ej. DS-K1T), no en cámaras de
-        oficina. La foto JPEG se guarda en NEXARA para ficha y eventos. Si el alta falla, el
-        mensaje indica qué terminal rechazó — no es un botón muerto.
+        <strong>Cambios en vivo a terminales.</strong> Alta, edición, Face ID y baja se empujan
+        al instante a todos los ACS. «Reconciliar» solo relee el inventario si el espejo se
+        desfasó — no es un paso obligatorio. Face ID vive en los terminales (DS-K1T), no en
+        cámaras de oficina.
       </p>
 
       <IgFilters>
@@ -688,7 +693,7 @@ export default function IntegraPeoplePage() {
                   <p>
                     {isArtemis
                       ? "No hay coincidencias en el directorio. Prueba otro filtro o sincroniza el sitio."
-                      : "El espejo está vacío o el filtro no deja nada. Sincroniza o da de alta."}
+                      : "El espejo está vacío o el filtro no deja nada. Da de alta o reconciliá."}
                   </p>
                   {(isIsapi || isArtemis) && (
                     <IgBtn variant="primary" onClick={startAlta}>

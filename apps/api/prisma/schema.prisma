@@ -5726,6 +5726,7 @@ model IntegraSite {
   edgeAgent  IntegraEdgeAgent?
   pushEvents IntegraPushEvent[]
   roomBookings IntegraRoomBooking[]
+  spacePolicies IntegraSpacePolicy[]
   /// sha256 del token que los equipos llevan en la URL de notificacion.
   /// Solo el hash: el token en claro se ensena una vez al configurarlos.
   pushTokenHash String?  @db.VarChar(64)
@@ -5853,6 +5854,29 @@ model IntegraRoomBooking {
   @@index([companyId, startsAt])
   @@index([companyId, status])
   @@map("integra_room_bookings")
+}
+
+/// Plantilla de vigencia por defecto para un espacio/puerta (indefinido vs temporal).
+/// No escribe al ACS sola: guía altas y el panel de política.
+model IntegraSpacePolicy {
+  id            Int      @id @default(autoincrement())
+  companyId     Int
+  siteId        Int
+  doorIndexCode String   @db.VarChar(120)
+  /// INDEFINITE | TIMED_DAY | TIMED_WEEK | TIMED_30D | BOOKING_ONLY | CUSTOM
+  templateKey   String   @default("INDEFINITE") @db.VarChar(32)
+  label         String?  @db.VarChar(160)
+  /// CUSTOM: { durationDays?, beginTime?, endTime?, notes? }
+  config        Json?
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, doorIndexCode])
+  @@index([companyId])
+  @@map("integra_space_policies")
 }
 
 model IntegraDoor {

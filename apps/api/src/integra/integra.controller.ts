@@ -84,6 +84,13 @@ class UpdatePersonDto {
   @IsOptional() @Allow() rightPlan?: unknown;
 }
 
+/** Vincula ACS personId → User.employeeNumber (identidad canónica). */
+class LinkPersonDto {
+  @Type(() => Number)
+  @IsInt()
+  userId!: number;
+}
+
 class AssignPrivilegeDto {
   @IsArray() @ArrayNotEmpty() @IsString({ each: true }) personIds!: string[];
 }

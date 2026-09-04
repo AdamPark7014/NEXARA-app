@@ -27,14 +27,9 @@ export class UsersService {
     const normalized = String(value || '').trim().toUpperCase().replace(/\s+/g, '');
     if (!normalized) return null;
 
-    // Allow short numeric input like "4" or "04" and normalize it to
-    // the canonical employee number format (NXR25SYS004).
-    if (/^\d+$/.test(normalized)) {
-      const parsed = Number.parseInt(normalized, 10);
-      return this.formatEmployeeNumberFromId(parsed);
-    }
-
-    // Normalize already-prefixed values so numeric suffix keeps fixed width.
+    // Prefijo ERP NXR25SYS###: normaliza sufijo a 3 dígitos.
+    // Códigos ACS (p.ej. "42", "ACS-1042") se conservan literales — son la
+    // clave canónica User.employeeNumber ↔ IntegraPerson.personId.
     if (normalized.startsWith(this.employeeNumberPrefix)) {
       const suffix = normalized.slice(this.employeeNumberPrefix.length).replace(/\D+/g, '');
       if (suffix) {
@@ -971,9 +966,7 @@ export class UsersService {
         updateUserDto.nombre !== undefined ||
         updateUserDto.employeeNumber !== undefined ||
         (before &&
-          (before.nombre !== user.nombre ||
-            before.employeeNumber !== user.employeeNumber ||
-            before.isActive !== user.isActive));
+          (before.nombre !== user.nombre || before.employeeNumber !== user.employeeNumber));
 
       if (shouldPushAcs) {
         const acsPush = await this.pushAcsFromErp({
