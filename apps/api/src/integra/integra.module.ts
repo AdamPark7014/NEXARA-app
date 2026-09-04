@@ -16,6 +16,7 @@ import {
 } from './integra-edge.controller';
 import { IntegraPushService } from './integra-push.service';
 import { IntegraPushController } from './integra-push.controller';
+import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
 
 @Module({
   imports: [ConfigModule, PrismaModule, AuditModule, ServiceClientsModule],
@@ -33,6 +34,7 @@ import { IntegraPushController } from './integra-push.controller';
     IntegraPortfolioService,
     IntegraEdgeService,
     IntegraPushService,
+    IntegraAcsFanoutService,
   ],
   exports: [
     IntegraArtemisService,
@@ -41,6 +43,7 @@ import { IntegraPushController } from './integra-push.controller';
     IntegraPortfolioService,
     IntegraEdgeService,
     IntegraPushService,
+    IntegraAcsFanoutService,
   ],
 })
 export class IntegraModule {}

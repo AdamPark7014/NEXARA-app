@@ -455,7 +455,29 @@ export default function ViaticosPage() {
       subtitle={cfg.subtitle}
       actions={
         <>
-          <Button variant="ghost" iconLeft="📄" onClick={() => void downloadPdf()}>PDF control</Button>
+          <ListExportActions
+            size="md"
+            onPdf={token ? () => void downloadPdf() : undefined}
+            pdfBusy={pdfBusy}
+            onExcel={
+              filtered.length > 0 && tab !== "analytics"
+                ? () =>
+                    exportToExcel(
+                      filtered,
+                      [
+                        { key: "id", label: "ID" },
+                        { key: "concepto", label: "Concepto" },
+                        { key: "usuario", label: "Solicitante", format: (v) => (v as Viatico["usuario"])?.nombre ?? "—" },
+                        { key: "montoSolicitado", label: "Monto" },
+                        { key: "estatus", label: "Estatus" },
+                        { key: "fechaSolicitud", label: "Fecha", format: (v) => (v ? String(v).slice(0, 10) : "") },
+                      ],
+                      "viaticos",
+                      { title: "Control de viáticos" },
+                    )
+                : undefined
+            }
+          />
           <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
           {cfg.canCreate && (
             <Button variant="primary" iconLeft="💸" onClick={openCreate}>Solicitar viático</Button>
@@ -496,16 +518,32 @@ export default function ViaticosPage() {
         }] : []}
         onClear={() => { setFilter(""); setFilterEstatus(""); }}
         resultCount={loading || tab === "analytics" ? null : filtered.length}
-        rightActions={filtered.length > 0 && tab !== "analytics" ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(filtered, [
-            { key: "id", label: "ID" },
-            { key: "concepto", label: "Concepto" },
-            { key: "usuario", label: "Solicitante", format: (v) => (v as Viatico["usuario"])?.nombre ?? "—" },
-            { key: "montoSolicitado", label: "Monto" },
-            { key: "estatus", label: "Estatus" },
-            { key: "fechaSolicitud", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "viaticos")}>Excel</Button>
-        ) : undefined}
+        rightActions={
+          tab !== "analytics" ? (
+            <ListExportActions
+              onExcel={
+                filtered.length > 0
+                  ? () =>
+                      exportToExcel(
+                        filtered,
+                        [
+                          { key: "id", label: "ID" },
+                          { key: "concepto", label: "Concepto" },
+                          { key: "usuario", label: "Solicitante", format: (v) => (v as Viatico["usuario"])?.nombre ?? "—" },
+                          { key: "montoSolicitado", label: "Monto" },
+                          { key: "estatus", label: "Estatus" },
+                          { key: "fechaSolicitud", label: "Fecha", format: (v) => (v ? String(v).slice(0, 10) : "") },
+                        ],
+                        "viaticos",
+                        { title: "Control de viáticos" },
+                      )
+                  : undefined
+              }
+              onPdf={token ? () => void downloadPdf() : undefined}
+              pdfBusy={pdfBusy}
+            />
+          ) : undefined
+        }
       />
 
       <Section title={loading ? "Cargando…" : tab === "analytics" ? "Control de gastos" : `${filtered.length} viáticos`}>
