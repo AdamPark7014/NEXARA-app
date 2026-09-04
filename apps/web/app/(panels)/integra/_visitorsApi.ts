@@ -224,7 +224,7 @@ function normalizeVisitor(raw: Record<string, unknown>): RecurringVisitor | null
   if (!id && !visitorName) return null;
 
   const doorsRaw =
-    raw.doorIds ?? raw.doors ?? raw.doorIndexCodes ?? raw.doorList ?? [];
+    raw.doorIndexCodes ?? raw.doorIds ?? raw.doors ?? raw.doorList ?? [];
   const doorIds = asArray(doorsRaw)
     .map((d) => {
       if (typeof d === "string" || typeof d === "number") return String(d);

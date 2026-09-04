@@ -371,6 +371,27 @@ export class ActivityTeamService {
         icon: '🚀',
       });
     }
+    if (activity.acsEnteredAt) {
+      const who = activity.acsEnteredByUser?.nombre;
+      const door = activity.acsEntryDoor;
+      events.push({
+        id: 'acs-entry',
+        at: new Date(activity.acsEnteredAt).toISOString(),
+        kind: 'acs',
+        title: who ? `${who} entró por ACS` : 'Entró por ACS',
+        subtitle: door || undefined,
+        icon: '🚪',
+      });
+    }
+    if (activity.acsExitedAt || activity.acsLeftSite) {
+      events.push({
+        id: 'acs-exit',
+        at: new Date(activity.acsExitedAt ?? activity.acsEnteredAt ?? Date.now()).toISOString(),
+        kind: 'acs',
+        title: 'Salió del sitio (ACS)',
+        icon: '🚶',
+      });
+    }
 
     for (const r of reassignments) {
       events.push({

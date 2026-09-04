@@ -1,0 +1,220 @@
+src/integra/acs-ops-bridge.service.ts:128:9 - error TS2353: Object literal may only specify known properties, and 'acsEnteredAt' does not exist in type 'ActivitySelect<DefaultArgs>'.
+
+128         acsEnteredAt: true,
+            ~~~~~~~~~~~~
+src/integra/acs-ops-bridge.service.ts:148:19 - error TS2339: Property 'acsEnteredAt' does not exist on type '{ id: number; companyId: number; deletedAt: Date | null; anNumber: string; titulo: string; descripcion: string | null; indicaciones: string | null; estatus: string; prioridad: string | null; ... 26 more ...; ticketReportGeneratedAt: Date | null; }'.
+
+148     if (!activity.acsEnteredAt) {
+                      ~~~~~~~~~~~~
+src/integra/acs-ops-bridge.service.ts:187:24 - error TS2339: Property 'acsEnteredAt' does not exist on type '{ id: number; companyId: number; deletedAt: Date | null; anNumber: string; titulo: string; descripcion: string | null; indicaciones: string | null; estatus: string; prioridad: string | null; ... 26 more ...; ticketReportGeneratedAt: Date | null; }'.
+
+187       action: activity.acsEnteredAt ? 'assignee_stamp' : 'checkin',
+                           ~~~~~~~~~~~~
+src/integra/acs-ops-bridge.service.ts:217:9 - error TS2353: Object literal may only specify known properties, and 'acsExitedAt' does not exist in type '(Without<ActivityUpdateManyMutationInput, ActivityUncheckedUpdateManyInput> & ActivityUncheckedUpdateManyInput) | (Without<...> & ActivityUpdateManyMutationInput)'.
+
+217         acsExitedAt: at,
+            ~~~~~~~~~~~
+
+  ../../node_modules/.prisma/client/index.d.ts:55716:5
+    55716     data: XOR<ActivityUpdateManyMutationInput, ActivityUncheckedUpdateManyInput>
+              ~~~~
+    The expected type comes from property 'data' which is declared here on type '{ data: (Without<ActivityUpdateManyMutationInput, ActivityUncheckedUpdateManyInput> & ActivityUncheckedUpdateManyInput) | (Without<...> & ActivityUpdateManyMutationInput); where?: ActivityWhereInput | undefined; }'
+src/integra/acs-ops-bridge.service.ts:367:9 - error TS2353: Object literal may only specify known properties, and 'acsEnteredAt' does not exist in type 'ActivitySelect<DefaultArgs>'.
+
+367         acsEnteredAt: true,
+            ~~~~~~~~~~~~
+src/integra/acs-ops-bridge.service.ts:387:9 - error TS2353: Object literal may only specify known properties, and 'acsEnteredAt' does not exist in type 'ActivityAssigneeWhereInput'.
+
+387         acsEnteredAt: { not: null },
+            ~~~~~~~~~~~~
+src/integra/acs-ops-bridge.service.ts:391:18 - error TS2353: Object literal may only specify known properties, and 'acsEnteredAt' does not exist in type 'ActivityAssigneeOrderByWithRelationInput | ActivityAssigneeOrderByWithRelationInput[]'.
+
+391       orderBy: { acsEnteredAt: 'desc' },
+                     ~~~~~~~~~~~~
+src/integra/acs-ops-bridge.service.ts:401:9 - error TS2353: Object literal may only specify known properties, and 'acsEnteredByUserId' does not exist in type 'ActivityWhereInput'.
+
+401         acsEnteredByUserId: userId,
+            ~~~~~~~~~~~~~~~~~~
+src/integra/acs-ops-bridge.service.ts:405:18 - error TS2353: Object literal may only specify known properties, and 'acsEnteredAt' does not exist in type 'ActivityOrderByWithRelationInput | ActivityOrderByWithRelationInput[]'.
+
+405       orderBy: { acsEnteredAt: 'desc' },
+                     ~~~~~~~~~~~~
+src/integra/acs-ops-bridge.service.ts:425:27 - error TS2353: Object literal may only specify known properties, and 'acsEnteredAt' does not exist in type 'ActivityAssigneeSelect<DefaultArgs>'.
+
+425       select: { id: true, acsEnteredAt: true },
+                              ~~~~~~~~~~~~
+
+  ../../node_modules/.prisma/client/index.d.ts:216971:5
+    216971     select?: ActivityAssigneeSelect<ExtArgs> | null
+               ~~~~~~
+    The expected type comes from property 'select' which is declared here on type '{ select?: ActivityAssigneeSelect<DefaultArgs> | null | undefined; include?: ActivityAssigneeInclude<DefaultArgs> | null | undefined; where: ActivityAssigneeWhereUniqueInput; }'
+src/integra/acs-ops-bridge.service.ts:430:40 - error TS2339: Property 'acsEnteredAt' does not exist on type '{ id: number; userId: number; companyId: number; activityId: number; retiradoAt: Date | null; rol: ActivityAssigneeRole; horasPlan: Decimal | null; horasReales: Decimal | null; asignadoAt: Date; }'.
+
+430     if (opts.acsEnteredAt && !existing.acsEnteredAt) {
+                                           ~~~~~~~~~~~~
+src/integra/acs-ops-bridge.service.ts:440:62 - error TS2339: Property 'acsEnteredAt' does not exist on type '{ id: number; userId: number; companyId: number; activityId: number; retiradoAt: Date | null; rol: ActivityAssigneeRole; horasPlan: Decimal | null; horasReales: Decimal | null; asignadoAt: Date; }'.
+
+440     if (opts.acsEntryDoor && !data.acsEntryDoor && !existing.acsEnteredAt) {
+                                                                 ~~~~~~~~~~~~
+src/integra/integra-acs-alarms.service.ts:71:44 - error TS2353: Object literal may only specify known properties, and 'alarmPolicy' does not exist in type 'IntegraSiteSelect<DefaultArgs>'.
+
+71       select: { id: true, companyId: true, alarmPolicy: true, serviceClientId: true, label: true, name: true },
+                                              ~~~~~~~~~~~
+
+  ../../node_modules/.prisma/client/index.d.ts:226821:5
+    226821     select?: IntegraSiteSelect<ExtArgs> | null
+               ~~~~~~
+    The expected type comes from property 'select' which is declared here on type '{ select?: IntegraSiteSelect<DefaultArgs> | null | undefined; include?: IntegraSiteInclude<DefaultArgs> | null | undefined; where: IntegraSiteWhereUniqueInput; }'
+src/integra/integra-acs-alarms.service.ts:75:42 - error TS2339: Property 'alarmPolicy' does not exist on type '{ id: number; isActive: boolean; createdAt: Date; updatedAt: Date; name: string; companyId: number; isDefault: boolean; notes: string | null; host: string; appKeyEnc: string; appSecretEnc: string; ... 7 more ...; provider: string; }'.
+
+75     const policy = parseAlarmPolicy(site.alarmPolicy);
+                                            ~~~~~~~~~~~
+src/integra/integra-acs-alarms.service.ts:95:40 - error TS2551: Property 'integraSocAlarm' does not exist on type 'PrismaService'. Did you mean 'integraAlarmAck'?
+
+95     const existing = await this.prisma.integraSocAlarm.findFirst({
+                                          ~~~~~~~~~~~~~~~
+
+  ../../node_modules/.prisma/client/index.d.ts:4309:7
+    4309   get integraAlarmAck(): Prisma.IntegraAlarmAckDelegate<ExtArgs>;
+               ~~~~~~~~~~~~~~~
+    'integraAlarmAck' is declared here.
+src/integra/integra-acs-alarms.service.ts:107:31 - error TS2551: Property 'integraSocAlarm' does not exist on type 'PrismaService'. Did you mean 'integraAlarmAck'?
+
+107       row = await this.prisma.integraSocAlarm.update({
+                                  ~~~~~~~~~~~~~~~
+
+  ../../node_modules/.prisma/client/index.d.ts:4309:7
+    4309   get integraAlarmAck(): Prisma.IntegraAlarmAckDelegate<ExtArgs>;
+               ~~~~~~~~~~~~~~~
+    'integraAlarmAck' is declared here.
+src/integra/integra-acs-alarms.service.ts:126:31 - error TS2551: Property 'integraSocAlarm' does not exist on type 'PrismaService'. Did you mean 'integraAlarmAck'?
+
+126       row = await this.prisma.integraSocAlarm.create({
+                                  ~~~~~~~~~~~~~~~
+
+  ../../node_modules/.prisma/client/index.d.ts:4309:7
+    4309   get integraAlarmAck(): Prisma.IntegraAlarmAckDelegate<ExtArgs>;
+               ~~~~~~~~~~~~~~~
+    'integraAlarmAck' is declared here.
+src/integra/integra-acs-alarms.service.ts:159:35 - error TS2551: Property 'integraSocAlarm' does not exist on type 'PrismaService'. Did you mean 'integraAlarmAck'?
+
+159           row = await this.prisma.integraSocAlarm.update({
+                                      ~~~~~~~~~~~~~~~
+
+  ../../node_modules/.prisma/client/index.d.ts:4309:7
+    4309   get integraAlarmAck(): Prisma.IntegraAlarmAckDelegate<ExtArgs>;
+               ~~~~~~~~~~~~~~~
+    'integraAlarmAck' is declared here.
+src/integra/integra-acs-alarms.service.ts:186:36 - error TS2551: Property 'integraSocAlarm' does not exist on type 'PrismaService'. Did you mean 'integraAlarmAck'?
+
+186     const rows = await this.prisma.integraSocAlarm.findMany({
+                                       ~~~~~~~~~~~~~~~
+
+  ../../node_modules/.prisma/client/index.d.ts:4309:7
+    4309   get integraAlarmAck(): Prisma.IntegraAlarmAckDelegate<ExtArgs>;
+               ~~~~~~~~~~~~~~~
+    'integraAlarmAck' is declared here.
+src/integra/integra-acs-alarms.service.ts:196:29 - error TS7006: Parameter 'r' implicitly has an 'any' type.
+
+196     const items = rows.map((r) => this.toQueueItem(r));
+                                ~
+src/integra/integra-acs-alarms.service.ts:197:37 - error TS7006: Parameter 'i' implicitly has an 'any' type.
+
+197     const openCount = items.filter((i) => i.status === 'OPEN' || i.status === 'TICKETED').length;
+                                        ~
+src/integra/integra-acs-alarms.service.ts:208:35 - error TS2551: Property 'integraSocAlarm' does not exist on type 'PrismaService'. Did you mean 'integraAlarmAck'?
+
+208     const row = await this.prisma.integraSocAlarm.findFirst({
+                                      ~~~~~~~~~~~~~~~
+
+  ../../node_modules/.prisma/client/index.d.ts:4309:7
+    4309   get integraAlarmAck(): Prisma.IntegraAlarmAckDelegate<ExtArgs>;
+               ~~~~~~~~~~~~~~~
+    'integraAlarmAck' is declared here.
+src/integra/integra-acs-alarms.service.ts:212:39 - error TS2551: Property 'integraSocAlarm' does not exist on type 'PrismaService'. Did you mean 'integraAlarmAck'?
+
+212     const updated = await this.prisma.integraSocAlarm.update({
+                                          ~~~~~~~~~~~~~~~
+
+  ../../node_modules/.prisma/client/index.d.ts:4309:7
+    4309   get integraAlarmAck(): Prisma.IntegraAlarmAckDelegate<ExtArgs>;
+               ~~~~~~~~~~~~~~~
+    'integraAlarmAck' is declared here.
+src/integra/integra-acs-alarms.service.ts:237:35 - error TS2551: Property 'integraSocAlarm' does not exist on type 'PrismaService'. Did you mean 'integraAlarmAck'?
+
+237     const row = await this.prisma.integraSocAlarm.findFirst({
+                                      ~~~~~~~~~~~~~~~
+
+  ../../node_modules/.prisma/client/index.d.ts:4309:7
+    4309   get integraAlarmAck(): Prisma.IntegraAlarmAckDelegate<ExtArgs>;
+               ~~~~~~~~~~~~~~~
+    'integraAlarmAck' is declared here.
+src/integra/integra-acs-alarms.service.ts:248:9 - error TS2353: Object literal may only specify known properties, and 'alarmPolicy' does not exist in type 'IntegraSiteSelect<DefaultArgs>'.
+
+248         alarmPolicy: true,
+            ~~~~~~~~~~~
+
+  ../../node_modules/.prisma/client/index.d.ts:226821:5
+    226821     select?: IntegraSiteSelect<ExtArgs> | null
+               ~~~~~~
+    The expected type comes from property 'select' which is declared here on type '{ select?: IntegraSiteSelect<DefaultArgs> | null | undefined; include?: IntegraSiteInclude<DefaultArgs> | null | undefined; where: IntegraSiteWhereUniqueInput; }'
+src/integra/integra-acs-alarms.service.ts:260:42 - error TS2339: Property 'alarmPolicy' does not exist on type '{ id: number; isActive: boolean; createdAt: Date; updatedAt: Date; name: string; companyId: number; isDefault: boolean; notes: string | null; host: string; appKeyEnc: string; appSecretEnc: string; ... 7 more ...; provider: string; }'.
+
+260     const policy = parseAlarmPolicy(site.alarmPolicy);
+                                             ~~~~~~~~~~~
+src/integra/integra-acs-alarms.service.ts:262:23 - error TS2551: Property 'integraSocAlarm' does not exist on type 'PrismaService'. Did you mean 'integraAlarmAck'?
+
+262     await this.prisma.integraSocAlarm.update({
+                          ~~~~~~~~~~~~~~~
+
+  ../../node_modules/.prisma/client/index.d.ts:4309:7
+    4309   get integraAlarmAck(): Prisma.IntegraAlarmAckDelegate<ExtArgs>;
+               ~~~~~~~~~~~~~~~
+    'integraAlarmAck' is declared here.
+src/integra/integra.controller.ts:1393:37 - error TS2339: Property 'planTemplateNo' does not exist on type 'PlanTemplate & { id: number; }'.
+
+1393         const id = String(t.id ?? t.planTemplateNo ?? '');
+                                         ~~~~~~~~~~~~~~
+src/integra/integra.controller.ts:1397:44 - error TS2339: Property 'name' does not exist on type 'PlanTemplate & { id: number; }'.
+
+1397           name: String(t.templateName || t.name || `Plantilla ${id}`),
+                                                ~~~~
+src/integra/integra.controller.ts:1398:22 - error TS2339: Property 'summary' does not exist on type 'PlanTemplate & { id: number; }'.
+
+1398           summary: t.summary != null ? String(t.summary) : undefined,
+                          ~~~~~~~
+src/integra/integra.controller.ts:1398:49 - error TS2339: Property 'summary' does not exist on type 'PlanTemplate & { id: number; }'.
+
+1398           summary: t.summary != null ? String(t.summary) : undefined,
+                                                     ~~~~~~~
+src/integra/integra.controller.ts:1483:19 - error TS18047: 'p' is possibly 'null'.
+
+1483         personId: p.personId,
+                       ~
+src/integra/integra.controller.ts:1484:15 - error TS18047: 'p' is possibly 'null'.
+
+1484         name: p.personName,
+                   ~
+src/integra/integra.controller.ts:1486:19 - error TS18047: 'p' is possibly 'null'.
+
+1486         planName: p.kindLabel,
+                       ~
+src/integra/integra.controller.ts:1487:22 - error TS18047: 'p' is possibly 'null'.
+
+1487         validEnable: p.validEnable !== false,
+                          ~
+src/integra/integra.controller.ts:1488:20 - error TS18047: 'p' is possibly 'null'.
+
+1488         validFrom: p.validFrom,
+                        ~
+src/integra/integra.controller.ts:1489:18 - error TS18047: 'p' is possibly 'null'.
+
+1489         validTo: p.validTo,
+                      ~
+src/integra/integra.controller.ts:1490:21 - error TS18047: 'p' is possibly 'null'.
+
+1490         indefinite: p.kind === 'indefinite',
+                         ~
+
+Found 38 error(s).
+
