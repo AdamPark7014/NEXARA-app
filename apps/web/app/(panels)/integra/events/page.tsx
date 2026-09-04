@@ -206,29 +206,52 @@ export default function IntegraEventsPage() {
     setPageNo(1);
   };
 
+  const visibleItems = useMemo(
+    () => (faceOnly ? items.filter((e) => Boolean(e.personName?.trim() || e.personId)) : items),
+    [items, faceOnly],
+  );
+
   return (
     <IgPage>
       <IgToolbar
-        title="Eventos ACS"
+        title="Eventos Face ACS"
         meta={
           busy
             ? "Cargando…"
-            : `pág ${pageNo} · ${items.length}/${total} · vivo ${liveHits.length} · auto ${auto ? "20s" : "off"}`
+            : `pág ${pageNo} · ${visibleItems.length}/${total} · vivo ${liveHits.length} · auto ${auto ? "20s" : "off"}`
         }
         actions={
           <>
+            <IgBtn
+              variant="primary"
+              onClick={() => {
+                preset(24);
+              }}
+              title="Últimas 24 horas (se recarga al cambiar el rango)"
+            >
+              Últimas 24h
+            </IgBtn>
+            <IgBtn
+              data-on={faceOnly ? "1" : undefined}
+              onClick={() => setFaceOnly((v) => !v)}
+              title="Oculta eventos sin nombre ni ID de persona"
+            >
+              {faceOnly ? "Con identidad ✓" : "Todos los eventos"}
+            </IgBtn>
+            <IgBtn onClick={() => router.push("/integra/people")}>Alta persona</IgBtn>
             <IgBtn onClick={() => setAuto((v) => !v)}>Auto {auto ? "ON" : "OFF"}</IgBtn>
-            <IgBtn variant="primary" disabled={busy} onClick={() => void load()}>
+            <IgBtn disabled={busy} onClick={() => void load()}>
               {busy ? "…" : "Buscar"}
             </IgBtn>
           </>
         }
       />
       <IgError>{error}</IgError>
-      <p className={styles.attNote}>
-        Identidad solo desde terminales ACS (nombre + foto). Las cajas ópticas de
-        oficina dicen «Humano · sin ID» — no es Face ID sobre AcuSense.
-      </p>
+      <IgNotice>
+        Solo los <strong>terminales ACS</strong> dan nombre + foto. Las cámaras de oficina
+        pueden detectar «humano» sin identidad — eso no es Face ID. Si falta alguien, da de
+        alta en Personas y sincroniza.
+      </IgNotice>
 
       <IgFilters>
         <IgField label="Desde">
@@ -264,7 +287,7 @@ export default function IntegraEventsPage() {
         <IgField label="Rango">
           <div style={{ display: "flex", gap: 4 }}>
             <IgBtn onClick={() => preset(1)}>1h</IgBtn>
-            <IgBtn onClick={() => preset(24)}>24h</IgBtn>
+            <IgBtn variant="primary" onClick={() => preset(24)}>24h</IgBtn>
             <IgBtn onClick={() => preset(168)}>7d</IgBtn>
           </div>
         </IgField>
@@ -302,15 +325,32 @@ export default function IntegraEventsPage() {
         </IgPanel>
       )}
 
-      <IgPanel title="Timeline" count={`${items.length}`}>
-        {items.length === 0 && !busy ? (
+      <IgPanel title="Timeline" count={`${visibleItems.length}${faceOnly && items.length !== visibleItems.length ? ` · ${items.length - visibleItems.length} sin ID ocultos` : ""}`}>
+        {visibleItems.length === 0 && !busy ? (
           <div className={styles.igEmpty}>
-            <strong className={styles.igEmptyTitle}>Sin eventos en el rango</strong>
-            <span className={styles.igEmptyHint}>Prueba 24h o quita filtros de puerta/persona.</span>
+            <strong className={styles.igEmptyTitle}>
+              {items.length === 0
+                ? "Sin eventos en el rango"
+                : "Sin eventos con identidad ACS"}
+            </strong>
+            <span className={styles.igEmptyHint}>
+              {items.length === 0
+                ? "Prueba «Últimas 24h» o quita filtros de puerta/persona."
+                : "Hay eventos sin nombre. Desactiva «Con identidad» o da de alta la persona en el terminal."}
+            </span>
+            <div className={styles.focusActions} style={{ marginTop: 10, justifyContent: "center" }}>
+              <IgBtn variant="primary" onClick={() => preset(24)}>
+                Últimas 24h
+              </IgBtn>
+              {faceOnly && items.length > 0 && (
+                <IgBtn onClick={() => setFaceOnly(false)}>Ver todos</IgBtn>
+              )}
+              <IgBtn onClick={() => router.push("/integra/people")}>Ir a Personas</IgBtn>
+            </div>
           </div>
         ) : (
           <div className={styles.evGrid}>
-            {items.map((e) => {
+            {visibleItems.map((e) => {
               const key = e.id || `${e.timestamp}-${e.doorId}-${e.personId}`;
               const pic = e.picUri ? picByUri[e.picUri] : null;
               const sel = selected?.id === e.id;
