@@ -279,7 +279,8 @@ export class IntegraPushService {
       liveOnly?: boolean;
       /**
        * `acs` = AccessControllerEvent major 5 (vista de negocio).
-       * `noise` = heartBeat/VMD/… · `all` = sin filtro de tipo.
+       * `noise` = heartBeat/VMD/… · `all` = sin filtro de tipo (diagnóstico).
+       * `null` / omitido = útil (excluye ruido) — default para overlay/poll.
        */
       scope?: 'acs' | 'all' | 'noise' | null;
       /** Solo concedidos o denegados (requiere scope acs o major 5). */

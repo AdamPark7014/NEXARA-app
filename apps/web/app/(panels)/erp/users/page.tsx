@@ -755,6 +755,14 @@ export default function UsersPage() {
       ),
     },
     { key: "role", label: "Rol", render: (u) => <Tag variant="accent">{u.role?.nombre ?? "—"}</Tag>, width: 140 },
+    {
+      key: "employeeNumber",
+      label: "Nº empleado",
+      width: 120,
+      render: (u) => (
+        <code style={{ fontSize: 11 }}>{u.employeeNumber || "—"}</code>
+      ),
+    },
     { key: "department", label: "Área", accessor: (u) => u.department?.nombre ?? "—", width: 120 },
     {
       key: "risk", label: "Riesgo", width: 110,
