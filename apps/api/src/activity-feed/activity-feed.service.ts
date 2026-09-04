@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { closedStatusVariants } from '../activities/activity-status.js';
 
 export type ActivityFeedItem = {
   id: string;

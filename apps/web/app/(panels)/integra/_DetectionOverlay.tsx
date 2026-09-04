@@ -24,6 +24,8 @@ export type PushEvent = {
   deviceIp: string;
   deviceName?: string | null;
   eventType: string;
+  major?: number | null;
+  minor?: number | null;
   label?: string | null;
   occurredAt: string;
   personId?: string | null;
@@ -31,6 +33,7 @@ export type PushEvent = {
   doorNo?: number | null;
   verifyMode?: string | null;
   photoPath?: string | null;
+  outcome?: "granted" | "denied" | null;
   targets?: PushTarget[] | null;
 };
 

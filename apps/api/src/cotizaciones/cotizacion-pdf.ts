@@ -100,11 +100,10 @@ const COLORS = {
   white: '#FFFFFF',
 };
 
-const MARGIN = 48;
-const FOOTER_ZONE = 42;
+const MARGIN = 44;
+const FOOTER_ZONE = 40;
 const TABLE_HEADER_H = 22;
-const ROW_PAD = 6;
-const TABLE_ROW_H = 34;
+const ROW_PAD = 5;
 
 const formatMoney = (value: number, currency: string) =>
   new Intl.NumberFormat('es-MX', {
