@@ -47,7 +47,21 @@ export function IntegraLiveAccessBanner({ enabled }: { enabled: boolean }) {
           };
         }
       }
-      if (best) setFlash(best);
+      if (!best) return;
+      setFlash((prev) => {
+        // Misma fila SSE re-emitida con foto diferida: conservar id y enriquecer.
+        if (prev && prev.id === best.id) {
+          return {
+            ...best,
+            photoPath: best.photoPath || prev.photoPath,
+            at: Math.min(prev.at, best.at),
+          };
+        }
+        if (prev && best.at < prev.at && Date.now() - prev.at < FLASH_TTL_MS) {
+          return prev;
+        }
+        return best;
+      });
     });
   }, [enabled]);
 

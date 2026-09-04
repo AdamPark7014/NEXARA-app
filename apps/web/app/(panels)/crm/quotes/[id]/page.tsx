@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
-import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import { Tag, Money } from "@/components/ui/DataTable";
@@ -12,7 +11,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
-import { DetailField, DetailFieldGrid, DetailSection, formatDate, DetailError } from "@/components/detail/DetailFrame";
+import { DetailField, DetailFieldGrid, formatDate, DetailError } from "@/components/detail/DetailFrame";
 import CtOrderPanel from "../components/CtOrderPanel";
 import chrome from "@/components/crm/crm-chrome.module.css";
 import styles from "../quotes.module.css";
@@ -336,37 +335,53 @@ export default function QuoteDetailPage() {
       />
 
       {/* Header info */}
-      <DetailSection title="Informacion general">
-        <DetailFieldGrid>
-          <DetailField label="No. Cotizacion" value={quote.quoteNumber} />
-          <DetailField label="Fecha de emision" value={formatDate(quote.issueDate)} />
-          <DetailField label="Valida hasta" value={formatDate(quote.validUntil)} />
-          <DetailField label="Moneda" value={quote.currency} />
-          <DetailField label="Empresa" value={quote.clientCompany} />
-          <DetailField label="Contacto" value={quote.clientName} />
-          <DetailField label="Email" value={quote.clientEmail} />
-          <DetailField label="Telefono" value={quote.clientPhone} />
-          <DetailField label="Anticipio" value={quote.depositPercent ? `${quote.depositPercent}%` : undefined} />
-          <DetailField label="Condiciones de pago" value={quote.paymentTerms} />
-          <DetailField label="Tiempo de entrega" value={quote.deliveryTime} />
-          <DetailField label="Elaboro" value={quote.preparedBy ?? quote.createdBy?.nombre} />
-        </DetailFieldGrid>
-        {quote.scope && (
-          <div style={{ marginTop: 12 }}>
-            <DetailField label="Alcance del proyecto" value={quote.scope} />
+      <div className={chrome.quoteDoc}>
+        <div className={chrome.quoteDocHead}>
+          <div>
+            <h2 className={chrome.quoteDocTitle}>Información general</h2>
+            <p className={chrome.quoteDocHint}>Datos del documento alineados al PDF comercial.</p>
           </div>
-        )}
-        {quote.note && (
-          <div style={{ marginTop: 8 }}>
-            <DetailField label="Notas" value={quote.note} />
-          </div>
-        )}
-      </DetailSection>
+          <span className={styles.quotesStatusChip}>{STATUS_LABEL[quote.status] ?? quote.status}</span>
+        </div>
+        <div style={{ padding: "14px 16px 16px" }}>
+          <DetailFieldGrid>
+            <DetailField label="No. Cotización" value={quote.quoteNumber} />
+            <DetailField label="Fecha de emisión" value={formatDate(quote.issueDate)} />
+            <DetailField label="Válida hasta" value={formatDate(quote.validUntil)} />
+            <DetailField label="Moneda" value={quote.currency} />
+            <DetailField label="Empresa" value={quote.clientCompany} />
+            <DetailField label="Contacto" value={quote.clientName} />
+            <DetailField label="Email" value={quote.clientEmail} />
+            <DetailField label="Teléfono" value={quote.clientPhone} />
+            <DetailField label="Anticipo" value={quote.depositPercent ? `${quote.depositPercent}%` : undefined} />
+            <DetailField label="Condiciones de pago" value={quote.paymentTerms} />
+            <DetailField label="Tiempo de entrega" value={quote.deliveryTime} />
+            <DetailField label="Elaboró" value={quote.preparedBy ?? quote.createdBy?.nombre} />
+          </DetailFieldGrid>
+          {quote.scope && (
+            <div style={{ marginTop: 12 }}>
+              <DetailField label="Alcance del proyecto" value={quote.scope} />
+            </div>
+          )}
+          {quote.note && (
+            <div style={{ marginTop: 8 }}>
+              <DetailField label="Notas" value={quote.note} />
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Line items */}
-      <Section title={`Partidas (${quote.items.length})`}>
+      <div className={chrome.quoteDoc}>
+        <div className={chrome.quoteDocHead}>
+          <div>
+            <h2 className={chrome.quoteDocTitle}>Partidas ({quote.items.length})</h2>
+            <p className={chrome.quoteDocHint}>Misma estructura que el PDF: descripción, margen y totales por línea.</p>
+          </div>
+        </div>
+        <div style={{ padding: "4px 8px 12px" }}>
         {quote.items.length === 0 ? (
-          <EmptyState icon="📋" title="Sin partidas" description="Esta cotizacion no tiene articulos registrados." />
+          <EmptyState icon="📋" title="Sin partidas" description="Esta cotización no tiene artículos registrados." />
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -466,7 +481,8 @@ export default function QuoteDetailPage() {
             </table>
           </div>
         )}
-      </Section>
+        </div>
+      </div>
 
       {/* Totals */}
       {economics.costTotal > 0 && (
@@ -478,7 +494,7 @@ export default function QuoteDetailPage() {
         </div>
       )}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8, marginBottom: 32 }}>
-        <div style={{ minWidth: 300, padding: 20, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
+        <div className={chrome.quoteTotals}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
             <span style={{ color: "var(--text-secondary)" }}>Subtotal</span>
             <Money value={subtotalNum} />

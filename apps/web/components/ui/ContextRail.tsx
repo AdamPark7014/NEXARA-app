@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { ReactNode } from "react";
+import CrossPanelLink from "@/components/CrossPanelLink";
 
 /**
  * NEXARA · ContextRail
@@ -15,7 +15,6 @@ export type ContextRailItem = {
   href?: string;
   active?: boolean;
   onClick?: () => void;
-  external?: boolean;
 };
 
 export default function ContextRail({
@@ -62,14 +61,14 @@ export default function ContextRail({
 
         if (item.href) {
           return (
-            <Link
+            <CrossPanelLink
               key={item.id}
               href={item.href}
               style={style}
               aria-current={item.active ? "page" : undefined}
             >
               {item.label}
-            </Link>
+            </CrossPanelLink>
           );
         }
 

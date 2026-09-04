@@ -267,7 +267,7 @@ export default function AgendaPage() {
             const byType: Record<string, number> = {};
             for (const a of all) byType[a.activityType] = (byType[a.activityType] ?? 0) + 1;
             const total = all.length;
-            const typeColors: Record<string, string> = { CALL: "var(--success)", EMAIL: "var(--primary)", MEETING: "var(--warning)", TASK: "var(--text-tertiary)", WHATSAPP: "#22c55e", VISIT: "var(--danger)", NOTE: "#a855f7" };
+            const typeColors: Record<string, string> = { CALL: "var(--success)", EMAIL: "var(--primary)", MEETING: "var(--warning)", TASK: "var(--text-tertiary)", WHATSAPP: "#16a34a", VISIT: "#0284c7", NOTE: "#0f766e" };
             const typeLabels: Record<string, string> = { CALL: "Llamadas", EMAIL: "Emails", MEETING: "Reuniones", TASK: "Tareas", WHATSAPP: "WhatsApp", VISIT: "Visitas", NOTE: "Notas" };
             return (
               <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>

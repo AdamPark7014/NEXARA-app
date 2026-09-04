@@ -477,7 +477,7 @@ export default function LeadsPage() {
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Etapa inicial</span>
                 <select value={convertStage} onChange={(e) => setConvertStage(e.target.value)}
                   style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 }}>
-                  <option value="DISCOVERY">Discovery</option>
+                  <option value="DISCOVERY">Descubrimiento</option>
                   <option value="PROPOSAL">Propuesta</option>
                   <option value="NEGOTIATION">Negociación</option>
                   <option value="WON">Ganada</option>
