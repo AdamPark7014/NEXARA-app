@@ -1166,11 +1166,9 @@ export default function IntegraPeoplePage() {
               <div className={styles.personEmptyBox}>
                 <strong>Ninguna ficha abierta</strong>
                 <p>Elige a alguien del directorio o da de alta a una persona nueva.</p>
-                {isIsapi && (
-                  <IgBtn variant="primary" onClick={startAlta}>
-                    + Nueva persona
-                  </IgBtn>
-                )}
+                <IgBtn variant="primary" onClick={startAlta}>
+                  + Nueva persona
+                </IgBtn>
               </div>
             )}
           </IgPanel>
