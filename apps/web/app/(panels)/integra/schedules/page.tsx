@@ -436,6 +436,7 @@ export default function IntegraSchedulesPage() {
                           setDraft({
                             ...draft,
                             indefinite: on,
+                            validMode: on ? "indefinite" : "window",
                             validTo: on
                               ? ISAPI_INDEFINITE_END
                               : draft.validTo.startsWith("2037")

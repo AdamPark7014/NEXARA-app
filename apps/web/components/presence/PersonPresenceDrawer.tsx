@@ -191,7 +191,7 @@ export function PersonPresenceDrawer({
                 ) : (
                   <ul>
                     {detail.crm.leads.map((l) => (
-                      <Link key={`l-${l.id}`} href={`/crm/leads`} className={styles.linkRow}>
+                      <Link key={`l-${l.id}`} href={`/crm/leads/${l.id}`} className={styles.linkRow}>
                         <strong>{l.name || l.company || `Lead #${l.id}`}</strong>
                         <span>
                           Lead · {STAGE_ES[l.status] || l.status}
