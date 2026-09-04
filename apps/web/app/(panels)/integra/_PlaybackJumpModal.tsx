@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { IgBtn, IgError } from "./_Console";
-import { IntegraHlsPlayer } from "./_HlsPlayer";
+import { IntegraLivePlayer } from "./_LivePlayer";
 import { integraApi, toDatetimeLocalValue } from "./_lib";
 
 type Props = {
@@ -12,7 +12,7 @@ type Props = {
   onClose: () => void;
 };
 
-/** Reproduce ±30s alrededor del evento vía playback Artemis. */
+/** Reproduce ±30s alrededor del evento vía playback NVR/Artemis (MSE). */
 export function PlaybackJumpModal({ open, cameraId, atIso, onClose }: Props) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export function PlaybackJumpModal({ open, cameraId, atIso, onClose }: Props) {
         );
         if (cancelled) return;
         const play = data.hls || data.url || null;
-        if (!play) throw new Error(data.note || "Sin URL de playback");
+        if (!play) throw new Error(data.note || "Sin grabación en ese momento");
         setUrl(play);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Playback");
@@ -97,7 +97,7 @@ export function PlaybackJumpModal({ open, cameraId, atIso, onClose }: Props) {
         </p>
         <IgError>{error}</IgError>
         {busy && <p style={{ fontSize: 13 }}>Cargando…</p>}
-        {!busy && url && <IntegraHlsPlayer src={url} />}
+        {!busy && url && <IntegraLivePlayer src={url} mode="mse" />}
         {!busy && !url && !error && (
           <p style={{ fontSize: 13 }}>No hay cámara ligada a este evento.</p>
         )}

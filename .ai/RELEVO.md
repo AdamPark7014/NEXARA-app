@@ -12,43 +12,33 @@ NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
 ### PTZ (prioridad Adam)
 
-1. **Pad ARRIBA del video** (`ptzChrome`): ya no queda enterrado bajo
-   Identidad ACS / Vehículos. Visible aunque MSE diga «Conectando…».
-2. **Hold continuo** (`continuous: true` → ISAPI `/continuous` a velocidad 92):
-   una sola orden al pulsar + `stop` al soltar. Antes `momentary` cada ~320 ms
-   sumaba RTT Tailscale y se sentía lento.
-3. Mensaje honesto: PTZ sin ANPR/FieldDetection; mando útil sin video.
+1. **Pad ARRIBA del video** (`ptzChrome`): no enterrado bajo ACS/Vehículos.
+   Visible aunque MSE diga «Conectando…».
+2. **Hold continuo** (`continuous: true` → ISAPI `/continuous`, vel. 92):
+   una orden al pulsar + `stop` al soltar (antes momentary cada ~320 ms).
+3. Mensaje honesto: PTZ sin ANPR/FieldDetection.
 
-### Overlay Meeting Room (sitting)
+### Overlay Meeting Room
 
-- Label: `Humano` + `sin ID · Ns` (antes «Humano · sin ID sin ID · ahora»).
-- Sticky 90 s / VMD hold 75 s / seed 120 s; merge multi-track (máx 8) sin
-  reemplazar todas las cajas por la última.
-- Parser: `TargetRectList`, X/x, todas las `DetectionRegionEntry`.
-- FieldDetection: habilita **todas** las regiones del canal, sens. 95.
+- Label sin duplicar «sin ID» (`Humano` + `sin ID · Ns`).
+- Sticky 90 s / VMD 75 s / seed 120 s; máx 8 tracks.
+- Parser multi-TargetRect; FieldDetection todas las regiones sens. 95.
 
-### Límite hardware (no mentir)
+### Límite hardware
 
-AcuSense FieldDetection empuja TargetRect por evento — a menudo **1 humano
-por aviso**, no tracking continuo de 3 sentados. Si solo dispara uno, solo
-hay una caja nueva; las demás viven del sticky/VMD si ya se pintaron antes.
+AcuSense empuja TargetRect por evento (a menudo 1 humano). Tres sentados
+sin re-disparo no inventan cajas nuevas — sticky/VMD conserva las ya vistas.
 
-SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app`
+SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109`
 
-Verificar: Video → PTZ → pad arriba + hold snappy; Meeting Room → labels
-sin duplicar «sin ID»; cajas sticky multi-persona cuando el equipo dispara.
+Verificar tras rebuild: Video→PTZ pad arriba + hold rápido; Meeting Room labels.
 
 ## A medias
 
-1. Portal empleado (User↔employeeNo).
-2. httpHost NVR `.34`.
-3. Cámara ANPR ITC.
-4. Micros / Hik-Connect — decisión Adam.
-5. TCPMSS / biblioteca init / empresas 1-2.
-6. Re-aplicar FieldDetection en prod tras deploy (push install / sync).
+1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
+2. Re-aplicar FieldDetection en equipos tras sync/push install.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales en repo, rutas ISAPI no verificadas.
-Face ID óptico inventado sobre AcuSense. People CRUD / playback (siblings).
+Puente NAS, Traefik, credenciales, Face ID óptico inventado.
+People CRUD / playback (siblings — hubo rescue d92bd7e).
