@@ -80,6 +80,26 @@ function extractDoorNos(plan: unknown, doorRight?: string | null): number[] {
   return [...nos];
 }
 
+/** planTemplateNo del RightPlan del espejo (primera entrada o la del doorNo). */
+function extractPlanTemplateNo(
+  plan: unknown,
+  doorNo?: number | null,
+): string | null {
+  if (!Array.isArray(plan)) return null;
+  const rows = plan.filter((r) => r && typeof r === 'object') as Array<{
+    doorNo?: unknown;
+    planTemplateNo?: unknown;
+  }>;
+  if (!rows.length) return null;
+  const match =
+    doorNo != null
+      ? rows.find((r) => Number(r.doorNo) === doorNo) || rows[0]
+      : rows[0];
+  const raw = match?.planTemplateNo;
+  if (raw == null || String(raw).trim() === '') return null;
+  return String(raw);
+}
+
 function classifyValid(opts: {
   validEnable?: boolean;
   validFrom?: string;
@@ -347,21 +367,25 @@ export class IntegraSpacesService {
     const space = overview.spaces.find((s) => s.id === doorIndexCode);
     if (!space) throw new NotFoundException('Espacio no encontrado');
 
+    const ip = doorIp(doorIndexCode);
+    const dNo = doorNoOf(doorIndexCode);
+
     const people = await this.prisma.integraPerson.findMany({
       where: { companyId, siteId: site.id },
     });
     const assigned = people
       .map((p) => {
         const dto = mapMirrorPersonToDto(p);
-        const ip = dto.sourceIp;
+        const personIp = dto.sourceIp;
         const nos = extractDoorNos(dto.rightPlan, dto.doorRight);
-        const codes = ip != null ? nos.map((n) => `${ip}|${n}`) : [];
+        const codes = personIp != null ? nos.map((n) => `${personIp}|${n}`) : [];
         if (!codes.includes(doorIndexCode)) return null;
         const cls = classifyValid({
           validEnable: dto.validEnable,
           validFrom: dto.validFrom,
           validTo: dto.validTo,
         });
+        const planTemplateNo = extractPlanTemplateNo(dto.rightPlan, dNo);
         return {
           personId: dto.id,
           personName: dto.name,
@@ -371,7 +395,9 @@ export class IntegraSpacesService {
           validTo: dto.validTo,
           validEnable: dto.validEnable,
           hasFace: dto.hasFace,
-          sourceIp: ip,
+          sourceIp: personIp,
+          planTemplateNo: planTemplateNo || '1',
+          doorRight: dto.doorRight,
         };
       })
       .filter((p): p is NonNullable<typeof p> => p != null);
@@ -387,8 +413,6 @@ export class IntegraSpacesService {
       take: 80,
     });
 
-    const ip = doorIp(doorIndexCode);
-    const dNo = doorNoOf(doorIndexCode);
     const recent = await this.prisma.integraPushEvent.findMany({
       where: {
         siteId: site.id,

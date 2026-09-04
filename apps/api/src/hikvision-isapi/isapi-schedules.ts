@@ -73,6 +73,23 @@ export type AccessPresetKey =
   | 'visitor_today'
   | 'contractor';
 
+/**
+ * Slots de plantilla/week-plan en DS-K1T Oficinas (alineado con
+ * access-schedule-defaults + UI Horarios). No pisar 1 (24/7 fábrica).
+ * 3 queda para contratista / diurno restringido.
+ */
+export const PRESET_TEMPLATE_SLOTS = {
+  office_hours: 2,
+  after_hours: 4,
+  weekend: 5,
+} as const;
+
+export function presetSlot(
+  preset: keyof typeof PRESET_TEMPLATE_SLOTS,
+): number {
+  return PRESET_TEMPLATE_SLOTS[preset];
+}
+
 const TIME_RE = /^([01]\d|2[0-4]):[0-5]\d:[0-5]\d$/;
 
 export function isHhMmSs(v: string): boolean {

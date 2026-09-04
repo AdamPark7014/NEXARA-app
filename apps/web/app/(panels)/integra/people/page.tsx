@@ -242,6 +242,7 @@ export default function IntegraPeoplePage() {
   const [erpLoading, setErpLoading] = useState(false);
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [acsDevices, setAcsDevices] = useState<AcsDev[]>([]);
+  const [forceDelete, setForceDelete] = useState(false);
   const [selected, setSelected] = useState<Person | null>(null);
   const [detail, setDetail] = useState<unknown>(null);
   const [faceBust, setFaceBust] = useState(0);
@@ -1721,16 +1722,31 @@ export default function IntegraPeoplePage() {
                         <span>zona de peligro</span>
                       </header>
                       <p className={styles.personNote}>
-                        Borra rostro, huella y ficha en cada ACS, verifica UserInfo y solo entonces
-                        limpia el espejo NEXARA. Si un terminal falla, la persona se queda.
+                        Borra rostro, huella y ficha en cada ACS (.160–.163), verifica UserInfo y
+                        limpia el espejo NEXARA. Si un terminal falla, por defecto la persona se
+                        queda. Con force: sale de NEXARA y se reintenta el Delete en las IPs caídas.
                       </p>
+                      <label className={styles.personNote} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                        <input
+                          type="checkbox"
+                          checked={forceDelete}
+                          onChange={(e) => setForceDelete(e.target.checked)}
+                          disabled={mutating}
+                        />
+                        <span>
+                          Eliminar de NEXARA aunque un terminal falle (force). Queda reintento en cola
+                          para IPs offline; el sync no la reimporta.
+                        </span>
+                      </label>
                       <IgBtn
                         variant="danger"
                         disabled={mutating}
                         onClick={async () => {
                           if (
                             !confirm(
-                              `¿ELIMINAR a ${selected.name} (${selected.code || selected.id}) de TODOS los terminales?\n\nNo se puede deshacer desde aquí.`,
+                              forceDelete
+                                ? `¿ELIMINAR a ${selected.name} (${selected.code || selected.id})?\n\nFORCE: sale del espejo aunque algún ACS falle. Se reintentará el Delete en IPs caídas.`
+                                : `¿ELIMINAR a ${selected.name} (${selected.code || selected.id}) de TODOS los terminales?\n\nSi uno falla, se conserva en NEXARA.`,
                             )
                           ) {
                             return;
@@ -1738,24 +1754,39 @@ export default function IntegraPeoplePage() {
                           setMutKind("delete");
                           setError(null);
                           try {
+                            const qs = forceDelete ? "?force=1" : "";
                             const r = await integraApi<{
                               success?: boolean;
                               partial?: boolean;
+                              forced?: boolean;
                               note?: string;
                               results?: OpResult[];
-                            }>(`integra/people/${encodeURIComponent(selected.id)}`, {
+                              pendingIps?: string[];
+                            }>(`integra/people/${encodeURIComponent(selected.id)}${qs}`, {
                               method: "DELETE",
                             });
                             applyOp(r);
-                            if (r.success) {
+                            if (r.success || r.forced) {
                               const gone = selected.id;
                               invalidatePersonFaceCache(gone);
                               setPeople((prev) => prev.filter((p) => p.id !== gone));
                               setSelected(null);
                               setDetail(null);
                               setMode("alta");
-                              setOpNote(r.note || "Eliminado de todos los terminales.");
+                              setForceDelete(false);
+                              setOpNote(r.note || "Eliminado.");
                               setOpOk(true);
+                              setError(null);
+                            } else {
+                              const fails = (r.results || [])
+                                .filter((x) => !x.ok)
+                                .map((x) => `${x.deviceIp}: ${x.error || "falló"}`)
+                                .join("\n");
+                              setError(
+                                fails
+                                  ? `${r.note || "Borrado incompleto"}\n${fails}`
+                                  : r.note || "Borrado incompleto — revisa por IP abajo.",
+                              );
                             }
                           } catch (err) {
                             setError(err instanceof Error ? err.message : "Error al eliminar");
@@ -1767,7 +1798,9 @@ export default function IntegraPeoplePage() {
                       >
                         {mutKind === "delete"
                           ? "Eliminando (esperando terminales)…"
-                          : "Eliminar de todos los terminales"}
+                          : forceDelete
+                            ? "Eliminar (force) de NEXARA + ACS"
+                            : "Eliminar de todos los terminales"}
                       </IgBtn>
                     </section>
 

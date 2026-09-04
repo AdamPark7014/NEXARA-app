@@ -667,7 +667,12 @@ export class IntegraRecurringVisitorsService {
       createIfMissing: true,
       userType: 'visitor',
       doorRight: '1',
-      RightPlan: [{ doorNo: 1, planTemplateNo: String(opts.planNo) }],
+      RightPlan: [
+        ...new Set(opts.doors.map((d) => d.doorNo || 1)),
+      ].map((doorNo) => ({
+        doorNo,
+        planTemplateNo: String(opts.planNo),
+      })),
       beginTime: formatLocalValid(begin),
       endTime: formatLocalValid(end),
       targetIps,

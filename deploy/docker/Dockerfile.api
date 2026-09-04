@@ -18,6 +18,9 @@ FROM node:22-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001
+# Default runtime heap; compose may override via NODE_OPTIONS.
+ENV NODE_OPTIONS=--max-old-space-size=2048
+ENV HEALTH_HEAP_LIMIT_MB=1536
 
 # Prisma (migrate) y engines nativos necesitan OpenSSL en imágenes slim
 RUN apt-get update -y \

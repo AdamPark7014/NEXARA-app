@@ -19,9 +19,14 @@ export class HealthController {
   @HealthCheck()
   @ApiOperation({ summary: 'Estado general del sistema' })
   check() {
+    // Heap threshold alineado con NODE_OPTIONS --max-old-space-size (prod ~2048).
+    // 300 MB era demasiado bajo: Integra push + Prisma + PDF empujan V8 >300 y
+    // Traefik/monitores marcaban 503 aunque el proceso estuviera sano.
+    const heapLimitMb = Number(process.env.HEALTH_HEAP_LIMIT_MB || 1536);
+    const heapBytes = Math.max(256, heapLimitMb) * 1024 * 1024;
     return this.health.check([
       () => this.db.isHealthy('database'),
-      () => this.memory.checkHeap('memory_heap', 300 * 1024 * 1024),
+      () => this.memory.checkHeap('memory_heap', heapBytes),
       () => this.disk.checkStorage('storage', { path: '/', thresholdPercent: 0.9 }),
       () => this.infra.checkRedis('redis'),
       async () => {

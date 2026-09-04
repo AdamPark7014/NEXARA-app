@@ -1,7 +1,6 @@
 /**
- * Cliente Visitas — citas Artemis (única) + recurrentes con acceso ACS limitado.
- * Consume `integra/visitors/recurring*` del sibling; si aún no aterriza, lista
- * vacía + nota (sin inventar ISAPI).
+ * Cliente Visitas — citas Artemis (única) + recurrentes con acceso ACS limitado
+ * (`GET/POST integra/visitors/recurring`, cancel en `…/cancel`).
  */
 
 import { integraApi } from "./_lib";

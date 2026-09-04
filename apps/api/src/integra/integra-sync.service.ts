@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { HikConnectTeamsClient } from '../hikvision-hct/index';
-import { describeDevice, listAllUserInfo, supportsAnpr, supportsPtz } from '../hikvision-isapi/index';
+import { describeDevice, deleteUserInfo, listAllUserInfo, supportsAnpr, supportsPtz } from '../hikvision-isapi/index';
 import { IntegraSiteService, type ResolvedIntegraClient } from './integra-site.service';
 
 /** `http://192.168.9.34` → `192.168.9.34`. */
@@ -645,6 +645,11 @@ export class IntegraSyncService {
     const peopleSeen = new Set<string>();
     let peopleCount = 0;
     let peopleFetchOk = false;
+    const deletePending = await this.prisma.integraPersonDeletePending.findMany({
+      where: { siteId },
+      select: { personId: true, failedIps: true, force: true },
+    });
+    const tombstoned = new Set(deletePending.map((t) => t.personId));
     const acsIps = [
       ...new Set(
         (
@@ -666,6 +671,17 @@ export class IntegraSyncService {
         for (const u of users) {
           const personId = String(u.employeeNo).trim();
           if (!personId) continue;
+          // Force-delete / baja pendiente: no reimportar; intentar Delete otra vez.
+          if (tombstoned.has(personId)) {
+            try {
+              await deleteUserInfo(client, personId);
+              this.logger.log(`Sync: Delete pending ${personId} en ${ip} OK`);
+            } catch (e) {
+              this.logger.warn(`Sync: Delete pending ${personId} en ${ip}: ${String(e)}`);
+              peopleSeen.add(personId); // sigue en terminal — no purgar espejo ajeno
+            }
+            continue;
+          }
           peopleSeen.add(personId);
           const personName = String(u.name || personId).trim() || personId;
           await this.prisma.integraPerson.upsert({
@@ -692,6 +708,17 @@ export class IntegraSyncService {
         }
       } catch (e) {
         this.logger.warn(`ISAPI UserInfo en ${ip}: ${String(e)}`);
+      }
+    }
+    // Tombstones ya limpios en todos los ACS → quitar pendiente.
+    for (const t of deletePending) {
+      if (!peopleSeen.has(t.personId)) {
+        await this.prisma.integraPersonDeletePending.deleteMany({
+          where: { siteId, personId: t.personId },
+        });
+        await this.prisma.integraPerson.deleteMany({
+          where: { siteId, personId: t.personId },
+        });
       }
     }
     peopleCount = peopleSeen.size;

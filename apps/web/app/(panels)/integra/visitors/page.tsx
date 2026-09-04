@@ -540,9 +540,7 @@ export default function IntegraVisitorsPage() {
                   >
                     {savingRec
                       ? "Creando acceso…"
-                      : apiReady
-                        ? "Crear visita recurrente"
-                        : "Crear (API pendiente)"}
+                      : "Crear visita recurrente"}
                   </IgBtn>
                   {!canSubmitRec && (
                     <span className={styles.visitDoorMeta}>
@@ -563,16 +561,8 @@ export default function IntegraVisitorsPage() {
               >
                 {upcoming.length === 0 ? (
                   <IgEmptyState
-                    title={
-                      apiReady
-                        ? "Sin visitas recurrentes"
-                        : "Esperando API de recurrentes"
-                    }
-                    hint={
-                      apiReady
-                        ? "Crea la primera a la izquierda: nombre, puertas, horario y vigencia."
-                        : "Cuando el sibling despliegue el endpoint, esta lista se llenará sola."
-                    }
+                    title="Sin visitas recurrentes"
+                    hint="Crea la primera a la izquierda: nombre, puertas, horario y vigencia. Al guardar se empuja al ACS."
                   />
                 ) : (
                   <IgTable
