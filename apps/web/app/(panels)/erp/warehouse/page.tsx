@@ -1322,6 +1322,14 @@ export default function WarehousePage() {
               >
                 Excel
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void downloadMovementsPdf()}
+                disabled={exportingPdf || movementsLoading}
+              >
+                {exportingPdf ? "PDF…" : "PDF kardex"}
+              </Button>
               {cfg.canCreate && (
                 <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowMovementForm(true)}>Registrar movimiento</Button>
               )}
