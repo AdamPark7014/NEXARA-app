@@ -1,10 +1,11 @@
-import { Injectable, Logger, Inject, Optional, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, Inject, Optional, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationType } from '@prisma/client';
 import { Cron } from '@nestjs/schedule';
 import { PERMISSIONS } from '../common/permissions.js';
 import { PushDispatchService } from '../devices/push-dispatch.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
 
 export interface INotificationPayload {
   userId: number;
@@ -32,6 +33,14 @@ export class NotificationsService {
     @Optional() @Inject('NOTIFICATIONS_GATEWAY') private readonly gateway?: any,
   ) {}
 
+  /**
+   * Inbox: hard-scope ocultaba filas legacy con companyId null (casi todas
+   * las creadas vía hierarchy/cron sin stamp). Soft = tenant activo + null.
+   */
+  private inboxScope(companyId?: number | null) {
+    return companyWhere(companyId ?? null, 'soft');
+  }
+
   async getUserNotifications(
     userId: number,
     limit: number = 50,
@@ -39,7 +48,7 @@ export class NotificationsService {
     companyId?: number | null,
   ) {
     return this.prisma.notification.findMany({
-      where: { userId, ...companyWhere(companyId ?? null) },
+      where: { userId, ...this.inboxScope(companyId) },
       include: {
         triggerUser: {
           select: {
@@ -50,7 +59,7 @@ export class NotificationsService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
       take: limit,
       skip: offset,
     });
@@ -670,13 +679,4 @@ export class NotificationsService {
         type: 'VIATICO_REJECTED',
         category: 'viatics',
         title: 'Viático rechazado',
-        message: reason || 'Tu viático ha sido rechazado. Contacta a tu supervisor para más información.',
-        relatedEntityId: viaticId,
-        entityType: 'Viatico',
-        relatedUrl: `/erp/finance/viatics?highlight=${viaticId}`,
-      });
-    } catch (error) {
-      this.logger.error('Error notifying viatico rejected:', error);
-    }
-  }
-}
+        message: reason || 'Tu viático ha sido rechazado. Contact

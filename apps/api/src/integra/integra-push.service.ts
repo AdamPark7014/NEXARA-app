@@ -455,7 +455,7 @@ export class IntegraPushService {
       const personId = r.personId as string;
       const day = dayIn(r.occurredAt, tz);
       const key = `${day}|${personId}`;
-      const granted = r.minor === 75 || r.minor === 76 || r.minor === 1;
+      const granted = GRANTED_MINORS.includes(r.minor ?? -1);
       const cur = days.get(key);
       if (!cur) {
         days.set(key, {
@@ -543,7 +543,7 @@ export class IntegraPushService {
     for (const r of rows) {
       if (dayIn(r.occurredAt, tz) !== today) continue;
       const personId = r.personId as string;
-      const granted = r.minor === 75 || r.minor === 76 || r.minor === 1;
+      const granted = GRANTED_MINORS.includes(r.minor ?? -1);
       const cur = byPerson.get(personId);
       if (!cur) {
         byPerson.set(personId, {
@@ -1001,6 +1001,8 @@ export class IntegraPushService {
           deviceIp: true,
           deviceName: true,
           eventType: true,
+          major: true,
+          minor: true,
           label: true,
           occurredAt: true,
           personId: true,
@@ -1070,6 +1072,16 @@ export class IntegraPushService {
 
 function sha256(v: string): string {
   return createHash('sha256').update(v).digest('hex');
+}
+
+function acsOutcome(
+  major: number | null,
+  minor: number | null,
+): 'granted' | 'denied' | null {
+  if (major !== 5 || minor == null) return null;
+  if (GRANTED_MINORS.includes(minor)) return 'granted';
+  if (DENIED_MINORS.includes(minor)) return 'denied';
+  return null;
 }
 
 function publicBase(): string {
