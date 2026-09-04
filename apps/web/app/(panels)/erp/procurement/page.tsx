@@ -1205,7 +1205,13 @@ export default function ProcurementPage() {
               { key: "totalAmount", label: "Monto" },
               { key: "status", label: "Estado", format: (v) => PO_STATUS[String(v ?? "")] ?? String(v ?? "") },
               { key: "expectedDate", label: "Entrega est.", format: (v) => v ? String(v).slice(0, 10) : "" },
-            ], "ordenes-compra")}>Excel</Button>
+            ], "ordenes-compra", {
+              title: "ÓRDENES DE COMPRA",
+              summaryRows: [
+                { label: "Órdenes visibles", value: visibleOrders.length },
+                { label: "Monto total", value: visibleOrders.reduce((s, o) => s + Number(o.totalAmount || 0), 0) },
+              ],
+            })}>Descargar Excel</Button>
           </div>
         ) : tab === "requisitions" && requisitions.length > 0 ? (
           <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleReqs, [
@@ -1214,7 +1220,7 @@ export default function ProcurementPage() {
             { key: "priority", label: "Prioridad" },
             { key: "status", label: "Estado", format: (v) => REQ_STATUS[String(v ?? "")] ?? String(v ?? "") },
             { key: "requestedBy", label: "Solicitó", format: (v) => (v as Requisition["requestedBy"])?.nombre ?? "—" },
-          ], "requisiciones")}>Excel</Button>
+          ], "requisiciones", { title: "REQUISICIONES" })}>Descargar Excel</Button>
         ) : undefined}
       />
       )}

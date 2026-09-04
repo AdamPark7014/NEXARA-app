@@ -5034,6 +5034,7 @@ model CompanyProfile {
   integraEdgeAgents         IntegraEdgeAgent[]
   integraPushEvents         IntegraPushEvent[]
   integraRoomBookings       IntegraRoomBooking[]
+  integraSpacePolicies      IntegraSpacePolicy[]
 
   @@map("company_profile")
 }
