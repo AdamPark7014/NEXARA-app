@@ -1,6 +1,15 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
+import { PDF_MODULE_ACCENTS, loadNexaraLogo } from '../common/pdf/nexara-pdf-theme.js';
+
+/**
+ * Cotización comercial — PDF producción.
+ *
+ * Misma familia visual que OC (`purchase-order-pdf.ts`): membrete con datos
+ * fiscales de CompanyProfile, tipografía Helvetica, multipágina con número,
+ * filas de altura dinámica y resumen MXN.
+ */
 
 export type CotizacionPdfItem = {
   category?: string | null;
@@ -25,6 +34,17 @@ export type CotizacionPdfItem = {
   warrantyMonths?: number;
   deliveryTime?: string | null;
   lineTotal: number;
+};
+
+export type CotizacionPdfCompany = {
+  legalName: string;
+  tradeName?: string | null;
+  rfc?: string | null;
+  fiscalAddress?: string | null;
+  fiscalPostalCode?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  websiteUrl?: string | null;
 };
 
 export type CotizacionPdfPayload = {
@@ -52,6 +72,7 @@ export type CotizacionPdfPayload = {
   iepsTotal?: number;
   retentionTotal?: number;
   total: number;
+  company?: CotizacionPdfCompany | null;
   items: CotizacionPdfItem[];
 };
 
@@ -60,29 +81,31 @@ export type CotizacionPdfOptions = {
   internal?: boolean;
 };
 
-const COMPANY = {
+const FALLBACK_COMPANY = {
   name: 'NEXARA',
   tagline: 'Integración tecnológica · CCTV · Redes · Soporte TI',
   web: 'sales.nexara.com.mx',
   email: 'ventas@nexara.com.mx',
 };
 
+const ACCENT = PDF_MODULE_ACCENTS.crm;
+
 const COLORS = {
   navy: '#0B1F3A',
-  teal: '#0F766E',
-  accent: '#14B8A6',
+  teal: ACCENT,
+  accent: ACCENT,
   text: '#1E293B',
   muted: '#64748B',
   line: '#CBD5E1',
   fill: '#F8FAFC',
+  soft: '#E8F1FB',
   white: '#FFFFFF',
 };
 
-const MARGIN = 48;
-const FOOTER_ZONE = 42;
+const MARGIN = 44;
+const FOOTER_ZONE = 40;
 const TABLE_HEADER_H = 22;
-const ROW_PAD = 6;
-const TABLE_ROW_H = 34;
+const ROW_PAD = 5;
 
 const formatMoney = (value: number, currency: string) =>
   new Intl.NumberFormat('es-MX', {
@@ -123,13 +146,14 @@ const DEFAULT_WARRANTY = [
   'No aplica por mal uso, daños de terceros o falta de mantenimiento.',
 ];
 
-const loadLogo = (): Buffer | null => {
+const loadCompanyLogo = (): Buffer | null => {
+  const fromTheme = loadNexaraLogo();
+  if (fromTheme) return fromTheme;
   const candidates = [
     path.resolve(__dirname, '../assets/logo-nexara.png'),
     path.resolve(process.cwd(), 'src/assets/logo-nexara.png'),
     path.resolve(process.cwd(), 'dist/assets/logo-nexara.png'),
-    path.resolve(process.cwd(), '../web/public/logo-nexara-platform.png'),
-    path.resolve(process.cwd(), '../../apps/web/public/logo-nexara-platform.png'),
+    path.resolve(process.cwd(), '../../apps/web/public/logo-nexara.png'),
   ];
   for (const filePath of candidates) {
     try {
@@ -141,6 +165,20 @@ const loadLogo = (): Buffer | null => {
   return null;
 };
 
+const brandName = (company?: CotizacionPdfCompany | null) =>
+  company?.tradeName || company?.legalName || FALLBACK_COMPANY.name;
+
+const resolveCompany = (company?: CotizacionPdfCompany | null): CotizacionPdfCompany => ({
+  legalName: company?.legalName || FALLBACK_COMPANY.name,
+  tradeName: company?.tradeName || FALLBACK_COMPANY.name,
+  rfc: company?.rfc || null,
+  fiscalAddress: company?.fiscalAddress || null,
+  fiscalPostalCode: company?.fiscalPostalCode || null,
+  contactEmail: company?.contactEmail || FALLBACK_COMPANY.email,
+  contactPhone: company?.contactPhone || null,
+  websiteUrl: company?.websiteUrl || FALLBACK_COMPANY.web,
+});
+
 type PdfCtx = {
   doc: PDFKit.PDFDocument;
   margin: number;
@@ -150,6 +188,7 @@ type PdfCtx = {
   pageBottom: number;
   pageNo: number;
   logo: Buffer | null;
+  companyShort: string;
 };
 
 const resetCursor = (doc: PDFKit.PDFDocument, x: number, y: number) => {
@@ -188,14 +227,14 @@ const boundedText = (
 
 const pageBottom = (doc: PDFKit.PDFDocument) => doc.page.height - FOOTER_ZONE;
 
-const drawFooter = (ctx: PdfCtx) => {
-  const { doc, margin, contentWidth, pageHeight, pageNo } = ctx;
-  const y = pageHeight - 30;
+const drawFooter = (ctx: PdfCtx, quoteNumber: string) => {
+  const { doc, margin, contentWidth, pageHeight, pageNo, companyShort } = ctx;
+  const y = pageHeight - 28;
   doc.save();
-  doc.moveTo(margin, y - 10).lineTo(margin + contentWidth, y - 10).strokeColor(COLORS.line).lineWidth(0.5).stroke();
+  doc.moveTo(margin, y - 8).lineTo(margin + contentWidth, y - 8).strokeColor(COLORS.line).lineWidth(0.5).stroke();
   doc.restore();
   doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7.5);
-  boundedText(doc, `${COMPANY.name} · ${COMPANY.web} · ${COMPANY.email}`, margin, y, {
+  boundedText(doc, `${companyShort} · Cotización ${quoteNumber} · Documento comercial`, margin, y, {
     width: contentWidth * 0.72,
     height: 10,
     ellipsis: true,
@@ -203,82 +242,95 @@ const drawFooter = (ctx: PdfCtx) => {
   boundedText(doc, `Página ${pageNo}`, margin, y, { width: contentWidth, height: 10, align: 'right' });
 };
 
-const startPage = (ctx: PdfCtx, withMiniHeader: boolean) => {
-  const { doc, margin, contentWidth, logo } = ctx;
-  if (withMiniHeader) {
-    doc.save();
-    doc.rect(0, 0, ctx.pageWidth, 4).fill(COLORS.teal);
-    doc.restore();
-    if (logo) {
-      try {
-        doc.image(logo, margin, 14, { fit: [52, 52] });
-      } catch {
-        // ignore
-      }
+const startContinuationPage = (ctx: PdfCtx): number => {
+  const { doc, margin, logo, companyShort } = ctx;
+  doc.save();
+  doc.rect(0, 0, ctx.pageWidth, 4).fill(COLORS.accent);
+  doc.restore();
+  if (logo) {
+    try {
+      doc.image(logo, margin, 12, { fit: [44, 44] });
+    } catch {
+      // ignore
     }
-    doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(11).text(COMPANY.name, margin + (logo ? 60 : 0), 18);
-    doc
-      .fillColor(COLORS.muted)
-      .font('Helvetica')
-      .fontSize(7.5)
-      .text('Cotización comercial', margin + (logo ? 60 : 0), 32);
-    return 52;
   }
-  return MARGIN;
+  doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(11).text(companyShort, margin + (logo ? 52 : 0), 16);
+  doc
+    .fillColor(COLORS.muted)
+    .font('Helvetica')
+    .fontSize(7.5)
+    .text('Cotización comercial (continuación)', margin + (logo ? 52 : 0), 30);
+  return 52;
 };
 
-const addPage = (ctx: PdfCtx): number => {
-  drawFooter(ctx);
+const addPage = (ctx: PdfCtx, quoteNumber: string): number => {
+  drawFooter(ctx, quoteNumber);
   ctx.doc.addPage();
   ctx.pageNo += 1;
-  const y = startPage(ctx, true);
+  const y = startContinuationPage(ctx);
   resetCursor(ctx.doc, ctx.margin, y);
   return y;
 };
 
-const ensureY = (ctx: PdfCtx, y: number, needed: number): number => {
+const ensureY = (ctx: PdfCtx, y: number, needed: number, quoteNumber: string): number => {
   if (y + needed <= ctx.pageBottom) return y;
-  return addPage(ctx);
+  return addPage(ctx, quoteNumber);
 };
 
 const drawLetterhead = (ctx: PdfCtx, payload: CotizacionPdfPayload): number => {
   const { doc, margin, contentWidth, logo } = ctx;
+  const company = resolveCompany(payload.company);
+  const brand = brandName(company);
   let y = MARGIN;
 
   doc.save();
-  doc.rect(0, 0, ctx.pageWidth, 6).fill(COLORS.teal);
+  doc.rect(0, 0, ctx.pageWidth, 6).fill(COLORS.accent);
   doc.restore();
 
-  const logoX = margin;
-  const textX = logo ? margin + 64 : margin;
   if (logo) {
     try {
-      doc.image(logo, logoX, y, { fit: [56, 56] });
+      doc.image(logo, margin, y, { fit: [54, 54] });
     } catch {
       // ignore
     }
   }
 
-  doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(18).text(COMPANY.name, textX, y);
-  doc.fillColor(COLORS.muted).font('Helvetica').fontSize(8.5).text(COMPANY.tagline, textX, y + 22);
-  doc.fontSize(8).text(`${COMPANY.web}  ·  ${COMPANY.email}`, textX, y + 36);
+  const textX = logo ? margin + 62 : margin;
+  doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(17).text(brand, textX, y);
+  doc.fillColor(COLORS.muted).font('Helvetica').fontSize(8);
+  const subtitleBits = [
+    company.legalName && company.legalName !== brand ? company.legalName : FALLBACK_COMPANY.tagline,
+    company.rfc ? `RFC ${company.rfc}` : null,
+  ].filter(Boolean);
+  if (subtitleBits.length) doc.text(subtitleBits.join(' · '), textX, y + 20, { width: contentWidth - 190 });
+  const contactBits = [company.websiteUrl, company.contactEmail, company.contactPhone].filter(Boolean);
+  if (contactBits.length) doc.text(contactBits.join('  ·  '), textX, y + 32, { width: contentWidth - 190 });
+  if (company.fiscalAddress) {
+    const addr = [company.fiscalAddress, company.fiscalPostalCode ? `C.P. ${company.fiscalPostalCode}` : null]
+      .filter(Boolean)
+      .join(' · ');
+    doc.text(addr, textX, y + 44, { width: contentWidth - 190, ellipsis: true });
+  }
 
   const boxW = 168;
   const boxX = margin + contentWidth - boxW;
-  const boxY = y;
+  const boxH = company.fiscalAddress ? 72 : 68;
   doc.save();
-  doc.roundedRect(boxX, boxY, boxW, 62, 6).fill(COLORS.fill);
-  doc.roundedRect(boxX, boxY, boxW, 62, 6).strokeColor(COLORS.line).lineWidth(0.8).stroke();
+  doc.roundedRect(boxX, y, boxW, boxH, 6).fill(COLORS.soft);
+  doc.roundedRect(boxX, y, boxW, boxH, 6).strokeColor(COLORS.line).lineWidth(0.8).stroke();
   doc.restore();
 
-  doc.fillColor(COLORS.muted).font('Helvetica-Bold').fontSize(7).text('COTIZACIÓN', boxX + 10, boxY + 8);
-  doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(12).text(payload.quoteNumber, boxX + 10, boxY + 18);
+  doc.fillColor(COLORS.muted).font('Helvetica-Bold').fontSize(7).text('COTIZACIÓN', boxX + 10, y + 8);
+  doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(12).text(payload.quoteNumber, boxX + 10, y + 18);
   doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7.5);
-  doc.text(`Emisión: ${formatDisplayDate(payload.issueDate)}`, boxX + 10, boxY + 34);
-  doc.text(`Vigencia: ${formatDisplayDate(payload.validUntil)}`, boxX + 10, boxY + 44);
-  doc.text(statusLabel(payload.status), boxX + 10, boxY + 54, { width: boxW - 20, align: 'right' });
+  doc.text(`Emisión: ${formatDisplayDate(payload.issueDate)}`, boxX + 10, y + 36);
+  doc.text(`Vigencia: ${formatDisplayDate(payload.validUntil)}`, boxX + 10, y + 46);
+  doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(8).text(statusLabel(payload.status), boxX + 10, y + 56, {
+    width: boxW - 20,
+    align: 'right',
+  });
 
-  y = Math.max(y + 62, boxY + 72);
+  y = Math.max(y + (company.fiscalAddress ? 62 : 58), y + boxH + 10);
   doc.moveTo(margin, y).lineTo(margin + contentWidth, y).strokeColor(COLORS.line).lineWidth(0.8).stroke();
   y += 14;
 
@@ -309,6 +361,7 @@ const drawLetterhead = (ctx: PdfCtx, payload: CotizacionPdfPayload): number => {
     payload.paymentTerms ? `Pago: ${payload.paymentTerms}` : '',
     payload.deliveryTime ? `Entrega: ${payload.deliveryTime}` : '',
     payload.depositPercent ? `Anticipo: ${payload.depositPercent}%` : '',
+    `Moneda: ${payload.currency || 'MXN'}`,
   ].filter(Boolean);
 
   const yLeft = drawInfoCol(margin, 'Cliente', clientLines.length ? clientLines : ['—']);
@@ -322,35 +375,48 @@ const drawLetterhead = (ctx: PdfCtx, payload: CotizacionPdfPayload): number => {
 
 type TableCol = { key: string; label: string; width: number; align: 'left' | 'right' | 'center' };
 
-const TABLE_COLS: TableCol[] = [
+const BASE_TABLE_COLS: TableCol[] = [
   { key: 'num', label: '#', width: 22, align: 'center' },
-  { key: 'desc', label: 'Descripción', width: 240, align: 'left' },
-  { key: 'qty', label: 'Cant.', width: 38, align: 'center' },
-  { key: 'unit', label: 'P. venta neto', width: 76, align: 'right' },
-  { key: 'tax', label: 'IVA', width: 40, align: 'center' },
-  { key: 'total', label: 'Importe', width: 78, align: 'right' },
+  { key: 'desc', label: 'Descripción', width: 230, align: 'left' },
+  { key: 'qty', label: 'Cant.', width: 36, align: 'center' },
+  { key: 'unit', label: 'UdM', width: 34, align: 'center' },
+  { key: 'price', label: 'P. venta neto', width: 72, align: 'right' },
+  { key: 'tax', label: 'IVA', width: 36, align: 'center' },
+  { key: 'total', label: 'Importe', width: 74, align: 'right' },
 ];
 
-const drawTableHeader = (ctx: PdfCtx, y: number): number => {
+const scaleTableCols = (contentWidth: number): TableCol[] => {
+  const sum = BASE_TABLE_COLS.reduce((a, c) => a + c.width, 0);
+  const factor = contentWidth / sum;
+  return BASE_TABLE_COLS.map((col) => ({ ...col, width: Math.floor(col.width * factor) }));
+};
+
+const drawTableHeader = (ctx: PdfCtx, y: number, cols: TableCol[]): number => {
   const { doc, margin } = ctx;
   doc.save();
   doc.rect(margin, y, ctx.contentWidth, TABLE_HEADER_H).fill(COLORS.navy);
   doc.restore();
   doc.fillColor(COLORS.white).font('Helvetica-Bold').fontSize(7.5);
-  let x = margin + 4;
-  for (const col of TABLE_COLS) {
-    doc.text(col.label, x, y + 7, { width: col.width - 6, align: col.align });
+  let x = margin + 3;
+  for (const col of cols) {
+    doc.text(col.label, x, y + 7, { width: col.width - 4, align: col.align });
     x += col.width;
   }
-  return y + TABLE_HEADER_H + 4;
+  return y + TABLE_HEADER_H + 3;
 };
 
 const itemDescription = (item: CotizacionPdfItem) => {
   const meta = [item.brand, item.model, item.sku ? `SKU ${item.sku}` : null].filter(Boolean).join(' · ');
-  return meta ? `${item.name}\n${meta}` : item.name;
+  const desc = item.description?.trim();
+  return [item.name, meta || null, desc || null].filter(Boolean).join('\n');
 };
 
-const measureRow = () => TABLE_ROW_H;
+const measureRow = (ctx: PdfCtx, item: CotizacionPdfItem, cols: TableCol[]): number => {
+  const { doc } = ctx;
+  doc.font('Helvetica').fontSize(8);
+  const descH = doc.heightOfString(itemDescription(item), { width: cols[1].width - 6 });
+  return Math.max(28, descH + ROW_PAD * 2);
+};
 
 const drawTableRow = (
   ctx: PdfCtx,
@@ -359,13 +425,14 @@ const drawTableRow = (
   index: number,
   currency: string,
   stripe: boolean,
+  cols: TableCol[],
 ): number => {
   const { doc, margin } = ctx;
-  const rowH = measureRow();
+  const rowH = measureRow(ctx, item, cols);
 
   if (stripe) {
     doc.save();
-    doc.rect(margin, y - 2, ctx.contentWidth, rowH).fill(COLORS.fill);
+    doc.rect(margin, y - 1, ctx.contentWidth, rowH).fill(COLORS.fill);
     doc.restore();
   }
 
@@ -373,22 +440,22 @@ const drawTableRow = (
     String(index + 1),
     itemDescription(item),
     String(item.qty),
+    item.unit || 'PZA',
     formatMoney(item.unitPrice, currency),
     `${item.tax || 0}%`,
     formatMoney(item.lineTotal, currency),
   ];
 
-  let x = margin + 4;
-  const textHeight = rowH - ROW_PAD * 2;
+  let x = margin + 3;
   cells.forEach((cell, i) => {
-    const col = TABLE_COLS[i];
-    if (i === 0) doc.font('Helvetica').fontSize(8).fillColor(COLORS.muted);
-    else if (i === 1) doc.font('Helvetica').fontSize(8.5).fillColor(COLORS.text);
-    else if (i === 5) doc.font('Helvetica-Bold').fontSize(8.5).fillColor(COLORS.navy);
+    const col = cols[i];
+    if (i === 0 || i === 3 || i === 5) doc.font('Helvetica').fontSize(7.5).fillColor(COLORS.muted);
+    else if (i === 1) doc.font('Helvetica').fontSize(8).fillColor(COLORS.text);
+    else if (i === 6) doc.font('Helvetica-Bold').fontSize(8).fillColor(COLORS.navy);
     else doc.font('Helvetica').fontSize(8).fillColor(COLORS.text);
     boundedText(doc, cell, x, y + ROW_PAD, {
-      width: col.width - 8,
-      height: textHeight,
+      width: col.width - 6,
+      height: rowH - ROW_PAD * 2,
       align: col.align,
       ellipsis: i === 1,
       lineGap: 0,
@@ -396,20 +463,26 @@ const drawTableRow = (
     x += col.width;
   });
 
-  doc.moveTo(margin, y + rowH - 2).lineTo(margin + ctx.contentWidth, y + rowH - 2).strokeColor(COLORS.line).lineWidth(0.3).stroke();
+  doc
+    .moveTo(margin, y + rowH - 1)
+    .lineTo(margin + ctx.contentWidth, y + rowH - 1)
+    .strokeColor(COLORS.line)
+    .lineWidth(0.3)
+    .stroke();
   return y + rowH;
 };
 
 const drawItemsTable = (ctx: PdfCtx, payload: CotizacionPdfPayload, startY: number): number => {
-  let y = drawTableHeader(ctx, startY);
+  const cols = scaleTableCols(ctx.contentWidth);
+  let y = drawTableHeader(ctx, startY, cols);
 
   payload.items.forEach((item, index) => {
-    const rowH = measureRow();
+    const rowH = measureRow(ctx, item, cols);
     if (y + rowH > ctx.pageBottom) {
-      y = addPage(ctx);
-      y = drawTableHeader(ctx, y);
+      y = addPage(ctx, payload.quoteNumber);
+      y = drawTableHeader(ctx, y, cols);
     }
-    y = drawTableRow(ctx, y, item, index, payload.currency, index % 2 === 1);
+    y = drawTableRow(ctx, y, item, index, payload.currency, index % 2 === 1, cols);
   });
 
   return y + 8;
@@ -418,9 +491,7 @@ const drawItemsTable = (ctx: PdfCtx, payload: CotizacionPdfPayload, startY: numb
 const drawSummary = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: number): number => {
   const { doc, margin, contentWidth } = ctx;
   const boxW = 220;
-  const rows: Array<[string, string, boolean]> = [
-    ['Subtotal', formatMoney(payload.subtotal, payload.currency), false],
-  ];
+  const rows: Array<[string, string, boolean]> = [['Subtotal', formatMoney(payload.subtotal, payload.currency), false]];
   if (payload.discountTotal > 0) {
     rows.push(['Descuentos', `− ${formatMoney(payload.discountTotal, payload.currency)}`, false]);
   }
@@ -439,7 +510,7 @@ const drawSummary = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: number): num
   }
 
   const boxH = 16 + rows.length * 15 + 12;
-  y = ensureY(ctx, y, boxH + 20);
+  y = ensureY(ctx, y, boxH + 20, payload.quoteNumber);
   const boxX = margin + contentWidth - boxW;
 
   doc.save();
@@ -474,7 +545,7 @@ const drawInternalEconomics = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: nu
   const marginAmt = Math.round((sellNet - costTotal) * 100) / 100;
   const marginPct = sellNet > 0 ? Math.round((marginAmt / sellNet) * 1000) / 10 : 0;
 
-  y = ensureY(ctx, y, 88);
+  y = ensureY(ctx, y, 88, payload.quoteNumber);
   doc.save();
   doc.roundedRect(margin, y, contentWidth, 78, 5).fill(COLORS.fill);
   doc.roundedRect(margin, y, contentWidth, 78, 5).strokeColor(COLORS.line).lineWidth(0.6).stroke();
@@ -617,7 +688,11 @@ export const generateCotizacionPdf = (
 
     let y = drawLetterhead(ctx, payload);
     if (options.internal) {
-      doc.fillColor(COLORS.muted).font('Helvetica-Bold').fontSize(8).text('DOCUMENTO INTERNO — incluye costos de proveedor', ctx.margin, y - 4);
+      doc
+        .fillColor(COLORS.muted)
+        .font('Helvetica-Bold')
+        .fontSize(8)
+        .text('DOCUMENTO INTERNO — incluye costos de proveedor', ctx.margin, y - 4);
       y += 10;
     } else {
       doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7.5).text(
