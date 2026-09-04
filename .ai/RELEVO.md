@@ -1,189 +1,100 @@
 # RELEVO
 
-- **Último turno:** claude-code
+- **Último turno:** cursor
 - **Fecha:** 2026-09-03
-- **Rama:** `claude/integra-edge-enrollment` — **ya empujada a `mejora/calidad-y-web`** y desplegada.
+- **Rama:** mejora/calidad-y-web
 
-## Arranque obligatorio: comparar contra origin
-
-Este turno empezó duplicando entero el provider ISAPI que Cursor ya había hecho,
-por no mirar `origin`. Ese trabajo se descartó. Antes de escribir código:
+## Arranque
 
 ```
-git fetch origin && git log --oneline HEAD..origin/mejora/calidad-y-web | head
+git fetch origin && git log --oneline HEAD..origin/mejora/calidad-y-web
 ```
 
-## El sitio de oficinas ya está en producción y funciona sin la laptop
+Este turno empezó **7 commits detrás de origin** (MSE LivePlayer + stagger HLS +
+CSP). Se hizo merge limpio antes de tocar nada. Los `.tmp-*.sh` del turno
+anterior se salvaron con `relevo.ps1 salvar`.
 
-**El puente es el NAS Synology (`192.168.9.32`)**, no la laptop de Adam. Tiene el
-paquete Tailscale, se enroló como `nas-nexara` (100.71.203.3) y anuncia
-`192.168.9.0/24` con la ruta aprobada. **Verificado quitándole el anuncio a la
-laptop**: el servidor siguió alcanzando NVR, terminales, cámaras y domo.
+## Puente — no cambiar
 
-Sitio `#1 "Oficinas NEXARA"`, **empresa 2 (NEXARA Demo)**, provider ISAPI,
-`host http://192.168.9.34`. Espejo: **13 cámaras · 4 puertas · 18 equipos**.
+**NAS Synology `192.168.9.32`** / Tailscale `nas-nexara` (`100.71.203.3`)
+anuncia `192.168.9.0/24`. **No volver a anunciar la misma ruta desde la
+laptop.** Sitio `#1 Oficinas NEXARA`, empresa **2**, provider ISAPI,
+`host http://192.168.9.34`.
 
-## Tres fallos de raíz, encontrados con medición y arreglados
+## Qué se hizo en este turno (cursor)
 
-### 1. El cliente ISAPI se ahogaba a través del túnel (`7270143`)
+### 1. Muro anti-trabado sobre MSE
 
-Iba **sin pooling**: una conexión TCP nueva por petición. En LAN era la decisión
-correcta y está bien razonada en el código. **Por túnel se invierte.** Con
-tcpdump sobre `tailscale0`: los cierres quedan a medias, el `FIN` se retransmite
-sin que el equipo lo confirme, y las pocas ranuras del firmware se agotan.
-Síntoma exacto: `deviceInfo` responde en 350 ms y **la siguiente llamada expira
-a los 15 s**, mientras la misma petición hecha a mano funciona en 200 ms.
+Claude ya dejó `_LivePlayer.tsx` (MSE / `<video-stream>` de go2rtc). El stagger
+`startDelayMs` se había perdido al cambiar de HLS → MSE. Ahora:
 
-Ahora **una conexión reutilizada por equipo** (`maxSockets: 1`, que mantiene la
-promesa de no acaparar ranuras) y `close()` para que un CLI pueda terminar.
+- `startDelayMs` + cupo **máx. 6 vivos** en muro (resto «En cola»; clic en
+  mosaico lo prioriza al seleccionar).
+- `IntersectionObserver`: fuera de viewport cierra el WebSocket.
+- Muro y Foco **ambos montados**; al cambiar de vista solo se oculta (`hidden`),
+  así no se reconstruyen 9 WS al volver.
+- Home console también usa `IntegraLivePlayer` para live (playback histórico
+  sigue en HLS empaquetado).
 
-Sync del sitio real: **de 133 s devolviendo 0 cámaras, a 7.3 s con todo**.
+Archivos: `_LivePlayer.tsx`, `video/page.tsx`, `page.tsx`, `integra.module.css`.
 
-### 2. go2rtc no podía escribir su configuración (`7270143`, `ef22944`)
+### 2. Personas: más datos en API + UI profesional
 
-El YAML iba montado `:ro`. Al registrar un stream, go2rtc lo añadía en memoria
-pero fallaba al persistirlo y devolvía **400** — la API lo leía como fallo y la
-consola no mostraba video.
+`listPeople` (espejo y live ISAPI) ahora expone: `gender`, vigencia
+(`validEnable/From/To`), `doorRight`, `rightPlan`, contadores face/FP/card,
+`faceUrl`, `userType`, `sourceIp` — mapeados desde `UserInfo` / `raw` sin
+inventar rutas ISAPI.
 
-Al ponerlo `:rw` apareció un problema peor: **go2rtc escribe las URLs RTSP con
-la contraseña dentro**, y el archivo estaba **versionado en git**. Quedaron
-cuatro líneas con la clave en un fichero rastreado. Ahora la configuración viva
-está en `/var/lib/nexara/go2rtc` (fuera del repo, permisos 600) y
-`deploy/go2rtc/go2rtc.yaml` es solo semilla que `update.sh` copia la primera vez.
+- `GET /api/integra/people/:id` en ISAPI lee el espejo (ficha completa).
+- `GET /api/integra/people/:id/face` — proxy Digest de `faceURL` (bytes, sin
+  guardar biométricos en DB). El front descarga con `X-Company-Id` vía blob.
+- UI `/integra/people`: directorio con avatar, chips de credenciales, vigencia,
+  filtros; ficha ISAPI con foto y hechos (no JSON crudo).
 
-### 3. El reproductor giraba para siempre: todo estaba en H.265 (`0a53899`)
+**Legal (sigue vigente):** mostrar foto por proxy sí; **no** copiar plantillas
+biométricas (`modelData`) a nuestra base.
 
-Los equipos publican el principal en **H.265 y el navegador no lo decodifica**.
-Los JPEG sí se veían porque los decodifica go2rtc en el servidor — por eso
-parecía problema de red y no de códec.
+## Contexto previo que sigue valiendo
 
-- **Equipos reconfigurados**: los 13 sub-streams del grabador y los 9 de las
-  cámaras con IP propia pasaron de H.265 a **H.264**. El principal, que es el
-  que graba, **no se tocó**: misma calidad y mismo espacio.
-- **Código**: `IntegraMediaService` sirve ahora el **secundario** (`302`, `102`…),
-  H.264 a 640×360 — justo lo que necesita un muro de 13 cámaras, y sin
-  transcodificar, que en un servidor de 4 núcleos con 28 contenedores de otros
-  seis negocios no es opción.
-
-## Alta automática de la caja on-site — ADR-0021 (`3cba6e9`)
-
-Emitir token del sitio, correr una línea en la caja, y se registra sola: genera
-sus claves (la privada nunca sale), recibe su `10.77.0.x`, levanta WireGuard y
-queda latiendo. La API **no toca WireGuard**: declara el peer y un reconciliador
-de systemd lo aplica con `wg set`, que no reinicia la interfaz. `AllowedIPs` es
-siempre la red del túnel, nunca la LAN del cliente, y hay un test que lo fija.
-
-`deploy/edge/server-setup.sh` **no se ha ejecutado**: el sitio de oficinas va por
-Tailscale sobre el NAS, no por este WireGuard. Está listo para el primer cliente.
-
-## Además, de paso
-
-**NEXARA estaba lentísimo por culpa de otro proyecto.** `biblioteca-web` llevaba
-4 días acumulando zombis: **10,541 procesos** contra los 23 de nexara-web. Con
-10,800 tareas el kernel se atasca en cada `fork()`, de ahí los SSH que expiraban
-y respuestas de 27 s con el ping perfecto a 110 ms. Reiniciado con permiso de
-Adam: de 10,541 zombis a 4, de 10,807 tareas a 302. **Vuelve a pasar** si no se
-le pone `init: true` al compose de biblioteca y se arregla su healthcheck.
-
-## Sesión 03-09 (tarde): video, y por qué media rejilla no arrancaba
-
-**El backend nunca fue el problema.** Medido: los 9 canales entregan imagen
-**simultánea** (16-24 KB por fotograma, 9 de 9). La cadena HLS pública completa
-—maestra, hija y primer segmento con 12,596 bytes de MPEG-TS— responde bien, y
-HTTP/2 está activo, así que tampoco era el límite de conexiones del navegador.
-
-### hls.js venía de un CDN que la CSP bloquea (`a057c26`)
-
-El player inyectaba `<script src="cdn.jsdelivr.net/...hls.min.js">` en runtime.
-La CSP del sitio permite Google Maps, Brevo y Stripe; **jsdelivr no está**. El
-navegador lo bloqueaba en silencio, el player caía al modo nativo —que sólo
-tiene Safari— y Chrome mostraba «No se pudo reproducir el stream».
-
-Ahora es dependencia (`hls.js@1.5.17`) y entra por `import()`, en su propio
-chunk. **Verificado en el bundle desplegado: 0 referencias a jsdelivr.** De paso
-quita una dependencia de internet en una consola de seguridad.
-
-### Chrome rechaza parte de los play() en un muro (`f807115`)
-
-Con 9 vídeos arrancando a la vez, parte de los `play()` se rechazan. No es la
-política de autoplay —van muteados, que ella permite— sino que el navegador no
-da abasto montando nueve decodificadores en el mismo instante. El player se
-rendía al primer rechazo y dejaba el mosaico con el play manual. Ahora reintenta
-escalonado (250 ms, 750, 1.5 s, 3 s).
-
-### La laptop competía con el NAS por la misma ruta
-
-Al intentar recuperar el inventario le devolví el `--advertise-routes` a la
-laptop y **no se lo quité**. Con los dos anunciando `192.168.9.0/24`, Tailscale
-elige uno; si elige la laptop y está fuera de la oficina, todo cae en un agujero
-negro. Explica el sync fallido de 03:30 y los eventos que expiraban. Ya
-corregido: **el NAS es el único que anuncia**. Si alguien vuelve a poner la ruta
-en un equipo móvil, esto se repite.
-
-## Lo que los terminales exponen y la consola todavía no muestra
-
-Comprobado contra `192.168.9.163` (`UserInfo/Search` y `FDLib/FDSearch`):
-
-- **Foto** por persona (`faceURL`) — las 21 tienen rostro dado de alta
-- Nº de empleado, nombre, género
-- **Vigencia**: `2026-05-23` → `2036-05-23`
-- **Puertas que puede abrir**: `RightPlan` con `doorNo` y plan horario
-- Contadores de rostros / huellas / tarjetas (`numOfFace`, `numOfFP`, `numOfCard`)
-- **Audio bidireccional**: `TwoWayAudio/channels` responde 200
-
-**Cuidado legal:** rostro y huella son datos personales **sensibles** bajo la
-LFPDPPP y las multas se duplican. Mostrar la foto haciendo de proxy contra el
-terminal sí; **copiar la plantilla biométrica (`modelData`) a nuestra base, no**.
-Se guarda el identificador, no el biométrico.
+- Cliente ISAPI con pooling `maxSockets: 1` por túnel (`7270143`).
+- go2rtc config en `/var/lib/nexara/go2rtc` (no en git) (`ef22944`).
+- Sub-stream H.264 para el muro; principal H.265 no se tocó (`0a53899`).
+- MSE reproduce solo; HLS no autoplayeaba bien en Chrome (`aed6c6c`).
+- Personas/eventos sync ISAPI ya existía (`981f1e1`); lo que faltaba era el DTO
+  rico y la UI.
 
 ## A medias
 
-- **Personas y eventos siguen en 0 para sitios ISAPI.** No es el túnel: es código
-  que falta. Comprobado que el terminal `192.168.9.163` tiene **21 usuarios**
-  dados de alta y `/ISAPI/AccessControl/UserInfo/Search` responde bien. Lo mismo
-  con `AcsEvent` (tope de 30 por página). Es lo siguiente y ahora es directo.
-- **Las reglas TCPMSS que añadí en el servidor no hacen falta** (el problema era
-  el pooling, no el MTU) y **no son persistentes**. Se pueden quitar:
-  `iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -o tailscale0 -j TCPMSS --set-mss 1240`
-  y la misma en POSTROUTING.
-- **Tailscale en el NAS es la versión 1.58.2**, de hace dos años. Conviene
-  actualizarla.
-- El sitio quedó en la **empresa 2**. Adam quiere que la Demo sea «Oficinas
-  NEXARA» y la 1 la infraestructura de clientes; **renombrar empresas en
-  producción no se ha hecho** y necesita su confirmación.
+- **Desplegar** este turno a producción y verificar muro 4/9 + fotos de las ~21
+  personas.
+- Eventos ACS en consola: sync existe; pulir UI de eventos si hace falta.
+- Quitar reglas TCPMSS sobrantes en el servidor (no persistentes).
+- `init: true` en compose de biblioteca (zombis).
+- Actualizar Tailscale del NAS (1.58.2).
+- Renombrar empresas 1/2 en prod — falta confirmación de Adam.
+- TwoWayAudio / FaceData Search / CardInfo Search: **no implementados**; no
+  inventar rutas fuera de `docs/INTEGRA-LAN.md`.
 
 ## No tocar
 
 - tickets layout, seed-demo-users, package-lock, xlsx
 - Oficinas ACS, PortalShell rewrite, Meta/ESP, OFX
-- `key.properties` y el keystore — credenciales
-- `ModuleEntry.webPath` — alimenta RBAC
-- **No inventar rutas ISAPI**: las verificadas están en `docs/INTEGRA-LAN.md`.
-- **No meter credenciales de equipos en el repo.** Van por `ISAPI_USER` /
-  `ISAPI_PASSWORD` o cifradas en `IntegraSite`. Ojo con lo que escriben los
-  servicios: go2rtc lo hacía sin que nadie lo notara.
-- **No mover Traefik de puerto** (ADR-0020): sirve 40 dominios de siete negocios.
-- El servidor hospeda **28 contenedores de otros proyectos**. Un build que llene
-  el disco tumba producción ajena.
+- `key.properties` / keystore
+- `ModuleEntry.webPath`
+- **No inventar rutas ISAPI** — verificadas en `docs/INTEGRA-LAN.md`
+- **No meter credenciales de equipos en el repo**
+- **No mover Traefik de puerto** (ADR-0020)
+- **No cambiar el puente NAS** por la laptop u otro nodo
+- Disco del servidor compartido con ~28 contenedores ajenos
 
 ## Siguiente paso
 
-1. **Fotos y ficha completa de personas** en la consola (ver arriba de dónde
-   salen). Es lo que Adam pide y ya está todo localizado.
-2. **Rediseño de la UI de Integra.** Adam insiste en que sigue poco intuitiva;
-   lo tocado hasta ahora han sido fallos concretos, no diseño.
-2. Quitar las reglas TCPMSS sobrantes del servidor.
-3. `init: true` en el compose de biblioteca, o los zombis vuelven.
-4. Decidir el tema de las empresas 1 y 2 con Adam.
+1. Deploy + smoke: muro 4 vivos fluidos; muro 9 con ≤6 vivos y cola; Personas
+   con fotos tras «Sincronizar terminales».
+2. TCPMSS / biblioteca `init: true` / Tailscale NAS.
+3. Decidir empresas 1 vs 2 con Adam.
 
 ## Mobile / Play — ENVIADO A REVISIÓN (31-08-2026)
 
-Sin cambios. Sigue en revisión con **Producción 5 (1.0.0)** del commit `c8bccea`.
-
-**Pendiente y sin comprobar:** que `play.review@nexara.com.mx` entre en
-producción. Sin `PLAY_REVIEWER_PASSWORD` el seed **rota la contraseña** y deja
-inservible la que está en Play Console:
-
-```
-docker compose --env-file .env.nexara -f docker-compose.nexara.yml   exec -T api sh -c "cd /app/apps/api && PLAY_REVIEWER_PASSWORD='...' npm run seed:play-reviewer"
-```
+Sin cambios. Producción 5 (1.0.0) `c8bccea`. Cuidado con
+`seed:play-reviewer` sin `PLAY_REVIEWER_PASSWORD` (rota la clave de Play).

@@ -50,6 +50,9 @@ type LayoutN = 1 | 4 | 9 | 16;
 const LAYOUT_KEY = "nexara_integra_video_layout";
 const MODE_KEY = "nexara_integra_video_mode";
 const AUTOOPEN_KEY = "nexara_integra_video_autoopen";
+/** Tope de decodificadores MSE vivos en el muro (el resto queda en cola). */
+const MAX_LIVE_WALL = 6;
+const STAGGER_MS = 650;
 
 function colsFor(layout: LayoutN): number {
   if (layout === 1) return 1;
@@ -264,7 +267,31 @@ export default function IntegraVideoPage() {
     return cells.slice(0, layout);
   }, [slots, layout]);
 
+  /** Cupo de vivos: seleccionado primero, luego por orden del muro. Fuera de Muro = 0. */
+  const liveWallIds = useMemo(() => {
+    if (mode !== "wall") return new Set<string>();
+    const filled = wallCells.filter((s): s is StreamSlot => Boolean(s));
+    const ordered = [
+      ...filled.filter((s) => s.id === selected),
+      ...filled.filter((s) => s.id !== selected),
+    ];
+    return new Set(ordered.slice(0, MAX_LIVE_WALL).map((s) => s.id));
+  }, [wallCells, selected, mode]);
+
+  const liveWallOrder = useMemo(() => {
+    const order = new Map<string, number>();
+    let i = 0;
+    for (const s of wallCells) {
+      if (!s || !liveWallIds.has(s.id)) continue;
+      order.set(s.id, i);
+      i += 1;
+    }
+    return order;
+  }, [wallCells, liveWallIds]);
+
   const inWall = (id: string) => slots.some((s) => s.id === id);
+  const liveCount = liveWallIds.size;
+  const queuedCount = Math.max(0, slots.length - liveCount);
 
   return (
     <IgPage>
@@ -273,7 +300,9 @@ export default function IntegraVideoPage() {
         meta={
           filling
             ? "Abriendo cámaras…"
-            : `${filtered.length} cámaras · ${slots.length}/${layout} activas`
+            : mode === "wall"
+              ? `${filtered.length} cámaras · ${slots.length}/${layout} en muro · ${liveCount} vivas${queuedCount ? ` · ${queuedCount} en cola` : ""}`
+              : `${filtered.length} cámaras · foco`
         }
         actions={
           <>
@@ -323,8 +352,9 @@ export default function IntegraVideoPage() {
       />
       <IgError>{error}</IgError>
 
-      {mode === "wall" ? (
-        <div className={styles.wallWorkbench} data-rail={railOpen ? "open" : "closed"}>
+      {/* Ambos montados: al ir a Foco el muro solo se oculta (cierra WS por IO),
+          así volver no reconstruye toda la rejilla desde cero. */}
+      <div className={styles.wallWorkbench} data-rail={railOpen ? "open" : "closed"} hidden={mode !== "wall"}>
           <aside className={styles.wallRail}>
             <div className={styles.wallRailHead}>
               <strong>Cámaras</strong>
@@ -358,6 +388,7 @@ export default function IntegraVideoPage() {
                   {filtered.map((c) => {
                     const active = inWall(c.id);
                     const sel = selected === c.id;
+                    const live = liveWallIds.has(c.id);
                     return (
                       <button
                         key={c.id}
@@ -374,7 +405,9 @@ export default function IntegraVideoPage() {
                       >
                         <span className={styles.wallCamDot} data-ok={onlineish(c.status) ? "1" : undefined} />
                         <span className={styles.wallCamName}>{c.name}</span>
-                        {active && <IgBadge tone="accent">muro</IgBadge>}
+                        {active && (
+                          <IgBadge tone={live ? "accent" : "warn"}>{live ? "vivo" : "cola"}</IgBadge>
+                        )}
                         {busy === c.id && <span className={styles.wallCamBusy}>…</span>}
                       </button>
                     );
@@ -384,7 +417,7 @@ export default function IntegraVideoPage() {
                   )}
                 </div>
                 <p className={styles.wallHint}>
-                  Clic → muro · Doble clic → foco · Vacío del grid → elige cámara
+                  Hasta {MAX_LIVE_WALL} vivas a la vez · Clic → muro · Doble clic → foco
                 </p>
               </>
             )}
@@ -400,6 +433,7 @@ export default function IntegraVideoPage() {
                   key={s.id}
                   className={styles.wallCell}
                   data-selected={selected === s.id ? "1" : undefined}
+                  data-queued={liveWallIds.has(s.id) ? undefined : "1"}
                   onClick={() => setSelected(s.id)}
                   onDoubleClick={() => openFocus(s.id)}
                   role="button"
@@ -443,7 +477,13 @@ export default function IntegraVideoPage() {
                         height={layout <= 4 ? 280 : 160}
                       />
                     ) : (
-                      <IntegraLivePlayer src={s.hls} compact showLiveBadge />
+                      <IntegraLivePlayer
+                        src={s.hls}
+                        compact
+                        showLiveBadge
+                        enabled={liveWallIds.has(s.id)}
+                        startDelayMs={(liveWallOrder.get(s.id) ?? i) * STAGGER_MS}
+                      />
                     )}
                   </div>
                 </div>
@@ -466,9 +506,9 @@ export default function IntegraVideoPage() {
               ),
             )}
           </div>
-        </div>
-      ) : (
-        <>
+      </div>
+
+      <div hidden={mode !== "focus"}>
           <IgFilters>
             <IgField label="Región">
               <select value={region} onChange={(e) => setRegion(e.target.value)} style={selectStyle}>
@@ -562,35 +602,28 @@ export default function IntegraVideoPage() {
                     <span>O cambia a Muro y pulsa «Llenar muro» para ver varias a la vez.</span>
                   </div>
                 )}
-                {focus && (
+                {focus && mode === "focus" && (
                   <>
                     {focus.provider === "HCT" ? (
                       <IntegraEzuiKitPlayer stream={focus.stream} cameraId={focus.id} height={420} />
                     ) : (
-                      <IntegraLivePlayer src={focus.hls} />
+                      <IntegraLivePlayer src={focus.hls} enabled={mode === "focus"} />
                     )}
                     {note && (
                       <p className={styles.videoNote}>
                         <button
                           type="button"
                           onClick={() => setShowTech((v) => !v)}
-                          style={{
-                            border: 0,
-                            background: "transparent",
-                            color: "inherit",
-                            cursor: "pointer",
-                            padding: 0,
-                            font: "inherit",
-                          }}
+                          className={styles.techToggle}
                         >
                           {showTech ? "Ocultar detalle técnico ▾" : "Detalle técnico ▸"}
                         </button>
-                        {showTech && <span style={{ display: "block", marginTop: 4 }}>{note}</span>}
+                        {showTech && <span className={styles.techDetail}>{note}</span>}
                       </p>
                     )}
                   </>
                 )}
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                <div className={styles.focusActions}>
                   <IgBtn
                     disabled={!selected || busy === "cap"}
                     onClick={async () => {
@@ -629,19 +662,10 @@ export default function IntegraVideoPage() {
                     </IgBtn>
                   )}
                 </div>
-                <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+                <div className={styles.focusPlayback}>
                   {!isHct ? (
                     <>
-                      <strong
-                        style={{
-                          fontSize: 11,
-                          letterSpacing: "0.08em",
-                          textTransform: "uppercase",
-                          color: "var(--ig-muted)",
-                        }}
-                      >
-                        Playback histórico
-                      </strong>
+                      <strong className={styles.focusPlaybackLabel}>Playback histórico</strong>
                       <IgField label="Inicio">
                         <input
                           type="datetime-local"
@@ -658,7 +682,7 @@ export default function IntegraVideoPage() {
                           style={inputStyle}
                         />
                       </IgField>
-                      <div style={{ display: "flex", gap: 6 }}>
+                      <div className={styles.focusActions}>
                         <IgBtn
                           onClick={() => {
                             const r = defaultRangeHours(1);
@@ -696,7 +720,7 @@ export default function IntegraVideoPage() {
                         </IgBtn>
                       </div>
                       {playbackUrl && (
-                        <code style={{ fontSize: 10, wordBreak: "break-all" }}>{playbackUrl}</code>
+                        <code className={styles.playbackUrl}>{playbackUrl}</code>
                       )}
                     </>
                   ) : (
@@ -708,8 +732,7 @@ export default function IntegraVideoPage() {
               </IgPanel>
             }
           />
-        </>
-      )}
+      </div>
     </IgPage>
   );
 }

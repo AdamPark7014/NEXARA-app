@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { rethrowArtemis, toArtemisOffsetIso } from '../hikvision-artemis/index';
@@ -8,6 +8,8 @@ import {
   identifyDevice,
   listAcsEvents,
   listAllUserInfo,
+  mapIsapiUserToPersonDto,
+  mapMirrorPersonToDto,
   type IsapiAcsEvent,
 } from '../hikvision-isapi/index';
 import { IntegraSiteService } from './integra-site.service';
@@ -850,13 +852,7 @@ export class IntegraArtemisService {
       return {
         total: items.length,
         source: 'mirror' as const,
-        items: items.map((p) => ({
-          id: p.personId,
-          name: p.personName,
-          code: p.personCode,
-          orgId: p.orgIndexCode,
-          orgName: p.orgName,
-        })),
+        items: items.map((p) => mapMirrorPersonToDto(p)),
       };
     }
 
@@ -867,24 +863,17 @@ export class IntegraArtemisService {
         where: { siteId: resolved.siteId, kind: 'ACS', ip: { not: null } },
         select: { ip: true },
       });
-      const byId = new Map<
-        string,
-        { id: string; name: string; code?: string; orgId?: string; orgName?: string }
-      >();
+      const byId = new Map<string, ReturnType<typeof mapIsapiUserToPersonDto>>();
       for (const d of acs) {
-        const client = resolved.isapiForHost(d.ip as string);
+        const ip = d.ip as string;
+        const client = resolved.isapiForHost(ip);
         if (!client) continue;
         try {
           const users = await listAllUserInfo(client);
           for (const u of users) {
             const id = String(u.employeeNo).trim();
             if (!id || byId.has(id)) continue;
-            byId.set(id, {
-              id,
-              name: String(u.name || id),
-              code: id,
-              orgName: u.userType != null ? String(u.userType) : undefined,
-            });
+            byId.set(id, mapIsapiUserToPersonDto(u, { sourceIp: ip }));
           }
         } catch (e) {
           this.logger.warn(`UserInfo live ${d.ip}: ${String(e)}`);
@@ -914,6 +903,29 @@ export class IntegraArtemisService {
   }
 
   async getPerson(companyId: number | null, personId: string, siteId?: number | null) {
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
+    if (resolved.provider === 'ISAPI' && companyId) {
+      const row = await this.prisma.integraPerson.findFirst({
+        where: {
+          companyId,
+          personId,
+          ...(resolved.siteId ? { siteId: resolved.siteId } : siteId ? { siteId } : {}),
+        },
+      });
+      if (!row) {
+        throw new NotFoundException(`Persona ${personId} no está en el espejo — sincroniza el sitio`);
+      }
+      const dto = mapMirrorPersonToDto(row);
+      return {
+        personId,
+        source: 'mirror' as const,
+        provider: 'ISAPI',
+        note: 'Alta y edición se hacen en el terminal. Aquí se muestra el espejo ISAPI.',
+        person: dto,
+        raw: row.raw,
+      };
+    }
+
     try {
       const { client } = await this.client(companyId, siteId);
       const data = await client.personInfo(personId);
@@ -921,6 +933,51 @@ export class IntegraArtemisService {
     } catch (error) {
       rethrowArtemis(error, `No se pudo obtener persona ${personId}`);
     }
+  }
+
+  /**
+   * Proxy autenticado de la foto de rostro (`faceURL` del UserInfo).
+   * No inventa rutas FaceData: solo GET Digest de la URL que ya devolvió el terminal.
+   */
+  async getPersonFace(
+    companyId: number | null,
+    personId: string,
+    siteId?: number | null,
+  ): Promise<{ buffer: Buffer; contentType: string }> {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
+    if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost) {
+      throw new BadRequestException('Foto por proxy solo disponible en sitios ISAPI');
+    }
+
+    const row = await this.prisma.integraPerson.findFirst({
+      where: {
+        companyId,
+        personId,
+        ...(resolved.siteId ? { siteId: resolved.siteId } : siteId ? { siteId } : {}),
+      },
+    });
+    if (!row) throw new NotFoundException(`Persona ${personId} no encontrada en espejo`);
+
+    const dto = mapMirrorPersonToDto(row);
+    if (!dto.faceUrl) {
+      throw new NotFoundException(`Persona ${personId} sin faceURL en el terminal`);
+    }
+
+    const sourceIp =
+      dto.sourceIp ||
+      (
+        await this.prisma.integraDevice.findFirst({
+          where: { siteId: row.siteId, kind: 'ACS', ip: { not: null } },
+          select: { ip: true },
+        })
+      )?.ip;
+
+    if (!sourceIp) throw new BadRequestException('Sin IP de terminal ACS para obtener la foto');
+    const client = resolved.isapiForHost(sourceIp);
+    if (!client) throw new BadRequestException('Cliente ISAPI no disponible');
+
+    return client.getBinary(dto.faceUrl);
   }
 
   async addPerson(

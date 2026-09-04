@@ -48,6 +48,22 @@ export async function integraApi<T>(path: string, init?: RequestInit): Promise<T
   return res.json() as Promise<T>;
 }
 
+/** URL del proxy de foto de rostro (cookies de sesión vía mismo origen). */
+export function integraPersonFaceUrl(personId: string): string {
+  return buildApiUrl(withSiteQuery(`integra/people/${encodeURIComponent(personId)}/face`));
+}
+
+/** Descarga la foto con headers de tenant (un `<img src>` no manda X-Company-Id). */
+export async function integraPersonFaceBlob(personId: string): Promise<Blob> {
+  const headers = new Headers(withTenantHeaders({}));
+  const res = await fetch(integraPersonFaceUrl(personId), {
+    credentials: "include",
+    headers,
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.blob();
+}
+
 export type IntegraCapabilities = {
   video: boolean;
   access: boolean;

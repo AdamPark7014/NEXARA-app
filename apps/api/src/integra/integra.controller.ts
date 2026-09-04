@@ -11,10 +11,12 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   Sse,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import {
   ArrayNotEmpty,
   IsArray,
@@ -475,6 +477,24 @@ export class IntegraController {
     @Query('siteId') siteId?: string,
   ) {
     return this.integra.getPerson(companyId, id, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  @Get('people/:id/face')
+  @ApiOperation({ summary: 'Proxy de foto de rostro (ISAPI faceURL)' })
+  async personFace(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Query('siteId') siteId: string | undefined,
+    @Res() res: Response,
+  ) {
+    const { buffer, contentType } = await this.integra.getPersonFace(
+      companyId,
+      id,
+      siteId ? parseInt(siteId, 10) : null,
+    );
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'private, max-age=120');
+    res.send(buffer);
   }
 
   @Post('people')
