@@ -22,11 +22,96 @@ export type IsapiUserInfo = {
   gender?: string;
   Valid?: { enable?: boolean; beginTime?: string; endTime?: string };
   doorRight?: string;
+  RightPlan?: unknown;
+  faceURL?: string;
   numOfCard?: number;
   numOfFace?: number;
   numOfFP?: number;
   [key: string]: unknown;
 };
+
+/** DTO de persona para la consola (espejo o live ISAPI). */
+export type IntegraPersonDto = {
+  id: string;
+  name: string;
+  code?: string;
+  orgId?: string;
+  orgName?: string;
+  userType?: string;
+  gender?: string;
+  validEnable?: boolean;
+  validFrom?: string;
+  validTo?: string;
+  doorRight?: string;
+  rightPlan?: unknown;
+  numOfFace?: number;
+  numOfFP?: number;
+  numOfCard?: number;
+  /** URL en el terminal; el navegador usa el proxy autenticado. */
+  faceUrl?: string | null;
+  hasFace?: boolean;
+  sourceIp?: string;
+};
+
+export function mapIsapiUserToPersonDto(
+  u: IsapiUserInfo,
+  extras?: { sourceIp?: string },
+): IntegraPersonDto {
+  const id = String(u.employeeNo ?? '').trim();
+  const valid = u.Valid;
+  const faceRaw = u.faceURL ?? (u as Record<string, unknown>).FaceURL;
+  const faceUrl =
+    typeof faceRaw === "string" && faceRaw.trim() ? faceRaw.trim() : null;
+  const numOfFace = u.numOfFace != null ? Number(u.numOfFace) : undefined;
+  const userType = u.userType != null ? String(u.userType) : undefined;
+  return {
+    id,
+    name: String(u.name || id).trim() || id,
+    code: id,
+    orgName: userType,
+    userType,
+    gender: u.gender != null ? String(u.gender) : undefined,
+    validEnable: valid?.enable,
+    validFrom: valid?.beginTime,
+    validTo: valid?.endTime,
+    doorRight: u.doorRight != null ? String(u.doorRight) : undefined,
+    rightPlan: u.RightPlan ?? (u as { rightPlan?: unknown }).rightPlan,
+    numOfFace: Number.isFinite(numOfFace) ? numOfFace : undefined,
+    numOfFP: u.numOfFP != null ? Number(u.numOfFP) : undefined,
+    numOfCard: u.numOfCard != null ? Number(u.numOfCard) : undefined,
+    faceUrl,
+    hasFace: Boolean(faceUrl) || (numOfFace != null && numOfFace > 0),
+    sourceIp: extras?.sourceIp,
+  };
+}
+
+/** Reconstruye el DTO desde la fila espejo (`raw` + columnas). */
+export function mapMirrorPersonToDto(row: {
+  personId: string;
+  personName: string;
+  personCode: string | null;
+  orgIndexCode: string | null;
+  orgName: string | null;
+  raw: unknown;
+}): IntegraPersonDto {
+  const raw = (row.raw && typeof row.raw === 'object' ? row.raw : {}) as IsapiUserInfo & {
+    sourceIp?: string;
+  };
+  const fromRaw = mapIsapiUserToPersonDto(
+    {
+      ...raw,
+      employeeNo: row.personId,
+      name: row.personName || raw.name || row.personId,
+    },
+    { sourceIp: raw.sourceIp },
+  );
+  return {
+    ...fromRaw,
+    code: row.personCode || fromRaw.code,
+    orgId: row.orgIndexCode || undefined,
+    orgName: row.orgName || fromRaw.orgName,
+  };
+}
 
 export type IsapiAcsEvent = {
   major?: number;

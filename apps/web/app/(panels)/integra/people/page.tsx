@@ -10,14 +10,128 @@ import {
   IgPage,
   IgPanel,
   IgSplit,
-  IgTable,
   IgToolbar,
 } from "../_Console";
 import { getCachedProvider, subscribeProvider } from "../_caps";
-import { inputStyle, integraApi, selectStyle } from "../_lib";
+import {
+  inputStyle,
+  integraApi,
+  integraPersonFaceBlob,
+  selectStyle,
+} from "../_lib";
+import styles from "../integra.module.css";
 
-type Person = { id: string; name: string; code?: string; orgId?: string; orgName?: string };
+type Person = {
+  id: string;
+  name: string;
+  code?: string;
+  orgId?: string;
+  orgName?: string;
+  userType?: string;
+  gender?: string;
+  validEnable?: boolean;
+  validFrom?: string;
+  validTo?: string;
+  doorRight?: string;
+  rightPlan?: unknown;
+  numOfFace?: number;
+  numOfFP?: number;
+  numOfCard?: number;
+  faceUrl?: string | null;
+  hasFace?: boolean;
+  sourceIp?: string;
+};
+
 type Org = { id: string; name: string; parentId?: string };
+
+type ValidityFilter = "" | "ok" | "warn" | "expired" | "off" | "face" | "noface";
+
+function genderLabel(g?: string) {
+  const v = String(g || "").toLowerCase();
+  if (v === "male" || v === "1" || v === "m") return "Hombre";
+  if (v === "female" || v === "2" || v === "f") return "Mujer";
+  if (!g) return null;
+  return String(g);
+}
+
+function validityOf(p: Person): { key: "ok" | "warn" | "expired" | "off" | "unknown"; label: string; tone: "ok" | "warn" | "danger" | "muted" | "neutral" } {
+  if (p.validEnable === false) return { key: "off", label: "Deshabilitada", tone: "danger" };
+  if (!p.validTo) return { key: "unknown", label: "Sin vigencia", tone: "muted" };
+  const end = Date.parse(p.validTo);
+  if (!Number.isFinite(end)) return { key: "unknown", label: p.validTo, tone: "muted" };
+  const days = (end - Date.now()) / 86_400_000;
+  if (days < 0) return { key: "expired", label: "Vencida", tone: "danger" };
+  if (days < 30) return { key: "warn", label: "Por vencer", tone: "warn" };
+  return { key: "ok", label: "Vigente", tone: "ok" };
+}
+
+function formatWhen(iso?: string) {
+  if (!iso) return "—";
+  const d = Date.parse(iso);
+  if (!Number.isFinite(d)) return iso;
+  return new Date(d).toLocaleDateString("es-MX", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function PersonAvatar({ person, large }: { person: Person; large?: boolean }) {
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!person.hasFace && !(person.numOfFace && person.numOfFace > 0) && !person.faceUrl) {
+      setSrc(null);
+      return;
+    }
+    let objectUrl: string | null = null;
+    let cancelled = false;
+    void integraPersonFaceBlob(person.id)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSrc(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setSrc(null);
+      });
+    return () => {
+      cancelled = true;
+      setSrc((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [person.id, person.hasFace, person.numOfFace, person.faceUrl]);
+
+  return (
+    <div className={large ? styles.personAvatarLg : styles.personAvatar} data-empty={!src ? "1" : undefined}>
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" />
+      ) : (
+        <span aria-hidden>{(person.name || "?").slice(0, 1).toUpperCase()}</span>
+      )}
+    </div>
+  );
+}
+
+function CredChips({ person }: { person: Person }) {
+  return (
+    <div className={styles.personChips}>
+      <span className={styles.personChip} data-on={(person.numOfFace ?? 0) > 0 || person.hasFace ? "1" : undefined}>
+        Rostro {person.numOfFace ?? (person.hasFace ? "·" : "0")}
+      </span>
+      <span className={styles.personChip} data-on={(person.numOfFP ?? 0) > 0 ? "1" : undefined}>
+        Huella {person.numOfFP ?? 0}
+      </span>
+      <span className={styles.personChip} data-on={(person.numOfCard ?? 0) > 0 ? "1" : undefined}>
+        Tarjeta {person.numOfCard ?? 0}
+      </span>
+    </div>
+  );
+}
 
 export default function IntegraPeoplePage() {
   const [people, setPeople] = useState<Person[]>([]);
@@ -28,6 +142,7 @@ export default function IntegraPeoplePage() {
   const [code, setCode] = useState("");
   const [orgId, setOrgId] = useState("");
   const [orgFilter, setOrgFilter] = useState("");
+  const [validityFilter, setValidityFilter] = useState<ValidityFilter>("");
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [live, setLive] = useState(false);
@@ -35,6 +150,7 @@ export default function IntegraPeoplePage() {
   const [syncing, setSyncing] = useState(false);
   const [provider, setProvider] = useState<string | null>(() => getCachedProvider());
   const isArtemis = !provider || provider === "ARTEMIS";
+  const isIsapi = provider === "ISAPI";
 
   useEffect(() => subscribeProvider(setProvider), []);
 
@@ -61,6 +177,13 @@ export default function IntegraPeoplePage() {
     () =>
       people.filter((p) => {
         if (orgFilter && p.orgId !== orgFilter) return false;
+        if (validityFilter === "face") {
+          if (!p.hasFace && !(p.numOfFace && p.numOfFace > 0)) return false;
+        } else if (validityFilter === "noface") {
+          if (p.hasFace || (p.numOfFace && p.numOfFace > 0)) return false;
+        } else if (validityFilter) {
+          if (validityOf(p).key !== validityFilter) return false;
+        }
         if (!q) return true;
         const qq = q.toLowerCase();
         return (
@@ -69,25 +192,25 @@ export default function IntegraPeoplePage() {
           p.id.toLowerCase().includes(qq)
         );
       }),
-    [people, q, orgFilter],
+    [people, q, orgFilter, validityFilter],
   );
 
   const openDetail = async (p: Person) => {
     setSelected(p);
     setDetail(null);
-    if (!isArtemis) {
-      setDetail({
-        source: provider || "ISAPI",
-        note: "Alta/edición en el terminal. Aquí se muestra el espejo interno.",
-        person: p,
-      });
-      return;
-    }
     setBusy(true);
     try {
       setDetail(await integraApi(`integra/people/${encodeURIComponent(p.id)}`));
     } catch (e) {
-      setDetail({ error: e instanceof Error ? e.message : "Sin detalle" });
+      if (!isArtemis) {
+        setDetail({
+          source: provider || "ISAPI",
+          note: "Detalle desde el listado (espejo local).",
+          person: p,
+        });
+      } else {
+        setDetail({ error: e instanceof Error ? e.message : "Sin detalle" });
+      }
     } finally {
       setBusy(false);
     }
@@ -106,15 +229,23 @@ export default function IntegraPeoplePage() {
     }
   };
 
+  const detailPerson: Person | null = useMemo(() => {
+    if (!detail || typeof detail !== "object") return selected;
+    const d = detail as { person?: Person };
+    return d.person || selected;
+  }, [detail, selected]);
+
+  const withFace = people.filter((p) => p.hasFace || (p.numOfFace ?? 0) > 0).length;
+
   return (
     <IgPage>
       <IgToolbar
         title="Personas"
-        meta={`${filtered.length}/${people.length}${orgs.length ? ` · ${orgs.length} orgs` : ""} · ${live ? "live" : "espejo"}`}
+        meta={`${filtered.length}/${people.length}${withFace ? ` · ${withFace} con rostro` : ""}${orgs.length ? ` · ${orgs.length} orgs` : ""} · ${live ? "live" : "espejo"}`}
         actions={
           <>
             <IgBtn onClick={() => setLive((v) => !v)}>{live ? "Live" : "Espejo"}</IgBtn>
-            {!isArtemis && (
+            {isIsapi && (
               <IgBtn variant="primary" disabled={syncing} onClick={() => void syncNow()}>
                 {syncing ? "Sincronizando…" : "Sincronizar terminales"}
               </IgBtn>
@@ -136,57 +267,137 @@ export default function IntegraPeoplePage() {
             </select>
           </IgField>
         )}
+        {isIsapi && (
+          <IgField label="Filtro">
+            <select
+              value={validityFilter}
+              onChange={(e) => setValidityFilter(e.target.value as ValidityFilter)}
+              style={selectStyle}
+            >
+              <option value="">Todas</option>
+              <option value="ok">Vigentes</option>
+              <option value="warn">Por vencer</option>
+              <option value="expired">Vencidas</option>
+              <option value="off">Deshabilitadas</option>
+              <option value="face">Con rostro</option>
+              <option value="noface">Sin rostro</option>
+            </select>
+          </IgField>
+        )}
         <IgField label="Buscar">
           <input value={q} onChange={(e) => setQ(e.target.value)} style={inputStyle} placeholder="nombre / código / id" />
         </IgField>
       </IgFilters>
 
       <IgSplit
-        leftWidth="58%"
+        leftWidth="56%"
         left={
           <IgPanel title="Directorio" count={filtered.length} flush>
-            <IgTable
-              selectedKey={selected?.id}
-              onRowClick={(key) => {
-                const p = people.find((x) => x.id === key);
-                if (p) void openDetail(p);
-              }}
-              columns={[
-                { key: "n", label: "Nombre" },
-                { key: "c", label: "Código", mono: true },
-                { key: "o", label: isArtemis ? "Org" : "Tipo" },
-                { key: "id", label: "ID", mono: true },
-              ]}
-              rows={filtered.map((p) => ({
-                key: p.id,
-                cells: {
-                  n: p.name,
-                  c: p.code || "—",
-                  o: p.orgName || p.orgId || "—",
-                  id: p.id,
-                },
-              }))}
-              empty={
-                isArtemis
-                  ? "Sin personas"
-                  : "Sin personas en espejo — pulsa «Sincronizar terminales»"
-              }
-            />
+            <div className={styles.personDirectory}>
+              {filtered.map((p) => {
+                const v = validityOf(p);
+                const sel = selected?.id === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={styles.personRow}
+                    data-selected={sel ? "1" : undefined}
+                    onClick={() => void openDetail(p)}
+                  >
+                    <PersonAvatar person={p} />
+                    <div className={styles.personRowMain}>
+                      <div className={styles.personRowTop}>
+                        <strong>{p.name}</strong>
+                        <IgBadge tone={v.tone}>{v.label}</IgBadge>
+                      </div>
+                      <div className={styles.personRowMeta}>
+                        <span className={styles.personMono}>{p.code || p.id}</span>
+                        {(p.userType || p.orgName) && (
+                          <span>{p.userType || p.orgName}</span>
+                        )}
+                        {genderLabel(p.gender) && <span>{genderLabel(p.gender)}</span>}
+                      </div>
+                      {isIsapi && <CredChips person={p} />}
+                    </div>
+                  </button>
+                );
+              })}
+              {filtered.length === 0 && (
+                <p className={styles.igEmpty}>
+                  {isArtemis
+                    ? "Sin personas"
+                    : "Sin personas en espejo — pulsa «Sincronizar terminales»"}
+                </p>
+              )}
+            </div>
           </IgPanel>
         }
         right={
-          <IgPanel title={isArtemis ? "Detalle / alta" : "Detalle"} count={selected?.name || "—"}>
-            {selected ? (
-              <div style={{ display: "grid", gap: 6, fontSize: 12, marginBottom: 12 }}>
-                <strong>{selected.name}</strong>
-                <span>{selected.code || "sin código"}</span>
-                <span>{selected.orgName || selected.orgId || "—"}</span>
-                {busy && <IgBadge>personInfo…</IgBadge>}
-                {detail != null && (
-                  <pre style={{ fontSize: 10, maxHeight: 200, overflow: "auto", margin: 0 }}>
+          <IgPanel title={isArtemis ? "Detalle / alta" : "Ficha"} count={selected?.name || "—"}>
+            {detailPerson && selected ? (
+              <div className={styles.personCard}>
+                <div className={styles.personCardHead}>
+                  <PersonAvatar person={detailPerson} large />
+                  <div>
+                    <h3 className={styles.personCardName}>{detailPerson.name}</h3>
+                    <p className={styles.personCardCode}>{detailPerson.code || detailPerson.id}</p>
+                    <div className={styles.personChips}>
+                      <IgBadge tone={validityOf(detailPerson).tone}>
+                        {validityOf(detailPerson).label}
+                      </IgBadge>
+                      {(detailPerson.userType || detailPerson.orgName) && (
+                        <IgBadge>{detailPerson.userType || detailPerson.orgName}</IgBadge>
+                      )}
+                      {genderLabel(detailPerson.gender) && (
+                        <IgBadge tone="neutral">{genderLabel(detailPerson.gender)}</IgBadge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {isIsapi && (
+                  <>
+                    <dl className={styles.personFacts}>
+                      <div>
+                        <dt>Vigencia</dt>
+                        <dd>
+                          {formatWhen(detailPerson.validFrom)} → {formatWhen(detailPerson.validTo)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Puertas</dt>
+                        <dd className={styles.personMono}>{detailPerson.doorRight || "—"}</dd>
+                      </div>
+                      {detailPerson.sourceIp && (
+                        <div>
+                          <dt>Terminal</dt>
+                          <dd className={styles.personMono}>{detailPerson.sourceIp}</dd>
+                        </div>
+                      )}
+                    </dl>
+                    <CredChips person={detailPerson} />
+                    {detailPerson.rightPlan != null && (
+                      <details className={styles.personRaw}>
+                        <summary>Plan de puertas (RightPlan)</summary>
+                        <pre>{JSON.stringify(detailPerson.rightPlan, null, 2)}</pre>
+                      </details>
+                    )}
+                    <p className={styles.personNote}>
+                      Alta y edición facial/tarjeta se hacen en el terminal. Esta ficha es el
+                      espejo ISAPI del sitio.
+                    </p>
+                  </>
+                )}
+
+                {busy && <IgBadge>Cargando detalle…</IgBadge>}
+
+                {isArtemis && detail != null && (
+                  <pre className={styles.personRawPre}>
                     {JSON.stringify(detail, null, 2)}
                   </pre>
                 )}
+
                 {isArtemis && (
                   <IgBtn
                     onClick={async () => {
@@ -204,16 +415,17 @@ export default function IntegraPeoplePage() {
                 )}
               </div>
             ) : (
-              <p style={{ fontSize: 12, color: "var(--ig-muted)" }}>
+              <p className={styles.personEmptyHint}>
                 {isArtemis
-                  ? "Click en una fila"
-                  : "Personas leídas de los terminales ACS. El alta facial/tarjeta se hace en el equipo; aquí se consulta el directorio interno."}
+                  ? "Selecciona una persona del directorio"
+                  : "Selecciona una persona para ver foto, vigencia y credenciales del terminal."}
               </p>
             )}
+
             {isArtemis && (
               <>
-                <hr style={{ borderColor: "var(--ig-line)", margin: "10px 0" }} />
-                <div style={{ display: "grid", gap: 8 }}>
+                <hr className={styles.personDivider} />
+                <div className={styles.personCreate}>
                   <IgField label="Nombre">
                     <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
                   </IgField>

@@ -9,29 +9,28 @@ type Props = {
   showLiveBadge?: boolean;
   compact?: boolean;
   className?: string;
+  /**
+   * Retraso antes de abrir el WebSocket. En el muro cada mosaico entra con
+   * turno propio para no saturar el decodificador del navegador.
+   */
+  startDelayMs?: number;
+  /**
+   * Si es false, no se abre el stream (cupo de vivos / en cola). El mosaico
+   * sigue montado y muestra “En cola”.
+   */
+  enabled?: boolean;
 };
 
 /**
  * Reproductor en vivo sobre **MSE por WebSocket**, no HLS.
  *
- * Por qué se cambió: con HLS el muro no arrancaba solo. Ni nueve mosaicos ni
- * uno: en Foco, con una sola cámara, el `play()` tampoco prosperaba y el
- * usuario tenía que pulsar el botón en cada cuadro. Se descartó el backend
- * midiendo —los 9 streams simultáneos entregan 8 de 8 playlists con segmentos,
- * y go2rtc conecta con la cámara en cuanto alguien pide— y se comprobó en el
- * navegador que el **mismo stream por MSE reproduce solo**. El problema era el
- * transporte, no el video.
- *
- * Se usa el componente `<video-stream>` del propio go2rtc en vez de
- * reimplementarlo: ya resuelve el arranque, la reconexión y el respaldo a otros
- * modos. Se sirve desde nuestro propio dominio (`/go2rtc/`), así que la CSP lo
- * admite con `script-src 'self'` — no hace falta abrirle hueco a ningún CDN,
- * que fue justo lo que dejó a hls.js sin cargar en producción.
+ * Se usa el componente `<video-stream>` del propio go2rtc: arranque,
+ * reconexión y respaldo ya resueltos. Se sirve desde `/go2rtc/` (mismo
+ * dominio → CSP `script-src 'self'`).
  */
 
 let loaderPromise: Promise<void> | null = null;
 
-/** Carga una sola vez el módulo de go2rtc y espera a que registre el elemento. */
 function loadVideoStream(base: string): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   if (customElements.get("video-stream")) return Promise.resolve();
@@ -42,7 +41,6 @@ function loadVideoStream(base: string): Promise<void> {
     s.type = "module";
     s.src = `${base}/video-stream.js`;
     s.onload = () => {
-      // El módulo registra el custom element de forma asíncrona.
       void customElements.whenDefined("video-stream").then(() => resolve());
     };
     s.onerror = () => reject(new Error("No se pudo cargar el reproductor"));
@@ -51,11 +49,6 @@ function loadVideoStream(base: string): Promise<void> {
   return loaderPromise;
 }
 
-/**
- * `https://host/go2rtc/api/stream.m3u8?src=NOMBRE` → base y nombre del stream.
- * La API ya devuelve la URL pública correcta, así que no hace falta que el
- * cliente conozca `GO2RTC_PUBLIC_URL` por su cuenta.
- */
 function parseHls(src: string): { base: string; name: string } | null {
   try {
     const u = new URL(src, window.location.origin);
@@ -74,16 +67,49 @@ export function IntegraLivePlayer({
   showLiveBadge = true,
   compact = false,
   className,
+  startDelayMs = 0,
+  enabled = true,
 }: Props) {
+  const shellRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
-  const [state, setState] = useState<"idle" | "loading" | "live" | "error">(
-    src ? "loading" : "idle",
+  const [visible, setVisible] = useState(true);
+  const [state, setState] = useState<"idle" | "queued" | "loading" | "live" | "error">(
+    src ? (enabled ? "loading" : "queued") : "idle",
   );
 
   useEffect(() => {
+    const el = shellRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        setVisible(Boolean(entry?.isIntersecting && (entry.intersectionRatio ?? 0) > 0.02));
+      },
+      { threshold: [0, 0.02, 0.15] },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  const shouldPlay = Boolean(src && enabled && visible);
+
+  useEffect(() => {
     const host = hostRef.current;
-    if (!host || !src) {
-      setState(src ? "loading" : "idle");
+    if (!host) return;
+
+    if (!src) {
+      setState("idle");
+      host.innerHTML = "";
+      return;
+    }
+    if (!enabled) {
+      setState("queued");
+      host.innerHTML = "";
+      return;
+    }
+    if (!visible) {
+      setState("queued");
+      host.innerHTML = "";
       return;
     }
 
@@ -94,44 +120,49 @@ export function IntegraLivePlayer({
     }
 
     let cancelled = false;
-    let el: (HTMLElement & { mode?: string; src?: URL | string }) | null = null;
+    let el: HTMLElement | null = null;
     setState("loading");
 
-    void loadVideoStream(parsed.base)
-      .then(() => {
-        if (cancelled || !hostRef.current) return;
-        const node = document.createElement("video-stream") as HTMLElement & {
-          mode?: string;
-          src?: URL | string;
-          background?: boolean;
-        };
-        // `mse` es el que arranca solo y da baja latencia. El componente cae a
-        // otros modos por su cuenta si el navegador no lo soporta.
-        node.mode = "mse";
-        node.background = false;
-        node.style.width = "100%";
-        node.style.height = "100%";
-        node.style.display = "block";
-        node.src = `${parsed.base}/api/ws?src=${encodeURIComponent(parsed.name)}`;
-        hostRef.current.appendChild(node);
-        el = node;
-        setState("live");
-      })
-      .catch(() => {
-        if (!cancelled) setState("error");
-      });
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      void loadVideoStream(parsed.base)
+        .then(() => {
+          if (cancelled || !hostRef.current) return;
+          const node = document.createElement("video-stream") as HTMLElement & {
+            mode?: string;
+            src?: URL | string;
+            background?: boolean;
+          };
+          node.mode = "mse";
+          node.background = false;
+          node.style.width = "100%";
+          node.style.height = "100%";
+          node.style.display = "block";
+          node.src = `${parsed.base}/api/ws?src=${encodeURIComponent(parsed.name)}`;
+          hostRef.current.appendChild(node);
+          el = node;
+          setState("live");
+        })
+        .catch(() => {
+          if (!cancelled) setState("error");
+        });
+    }, Math.max(0, startDelayMs));
 
     return () => {
       cancelled = true;
-      // Quitarlo del DOM cierra su WebSocket: sin esto, cerrar un mosaico
-      // dejaba la conexión viva contra el equipo.
+      window.clearTimeout(timer);
       el?.remove();
       if (host) host.innerHTML = "";
     };
-  }, [src]);
+  }, [src, shouldPlay, startDelayMs, enabled, visible]);
 
   return (
-    <div className={`${styles.playerShell} ${className || ""}`} data-compact={compact ? "1" : undefined}>
+    <div
+      ref={shellRef}
+      className={`${styles.playerShell} ${className || ""}`}
+      data-compact={compact ? "1" : undefined}
+      data-state={state}
+    >
       <div ref={hostRef} className={styles.playerVideo} />
       {showLiveBadge && state === "live" && (
         <span className={styles.playerLiveBadge}>
@@ -142,6 +173,11 @@ export function IntegraLivePlayer({
         <div className={styles.playerOverlay}>
           <span className={styles.playerSpinner} />
           {!compact && <span>Conectando…</span>}
+        </div>
+      )}
+      {state === "queued" && (
+        <div className={styles.playerOverlay} data-tone="queued">
+          <span>{!enabled ? "En cola" : "En espera"}</span>
         </div>
       )}
       {state === "error" && (
