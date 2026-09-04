@@ -2326,6 +2326,9 @@ enum NotificationType {
   SLA_ALERT
   STOCK_ALERT
 
+  // ACS → Operaciones (acceso denegado en puerta)
+  ACS_ACCESS_DENIED
+
   // Chat
   CHAT_MENTION
 }
