@@ -49,12 +49,14 @@ type Cam = {
 };
 
 export default function IntegraAccessPage() {
+  const router = useRouter();
   const [doors, setDoors] = useState<Door[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [assignBusy, setAssignBusy] = useState(false);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [selectedGroup, setSelectedGroup] = useState("");
   const [personFilter, setPersonFilter] = useState("");

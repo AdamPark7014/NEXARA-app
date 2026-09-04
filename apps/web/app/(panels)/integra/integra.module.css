@@ -3580,6 +3580,11 @@ button.evCard {
   border-color: color-mix(in srgb, #22d3ee 50%, var(--ig-line));
 }
 
+.evCard[data-denied="1"] {
+  border-color: color-mix(in srgb, var(--ig-danger) 55%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-danger) 6%, var(--ig-panel));
+}
+
 .evPhoto {
   width: 72px;
   height: 72px;

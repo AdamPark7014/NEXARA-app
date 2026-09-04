@@ -162,7 +162,22 @@ function Lbl({ text }: { text: string }) {
   );
 }
 
-const emptyForm = { nombre: "", email: "", password: "", roleId: "", departmentId: "", managerId: "" };
+const emptyForm = {
+  nombre: "",
+  email: "",
+  password: "",
+  roleId: "",
+  departmentId: "",
+  managerId: "",
+  employeeNumber: "",
+  autoEmployeeNumber: true,
+  autoPassword: true,
+};
+
+function generateTempPassword() {
+  const chunk = Math.random().toString(36).slice(2, 8);
+  return `Nexara-${chunk}!`;
+}
 
 function asList<T>(payload: unknown): T[] {
   if (Array.isArray(payload)) return payload;
@@ -249,6 +264,12 @@ export default function UsersPage() {
   const [target, setTarget] = useState<ApiUser | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
   const [pwForm, setPwForm] = useState({ newPassword: "", confirm: "" });
+  const [createdCreds, setCreatedCreds] = useState<{
+    nombre: string;
+    email: string;
+    password: string;
+    employeeNumber?: string | null;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
