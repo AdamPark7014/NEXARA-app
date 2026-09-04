@@ -449,22 +449,24 @@ export class IntegraPushService {
   }
 
   /**
-   * Eventos de vehículo (fielddetection target=vehicle). Sin texto de placa:
-   * este hardware no hace OCR. Contrato listo para cámaras ITC.
+   * Eventos de vehículo (fielddetection con target vehicle / human,vehicle).
+   * Sin texto de placa en este parque: no hay ITC/ANPR. Listo para OCR cuando
+   * llegue cámara de placas.
    */
   async plateEvents(
     companyId: number,
     opts: { siteId?: number | null; limit?: number } = {},
   ) {
     const take = Math.min(Math.max(opts.limit ?? 40, 1), 100);
+    const siteId = opts.siteId ?? null;
     const rows = await this.prisma.integraPushEvent.findMany({
       where: {
         companyId,
-        ...(opts.siteId ? { siteId: opts.siteId } : {}),
+        ...(siteId ? { siteId } : {}),
         occurredAt: { gte: new Date(Date.now() - 30 * 60_000) },
       },
       orderBy: { id: 'desc' },
-      take: take * 3,
+      take: take * 4,
       select: {
         id: true,
         deviceIp: true,
@@ -491,7 +493,13 @@ export class IntegraPushService {
 
     for (const r of rows) {
       const targets = Array.isArray(r.targets) ? (r.targets as Array<{ type?: string }>) : [];
-      const hasVehicle = targets.some((t) => String(t?.type || '').toLowerCase() === 'vehicle');
+      // AcuSense/NVR mandan "vehicle" o "human,vehicle" — no exigir igualdad exacta.
+      const hasVehicle = targets.some((t) =>
+        String(t?.type || '')
+          .toLowerCase()
+          .split(/[,\s]+/)
+          .includes('vehicle'),
+      );
       const raw = (r.raw && typeof r.raw === 'object' ? r.raw : {}) as Record<string, unknown>;
       const plate =
         (typeof raw.licensePlate === 'string' && raw.licensePlate) ||
@@ -511,11 +519,60 @@ export class IntegraPushService {
       if (items.length >= take) break;
     }
 
+    const vehicleSources = await this.vehicleCapableCameras(companyId, siteId);
+
     return {
       items,
       total: items.length,
-      note: 'Sin OCR en este parque: solo detecciones vehicle. plate llega cuando haya cámara ITC.',
+      note:
+        items.length === 0
+          ? 'Sin detecciones vehicle en los últimos 30 min. La PTZ DarkFighter no clasifica vehículos ni lee placas; mira Office Entrance / Azotea / Escalera (FieldDetection en NVR). OCR solo con cámara ITC.'
+          : 'Sin OCR en este parque: solo clasificación vehicle (FieldDetection). plate llega con cámara ITC/ANPR.',
+      ptz: {
+        fieldDetection: false,
+        anpr: false,
+        motion: true,
+        note: 'DS-2DF8C442: video + PTZ + motion. FieldDetection/ANPR/ITC = notSupport.',
+      },
+      vehicleSources,
     };
+  }
+
+  /** Cámaras del sitio con FieldDetection que admite vehicle (espejo + heurística PoE). */
+  private async vehicleCapableCameras(companyId: number, siteId: number | null) {
+    const cams = await this.prisma.integraCamera.findMany({
+      where: {
+        companyId,
+        ...(siteId ? { siteId } : {}),
+      },
+      select: { name: true, cameraIndexCode: true, raw: true },
+      orderBy: { name: 'asc' },
+    });
+    const out: Array<{ name: string; sourceIp: string | null; via: 'direct' | 'nvr' }> = [];
+    for (const c of cams) {
+      const raw = (c.raw && typeof c.raw === 'object' ? c.raw : {}) as {
+        anprCapable?: boolean;
+        ptz?: boolean;
+        source?: { ipAddress?: string | null; connMode?: string | null };
+      };
+      if (raw.ptz === true) continue;
+      if (raw.anprCapable === true) {
+        out.push({
+          name: c.name,
+          sourceIp: raw.source?.ipAddress ?? null,
+          via: 'direct',
+        });
+        continue;
+      }
+      // PoE NVR: FieldDetection ch 1/2/9/10 verificado con detectionTarget human,vehicle.
+      const ip = raw.source?.ipAddress || '';
+      const plug =
+        raw.source?.connMode === 'plugplay' || ip.startsWith('192.168.254.');
+      if (plug && /entrance|azotea|escalera|office/i.test(c.name)) {
+        out.push({ name: c.name, sourceIp: ip || null, via: 'nvr' });
+      }
+    }
+    return out;
   }
 
   /**
@@ -529,12 +586,30 @@ export class IntegraPushService {
   async wireDevices(
     companyId: number,
     siteId: number,
-    opts: { detection?: boolean } = {},
+    opts: { detection?: boolean; rotateToken?: boolean } = {},
   ) {
-    const { token, url } = await this.issueToken(siteId);
     const resolved = await this.sites.resolveClient({ companyId, siteId });
     if (!resolved.isapiForHost) {
       throw new BadRequestException('El empuje de eventos solo aplica a sitios ISAPI');
+    }
+
+    // Reusar token vivo si ya hay equipos cableados: rotar tumba el httpHosts
+    // de PTZ/ACS hasta reconfigurar todos. El NVR PoE (vehicle) depende de esto.
+    let url: string;
+    let token: string | null = null;
+    if (opts.rotateToken === false) {
+      const reused = await this.livePushUrlFromDevices(resolved);
+      if (reused) {
+        url = reused;
+      } else {
+        const issued = await this.issueToken(siteId);
+        token = issued.token;
+        url = issued.url;
+      }
+    } else {
+      const issued = await this.issueToken(siteId);
+      token = issued.token;
+      url = issued.url;
     }
 
     const devices = await this.prisma.integraDevice.findMany({
@@ -543,6 +618,14 @@ export class IntegraPushService {
     });
     // Varias filas comparten IP (un terminal es ACS y a la vez fuente de video).
     const byIp = new Map<string, { name: string; kind: string }>();
+    // Cabecera NVR: FieldDetection de PoE (Office Entrance/Azotea) solo empuja si
+    // el grabador tiene httpHosts. Las IPs 192.168.254.x no son alcanzables.
+    if (resolved.host) {
+      byIp.set(resolved.host.replace(/^https?:\/\//, '').split(':')[0], {
+        name: 'NVR cabecera',
+        kind: 'ENCODE',
+      });
+    }
     for (const d of devices) {
       const ip = d.ip as string;
       const prev = byIp.get(ip);

@@ -8,44 +8,49 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — CRM UI production polish
+## Este turno — Face recognition UX ACS (fotos + alta + eventos)
 
-Chrome B2B denso (sin purple AI-slop) en ventas + detalle OC. No toqué
-Integra, asistencia híbrida ni stock historial (siblings).
+Prioridad Adam: reconocimiento facial “ineficiente”. No inventamos Face ID
+sobre AcuSense. Maximizamos identidad ACS + JPEG en NEXARA.
 
-### Qué hay
+### Qué cambió
 
-1. **`components/crm/crm-chrome.module.css`** — shells, forms, pipeline board,
-   quoteDoc, detalle OC compartido.
-2. **Clientes / oportunidades** — EmptyState, formularios chrome, KPI/dist cards.
-3. **Pipeline** — columnas densas, empty states, colores de etapa sin índigo/púrpura;
-   label **Descubrimiento** (antes Discovery).
-4. **Cotización detalle** — bloques documentales alineados al PDF; copy ES
-   (Información, Cotización, Teléfono, Anticipo, Elaboró).
-5. **Dashboard / agenda** — acentos teal/slate (sin #a855f7 / #6366f1).
-6. **Procurement UX** — folio clickeable, detalle OC/req con meta grid + empty;
-   PDF download intacto (renderer del sibling no tocado).
+1. **Persistencia JPEG** `uploads/integra-faces/{company}/{personId}.jpg` al
+   subir FaceDataRecord; proxy `GET people/:id/face` sirve local primero.
+2. **`_PersonFace.tsx`**: thumb con tenant headers + cache blob (arregla
+   AcsIdentityStrip que usaba `<img src>` sin X-Company-Id).
+3. **Live banner / RecentAccess / Occupancy / ACS strip**: foto evento o
+   enrolada; prefetch en SSE.
+4. **Personas UI**: wizard Nombre → Código → **Foto JPEG obligatoria** →
+   Guardar (alta + fan-out face); ficha con Face/Huella; **zona peligro**
+   delete; prefetch listado (6 workers, sin N+1 bloqueante).
+5. **Eventos**: timeline con cara + tarjeta de identidad grande.
+6. **Huella** (secundario): CaptureFingerPrint → Download; plantilla en
+   `uploads/integra-fp/` si el ACS exporta.
+7. Docs `INTEGRA-LAN.md` rutas Face/FP.
 
 ### Concurrente (siblings — no pisar)
 
-Asistencia híbrida, stock movements, Integra Personas/PTZ/playback, OC PDF
-renderer (`purchase-order-pdf.ts`).
+CRM OC PDF · stock historial · asistencia híbrida · PTZ.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` · `deploy/update.sh --force-all` (rebuild api+web)
+`/var/www/nexara-app`
 
-Verificar: `/crm/quotes`, `/crm/clients`, `/crm/pipeline`, `/crm/opportunities`,
-detalle cotización PDF-like, `/erp/procurement` detalle OC + PDF.
+### Verificar (hard refresh)
+
+1. Integra → Personas → **Ctrl+Shift+R** → Alta → foto JPEG → Guardar.
+2. Listado/ficha deben mostrar la cara (no inicial vacía).
+3. Eventos ACS → cards con foto; detalle identidad grande.
+4. Video → pase por puerta → banner + RecentAccess con cara.
+5. Ficha → zona roja Eliminar (todos los ACS).
 
 ## A medias
 
 1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
-2. Alinear códigos employeeNumber↔personId en plantilla real Oficinas.
-3. go2rtc.yaml en disco corruptible — streams viven en RAM.
-4. FieldDetection re-apply tras sync/push install.
+2. Re-aplicar FieldDetection; alinear employeeNumber↔personId Oficinas.
+3. Batch face endpoint (ahora prefetch+cache); captura huella en prod Oficinas.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales, ISAPI no verificada.
-Face ID óptico inventado. No pelear PTZ pad / Personas CRUD / hybrid
-attendance / stock detail del sibling.
+Puente NAS, Traefik, credenciales, Face ID óptico inventado sobre AcuSense.
+CRM/stock/asistencia siblings.

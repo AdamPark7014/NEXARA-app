@@ -493,7 +493,11 @@ export default function IntegraPeoplePage() {
                     <PersonFaceThumb
                       className={styles.personAvatar}
                       size="md"
-                      personId={p.id}
+                      personId={
+                        p.hasFace || p.hasLocalFace || (p.numOfFace ?? 0) > 0 || p.faceUrl
+                          ? p.id
+                          : null
+                      }
                       personName={p.name}
                       bust={faceBust}
                     />
