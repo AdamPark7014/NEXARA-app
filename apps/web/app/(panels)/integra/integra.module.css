@@ -2338,6 +2338,19 @@ select.igControl {
   color: var(--ig-text);
 }
 
+.personNote[data-tone="ok"] {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--ig-ok) 32%, transparent);
+  background: color-mix(in srgb, var(--ig-ok) 10%, var(--ig-panel));
+  color: var(--ig-text);
+}
+
+.personFileBtn[data-busy="1"] {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
 .personCheck {
   display: flex;
   align-items: center;
@@ -2399,6 +2412,86 @@ select.igControl {
   font-size: 12px;
   color: var(--ig-muted);
   line-height: 1.45;
+}
+
+.personLead {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ig-muted);
+  max-width: 72ch;
+}
+
+.personLead strong {
+  color: var(--ig-text);
+  font-weight: 600;
+}
+
+.personEmptyBox {
+  display: grid;
+  gap: 8px;
+  padding: 18px 14px;
+  text-align: left;
+}
+
+.personEmptyBox strong {
+  font-size: 14px;
+}
+
+.personEmptyBox p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ig-muted);
+  line-height: 1.45;
+}
+
+.personCrud {
+  display: grid;
+  gap: 12px;
+}
+
+.personSection {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--ig-line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ig-surface, #fff) 55%, var(--ig-panel));
+}
+
+.personSection[data-tone="accent"] {
+  border-color: color-mix(in srgb, var(--ig-accent) 40%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-accent) 6%, var(--ig-panel));
+}
+
+.personSection[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--ig-danger, #dc2626) 35%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-danger, #dc2626) 6%, var(--ig-panel));
+}
+
+.personSectionHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+}
+
+.personSectionHead strong {
+  color: var(--ig-text);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.personBtnRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 
 .personDivider {
