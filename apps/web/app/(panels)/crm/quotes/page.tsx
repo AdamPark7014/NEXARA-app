@@ -572,7 +572,7 @@ export default function QuotesPage() {
         rightActions={
           periodItems.length > 0 ? (
             <Button variant="ghost" size="sm" iconLeft="⬇" onClick={exportQuotesExcel}>
-              Excel
+              Descargar Excel
             </Button>
           ) : undefined
         }
