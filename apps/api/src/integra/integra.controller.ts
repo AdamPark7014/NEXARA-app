@@ -205,6 +205,7 @@ export class IntegraController {
     private readonly push: IntegraPushService,
     private readonly acsFanout: IntegraAcsFanoutService,
     private readonly identity: IdentityLinkService,
+    private readonly spaces: IntegraSpacesService,
   ) {}
 
   @Get('health')
