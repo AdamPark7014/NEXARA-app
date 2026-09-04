@@ -238,6 +238,7 @@ function MseFocusPlayer({
   const nodeRef = useRef<VideoStreamEl | null>(null);
   const [visible, setVisible] = useState(true);
   const [muted, setMuted] = useState(true);
+  const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<"idle" | "queued" | "loading" | "live" | "error">(
     src ? (enabled ? "loading" : "queued") : "idle",
   );
@@ -282,7 +283,9 @@ function MseFocusPlayer({
     let cancelled = false;
     let el: VideoStreamEl | null = null;
     let playWatch: number | null = null;
+    let stuckTimer: number | null = null;
     let kickTimers: number[] = [];
+    let sawLive = false;
     setState("loading");
 
     const timer = window.setTimeout(() => {
@@ -311,7 +314,10 @@ function MseFocusPlayer({
             kickPlay(node);
           };
           arm();
-          kickTimers = [50, 200, 600, 1500, 3000].map((ms) => window.setTimeout(arm, ms));
+          // PTZ / go2rtc a veces abre WS tarde: patadas densas al inicio.
+          kickTimers = [0, 40, 120, 280, 600, 1200, 2400].map((ms) =>
+            window.setTimeout(arm, ms),
+          );
 
           playWatch = window.setInterval(() => {
             if (cancelled) return;
@@ -319,10 +325,17 @@ function MseFocusPlayer({
             if (!v) return;
             if (v.paused || v.ended) kickPlay(node);
             if (v.readyState >= 2 && !v.paused) {
+              sawLive = true;
               setState("live");
               onLive?.(true);
             }
-          }, 1200);
+          }, 350);
+
+          // Si se queda en «Conectando…», remonta el <video-stream> una vez.
+          stuckTimer = window.setTimeout(() => {
+            if (cancelled || sawLive || attempt >= 1) return;
+            setAttempt((n) => n + 1);
+          }, 3800);
         })
         .catch(() => {
           if (!cancelled) setState("error");
@@ -333,16 +346,18 @@ function MseFocusPlayer({
       cancelled = true;
       window.clearTimeout(timer);
       if (playWatch != null) window.clearInterval(playWatch);
+      if (stuckTimer != null) window.clearTimeout(stuckTimer);
       for (const t of kickTimers) window.clearTimeout(t);
       el?.remove();
       nodeRef.current = null;
       if (host) host.innerHTML = "";
     };
-  }, [src, shouldPlay, startDelayMs, enabled, visible, audio]);
+  }, [src, shouldPlay, startDelayMs, enabled, visible, audio, attempt]);
 
   // Un stream nuevo llega mudo otra vez: el gesto de abrir sonido no se hereda.
   useEffect(() => {
     setMuted(true);
+    setAttempt(0);
   }, [src, audio]);
 
   const toggleSound = () => {

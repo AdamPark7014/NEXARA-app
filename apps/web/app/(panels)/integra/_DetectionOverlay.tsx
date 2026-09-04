@@ -48,15 +48,15 @@ const BOX_TTL_OPTICAL_MS = 90_000;
 /** ACS FaceRect + nombre: sticky más largo — el pase es un flash, la placa no. */
 const BOX_TTL_NAMED_MS = 60_000;
 /** Sondeo incremental si SSE cae o aún no conectó. */
-const POLL_MS = 400;
+const POLL_MS = 250;
 const SEED_MS = 120_000;
 /** VMD sin TargetRect: solo mantiene cajas ya pintadas (presencia sentada). */
-const PRESENCE_HOLD_MS = 75_000;
+const PRESENCE_HOLD_MS = 90_000;
 /** Distancia de centros (0..1) bajo la cual dos humanos se consideran el mismo.
  *  Conservador: en Meeting Room tres sentados están lejos; no fusionarlos. */
-const SOFT_CENTER_DIST = 0.12;
-/** Tope de cajas sticky simultáneas (multi-persona). */
-const MAX_TRACKS = 8;
+const SOFT_CENTER_DIST = 0.1;
+/** Tope de cajas sticky simultáneas (multi-persona / sala de juntas). */
+const MAX_TRACKS = 12;
 
 type Listener = (events: PushEvent[]) => void;
 
@@ -73,7 +73,10 @@ function ttlFor(ev: PushEvent, t: PushTarget): number {
 }
 
 function sameTrackKind(a: PushTarget, b: PushTarget, namedA?: string | null, namedB?: string | null): boolean {
-  if (namedA?.trim() && namedB?.trim()) return true;
+  const na = namedA?.trim();
+  const nb = namedB?.trim();
+  // Nombres distintos = personas distintas (Meeting Room multi-caja).
+  if (na && nb) return na === nb;
   if (a.type === b.type) return true;
   // AcuSense a veces alterna human / unknown en la misma persona sentada.
   const soft = new Set(["human", "unknown", "face"]);

@@ -8,6 +8,7 @@ import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
+import PanelTabs from "@/components/ui/PanelTabs";
 import { useUser } from "@/components/UserContext";
 import { getErpInventorySectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";

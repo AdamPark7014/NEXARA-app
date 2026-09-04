@@ -1,0 +1,483 @@
+{
+  "siteId": 1,
+  "companyId": 2,
+  "ptz": {
+    "name": "PTZ",
+    "code": "192.168.9.34|1301",
+    "ip": "192.168.9.179",
+    "model": "DS-2DF8C442IXG-ELW",
+    "anprCapable": false
+  },
+  "camCount": 17
+}
+
+==== PTZ 192.168.9.179 ch1 ====
+{
+  "label": "PTZ",
+  "host": "192.168.9.179",
+  "channel": 1,
+  "ok": [
+    {
+      "path": "/ISAPI/System/deviceInfo",
+      "flags": []
+    },
+    {
+      "path": "/ISAPI/System/capabilities",
+      "flags": [
+        "Vehicle",
+        "plate",
+        "FieldDetection",
+        "LineDetection",
+        "isSupport"
+      ]
+    },
+    {
+      "path": "/ISAPI/Smart/capabilities",
+      "flags": [
+        "FieldDetection",
+        "LineDetection",
+        "isSupport"
+      ]
+    },
+    {
+      "path": "/ISAPI/System/Video/inputs/channels/1/motionDetection",
+      "flags": []
+    },
+    {
+      "path": "/ISAPI/System/Video/inputs/channels/1/motionDetection/capabilities",
+      "flags": []
+    },
+    {
+      "path": "/ISAPI/Event/notification/httpHosts",
+      "flags": []
+    },
+    {
+      "path": "/ISAPI/Event/notification/httpHosts/1",
+      "flags": []
+    },
+    {
+      "path": "/ISAPI/Streaming/channels",
+      "flags": []
+    },
+    {
+      "path": "/ISAPI/PTZCtrl/channels/1/presets",
+      "flags": []
+    },
+    {
+      "path": "/ISAPI/Intelligent/channels/1/capabilities",
+      "flags": [
+        "FieldDetection",
+        "LineDetection",
+        "isSupport"
+      ]
+    }
+  ],
+  "fail": [
+    {
+      "path": "/ISAPI/Smart/FieldDetection/1",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Smart/FieldDetection/1)"
+    },
+    {
+      "path": "/ISAPI/Smart/FieldDetection/1/capabilities",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Smart/FieldDetection/1/capabilities)"
+    },
+    {
+      "path": "/ISAPI/Smart/LineDetection/1",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Smart/LineDetection/1)"
+    },
+    {
+      "path": "/ISAPI/Smart/LineDetection/1/capabilities",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Smart/LineDetection/1/capabilities)"
+    },
+    {
+      "path": "/ISAPI/Smart/vehicleDetection/1",
+      "status": 404,
+      "error": "[HTTP 404] respuesta no OK del equipo (/ISAPI/Smart/vehicleDetection/1)"
+    },
+    {
+      "path": "/ISAPI/Smart/vehicleDetection/1/capabilities",
+      "status": 404,
+      "error": "[HTTP 404] respuesta no OK del equipo (/ISAPI/Smart/vehicleDetection/1/capabilities)"
+    },
+    {
+      "path": "/ISAPI/Smart/VMD/1",
+      "status": 404,
+      "error": "[HTTP 404] respuesta no OK del equipo (/ISAPI/Smart/VMD/1)"
+    },
+    {
+      "path": "/ISAPI/Smart/VMD/1/capabilities",
+      "status": 404,
+      "error": "[HTTP 404] respuesta no OK del equipo (/ISAPI/Smart/VMD/1/capabilities)"
+    },
+    {
+      "path": "/ISAPI/Event/triggers",
+      "status": 500,
+      "error": "[HTTP 500] Device Error (deviceError) (/ISAPI/Event/triggers)"
+    },
+    {
+      "path": "/ISAPI/Event/notification/alertStream/capabilities",
+      "status": 404,
+      "error": "[HTTP 404] respuesta no OK del equipo (/ISAPI/Event/notification/alertStream/capabilities)"
+    },
+    {
+      "path": "/ISAPI/Traffic/channels/1/licensePlateAuditData/capabilities",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (invalidOperation) (/ISAPI/Traffic/channels/1/licensePlateAuditData/capabilities)"
+    },
+    {
+      "path": "/ISAPI/Traffic/channels/1/vehicleDetect",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Traffic/channels/1/vehicleDetect)"
+    },
+    {
+      "path": "/ISAPI/ITC/entrance/capabilities",
+      "status": 404,
+      "error": "[HTTP 404] respuesta no OK del equipo (/ISAPI/ITC/entrance/capabilities)"
+    },
+    {
+      "path": "/ISAPI/Intelligent/channels/1/vehicles",
+      "status": 404,
+      "error": "[HTTP 404] respuesta no OK del equipo (/ISAPI/Intelligent/channels/1/vehicles)"
+    }
+  ],
+  "fieldDetail": null,
+  "httpHosts": {
+    "status": 200,
+    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?> <HttpHostNotificationList version=\"2.0\" xmlns=\"http://www.hikvision.com/ver20/XMLSchema\"> <HttpHostNotification version=\"2.0\" xmlns=\"http://www.hikvision.com/ver20/XMLSchema\"> <id>1</id> <url>/api/integra/hik/1/b91b95c98798c7ff6596e942</url> <protocolType>HTTPS</protocolType> <parameterFormatType>JSON</parameterFormatType> <addressingFormatType>hostname</addressingFormatType> <hostName>integra.nexara.com.mx</hostName> <portNo>443</portNo> <userName></userName> <httpAuthenticationMethod>none</httpAuthenticationMethod> <httpBroken>true</httpBroken> </HttpHostNotification> <HttpHostNotification version=\"2.0\" xmlns=\"http://www.hikvision.com/ver20/XMLSchema\"> <id>2</id> <url>/</url> <protocolType>HTTP</protocolType> <parameterFormatType>XML</parameterFormatType> <addressingFormatType>ipaddress</addressingFormatType> <ipAddress>0.0.0.0</ipAddress> <portNo>80</portNo> <userName></userName> <httpAuthenticationMethod>none</httpAuthenticationMethod> <httpBroken>true</httpBroken> </HttpHostNotification> <HttpHostNotification version=\"2.0\" xmlns=\"http://www.hikvision.com/ver20/XMLSchema\"> <id>3</id> <url>/</url> <protocolType>HTTP</protocolType> <parameterFormatType>XML</parameterFormatType> <addressingFormatType>ipaddress</addressingFormatType> <ipAddress>0.0.0.0</ipAddress> <portNo>80</portNo> <userName></userName> <httpAuthenticationMethod>none</ht"
+  },
+  "capsHit": {
+    "isSupportFieldDetection": "false",
+    "isSupportLineDetection": "false",
+    "isSupportMotionDetection": "true",
+    "isSupportTraffic": "false",
+    "isSupportPeopleDetection": "false",
+    "isSupportSmart": "mentioned"
+  },
+  "smartCaps": "<?xml version=\"1.0\" encoding=\"UTF-8\"?> <SmartCap version=\"2.0\" xmlns=\"http://www.hikvision.com/ver20/XMLSchema\"> <isSupportROI>true</isSupportROI> <isSupportAudioDetection>true</isSupportAudioDetection> <isSupportFaceDetect>false</isSupportFaceDetect> <isSupportLineDetection>false</isSupportLineDetection> <isSupportFieldDetection>false</isSupportFieldDetection> <isSupportRegionEntrance>false</isSupportRegionEntrance> <isSupportRegionExiting>false</isSupportRegionExiting> <isSupportLoitering>false</isSupportLoitering> <isSupportGroup>false</isSupportGroup> <isSupportRapidMove>false</isSupportRapidMove> <isSupportParking>false</isSupportParking> <isSupportUnattendedBaggage>false</isSupportUnattendedBaggage> <isSupportAttendedBaggage>false</isSupportAttendedBaggage> <isSupportSmartCalibration>false</isSupportSmartCalibration> <isSupportIntelliTrace>false</isSupportIntelliTrace> <isSupportPeopleDetection>false</isSupportPeopleDetection> <isSupportDefocusDetection>false</isSupportDefocusDetection> <isSupportSceneChangeDetection>false</isSupportSceneChangeDetection> <isSupportStorageDetection>true</isSupportStorageDetection> <isSupportChannelResource>false</isSupportChannelResource> <isSupportSmartOverlapParams>false</isSupportSmartOverlapParams> </SmartCap> "
+}
+
+NVR PTZ channel: 13 192.168.9.34|1301
+
+==== NVR-for-PTZ 192.168.9.34 ch13 ====
+{
+  "label": "NVR-for-PTZ",
+  "host": "192.168.9.34",
+  "channel": 13,
+  "ok": [
+    {
+      "path": "/ISAPI/System/deviceInfo",
+      "flags": []
+    },
+    {
+      "path": "/ISAPI/System/capabilities",
+      "flags": [
+        "vehicle",
+        "ANPR",
+        "plate",
+        "Plate",
+        "FieldDetection",
+        "LineDetection",
+        "VMD",
+        "isSupport"
+      ]
+    },
+    {
+      "path": "/ISAPI/Smart/capabilities",
+      "flags": [
+        "FieldDetection",
+        "LineDetection",
+        "isSupport"
+      ]
+    },
+    {
+      "path": "/ISAPI/System/Video/inputs/channels/13/motionDetection",
+      "flags": []
+    },
+    {
+      "path": "/ISAPI/System/Video/inputs/channels/13/motionDetection/capabilities",
+      "flags": []
+    },
+    {
+      "path": "/ISAPI/Event/triggers",
+      "flags": [
+        "VMD"
+      ]
+    },
+    {
+      "path": "/ISAPI/Event/notification/httpHosts",
+      "flags": []
+    },
+    {
+      "path": "/ISAPI/Event/notification/httpHosts/1",
+      "flags": []
+    },
+    {
+      "path": "/ISAPI/Streaming/channels",
+      "flags": []
+    },
+    {
+      "path": "/ISAPI/PTZCtrl/channels/13/presets",
+      "flags": []
+    },
+    {
+      "path": "/ISAPI/Intelligent/channels/13/capabilities",
+      "flags": [
+        "FieldDetection",
+        "LineDetection",
+        "isSupport"
+      ]
+    }
+  ],
+  "fail": [
+    {
+      "path": "/ISAPI/Smart/FieldDetection/13",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Smart/FieldDetection/13)"
+    },
+    {
+      "path": "/ISAPI/Smart/FieldDetection/13/capabilities",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Smart/FieldDetection/13/capabilities)"
+    },
+    {
+      "path": "/ISAPI/Smart/LineDetection/13",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Smart/LineDetection/13)"
+    },
+    {
+      "path": "/ISAPI/Smart/LineDetection/13/capabilities",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Smart/LineDetection/13/capabilities)"
+    },
+    {
+      "path": "/ISAPI/Smart/vehicleDetection/13",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Smart/vehicleDetection/13)"
+    },
+    {
+      "path": "/ISAPI/Smart/vehicleDetection/13/capabilities",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Smart/vehicleDetection/13/capabilities)"
+    },
+    {
+      "path": "/ISAPI/Smart/VMD/13",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Smart/VMD/13)"
+    },
+    {
+      "path": "/ISAPI/Smart/VMD/13/capabilities",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Smart/VMD/13/capabilities)"
+    },
+    {
+      "path": "/ISAPI/Event/notification/alertStream/capabilities",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Event/notification/alertStream/capabilities)"
+    },
+    {
+      "path": "/ISAPI/Traffic/channels/13/licensePlateAuditData/capabilities",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Traffic/channels/13/licensePlateAuditData/capabilities)"
+    },
+    {
+      "path": "/ISAPI/Traffic/channels/13/vehicleDetect",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Traffic/channels/13/vehicleDetect)"
+    },
+    {
+      "path": "/ISAPI/ITC/entrance/capabilities",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/ITC/entrance/capabilities)"
+    },
+    {
+      "path": "/ISAPI/Intelligent/channels/13/vehicles",
+      "status": 403,
+      "error": "[HTTP 403] Invalid Operation (notSupport) (/ISAPI/Intelligent/channels/13/vehicles)"
+    }
+  ],
+  "fieldDetail": null,
+  "httpHosts": {
+    "status": 200,
+    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\" ?> <HttpHostNotificationList version=\"2.0\" xmlns=\"http://www.isapi.org/ver20/XMLSchema\"> <HttpHostNotification> <id>1</id> <url></url> <protocolType>HTTP</protocolType> <parameterFormatType>XML</parameterFormatType> <addressingFormatType>hostname</addressingFormatType> <hostName></hostName> <portNo>80</portNo> <httpAuthenticationMethod>none</httpAuthenticationMethod> <Extensions xmlns=\"urn:selfextension:psiaext-ver10-xsd\"> <intervalBetweenEvents>0</intervalBetweenEvents> </Extensions> </HttpHostNotification> </HttpHostNotificationList> "
+  },
+  "capsHit": {
+    "isSupportFieldDetection": "true",
+    "isSupportLineDetection": "true",
+    "isSupportSmart": "mentioned"
+  },
+  "smartCaps": "<?xml version=\"1.0\" encoding=\"UTF-8\" ?> <SmartCap version=\"2.0\" xmlns=\"http://www.isapi.org/ver20/XMLSchema\"> <isSupportROI>false</isSupportROI> <isSupportFaceDetect>true</isSupportFaceDetect> <isSupportIntelliTrace>false</isSupportIntelliTrace> <isSupportFieldDetection>true</isSupportFieldDetection> <isSupportDefocusDetection>true</isSupportDefocusDetection> <isSupportAudioDetection>true</isSupportAudioDetection> <isSupportSceneChangeDetection>true</isSupportSceneChangeDetection> <isSupportLineDetection>true</isSupportLineDetection> <isSupportRegionEntrance>true</isSupportRegionEntrance> <isSupportRegionExiting>true</isSupportRegionExiting> <isSupportLoitering>true</isSupportLoitering> <isSupportGroup>true</isSupportGroup> <isSupportRapidMove>true</isSupportRapidMove> <isSupportParking>true</isSupportParking> <isSupportUnattendedBaggage>true</isSupportUnattendedBaggage> <isSupportAttendedBaggage>true</isSupportAttendedBaggage> <isSupportShield>true</isSupportShield> <isSupportAnalysisUnitSwitch>true</isSupportAnalysisUnitSwitch> <isSupportSmartCalibration>true</isSupportSmartCalibration> <isSupportShipsDetection>true</isSupportShipsDetection> <isSupportDetectionDistance>false</isSupportDetectionDistance> </SmartCap> "
+}
+CAM 192.168.9.171 Planning & Design: FD=OK vehicleStr=true targets=["human","human,vehicle","human,vehicle","human,vehicle"]
+CAM 192.168.9.172 Almacen 01: FD=OK vehicleStr=true targets=["human","human,vehicle","human,vehicle","human,vehicle"]
+CAM 192.168.9.173 Support & Engineering 01: FD=OK vehicleStr=true targets=["human","human,vehicle","human,vehicle","human,vehicle"]
+CAM 192.168.9.174 Support & Engineering 02: FD=OK vehicleStr=true targets=["human","human,vehicle","human,vehicle","human,vehicle"]
+CAM 192.168.9.175 Privado 01: FD=OK vehicleStr=true targets=["human","human,vehicle","human,vehicle","human,vehicle"]
+CAM 192.168.9.176 Coffee Area: FD=OK vehicleStr=true targets=["human","human,vehicle","human,vehicle","human,vehicle"]
+CAM 192.168.9.177 Privado 02: FD=OK vehicleStr=true targets=["human","human,vehicle","human,vehicle","human,vehicle"]
+CAM 192.168.9.178 Meeting Room: FD=OK vehicleStr=true targets=["human","human,vehicle","human,vehicle","human,vehicle"]
+
+==== DB events .179 by type ====
+[]
+
+==== vehicle target events last 24h (sample) ====
+[]
+
+==== vehicle-capable cam summary ====
+[
+  {
+    "ip": "192.168.9.171",
+    "name": "Planning & Design",
+    "model": "DS-2CD2123G2-LIS2U",
+    "fdOk": true,
+    "fdStatus": 200,
+    "hasVehicleString": true,
+    "optVehicle": false,
+    "targets": [
+      "human",
+      "human,vehicle",
+      "human,vehicle",
+      "human,vehicle"
+    ],
+    "vdStatus": 404,
+    "vdErr": "[HTTP 404] respuesta no OK del equipo (/ISAPI/Smart/vehicleDetection/1)",
+    "anprCapStatus": 403,
+    "motionStatus": 200
+  },
+  {
+    "ip": "192.168.9.172",
+    "name": "Almacen 01",
+    "model": "DS-2CD2123G2-LIS2U",
+    "fdOk": true,
+    "fdStatus": 200,
+    "hasVehicleString": true,
+    "optVehicle": false,
+    "targets": [
+      "human",
+      "human,vehicle",
+      "human,vehicle",
+      "human,vehicle"
+    ],
+    "vdStatus": 404,
+    "vdErr": "[HTTP 404] respuesta no OK del equipo (/ISAPI/Smart/vehicleDetection/1)",
+    "anprCapStatus": 403,
+    "motionStatus": 200
+  },
+  {
+    "ip": "192.168.9.173",
+    "name": "Support & Engineering 01",
+    "model": "DS-2CD2123G2-LIS2U",
+    "fdOk": true,
+    "fdStatus": 200,
+    "hasVehicleString": true,
+    "optVehicle": false,
+    "targets": [
+      "human",
+      "human,vehicle",
+      "human,vehicle",
+      "human,vehicle"
+    ],
+    "vdStatus": 404,
+    "vdErr": "[HTTP 404] respuesta no OK del equipo (/ISAPI/Smart/vehicleDetection/1)",
+    "anprCapStatus": 403,
+    "motionStatus": 200
+  },
+  {
+    "ip": "192.168.9.174",
+    "name": "Support & Engineering 02",
+    "model": "DS-2CD2123G2-LIS2U",
+    "fdOk": true,
+    "fdStatus": 200,
+    "hasVehicleString": true,
+    "optVehicle": false,
+    "targets": [
+      "human",
+      "human,vehicle",
+      "human,vehicle",
+      "human,vehicle"
+    ],
+    "vdStatus": 404,
+    "vdErr": "[HTTP 404] respuesta no OK del equipo (/ISAPI/Smart/vehicleDetection/1)",
+    "anprCapStatus": 403,
+    "motionStatus": 200
+  },
+  {
+    "ip": "192.168.9.175",
+    "name": "Privado 01",
+    "model": "DS-2CD2123G2-LIS2U",
+    "fdOk": true,
+    "fdStatus": 200,
+    "hasVehicleString": true,
+    "optVehicle": false,
+    "targets": [
+      "human",
+      "human,vehicle",
+      "human,vehicle",
+      "human,vehicle"
+    ],
+    "vdStatus": 404,
+    "vdErr": "[HTTP 404] respuesta no OK del equipo (/ISAPI/Smart/vehicleDetection/1)",
+    "anprCapStatus": 403,
+    "motionStatus": 200
+  },
+  {
+    "ip": "192.168.9.176",
+    "name": "Coffee Area",
+    "model": "DS-2CD2123G2-LIS2U",
+    "fdOk": true,
+    "fdStatus": 200,
+    "hasVehicleString": true,
+    "optVehicle": false,
+    "targets": [
+      "human",
+      "human,vehicle",
+      "human,vehicle",
+      "human,vehicle"
+    ],
+    "vdStatus": 404,
+    "vdErr": "[HTTP 404] respuesta no OK del equipo (/ISAPI/Smart/vehicleDetection/1)",
+    "anprCapStatus": 403,
+    "motionStatus": 200
+  },
+  {
+    "ip": "192.168.9.177",
+    "name": "Privado 02",
+    "model": "DS-2CD2123G2-LIS2U",
+    "fdOk": true,
+    "fdStatus": 200,
+    "hasVehicleString": true,
+    "optVehicle": false,
+    "targets": [
+      "human",
+      "human,vehicle",
+      "human,vehicle",
+      "human,vehicle"
+    ],
+    "vdStatus": 404,
+    "vdErr": "[HTTP 404] respuesta no OK del equipo (/ISAPI/Smart/vehicleDetection/1)",
+    "anprCapStatus": 403,
+    "motionStatus": 200
+  },
+  {
+    "ip": "192.168.9.178",
+    "name": "Meeting Room",
+    "model": "DS-2CD2123G2-LIS2U",
+    "fdOk": true,
+    "fdStatus": 200,
+    "hasVehicleString": true,
+    "optVehicle": false,
+    "targets": [
+      "human",
+      "human,vehicle",
+      "human,vehicle",
+      "human,vehicle"
+    ],
+    "vdStatus": 404,
+    "vdErr": "[HTTP 404] respuesta no OK del equipo (/ISAPI/Smart/vehicleDetection/1)",
+    "anprCapStatus": 403,
+    "motionStatus": 200
+  }
+]

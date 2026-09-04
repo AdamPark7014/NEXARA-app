@@ -163,7 +163,7 @@ export default function OpportunityDetailPage() {
       {/* Stage flow stepper */}
       {(() => {
         const MAIN_FLOW = [
-          { key: "DISCOVERY", label: "Discovery", icon: "🔍" },
+          { key: "DISCOVERY", label: "Descubrimiento", icon: "🔍" },
           { key: "QUALIFICATION", label: "Calificación", icon: "📋" },
           { key: "PROPOSAL", label: "Propuesta", icon: "📄" },
           { key: "NEGOTIATION", label: "Negociación", icon: "🤝" },
