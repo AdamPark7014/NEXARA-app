@@ -213,9 +213,19 @@ export class IntegraAcsFanoutService implements OnModuleInit {
     enable: boolean;
     /** Si false, no crea si no existe (solo deshabilitar). */
     createIfMissing?: boolean;
+    userType?: 'normal' | 'visitor';
+    doorRight?: string;
+    RightPlan?: Array<{ doorNo: number; planTemplateNo: string }>;
+    beginTime?: string;
+    endTime?: string;
+    /** Solo estos IPs reciben upsert; el resto se deshabilita si disableOthers. */
+    targetIps?: string[] | null;
+    disableOthers?: boolean;
+    scheduleKey?: string;
   }): Promise<{
     skipped?: boolean;
     reason?: string;
+    scheduleKey?: string;
     sites: Array<{
       siteId: number;
       siteName: string;
@@ -248,13 +258,22 @@ export class IntegraAcsFanoutService implements OnModuleInit {
     const user: UserInfoWrite = {
       employeeNo,
       name: String(opts.name || employeeNo).trim() || employeeNo,
-      userType: 'normal',
+      userType: opts.userType || 'normal',
       Valid: {
         enable: opts.enable,
-        beginTime: '2020-01-01T00:00:00',
-        endTime: '2037-12-31T23:59:59',
+        beginTime: opts.beginTime || '2020-01-01T00:00:00',
+        endTime: opts.endTime || '2037-12-31T23:59:59',
       },
+      ...(opts.doorRight != null && opts.doorRight !== ''
+        ? { doorRight: opts.doorRight }
+        : {}),
+      ...(opts.RightPlan != null ? { RightPlan: opts.RightPlan } : {}),
     };
+
+    const targetSet =
+      opts.targetIps && opts.targetIps.length
+        ? new Set(opts.targetIps.map((ip) => String(ip).trim()).filter(Boolean))
+        : null;
 
     const sitesOut: Array<{
       siteId: number;
@@ -271,18 +290,34 @@ export class IntegraAcsFanoutService implements OnModuleInit {
       });
       if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost) continue;
 
+      const devices = await this.prisma.integraDevice.findMany({
+        where: { siteId: site.id, kind: 'ACS', ip: { not: null } },
+        select: { ip: true },
+      });
+      const allIps = devices.map((d) => d.ip as string);
+      const upsertIps = targetSet
+        ? allIps.filter((ip) => targetSet.has(ip))
+        : allIps;
+      const disableIps =
+        opts.disableOthers && targetSet
+          ? allIps.filter((ip) => !targetSet.has(ip))
+          : [];
+
       const op = opts.enable ? 'erp.upsert' : 'erp.disable';
       const results = await this.fanout({
         companyId: opts.companyId,
         siteId: site.id,
         op,
         employeeNo,
-        isapiForHost: resolved.isapiForHost,
-        fn: async (client) => {
-          if (!opts.enable) {
-            await this.disableOrModify(client, user);
-            return;
+        isapiForHost: (ip) => {
+          if (!opts.enable) return resolved.isapiForHost!(ip);
+          if (targetSet && !targetSet.has(ip) && !disableIps.includes(ip)) {
+            return null;
           }
+          return resolved.isapiForHost!(ip);
+        },
+        fn: async (client) => {
+          // El fanout itera todos los ACS; decidimos por IP del cliente vía wrapper abajo.
           await this.upsertUserOnDevice(client, user, opts.createIfMissing !== false);
         },
         retry: {
@@ -291,29 +326,86 @@ export class IntegraAcsFanoutService implements OnModuleInit {
           op: opts.enable ? 'userUpsert' : 'userDisable',
           user,
         },
+        // Reemplazamos el fanout genérico con uno que distingue upsert vs disable.
+        skipQueue: true,
       });
 
-      const anyOk = results.some((r) => r.ok);
-      const allOk = results.length > 0 && results.every((r) => r.ok);
-      if (anyOk) {
+      // Re-run con lógica por IP (el fanout genérico no distingue target/disable).
+      const precise: AcsDeviceResult[] = [];
+      for (const ip of allIps) {
+        const client = resolved.isapiForHost(ip);
+        if (!client) {
+          precise.push({ deviceIp: ip, ok: false, error: 'Sin cliente ISAPI', attempts: 0 });
+          continue;
+        }
+        const shouldUpsert = !opts.enable
+          ? false
+          : targetSet
+            ? upsertIps.includes(ip)
+            : true;
+        const shouldDisable =
+          !opts.enable || (opts.disableOthers === true && disableIps.includes(ip));
+        if (!shouldUpsert && !shouldDisable) {
+          precise.push({ deviceIp: ip, ok: true, attempts: 0 });
+          continue;
+        }
+        try {
+          if (shouldDisable && !shouldUpsert) {
+            await this.disableOrModify(client, user);
+          } else if (!opts.enable) {
+            await this.disableOrModify(client, user);
+          } else {
+            await this.upsertUserOnDevice(client, user, opts.createIfMissing !== false);
+          }
+          precise.push({ deviceIp: ip, ok: true, attempts: 1 });
+        } catch (e) {
+          precise.push({
+            deviceIp: ip,
+            ok: false,
+            error: e instanceof Error ? e.message : String(e),
+            attempts: 1,
+          });
+        }
+      }
+
+      const merged = precise.length ? precise : results;
+      const anyOk = merged.some((r) => r.ok);
+      const allOk = merged.length > 0 && merged.every((r) => r.ok);
+      if (anyOk && opts.enable) {
         await this.upsertMirror({
           companyId: opts.companyId,
           siteId: site.id,
           employeeNo,
           name: user.name,
-          raw: { ...user, source: 'erp' },
+          raw: {
+            ...user,
+            source: 'erp',
+            scheduleKey: opts.scheduleKey,
+            targetIps: opts.targetIps ?? null,
+          },
         });
       }
+      this.remember({
+        id: `${site.id}-${employeeNo}-erp-${Date.now()}`,
+        at: new Date().toISOString(),
+        companyId: opts.companyId,
+        siteId: site.id,
+        op,
+        employeeNo,
+        results: merged,
+        pendingRetry: false,
+        note: summarize(merged, false),
+      });
       sitesOut.push({
         siteId: site.id,
         siteName: site.name,
-        results,
+        results: merged,
         success: allOk,
         partial: anyOk && !allOk,
       });
     }
 
-    return { sites: sitesOut };
+    return { sites: sitesOut, scheduleKey: opts.scheduleKey };
   }
 
   /** Actualiza nombre en espejo desde evento push (sin sync completo). */
