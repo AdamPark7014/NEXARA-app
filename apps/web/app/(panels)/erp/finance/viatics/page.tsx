@@ -116,6 +116,7 @@ export default function ViaticosPage() {
   const [projects, setProjects] = useState<{ id: number; name: string }[]>([]);
   const [vehicles, setVehicles] = useState<{ id: number; nombre: string; placas?: string | null }[]>([]);
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -346,14 +347,16 @@ export default function ViaticosPage() {
 
   const downloadPdf = async () => {
     if (!token) return;
+    setPdfBusy(true);
     try {
-      const { downloadViaticsReportPdf } = await import("@/lib/viatics-api");
       await downloadViaticsReportPdf(token, {
         from: dateFrom || undefined,
         to: dateTo || undefined,
       });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo generar el PDF");
+    } finally {
+      setPdfBusy(false);
     }
   };
 
