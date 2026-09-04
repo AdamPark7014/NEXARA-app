@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Socket } from "socket.io-client";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import { Tag } from "@/components/ui/DataTable";
 import Button from "@/components/ui/Button";
+import PanelTabs from "@/components/ui/PanelTabs";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import { normalizeLegacyRelatedUrl } from "@/lib/legacy-path-remap";
 import { toast } from "@/components/Toast";
-import KpiCard from "@/components/ui/KpiCard";
 import { fetchActivityFeed, type ActivityFeedItem } from "@/lib/activity-feed-api";
 import { createRealtimeSocket } from "@/lib/realtime-socket";
 import {
@@ -31,7 +31,8 @@ interface Notif {
   relatedUrl?: string | null;
 }
 
-type ViewMode = "notifications" | "feed";
+type ViewMode = "action" | "notifications" | "feed";
+type CategoryFilter = "all" | "ops" | "sales" | "erp" | "other";
 
 async function apiFetch(path: string, token: string, opts?: RequestInit) {
   const res = await fetch(buildApiUrl(path), {
@@ -52,9 +53,37 @@ function timeAgo(iso: string): string {
   return `Hace ${Math.floor(h / 24)}d`;
 }
 
-const CATEGORY_ICON: Record<string, string> = {
-  attendance: "🕐", activity: "🧰", tool: "🔧", finance: "💸",
-  noc: "🚨", crm: "✨", approval: "🛡️", evidence: "📸", default: "🔔",
+function bucketCategory(category: string): CategoryFilter {
+  const c = category.toLowerCase();
+  if (c.includes("sla") || c === "activity" || c === "activities" || c === "noc" || c === "evidence") return "ops";
+  if (c.includes("quote") || c === "crm" || c === "sales") return "sales";
+  if (c === "erp" || c.includes("purchase") || c.includes("stock") || c === "finance" || c === "approval") return "erp";
+  return "other";
+}
+
+function isActionable(n: Notif): boolean {
+  if (n.isRead) return false;
+  if (n.priority === "high") return true;
+  const b = bucketCategory(n.category);
+  return b === "ops" || b === "sales" || b === "erp";
+}
+
+const CATEGORY_LABEL: Record<string, string> = {
+  attendance: "Asistencia",
+  activity: "OT",
+  activities: "OT",
+  tool: "Herramientas",
+  finance: "Finanzas",
+  noc: "NOC",
+  crm: "CRM",
+  approval: "Aprobación",
+  evidence: "Evidencias",
+  sales: "Ventas",
+  quotes: "Cotizaciones",
+  "sla-alert": "SLA",
+  "sla-breach": "SLA",
+  erp: "ERP",
+  confirmations: "Confirmación",
 };
 
 export default function NotificationsCenterPage() {
@@ -64,27 +93,35 @@ export default function NotificationsCenterPage() {
   const searchParams = useSearchParams();
   const socketRef = useRef<Socket | null>(null);
 
-  const initialView = searchParams.get("view") === "feed" ? "feed" : "notifications";
+  const initialView: ViewMode =
+    searchParams.get("view") === "feed"
+      ? "feed"
+      : searchParams.get("view") === "all"
+        ? "notifications"
+        : "action";
   const [view, setView] = useState<ViewMode>(initialView);
+  const [category, setCategory] = useState<CategoryFilter>("all");
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [feed, setFeed] = useState<ActivityFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const v = searchParams.get("view") === "feed" ? "feed" : "notifications";
-    setView(v);
+    const v = searchParams.get("view");
+    if (v === "feed") setView("feed");
+    else if (v === "all") setView("notifications");
+    else setView("action");
   }, [searchParams]);
 
   const loadNotifs = useCallback(async () => {
     if (!token) return;
-    const data = await apiFetch("notifications?limit=50", token);
+    const data = await apiFetch("notifications?limit=80", token);
     setNotifs(Array.isArray(data) ? data : (data.data ?? []));
   }, [token]);
 
   const loadFeed = useCallback(async () => {
     if (!token) return;
-    const data = await fetchActivityFeed(token, 50);
+    const data = await fetchActivityFeed(token, 60);
     setFeed(data.items);
   }, [token]);
 
@@ -115,7 +152,7 @@ export default function NotificationsCenterPage() {
       setNotifs((prev) => [payload, ...prev.filter((n) => n.id !== payload.id)]);
     });
     socket.on("notification:read", (payload: { id: number }) => {
-      setNotifs((prev) => prev.map((n) => n.id === payload.id ? { ...n, isRead: true } : n));
+      setNotifs((prev) => prev.map((n) => (n.id === payload.id ? { ...n, isRead: true } : n)));
     });
     socket.on("notifications:read-all", () => {
       setNotifs((prev) => prev.map((n) => ({ ...n, isRead: true })));
@@ -135,7 +172,7 @@ export default function NotificationsCenterPage() {
     if (!token) return;
     try {
       await apiFetch(`notifications/${id}/read`, token, { method: "PATCH" });
-      setNotifs((prev) => prev.map((n) => n.id === id ? { ...n, isRead: true } : n));
+      setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
     } catch (e: unknown) {
       toast.error("No se pudo marcar como leída: " + (e instanceof Error ? e.message : "error"));
     }
@@ -179,25 +216,31 @@ export default function NotificationsCenterPage() {
   };
 
   const unread = notifs.filter((n) => !n.isRead).length;
+  const actionable = useMemo(() => notifs.filter(isActionable), [notifs]);
 
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    padding: "8px 18px",
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: "pointer",
-    border: "none",
-    borderBottom: active ? "2px solid var(--primary)" : "2px solid transparent",
-    background: "transparent",
-    color: active ? "var(--primary)" : "var(--text-secondary)",
-    fontFamily: "inherit",
-  });
+  const sortedNotifs = useMemo(() => {
+    const base =
+      view === "action"
+        ? actionable
+        : category === "all"
+          ? notifs
+          : notifs.filter((n) => bucketCategory(n.category) === category);
+    return [...base].sort((a, b) => {
+      const pa = a.priority === "high" ? 0 : a.isRead ? 2 : 1;
+      const pb = b.priority === "high" ? 0 : b.isRead ? 2 : 1;
+      if (pa !== pb) return pa - pb;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [view, actionable, notifs, category]);
+
+  const highCount = notifs.filter((n) => !n.isRead && n.priority === "high").length;
 
   return (
     <>
       <PageHeader
-        eyebrow="NEXARA · Comunicación"
+        eyebrow="NEXARA · Decisiones"
         title="Centro de notificaciones"
-        subtitle="Alertas personales y feed operacional de la empresa en un solo lugar."
+        subtitle="Prioriza SLA, cotizaciones y OC — no ruido. Inbox personal + feed de señales de negocio."
         actions={
           unread > 0 ? (
             <Button variant="secondary" onClick={markAllRead}>
@@ -207,82 +250,157 @@ export default function NotificationsCenterPage() {
         }
       />
 
-      <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: "1px solid var(--border)" }}>
-        <button type="button" style={tabStyle(view === "notifications")} onClick={() => setView("notifications")}>
-          Notificaciones {unread > 0 ? `(${unread})` : ""}
-        </button>
-        <button type="button" style={tabStyle(view === "feed")} onClick={() => setView("feed")}>
-          Actividad global
-        </button>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+          gap: 10,
+          marginBottom: 16,
+        }}
+      >
+        <div style={kpiBox}>
+          <div style={kpiLabel}>Sin leer</div>
+          <div style={kpiValue}>{loading ? "…" : unread}</div>
+        </div>
+        <div style={kpiBox}>
+          <div style={kpiLabel}>Acción ahora</div>
+          <div style={{ ...kpiValue, color: actionable.length ? "var(--warning)" : "var(--text-primary)" }}>
+            {loading ? "…" : actionable.length}
+          </div>
+        </div>
+        <div style={kpiBox}>
+          <div style={kpiLabel}>Prioridad alta</div>
+          <div style={{ ...kpiValue, color: highCount ? "var(--danger)" : "var(--text-primary)" }}>
+            {loading ? "…" : highCount}
+          </div>
+        </div>
       </div>
 
-      {view === "notifications" && !loading && notifs.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 18 }}>
-          <KpiCard label="Total" value={notifs.length} icon="🔔" />
-          <KpiCard label="Sin leer" value={unread} icon="📬" variant={unread > 0 ? "warning" : "positive"} />
-          <KpiCard label="Leídas" value={notifs.length - unread} icon="✅" variant="positive" />
-        </div>
+      <PanelTabs
+        ariaLabel="Vistas de notificaciones"
+        value={view}
+        onChange={setView}
+        tabs={[
+          { key: "action", label: "Acción ahora", badge: actionable.length || undefined },
+          { key: "notifications", label: "Inbox", badge: unread || undefined },
+          { key: "feed", label: "Señales de negocio" },
+        ]}
+      />
+
+      {view === "notifications" && (
+        <PanelTabs
+          ariaLabel="Filtro por dominio"
+          value={category}
+          onChange={setCategory}
+          tabs={[
+            { key: "all", label: "Todas" },
+            { key: "ops", label: "Ops / SLA" },
+            { key: "sales", label: "CRM / Cotiz." },
+            { key: "erp", label: "ERP / OC" },
+            { key: "other", label: "Otras" },
+          ]}
+        />
       )}
 
-      {view === "feed" && !loading && feed.length > 0 && (
-        <div style={{ marginBottom: 18 }}>
-          <KpiCard label="Eventos recientes" value={feed.length} icon="📡" variant="accent" />
-        </div>
-      )}
-
-      <Section title={view === "notifications" ? (loading ? "Cargando…" : `${unread} sin leer`) : "Actividad de la plataforma"}>
+      <Section
+        title={
+          view === "feed"
+            ? "Señales accionables (OT, tickets, cotizaciones, OC)"
+            : view === "action"
+              ? loading
+                ? "Cargando…"
+                : `${actionable.length} requieren decisión`
+              : loading
+                ? "Cargando…"
+                : `${unread} sin leer`
+        }
+      >
         {error && (
-          <div style={{ padding: 14, borderRadius: 10, background: "color-mix(in srgb, var(--danger) 10%, transparent)", color: "var(--danger)", marginBottom: 12 }}>
+          <div
+            style={{
+              padding: 14,
+              borderRadius: 10,
+              background: "color-mix(in srgb, var(--danger) 10%, transparent)",
+              color: "var(--danger)",
+              marginBottom: 12,
+            }}
+          >
             {error}
           </div>
         )}
 
-        {view === "notifications" && (
+        {(view === "action" || view === "notifications") && (
           <>
-            {!loading && notifs.length === 0 && !error && (
-              <div style={{ textAlign: "center", padding: "48px 0", color: "var(--text-tertiary)" }}>
-                Sin notificaciones 🎉
+            {!loading && sortedNotifs.length === 0 && !error && (
+              <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-tertiary)", fontSize: 13 }}>
+                {view === "action" ? "Nada urgente en tu bandeja." : "Sin notificaciones."}
               </div>
             )}
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {notifs.map((n) => (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {sortedNotifs.map((n) => (
                 <article
                   key={n.id}
                   onClick={() => n.relatedUrl && openNotif(n)}
                   style={{
-                    display: "grid", gridTemplateColumns: "auto 1fr auto auto", gap: 14, alignItems: "center",
-                    padding: 14,
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto",
+                    gap: 10,
+                    alignItems: "start",
+                    padding: "10px 12px",
                     cursor: n.relatedUrl ? "pointer" : "default",
-                    background: !n.isRead ? "color-mix(in srgb, var(--primary) 5%, transparent)" : "var(--surface)",
-                    border: "1px solid var(--border)",
-                    borderLeft: !n.isRead ? "3px solid var(--primary)" : "1px solid var(--border)",
-                    borderRadius: 12,
+                    background: !n.isRead
+                      ? "color-mix(in srgb, var(--primary) 5%, transparent)"
+                      : "var(--surface)",
+                    border: "1px solid var(--nx-panel-hairline, var(--border))",
+                    borderLeft:
+                      n.priority === "high"
+                        ? "3px solid var(--danger)"
+                        : !n.isRead
+                          ? "3px solid var(--panel-accent, var(--primary))"
+                          : "1px solid var(--nx-panel-hairline, var(--border))",
+                    borderRadius: 8,
                   }}
                 >
-                  <span style={{ fontSize: 22 }}>{CATEGORY_ICON[n.category] ?? CATEGORY_ICON.default}</span>
                   <div>
-                    <div style={{ fontWeight: !n.isRead ? 700 : 500, fontSize: 13 }}>{n.title}</div>
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{n.message}</div>
-                    <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 4 }}>
-                      {timeAgo(n.createdAt)} · <Tag variant="neutral">{n.category}</Tag>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: !n.isRead ? 700 : 550, fontSize: 13 }}>{n.title}</span>
+                      {n.priority === "high" && <Tag variant="danger">Alta</Tag>}
+                      <Tag variant="neutral">{CATEGORY_LABEL[n.category] ?? n.category}</Tag>
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3, lineHeight: 1.35 }}>
+                      {n.message}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>
+                      {timeAgo(n.createdAt)}
+                      {n.relatedUrl ? " · Abrir →" : ""}
                     </div>
                   </div>
-                  {!n.isRead && (
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {!n.isRead && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void markRead(n.id);
+                        }}
+                        title="Marcar como leída"
+                        style={iconBtn}
+                      >
+                        ✓
+                      </button>
+                    )}
                     <button
-                      onClick={(e) => { e.stopPropagation(); void markRead(n.id); }}
-                      title="Marcar como leída"
-                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--primary)" }}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void remove(n.id);
+                      }}
+                      title="Eliminar"
+                      style={iconBtn}
                     >
-                      ✓
+                      ✕
                     </button>
-                  )}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); void remove(n.id); }}
-                    title="Eliminar"
-                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "var(--text-tertiary)" }}
-                  >
-                    ✕
-                  </button>
+                  </div>
                 </article>
               ))}
             </div>
@@ -290,11 +408,15 @@ export default function NotificationsCenterPage() {
         )}
 
         {view === "feed" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {loading && <div style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando feed…</div>}
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {loading && (
+              <div style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>
+                Cargando señales…
+              </div>
+            )}
             {!loading && feed.length === 0 && (
-              <div style={{ textAlign: "center", padding: "48px 0", color: "var(--text-tertiary)" }}>
-                Sin actividad reciente en tu tenant.
+              <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-tertiary)", fontSize: 13 }}>
+                Sin señales de negocio en tu alcance.
               </div>
             )}
             {feed.map((item) => (
@@ -303,23 +425,32 @@ export default function NotificationsCenterPage() {
                 onClick={() => item.deepLink && openPath(item.deepLink)}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "auto 1fr",
-                  gap: 14,
-                  padding: 14,
+                  gridTemplateColumns: "1fr auto",
+                  gap: 10,
+                  padding: "10px 12px",
                   cursor: item.deepLink ? "pointer" : "default",
                   background: "var(--surface)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 12,
+                  border: "1px solid var(--nx-panel-hairline, var(--border))",
+                  borderLeft:
+                    item.priority === "high"
+                      ? "3px solid var(--danger)"
+                      : "1px solid var(--nx-panel-hairline, var(--border))",
+                  borderRadius: 8,
                 }}
               >
-                <span style={{ fontSize: 22 }}>{item.icon}</span>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{item.title}</div>
-                  {item.subtitle && <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>{item.subtitle}</div>}
-                  <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 4 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 650, fontSize: 13 }}>{item.title}</span>
+                    {item.priority === "high" && <Tag variant="danger">Alta</Tag>}
+                    <Tag variant="neutral">{item.kind}</Tag>
+                  </div>
+                  {item.subtitle && (
+                    <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3 }}>{item.subtitle}</div>
+                  )}
+                  <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>
                     {timeAgo(item.at)}
                     {item.actorName && <> · {item.actorName}</>}
-                    · <Tag variant="neutral">{item.kind}</Tag>
+                    {item.deepLink ? " · Abrir →" : ""}
                   </div>
                 </div>
               </article>
@@ -330,3 +461,35 @@ export default function NotificationsCenterPage() {
     </>
   );
 }
+
+const kpiBox: React.CSSProperties = {
+  padding: "10px 12px",
+  borderRadius: 8,
+  border: "1px solid var(--nx-panel-hairline, var(--border))",
+  background: "var(--surface)",
+};
+
+const kpiLabel: React.CSSProperties = {
+  fontSize: 10.5,
+  fontWeight: 700,
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: "var(--text-tertiary)",
+};
+
+const kpiValue: React.CSSProperties = {
+  fontSize: 22,
+  fontWeight: 750,
+  fontVariantNumeric: "tabular-nums",
+  marginTop: 2,
+  letterSpacing: "-0.02em",
+};
+
+const iconBtn: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  fontSize: 14,
+  color: "var(--text-tertiary)",
+  padding: "2px 6px",
+};

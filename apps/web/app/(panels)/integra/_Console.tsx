@@ -173,11 +173,14 @@ export function IgNotice({
   tone = "info",
 }: {
   children: ReactNode;
-  tone?: "info" | "warn";
+  tone?: "info" | "warn" | "ok";
 }) {
   if (!children) return null;
   return (
-    <p className={styles.igNotice} data-tone={tone === "warn" ? "warn" : undefined}>
+    <p
+      className={styles.igNotice}
+      data-tone={tone === "warn" ? "warn" : tone === "ok" ? "ok" : undefined}
+    >
       {children}
     </p>
   );
