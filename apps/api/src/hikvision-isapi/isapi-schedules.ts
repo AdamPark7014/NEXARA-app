@@ -211,8 +211,10 @@ export async function getWeekPlan(
   if (n < 1) return null;
   try {
     const raw = await client.get(`/ISAPI/AccessControl/UserRightWeekPlanCfg/${n}?format=json`);
-    if (raw.statusCode === 4 || raw.subStatusCode === 'notSupport') return null;
-    const block = (raw.UserRightWeekPlanCfg ?? raw) as WeekPlanCfg;
+    const statusCode = Number((raw as Record<string, unknown>).statusCode);
+    const sub = String((raw as Record<string, unknown>).subStatusCode ?? '');
+    if (statusCode === 4 || sub === 'notSupport') return null;
+    const block = (raw.UserRightWeekPlanCfg ?? raw) as unknown as WeekPlanCfg;
     if (!block || !Array.isArray(block.WeekPlanCfg)) return null;
     return {
       enable: Boolean(block.enable),
@@ -246,8 +248,10 @@ export async function getPlanTemplate(
   if (n < 1) return null;
   try {
     const raw = await client.get(`/ISAPI/AccessControl/UserRightPlanTemplate/${n}?format=json`);
-    if (raw.statusCode === 4 || raw.subStatusCode === 'notSupport') return null;
-    const block = (raw.UserRightPlanTemplate ?? raw) as PlanTemplate;
+    const statusCode = Number((raw as Record<string, unknown>).statusCode);
+    const sub = String((raw as Record<string, unknown>).subStatusCode ?? '');
+    if (statusCode === 4 || sub === 'notSupport') return null;
+    const block = (raw.UserRightPlanTemplate ?? raw) as unknown as PlanTemplate;
     if (!block || typeof block !== 'object') return null;
     return {
       id: n,
@@ -467,7 +471,4 @@ export const ACCESS_SCHEDULE_MODEL_ES = {
     never: 'Valid.enable=false',
     perDoor: 'RightPlan por doorNo; entre terminales, Modify distinto por IP',
     contractor: 'Valid endTime cercano',
-    visitorDayPass: 'Valid del día + plantilla deseada',
-    afterHoursOrWeekend: 'Preset week plan en slot ≥2 + asignar plantilla',
-  },
-} as const;
+    visi
