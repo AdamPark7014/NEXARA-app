@@ -278,6 +278,7 @@ export class ActivitiesService {
           where: { retiradoAt: null },
           include: { user: { select: { id: true, nombre: true, email: true } } },
         },
+        acsEnteredByUser: { select: { id: true, nombre: true } },
         inventorySnapshot: {
           include: {
             items: { orderBy: [{ groupName: 'asc' }, { sortOrder: 'asc' }, { id: 'asc' }] },

@@ -19,6 +19,12 @@ export type ActivityDetail = {
   fechaInicio?: string | null;
   fechaEntregaEsperada?: string | null;
   fechaFinalizacion?: string | null;
+  /** Sello ACS Acceso General → Ops */
+  acsEnteredAt?: string | null;
+  acsExitedAt?: string | null;
+  acsLeftSite?: boolean | null;
+  acsEntryDoor?: string | null;
+  acsEnteredByUser?: { id: number; nombre: string } | null;
   responsable?: { id: number; nombre: string } | null;
   creador?: { id: number; nombre: string } | null;
   client?: {
@@ -33,6 +39,10 @@ export type ActivityDetail = {
     rol?: string;
     horasPlan?: number | string | null;
     horasReales?: number | string | null;
+    acsEnteredAt?: string | null;
+    acsExitedAt?: string | null;
+    acsLeftSite?: boolean | null;
+    acsEntryDoor?: string | null;
     user?: { id: number; nombre: string; email?: string };
   }>;
   fechaMaxima?: string | null;
