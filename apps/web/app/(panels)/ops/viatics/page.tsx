@@ -77,6 +77,7 @@ export default function OpsViaticsPage() {
     motivo: "",
   });
   const [assignErr, setAssignErr] = useState<string | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -348,16 +349,47 @@ export default function OpsViaticsPage() {
         }]}
         onClear={() => { setSearchQ(""); setFilterEstatus(""); }}
         resultCount={loading ? null : visibleItems.length}
-        rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
-            { key: "id", label: "ID" },
-            { key: "concepto", label: "Concepto" },
-            { key: "usuario", label: "Ingeniero", format: (v) => (v as ViaticoRow["usuario"])?.nombre ?? "—" },
-            { key: "montoSolicitado", label: "Monto" },
-            { key: "estatus", label: "Estado" },
-            { key: "fechaSolicitud", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "viaticos-campo")}>Excel</Button>
-        ) : undefined}
+        rightActions={
+          <ListExportActions
+            onExcel={
+              items.length > 0
+                ? () =>
+                    exportToExcel(
+                      visibleItems,
+                      [
+                        { key: "id", label: "ID" },
+                        { key: "concepto", label: "Concepto" },
+                        { key: "usuario", label: "Ingeniero", format: (v) => (v as ViaticoRow["usuario"])?.nombre ?? "—" },
+                        { key: "montoSolicitado", label: "Monto" },
+                        { key: "estatus", label: "Estado" },
+                        { key: "fechaSolicitud", label: "Fecha", format: (v) => (v ? String(v).slice(0, 10) : "") },
+                      ],
+                      "viaticos-campo",
+                      { title: "Viáticos de campo" },
+                    )
+                : undefined
+            }
+            onPdf={
+              token
+                ? () => {
+                    void (async () => {
+                      setPdfBusy(true);
+                      try {
+                        const to = new Date().toISOString().slice(0, 10);
+                        const from = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+                        await downloadViaticsReportPdf(token, { from, to });
+                      } catch (e) {
+                        toast.error(e instanceof Error ? e.message : "No se pudo generar el PDF");
+                      } finally {
+                        setPdfBusy(false);
+                      }
+                    })();
+                  }
+                : undefined
+            }
+            pdfBusy={pdfBusy}
+          />
+        }
       />
 
       <Section title={loading ? "Cargando…" : `${visibleItems.length} viáticos`}>

@@ -219,6 +219,19 @@ export class IntegraPushService {
    */
   @Cron('27 4 * * *')
   async purgeOldEvents() {
+    return this.purgeEvents({ wipeAllNoise: true, includeBusiness: true });
+  }
+
+  /** Cada hora: borra ruido histórico en lotes (no esperar a las 4:27). */
+  @Cron('17 * * * *')
+  async purgeNoiseHourly() {
+    return this.purgeEvents({ wipeAllNoise: true, includeBusiness: false });
+  }
+
+  private async purgeEvents(opts: {
+    wipeAllNoise: boolean;
+    includeBusiness: boolean;
+  }) {
     const now = Date.now();
     const noiseBefore = new Date(now - NOISE_TTL_HOURS * 3_600_000);
     const anyBefore = new Date(now - EVENT_TTL_DAYS * 86_400_000);
@@ -226,11 +239,27 @@ export class IntegraPushService {
     const doomed = await this.prisma.integraPushEvent.findMany({
       where: {
         OR: [
-          { eventType: { in: [...NOISE_TYPES] }, occurredAt: { lt: noiseBefore } },
-          { occurredAt: { lt: anyBefore } },
+          opts.wipeAllNoise
+            ? { eventType: { in: [...NOISE_TYPES] } }
+            : {
+                eventType: { in: [...NOISE_TYPES] },
+                occurredAt: { lt: noiseBefore },
+              },
+          ...(opts.includeBusiness
+            ? [
+                {
+                  AND: [
+                    { eventType: { notIn: [...NOISE_TYPES] } },
+                    { occurredAt: { lt: anyBefore } },
+                  ],
+                },
+              ]
+            : []),
         ],
       },
       select: { id: true, photoPath: true },
+      take: 8_000,
+      orderBy: { id: 'asc' },
     });
     if (doomed.length === 0) return { deleted: 0, photos: 0 };
 
@@ -249,15 +278,17 @@ export class IntegraPushService {
     const { count } = await this.prisma.integraPushEvent.deleteMany({
       where: { id: { in: doomed.map((d) => d.id) } },
     });
-    this.logger.log(`Poda de eventos: ${count} filas, ${photos} fotos`);
+    this.logger.log(
+      `Poda de eventos (${opts.includeBusiness ? 'full' : 'noise'}): ${count} filas, ${photos} fotos`,
+    );
     return { deleted: count, photos };
   }
 
   /**
    * Listado de eventos empujados.
    *
-   * Por defecto (sin filtros de negocio) sirve al overlay/SSE: todo lo reciente.
-   * Con `scope=acs` prioriza control de acceso (major=5) y excluye heartBeat/VMD.
+   * Default (scope omitido): excluye ruido VMD/heartBeat — overlay y poll afterId.
+   * `scope=acs` = negocio; `scope=all` = diagnóstico con ruido; `scope=noise` = solo ruido.
    * `afterId` = sondeo incremental barato (índice companyId+id).
    * `beforeId` = paginación hacia atrás sin OFFSET.
    */
