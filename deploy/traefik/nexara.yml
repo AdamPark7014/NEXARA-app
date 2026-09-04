@@ -26,7 +26,7 @@ http:
     # ───────────────────────────────────────────────────────────
     erp-http:
       rule: >-
-        Host(`core.nexara.com.mx`) ||
+        (Host(`core.nexara.com.mx`) ||
         Host(`consola.nexara.com.mx`) ||
         Host(`console.nexara.com.mx`) ||
         Host(`app.nexara.com.mx`) ||
@@ -52,12 +52,21 @@ http:
         Host(`hr.nexara.com.mx`) ||
         Host(`lab.nexara.com.mx`) ||
         Host(`dev.nexara.com.mx`) ||
-        Host(`integra.nexara.com.mx`)
+        Host(`integra.nexara.com.mx`)) && !PathPrefix(`/api/integra/hik`)
       entryPoints:
         - web
       middlewares:
         - redirect-https
       service: dummy
+
+    # NVR Oficinas: httpHosts solo acepta HTTP (HTTPS → badXmlContent).
+    # Prioridad alta para no caer en el redirect-https de erp-http.
+    integra-hik-push-http:
+      rule: 'Host(`integra.nexara.com.mx`) && PathPrefix(`/api/integra/hik`)'
+      entryPoints:
+        - web
+      service: nexara-api
+      priority: 200
 
     public-http:
       rule: 'Host(`nexara.com.mx`)'

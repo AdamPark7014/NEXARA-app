@@ -28,16 +28,16 @@ Adam: «aquí ni detecta los autos en la PTZ». Hardware ya era honesto en UI.
    hits vehicle si llegan + actividad hermana etiquetada «no es ID vehicle».
 3. Script `apps/api/scripts/wire-parking-nvr.cjs` — wire detection sin rotar
    token (`rotateToken: false`).
-4. Fix NVR `httpHosts`: parchear plantilla XML (el NVR rechazaba JSON +
-   `uploadImagesDataType` → `badXmlContent`). FieldDetection PoE 4/4 OK.
-5. No se tocó `_DetectionOverlay` (otro agente TTL humanos).
+4. Fix NVR `httpHosts`: plantilla XML + **solo HTTP:80** (HTTPS →
+   `badXmlContent`). Traefik: ruta HTTP `/api/integra/hik` sin redirect.
+5. FieldDetection PoE 4/4 OK. No se tocó `_DetectionOverlay`.
 
 ### Cómo verificar (ops)
 
 1. Hard refresh Video → PTZ.
-2. Panel Vehículos: fuentes Azotea/Entrance/Escalera + aviso o pulse NVR.
-3. Tras re-wire: NVR push=ok; movimiento en zona PoE lista vehicle con
-   nombre de cámara fuente (no inventario de autos quietos).
+2. Panel Vehículos: fuentes Azotea/Entrance/Escalera.
+3. `curl -sI http://integra.nexara.com.mx/api/integra/hik/1/x` → **no** 308.
+4. Movimiento en zona PoE → vehicle en panel (fuente = cam NVR, no PTZ).
 
 ## A medias
 
