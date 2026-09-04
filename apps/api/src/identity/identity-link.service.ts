@@ -26,7 +26,7 @@ export type LinkedErpUser = {
   email: string;
   employeeNumber: string | null;
   companyEmployeeNumber: string | null;
-  role: { id: number; nombre: string; roleKey: string | null } | null;
+  role: { id: number; nombre: string; orgRoleKey: string | null } | null;
   department: { id: number; nombre: string } | null;
 };
 

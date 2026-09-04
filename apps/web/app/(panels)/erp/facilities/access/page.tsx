@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   DashPage,
   DashHero,
@@ -12,6 +13,9 @@ import {
   StatStrip,
 } from "@/components/dashboard/DashKit";
 import { buildApiUrl } from "@/lib/api-base";
+import chrome from "@/components/erp/erp-chrome.module.css";
+import EmptyState from "@/components/ui/EmptyState";
+import Button from "@/components/ui/Button";
 
 type Door = {
   id: string;
@@ -55,6 +59,13 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+const DOOR_STATUS: Record<string, string> = {
+  locked: "Cerrada",
+  unlocked: "Abierta",
+  open: "Abierta",
+  closed: "Cerrada",
+};
+
 export default function OfficesAccessPage() {
   const [health, setHealth] = useState<Health | null>(null);
   const [doors, setDoors] = useState<Door[]>([]);
@@ -81,7 +92,9 @@ export default function OfficesAccessPage() {
         setEvents([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar ACS oficinas");
+      setError(err instanceof Error ? err.message : "No se pudo cargar accesos");
+      setDoors([]);
+      setEvents([]);
     } finally {
       setLoading(false);
     }
@@ -95,7 +108,7 @@ export default function OfficesAccessPage() {
     setBusyDoor(doorId);
     setError(null);
     try {
-      await apiJson(`access-control/doors/${encodeURIComponent(doorId)}/unlock`, {
+      await apiJson("access-control/doors/unlock", {
         method: "POST",
         body: JSON.stringify({ doorId, reason: "Apertura desde Core ERP" }),
       });
@@ -112,25 +125,34 @@ export default function OfficesAccessPage() {
   return (
     <DashPage>
       <DashHero
-        eyebrow="Facilities"
+        eyebrow="ERP · Instalaciones"
         title="Accesos · oficinas NEXARA"
-        subtitle="Puertas y eventos de sedes NEXARA. Independiente del panel Integra."
+        subtitle="Puertas y eventos de sedes NEXARA. Para video, personas y ACS en vivo usa Integra."
       />
+
+      <div className={chrome.hintBanner}>
+        <span aria-hidden="true">ℹ️</span>
+        <div>
+          <strong>¿Buscas cámaras o personas ACS?</strong>{" "}
+          Este módulo solo abre puertas de oficinas. Consola operativa:{" "}
+          <Link href="/integra">abrir Integra →</Link>
+        </div>
+      </div>
 
       <StatStrip
         stats={[
           {
             label: "Plataforma",
             value: health?.connected
-              ? "OK"
+              ? "Conectada"
               : health?.config?.configured
-                ? "Down"
-                : "Sin config",
+                ? "Caída"
+                : "Sin configurar",
             tone: health?.connected ? "positive" : "warning",
           },
           { label: "Puertas", value: String(doors.length) },
           { label: "En línea", value: String(online) },
-          { label: "Eventos 24h", value: String(events.length) },
+          { label: "Eventos recientes", value: String(events.length) },
         ]}
       />
 
@@ -150,11 +172,20 @@ export default function OfficesAccessPage() {
             }
           >
             {doors.length === 0 && !loading && (
-              <p style={{ color: "var(--text-tertiary)", fontSize: 13 }}>
-                {health?.config?.configured
-                  ? "Sin puertas en la respuesta del servidor."
-                  : "Configura las variables de acceso de oficinas en el servidor."}
-              </p>
+              <EmptyState
+                variant="compact"
+                title="Sin puertas"
+                description={
+                  health?.config?.configured
+                    ? "El servidor no devolvió puertas. Revisa la integración de oficinas."
+                    : "Falta configurar el acceso de oficinas en el servidor."
+                }
+                action={
+                  <Link href="/integra" style={{ textDecoration: "none" }}>
+                    <Button size="sm" variant="secondary">Ir a Integra</Button>
+                  </Link>
+                }
+              />
             )}
             {doors.map((d) => (
               <ListRow
@@ -164,10 +195,10 @@ export default function OfficesAccessPage() {
                 trail={
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <DashPill tone={d.isOnline ? "positive" : "neutral"}>
-                      {d.isOnline ? "online" : "offline"}
+                      {d.isOnline ? "En línea" : "Fuera de línea"}
                     </DashPill>
-                    <DashPill tone={d.status === "locked" ? "warning" : "positive"}>
-                      {d.status || "—"}
+                    <DashPill tone={d.status === "locked" || d.status === "closed" ? "warning" : "positive"}>
+                      {DOOR_STATUS[d.status || ""] || d.status || "—"}
                     </DashPill>
                     <button
                       type="button"
@@ -185,15 +216,15 @@ export default function OfficesAccessPage() {
         </DashCol>
 
         <DashCol span={5}>
-          <DashPanel title="Eventos recientes" subtitle="Últimas 24 horas">
+          <DashPanel title="Eventos recientes" subtitle="Últimas lecturas">
             {events.length === 0 && !loading && (
-              <p style={{ color: "var(--text-tertiary)", fontSize: 13 }}>Sin eventos.</p>
+              <EmptyState variant="compact" title="Sin eventos" description="No hay lecturas recientes en oficinas." />
             )}
             {events.map((e) => (
               <ListRow
                 key={e.id || `${e.doorId}-${e.timestamp}`}
                 title={e.cardNumber || e.employeeId || "Evento"}
-                sub={`${e.doorId} · ${e.timestamp ? new Date(e.timestamp).toLocaleString() : "—"}`}
+                sub={`${e.doorId} · ${e.timestamp ? new Date(e.timestamp).toLocaleString("es-MX") : "—"}`}
               />
             ))}
           </DashPanel>
