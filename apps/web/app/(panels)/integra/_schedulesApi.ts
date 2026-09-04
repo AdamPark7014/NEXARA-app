@@ -432,7 +432,9 @@ export async function fetchPersonSchedule(
         deviceIp: d.deviceIp,
         doorNo: d.doorNo ?? 1,
         planTemplateNo: plan,
-        planName: d.templateName || templateLabel(catalog.templates, plan),
+        planName:
+          ("templateName" in d && d.templateName) ||
+          templateLabel(catalog.templates, plan),
         present: d.present,
         error: d.error,
       };

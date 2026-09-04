@@ -17,7 +17,7 @@ import { resolveUploadsDir } from '../common/uploads-path';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { IntegraSiteService } from './integra-site.service';
 import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
-import { AcsOpsBridgeService } from './acs-ops-bridge.service';
+import { IntegraEventRouterService } from './integra-event-router.service';
 import { readLocalPersonFace } from './integra-person-media';
 
 /** Fila lista para consola / SSE (ISO dates, sin `raw`). */
@@ -111,7 +111,7 @@ export class IntegraPushService {
     private readonly prisma: PrismaService,
     private readonly sites: IntegraSiteService,
     private readonly acsFanout: IntegraAcsFanoutService,
-    private readonly acsOps: AcsOpsBridgeService,
+    private readonly eventRouter: IntegraEventRouterService,
   ) {}
 
   stream(siteId: number): Observable<PushEventDto> {
@@ -1087,13 +1087,29 @@ export class IntegraPushService {
         .catch(() => undefined);
     }
 
-    // ACS concedido/denegado → sellos Ops (check-in / salida / aviso). Best-effort.
+    // ACS → router (Ops presencia OT + alarma SOC denegado + stubs). Best-effort.
     if (ev.eventType === 'AccessControllerEvent' && ev.major === 5) {
-      void this.acsOps.handlePushEvent(site, ev).catch((e) => {
-        this.logger.warn(
-          `ACS→Ops: ${e instanceof Error ? e.message : String(e)}`,
-        );
-      });
+      void this.eventRouter
+        .onPushEvent(
+          site,
+          {
+            eventType: ev.eventType,
+            major: ev.major,
+            minor: ev.minor,
+            occurredAt: ev.occurredAt,
+            personId: ev.personId,
+            personName: ev.personName,
+            deviceName: ev.deviceName,
+            doorNo: ev.doorNo,
+            deviceIp: ev.deviceIp,
+          },
+          { pushEventId: row.id, photoPath },
+        )
+        .catch((e) => {
+          this.logger.warn(
+            `ACS→router: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        });
     }
 
     // Snapshot de canal siempre en fresco (aunque ya haya cara enrolada):
