@@ -176,18 +176,36 @@ export class IntegraPushService {
     if (!site) throw new NotFoundException(`Sitio ${siteId} no existe`);
     // 24 hex = 96 bits. La URL entera tiene que caber en 128 caracteres.
     const token = randomBytes(12).toString('hex');
+    const pushTokenHash = sha256(token);
     await this.prisma.integraSite.update({
       where: { id: siteId },
-      data: { pushTokenHash: sha256(token), pushTokenAt: new Date() },
+      data: { pushTokenHash, pushTokenAt: new Date() },
     });
+    this.invalidateTokenCache(siteId);
     return { token, url: `${publicBase()}/api/integra/hik/${siteId}/${token}` };
   }
 
-  /** Resuelve el sitio a partir del token de la URL. */
+  private invalidateTokenCache(siteId: number) {
+    const prefix = `${siteId}:`;
+    for (const key of this.tokenCache.keys()) {
+      if (key.startsWith(prefix)) this.tokenCache.delete(key);
+    }
+  }
+
+  /** Resuelve el sitio a partir del token de la URL (con caché corta). */
   async siteForToken(siteId: number, token: string) {
-    const site = await this.prisma.integraSite.findUnique({ where: { id: siteId } });
+    const hash = sha256(token);
+    const cacheKey = `${siteId}:${hash}`;
+    const hit = this.tokenCache.get(cacheKey);
+    if (hit && hit.expires > Date.now()) return hit.site;
+
+    const site = await this.prisma.integraSite.findUnique({
+      where: { id: siteId },
+      select: { id: true, companyId: true, pushTokenHash: true },
+    });
     if (!site?.pushTokenHash) throw new NotFoundException('Sitio sin token de eventos');
-    if (site.pushTokenHash !== sha256(token)) throw new NotFoundException('Token no válido');
+    if (site.pushTokenHash !== hash) throw new NotFoundException('Token no válido');
+    this.tokenCache.set(cacheKey, { site, expires: Date.now() + TOKEN_CACHE_MS });
     return site;
   }
 
@@ -206,13 +224,13 @@ export class IntegraPushService {
   @Cron('27 4 * * *')
   async purgeOldEvents() {
     const now = Date.now();
-    const noiseBefore = new Date(now - NOISE_TTL_DAYS * 86_400_000);
+    const noiseBefore = new Date(now - NOISE_TTL_HOURS * 3_600_000);
     const anyBefore = new Date(now - EVENT_TTL_DAYS * 86_400_000);
 
     const doomed = await this.prisma.integraPushEvent.findMany({
       where: {
         OR: [
-          { eventType: { in: NOISE_TYPES }, occurredAt: { lt: noiseBefore } },
+          { eventType: { in: [...NOISE_TYPES] }, occurredAt: { lt: noiseBefore } },
           { occurredAt: { lt: anyBefore } },
         ],
       },
