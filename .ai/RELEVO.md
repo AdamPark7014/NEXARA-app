@@ -148,11 +148,17 @@ El cuerpo llega en tres formas y ninguna con la cabecera correcta, así que
 forma del cuerpo. Multipart se trocea a mano: no es un formulario, son partes
 sin nombre de campo, y multer las tiraría.
 
-**Y hace falta `bodyParser: false` en `NestFactory.create`**: el parser de Nest
-se registra antes que cualquier `app.use` y contesta **415** a `application/xml`
-y a `text/plain` (medido contra producción). El `rawBody` de Stripe se conserva
-con el `verify` de `express.json`, que guarda los bytes exactos — que es lo que
-la firma HMAC necesita.
+Dos cosas hicieron falta para que la ruta acepte XML (probado contra
+producción, daba **415**):
+
+1. `bodyParser: false` en `NestFactory.create`, o el parser de Nest se registra
+   antes que cualquier `app.use`. El `rawBody` de Stripe se conserva con el
+   `verify` de `express.json`, que además guarda los bytes exactos sobre los
+   que se firma.
+2. **El filtro de `Content-Type` de `main.ts` es de casa, no de Nest** — un
+   allowlist de seguridad que además mete strike a la IP. Se exime solo el
+   buzón de los equipos, y solo para xml/text: lo que protege esa ruta es el
+   token, no la cabecera. No tocar el allowlist global.
 
 La foto: si el equipo la manda (solo las cámaras), esa. Si no, NEXARA se la
 pide al propio equipo por `Streaming/channels/101/picture` — ~300 ms, la
