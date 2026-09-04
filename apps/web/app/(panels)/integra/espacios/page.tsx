@@ -319,8 +319,18 @@ export default function IntegraEspaciosPage() {
         actions={
           <>
             <IgBtn onClick={() => void loadOverview()}>Actualizar</IgBtn>
-            <IgBtn onClick={() => (window.location.href = "/integra/people")}>Personas · vigencia</IgBtn>
-            <IgBtn onClick={() => (window.location.href = "/integra/access")}>Control de acceso</IgBtn>
+            <IgBtn
+              onClick={() => {
+                const q = selectedId
+                  ? `?view=door&door=${encodeURIComponent(selectedId)}`
+                  : "?view=door";
+                window.location.href = `/integra/schedules${q}`;
+              }}
+            >
+              Horarios ACS
+            </IgBtn>
+            <IgBtn onClick={() => (window.location.href = "/integra/people")}>Personas</IgBtn>
+            <IgBtn onClick={() => (window.location.href = "/integra/access")}>Accesos</IgBtn>
           </>
         }
       />
@@ -328,10 +338,10 @@ export default function IntegraEspaciosPage() {
       <IgError>{error}</IgError>
 
       <IgNotice>
-        Cada puerta es un espacio. Ves quién tiene acceso <strong>indefinido</strong> vs{" "}
-        <strong>temporal</strong> (Valid del ACS), la plantilla por defecto del espacio, las
-        ventanas de uso planificadas y las últimas entradas en vivo. No es un calendario Google:
-        es política de acceso operativa.
+        Todas las puertas del sitio: quién tiene acceso <strong>indefinido</strong> vs{" "}
+        <strong>temporal</strong> (Valid), plantilla por espacio, ventanas de uso planificadas y
+        últimas entradas en vivo. Para empujar RightPlan / franjas semanales al terminal usa{" "}
+        <Link href="/integra/schedules">Horarios</Link>.
       </IgNotice>
 
       {site && (
@@ -433,8 +443,11 @@ export default function IntegraEspaciosPage() {
               <section className={styles.spaceSection}>
                 <header>
                   <h3>Plantilla por defecto</h3>
-                  <Link href="/integra/people" className={styles.spaceLink}>
-                    Editar vigencia en Personas
+                  <Link
+                    href={`/integra/schedules?view=door&door=${encodeURIComponent(detail.id)}`}
+                    className={styles.spaceLink}
+                  >
+                    Empujar horario ACS
                   </Link>
                 </header>
                 <div className={styles.spacePolicyRow}>

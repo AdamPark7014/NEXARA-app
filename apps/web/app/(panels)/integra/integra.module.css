@@ -3790,3 +3790,407 @@ button.evCard {
   font-size: 13px;
   font-weight: 750;
 }
+
+/* ── Espacios / puertas (política + uso) ───────────────────────── */
+.spaceKpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.spaceKpi {
+  background: var(--ig-panel);
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius);
+  padding: 10px 12px;
+  display: grid;
+  gap: 2px;
+}
+
+.spaceKpi strong {
+  font-family: var(--ig-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.spaceKpi span {
+  font-size: 11.5px;
+  color: var(--ig-muted);
+}
+
+.spaceKpi[data-tone="ok"] strong { color: var(--ig-ok); }
+.spaceKpi[data-tone="warn"] strong { color: var(--ig-warn); }
+.spaceKpi[data-tone="danger"] strong { color: var(--ig-danger); }
+
+.spaceList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  max-height: min(70vh, 720px);
+  overflow: auto;
+}
+
+.spaceRow {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--ig-line);
+  background: var(--ig-panel);
+  border-radius: var(--ig-radius);
+  padding: 10px 12px;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  color: inherit;
+  font: inherit;
+}
+
+.spaceRow:hover {
+  border-color: color-mix(in srgb, var(--ig-accent) 45%, var(--ig-line));
+}
+
+.spaceRow[data-active="1"] {
+  border-color: var(--ig-accent);
+  box-shadow: inset 3px 0 0 var(--ig-accent);
+}
+
+.spaceRow[data-online="0"] {
+  opacity: 0.78;
+}
+
+.spaceRowHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.spaceRowHead strong {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.spaceRowMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 11.5px;
+  color: var(--ig-muted);
+}
+
+.spaceRowLive {
+  font-size: 11.5px;
+  color: var(--ig-ink-soft);
+}
+
+.spaceRowLive[data-phase="now"] {
+  color: var(--ig-ok);
+  font-weight: 650;
+}
+
+.spaceDetail {
+  display: grid;
+  gap: 16px;
+}
+
+.spaceSection {
+  display: grid;
+  gap: 8px;
+}
+
+.spaceSection header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.spaceSection h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 750;
+  font-family: var(--ig-font-display);
+}
+
+.spaceSection header span {
+  font-size: 11.5px;
+  color: var(--ig-muted);
+}
+
+.spaceLink {
+  font-size: 12px;
+  color: var(--ig-accent-deep);
+  text-decoration: none;
+  font-weight: 650;
+}
+
+.spaceLink:hover {
+  text-decoration: underline;
+}
+
+.spacePolicyRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.spacePeople,
+.spaceWindows,
+.spaceLive {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.spacePeople li,
+.spaceLive li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-sm);
+  background: color-mix(in srgb, var(--ig-surface) 65%, var(--ig-panel));
+}
+
+.spacePeople li strong,
+.spaceLive li strong,
+.spaceWindows li strong {
+  display: block;
+  font-size: 12.5px;
+}
+
+.spacePeople li span,
+.spaceLive li span,
+.spaceWindows li span {
+  display: block;
+  font-size: 11px;
+  color: var(--ig-muted);
+}
+
+.spaceWindows li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-sm);
+}
+
+.spaceWindows li[data-phase="now"] {
+  border-color: color-mix(in srgb, var(--ig-ok) 45%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-ok) 8%, var(--ig-panel));
+}
+
+.spaceWindowActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.spaceBookingForm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  align-items: end;
+  padding: 10px;
+  border: 1px dashed var(--ig-line);
+  border-radius: var(--ig-radius);
+}
+
+@media (max-width: 900px) {
+  .spaceKpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Visitas: recurrente + acceso limitado ──────────────────────────── */
+.visitLead {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ig-ink-soft);
+}
+
+.visitBlock {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ig-line);
+}
+
+.visitBlockLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+}
+
+.visitDoorList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.visitDoorRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  row-gap: 2px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius);
+  background: var(--ig-panel);
+  cursor: pointer;
+}
+
+.visitDoorRow input {
+  grid-row: 1 / span 2;
+}
+
+.visitDoorRow[data-on="1"] {
+  border-color: color-mix(in srgb, var(--ig-accent) 55%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-accent) 8%, var(--ig-panel));
+}
+
+.visitDoorName {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ig-ink);
+}
+
+.visitDoorMeta {
+  font-size: 11.5px;
+  color: var(--ig-muted);
+}
+
+.visitTimeRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.visitWeekRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.visitDayChip {
+  appearance: none;
+  border: 1px solid var(--ig-line);
+  background: var(--ig-panel);
+  color: var(--ig-ink-soft);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  min-width: 44px;
+}
+
+.visitDayChip:hover {
+  border-color: color-mix(in srgb, var(--ig-accent) 40%, var(--ig-line));
+}
+
+.visitDayChip[data-on="1"] {
+  background: color-mix(in srgb, var(--ig-accent) 16%, var(--ig-panel));
+  border-color: color-mix(in srgb, var(--ig-accent) 55%, var(--ig-line));
+  color: var(--ig-accent-deep);
+}
+
+.visitWeekHints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.visitHintBtn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ig-accent-deep);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  padding: 2px 4px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.visitPhotoRow {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.visitPhotoPrev {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  border: 1px solid var(--ig-line);
+  background: color-mix(in srgb, var(--ig-accent) 10%, var(--ig-panel));
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ig-muted);
+}
+
+.visitPhotoPrev img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.visitPhotoActions {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.visitActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.visitCellStack {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.visitCellStack strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .visitTimeRow {
+    grid-template-columns: 1fr;
+  }
+}
