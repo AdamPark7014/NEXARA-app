@@ -550,7 +550,13 @@ export class UsersService {
         return this.withEmployeeNumber(updatedUser);
       });
       await this.chat.addUserToOrgChannels(created.id);
-      return created;
+      const acsPush = await this.pushAcsFromErp({
+        companyId: tenantId,
+        employeeNumber: created.employeeNumber,
+        name: created.nombre,
+        enable: true,
+      });
+      return acsPush ? { ...created, acsPush } : created;
     } catch (e) {
       if (e instanceof BadRequestException || e instanceof ConflictException) throw e;
       if (e instanceof Prisma.PrismaClientKnownRequestError) {

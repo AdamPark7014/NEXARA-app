@@ -530,6 +530,6 @@ export default function ApprovalsPage() {
           </div>
         </div>
       )}
-    </>
+    </PageChrome>
   );
 }

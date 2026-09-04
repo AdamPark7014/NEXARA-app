@@ -27,9 +27,9 @@ const WIDGETS: Record<string, CommandWidget[]> = {
     { id: "dispatch", label: "Centro de despacho", href: "/ops/dispatch", icon: "🗺️" },
     { id: "ops-dash", label: "Hoy en OPS", href: "/ops/dashboard", icon: "🚀" },
     { id: "activities", label: "Todas las OT", href: "/ops/activities", icon: "📋" },
-    { id: "gps", label: "GPS en vivo", href: "/ops/gps", icon: "📍" },
-    { id: "noc", label: "NOC", href: "/ops/noc", icon: "📡" },
+    { id: "sla", label: "SLA", href: "/ops/support/sla", icon: "⏱️", hint: "Cumplimiento" },
     { id: "support", label: "Soporte", href: "/ops/support", icon: "🎫" },
+    { id: "notifications", label: "Notificaciones", href: "/ops/notifications-center", icon: "🔔" },
   ],
   field: [
     { id: "my-activities", label: "Mis OT", href: "/ops/my-activities", icon: "🧰" },
@@ -42,8 +42,8 @@ const WIDGETS: Record<string, CommandWidget[]> = {
     { id: "crm-dash", label: "Mi pipeline", href: "/crm/dashboard", icon: "💼" },
     { id: "quotes", label: "Cotizaciones", href: "/crm/quotes", icon: "📄" },
     { id: "smart-quote", label: "Cotizador inteligente", href: "/crm/quotes/nueva", icon: "✨" },
-    { id: "clients", label: "Clientes 360", href: "/crm/clients", icon: "👥" },
     { id: "agenda", label: "Agenda", href: "/crm/agenda", icon: "📅" },
+    { id: "notifications", label: "Notificaciones", href: "/crm/notifications-center", icon: "🔔" },
     { id: "crm-chat", label: "Chat comercial", href: "/crm/chat", icon: "💬" },
   ],
   default: [

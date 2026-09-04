@@ -227,12 +227,47 @@ export default function CrmDashboardPage() {
             tone: enCierre > 0 ? "warning" : "default",
           },
           {
+            label: "Seguimientos vencidos",
+            value: loading ? "…" : overdueAgenda.length,
+            tone: overdueAgenda.length > 0 ? "danger" : "positive",
+          },
+          {
             label: "Tasa de conversión",
             value: loading ? "…" : `${metrics?.conversionRate ?? 0}%`,
             sub: "Este mes",
           },
         ]}
       />
+
+      {!loading && (overdueAgenda.length > 0 || salesNotifs.length > 0) && (
+        <DashPanel
+          title="Decisiones comerciales"
+          subtitle="Seguimientos vencidos y cotizaciones / pipeline que requieren acción"
+          action="Notificaciones"
+          actionHref="/crm/notifications-center"
+        >
+          {overdueAgenda.slice(0, 4).map((a) => (
+            <ListRow
+              key={`od-${a.id}`}
+              href={a.opportunity?.id ? `/crm/opportunities/${a.opportunity.id}` : "/crm/agenda"}
+              accent="var(--danger)"
+              title={a.subject}
+              sub={a.lead?.name ?? a.opportunity?.title ?? "Seguimiento vencido"}
+              trail={<DashPill tone="danger">Vencido</DashPill>}
+            />
+          ))}
+          {salesNotifs.map((n) => (
+            <ListRow
+              key={n.id}
+              href={n.relatedUrl || "/crm/notifications-center"}
+              accent={n.priority === "high" ? "var(--danger)" : "var(--warning)"}
+              title={n.title}
+              sub={n.message.slice(0, 90)}
+              trail={n.priority === "high" ? <DashPill tone="danger">Alta</DashPill> : undefined}
+            />
+          ))}
+        </DashPanel>
+      )}
 
       <DashGrid>
         <DashCol span={7}>
