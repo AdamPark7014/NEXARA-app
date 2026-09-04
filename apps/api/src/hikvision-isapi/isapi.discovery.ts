@@ -645,12 +645,13 @@ export async function enableMotionDetection(
 }
 
 /**
- * Enciende la detección de intrusión sobre todo el encuadre, solo para personas.
+ * Enciende FieldDetection (intrusión AcuSense) a tope.
  *
- * Las reglas vienen de fábrica presentes pero con las zonas apagadas **y sin
- * polígono**: la región 1 no trae `RegionCoordinatesList`, así que no basta con
- * poner `enabled` a true — hay que darle la zona. Se le da el cuadro entero en
- * la rejilla normalizada que el propio equipo declara (1000×1000).
+ * Verificado en DS-2CD2123G2-LIS2U V5.7.19 (Oficinas .171–.178):
+ * - Tag real = `sensitivityLevel` (0–100), **no** `sensitivity`.
+ * - `alarmConfidence` opt=`low,mediumLow,mediumHigh,high`.
+ * - Hasta 4 regiones; sin polígono la región no dispara.
+ * - IntrusionDetection separado → 404 (FieldDetection es la intrusión).
  *
  * `detectionTarget` por defecto `human`. En oficinas `vehicle` dispara ruido;
  * en canales de entrada/azotea (NVR PoE) se usa `human,vehicle` (verificado).
@@ -677,6 +678,7 @@ export async function enableFieldDetection(
   ]
     .map(([x, y]) => `<RegionCoordinates><positionX>${x}</positionX><positionY>${y}</positionY></RegionCoordinates>`)
     .join('');
+  const poly = `<RegionCoordinatesList>${corners}</RegionCoordinatesList>`;
 
   const bump = (regionXml: string, tag: string, value: string) => {
     if (new RegExp(`<${tag}>`, 'i').test(regionXml)) {
@@ -688,7 +690,15 @@ export async function enableFieldDetection(
     );
   };
 
-  let out = xml;
+  let out = xml.replace(
+    /(<FieldDetection\b[^>]*>[\s\S]*?<enabled>)\s*false\s*(<\/enabled>)/i,
+    '$1true$2',
+  );
+  // Re-armar más rápido entre disparos (firmware: start/endTriggerTime en ms).
+  out = out
+    .replace(/<startTriggerTime>\d+<\/startTriggerTime>/i, '<startTriggerTime>0</startTriggerTime>')
+    .replace(/<endTriggerTime>\d+<\/endTriggerTime>/i, '<endTriggerTime>0</endTriggerTime>');
+
   for (const match of regions) {
     let patched = match[0]
       .replace(/<enabled>\s*false\s*<\/enabled>/, '<enabled>true</enabled>')
@@ -696,12 +706,20 @@ export async function enableFieldDetection(
         /<detectionTarget>[^<]*<\/detectionTarget>/,
         `<detectionTarget>${target}</detectionTarget>`,
       );
-    patched = bump(patched, 'sensitivity', '95');
+    // DS-2CD2123G2 usa sensitivityLevel; firmwares viejos a veces sensitivity.
+    patched = bump(patched, 'sensitivityLevel', '100');
+    patched = bump(patched, 'sensitivity', '100');
     patched = bump(patched, 'timeThreshold', '0');
-    if (!/<RegionCoordinatesList>/.test(patched)) {
+    patched = bump(patched, 'alarmConfidence', 'low');
+    if (/<RegionCoordinatesList>[\s\S]*?<\/RegionCoordinatesList>/i.test(patched)) {
+      patched = patched.replace(
+        /<RegionCoordinatesList>[\s\S]*?<\/RegionCoordinatesList>/i,
+        poly,
+      );
+    } else {
       patched = patched.replace(
         /<\/FieldDetectionRegion>/,
-        `<RegionCoordinatesList>${corners}</RegionCoordinatesList></FieldDetectionRegion>`,
+        `${poly}</FieldDetectionRegion>`,
       );
     }
     out = out.replace(match[0], patched);
@@ -717,6 +735,192 @@ export async function enableHumanFieldDetection(
   channel = 1,
 ): Promise<boolean> {
   return enableFieldDetection(client, channel, 'human');
+}
+
+/**
+ * Línea virtual a todo el ancho (mitad del encuadre), dirección any.
+ * Verificado: `/ISAPI/Smart/LineDetection/1` en DS-2CD2123G2 (SmartCap true).
+ * Sirve para TargetRect al cruzar; sentados quietos siguen siendo FieldDetection.
+ */
+export async function enableLineDetection(
+  client: HikvisionIsapiClient,
+  channel = 1,
+  target: 'human' | 'human,vehicle' = 'human',
+): Promise<boolean> {
+  const path = `/ISAPI/Smart/LineDetection/${channel}`;
+  try {
+    const { buffer } = await client.getBinary(path);
+    let xml = buffer.toString('utf8');
+    if (!/<LineDetection\b/i.test(xml) && !/<LineItem\b/i.test(xml)) return false;
+
+    const w = Number(/<normalizedScreenWidth>(\d+)</.exec(xml)?.[1]) || 1000;
+    const h = Number(/<normalizedScreenHeight>(\d+)</.exec(xml)?.[1]) || 1000;
+    const midY = Math.round(h / 2);
+    const lineCoords =
+      `<CoordinatesList>` +
+      `<Coordinates><positionX>0</positionX><positionY>${midY}</positionY></Coordinates>` +
+      `<Coordinates><positionX>${w}</positionX><positionY>${midY}</positionY></Coordinates>` +
+      `</CoordinatesList>`;
+
+    xml = xml.replace(
+      /(<LineDetection\b[^>]*>[\s\S]*?<enabled>)\s*false\s*(<\/enabled>)/i,
+      '$1true$2',
+    );
+
+    const items = [...xml.matchAll(/<LineItem\b[\s\S]*?<\/LineItem>/g)];
+    if (items.length === 0) return false;
+    for (const match of items) {
+      let patched = match[0]
+        .replace(/<enabled>\s*false\s*<\/enabled>/, '<enabled>true</enabled>')
+        .replace(
+          /<detectionTarget>[^<]*<\/detectionTarget>/,
+          `<detectionTarget>${target}</detectionTarget>`,
+        )
+        .replace(
+          /<sensitivityLevel>\s*\d+\s*<\/sensitivityLevel>/i,
+          '<sensitivityLevel>100</sensitivityLevel>',
+        )
+        .replace(
+          /<directionSensitivity>[^<]*<\/directionSensitivity>/i,
+          '<directionSensitivity>any</directionSensitivity>',
+        )
+        .replace(
+          /<alarmConfidence[^>]*>[^<]*<\/alarmConfidence>/i,
+          '<alarmConfidence>low</alarmConfidence>',
+        );
+      if (/<CoordinatesList>[\s\S]*?<\/CoordinatesList>/i.test(patched)) {
+        patched = patched.replace(/<CoordinatesList>[\s\S]*?<\/CoordinatesList>/i, lineCoords);
+      } else {
+        patched = patched.replace(/<\/LineItem>/, `${lineCoords}</LineItem>`);
+      }
+      xml = xml.replace(match[0], patched);
+    }
+    await client.put(path, xml);
+    return true;
+  } catch (e) {
+    if (e instanceof IsapiAuthRejectedError) throw e;
+    return false;
+  }
+}
+
+/**
+ * FaceDetect AcuSense = cajas de rostro, **no** Face ID / nombres.
+ * SmartCap `isSupportFaceDetect=true` en DS-2CD2123G2; Face ID óptico no existe.
+ */
+export async function enableFaceDetect(
+  client: HikvisionIsapiClient,
+  channel = 1,
+): Promise<boolean> {
+  const path = `/ISAPI/Smart/FaceDetect/${channel}`;
+  try {
+    const { buffer } = await client.getBinary(path);
+    let xml = buffer.toString('utf8');
+    if (!/<FaceDetect\b/i.test(xml)) return false;
+    xml = xml
+      .replace(/<enabled>\s*false\s*<\/enabled>/i, '<enabled>true</enabled>')
+      .replace(
+        /<sensitivityLevel>\s*\d+\s*<\/sensitivityLevel>/i,
+        '<sensitivityLevel>5</sensitivityLevel>',
+      )
+      .replace(
+        /<highlightsenabled>\s*false\s*<\/highlightsenabled>/i,
+        '<highlightsenabled>true</highlightsenabled>',
+      );
+    await client.put(path, xml);
+    return true;
+  } catch (e) {
+    if (e instanceof IsapiAuthRejectedError) throw e;
+    return false;
+  }
+}
+
+/**
+ * Asegura substream H.264 (go2rtc MSE). No toca main H.265.
+ * Verificado: canal `…02` = sub en DS-2CD2123G2 (ya H.264 640×360 en Oficinas).
+ */
+export async function ensureSubstreamH264(
+  client: HikvisionIsapiClient,
+  channel = 1,
+): Promise<'ok' | 'already' | 'no-channel' | 'fail'> {
+  const subId = `${channel}02`;
+  const path = `/ISAPI/Streaming/channels/${subId}`;
+  try {
+    const { buffer } = await client.getBinary(path);
+    const xml = buffer.toString('utf8');
+    if (!/<StreamingChannel\b/i.test(xml)) return 'no-channel';
+    const codec = /<videoCodecType>([^<]*)<\/videoCodecType>/i.exec(xml)?.[1]?.trim();
+    if (!codec) return 'no-channel';
+    if (/^H\.?264$/i.test(codec)) return 'already';
+    const patched = xml.replace(
+      /<videoCodecType>[^<]*<\/videoCodecType>/i,
+      '<videoCodecType>H.264</videoCodecType>',
+    );
+    await client.put(path, patched);
+    return 'ok';
+  } catch (e) {
+    if (e instanceof IsapiAuthRejectedError) throw e;
+    return 'fail';
+  }
+}
+
+export type MaxSmartDetectionReport = {
+  field: boolean;
+  line: boolean;
+  motion: boolean;
+  face: boolean;
+  audio: boolean;
+  substream: 'ok' | 'already' | 'no-channel' | 'fail';
+};
+
+/**
+ * Empuja una AcuSense al máximo útil para cajas + tasa de eventos push.
+ * No inventa Face ID: FaceDetect solo aporta FaceRect / highlighted.
+ */
+export async function enableMaxSmartDetection(
+  client: HikvisionIsapiClient,
+  opts: {
+    channel?: number;
+    /** Oficinas indoor: `human`. Entrada/azotea/almacén: `human,vehicle`. */
+    fieldTarget?: 'human' | 'human,vehicle';
+    line?: boolean;
+    face?: boolean;
+    motion?: boolean;
+    audio?: boolean;
+    substreamH264?: boolean;
+  } = {},
+): Promise<MaxSmartDetectionReport> {
+  const channel = opts.channel ?? 1;
+  const fieldTarget = opts.fieldTarget ?? 'human';
+  const report: MaxSmartDetectionReport = {
+    field: false,
+    line: false,
+    motion: false,
+    face: false,
+    audio: false,
+    substream: 'no-channel',
+  };
+
+  report.field = await enableFieldDetection(client, channel, fieldTarget);
+
+  if (opts.line !== false) {
+    report.line = await enableLineDetection(client, channel, fieldTarget === 'human' ? 'human' : 'human,vehicle');
+  }
+  if (opts.face !== false) {
+    report.face = await enableFaceDetect(client, channel);
+  }
+  if (opts.motion !== false) {
+    report.motion = await enableMotionDetection(client, channel, 80);
+  }
+  if (opts.audio !== false) {
+    // Sub + main: si hay bloque Audio, encenderlo (mic en AcuSense Oficinas = true).
+    const a1 = await setChannelAudio(client, `${channel}01`, true);
+    const a2 = await setChannelAudio(client, `${channel}02`, true);
+    report.audio = a1 || a2;
+  }
+  if (opts.substreamH264 !== false) {
+    report.substream = await ensureSubstreamH264(client, channel);
+  }
+  return report;
 }
 
 /**
