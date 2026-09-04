@@ -885,7 +885,7 @@ export default function ProcurementPage() {
   ];
 
   const receiptColumns: Column<GoodsReceipt>[] = [
-    { key: "receiptNumber", label: "Recepción", render: (r) => <code style={{ fontSize: 11.5 }}>{r.receiptNumber}</code>, width: 130 },
+    { key: "receiptNumber", label: "Folio", render: (r) => <code style={{ fontSize: 11.5 }}>{r.receiptNumber}</code>, width: 120 },
     {
       key: "purchaseOrder",
       label: "OC",
@@ -894,14 +894,66 @@ export default function ProcurementPage() {
           {r.purchaseOrder?.poNumber ?? `OC-${r.purchaseOrderId}`}
         </Link>
       ),
-      width: 120,
+      width: 110,
     },
-    { key: "receivedBy", label: "Recibió", accessor: (r) => r.receivedBy?.nombre ?? "—", width: 140 },
+    {
+      key: "supplier",
+      label: "Proveedor",
+      accessor: (r) => r.purchaseOrder?.supplier?.name ?? "—",
+      width: 140,
+    },
+    {
+      key: "warehouse",
+      label: "Almacén",
+      render: (r) => (
+        <span style={{ fontSize: 12 }}>
+          {r.warehouse ? [r.warehouse.code, r.warehouse.name].filter(Boolean).join(" · ") : "—"}
+        </span>
+      ),
+      width: 140,
+    },
+    {
+      key: "items",
+      label: "Partidas",
+      render: (r) => {
+        const n = r.items?.length ?? 0;
+        const qty = (r.items ?? []).reduce((s, i) => s + Number(i.quantityReceived || 0), 0);
+        return <span style={{ fontSize: 12 }}>{n} · cant. {qty}</span>;
+      },
+      width: 100,
+      numeric: true,
+    },
+    {
+      key: "landed",
+      label: "Landed",
+      render: (r) => {
+        const t = receiptLandedTotal(r);
+        return t > 0 ? <Money value={t} compact /> : <span style={{ color: "var(--text-tertiary)" }}>—</span>;
+      },
+      width: 90,
+      numeric: true,
+    },
+    { key: "receivedBy", label: "Usuario", accessor: (r) => r.receivedBy?.nombre ?? "—", width: 120 },
     {
       key: "receiptDate",
       label: "Fecha",
-      accessor: (r) => (r.receiptDate ? new Date(r.receiptDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—"),
-      width: 100,
+      accessor: (r) => (r.receiptDate ? new Date(r.receiptDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—"),
+      width: 110,
+    },
+    {
+      key: "actions",
+      label: "",
+      width: 56,
+      render: (r) => (
+        <button
+          type="button"
+          title="PDF recepción"
+          onClick={(e) => { e.stopPropagation(); void downloadReceiptPdf(r.id, r.receiptNumber); }}
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--primary)", padding: "4px 6px", fontWeight: 600 }}
+        >
+          PDF
+        </button>
+      ),
     },
   ];
 
