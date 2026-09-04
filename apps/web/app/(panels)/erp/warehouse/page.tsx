@@ -810,16 +810,17 @@ export default function WarehousePage() {
       <PageHeader
         eyebrow="ERP · Almacén"
         title="Inventario y stock"
-        subtitle="Existencias, reorden y valuación por almacén — con inteligencia de rotación cuando hay historial."
+        subtitle="Existencias, reorden y valuación por almacén."
+        density="ops"
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Button variant="ghost" size="sm" onClick={load}>Actualizar</Button>
             {cfg.canCreate && (
               <>
                 <Button variant="secondary" size="sm" onClick={() => setShowWarehouseForm(true)}>Nuevo almacén</Button>
                 <Button variant="primary" size="sm" onClick={() => setShowMovementForm(true)}>Entrada de stock</Button>
               </>
             )}
-            <Button variant="ghost" size="sm" onClick={load}>Actualizar</Button>
           </div>
         }
       />
@@ -827,9 +828,9 @@ export default function WarehousePage() {
       <ContextRail
         ariaLabel="Catálogos de inventario"
         items={[
-          { id: "stock", label: "Stock productos", active: true },
-          { id: "catalog", label: "Catálogo productos", href: "/crm/products" },
-          { id: "tools", label: "Stock herramientas", href: "/ops/tools?tab=inventory" },
+          { id: "stock", label: "Stock de productos", active: true },
+          { id: "catalog", label: "Catálogo CRM", href: "/crm/products" },
+          { id: "tools", label: "Herramientas OPS", href: "/ops/tools?tab=inventory" },
         ]}
       />
 

@@ -58,7 +58,7 @@ type Person = {
 
 type Org = { id: string; name: string; parentId?: string };
 type AcsDev = { id: string; name: string; kind: string; ip?: string | null; deviceType?: string | null };
-type OpResult = { deviceIp: string; ok: boolean; error?: string };
+type OpResult = { deviceIp: string; ok: boolean; error?: string; attempts?: number };
 type ValidityFilter = "" | "ok" | "warn" | "expired" | "off" | "face" | "noface" | "erp" | "noerp";
 type MutKind = "save" | "photo" | "faceDel" | "delete" | "create" | "fp" | null;
 type AltaStep = 1 | 2 | 3 | 4;

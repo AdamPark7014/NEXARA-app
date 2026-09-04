@@ -414,15 +414,17 @@ export default function InvoicingPage() {
         eyebrow="ERP · Finanzas"
         title={cfg.title}
         subtitle={cfg.subtitle}
+        density="ops"
         actions={
           <>
+            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
             {cfg.canCreate && (
               <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva factura</Button>
             )}
-            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
           </>
         }
       />
+      <FinanceModuleRail />
 
       {(() => {
         const incomeInvoices = items.filter((f) => displayInvoiceType(f.type) === "INCOME" && f.status !== "CANCELLED");
