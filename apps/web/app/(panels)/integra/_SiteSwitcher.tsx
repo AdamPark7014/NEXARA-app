@@ -48,16 +48,16 @@ export function IntegraSiteSwitcher({ onChange }: { onChange?: (id: number | nul
   }
 
   const current = sites.find((s) => s.id === active) || sites[0];
-  const inv =
-    current?._count != null
-      ? `${current._count.cameras ?? 0} cam · ${current._count.doors ?? 0} pta`
-      : null;
+  // El inventario del sitio activo ya lo muestran los KPI de la barra, con más
+  // detalle (puertas en línea sobre el total, y personas). Repetirlo aquí daba
+  // dos veces el mismo número en la misma fila, y a veces desincronizados
+  // porque cada uno se refresca por su lado. En el desplegable sí se conserva:
+  // ahí sirve para elegir entre sitios.
 
   if (sites.length === 1 && current) {
     return (
       <div className={styles.siteChip} title={current.host}>
         <span className={styles.siteChipName}>{current.label || current.name}</span>
-        {inv && <span className={styles.siteChipMeta}>{inv}</span>}
       </div>
     );
   }

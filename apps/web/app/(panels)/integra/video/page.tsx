@@ -14,7 +14,7 @@ import {
   IgToolbar,
 } from "../_Console";
 import { IntegraEzuiKitPlayer } from "../_EzuiKitPlayer";
-import { IntegraHlsPlayer } from "../_HlsPlayer";
+import { IntegraLivePlayer } from "../_LivePlayer";
 import {
   defaultRangeHours,
   fromDatetimeLocalValue,
@@ -443,7 +443,7 @@ export default function IntegraVideoPage() {
                         height={layout <= 4 ? 280 : 160}
                       />
                     ) : (
-                      <IntegraHlsPlayer src={s.hls} compact showLiveBadge />
+                      <IntegraLivePlayer src={s.hls} compact showLiveBadge />
                     )}
                   </div>
                 </div>
@@ -567,7 +567,7 @@ export default function IntegraVideoPage() {
                     {focus.provider === "HCT" ? (
                       <IntegraEzuiKitPlayer stream={focus.stream} cameraId={focus.id} height={420} />
                     ) : (
-                      <IntegraHlsPlayer src={focus.hls} />
+                      <IntegraLivePlayer src={focus.hls} />
                     )}
                     {note && (
                       <p className={styles.videoNote}>

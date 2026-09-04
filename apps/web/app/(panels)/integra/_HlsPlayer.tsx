@@ -1,5 +1,6 @@
 "use client";
 
+import type HlsType from "hls.js";
 import { useEffect, useRef, useState } from "react";
 import styles from "./integra.module.css";
 
@@ -11,6 +12,12 @@ type Props = {
   showLiveBadge?: boolean;
   compact?: boolean;
   className?: string;
+  /**
+   * Espera antes de conectar. En un muro los mosaicos se escalonan: si los
+   * nueve montan su decodificador y piden el manifiesto en el mismo instante,
+   * el navegador no da abasto y parte se queda pausada con el botón de play.
+   */
+  startDelayMs?: number;
 };
 
 type Phase = "idle" | "loading" | "playing" | "paused" | "error";
@@ -29,6 +36,7 @@ export function IntegraHlsPlayer({
   showLiveBadge = true,
   compact = false,
   className,
+  startDelayMs = 0,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [phase, setPhase] = useState<Phase>(src ? "loading" : "idle");
@@ -47,39 +55,81 @@ export function IntegraHlsPlayer({
       return;
     }
 
-    let hls: {
-      destroy: () => void;
-      on?: (ev: string, cb: (...args: unknown[]) => void) => void;
-      startLoad?: () => void;
-      recoverMediaError?: () => void;
-    } | null = null;
+    // Tipo real del paquete. Antes era una forma estructural a mano porque
+    // `Hls` llegaba como global sin tipos desde el CDN.
+    let hls: HlsType | null = null;
     let usingHls = false;
     let cancelled = false;
+    let playTimer: ReturnType<typeof setTimeout> | null = null;
+    let startTimer: ReturnType<typeof setTimeout> | null = null;
     setPhase("loading");
     setErrMsg(null);
+
+    /**
+     * Arranca el video, reintentando si el navegador dice que no.
+     *
+     * En un muro de 9 cámaras, Chrome rechaza parte de los `play()` cuando
+     * todos arrancan en el mismo instante: no es la política de autoplay —el
+     * video va muteado, que ella sí permite— sino que el navegador no da abasto
+     * montando nueve decodificadores a la vez. Rendirse al primer intento
+     * dejaba media rejilla con el botón de play puesto, y el usuario tenía que
+     * ir clic por clic.
+     *
+     * Los reintentos van escalonados, así que cada mosaico entra cuando hay
+     * hueco en vez de pelearse con los demás. Sólo tras agotarlos se muestra el
+     * play manual, que es la salida honesta si el navegador de verdad no puede.
+     */
+    let playAttempt = 0;
+    const PLAY_RETRY_MS = [250, 750, 1500, 3000];
 
     const tryPlay = () => {
       if (cancelled || !autoPlay) return;
       video.muted = true;
       const p = video.play();
-      if (p && typeof p.then === "function") {
-        void p
-          .then(() => {
-            if (!cancelled) setPhase("playing");
-          })
-          .catch(() => {
-            if (!cancelled) setPhase("paused");
-          });
-      }
+      if (!p || typeof p.then !== "function") return;
+      void p
+        .then(() => {
+          if (!cancelled) {
+            playAttempt = 0;
+            setPhase("playing");
+          }
+        })
+        .catch(() => {
+          if (cancelled) return;
+          const wait = PLAY_RETRY_MS[playAttempt];
+          if (wait == null) {
+            setPhase("paused");
+            return;
+          }
+          playAttempt += 1;
+          setPhase("loading");
+          playTimer = setTimeout(tryPlay, wait);
+        });
     };
 
     const onPlaying = () => {
-      if (!cancelled) setPhase("playing");
+      if (cancelled) return;
+      playAttempt = 0;
+      setPhase("playing");
     };
+    /**
+     * Un mosaico que se pausa solo no es una pausa: es una avería.
+     *
+     * Con nueve cámaras el buffer de alguna se vacía —los segmentos de go2rtc
+     * son de medio segundo— y Chrome pausa el elemento. Antes eso pintaba el
+     * botón de play y ahí se quedaba: la rejilla acababa con la mitad de los
+     * cuadros congelados con imagen pero detenidos, y había que ir clic por
+     * clic. `paused` sólo se muestra cuando de verdad se agotan los reintentos.
+     */
     const onPause = () => {
-      if (!cancelled && !video.ended) {
+      if (cancelled || video.ended) return;
+      if (!autoPlay) {
         setPhase((p) => (p === "loading" ? p : "paused"));
+        return;
       }
+      setPhase("loading");
+      if (playTimer) clearTimeout(playTimer);
+      playTimer = setTimeout(tryPlay, 400);
     };
     const onWaiting = () => {
       if (!cancelled && !video.paused) setPhase("loading");
@@ -104,31 +154,22 @@ export function IntegraHlsPlayer({
         return;
       }
 
-      await new Promise<void>((resolve, reject) => {
-        if ((window as any).Hls) {
-          resolve();
-          return;
-        }
-        const existing = document.querySelector<HTMLScriptElement>("script[data-hlsjs]");
-        if (existing) {
-          if ((window as any).Hls) {
-            resolve();
-            return;
-          }
-          existing.addEventListener("load", () => resolve(), { once: true });
-          existing.addEventListener("error", () => reject(new Error("HLS.js")), { once: true });
-          return;
-        }
-        const s = document.createElement("script");
-        s.src = "https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js";
-        s.dataset.hlsjs = "1";
-        s.onload = () => resolve();
-        s.onerror = () => reject(new Error("No se pudo cargar HLS.js"));
-        document.head.appendChild(s);
-      });
+      // hls.js va **empaquetado**, no desde un CDN.
+      //
+      // Antes se inyectaba un <script> a jsdelivr y en producción no cargaba
+      // nunca: la CSP del sitio permite scripts de Google Maps, Brevo y Stripe,
+      // pero no jsdelivr. El navegador lo bloqueaba en silencio, el player caía
+      // al modo nativo —que sólo Safari tiene— y Chrome mostraba «No se pudo
+      // reproducir el stream» aunque go2rtc estuviera sirviendo el HLS
+      // perfectamente.
+      //
+      // Importarlo también quita una dependencia de internet en una consola de
+      // seguridad: si el sitio del cliente no alcanza el CDN, el video seguía
+      // sin verse. El `import()` lo deja en su propio chunk, así que sólo lo
+      // descarga quien abre el video.
+      const Hls = (await import("hls.js")).default;
 
       if (cancelled) return;
-      const Hls = (window as any).Hls;
       if (!Hls?.isSupported()) {
         video.src = src;
         video.addEventListener("loadedmetadata", tryPlay, { once: true });
@@ -168,15 +209,28 @@ export function IntegraHlsPlayer({
       hls = instance;
     };
 
-    void attach().catch(() => {
-      if (cancelled || !video) return;
-      usingHls = false;
-      video.src = src;
-      video.addEventListener("loadedmetadata", tryPlay, { once: true });
-    });
+    // El arranque va escalonado: el muro le da a cada mosaico un turno. Nueve
+    // decodificadores montándose a la vez es lo que dejaba media rejilla con el
+    // botón de play, y reintentar tampoco servía porque todos reintentaban
+    // juntos otra vez.
+    const start = () =>
+      void attach().catch(() => {
+        if (cancelled || !video) return;
+        usingHls = false;
+        video.src = src;
+        video.addEventListener("loadedmetadata", tryPlay, { once: true });
+      });
+
+    if (startDelayMs > 0) {
+      startTimer = setTimeout(start, startDelayMs);
+    } else {
+      start();
+    }
 
     return () => {
       cancelled = true;
+      if (playTimer) clearTimeout(playTimer);
+      if (startTimer) clearTimeout(startTimer);
       video.removeEventListener("playing", onPlaying);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("waiting", onWaiting);
@@ -193,7 +247,7 @@ export function IntegraHlsPlayer({
         /* ignore */
       }
     };
-  }, [src, autoPlay, retryTick]);
+  }, [src, autoPlay, retryTick, startDelayMs]);
 
   useEffect(() => {
     const video = videoRef.current;
