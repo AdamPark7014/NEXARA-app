@@ -8,35 +8,40 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Health heap + deploy estable
+## Este turno — Horarios ACS todas las puertas + indefinido + presets
 
-Prod `/api/health` daba 503 por `memory_heap` (umbral Terminus 300 MB).
-Contenedor ~1.2 GiB RSS; umbral demasiado bajo bajo carga Integra.
+Cierra el WIP abortado de schedules: path usable API+UI para **todas** las
+puertas del sitio (no solo Sala de Juntas), vigencia indefinida vs temporal,
+presets que materializan franjas en slots correctos.
 
 ### Qué hay
 
-1. **Heap runtime** — `NODE_OPTIONS=--max-old-space-size=2048` en
-   `Dockerfile.api` runner + `docker-compose.nexara.yml`.
-2. **Health** — umbral `HEALTH_HEAP_LIMIT_MB` default **1536** (env).
-3. **Sitio** — `resolveClient`: si `siteId` no pertenece al tenant, cae al
-   sitio default activo (evita 404 por localStorage stale / company mismatch).
-   Oficinas reales: `integra_sites.id=1` / `companyId=2`.
-4. Pre-deploy: health ya 200 (heap bajo tras restart); falta aplicar env.
+1. **Slots plantilla alineados** — `PRESET_TEMPLATE_SLOTS`: oficina=2,
+   after-hours=4, weekend=5 (slot 3 = contratista/diurno). Antes after-hours
+   iba a 3 y weekend a 4 (desfase vs UI/defaults).
+2. **API** — `GET/PATCH people/:id/access`, catálogo `access-schedules` +
+   alias `schedules`; `ensure-preset` en todos los ACS; listado por puerta con
+   `planTemplateNo` desde espejo RightPlan.
+3. **UI `/integra/schedules`** — vistas Por persona / Por puerta / Matriz;
+   presets (24/7, oficina, after-hours, weekend, sala juntas, contratista,
+   visita 1 día, sin acceso); CSS `sched*` en `integra.module.css`.
+4. **`nest build` apps/api** — OK.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
 `/var/www/nexara-app` · `bash deploy/update.sh --force-all`
 
 ### Verificar
 
-1. `GET /api/health` → 200; `memory_heap` up.
-2. `docker exec nexara-api printenv NODE_OPTIONS` → max-old-space-size=2048.
-3. nexara-api / nexara-web Up.
+1. Hard refresh `/integra/schedules` — tabs + presets visibles.
+2. Persona → Indefinido 24/7 → Guardar → OK en .160–.163.
+3. Misma persona → desmarcar indefinido + Hasta hoy → temporal.
+4. Por puerta: lista con plantilla (no todo «1»).
 
 ## A medias
 
 1. Portal empleado · ANPR ITC · micros · TCPMSS.
-2. Visitas recurrentes / Espacios / Horarios — validar UI en prod.
-3. FieldDetection re-apply · employeeNumber↔personId.
+2. Presence / SOC alarms — validar en prod aparte.
+3. FieldDetection re-apply · employeeNumber↔personId Oficinas.
 
 ## No tocar
 
