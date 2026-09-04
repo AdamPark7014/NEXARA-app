@@ -727,6 +727,30 @@ export default function IntegraVideoPage() {
                 )}
                 {focus && mode === "focus" && (
                   <>
+                    {showPtz && (
+                      <div className={styles.ptzChrome}>
+                        <IntegraPtzPad
+                          cameraId={focus.id}
+                          canControl={Boolean(caps?.canControlDoors)}
+                        />
+                        <div className={styles.ptzChromeMeta}>
+                          {focusCam?.anprCapable !== true && (
+                            <p className={styles.ptzHint}>
+                              Esta PTZ no clasifica vehículo ni lee placa
+                              (FieldDetection/ANPR no soportados). Solo video +
+                              mando. Hace falta cámara ITC/AcuSense con vehicle.
+                            </p>
+                          )}
+                          {!focus.hls && (
+                            <p className={styles.ptzHint}>
+                              El mando funciona aunque el video diga «Conectando…»
+                              (MSE/go2rtc). Reintenta Actualizar si el cuadro
+                              no abre.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     {focus.provider === "HCT" ? (
                       <IntegraEzuiKitPlayer stream={focus.stream} cameraId={focus.id} height={420} />
                     ) : (
@@ -759,20 +783,6 @@ export default function IntegraVideoPage() {
                           anprCapable={focusCam?.anprCapable}
                           isPtz={Boolean(showPtz || focusCam?.isPtz)}
                         />
-                      )}
-                      {showPtz && (
-                        <>
-                          {focusCam?.anprCapable !== true && (
-                            <p className={styles.ptzHint}>
-                              Esta PTZ no tiene ANPR: se mueve y hace zoom, pero no lee
-                              matrículas. Hace falta cámara serie ITC.
-                            </p>
-                          )}
-                          <IntegraPtzPad
-                            cameraId={focus.id}
-                            canControl={Boolean(caps?.canControlDoors)}
-                          />
-                        </>
                       )}
                     </div>
                     {note && (

@@ -50,8 +50,11 @@ const POLL_MS = 400;
 const SEED_MS = 90_000;
 /** VMD sin TargetRect: solo mantiene cajas ya pintadas (presencia sentada). */
 const PRESENCE_HOLD_MS = 75_000;
-/** Distancia de centros (0..1) bajo la cual dos humanos se consideran el mismo. */
-const SOFT_CENTER_DIST = 0.2;
+/** Distancia de centros (0..1) bajo la cual dos humanos se consideran el mismo.
+ *  Conservador: en Meeting Room tres sentados están lejos; no fusionarlos. */
+const SOFT_CENTER_DIST = 0.12;
+/** Tope de cajas sticky simultáneas (multi-persona). */
+const MAX_TRACKS = 8;
 
 type Listener = (events: PushEvent[]) => void;
 
@@ -132,7 +135,16 @@ export function mergeBoxes(prev: Box[], incoming: Box[]): Box[] {
       out.push(n);
     }
   }
-  return out;
+  if (out.length <= MAX_TRACKS) return out;
+  // Conserva las más recientes / con nombre; no tira las demás al llegar 1 caja nueva.
+  return out
+    .slice()
+    .sort((a, b) => {
+      const named = Number(Boolean(b.personName)) - Number(Boolean(a.personName));
+      if (named) return named;
+      return b.at - a.at;
+    })
+    .slice(0, MAX_TRACKS);
 }
 
 function boxesFromEvents(events: PushEvent[], deviceIp: string, now = Date.now()): Box[] {
@@ -371,12 +383,14 @@ export function IntegraDetectionOverlay({
     <div className={styles.detOverlay} aria-hidden>
       {motionAt != null && (
         <div className={styles.detMotionChip} data-boxes={boxes.length ? "1" : undefined}>
-          {boxes.length ? "Detección activa" : "Movimiento · sin caja AcuSense"}
+          {boxes.length
+            ? `Presencia · ${boxes.length}`
+            : "Movimiento · sin caja AcuSense"}
         </div>
       )}
       {boxes.map((b) => {
         const name = b.personName?.trim();
-        const tag = name || (b.type === "human" ? "Humano · sin ID" : labelFor(b.type));
+        const tag = name || labelFor(b.type);
         const life = Math.max(0.25, 1 - (Date.now() - b.at) / b.ttl);
         return (
           <div

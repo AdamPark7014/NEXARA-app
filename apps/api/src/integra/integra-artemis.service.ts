@@ -439,7 +439,13 @@ export class IntegraArtemisService {
   ptzMove(
     companyId: number | null,
     cameraIndexCode: string,
-    v: { pan?: number; tilt?: number; zoom?: number; durationMs?: number },
+    v: {
+      pan?: number;
+      tilt?: number;
+      zoom?: number;
+      durationMs?: number;
+      continuous?: boolean;
+    },
     siteId?: number | null,
   ) {
     return this.media.ptzMove(companyId, cameraIndexCode, v, siteId);
