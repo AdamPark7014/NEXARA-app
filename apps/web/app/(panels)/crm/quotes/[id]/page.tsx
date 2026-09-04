@@ -179,8 +179,8 @@ export default function QuoteDetailPage() {
     } finally { setSending(false); }
   };
 
-  if (loading) return <EmptyState icon="⏳" title="Cargando cotizacion…" description="Consultando detalle." />;
-  if (error || !quote) return <DetailError message={error ?? "Cotizacion no encontrada"} onRetry={load} />;
+  if (loading) return <EmptyState icon="⏳" title="Cargando cotización…" description="Consultando detalle." />;
+  if (error || !quote) return <DetailError message={error ?? "Cotización no encontrada"} onRetry={load}; />;
 
   const linkedOpportunity = quote.salesQuotes?.[0]?.opportunity;
   const totalNum = Number(quote.total);
