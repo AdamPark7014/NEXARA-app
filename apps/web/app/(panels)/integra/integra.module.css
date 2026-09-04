@@ -2304,6 +2304,79 @@ select.igControl {
   opacity: 0.72;
 }
 
+.personModeTabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 3px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-sm, 8px);
+  background: color-mix(in srgb, var(--ig-surface, #fff) 55%, var(--ig-panel));
+}
+
+.personModeTab {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--ig-muted);
+  font-size: 11.5px;
+  font-weight: 650;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.personModeTab[data-on="1"] {
+  background: var(--ig-panel);
+  color: var(--ig-fg, var(--foreground));
+  box-shadow: 0 1px 2px color-mix(in srgb, #000 8%, transparent);
+}
+
+.personModeTab:focus-visible {
+  outline: none;
+  box-shadow: var(--ig-focus);
+}
+
+.personErpOnly {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-top: 1px dashed var(--ig-line);
+  display: grid;
+  gap: 8px;
+}
+
+.personErpOnly > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--ig-muted);
+}
+
+.personErpOnly > header strong {
+  font-size: 12px;
+  color: var(--ig-fg, var(--foreground));
+}
+
+.personErpOnlyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.personErpOnlyRow strong {
+  display: block;
+  font-size: 13px;
+}
+
+.personErpOnlyRow span {
+  display: block;
+  font-size: 11px;
+  color: var(--ig-muted);
+}
+
 .personCard {
   display: grid;
   gap: 12px;

@@ -1806,7 +1806,7 @@ export default function IntegraPeoplePage() {
               <div className={styles.personEmptyBox}>
                 <strong>Ninguna ficha abierta</strong>
                 <p>Elige a alguien del directorio o da de alta a una persona nueva.</p>
-                <IgBtn variant="primary" onClick={startAlta}>
+                <IgBtn variant="primary" onClick={() => startAlta("unified")}>
                   + Nueva persona
                 </IgBtn>
               </div>

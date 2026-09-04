@@ -8,43 +8,55 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — ERP shell UX (amigable / denso)
+## Este turno — ERP rol → plantilla de acceso ACS
 
-Ownership: AppShell + chrome de páginas ERP (no motores PDF / hybrid /
-identidad ACS).
+Unifiqué horarios de acceso con usuarios ERP vía `employeeNumber` =
+`employeeNo` ACS. Al crear/editar/activar/cambiar rol o contrato se
+empuja `UserInfo` + `RightPlan` + `Valid` a los terminales (fan-out
+ISAPI). **No** se duplicó el editor semanal (UI sibling en Integra
+Personas).
 
-### Entregado (shell UX)
+### Plantillas (roleKey / tipoContrato / isActive)
 
-1. **PageChrome** + `PageHeader density="ops"`; FilterToolbar / EmptyState densos.
-2. **Rails**: SettingsModuleRail, FinanceModuleRail, ErpModuleCards + erp-chrome.css.
-3. **Labels ES** access-matrix + breadcrumbs (Analítica, Base de conocimiento,
-   Registro de auditoría, Bancos, Documentos→Gobierno…).
-4. **AppShell** ERP/OPS más denso (248px, menos glow).
-5. **Callejones**: approvals→mapa; settings ES+rail; facilities→Integra;
-   documentos/finanzas chrome.
+| Caso | Clave | Puertas | Vigencia | planTemplateNo |
+|------|-------|---------|----------|----------------|
+| Empleado indefinido | `office_hours` | todas | indefinida | `2` (env `INTEGRA_PLAN_OFFICE`) |
+| CEO / super_admin / dir_ops / arquitecto | `always_on` | todas | indefinida 24/7 | `1` |
+| Contratista / ing_campo | `contractor` | General + Sala Juntas | ingreso → +12 meses | `3` |
+| Visitante / cliente | `visitor` | solo Sala de Juntas | día en curso | `1` |
+| Inactivo | `disabled` | — | `Valid.enable=false` | — |
 
-### Concurrente en disco (siblings — no pisar)
+- `GET /users/:id/integra-access-schedule` — vista previa.
+- UI ERP usuarios: bloque «Horario de acceso Integra» en drawer + hint en formulario.
+- Archivos: `access-schedule-defaults.ts` (+spec), `integra-acs-fanout.pushErpUser` ampliado, hooks en `users.service`.
 
-- Identidad unificada ERP↔ACS (`IdentityLinkService`, Personas link, my-profile).
-- Stock kardex hiper-detallado; PTZ/Eventos/Personas ACS; OC PDF CRM.
+Las plantillas week 2/3 deben existir en el ACS (sibling calendarios /
+`UserRightWeekPlanCfg`). Sin ellas el terminal puede rechazar o ignorar
+el `planTemplateNo`.
+
+### Concurrente (siblings — no pisar)
+
+Editor semanal Personas · fan-out identity · business events ROI ·
+asistencia ACS · hybrid attendance · PTZ.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` → `./deploy/update.sh`
+`/var/www/nexara-app` · `./deploy/update.sh --force-all --with-migrate`
 
-### Verificar shell UX (hard refresh)
+### Verificar
 
-1. Sidebar ERP: labels claros + densidad.
-2. Configuración / CFDI / Bancos: rails.
-3. Aprobaciones: sin botón muerto.
-4. Accesos oficinas → banner Integra.
+1. ERP usuarios → abrir IAM: bloque Horario de acceso Integra.
+2. Activar/desactivar empleado → ACS `Valid.enable`.
+3. Rol CEO → plan 1 todas las puertas; cliente → solo Sala Juntas.
+4. Mismo `employeeNumber` en ficha ERP y terminal.
 
 ## A medias
 
-1. Portal empleado · NVR httpHost · ANPR · micros · TCPMSS.
-2. FieldDetection; más páginas ERP aún en PageHeader default.
-3. Identity link: wire completo + push fan-out (sibling).
+1. Portal empleado · ANPR ITC · micros · TCPMSS.
+2. Asegurar plantillas week 2/3 en terminales Oficinas (sibling).
+3. Backfill masivo `notifications.companyId`.
+4. FieldDetection re-apply tras sync.
 
 ## No tocar
 
 Puente NAS, Traefik, credenciales.
-No pelear siblings identidad/PTZ/Personas/Eventos/asistencia/OC PDF/stock.
+Face ID óptico inventado. Editor semanal UI (sibling).
