@@ -29,6 +29,7 @@ const PATH_TO_MODULE: Record<string, string> = {
   "/integra/access": "integra-access",
   "/integra/people": "integra-people",
   "/integra/schedules": "integra-schedules",
+  "/integra/espacios": "integra-espacios",
   "/integra/events": "integra-events",
   "/integra/vehicles": "integra-vehicles",
   "/integra/alarms": "integra-alarms",

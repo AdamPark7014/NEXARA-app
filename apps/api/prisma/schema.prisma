@@ -882,6 +882,14 @@ model Activity {
   recommendations         ActivityRecommendation[]
   /// Acuerdos de reunión que apuntan a este servicio.
   meetingAgreements       MeetingAgreement[]
+  /// Primer check-in ACS (Acceso General) vinculado al equipo de la OT.
+  acsEnteredAt            DateTime?
+  acsEnteredByUserId      Int?
+  acsEnteredByUser        User?                    @relation("ActivityAcsEnteredBy", fields: [acsEnteredByUserId], references: [id], onDelete: SetNull)
+  acsEntryDoor            String?                  @db.VarChar(120)
+  /// Salida ACS / bandera «salió del sitio».
+  acsExitedAt             DateTime?
+  acsLeftSite             Boolean                  @default(false)
   deletedAt               DateTime?
   companyId               Int
   company                 CompanyProfile           @relation(fields: [companyId], references: [id], onDelete: Restrict)
@@ -890,6 +898,7 @@ model Activity {
   @@index([projectId])
   @@index([clientId])
   @@index([companyId])
+  @@index([acsEnteredAt])
 }
 
 enum ActivityWorkType {
