@@ -54,11 +54,11 @@ function genderLabel(g?: string) {
   return String(g);
 }
 
-function validityOf(p: Person): { key: "ok" | "warn" | "expired" | "off" | "unknown"; label: string; tone: "ok" | "warn" | "danger" | "muted" | "neutral" } {
+function validityOf(p: Person): { key: "ok" | "warn" | "expired" | "off" | "unknown"; label: string; tone: "ok" | "warn" | "danger" | "neutral" } {
   if (p.validEnable === false) return { key: "off", label: "Deshabilitada", tone: "danger" };
-  if (!p.validTo) return { key: "unknown", label: "Sin vigencia", tone: "muted" };
+  if (!p.validTo) return { key: "unknown", label: "Sin vigencia", tone: "neutral" };
   const end = Date.parse(p.validTo);
-  if (!Number.isFinite(end)) return { key: "unknown", label: p.validTo, tone: "muted" };
+  if (!Number.isFinite(end)) return { key: "unknown", label: p.validTo, tone: "neutral" };
   const days = (end - Date.now()) / 86_400_000;
   if (days < 0) return { key: "expired", label: "Vencida", tone: "danger" };
   if (days < 30) return { key: "warn", label: "Por vencer", tone: "warn" };
