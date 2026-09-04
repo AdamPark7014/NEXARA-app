@@ -51,6 +51,10 @@ export type IntegraPersonDto = {
   faceUrl?: string | null;
   hasFace?: boolean;
   sourceIp?: string;
+  /** Nombre del terminal donde está dada de alta. La IP no le dice nada a nadie. */
+  sourceName?: string;
+  /** Puertas a las que tiene derecho, ya resueltas a nombre. */
+  doorNames?: string[];
 };
 
 export function mapIsapiUserToPersonDto(

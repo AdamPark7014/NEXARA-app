@@ -42,6 +42,10 @@ type StreamSlot = {
   note?: string | null;
   provider?: string | null;
   stream?: Record<string, unknown> | null;
+  /** El equipo tiene pista de audio. Las cámaras del parque salen sin ella. */
+  hasAudio?: boolean;
+  /** Este stream concreto se pidió con audio. */
+  audio?: boolean;
 };
 
 type ViewMode = "wall" | "focus";
@@ -135,24 +139,32 @@ export default function IntegraVideoPage() {
     [items, region, q],
   );
 
-  const fetchStream = useCallback(async (cam: Cam): Promise<StreamSlot> => {
-    const data = await integraApi<{
-      hls: string | null;
-      rtsp: string | null;
-      note?: string;
-      provider?: string;
-      stream?: Record<string, unknown>;
-    }>(`integra/cameras/${encodeURIComponent(cam.id)}/stream`, { method: "POST" });
-    return {
-      id: cam.id,
-      name: cam.name,
-      hls: data.hls,
-      rtsp: data.rtsp,
-      note: data.note,
-      provider: data.provider,
-      stream: data.stream,
-    };
-  }, []);
+  const fetchStream = useCallback(
+    async (cam: Cam, withAudio = false): Promise<StreamSlot> => {
+      const qs = withAudio ? "?audio=1" : "";
+      const data = await integraApi<{
+        hls: string | null;
+        rtsp: string | null;
+        note?: string;
+        provider?: string;
+        stream?: Record<string, unknown>;
+        hasAudio?: boolean;
+        audio?: boolean;
+      }>(`integra/cameras/${encodeURIComponent(cam.id)}/stream${qs}`, { method: "POST" });
+      return {
+        id: cam.id,
+        name: cam.name,
+        hls: data.hls,
+        rtsp: data.rtsp,
+        note: data.note,
+        provider: data.provider,
+        stream: data.stream,
+        hasAudio: data.hasAudio,
+        audio: data.audio,
+      };
+    },
+    [],
+  );
 
   const playLive = useCallback(
     async (cam: Cam, multi = false) => {
@@ -616,6 +628,33 @@ export default function IntegraVideoPage() {
                   </>
                 )}
                 <div className={styles.focusActions}>
+                  {focus?.hasAudio && (
+                    <IgBtn
+                      variant={focus.audio ? "primary" : undefined}
+                      disabled={busy === "aud"}
+                      title={
+                        focus.audio
+                          ? "Volver al stream sin audio"
+                          : "Reabrir el stream con la pista de audio del equipo"
+                      }
+                      onClick={async () => {
+                        const cam = items.find((c) => c.id === focus.id);
+                        if (!cam) return;
+                        setBusy("aud");
+                        try {
+                          const slot = await fetchStream(cam, !focus.audio);
+                          setSlots((prev) => prev.map((x) => (x.id === slot.id ? slot : x)));
+                          setNote(slot.note || null);
+                        } catch (e) {
+                          setError(e instanceof Error ? e.message : "Error audio");
+                        } finally {
+                          setBusy(null);
+                        }
+                      }}
+                    >
+                      {busy === "aud" ? "…" : focus.audio ? "Audio activo" : "Escuchar"}
+                    </IgBtn>
+                  )}
                   <IgBtn
                     disabled={!selected || busy === "cap"}
                     onClick={async () => {

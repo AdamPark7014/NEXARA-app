@@ -45,6 +45,13 @@ export type IsapiVideoChannel = {
   /** El id sin sufijo de stream — `null` si el equipo usa otra numeración. */
   streamIndex: number | null;
   ptz: boolean | null;
+  /**
+   * El canal trae pista de audio. Las cámaras de este parque salen de fábrica
+   * con `<Audio><enabled>false</enabled>` aunque el micrófono exista; los
+   * terminales de acceso vienen con audio activo. `null` = el equipo no lo dice.
+   */
+  audio: boolean | null;
+  audioCodec: string | null;
   rtsp: string;
   rtspRedacted: string;
   /**
@@ -131,6 +138,7 @@ export async function listVideoChannels(
       const numeric = /^\d+$/.test(id) ? Number(id) : null;
       const width = pick(node, 'Video.videoResolutionWidth');
       const height = pick(node, 'Video.videoResolutionHeight');
+      const audioEnabled = pick(node, 'Audio.enabled');
       return {
         id,
         name: pick(node, 'channelName'),
@@ -142,6 +150,8 @@ export async function listVideoChannels(
         channelNumber: numeric && id.length >= 3 ? Math.floor(numeric / 100) : numeric,
         streamIndex: numeric && id.length >= 3 ? numeric % 100 : null,
         ptz: null,
+        audio: audioEnabled === null ? null : audioEnabled === 'true',
+        audioCodec: pick(node, 'Audio.audioCompressionType'),
         rtsp: client.rtspUrl(id),
         rtspRedacted: client.rtspUrlRedacted(id),
         source: null,

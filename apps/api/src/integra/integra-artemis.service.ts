@@ -390,8 +390,13 @@ export class IntegraArtemisService {
     }
   }
 
-  stream(companyId: number | null, cameraIndexCode: string, siteId?: number | null) {
-    return this.media.liveStream(companyId, cameraIndexCode, siteId);
+  stream(
+    companyId: number | null,
+    cameraIndexCode: string,
+    siteId?: number | null,
+    opts?: { audio?: boolean },
+  ) {
+    return this.media.liveStream(companyId, cameraIndexCode, siteId, opts);
   }
 
   async playback(
@@ -843,16 +848,62 @@ export class IntegraArtemisService {
     }
   }
 
+  /**
+   * Cambia la IP del terminal por su nombre y resuelve las puertas del
+   * `RightPlan`. La ficha de una persona tiene que decir «Acceso General», no
+   * «192.168.9.163»: la IP es un detalle de instalación, no un dato de negocio.
+   */
+  private async personLabels(siteId: number | null | undefined) {
+    if (!siteId) return { name: () => undefined, doors: () => undefined };
+    const [devices, doors] = await Promise.all([
+      this.prisma.integraDevice.findMany({
+        where: { siteId, ip: { not: null } },
+        select: { ip: true, name: true },
+      }),
+      this.prisma.integraDoor.findMany({
+        where: { siteId },
+        select: { doorIndexCode: true, name: true },
+      }),
+    ]);
+    const byIp = new Map(devices.map((d) => [d.ip as string, d.name]));
+    // `doorIndexCode` es `<ip>|<doorNo>`; el RightPlan de la persona trae el
+    // `doorNo` relativo a **su** terminal, así que la IP desempata.
+    const byKey = new Map(doors.map((d) => [d.doorIndexCode, d.name]));
+    return {
+      name: (ip?: string) => (ip ? byIp.get(ip) : undefined),
+      doors: (ip: string | undefined, plan: unknown) => {
+        if (!ip) return undefined;
+        const nos = Array.isArray(plan)
+          ? plan
+              .map((r) => (r && typeof r === 'object' ? (r as { doorNo?: unknown }).doorNo : null))
+              .filter((n): n is number => typeof n === 'number')
+          : [];
+        const names = nos
+          .map((no) => byKey.get(`${ip}|${no}`))
+          .filter((n): n is string => Boolean(n));
+        return names.length ? names : undefined;
+      },
+    };
+  }
+
   async listPeople(companyId: number | null, live = false, siteId?: number | null) {
     if (!live && companyId) {
       const items = await this.prisma.integraPerson.findMany({
         where: { companyId, ...(siteId ? { siteId } : {}) },
         orderBy: { personName: 'asc' },
       });
+      const label = await this.personLabels(siteId ?? items[0]?.siteId ?? null);
       return {
         total: items.length,
         source: 'mirror' as const,
-        items: items.map((p) => mapMirrorPersonToDto(p)),
+        items: items.map((p) => {
+          const dto = mapMirrorPersonToDto(p);
+          return {
+            ...dto,
+            sourceName: label.name(dto.sourceIp),
+            doorNames: label.doors(dto.sourceIp, dto.rightPlan),
+          };
+        }),
       };
     }
 
@@ -879,7 +930,14 @@ export class IntegraArtemisService {
           this.logger.warn(`UserInfo live ${d.ip}: ${String(e)}`);
         }
       }
-      const items = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+      const label = await this.personLabels(resolved.siteId);
+      const items = [...byId.values()]
+        .map((dto) => ({
+          ...dto,
+          sourceName: label.name(dto.sourceIp),
+          doorNames: label.doors(dto.sourceIp, dto.rightPlan),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
       return { total: items.length, source: 'live' as const, items };
     }
 
@@ -916,12 +974,17 @@ export class IntegraArtemisService {
         throw new NotFoundException(`Persona ${personId} no está en el espejo — sincroniza el sitio`);
       }
       const dto = mapMirrorPersonToDto(row);
+      const label = await this.personLabels(row.siteId);
       return {
         personId,
         source: 'mirror' as const,
         provider: 'ISAPI',
         note: 'Alta y edición se hacen en el terminal. Aquí se muestra el espejo ISAPI.',
-        person: dto,
+        person: {
+          ...dto,
+          sourceName: label.name(dto.sourceIp),
+          doorNames: label.doors(dto.sourceIp, dto.rightPlan),
+        },
         raw: row.raw,
       };
     }

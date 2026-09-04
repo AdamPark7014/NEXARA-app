@@ -314,8 +314,11 @@ export class IntegraController {
     @CurrentCompanyId() companyId: number | null,
     @Param('id') id: string,
     @Query('siteId') siteId?: string,
+    @Query('audio') audio?: string,
   ) {
-    return this.integra.stream(companyId, id, siteId ? parseInt(siteId, 10) : null);
+    return this.integra.stream(companyId, id, siteId ? parseInt(siteId, 10) : null, {
+      audio: audio === '1' || audio === 'true',
+    });
   }
 
   @Post('cameras/:id/playback')

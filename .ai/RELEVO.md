@@ -1,7 +1,7 @@
 # RELEVO
 
-- **Último turno:** cursor
-- **Fecha:** 2026-09-03
+- **Último turno:** claude-code
+- **Fecha:** 2026-09-04
 - **Rama:** mejora/calidad-y-web
 
 ## Puente — no cambiar
@@ -21,13 +21,64 @@ componente se queda vacío → spinner eterno.
 - **Foco** → MSE (`video-stream`), `src` se asigna **después** de
   `appendChild` (si no, `onconnect` sale con `isConnected=false`).
 
+## Muro visible en modo Foco («En cola» en todos los mosaicos)
+
+Muro y foco viven montados a la vez y se alternan con el atributo `hidden`.
+Un `display` de clase **le gana** a `[hidden]`, así que `.wallWorkbench`
+(`display: grid`) seguía a la vista en Foco: sus mosaicos se quedaban «En
+cola» —en Foco el muro pierde el cupo— y el panel de foco quedaba debajo,
+ese sí oculto. Por eso «no dejaba ver ninguna en grande».
+Arreglo: `.wallWorkbench[hidden] { display: none }`.
+
+## Audio — medido, no supuesto
+
+| Equipo | Canal | Video | Audio |
+|---|---|---|---|
+| Cámaras (NVR y directas) | 102 / x02 | H.264 | **ninguno** — `<Audio><enabled>false</enabled>` de fábrica |
+| Terminales DS-K1T (.160–.163) | 101 | H.264 720p | **PCM mu-law 8 kHz, activo** |
+
+El hardware de las cámaras sí lleva micro (`audioInputType: MicIn`,
+`TwoWayAudio` presente pero `enabled:false`). **No se ha encendido**:
+prender micrófonos en toda la oficina es decisión de Adam, no del código
+(LFPDPPP + laboral). Se guarda `hasAudio` por cámara en el espejo.
+
+**Transporte:** MSE no reproduce G.711 — con el RTSP crudo el MP4 llega
+**sin pista de audio** (ffprobe sobre `/api/stream.mp4`). Se transcodifica
+solo el audio: `ffmpeg:<rtsp>#video=copy#audio=aac` → `aac 8000 Hz`. go2rtc
+1.9.7 trae ffmpeg 6.1.1 en la imagen. Va a un stream aparte (`…_a`) para no
+cargar el mudo que comparte el muro.
+
+## Fotos de rostro — no se pueden bajar, y está probado
+
+`FDLib/capabilities` → `isSupportModelData: true`, sin capacidad de imagen.
+El terminal guarda un **modelo biométrico** (`modelData`, cabecera `FR700006`),
+no un JPEG. La `faceURL` del UserInfo da **404 con todo**: digest, sin auth
+(401, o sea que la auth sí entra), token `@WEB` recién emitido por FDSearch,
+y `sessionLogin` v2 (login 200 OK). Rutas alternativas probadas: 404.
+
+Los eventos tampoco traen `pictureURL` ni con `picEnable:true` — sí traen
+`FaceRect`, `mask`, `currentVerifyMode`, `cardType`.
+
+**Salidas reales:** (a) que NEXARA sea la fuente y empuje la foto al
+terminal con `FDLib/pictureUpload`; (b) mirar la cámara de la puerta en vivo.
+La ficha ya lo dice en vez de fallar en silencio.
+
+## Terminales de acceso como cámaras
+
+Los cuatro DS-K1T publican `/ISAPI/Streaming/channels/101` (H.264 720p +
+audio). El sync los da de alta en `integra_cameras` con
+`streamId: '101'` — **no** se les deriva sub-stream: solo tienen ese.
+Aparecen en el muro como «<nombre> (puerta)».
+
 SSH: `-p 2222 root@5.78.215.109` → `/var/www/nexara-app`
 
 ## A medias
 
-1. Desplegar este fix y hard-refresh del muro.
-2. Personas sync + fotos.
-3. TCPMSS / biblioteca init / empresas 1-2.
+1. Verificar el muro tras este despliegue + correr sync para que aparezcan
+   las 4 cámaras de puerta (13 → 17).
+2. Control de acceso desde la ficha de persona (abrir puerta, ver su cámara).
+3. Decidir si se encienden los micros de las cámaras.
+4. TCPMSS / biblioteca `init: true` / empresas 1-2.
 
 ## No tocar
 
