@@ -746,8 +746,10 @@ export default function IntegraPeoplePage() {
       />
       <IgError>{error}</IgError>
       <p className={styles.personLead}>
-        Una persona = <strong>usuario ERP</strong> (rol + correo) + <strong>código ACS</strong>{" "}
-        (mismo nº de empleado) + <strong>foto Face ID</strong>. El alta unificada crea ambos;
+        <strong>Cambios en vivo a terminales.</strong> Alta, edición, Face ID y baja se empujan
+        al instante a todos los ACS; «Reconciliar» solo si el espejo se desfasó. Una persona ={" "}
+        <strong>usuario ERP</strong> (rol + correo) + <strong>código ACS</strong> (mismo nº de
+        empleado / employeeNumber) + <strong>foto Face ID</strong>. El alta unificada crea ambos;
         «Vincular» enrola en terminales a alguien que ya está en ERP.
       </p>
 
