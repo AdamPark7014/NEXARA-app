@@ -99,7 +99,7 @@ export default function WarehousePage() {
   const [products, setProducts] = useState<{ id: number; name: string; sku: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([]);
   const [movement, setMovement] = useState({
-    type: "RECEIPT" as "RECEIPT" | "DISPATCH" | "TRANSFER" | "ADJUSTMENT",
+    type: "RECEIPT" as "RECEIPT" | "DISPATCH" | "TRANSFER" | "ADJUSTMENT" | "ADJUSTMENT_OUT",
     productId: "",
     warehouseId: "",
     toWarehouseId: "",
@@ -108,6 +108,7 @@ export default function WarehousePage() {
     reference: "",
     notes: "",
   });
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [savingMovement, setSavingMovement] = useState(false);
   const [showWarehouseForm, setShowWarehouseForm] = useState(false);
   const [warehouseForm, setWarehouseForm] = useState({ name: "", code: "", address: "", city: "" });

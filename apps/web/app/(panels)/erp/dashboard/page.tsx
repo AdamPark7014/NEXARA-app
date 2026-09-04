@@ -313,7 +313,7 @@ export default function ErpDashboardPage() {
                     <>
                       {a.monto !== null && <Money value={a.monto} compact bold />}
                       <DashPill tone={a.urgencia === "alta" ? "danger" : a.urgencia === "media" ? "warning" : "neutral"}>
-                        {a.urgencia}
+                        {a.urgencia === "alta" ? "Alta" : a.urgencia === "media" ? "Media" : "Baja"}
                       </DashPill>
                     </>
                   }
