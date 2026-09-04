@@ -159,7 +159,7 @@ export default function HybridAttendancePanel({
       label: "Vínculo",
       width: 110,
       render: (r) => (
-        <Tag variant={r.linkStatus === "linked" ? "positive" : r.linkStatus === "erp_only" ? "accent" : "warn"}>
+        <Tag variant={r.linkStatus === "linked" ? "positive" : r.linkStatus === "erp_only" ? "accent" : "warning"}>
           {statusLabel(r.linkStatus)}
         </Tag>
       ),
@@ -210,7 +210,7 @@ export default function HybridAttendancePanel({
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
             {r.flags.map((f) => (
-              <Tag key={f} variant="warn">
+              <Tag key={f} variant="warning">
                 {FLAG_LABEL[f] || f}
               </Tag>
             ))}
@@ -286,7 +286,7 @@ export default function HybridAttendancePanel({
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 14 }}>
         <KpiCard label="Vinculados" value={data?.summary.linked ?? 0} variant="positive" icon="🔗" />
         <KpiCard label="Solo ERP" value={data?.summary.erpOnly ?? 0} variant="accent" icon="⏰" />
-        <KpiCard label="Solo ACS" value={data?.summary.acsOnly ?? 0} variant="warn" icon="🚪" />
+        <KpiCard label="Solo ACS" value={data?.summary.acsOnly ?? 0} variant="warning" icon="🚪" />
         <KpiCard label="Con alertas" value={data?.summary.withFlags ?? 0} variant={data?.summary.withFlags ? "danger" : "default"} icon="⚠️" />
       </div>
 
