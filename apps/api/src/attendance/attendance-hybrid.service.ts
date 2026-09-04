@@ -49,6 +49,7 @@ export class AttendanceHybridService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly integraPush: IntegraPushService,
+    private readonly attendanceService: AttendanceService,
   ) {}
 
   async getHybridDay(
@@ -116,6 +117,19 @@ export class AttendanceHybridService {
         select: { personId: true, personCode: true, personName: true },
       }),
     ]);
+
+    // Plantilla ACS por usuario (retardo vs horario oficina/contratista).
+    const scheduleByUser = new Map<number, string>();
+    for (const u of users) {
+      const assignment = buildAccessScheduleAssignment({
+        employeeNumber: u.employeeNumber,
+        isActive: true,
+        roleKey: (u as { roleKey?: string | null }).roleKey,
+        orgRoleKey: (u as { role?: { orgRoleKey?: string | null } }).role?.orgRoleKey,
+        tipoContrato: (u as { tipoContrato?: string | null }).tipoContrato,
+      });
+      scheduleByUser.set(u.id, assignment.key);
+    }
 
     const companyEmpByUser = new Map<number, string | null>();
     for (const m of memberships) {

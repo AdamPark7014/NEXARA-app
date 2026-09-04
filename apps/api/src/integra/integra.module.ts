@@ -20,10 +20,19 @@ import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
 import { IntegraSpacesService } from './integra-spaces.service';
 import { IntegraSchedulesService } from './integra-schedules.service';
 import { IntegraPresenceService } from './integra-presence.service';
+import { AcsOpsBridgeService } from './acs-ops-bridge.service';
 import { IdentityModule } from '../identity/identity.module';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, AuditModule, ServiceClientsModule, IdentityModule],
+  imports: [
+    ConfigModule,
+    PrismaModule,
+    AuditModule,
+    ServiceClientsModule,
+    IdentityModule,
+    NotificationsModule,
+  ],
   controllers: [
     IntegraController,
     IntegraEdgeController,
@@ -42,6 +51,7 @@ import { IdentityModule } from '../identity/identity.module';
     IntegraSpacesService,
     IntegraSchedulesService,
     IntegraPresenceService,
+    AcsOpsBridgeService,
   ],
   exports: [
     IntegraArtemisService,
@@ -54,6 +64,7 @@ import { IdentityModule } from '../identity/identity.module';
     IntegraSpacesService,
     IntegraSchedulesService,
     IntegraPresenceService,
+    AcsOpsBridgeService,
   ],
 })
 export class IntegraModule {}
