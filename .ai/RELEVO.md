@@ -8,55 +8,52 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — AcuSense al límite (Field/Line/Face/Motion + push)
+## Este turno — Integra Eventos ACS (negocio)
 
-Adam: maximizar cajas y tasa de eventos en cámaras LAN `.171–.178`
-(DS-2CD2123G2-LIS2U). Sin Face ID óptico inventado.
+Vista de negocio sobre empuje local: accesos concedidos/denegados con foto,
+puerta, persona y hora. **No** toqué FieldDetection / ISAPI discovery / AcuSense
+(sibling concurrente, ya en commits WIP).
 
-### Qué cambió (código)
+### Qué hay
 
-1. **`enableMaxSmartDetection`** (hikvision-isapi): FieldDetection todas las
-   regiones, polígono full-frame, `sensitivityLevel=100`, `timeThreshold=0`,
-   `alarmConfidence=low`, `detectionTarget=human` (Almacén → `human,vehicle`).
-2. **Bugfix**: el tag real es `sensitivityLevel` (antes se escribía
-   `sensitivity` y el firmware lo ignoraba — regiones seguían a 50 / off).
-3. **LineDetection** línea horizontal mid-frame; **FaceDetect** (cajas, no ID);
-   **Motion** sens. 80; **substream H.264** confirmado; audio ON si hay mic.
-4. **`ensureSmartEventTriggersCenter`**: field/line/face/VMD → `center`
-   (httpHosts). `uploadImagesDataType=binary` + `httpBroken=false`.
-5. **`wireDevices(detection)`** usa `enableMaxSmartDetection` en AcuSense;
-   NVR PoE vehicle y PTZ motion intactos (sibling PTZ/NVR).
-6. Parser: `facedetection` usa `FaceRect` de la raíz del alert.
-7. Docs `INTEGRA-LAN.md` rutas Smart verificadas en vivo contra .178.
+1. **`push/events`** — filtros `scope=acs|noise|all`, `outcome=granted|denied`,
+   `personName`, `deviceIp`, `from`/`to`, `beforeId` (paginación sin OFFSET),
+   latencia `ms` en respuesta. UI default = ACS (no heartBeat/VMD).
+2. **`push/events/stats`** — KPIs del día: entradas, denegados, únicos, en sitio.
+3. **Índices** — migración `20260904160000_integra_push_events_acs_indexes`
+   (`companyId+major+occurredAt`, `siteId+major+occurredAt`, `companyId+id`,
+   `siteId+eventType+occurredAt`).
+4. **UI `/integra/events`** — KPI strip, Hoy/Denegados/7d/Ruido, persona/puerta,
+   CSV, live SSE + poll `afterId`+`live=1`, tarjetas con foto y tono
+   concedido/denegado. Fuente = push (rápido), no sondeo Artemis.
+5. **DTO** — `major`/`minor`/`outcome` en PushEventDto (SSE/overlay compat).
 
-### Probe real (prod → NAS → cámaras)
+### Concurrente (siblings — no pisar)
 
-- SmartCap: Field+Line+FaceDetect true; IntrusionDetection 404; Parking false.
-- Antes del wire: regiones FieldDetection **disabled**; httpHosts sin binary.
-- Substream ya H.264 640×360; audio true en AcuSense.
+AcuSense Field/Line/Face/Motion XML · Face ACS JPEG / Personas · CRM OC PDF ·
+stock · PTZ · hybrid attendance · ERP chrome · `integra_room_bookings` (untracked).
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` → `./deploy/update.sh --force-all`
+`/var/www/nexara-app` · `deploy/update.sh --force-all` (rebuild api+web; aplica
+migración índices)
 
-### Verificar
+### Verificar (hard refresh)
 
-1. Tras deploy: wire site 1 con `detection:true`.
-2. GET FieldDetection/1 en .178 → 4 regiones enabled, sens 100, poly full.
-3. httpHosts/1 → `uploadImagesDataType=binary`.
-4. Eventos fielddetection↑; Meeting Room multi-caja sticky.
-
-## Concurrente (siblings — no pisar)
-
-Asistencia híbrida ERP↔Integra (desplegada) · CRM · stock · Personas ACS ·
-identity-link WIP · Eventos UI.
+1. `/integra/events` — KPIs del día; default sin VMD/heartBeat.
+2. Filtro Denegados + Exportar CSV.
+3. Pase real en terminal → tarjeta en vivo &lt;4 s con foto.
+4. Overlay video / RecentAccess siguen vivos (`scope` all / `live=1`).
+5. Migración índices aplicada en deploy.
 
 ## A medias
 
-1. Portal empleado · ANPR ITC · micros · TCPMSS.
-2. Confirmar wire+event rate en prod tras este deploy.
-3. Alinear employeeNumber↔personId Oficinas (asistencia).
+1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
+2. Alinear códigos employeeNumber↔personId en plantilla real Oficinas.
+3. go2rtc.yaml en disco corruptible — streams viven en RAM.
+4. FieldDetection re-apply tras sync/push install (sibling AcuSense).
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales, Face ID inventado sobre AcuSense.
-CRM/stock/asistencia siblings.
+Puente NAS, Traefik, credenciales, ISAPI no verificada.
+Face ID óptico inventado. No pelear PTZ / Personas CRUD / hybrid attendance /
+stock detail / OC PDF / FieldDetection camera XML / room_bookings untracked.
