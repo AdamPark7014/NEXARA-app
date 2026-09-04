@@ -19,6 +19,7 @@ export {
   enableFaceDetect,
   ensureSubstreamH264,
   enableMaxSmartDetection,
+  ensureSmartEventTriggersCenter,
   enableNvrParkingVehicleDetection,
   disableFieldDetection,
   type MaxSmartDetectionReport,

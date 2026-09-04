@@ -319,8 +319,11 @@ export default function IntegraPeoplePage() {
       // Sync no bloquea el listado más de lo necesario: fire + refresh.
       await integraApi("integra/sync", { method: "POST" });
       await load();
+      toast.success("Directorio sincronizado desde los terminales");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error sync");
+      const msg = e instanceof Error ? e.message : "Error al sincronizar personas";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSyncing(false);
     }
@@ -410,18 +413,30 @@ export default function IntegraPeoplePage() {
   return (
     <IgPage>
       <IgToolbar
-        title="Control de personal"
+        title="Personas · alta ACS"
         meta={`${filtered.length}/${people.length}${withFace ? ` · ${withFace} con Face` : ""}${
           orgs.length ? ` · ${orgs.length} orgs` : ""
-        } · ${live ? "live" : "espejo"}`}
+        } · ${live ? "consulta live" : "espejo sync"}`}
         actions={
           <>
-            {isIsapi && (
+            {(isIsapi || isArtemis) && (
               <IgBtn variant="primary" onClick={startAlta}>
                 + Nueva persona
               </IgBtn>
             )}
-            <IgBtn onClick={() => setLive((v) => !v)}>{live ? "Live ACS" : "Espejo"}</IgBtn>
+            <IgBtn onClick={() => router.push("/integra/events")} title="Timeline ACS con foto">
+              Eventos Face
+            </IgBtn>
+            <IgBtn
+              onClick={() => setLive((v) => !v)}
+              title={
+                live
+                  ? "Consultando terminales en vivo (más lento)"
+                  : "Listado del espejo sincronizado"
+              }
+            >
+              {live ? "Live ACS ON" : "Espejo sync"}
+            </IgBtn>
             {isIsapi && (
               <IgBtn disabled={syncing} onClick={() => void syncNow()}>
                 {syncing ? "Sincronizando…" : "Sincronizar"}
@@ -433,8 +448,9 @@ export default function IntegraPeoplePage() {
       />
       <IgError>{error}</IgError>
       <p className={styles.personLead}>
-        Face ID vive en los <strong>terminales ACS</strong> (DS-K1T), no en cámaras de oficina.
-        La foto JPEG se guarda en NEXARA para que ficha y eventos siempre muestren imagen.
+        Face ID vive en los <strong>terminales ACS</strong> (p. ej. DS-K1T), no en cámaras de
+        oficina. La foto JPEG se guarda en NEXARA para ficha y eventos. Si el alta falla, el
+        mensaje indica qué terminal rechazó — no es un botón muerto.
       </p>
 
       <IgFilters>

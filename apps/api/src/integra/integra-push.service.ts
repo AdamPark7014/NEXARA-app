@@ -916,7 +916,7 @@ export class IntegraPushService {
               fieldTarget: vehicleish ? 'human,vehicle' : 'human',
             });
             entry.detection = r.field
-              ? `max:fd=${r.field}/ln=${r.line}/fc=${r.face}/md=${r.motion}/au=${r.audio}/sub=${r.substream}`
+              ? `max:fd=${r.field}/ln=${r.line}/fc=${r.face}/md=${r.motion}/tr=${r.triggers}/au=${r.audio}/sub=${r.substream}`
               : 'no-soportado';
           }
         } catch (e) {

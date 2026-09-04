@@ -930,6 +930,7 @@ export type MaxSmartDetectionReport = {
   motion: boolean;
   face: boolean;
   audio: boolean;
+  triggers: boolean;
   substream: 'ok' | 'already' | 'no-channel' | 'fail';
 };
 
@@ -958,6 +959,7 @@ export async function enableMaxSmartDetection(
     motion: false,
     face: false,
     audio: false,
+    triggers: false,
     substream: 'no-channel',
   };
 
@@ -972,6 +974,7 @@ export async function enableMaxSmartDetection(
   if (opts.motion !== false) {
     report.motion = await enableMotionDetection(client, channel, 80);
   }
+  report.triggers = await ensureSmartEventTriggersCenter(client);
   if (opts.audio !== false) {
     // Sub + main: si hay bloque Audio, encenderlo (mic en AcuSense Oficinas = true).
     const a1 = await setChannelAudio(client, `${channel}01`, true);

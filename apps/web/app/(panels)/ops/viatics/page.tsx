@@ -408,8 +408,16 @@ export default function OpsViaticsPage() {
             rows={visibleItems}
             rowKey={(v) => v.id}
             emptyTitle="Sin viáticos"
-            emptyDescription="Registra el primer gasto de campo o espera solicitudes del equipo en sitio."
-            emptyAction={<Button size="sm" variant="secondary" onClick={() => void load()}>Actualizar lista</Button>}
+            emptyDescription="Asigna un presupuesto anticipado o espera solicitudes del equipo en sitio."
+            emptyAction={
+              cfg.canAssign ? (
+                <Button size="sm" variant="primary" onClick={() => { setShowAssign(true); setAssignErr(null); }}>
+                  Asignar viático
+                </Button>
+              ) : (
+                <Button size="sm" variant="secondary" onClick={() => void load()}>Actualizar lista</Button>
+              )
+            }
           />
         )}
       </Section>
