@@ -185,6 +185,7 @@ export default function IntegraPeoplePage() {
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [provider, setProvider] = useState<string | null>(() => getCachedProvider());
+  const [altaOpen, setAltaOpen] = useState(true);
   const isArtemis = !provider || provider === "ARTEMIS";
   const isIsapi = provider === "ISAPI";
 
@@ -290,10 +291,25 @@ export default function IntegraPeoplePage() {
         meta={`${filtered.length}/${people.length}${withFace ? ` · ${withFace} con rostro` : ""}${orgs.length ? ` · ${orgs.length} orgs` : ""} · ${live ? "live" : "espejo"}`}
         actions={
           <>
+            {isIsapi && (
+              <IgBtn
+                variant="primary"
+                onClick={() => {
+                  setSelected(null);
+                  setDetail(null);
+                  setAltaOpen(true);
+                  setOpNote(null);
+                  setOpResults(null);
+                  setError(null);
+                }}
+              >
+                + Nueva persona
+              </IgBtn>
+            )}
             <IgBtn onClick={() => setLive((v) => !v)}>{live ? "Live" : "Espejo"}</IgBtn>
             {isIsapi && (
-              <IgBtn variant="primary" disabled={syncing} onClick={() => void syncNow()}>
-                {syncing ? "Sincronizando…" : "Sincronizar terminales"}
+              <IgBtn disabled={syncing} onClick={() => void syncNow()}>
+                {syncing ? "Sincronizando…" : "Sincronizar"}
               </IgBtn>
             )}
             <IgBtn onClick={() => void load()}>Actualizar</IgBtn>
