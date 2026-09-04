@@ -353,7 +353,7 @@ export default function ErpDashboardPage() {
         </DashCol>
 
         <DashCol span={4}>
-          <DashPanel title="Lo que más usas" subtitle="Saltos rápidos entre paneles" flush>
+          <DashPanel title="Atajos por rol" subtitle="Módulos que usas con más frecuencia" flush>
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               {shortcuts.map((s) => (
                 <ListRow key={s.href} href={s.href} title={s.title} sub={s.desc} trail="→" />

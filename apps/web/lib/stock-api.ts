@@ -169,6 +169,43 @@ export async function listStockMovements(
   return unwrapArray(raw);
 }
 
+async function downloadStockPdf(token: string, path: string, fallbackName: string) {
+  const res = await fetch(buildApiUrl(path), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(typeof data?.message === "string" ? data.message : "No se pudo generar el PDF");
+  }
+  const blob = await res.blob();
+  const cd = res.headers.get("Content-Disposition") || "";
+  const match = /filename="?([^";]+)"?/i.exec(cd);
+  const filename = match?.[1] || fallbackName;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadStockMovementsPdf(
+  token: string,
+  filters?: { productId?: number; warehouseId?: number; type?: string; from?: string; to?: string },
+) {
+  const qs = new URLSearchParams();
+  if (filters?.productId) qs.set("productId", String(filters.productId));
+  if (filters?.warehouseId) qs.set("warehouseId", String(filters.warehouseId));
+  if (filters?.type) qs.set("type", filters.type);
+  if (filters?.from) qs.set("from", filters.from);
+  if (filters?.to) qs.set("to", filters.to);
+  return downloadStockPdf(token, `stock/movements/pdf?${qs}`, "kardex-movimientos.pdf");
+}
+
+export async function downloadStockMovementSlipPdf(token: string, id: number) {
+  return downloadStockPdf(token, `stock/movements/${id}/pdf`, `MOV-${id}.pdf`);
+}
+
 export type LotRow = {
   id: number;
   lotNumber: string;
