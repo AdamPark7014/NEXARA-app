@@ -8,50 +8,48 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Live detection hotpath (ráfagas + sticky multi-caja)
+## Este turno — ACS face al límite + live detection hotpath
 
-Prioridad Adam: UX de detección en vivo al límite mientras siblings
-reconfiguran cámaras (más eventos). Sin inventar Face ID óptico.
+Sin inventar Face ID óptico sobre AcuSense. Maximizamos ACS + NEXARA.
 
-### Qué cambió
+### Face / Personas / push foto
 
-1. **Bus SSE/poll (`_DetectionOverlay`)**: fan-out coalescido 32 ms + dedupe
-   por id (foto diferida pisa); poll 1.2 s si SSE sano / 280 ms si degradado;
-   reconnect SSE 800 ms; lote por chunk de red.
-2. **Paint throttled (~30 fps)**: merge/sticky en refs; `setState` por rAF —
-   no se ralentiza el poll. Edad de placa a 1 Hz.
-3. **Multi-target sticky**: merge lote entrante + tracks; nombres distintos
-   no se fusionan (Meeting Room); tope 12 cajas; presencia VMD 90 s.
-4. **Stream más rápido**: `preloadGo2rtcPlayer` al abrir Video; kicks densos;
-   remount anti-stuck 2.6 s; muro stagger 90 ms; fallback MSE 4.5 s.
-5. **Backend ya en rama**: `attachSnapshotLater` (SSE nombre/FaceRect antes
-   de JPEG); índices ACS `integra_push_events_*` (migración
-   `20260904160000_integra_push_events_acs_indexes`).
-6. **Eventos / banner** (turno facial previo): tarjetas + live SSE; placa
-   «Humano · sin ID» vs nombre ACS.
+1. **Ingest**: acceso ACS (`AccessControllerEvent` major 5) con `personId`
+   adjunta **JPEG enrolado** al instante → banner/events en el primer SSE.
+2. **Snapshot** diferido: canal **102** luego 101; re-SSE con captura de
+   puerta (sustituye foto si llega).
+3. **FaceDataRecord**: validación 8 KB–1.8 MB; meta con `faceLibType`;
+   post-upload **FDSearch** por terminal (verifica enrolo).
+4. Persistencia `uploads/integra-faces/`; proxy face sirve local primero.
+5. UI: wizard foto obligatoria; guía 50–400 KB / 480–720 px.
 
-### Concurrente (siblings — no pisar)
+### Live detection (mismo turno / sibling en rama)
 
-Personas enroll/face storage · FieldDetection wire · CRM/HR/stock.
+Bus SSE/poll coalescido, sticky multi-caja, preload go2rtc — ver commits
+recientes en `mejora/calidad-y-web`. Cajas AcuSense = «Humano · sin ID».
+
+### Concurrente — no pisar
+
+CRM · stock · asistencia · FieldDetection wire.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
 `/var/www/nexara-app` → `./deploy/update.sh`
 
-### Verificar (hard refresh Video + Eventos)
+### Verificar (hard refresh)
 
-1. Video muro/foco: cajas sticky multi-persona; sin lag con ráfagas.
-2. Pase ACS: banner &lt;1 s con nombre (foto puede llegar después).
-3. PTZ no se queda eterno en «Conectando…» (reintenta ~2.6 s).
-4. Eventos: franja «En vivo · ACS» + cards con cara.
-5. Óptica AcuSense sigue diciendo «Humano · sin ID».
+1. Personas → Alta JPEG bueno → ficha con cara; note FDSearch.
+2. Pase puerta → banner **inmediato** con cara enrolada; puede refrescar
+   con snapshot.
+3. Eventos → cards con foto.
+4. Video → cajas sticky; ACS name ≠ Face ID de oficina.
 
 ## A medias
 
-1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
-2. Re-aplicar FieldDetection en equipos (sibling); alinear employeeNumber↔personId.
-3. Migración índices push: correr `prisma migrate deploy` en prod si no aplica sola.
+1. Portal empleado · ANPR ITC · micros · TCPMSS.
+2. Re-wire httpHosts si cambia PUBLIC_API_URL.
+3. CaptureFaceData en sensor (si firmware Oficinas lo expone).
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales, Face ID óptico inventado sobre AcuSense.
-No reescribir Personas CRUD/enroll del sibling.
+Puente NAS, Traefik, credenciales.
+**No** matching Face ID inventado sobre RTSP/AcuSense.
