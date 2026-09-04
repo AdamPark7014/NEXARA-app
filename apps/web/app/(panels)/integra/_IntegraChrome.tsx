@@ -101,12 +101,20 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
     
     const probeMedia = async () => {
       try {
-        const res = await fetch('/api/health', { cache: 'no-store' });
+        const res = await fetch("/api/health", { cache: "no-store" });
+        if (!res.ok) return;
         const json = await res.json();
         const g = json?.info?.go2rtc || json?.error?.go2rtc || json?.details?.go2rtc;
-        setMediaDown(Boolean(g && g.status && g.status !== 'up'));
+        // Solo marcar down si el indicador existe y dice explícitamente que no está up.
+        // Si el health no incluye go2rtc, no alarmar (evita falsos "Video offline").
+        if (!g || typeof g !== "object") {
+          setMediaDown(false);
+          return;
+        }
+        const status = String(g.status || g.status?.status || "").toLowerCase();
+        setMediaDown(Boolean(status) && status !== "up" && status !== "ok");
       } catch {
-        /* ignore */
+        /* no tocar el estado anterior */
       }
     };
     void probeMedia();
