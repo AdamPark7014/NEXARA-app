@@ -42,6 +42,7 @@ import { IntegraSiteService } from './integra-site.service';
 import { IntegraPushService } from './integra-push.service';
 import { IntegraSyncService } from './integra-sync.service';
 import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
+import { IntegraSpacesService } from './integra-spaces.service';
 import { IdentityLinkService } from '../identity/identity-link.service';
 
 export function integraCanSettings(user: { roleKey?: string; isSuperAdmin?: boolean } | null) {
@@ -173,6 +174,22 @@ class PlaybackDto {
   @IsString() beginTime!: string;
   @IsString() endTime!: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) segmentIndex?: number;
+}
+
+class SpacePolicyDto {
+  @IsString() templateKey!: string;
+  @IsOptional() @IsString() label?: string;
+  @IsOptional() @IsObject() config?: Record<string, unknown>;
+}
+
+class SpaceBookingDto {
+  @IsString() doorIndexCode!: string;
+  @IsString() title!: string;
+  @IsString() startsAt!: string;
+  @IsString() endsAt!: string;
+  @IsOptional() @IsString() hostName?: string;
+  @IsOptional() @IsString() hostPersonId?: string;
+  @IsOptional() @IsString() notes?: string;
 }
 
 @ApiTags('Integra · Artemis')

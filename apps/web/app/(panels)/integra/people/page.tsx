@@ -1097,10 +1097,129 @@ export default function IntegraPeoplePage() {
                         <IgBadge>{detailPerson.userType || detailPerson.orgName}</IgBadge>
                       )}
                     </div>
+                    <IdentityStatusBadges person={detailPerson} erp={selectedErp} />
                   </div>
                 </div>
 
                 {busy && <IgBadge>Cargando detalle…</IgBadge>}
+
+                <section className={styles.personSection} data-tone="accent">
+                  <header className={styles.personSectionHead}>
+                    <strong>Identidad ERP</strong>
+                    <span>User.employeeNumber ↔ ACS</span>
+                  </header>
+                  {selectedErp ? (
+                    <>
+                      <dl className={styles.personFacts}>
+                        <div>
+                          <dt>Usuario</dt>
+                          <dd>
+                            {selectedErp.nombre}
+                            <span className={styles.personFactSub}>{selectedErp.email}</span>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Rol</dt>
+                          <dd>{selectedErp.role?.nombre || "—"}</dd>
+                        </div>
+                        <div>
+                          <dt>Nº empleado</dt>
+                          <dd className={styles.personMono}>
+                            {selectedErp.employeeNumber || detailPerson.id}
+                          </dd>
+                        </div>
+                      </dl>
+                      <div className={styles.personBtnRow}>
+                        <IgBtn onClick={() => router.push(`/erp/users?highlight=${selectedErp.id}`)}>
+                          Abrir en ERP
+                        </IgBtn>
+                        <IgBtn
+                          disabled={mutating}
+                          onClick={async () => {
+                            if (
+                              !confirm(
+                                `¿Desvincular ${detailPerson.name} del usuario ERP? El terminal no se modifica.`,
+                              )
+                            ) {
+                              return;
+                            }
+                            setMutKind("save");
+                            try {
+                              const r = await integraApi<{ note?: string }>(
+                                `integra/people/${encodeURIComponent(selected.id)}/link`,
+                                { method: "DELETE" },
+                              );
+                              setOpNote(r.note || "Desvinculado del ERP.");
+                              setOpOk(true);
+                              await loadErpDirectory();
+                              await load();
+                            } catch (e) {
+                              setError(e instanceof Error ? e.message : "No se pudo desvincular");
+                              setOpOk(false);
+                            } finally {
+                              setMutKind(null);
+                            }
+                          }}
+                        >
+                          Desvincular
+                        </IgBtn>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className={styles.personNote}>
+                        Sin usuario ERP. Vincula para que asistencia híbrida y actividades
+                        resuelvan a la misma persona (mismo código ACS).
+                      </p>
+                      <IgField label="Usuario ERP">
+                        <select
+                          value={linkUserId}
+                          onChange={(e) => setLinkUserId(e.target.value)}
+                          style={{ ...selectStyle, maxWidth: "100%" }}
+                        >
+                          <option value="">— Elegir —</option>
+                          {erpOnlyUsers.map((u) => (
+                            <option key={u.id} value={String(u.id)}>
+                              {u.nombre} · {u.role?.nombre || "sin rol"}
+                              {u.employeeNumber ? ` · ${u.employeeNumber}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </IgField>
+                      <div className={styles.personBtnRow}>
+                        <IgBtn
+                          variant="primary"
+                          disabled={mutating || !linkUserId}
+                          onClick={async () => {
+                            setMutKind("save");
+                            try {
+                              const r = await integraApi<{ note?: string }>(
+                                `integra/people/${encodeURIComponent(selected.id)}/link`,
+                                {
+                                  method: "POST",
+                                  body: JSON.stringify({ userId: Number(linkUserId) }),
+                                },
+                              );
+                              setOpNote(r.note || "Vinculado al ERP.");
+                              setOpOk(true);
+                              setLinkUserId("");
+                              await loadErpDirectory();
+                              await load();
+                            } catch (e) {
+                              setError(e instanceof Error ? e.message : "No se pudo vincular");
+                              setOpOk(false);
+                            } finally {
+                              setMutKind(null);
+                            }
+                          }}
+                        >
+                          Vincular a ERP
+                        </IgBtn>
+                        <IgBtn onClick={() => startAlta("link")}>Alta / vínculo guiado</IgBtn>
+                      </div>
+                    </>
+                  )}
+                </section>
 
                 {isIsapi && (
                   <>
