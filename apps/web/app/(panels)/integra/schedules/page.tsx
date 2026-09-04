@@ -430,7 +430,7 @@ export default function IntegraSchedulesPage() {
                             ...draft,
                             indefinite: on,
                             validTo: on
-                              ? "2037-12-31T23:59:59"
+                              ? ISAPI_INDEFINITE_END
                               : draft.validTo.startsWith("2037")
                                 ? `${new Date().toISOString().slice(0, 10)}T23:59:59`
                                 : draft.validTo,
