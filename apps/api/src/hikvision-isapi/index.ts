@@ -95,6 +95,8 @@ export {
   putPlanTemplate,
   putWeekPlan,
   validFromMode,
+  PRESET_TEMPLATE_SLOTS,
+  presetSlot,
   type AccessPresetKey,
   type PlanTemplate,
   type RightPlanEntry,

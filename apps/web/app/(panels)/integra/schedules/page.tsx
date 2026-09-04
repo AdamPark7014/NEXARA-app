@@ -109,14 +109,13 @@ function WeekGridPreview({
   return (
     <div className={styles.schedWeekGrid} role="table" aria-label="Resumen horario">
       {WEEK_DAYS.map((d) => {
-        const office = planId === "2" || planId === "3";
-        const always = planId === "1";
         const weekend = d.key === "Saturday" || d.key === "Sunday";
         let label = "—";
-        if (always) label = "00:00–24:00";
-        else if (office && !weekend) {
-          label = planId === "3" ? "08:00–20:00" : "09:00–18:00";
-        }
+        if (planId === "1") label = "00:00–24:00";
+        else if (planId === "2" && !weekend) label = "08:00–18:00";
+        else if (planId === "3" && !weekend) label = "08:00–20:00";
+        else if (planId === "4" && !weekend) label = "18:00–08:00";
+        else if (planId === "5" && weekend) label = "00:00–24:00";
         return (
           <div key={d.key} className={styles.schedWeekRow} role="row">
             <span className={styles.schedWeekDay}>{d.short}</span>
@@ -414,6 +413,12 @@ export default function IntegraSchedulesPage() {
                 </IgPanel>
 
                 <IgPanel title="Vigencia" count="UserInfo.Valid">
+                  <p className={styles.personNote}>
+                    <strong>Indefinido</strong> = sin fecha fin (terminal guarda
+                    2037-12-31). <strong>Temporal</strong> = desmarca «Sin fecha
+                    fin» y elige Desde/Hasta. El horario semanal se elige por
+                    puerta abajo (plantilla), no en la vigencia.
+                  </p>
                   <div className={styles.schedValidGrid}>
                       <label className={styles.personCheck}>
                         <input
