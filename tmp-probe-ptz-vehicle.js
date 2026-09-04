@@ -238,10 +238,14 @@ async function main() {
 
   await probeHost('PTZ', '192.168.9.179', 1);
 
-  let nvrChannel = 1;
+  let nvrChannel = 13;
   if (ptz?.cameraIndexCode) {
     const m = /\|(\d+)/.exec(ptz.cameraIndexCode);
-    if (m) nvrChannel = Number(m[1]);
+    if (m) {
+      const streamId = Number(m[1]);
+      // 1301 → canal físico 13 (no el id de streaming)
+      nvrChannel = streamId >= 100 ? Math.floor(streamId / 100) : streamId;
+    }
   }
   console.log('\nNVR PTZ channel:', nvrChannel, ptz?.cameraIndexCode);
   await probeHost('NVR-for-PTZ', '192.168.9.34', nvrChannel);
@@ -258,9 +262,10 @@ async function main() {
   for (const ip of lanIps) {
     const cam = enriched.find((c) => c.sourceIp === ip);
     const client = new HikvisionIsapiClient({
-      baseUrl: `http://${ip}`,
+      host: `http://${ip}`,
       username: user,
       password: pass,
+      scope: `probe-${ip}`,
     });
     const entry = {
       name: cam?.name,

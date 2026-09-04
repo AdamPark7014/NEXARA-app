@@ -258,32 +258,22 @@ export default function QuoteDetailPage() {
       </div>
 
       {quote.status === "DRAFT" && (
-        <div
-          style={{
-            marginBottom: 14,
-            padding: "14px 16px",
-            borderRadius: 14,
-            border: "1px solid color-mix(in srgb, var(--primary) 30%, var(--border))",
-            background: "color-mix(in srgb, var(--primary) 6%, var(--surface))",
-            display: "grid",
-            gap: 8,
-          }}
-        >
-          <div style={{ fontWeight: 750, fontSize: 14 }}>Borrador listo para enviar</div>
-          <p style={{ margin: 0, fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-            Revisa partidas y condiciones. Puedes <strong>editar el borrador</strong>, descargar el PDF
-            profesional o enviarlo al cliente. Si necesitas otra con el mayorista, usa{" "}
-            <strong>Nueva rápida</strong>.
-          </p>
-          {cfg.canEdit && (
-            <div style={{ marginTop: 4 }}>
-              <Link href={`/crm/quotes/${quote.id}/edit`}>
-                <Button size="sm" variant="primary" iconLeft="✏️">
-                  Editar borrador
-                </Button>
-              </Link>
-            </div>
-          )}
+        <div className={styles.quotesCoach}>
+          <div className={styles.quotesCoachIcon}>📝</div>
+          <div>
+            <p className={styles.quotesCoachTitle}>Borrador listo para enviar</p>
+            <p className={styles.quotesCoachText}>
+              Revisa partidas y condiciones. Puedes editar el borrador, descargar el PDF profesional o enviarlo al cliente.
+              Si necesitas otra con el mayorista, usa Nueva rápida.
+            </p>
+            {cfg.canEdit && (
+              <div style={{ marginTop: 8 }}>
+                <Link href={`/crm/quotes/${quote.id}/edit`}>
+                  <Button size="sm" variant="primary" iconLeft="✏️">Editar borrador</Button>
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
