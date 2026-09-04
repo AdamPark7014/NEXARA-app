@@ -638,6 +638,12 @@ export default function AttendancePage() {
 
       <HrModuleRail />
 
+      {(viewMode === "manage" || viewMode === "manage_register") && (
+        <div style={{ marginBottom: 16 }}>
+          <EnSitioStrip variant="compact" title="En sitio · asistencia" />
+        </div>
+      )}
+
       {highlightId && (
         <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 8, border: "1px solid var(--nx-panel-hairline)", background: "var(--nx-panel-surface-overlay)", fontSize: 12.5 }}>
           Destacando usuario <strong>#{highlightId}</strong> desde notificación.

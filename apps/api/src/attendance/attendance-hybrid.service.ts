@@ -1,17 +1,22 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { IntegraPushService } from '../integra/integra-push.service';
+import { AttendanceService } from './attendance.service';
+import { buildAccessScheduleAssignment } from '../integra/access-schedule-defaults.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { workDateColumn, workDayEnd, workDayStart } from '../common/time/workday.js';
 import {
   acsIdentityKeys,
+  buildAcsCheckInSuggestion,
   erpIdentityKeys,
+  expectedStartHm,
   findAcsMatchKey,
   hybridTimeFlags,
   normalizeIdentityKey,
   type HybridFlag,
   type HybridLinkStatus,
+  type HybridSuggestion,
 } from './attendance-hybrid.match';
 
 type CurrentUser = {
