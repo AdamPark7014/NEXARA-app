@@ -166,6 +166,9 @@ export class AttendanceHybridService {
       linkStatus: HybridLinkStatus;
       matchKey: string | null;
       flags: HybridFlag[];
+      suggestion: HybridSuggestion | null;
+      scheduleKey: string | null;
+      expectedStart: string | null;
       user: {
         id: number;
         nombre: string;
@@ -222,6 +225,7 @@ export class AttendanceHybridService {
             ? 'PRESENTE'
             : 'AUSENTE';
 
+      const scheduleKey = scheduleByUser.get(u.id) ?? null;
       const flags = hybridTimeFlags({
         erpCheckIn: checkIn,
         erpCheckOut: checkOut,
@@ -230,8 +234,16 @@ export class AttendanceHybridService {
         acsLastAt: acs?.lastAt,
         acsMinutes: acs?.minutes ?? null,
         acsPasses: acs?.passes,
+        scheduleKey,
       });
       if (!keys.length) flags.unshift('sin_numero_empleado');
+
+      const suggestion = buildAcsCheckInSuggestion({
+        hasErp,
+        hasUser: true,
+        acsFirstAt: acs?.firstAt,
+        acsFirstDoor: acs?.firstDoor,
+      });
 
       // Sin señal en ningún lado: no ensucia la vista (salvo selfOnly).
       if (!opts.selfOnly && !hasErp && !acs) continue;
@@ -240,6 +252,9 @@ export class AttendanceHybridService {
         linkStatus: acs ? 'linked' : 'erp_only',
         matchKey,
         flags,
+        suggestion,
+        scheduleKey,
+        expectedStart: expectedStartHm(scheduleKey),
         user: {
           id: u.id,
           nombre: u.nombre,
@@ -279,6 +294,9 @@ export class AttendanceHybridService {
           acsMinutes: acs.minutes,
           acsPasses: acs.passes,
         }),
+        suggestion: null,
+        scheduleKey: null,
+        expectedStart: null,
         user: null,
         erp: null,
         acs: {

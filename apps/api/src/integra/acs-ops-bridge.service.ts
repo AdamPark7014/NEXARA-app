@@ -10,7 +10,6 @@ import {
   acsOpsDirection,
   dayKeyInTz,
   isAccesoGeneralDoor,
-  normalizeEmpKey,
   pickTodayActivityId,
   type AcsOpsDirection,
 } from './acs-ops-bridge.match';
