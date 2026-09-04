@@ -20,6 +20,8 @@ import {
   listCatalogProducts,
   createStockMovement,
   listStockMovements,
+  downloadStockMovementsPdf,
+  downloadStockMovementSlipPdf,
   listLots,
   createLot,
   getStockValuation,
