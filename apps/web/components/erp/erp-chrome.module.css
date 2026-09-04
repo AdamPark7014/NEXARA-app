@@ -1,0 +1,115 @@
+/* ERP shared production chrome — denso, ops-first, sin marketing */
+
+.moduleGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.moduleCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 15px;
+  border-radius: 10px;
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  background: var(--surface);
+  color: var(--text-primary);
+  text-decoration: none;
+  min-height: 88px;
+  box-shadow: var(--nx-panel-elev-1, none);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.moduleCard:hover {
+  border-color: color-mix(in srgb, var(--panel-accent, var(--primary)) 32%, var(--border));
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+
+.moduleCardIcon {
+  font-size: 16px;
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--panel-accent, var(--primary)) 10%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--panel-accent, var(--primary)) 18%, transparent);
+}
+
+.moduleCardTitle {
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.moduleCardDesc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  flex: 1;
+}
+
+.moduleCardCta {
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--panel-accent, var(--primary));
+}
+
+.kpiStrip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.distCard {
+  margin-bottom: 14px;
+  padding: 11px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  border-radius: 10px;
+}
+
+.distLabel {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.hintBanner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--nx-panel-hairline, var(--border));
+  background: color-mix(in srgb, var(--panel-accent, var(--primary)) 6%, var(--surface));
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.hintBanner strong {
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+.hintBanner a {
+  color: var(--panel-accent, var(--primary));
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.hintBanner a:hover {
+  text-decoration: underline;
+}

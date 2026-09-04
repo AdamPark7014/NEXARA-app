@@ -666,6 +666,97 @@ export class ActivitiesService {
     return { pdf, reportUrl };
   }
 
+  /**
+   * PDF agregado de OT (lista operativa). Scope por ids de responsable opcionales
+   * (null = todo el tenant). Periodo por fechaAsignacion.
+   */
+  async reportPdf(
+    filters: { from?: string; to?: string } = {},
+    preparedBy?: string | null,
+    opts?: { companyId?: number | null; responsableIds?: number[] | null },
+  ) {
+    const where: Record<string, unknown> = {
+      ...companyWhere(opts?.companyId ?? null),
+    };
+    if (opts?.responsableIds && opts.responsableIds.length > 0) {
+      where.responsableId = { in: opts.responsableIds };
+    }
+    if (filters.from || filters.to) {
+      where.fechaAsignacion = {
+        ...(filters.from ? { gte: new Date(filters.from) } : {}),
+        ...(filters.to ? { lte: new Date(`${filters.to}T23:59:59.999Z`) } : {}),
+      };
+    }
+
+    const rows = await this.prisma['activity'].findMany({
+      where,
+      select: {
+        id: true,
+        anNumber: true,
+        titulo: true,
+        estatus: true,
+        prioridad: true,
+        fechaAsignacion: true,
+        client: { select: { name: true } },
+        responsable: { select: { nombre: true } },
+      },
+      orderBy: { fechaAsignacion: 'desc' },
+      take: 500,
+    });
+
+    const byStatusMap = new Map<string, number>();
+    const byPriorityMap = new Map<string, number>();
+    let abiertas = 0;
+    let enProceso = 0;
+    let finalizadas = 0;
+
+    for (const row of rows) {
+      const st = row.estatus || 'Sin estatus';
+      byStatusMap.set(st, (byStatusMap.get(st) || 0) + 1);
+      const pr = row.prioridad || 'Sin prioridad';
+      byPriorityMap.set(pr, (byPriorityMap.get(pr) || 0) + 1);
+      if (st === 'Finalizada' || st === 'Aprobada') finalizadas += 1;
+      else if (st === 'En Proceso') enProceso += 1;
+      else abiertas += 1;
+    }
+
+    const fmt = (d?: Date | null) =>
+      d
+        ? d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: '2-digit' })
+        : '—';
+
+    const periodLabel =
+      filters.from || filters.to
+        ? `${filters.from || 'inicio'} → ${filters.to || 'hoy'}`
+        : 'Sin filtro de fechas';
+
+    return generateActivitiesReportPdf({
+      title: 'Reporte de actividades OPS',
+      periodLabel,
+      generatedAt: new Date().toLocaleString('es-MX'),
+      preparedBy: preparedBy || null,
+      total: rows.length,
+      abiertas,
+      enProceso,
+      finalizadas,
+      byStatus: Array.from(byStatusMap.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count),
+      byPriority: Array.from(byPriorityMap.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count),
+      rows: rows.map((r) => ({
+        an: r.anNumber || `#${r.id}`,
+        fecha: fmt(r.fechaAsignacion),
+        titulo: r.titulo || '—',
+        cliente: r.client?.name || 'Interna',
+        responsable: r.responsable?.nombre || '—',
+        estatus: r.estatus || '—',
+        prioridad: r.prioridad || '—',
+      })),
+    });
+  }
+
   async update(
     id: number,
     updateActivityDto: UpdateActivityDto,

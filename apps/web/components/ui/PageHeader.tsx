@@ -82,12 +82,12 @@ export default function PageHeader({
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 8,
-                fontSize: 10.5,
+                fontSize: isOps ? 10 : 10.5,
                 fontWeight: 700,
                 textTransform: "uppercase",
                 letterSpacing: "var(--nx-panel-eyebrow-letter, 0.12em)",
                 color: "var(--text-tertiary)",
-                marginBottom: 10,
+                marginBottom: isOps ? 6 : 10,
               }}
             >
               <span
@@ -106,7 +106,9 @@ export default function PageHeader({
           <h1
             style={{
               fontFamily: "var(--nx-font-display, 'Space Grotesk', sans-serif)",
-              fontSize: "clamp(1.55rem, 1.1rem + 1.4vw, 2.15rem)",
+              fontSize: isOps
+                ? "clamp(1.2rem, 1rem + 0.7vw, 1.55rem)"
+                : "clamp(1.55rem, 1.1rem + 1.4vw, 2.15rem)",
               fontWeight: 700,
               letterSpacing: "var(--nx-panel-title-letter, -0.02em)",
               margin: 0,
@@ -119,12 +121,12 @@ export default function PageHeader({
           {subtitle && (
             <p
               style={{
-                marginTop: 10,
+                marginTop: isOps ? 6 : 10,
                 marginBottom: 0,
-                fontSize: "0.95rem",
+                fontSize: isOps ? "0.8125rem" : "0.95rem",
                 color: "var(--text-secondary)",
-                maxWidth: 760,
-                lineHeight: 1.55,
+                maxWidth: isOps ? 640 : 760,
+                lineHeight: 1.45,
               }}
             >
               {subtitle}
@@ -133,7 +135,7 @@ export default function PageHeader({
           {meta && (
             <div
               style={{
-                marginTop: 14,
+                marginTop: isOps ? 10 : 14,
                 display: "flex",
                 flexWrap: "wrap",
                 gap: 8,
