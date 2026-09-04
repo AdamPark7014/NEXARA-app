@@ -1,11 +1,15 @@
 /**
- * Probe profundo PTZ .179 + AcuSense parking: smart/traffic/ANPR/VMD/motion.
- * Solo rutas ISAPI ya usadas o documentadas en discovery/push — no inventa.
+ * Probe profundo PTZ .179 + AcuSense: smart/traffic/ANPR/VMD/motion.
+ * Rutas ya usadas en discovery/push o documentadas httpHosts — no inventa.
  */
 const path = require('path');
-const { PrismaClient } = require('@prisma/client');
+const Module = require('module');
+const roots = ['/app/node_modules', '/app/apps/api/node_modules'];
+process.env.NODE_PATH = [...roots, process.env.NODE_PATH || ''].filter(Boolean).join(path.delimiter);
+Module._initPaths();
 
-const dist = '/app';
+const { PrismaClient } = require('@prisma/client');
+const dist = '/app/apps/api/dist';
 const { decryptSecret } = require(path.join(dist, 'integra/integra-secrets.js'));
 const { HikvisionIsapiClient } = require(path.join(dist, 'hikvision-isapi/isapi.client.js'));
 
@@ -43,15 +47,11 @@ async function probePath(client, pth) {
     const { buffer, status } = await client.getBinary(pth);
     const xml = buffer.toString('utf8');
     const statusCode = status || 200;
-    const snippet = xml
-      .replace(/\s+/g, ' ')
-      .slice(0, 280);
     const flags = [];
     for (const k of [
       'vehicle',
       'Vehicle',
       'ANPR',
-      'anpr',
       'plate',
       'Plate',
       'ITC',
@@ -66,10 +66,16 @@ async function probePath(client, pth) {
     ]) {
       if (xml.includes(k)) flags.push(k);
     }
-    return { path: pth, status: statusCode, ok: statusCode >= 200 && statusCode < 300, flags, snippet };
+    return {
+      path: pth,
+      status: statusCode,
+      ok: statusCode >= 200 && statusCode < 300,
+      flags,
+      snippet: xml.replace(/\s+/g, ' ').slice(0, 260),
+    };
   } catch (e) {
     const msg = String(e?.message || e);
-    const m = /HTTP\s+(\d+)/i.exec(msg) || /status[=:\s]+(\d+)/i.exec(msg);
+    const m = /HTTP\s+(\d+)/i.exec(msg) || /\b(\d{3})\b/.exec(msg);
     return {
       path: pth,
       status: m ? Number(m[1]) : null,
@@ -78,6 +84,16 @@ async function probePath(client, pth) {
       flags: [],
     };
   }
+}
+
+function camMeta(raw) {
+  const r = raw && typeof raw === 'object' ? raw : {};
+  return {
+    sourceIp: r.sourceIp || r.ipAddress || r.source?.ipAddress || null,
+    model: r.model || r.source?.model || null,
+    isPtz: r.ptz === true || r.isPtz === true || /DF8C|PTZ/i.test(String(r.model || '')),
+    anprCapable: r.anprCapable === true,
+  };
 }
 
 async function main() {
@@ -91,33 +107,32 @@ async function main() {
 
   const cameras = await p.integraCamera.findMany({
     where: { siteId: site.id },
-    select: {
-      id: true,
-      name: true,
-      sourceIp: true,
-      cameraIndexCode: true,
-      model: true,
-      isPtz: true,
-      anprCapable: true,
-    },
+    select: { id: true, name: true, cameraIndexCode: true, raw: true },
     orderBy: { name: 'asc' },
   });
 
-  const ptz = cameras.find((c) => c.sourceIp === '192.168.9.179' || c.isPtz);
-  const outdoorish = cameras.filter(
-    (c) =>
-      c.sourceIp &&
-      c.sourceIp !== '192.168.9.179' &&
-      /outdoor|parking|estacion|azotea|entrada|acceso|support|lobby|coffee|escalera/i.test(
-        `${c.name || ''} ${c.model || ''}`,
-      ),
+  const enriched = cameras.map((c) => ({ ...c, ...camMeta(c.raw) }));
+  const ptz = enriched.find((c) => c.sourceIp === '192.168.9.179' || c.isPtz);
+  console.log(
+    JSON.stringify(
+      {
+        siteId: site.id,
+        companyId: site.companyId,
+        ptz: ptz
+          ? {
+              name: ptz.name,
+              code: ptz.cameraIndexCode,
+              ip: ptz.sourceIp,
+              model: ptz.model,
+              anprCapable: ptz.anprCapable,
+            }
+          : null,
+        camCount: enriched.length,
+      },
+      null,
+      2,
+    ),
   );
-  // También todas las LAN directas (.171-.178) + NVR channel de PTZ
-  const lanCams = cameras.filter(
-    (c) => c.sourceIp && /^192\.168\.9\.(17[1-9]|34)$/.test(c.sourceIp),
-  );
-
-  console.log(JSON.stringify({ siteId: site.id, siteName: site.name, ptz, outdoorishCount: outdoorish.length }, null, 2));
 
   async function probeHost(label, host, channel) {
     const client = new HikvisionIsapiClient({
@@ -129,37 +144,42 @@ async function main() {
     for (const pth of PATHS_CH(channel)) {
       results.push(await probePath(client, pth));
     }
-    // FieldDetection XML detail if 200
-    const fd = results.find((r) => r.path.includes(`/FieldDetection/${channel}`) && !r.path.includes('capabilities'));
+
     let fieldDetail = null;
-    if (fd?.ok) {
+    const fd = results.find(
+      (r) => r.path === `/ISAPI/Smart/FieldDetection/${channel}` && r.ok,
+    );
+    if (fd) {
       try {
         const { buffer } = await client.getBinary(`/ISAPI/Smart/FieldDetection/${channel}`);
         const xml = buffer.toString('utf8');
         fieldDetail = {
-          detectionTargets: [...xml.matchAll(/<detectionTarget>([^<]+)<\/detectionTarget>/g)].map((m) => m[1]),
+          detectionTargets: [...xml.matchAll(/<detectionTarget>([^<]+)<\/detectionTarget>/g)].map(
+            (m) => m[1],
+          ),
           enabled: [...xml.matchAll(/<enabled>([^<]+)<\/enabled>/g)].map((m) => m[1]).slice(0, 8),
           hasVehicleOpt: /vehicle/i.test(xml),
           hasHumanOpt: /human/i.test(xml),
+          snippet: xml.replace(/\s+/g, ' ').slice(0, 800),
         };
       } catch (e) {
         fieldDetail = { error: String(e?.message || e).slice(0, 200) };
       }
     }
 
-    // httpHosts detail
     let httpHosts = null;
     try {
       const { buffer, status } = await client.getBinary('/ISAPI/Event/notification/httpHosts');
-      httpHosts = { status: status || 200, xml: buffer.toString('utf8').replace(/\s+/g, ' ').slice(0, 1200) };
+      httpHosts = {
+        status: status || 200,
+        xml: buffer.toString('utf8').replace(/\s+/g, ' ').slice(0, 1400),
+      };
     } catch (e) {
       httpHosts = { error: String(e?.message || e).slice(0, 200) };
     }
 
-    // capabilities vehicle/ANPR flags from System/capabilities if present
     let capsHit = null;
-    const cap = results.find((r) => r.path === '/ISAPI/System/capabilities' && r.ok);
-    if (cap) {
+    if (results.some((r) => r.path === '/ISAPI/System/capabilities' && r.ok)) {
       try {
         const { buffer } = await client.getBinary('/ISAPI/System/capabilities');
         const xml = buffer.toString('utf8');
@@ -177,9 +197,9 @@ async function main() {
         ];
         capsHit = {};
         for (const k of interesting) {
-          const re = new RegExp(`<${k}[^>]*>([^<]*)</${k}>|<${k}\\s[^/]*/>`, 'i');
+          const re = new RegExp(`<${k}[^>]*>([^<]*)</${k}>`, 'i');
           const m = re.exec(xml);
-          if (m) capsHit[k] = m[1] ?? 'present';
+          if (m) capsHit[k] = m[1];
           else if (xml.includes(k)) capsHit[k] = 'mentioned';
         }
       } catch (e) {
@@ -187,66 +207,71 @@ async function main() {
       }
     }
 
+    let smartCaps = null;
+    if (results.some((r) => r.path === '/ISAPI/Smart/capabilities' && r.ok)) {
+      try {
+        const { buffer } = await client.getBinary('/ISAPI/Smart/capabilities');
+        smartCaps = buffer.toString('utf8').replace(/\s+/g, ' ').slice(0, 1600);
+      } catch (e) {
+        smartCaps = String(e?.message || e).slice(0, 200);
+      }
+    }
+
     const summary = {
       label,
       host,
       channel,
-      ok: results.filter((r) => r.ok).map((r) => r.path),
+      ok: results.filter((r) => r.ok).map((r) => ({ path: r.path, flags: r.flags })),
       fail: results
         .filter((r) => !r.ok)
         .map((r) => ({ path: r.path, status: r.status, error: r.error })),
       fieldDetail,
       httpHosts,
       capsHit,
+      smartCaps,
     };
-    console.log('\n==== ' + label + ' ' + host + ' ch' + channel + ' ====');
+    console.log(`\n==== ${label} ${host} ch${channel} ====`);
     console.log(JSON.stringify(summary, null, 2));
     return summary;
   }
 
-  // PTZ directo
   await probeHost('PTZ', '192.168.9.179', 1);
 
-  // NVR: localizar canal de la PTZ
-  const nvrPtz = cameras.find(
-    (c) =>
-      (c.sourceIp === '192.168.9.179' || /ptz|domo|df8c/i.test(`${c.name} ${c.model}`)) &&
-      String(c.cameraIndexCode || '').includes('192.168.9.34'),
-  );
   let nvrChannel = 1;
-  if (nvrPtz?.cameraIndexCode) {
-    const m = /\|(\d+)/.exec(nvrPtz.cameraIndexCode);
+  if (ptz?.cameraIndexCode) {
+    const m = /\|(\d+)/.exec(ptz.cameraIndexCode);
     if (m) nvrChannel = Number(m[1]);
-  } else {
-    // buscar en proxy / cameraIndexCode containing 179
-    const viaNvr = cameras.find((c) => c.sourceIp === '192.168.9.179');
-    if (viaNvr?.cameraIndexCode) {
-      const m = /\|(\d+)/.exec(viaNvr.cameraIndexCode);
-      if (m) nvrChannel = Number(m[1]);
-    }
   }
-  console.log('\nNVR PTZ channel guess:', nvrChannel, nvrPtz || ptz);
+  console.log('\nNVR PTZ channel:', nvrChannel, ptz?.cameraIndexCode);
   await probeHost('NVR-for-PTZ', '192.168.9.34', nvrChannel);
 
-  // Probe FieldDetection only on outdoor/LAN cams for vehicle option
+  const lanIps = [
+    ...new Set(
+      enriched
+        .map((c) => c.sourceIp)
+        .filter((ip) => ip && /^192\.168\.9\.17[1-8]$/.test(ip)),
+    ),
+  ].sort();
+
   const vehicleCandidates = [];
-  for (const cam of lanCams) {
-    if (cam.sourceIp === '192.168.9.179' || cam.sourceIp === '192.168.9.34') continue;
+  for (const ip of lanIps) {
+    const cam = enriched.find((c) => c.sourceIp === ip);
     const client = new HikvisionIsapiClient({
-      baseUrl: `http://${cam.sourceIp}`,
+      baseUrl: `http://${ip}`,
       username: user,
       password: pass,
     });
     const entry = {
-      name: cam.name,
-      ip: cam.sourceIp,
-      model: cam.model,
-      anprCapable: cam.anprCapable,
+      name: cam?.name,
+      ip,
+      model: cam?.model,
+      anprCapable: cam?.anprCapable,
     };
     for (const pth of [
       `/ISAPI/Smart/FieldDetection/1`,
       `/ISAPI/Smart/vehicleDetection/1`,
       `/ISAPI/Traffic/channels/1/licensePlateAuditData/capabilities`,
+      `/ISAPI/System/Video/inputs/channels/1/motionDetection`,
     ]) {
       entry[pth] = await probePath(client, pth);
     }
@@ -254,21 +279,26 @@ async function main() {
       try {
         const { buffer } = await client.getBinary('/ISAPI/Smart/FieldDetection/1');
         const xml = buffer.toString('utf8');
-        entry.detectionTargets = [...xml.matchAll(/<detectionTarget>([^<]+)<\/detectionTarget>/g)].map(
-          (m) => m[1],
-        );
+        entry.detectionTargets = [
+          ...xml.matchAll(/<detectionTarget>([^<]+)<\/detectionTarget>/g),
+        ].map((m) => m[1]);
         entry.hasVehicleString = /vehicle/i.test(xml);
+        // enum options in capabilities-like attributes
+        entry.optVehicle = /opt=("[^"]*vehicle[^"]*"|'[^']*vehicle[^']*')/i.test(xml);
       } catch (e) {
         entry.fdError = String(e?.message || e).slice(0, 160);
       }
     }
     vehicleCandidates.push(entry);
     console.log(
-      `CAM ${cam.sourceIp} ${cam.name}: FD=${entry['/ISAPI/Smart/FieldDetection/1']?.ok ? 'OK' : entry['/ISAPI/Smart/FieldDetection/1']?.status || 'ERR'} vehicleStr=${entry.hasVehicleString} targets=${JSON.stringify(entry.detectionTargets || [])}`,
+      `CAM ${ip} ${cam?.name}: FD=${
+        entry['/ISAPI/Smart/FieldDetection/1']?.ok
+          ? 'OK'
+          : entry['/ISAPI/Smart/FieldDetection/1']?.status || 'ERR'
+      } vehicleStr=${entry.hasVehicleString} targets=${JSON.stringify(entry.detectionTargets || [])}`,
     );
   }
 
-  // Push events from .179 historically
   const ev179 = await p.integraPushEvent.groupBy({
     by: ['eventType'],
     where: { deviceIp: '192.168.9.179' },
@@ -280,8 +310,14 @@ async function main() {
       occurredAt: { gte: new Date(Date.now() - 24 * 3600_000) },
     },
     orderBy: { id: 'desc' },
-    take: 200,
-    select: { deviceIp: true, deviceName: true, eventType: true, targets: true, occurredAt: true },
+    take: 300,
+    select: {
+      deviceIp: true,
+      deviceName: true,
+      eventType: true,
+      targets: true,
+      occurredAt: true,
+    },
   });
   const withVehicle = recentVehicle.filter((r) => {
     const t = Array.isArray(r.targets) ? r.targets : [];
@@ -290,10 +326,10 @@ async function main() {
 
   console.log('\n==== DB events .179 by type ====');
   console.log(JSON.stringify(ev179, null, 2));
-  console.log('\n==== vehicle target events last 24h ====');
+  console.log('\n==== vehicle target events last 24h (sample) ====');
   console.log(
     JSON.stringify(
-      withVehicle.slice(0, 30).map((e) => ({
+      withVehicle.slice(0, 40).map((e) => ({
         ip: e.deviceIp,
         name: e.deviceName,
         type: e.eventType,
@@ -314,11 +350,15 @@ async function main() {
         fdOk: c['/ISAPI/Smart/FieldDetection/1']?.ok,
         fdStatus: c['/ISAPI/Smart/FieldDetection/1']?.status,
         hasVehicleString: c.hasVehicleString,
+        optVehicle: c.optVehicle,
         targets: c.detectionTargets,
-        vd: c['/ISAPI/Smart/vehicleDetection/1']?.status || c['/ISAPI/Smart/vehicleDetection/1']?.error,
-        anprCapPath:
-          c['/ISAPI/Traffic/channels/1/licensePlateAuditData/capabilities']?.status ||
-          c['/ISAPI/Traffic/channels/1/licensePlateAuditData/capabilities']?.error,
+        vdStatus: c['/ISAPI/Smart/vehicleDetection/1']?.status,
+        vdErr: c['/ISAPI/Smart/vehicleDetection/1']?.error,
+        anprCapStatus:
+          c['/ISAPI/Traffic/channels/1/licensePlateAuditData/capabilities']?.status,
+        motionStatus:
+          c['/ISAPI/System/Video/inputs/channels/1/motionDetection']?.status ||
+          (c['/ISAPI/System/Video/inputs/channels/1/motionDetection']?.ok ? 200 : null),
       })),
       null,
       2,

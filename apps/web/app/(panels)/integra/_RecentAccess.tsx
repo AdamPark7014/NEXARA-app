@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { subscribePushEvents, type PushEvent } from "./_DetectionOverlay";
+import { PersonFaceThumb, prefetchPersonFace } from "./_PersonFace";
 import { integraApi } from "./_lib";
 import styles from "./integra.module.css";
 
@@ -22,13 +23,30 @@ type AccessHit = {
   verifyMode: string | null;
 };
 
-const ACCESS_TTL_MS = 60_000;
-const SEED_MS = 60_000;
+const ACCESS_TTL_MS = 90_000;
+const SEED_MS = 90_000;
 
 function relAge(at: number): string {
   const s = Math.max(0, Math.round((Date.now() - at) / 1000));
   if (s < 1) return "ahora";
   return `${s}s`;
+}
+
+function toHit(ev: PushEvent): AccessHit | null {
+  const name = ev.personName?.trim();
+  if (!name) return null;
+  const at = Date.parse(ev.occurredAt);
+  if (!Number.isFinite(at) || Date.now() - at > ACCESS_TTL_MS) return null;
+  if (ev.personId) prefetchPersonFace(ev.personId);
+  return {
+    id: ev.id,
+    at,
+    personName: name,
+    personId: ev.personId ?? null,
+    photoPath: ev.photoPath ?? null,
+    label: ev.label ?? null,
+    verifyMode: ev.verifyMode ?? null,
+  };
 }
 
 export function IntegraRecentAccess({
@@ -56,26 +74,11 @@ export function IntegraRecentAccess({
         const fresh: AccessHit[] = [];
         for (const ev of d.items || []) {
           if (ev.deviceIp !== deviceIp) continue;
-          const name = ev.personName?.trim();
-          if (!name) continue;
-          const at = Date.parse(ev.occurredAt);
-          if (!Number.isFinite(at) || Date.now() - at > ACCESS_TTL_MS) continue;
-          fresh.push({
-            id: ev.id,
-            at,
-            personName: name,
-            personId: ev.personId ?? null,
-            photoPath: ev.photoPath ?? null,
-            label: ev.label ?? null,
-            verifyMode: ev.verifyMode ?? null,
-          });
+          const h = toHit(ev);
+          if (h) fresh.push(h);
         }
         if (!fresh.length) return;
-        setHits(
-          fresh
-            .sort((a, b) => b.at - a.at)
-            .slice(0, 12),
-        );
+        setHits(fresh.sort((a, b) => b.at - a.at).slice(0, 12));
       })
       .catch(() => undefined);
     return () => {
@@ -89,27 +92,14 @@ export function IntegraRecentAccess({
       const fresh: AccessHit[] = [];
       for (const ev of events) {
         if (ev.deviceIp !== deviceIp) continue;
-        const name = ev.personName?.trim();
-        if (!name) continue;
-        const age = Date.now() - Date.parse(ev.occurredAt);
-        if (!Number.isFinite(age) || age > ACCESS_TTL_MS) continue;
-        fresh.push({
-          id: ev.id,
-          at: Date.parse(ev.occurredAt) || Date.now(),
-          personName: name,
-          personId: ev.personId ?? null,
-          photoPath: ev.photoPath ?? null,
-          label: ev.label ?? null,
-          verifyMode: ev.verifyMode ?? null,
-        });
+        const h = toHit(ev);
+        if (h) fresh.push(h);
       }
       if (!fresh.length) return;
       setHits((prev) => {
         const map = new Map(prev.map((h) => [h.id, h]));
         for (const h of fresh) map.set(h.id, h);
-        return [...map.values()]
-          .sort((a, b) => b.at - a.at)
-          .slice(0, 12);
+        return [...map.values()].sort((a, b) => b.at - a.at).slice(0, 12);
       });
     });
   }, [deviceIp, enabled]);
@@ -130,19 +120,18 @@ export function IntegraRecentAccess({
     <aside className={styles.accessStrip} aria-label="Últimos accesos">
       <header className={styles.accessStripHead}>
         <strong>Últimos accesos</strong>
-        <span>60 s</span>
+        <span>ACS · 90 s</span>
       </header>
       <ul className={styles.accessStripList}>
         {hits.map((h) => (
-          <li key={h.id} className={styles.accessStripRow}>
-            <div className={styles.accessStripPhoto} data-empty={!h.photoPath ? "1" : undefined}>
-              {h.photoPath ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={h.photoPath} alt="" />
-              ) : (
-                <span aria-hidden>{h.personName.slice(0, 1).toUpperCase()}</span>
-              )}
-            </div>
+          <li key={h.id} className={styles.accessStripRow} data-fresh={Date.now() - h.at < 4000 ? "1" : undefined}>
+            <PersonFaceThumb
+              className={styles.accessStripPhoto}
+              size="md"
+              personId={h.personId}
+              personName={h.personName}
+              photoPath={h.photoPath}
+            />
             <div className={styles.accessStripBody}>
               <strong>{h.personName}</strong>
               <span>

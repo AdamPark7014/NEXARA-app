@@ -10,6 +10,8 @@ import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
+import PanelTabs from "@/components/ui/PanelTabs";
+import HrModuleRail from "@/components/hr/HrModuleRail";
 import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -652,7 +654,6 @@ export default function HrPage() {
         eyebrow="ERP · Personas"
         title={cfg.title}
         subtitle={cfg.subtitle}
-        variant="hero"
         meta={
           state.kind === "ready" ? (
             <>
@@ -664,45 +665,45 @@ export default function HrPage() {
         }
         actions={
           <>
-            <Button variant="ghost" iconLeft="🔄" onClick={() => void fetchStaff()}>Actualizar</Button>
+            <Button variant="ghost" onClick={() => void fetchStaff()}>Actualizar</Button>
             {cfg.canCreate && (
-              <Button variant="primary" iconLeft="👤" onClick={openCreate}>Alta de personal</Button>
+              <Button variant="primary" onClick={openCreate}>Alta de personal</Button>
             )}
           </>
         }
       />
 
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18, borderBottom: "1px solid var(--border)", paddingBottom: 12 }}>
-        {TABS.map((t) => (
-          <Button key={t.key} size="sm" variant={tab === t.key ? "primary" : "secondary"} onClick={() => setTab(t.key)}>
-            {t.label}
-            {t.key === "permisos" && pendingLeavesCount > 0 && (
-              <span style={{ marginLeft: 6, background: "var(--danger)", color: "#fff", borderRadius: 999, padding: "1px 6px", fontSize: 10.5 }}>{pendingLeavesCount}</span>
-            )}
-          </Button>
-        ))}
-      </div>
+      <HrModuleRail />
+
+      <PanelTabs
+        ariaLabel="Secciones de plantilla"
+        value={tab}
+        onChange={setTab}
+        tabs={TABS.map((t) => ({
+          key: t.key,
+          label: t.label,
+          badge: t.key === "permisos" && pendingLeavesCount > 0 ? pendingLeavesCount : undefined,
+        }))}
+      />
 
       {tab === "plantilla" && (
       <>
       {state.kind === "ready" && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 14 }}>
-            <KpiCard label="Plantilla total" value={total} hint={`${activos} activos`} variant="default" icon="🧑‍💼" />
-            <KpiCard label="En vacaciones" value={vac} hint="Esta semana" variant="accent" icon="🏖️" />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 14 }}>
+            <KpiCard label="Plantilla total" value={total} hint={`${activos} activos`} variant="default" />
+            <KpiCard label="En vacaciones" value={vac} hint="Esta semana" variant="accent" />
             <KpiCard
               label="Incidencias"
               value={state.items.filter((e) => e.estadoRRHH === "Incidencia").length}
               hint="Abiertas"
               variant={state.items.some((e) => e.estadoRRHH === "Incidencia") ? "warning" : "positive"}
-              icon="🛡️"
             />
             <KpiCard
               label="Honorarios"
               value={state.items.filter((e) => e.tipoContrato === "Honorarios").length}
               hint="Sin prestaciones"
               variant="default"
-              icon="📋"
             />
           </div>
           {total > 0 && depts.length > 0 && (() => {
@@ -712,8 +713,8 @@ export default function HrPage() {
               .sort((a, b) => b.count - a.count);
             if (byDept.length === 0) return null;
             return (
-              <div style={{ marginBottom: 16, padding: "12px 16px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Headcount por departamento</div>
+              <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--nx-panel-surface-overlay)", border: "1px solid var(--nx-panel-hairline)", borderRadius: "var(--nx-panel-radius-sm)", boxShadow: "var(--nx-panel-elev-1)" }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Headcount por departamento</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                   {byDept.map(({ nombre, count }) => (
                     <div key={nombre} style={{ display: "grid", gridTemplateColumns: "140px 1fr 32px", gap: 10, alignItems: "center" }}>

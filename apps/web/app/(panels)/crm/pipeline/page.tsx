@@ -19,6 +19,7 @@ import {
   updateSalesOpportunityStage,
   type SalesOpportunity,
 } from "@/lib/sales-api";
+import chrome from "@/components/crm/crm-chrome.module.css";
 
 function daysAgo(iso?: string): string {
   if (!iso) return "—";

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { subscribePushEvents } from "./_DetectionOverlay";
-import { integraApi, integraPersonFaceUrl } from "./_lib";
+import { PersonFaceThumb, prefetchPersonFace } from "./_PersonFace";
+import { integraApi } from "./_lib";
 import styles from "./integra.module.css";
 
 type OccRow = {
@@ -20,39 +21,6 @@ function relAge(iso: string): string {
   const m = Math.floor(s / 60);
   if (m < 60) return `${m}m`;
   return `${Math.floor(m / 60)}h`;
-}
-
-function FaceThumb({
-  personId,
-  personName,
-  lastPhoto,
-}: {
-  personId: string;
-  personName: string | null;
-  lastPhoto: string | null;
-}) {
-  const [broken, setBroken] = useState(false);
-  const src = lastPhoto || integraPersonFaceUrl(personId);
-  const initial = (personName || personId || "?").slice(0, 1).toUpperCase();
-
-  useEffect(() => {
-    setBroken(false);
-  }, [src]);
-
-  if (broken) {
-    return (
-      <div className={styles.accessStripPhoto} data-empty="1">
-        <span aria-hidden>{initial}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className={styles.accessStripPhoto} data-empty={!lastPhoto ? "1" : undefined}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="" onError={() => setBroken(true)} />
-    </div>
-  );
 }
 
 /**
@@ -74,7 +42,9 @@ export function IntegraAcsIdentityStrip({ enabled }: { enabled: boolean }) {
       try {
         const data = await integraApi<{ items: OccRow[]; note?: string }>("integra/occupancy");
         if (stop) return;
-        setItems(data.items || []);
+        const rows = data.items || [];
+        for (const r of rows) prefetchPersonFace(r.personId);
+        setItems(rows);
         setNote(data.note || null);
         setError(null);
       } catch (e) {
@@ -82,7 +52,7 @@ export function IntegraAcsIdentityStrip({ enabled }: { enabled: boolean }) {
       }
     };
     void load();
-    const id = window.setInterval(() => void load(), 8_000);
+    const id = window.setInterval(() => void load(), 6_000);
     const tick = window.setInterval(() => setTick((n) => n + 1), 1_000);
     const unsub = subscribePushEvents((events) => {
       if (events.some((e) => e.personName?.trim())) void load();
@@ -118,10 +88,12 @@ export function IntegraAcsIdentityStrip({ enabled }: { enabled: boolean }) {
         <ul className={styles.accessStripList}>
           {items.map((h) => (
             <li key={h.personId} className={styles.accessStripRow}>
-              <FaceThumb
+              <PersonFaceThumb
+                className={styles.accessStripPhoto}
+                size="md"
                 personId={h.personId}
                 personName={h.personName}
-                lastPhoto={h.lastPhoto}
+                photoPath={h.lastPhoto}
               />
               <div className={styles.accessStripBody}>
                 <strong>{h.personName || h.personId}</strong>
