@@ -69,6 +69,7 @@ const ENTITIES: ExportCard[] = [
     icon: "🧰",
     desc: "Órdenes de trabajo, técnicos, estados y tiempos",
     xlsxPath: () => "activities/export/xlsx",
+    pdfPath: (from, to) => `activities/report.pdf?from=${from}&to=${to}`,
   },
   {
     key: "viatics",
@@ -77,6 +78,13 @@ const ENTITIES: ExportCard[] = [
     desc: "Gastos de viaje aprobados y por aprobar",
     xlsxPath: () => "viatics/export/xlsx",
     pdfPath: (from, to) => `viatics/report.pdf?from=${from}&to=${to}`,
+  },
+  {
+    key: "attendance",
+    label: "Asistencia híbrida",
+    icon: "🕒",
+    desc: "Contraste checador ERP ↔ accesos ACS (día fin = Hasta)",
+    xlsxPath: (_from, to) => `attendance/hybrid?date=${to}&format=xlsx`,
   },
   {
     key: "vehicles",
