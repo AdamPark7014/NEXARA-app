@@ -5851,6 +5851,49 @@ model IntegraCamera {
   @@map("integra_cameras")
 }
 
+/// Visita recurrente ISAPI: Valid (rango fechas) + RightPlan/WeekPlan (días·horas)
+/// en puertas limitadas. Al vencer o cancelar → Valid.enable=false en terminales.
+model IntegraRecurringVisitor {
+  id               Int       @id @default(autoincrement())
+  companyId        Int
+  siteId           Int
+  visitorName      String    @db.VarChar(220)
+  phone            String?   @db.VarChar(40)
+  hostPersonId     String?   @db.VarChar(120)
+  hostName         String?   @db.VarChar(220)
+  /// employeeNo temporal en ACS (UserInfo).
+  employeeNo       String    @db.VarChar(32)
+  /// doorIndexCode[] p.ej. ["192.168.9.160|1", ...]
+  doorIndexCodes   Json
+  /// Weekday ISAPI: Monday…Sunday
+  weekdays         Json
+  /// HH:MM:SS franja diaria en WeekPlanCfg
+  timeFrom         String    @db.VarChar(8)
+  timeTo           String    @db.VarChar(8)
+  /// Fecha local YYYY-MM-DD → Valid.beginTime / endTime
+  validFrom        DateTime  @db.Date
+  validTo          DateTime  @db.Date
+  /// planTemplateNo escrito en terminales (slot ≥10)
+  planTemplateNo   String    @default("10") @db.VarChar(8)
+  /// ACTIVE | PENDING | SYNCED | EXPIRED | CANCELLED | ERROR
+  status           String    @default("PENDING") @db.VarChar(16)
+  hasFace          Boolean   @default(false)
+  lastPushAt       DateTime?
+  lastError        String?   @db.Text
+  notes            String?   @db.Text
+  createdById      Int?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, employeeNo])
+  @@index([companyId, status])
+  @@index([siteId, status, validTo])
+  @@map("integra_recurring_visitors")
+}
+
 /// Ventanas planificadas de uso de sala (p. ej. Sala de juntas).
 /// No es Google Calendar: solo título, quién, franja y vínculo ACS Valid.
 model IntegraRoomBooking {

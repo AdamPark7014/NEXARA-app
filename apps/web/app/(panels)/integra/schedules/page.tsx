@@ -270,7 +270,7 @@ export default function IntegraSchedulesPage() {
     setOpNote(null);
     setOpResults(null);
     try {
-      const r = await savePersonSchedule(draft);
+      const r = await savePersonSchedule(draft, { preset: activePreset });
       setOpOk(r.success);
       setOpNote(
         r.success
@@ -500,7 +500,7 @@ export default function IntegraSchedulesPage() {
                     <ul className={styles.schedDoorList}>
                       {draft.doorPlans.map((dp) => (
                         <li
-                          key={dp.doorId}
+                          key={dp.doorId || dp.deviceIp}
                           className={styles.schedDoorRow}
                           data-on={dp.planTemplateNo !== "0" ? "1" : undefined}
                           data-active={previewDoorId === dp.doorId ? "1" : undefined}
@@ -511,7 +511,11 @@ export default function IntegraSchedulesPage() {
                             onClick={() => setPreviewDoorId(dp.doorId)}
                           >
                             <strong>{dp.doorName || dp.doorId}</strong>
-                            <span>{dp.doorId}</span>
+                            <span>
+                              {dp.deviceIp}
+                              {dp.present === false ? " · no enrolado" : ""}
+                              {dp.error ? ` · ${dp.error}` : ""}
+                            </span>
                           </button>
                           <select
                             value={dp.planTemplateNo}
