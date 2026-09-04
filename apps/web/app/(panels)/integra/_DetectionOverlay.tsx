@@ -1,19 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { integraApi } from "./_lib";
+import { buildApiUrl } from "@/lib/api-base";
+import { withTenantHeaders } from "@/lib/tenant";
+import { getActiveIntegraSiteId, integraApi, withSiteQuery } from "./_lib";
 import styles from "./integra.module.css";
 
 /**
  * Recuadros sobre el video, encima de quien la cámara acaba de detectar.
  *
- * Vienen del propio equipo, que ya clasifica persona de vehículo: `TargetRect`
- * llega normalizado 0..1, así que el recuadro se posiciona en porcentaje y
- * sigue cuadrando aunque el mosaico cambie de tamaño.
+ * Vienen del propio equipo (`TargetRect` 0..1). Identidad real solo en accesos
+ * ACS (`personName`). AcuSense = human/vehicle sin nombre.
  *
- * Identidad real solo llega en accesos (`AccessControllerEvent.name`). Las
- * cámaras AcuSense mandan human/vehicle sin nombre: se etiqueta el tipo, no
- * se inventa matching facial.
+ * Transporte: SSE con headers de tenant (fetch stream) + sondeo `afterId`
+ * cada ~400 ms de respaldo. Antes solo poll 1.5 s → cajas “fantasma” tarde.
  */
 
 export type PushTarget = { type: string; x: number; y: number; w: number; h: number };
@@ -38,69 +38,210 @@ type Box = PushTarget & {
   at: number;
   personName?: string | null;
   personId?: string | null;
+  ttl: number;
 };
 
-/** Cuánto se queda pintado un recuadro desde que llega su evento. */
-const BOX_TTL_MS = 6000;
-/** Cada cuánto se pregunta por detecciones nuevas. */
-const POLL_MS = 1500;
+const BOX_TTL_OPTICAL_MS = 10_000;
+const BOX_TTL_NAMED_MS = 14_000;
+/** Sondeo incremental si SSE cae o aún no conectó. */
+const POLL_MS = 400;
+const SEED_MS = 12_000;
 
 type Listener = (events: PushEvent[]) => void;
 
 const listeners = new Set<Listener>();
-let timer: number | null = null;
+let pollTimer: number | null = null;
 let lastId = 0;
+let sseAbort: AbortController | null = null;
+let sseRetryTimer: number | null = null;
+
+function ttlFor(ev: PushEvent, t: PushTarget): number {
+  if (ev.personName?.trim()) return BOX_TTL_NAMED_MS;
+  if (t.type === "face") return BOX_TTL_NAMED_MS;
+  return BOX_TTL_OPTICAL_MS;
+}
+
+function overlapScore(a: PushTarget, b: PushTarget): number {
+  const ax2 = a.x + a.w;
+  const ay2 = a.y + a.h;
+  const bx2 = b.x + b.w;
+  const by2 = b.y + b.h;
+  const ix = Math.max(0, Math.min(ax2, bx2) - Math.max(a.x, b.x));
+  const iy = Math.max(0, Math.min(ay2, by2) - Math.max(a.y, b.y));
+  const inter = ix * iy;
+  if (inter <= 0) {
+    const acx = a.x + a.w / 2;
+    const acy = a.y + a.h / 2;
+    const bcx = b.x + b.w / 2;
+    const bcy = b.y + b.h / 2;
+    const d = Math.hypot(acx - bcx, acy - bcy);
+    return d < 0.12 ? 0.25 : 0;
+  }
+  const uni = a.w * a.h + b.w * b.h - inter;
+  return uni > 0 ? inter / uni : 0;
+}
+
+/** Fusiona cajas solapadas para que el track “siga” en vez de apilar fantasmas. */
+export function mergeBoxes(prev: Box[], incoming: Box[]): Box[] {
+  const out = [...prev];
+  for (const n of incoming) {
+    let best = -1;
+    let bestScore = 0.22;
+    for (let i = 0; i < out.length; i++) {
+      const o = out[i];
+      if (o.type !== n.type && !(o.personName && n.personName)) continue;
+      const s = overlapScore(o, n);
+      if (s > bestScore) {
+        bestScore = s;
+        best = i;
+      }
+    }
+    if (best >= 0) {
+      const prevBox = out[best];
+      out[best] = {
+        ...n,
+        key: prevBox.key,
+        at: n.at,
+        personName: n.personName || prevBox.personName,
+        personId: n.personId || prevBox.personId,
+        ttl: Math.max(n.ttl, prevBox.ttl),
+      };
+    } else {
+      out.push(n);
+    }
+  }
+  return out;
+}
 
 function boxesFromEvents(events: PushEvent[], deviceIp: string, now = Date.now()): Box[] {
   const fresh: Box[] = [];
   for (const ev of events) {
     if (ev.deviceIp !== deviceIp || !ev.targets?.length) continue;
     const age = now - Date.parse(ev.occurredAt);
-    if (!Number.isFinite(age) || age > BOX_TTL_MS * 2) continue;
+    if (!Number.isFinite(age) || age > BOX_TTL_NAMED_MS * 1.5) continue;
     for (const [i, t] of ev.targets.entries()) {
+      const ttl = ttlFor(ev, t);
+      if (age > ttl) continue;
       fresh.push({
         ...t,
         key: `${ev.id}-${i}`,
         at: now - Math.max(0, age),
         personName: ev.personName,
         personId: ev.personId,
+        ttl,
       });
     }
   }
   return fresh;
 }
 
+function fanOut(items: PushEvent[]) {
+  if (!items.length) return;
+  lastId = Math.max(lastId, ...items.map((e) => e.id));
+  for (const fn of listeners) fn(items);
+}
+
 async function pollOnce() {
   try {
-    const data = await integraApi<{ items: PushEvent[] }>("integra/push/events?limit=40");
-    const items = (data.items || []).filter((e) => e.id > lastId);
-    if (items.length === 0) return;
-    lastId = Math.max(lastId, ...items.map((e) => e.id));
-    for (const fn of listeners) fn(items);
+    if (lastId <= 0) {
+      const data = await integraApi<{ items: PushEvent[] }>("integra/push/events?limit=1");
+      lastId = Math.max(lastId, data.items?.[0]?.id ?? 0);
+      return;
+    }
+    const data = await integraApi<{ items: PushEvent[] }>(
+      `integra/push/events?afterId=${lastId}&limit=80`,
+    );
+    fanOut(data.items || []);
   } catch {
-    // Quedarse sin recuadros no debe romper el video que hay debajo.
+    // Quedarse sin recuadros no debe romper el video.
   }
 }
 
-/** Un solo sondeo compartido: muro, foco, tira de accesos y badges del rail. */
+function parseSseChunk(buffer: string): { events: Array<{ type?: string; item?: PushEvent }>; rest: string } {
+  const parts = buffer.split("\n\n");
+  const rest = parts.pop() ?? "";
+  const events: Array<{ type?: string; item?: PushEvent }> = [];
+  for (const block of parts) {
+    const dataLine = block
+      .split("\n")
+      .filter((l) => l.startsWith("data:"))
+      .map((l) => l.slice(5).trim())
+      .join("");
+    if (!dataLine) continue;
+    try {
+      events.push(JSON.parse(dataLine));
+    } catch {
+      /* ignore */
+    }
+  }
+  return { events, rest };
+}
+
+async function runSse(signal: AbortSignal) {
+  const siteId = getActiveIntegraSiteId();
+  if (!siteId) throw new Error("sin sitio");
+  const url = buildApiUrl(withSiteQuery(`integra/push/stream?siteId=${siteId}`));
+  const headers = new Headers(withTenantHeaders({ Accept: "text/event-stream" }));
+  const res = await fetch(url, { credentials: "include", headers, signal });
+  if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`);
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (!signal.aborted) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const parsed = parseSseChunk(buf);
+    buf = parsed.rest;
+    for (const msg of parsed.events) {
+      if (msg.type === "event" && msg.item?.id) fanOut([msg.item]);
+    }
+  }
+}
+
+function ensureTransport() {
+  if (pollTimer == null) {
+    void pollOnce();
+    pollTimer = window.setInterval(() => void pollOnce(), POLL_MS);
+  }
+  if (sseAbort) return;
+  const start = () => {
+    sseAbort?.abort();
+    sseAbort = new AbortController();
+    void runSse(sseAbort.signal).catch(() => {
+      sseAbort = null;
+      if (listeners.size === 0) return;
+      if (sseRetryTimer != null) window.clearTimeout(sseRetryTimer);
+      sseRetryTimer = window.setTimeout(() => {
+        sseRetryTimer = null;
+        if (listeners.size > 0) start();
+      }, 2500);
+    });
+  };
+  start();
+}
+
+function stopTransportIfIdle() {
+  if (listeners.size > 0) return;
+  if (pollTimer != null) {
+    window.clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  sseAbort?.abort();
+  sseAbort = null;
+  if (sseRetryTimer != null) {
+    window.clearTimeout(sseRetryTimer);
+    sseRetryTimer = null;
+  }
+}
+
+/** Un solo canal compartido: muro, foco, tira de accesos, badges y ocupación. */
 export function subscribePushEvents(fn: Listener): () => void {
   listeners.add(fn);
-  if (timer == null) {
-    // Marca inicial: sin esto, al abrir el muro aparecerían de golpe minutos
-    // de historia. Cada overlay además pide su semilla reciente por IP.
-    void integraApi<{ items: PushEvent[] }>("integra/push/events?limit=1")
-      .then((d) => {
-        lastId = Math.max(lastId, d.items?.[0]?.id ?? 0);
-      })
-      .catch(() => undefined);
-    timer = window.setInterval(() => void pollOnce(), POLL_MS);
-  }
+  ensureTransport();
   return () => {
     listeners.delete(fn);
-    if (listeners.size === 0 && timer != null) {
-      window.clearInterval(timer);
-      timer = null;
-    }
+    stopTransportIfIdle();
   };
 }
 
@@ -130,15 +271,19 @@ export function IntegraDetectionOverlay({
     setBoxes([]);
   }, [deviceIp]);
 
-  // Semilla: últimos segundos de esta cámara (el poll compartido solo ve lo nuevo).
+  // Semilla: últimos segundos de esta cámara (el canal solo ve lo nuevo).
   useEffect(() => {
     if (!deviceIp) return;
     let stop = false;
-    void integraApi<{ items: PushEvent[] }>("integra/push/events?limit=40")
+    void integraApi<{ items: PushEvent[] }>(
+      `integra/push/events?sinceMs=${SEED_MS}&limit=60&live=1`,
+    )
       .then((d) => {
         if (stop) return;
         const fresh = boxesFromEvents(d.items || [], deviceIp);
-        if (fresh.length) setBoxes(fresh);
+        if (fresh.length) setBoxes((prev) => mergeBoxes(prev, fresh));
+        const maxId = Math.max(0, ...(d.items || []).map((e) => e.id));
+        if (maxId > lastId) lastId = maxId;
       })
       .catch(() => undefined);
     return () => {
@@ -150,17 +295,17 @@ export function IntegraDetectionOverlay({
     if (!deviceIp) return;
     return subscribePushEvents((events) => {
       const fresh = boxesFromEvents(events, deviceIp);
-      if (fresh.length) setBoxes((prev) => [...prev, ...fresh]);
+      if (fresh.length) setBoxes((prev) => mergeBoxes(prev, fresh));
     });
   }, [deviceIp]);
 
   useEffect(() => {
     if (boxes.length === 0) return;
     const id = window.setInterval(() => {
-      const cut = Date.now() - BOX_TTL_MS;
-      setBoxes((prev) => prev.filter((b) => b.at > cut));
+      const now = Date.now();
+      setBoxes((prev) => prev.filter((b) => now - b.at < b.ttl));
       setTick((n) => n + 1);
-    }, 500);
+    }, 250);
     return () => window.clearInterval(id);
   }, [boxes.length]);
 
@@ -170,7 +315,8 @@ export function IntegraDetectionOverlay({
     <div className={styles.detOverlay} aria-hidden>
       {boxes.map((b) => {
         const name = b.personName?.trim();
-        const tag = name || labelFor(b.type);
+        const tag = name || (b.type === "human" ? "Humano · sin ID" : labelFor(b.type));
+        const life = Math.max(0.2, 1 - (Date.now() - b.at) / b.ttl);
         return (
           <div
             key={b.key}
@@ -182,6 +328,9 @@ export function IntegraDetectionOverlay({
               top: `${b.y * 100}%`,
               width: `${b.w * 100}%`,
               height: `${b.h * 100}%`,
+              opacity: 0.35 + life * 0.65,
+              // Reinicia el fade al actualizar posición (track continuo).
+              animationDuration: `${b.ttl}ms`,
             }}
           >
             <span className={styles.detTag} data-named={name ? "1" : undefined}>

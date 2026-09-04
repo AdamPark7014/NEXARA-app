@@ -31,7 +31,7 @@ import {
   IsString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { Observable, interval, switchMap, startWith, catchError, of } from 'rxjs';
+import { Observable, interval, switchMap, startWith, catchError, of, map, merge } from 'rxjs';
 import { RbacGuard } from '../common/rbac.guard';
 import { CurrentUser } from '../common/current-user.decorator';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
@@ -955,6 +955,9 @@ export class IntegraController {
     @Query('siteId') siteId?: string,
     @Query('personId') personId?: string,
     @Query('limit') limit?: string,
+    @Query('afterId') afterId?: string,
+    @Query('sinceMs') sinceMs?: string,
+    @Query('live') live?: string,
   ) {
     if (!companyId) throw new BadRequestException('Empresa requerida');
     const take = Math.min(Math.max(parseInt(limit || '60', 10) || 60, 1), 300);
@@ -962,8 +965,37 @@ export class IntegraController {
       siteId: siteId ? parseInt(siteId, 10) : null,
       personId: personId || null,
       take,
+      afterId: afterId ? parseInt(afterId, 10) : null,
+      sinceMs: sinceMs ? parseInt(sinceMs, 10) : null,
+      liveOnly: live === '1' || live === 'true',
     });
     return { items, total: items.length };
+  }
+
+  @Sse('push/stream')
+  @ApiOperation({ summary: 'SSE: eventos empujados al instante (con heartbeat)' })
+  pushStream(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ): Observable<MessageEvent> {
+    if (!companyId) {
+      return of({ data: { type: 'error', message: 'Empresa requerida' } } as MessageEvent);
+    }
+    const sid = siteId ? parseInt(siteId, 10) : NaN;
+    if (!Number.isFinite(sid) || sid <= 0) {
+      return of({ data: { type: 'error', message: 'siteId requerido' } } as MessageEvent);
+    }
+    // Garantiza Subject antes del primer evento.
+    const live$ = this.push.stream(sid).pipe(
+      map((item) => ({ data: { type: 'event', item } }) as MessageEvent),
+    );
+    const ping$ = interval(12_000).pipe(
+      startWith(0),
+      map(() => ({ data: { type: 'ping', t: Date.now() } }) as MessageEvent),
+    );
+    return merge(live$, ping$).pipe(
+      catchError(() => of({ data: { type: 'error', message: 'stream' } } as MessageEvent)),
+    );
   }
 
   @Get('attendance')

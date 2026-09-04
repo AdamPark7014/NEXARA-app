@@ -16,6 +16,7 @@ import {
 import { IntegraEzuiKitPlayer } from "../_EzuiKitPlayer";
 import { IntegraDetectionOverlay, subscribePushEvents } from "../_DetectionOverlay";
 import { IntegraLivePlayer } from "../_LivePlayer";
+import { IntegraLiveAccessBanner } from "../_LiveAccessBanner";
 import { IntegraOccupancyPanel } from "../_OccupancyPanel";
 import { IntegraPtzPad } from "../_PtzPad";
 import { IntegraRecentAccess } from "../_RecentAccess";
@@ -139,7 +140,7 @@ export default function IntegraVideoPage() {
           if (!ev.deviceIp) continue;
           if (!ev.targets?.length && !ev.personName) continue;
           const age = now - Date.parse(ev.occurredAt);
-          if (!Number.isFinite(age) || age > 8_000) continue;
+          if (!Number.isFinite(age) || age > 12_000) continue;
           if (!next) next = { ...prev };
           next[ev.deviceIp] = now;
           if (ev.personName) named += 1;
@@ -154,9 +155,33 @@ export default function IntegraVideoPage() {
     });
   }, []);
 
+  // Semilla badges del rail: lo vivo de los últimos segundos.
+  useEffect(() => {
+    let stop = false;
+    void integraApi<{ items: Array<{ id: number; deviceIp: string; personName?: string | null; targets?: unknown; occurredAt: string }> }>(
+      "integra/push/events?sinceMs=12000&limit=60&live=1",
+    )
+      .then((d) => {
+        if (stop) return;
+        const now = Date.now();
+        const next: Record<string, number> = {};
+        for (const ev of d.items || []) {
+          if (!ev.deviceIp) continue;
+          const age = now - Date.parse(ev.occurredAt);
+          if (!Number.isFinite(age) || age > 12_000) continue;
+          next[ev.deviceIp] = now - Math.max(0, age);
+        }
+        if (Object.keys(next).length) setDetByIp((prev) => ({ ...next, ...prev }));
+      })
+      .catch(() => undefined);
+    return () => {
+      stop = true;
+    };
+  }, []);
+
   useEffect(() => {
     const id = window.setInterval(() => {
-      const cut = Date.now() - 6_000;
+      const cut = Date.now() - 10_000;
       setDetByIp((prev) => {
         const keys = Object.keys(prev);
         if (!keys.some((k) => prev[k] < cut)) return prev;
@@ -376,6 +401,7 @@ export default function IntegraVideoPage() {
 
   return (
     <IgPage>
+      <IntegraLiveAccessBanner enabled />
       <IgToolbar
         title="Video en vivo"
         meta={
@@ -471,7 +497,7 @@ export default function IntegraVideoPage() {
                     const sel = selected === c.id;
                     const det =
                       c.sourceIp && detByIp[c.sourceIp]
-                        ? Date.now() - detByIp[c.sourceIp] < 6_000
+                        ? Date.now() - detByIp[c.sourceIp] < 10_000
                         : false;
                     const online = onlineish(c.status);
                     return (

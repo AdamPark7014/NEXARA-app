@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { subscribePushEvents } from "./_DetectionOverlay";
 import { integraApi } from "./_lib";
 import styles from "./integra.module.css";
 
@@ -47,10 +48,14 @@ export function IntegraOccupancyPanel({ enabled }: { enabled: boolean }) {
       }
     };
     void load();
-    const id = window.setInterval(() => void load(), 15_000);
+    const id = window.setInterval(() => void load(), 20_000);
+    const unsub = subscribePushEvents((events) => {
+      if (events.some((e) => e.personName?.trim())) void load();
+    });
     return () => {
       stop = true;
       window.clearInterval(id);
+      unsub();
     };
   }, [enabled]);
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { subscribePushEvents, type PushEvent } from "./_DetectionOverlay";
+import { integraApi } from "./_lib";
 import styles from "./integra.module.css";
 
 /**
@@ -21,7 +22,8 @@ type AccessHit = {
   verifyMode: string | null;
 };
 
-const ACCESS_TTL_MS = 30_000;
+const ACCESS_TTL_MS = 60_000;
+const SEED_MS = 60_000;
 
 function relAge(at: number): string {
   const s = Math.max(0, Math.round((Date.now() - at) / 1000));
@@ -42,6 +44,44 @@ export function IntegraRecentAccess({
   useEffect(() => {
     setHits([]);
   }, [deviceIp]);
+
+  useEffect(() => {
+    if (!enabled || !deviceIp) return;
+    let stop = false;
+    void integraApi<{ items: PushEvent[] }>(
+      `integra/push/events?sinceMs=${SEED_MS}&limit=40&live=1`,
+    )
+      .then((d) => {
+        if (stop) return;
+        const fresh: AccessHit[] = [];
+        for (const ev of d.items || []) {
+          if (ev.deviceIp !== deviceIp) continue;
+          const name = ev.personName?.trim();
+          if (!name) continue;
+          const at = Date.parse(ev.occurredAt);
+          if (!Number.isFinite(at) || Date.now() - at > ACCESS_TTL_MS) continue;
+          fresh.push({
+            id: ev.id,
+            at,
+            personName: name,
+            personId: ev.personId ?? null,
+            photoPath: ev.photoPath ?? null,
+            label: ev.label ?? null,
+            verifyMode: ev.verifyMode ?? null,
+          });
+        }
+        if (!fresh.length) return;
+        setHits(
+          fresh
+            .sort((a, b) => b.at - a.at)
+            .slice(0, 12),
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      stop = true;
+    };
+  }, [deviceIp, enabled]);
 
   useEffect(() => {
     if (!enabled || !deviceIp) return;
@@ -90,7 +130,7 @@ export function IntegraRecentAccess({
     <aside className={styles.accessStrip} aria-label="Últimos accesos">
       <header className={styles.accessStripHead}>
         <strong>Últimos accesos</strong>
-        <span>30 s</span>
+        <span>60 s</span>
       </header>
       <ul className={styles.accessStripList}>
         {hits.map((h) => (
