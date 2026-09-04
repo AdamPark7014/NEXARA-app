@@ -238,10 +238,20 @@ export function resolveValidityWindow(
     };
   }
   if (validity === 'dated') {
-    const ingress = opts?.fechaIngreso ? new Date(opts.fechaIngreso) : now;
-    const begin = Number.isNaN(ingress.getTime())
-      ? now
-      : new Date(ingress.getFullYear(), ingress.getMonth(), ingress.getDate(), 0, 0, 0);
+    let begin: Date;
+    if (opts?.fechaIngreso) {
+      if (typeof opts.fechaIngreso === 'string' && /^\d{4}-\d{2}-\d{2}/.test(opts.fechaIngreso)) {
+        const [y, m, d] = opts.fechaIngreso.slice(0, 10).split('-').map(Number);
+        begin = new Date(y, m - 1, d, 0, 0, 0);
+      } else {
+        const ingress = new Date(opts.fechaIngreso);
+        begin = Number.isNaN(ingress.getTime())
+          ? now
+          : new Date(ingress.getFullYear(), ingress.getMonth(), ingress.getDate(), 0, 0, 0);
+      }
+    } else {
+      begin = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    }
     const end = new Date(begin);
     end.setFullYear(end.getFullYear() + 1);
     end.setHours(23, 59, 59, 0);
