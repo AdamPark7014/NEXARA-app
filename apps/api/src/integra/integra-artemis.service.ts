@@ -27,6 +27,7 @@ import { IntegraSiteService } from './integra-site.service';
 import { IntegraMediaService } from './integra-media.service';
 import { IntegraSyncService } from './integra-sync.service';
 import { IntegraPortfolioService } from './integra-portfolio.service';
+import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
 import {
   deleteAllLocalPersonMedia,
   deleteLocalFingerData,
@@ -78,6 +79,7 @@ export class IntegraArtemisService {
     private readonly media: IntegraMediaService,
     private readonly sync: IntegraSyncService,
     private readonly portfolioSvc: IntegraPortfolioService,
+    private readonly acsFanout: IntegraAcsFanoutService,
   ) {}
 
   /** Artemis-only; sitios HCT e ISAPI → 400 con mensaje claro (ADR-0019). */

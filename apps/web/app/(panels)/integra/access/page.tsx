@@ -115,15 +115,21 @@ export default function IntegraAccessPage() {
 
   const control = async (id: string, reason: string) => {
     setBusy(id);
+    setError(null);
     try {
       await integraApi(`integra/doors/${encodeURIComponent(id)}/control`, {
         method: "POST",
         body: JSON.stringify({ controlType, reason }),
       });
+      const label =
+        DOOR_CONTROL_OPTIONS.find((o) => o.value === controlType)?.label || "Acción";
+      toast.success(`${label} enviada · ${confirmDoor?.name || id}`);
       setConfirmDoor(null);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      const msg = e instanceof Error ? e.message : "Error al controlar la puerta";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusy(null);
     }

@@ -21,7 +21,7 @@ import styles from "../integra.module.css";
  * Fuente primaria = empuje local (rápido + foto). No heartBeat/VMD en la vista default.
  */
 
-type Device = { id: number; name: string; ip?: string | null; kind?: string };
+type Device = { id: string | number; name: string; ip?: string | null; kind?: string };
 
 type Stats = {
   day: string;

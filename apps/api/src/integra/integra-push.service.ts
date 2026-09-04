@@ -432,10 +432,16 @@ export class IntegraPushService {
 
     return {
       day: today,
+      /** ES — KPI strip Eventos UI sibling */
       entradas: grantedToday.length,
       denegados: deniedToday.length,
       unicos: unique.size,
       enSitio: occupancy.total,
+      /** EN aliases — mismo contrato para strip genérico */
+      granted: grantedToday.length,
+      denied: deniedToday.length,
+      uniquePersons: unique.size,
+      onSite: occupancy.total,
       ms: Date.now() - t0,
     };
   }
@@ -960,6 +966,7 @@ export class IntegraPushService {
       where: { id: siteId },
       data: { pushTokenHash: null, pushTokenAt: null },
     });
+    this.invalidateTokenCache(siteId);
     return { devices: results };
   }
 
@@ -983,6 +990,11 @@ export class IntegraPushService {
     ev: NormalizedEvent,
     pushedImage?: Buffer | null,
   ) {
+    // ~97 % del tráfico medido: no merece fila ni foto ni SSE.
+    if (SKIP_STORE_TYPES.has(ev.eventType) || DROP_TYPES.has(ev.eventType)) {
+      return null;
+    }
+
     let photoPath: string | null = null;
     if (pushedImage?.length) {
       // Si el equipo mandó la imagen, esa es la buena: es el fotograma exacto
@@ -1020,6 +1032,8 @@ export class IntegraPushService {
         verifyMode: ev.verifyMode,
         photoPath,
         targets: (ev.targets ?? undefined) as never,
+        // ACS/detecciones útiles: raw compacto; no duplicar blobs enormes de VMD
+        // (ya no se insertan). Cap implícito vía JSON del equipo.
         raw: (ev.raw ?? undefined) as never,
       },
     });
