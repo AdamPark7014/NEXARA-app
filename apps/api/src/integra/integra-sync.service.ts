@@ -487,6 +487,10 @@ export class IntegraSyncService {
           width: ch.width,
           height: ch.height,
           rtsp: ch.rtspRedacted,
+          // El parque sale de fábrica con el audio apagado en el canal. Se
+          // guarda lo que el equipo reporta para no prometer sonido que no hay.
+          hasAudio: ch.audio === true,
+          audioCodec: ch.audioCodec,
           source: proxy
             ? {
                 ipAddress: proxy.ipAddress,
@@ -570,6 +574,38 @@ export class IntegraSyncService {
           },
           update: { name, online: info.reachable, syncedAt: now },
         });
+
+        // La terminal lleva cámara: es la que mira a quien pasa por la puerta.
+        // Entra al inventario de video para poder verla desde la consola —
+        // sigue siendo un equipo ACS, así que no se le deriva sub-stream: no
+        // tiene. Se guarda su id de stream tal cual y si trae audio.
+        const videoCh = info.videoChannels.find((c) => c.enabled) || info.videoChannels[0];
+        if (videoCh) {
+          const cameraIndexCode = `${ip}|${videoCh.id}`;
+          camerasSeen.add(cameraIndexCode);
+          cameraCount++;
+          await upsertCamera(cameraIndexCode, `${name} (puerta)`, info.reachable, {
+            channelId: videoCh.id,
+            // Id exacto: la terminal solo publica el 101.
+            streamId: videoCh.id,
+            channelNumber: videoCh.channelNumber,
+            codec: videoCh.codec,
+            width: videoCh.width,
+            height: videoCh.height,
+            rtsp: videoCh.rtspRedacted,
+            hasAudio: videoCh.audio === true,
+            audioCodec: videoCh.audioCodec,
+            deviceKind: 'ACS',
+            doorIndexCode,
+            source: {
+              ipAddress: ip,
+              model: info.identity?.model ?? null,
+              serialNumber: info.identity?.serialNumber ?? null,
+              connMode: 'manual',
+              reachableDirectly: true,
+            },
+          });
+        }
       }
     }
 

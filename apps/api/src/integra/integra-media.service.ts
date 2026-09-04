@@ -15,6 +15,19 @@ function subStreamOf(channelId: string): string {
 }
 
 /**
+ * Fuente go2rtc con audio audible en el navegador.
+ *
+ * Los equipos entregan el audio en G.711 (`pcm_mulaw`, 8 kHz) y MSE no
+ * reproduce G.711: sin esto el navegador recibe el MP4 **sin pista de audio**
+ * —comprobado con ffprobe contra `/api/stream.mp4`—. Se transcodifica solo el
+ * audio a AAC y el video se copia tal cual, así que el coste es el de 8 kHz
+ * mono y no el de reencodear 720p. go2rtc trae ffmpeg en la propia imagen.
+ */
+function audioSourceFor(rtsp: string): string {
+  return `ffmpeg:${rtsp}#video=copy#audio=aac`;
+}
+
+/**
  * Registra el RTSP de Artemis en go2rtc y devuelve URL HLS consumible por el browser.
  * Sitios HCT: stream token cloud (EZUIKit) — ADR-0019; no go2rtc RTSP.
  * Sitios ISAPI: RTSP directo del equipo en LAN → go2rtc (ADR-0019 §5).
@@ -44,6 +57,7 @@ export class IntegraMediaService {
     companyId: number | null,
     cameraIndexCode: string,
     siteId?: number | null,
+    opts?: { audio?: boolean },
   ) {
     const resolved = await this.sites.resolveClient({ companyId, siteId });
 
@@ -68,10 +82,14 @@ export class IntegraMediaService {
           provider: 'ISAPI' as const,
           rtsp: null,
           hls: null,
+          hasAudio: false,
           note: `Cámara ${cameraIndexCode} no está en el espejo del sitio. Corre el sync.`,
         };
       }
-      return this.publish('ISAPI', cameraIndexCode, source.rtsp, source.redacted, source.note);
+      return this.publish('ISAPI', cameraIndexCode, source.rtsp, source.redacted, source.note, {
+        hasAudio: source.hasAudio,
+        withAudio: Boolean(opts?.audio) && source.hasAudio,
+      });
     }
 
     if (!resolved.client) {
@@ -118,7 +136,7 @@ export class IntegraMediaService {
   private async isapiRtsp(
     resolved: Awaited<ReturnType<IntegraSiteService['resolveClient']>>,
     cameraIndexCode: string,
-  ): Promise<{ rtsp: string; redacted: string; note: string } | null> {
+  ): Promise<{ rtsp: string; redacted: string; note: string; hasAudio: boolean } | null> {
     if (!resolved.isapi || !resolved.siteId) return null;
 
     const camera = await this.prisma.integraCamera.findUnique({
@@ -129,19 +147,29 @@ export class IntegraMediaService {
 
     const raw = (camera.raw ?? {}) as {
       channelId?: string;
+      /** Id exacto a pedir. Lo ponen los equipos con un solo stream. */
+      streamId?: string;
+      hasAudio?: boolean;
       source?: { ipAddress?: string | null; reachableDirectly?: boolean } | null;
     };
     const channelId = raw.channelId;
     if (!channelId) return null;
+    const hasAudio = raw.hasAudio === true;
 
     const directIp = raw.source?.reachableDirectly ? raw.source.ipAddress : null;
     if (directIp && resolved.isapiForHost) {
       const direct = resolved.isapiForHost(directIp);
-      // La cámara suelta numera desde 101 aunque en el NVR sea el canal 7.
+      // Una terminal de acceso publica un único stream: pedirle el «sub» da 404.
+      // El resto son cámaras sueltas, que numeran desde 101 aunque en el NVR
+      // sean el canal 7.
+      const streamId = raw.streamId ?? SUB_STREAM_ID;
       return {
-        rtsp: direct.rtspUrl(SUB_STREAM_ID),
-        redacted: direct.rtspUrlRedacted(SUB_STREAM_ID),
-        note: `RTSP directo a la cámara (${directIp}), sin cargar el grabador`,
+        rtsp: direct.rtspUrl(streamId),
+        redacted: direct.rtspUrlRedacted(streamId),
+        note: raw.streamId
+          ? `RTSP directo a la terminal (${directIp}), canal ${streamId}`
+          : `RTSP directo a la cámara (${directIp}), sin cargar el grabador`,
+        hasAudio,
       };
     }
 
@@ -150,6 +178,7 @@ export class IntegraMediaService {
       rtsp: resolved.isapi.rtspUrl(sub),
       redacted: resolved.isapi.rtspUrlRedacted(sub),
       note: `RTSP vía grabador ${resolved.host}, canal ${channelId}`,
+      hasAudio,
     };
   }
 
@@ -165,7 +194,10 @@ export class IntegraMediaService {
     rtsp: string,
     rtspForResponse: string,
     sourceNote?: string,
+    audio?: { hasAudio: boolean; withAudio: boolean },
   ) {
+    const hasAudio = Boolean(audio?.hasAudio);
+    const withAudio = Boolean(audio?.withAudio);
     const internal = this.go2rtcInternal();
     if (!internal) {
       return {
@@ -173,13 +205,19 @@ export class IntegraMediaService {
         provider,
         rtsp: rtspForResponse,
         hls: null,
+        hasAudio,
+        audio: false,
         note: [sourceNote, 'GO2RTC_URL no configurado — usa VLC con RTSP'].filter(Boolean).join(' · '),
       };
     }
 
-    const streamName = `cam_${cameraIndexCode.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+    const base = `cam_${cameraIndexCode.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+    // Stream aparte para el audio: el mudo lo comparten todos los mosaicos del
+    // muro y no debe cargar con el transcodificado.
+    const streamName = withAudio ? `${base}_a` : base;
+    const src = withAudio ? audioSourceFor(rtsp) : rtsp;
     try {
-      const url = `${internal}/api/streams?name=${encodeURIComponent(streamName)}&src=${encodeURIComponent(rtsp)}`;
+      const url = `${internal}/api/streams?name=${encodeURIComponent(streamName)}&src=${encodeURIComponent(src)}`;
       await fetch(url, { method: 'PUT' });
       const publicBase = this.go2rtcPublic() || internal;
       const hls = `${publicBase}/api/stream.m3u8?src=${encodeURIComponent(streamName)}`;
@@ -189,7 +227,11 @@ export class IntegraMediaService {
         rtsp: rtspForResponse,
         hls,
         streamName,
-        note: [sourceNote, 'HLS vía go2rtc'].filter(Boolean).join(' · '),
+        hasAudio,
+        audio: withAudio,
+        note: [sourceNote, withAudio ? 'HLS vía go2rtc, audio AAC' : 'HLS vía go2rtc']
+          .filter(Boolean)
+          .join(' · '),
       };
     } catch (e) {
       this.logger.warn(`go2rtc falló: ${String(e)}`);
@@ -198,6 +240,8 @@ export class IntegraMediaService {
         provider,
         rtsp: rtspForResponse,
         hls: null,
+        hasAudio,
+        audio: false,
         note: [sourceNote, 'go2rtc no disponible — fallback RTSP'].filter(Boolean).join(' · '),
       };
     }

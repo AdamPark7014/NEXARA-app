@@ -40,6 +40,8 @@ type Person = {
   faceUrl?: string | null;
   hasFace?: boolean;
   sourceIp?: string;
+  sourceName?: string;
+  doorNames?: string[];
 };
 
 type Org = { id: string; name: string; parentId?: string };
@@ -76,14 +78,34 @@ function formatWhen(iso?: string) {
   });
 }
 
-function PersonAvatar({ person, large }: { person: Person; large?: boolean }) {
+/**
+ * `enrolled` = el terminal dice tener rostro; `unavailable` = lo tiene, pero no
+ * lo entrega. Los DS-K1T guardan el rostro como **modelo biométrico**, no como
+ * JPEG: `FDLib/capabilities` responde `isSupportModelData: true` y la `faceURL`
+ * del UserInfo devuelve 404 con cualquier autenticación. No es un fallo nuestro
+ * ni se arregla con otra ruta: la foto no está en el equipo.
+ */
+type FaceState = "none" | "enrolled" | "unavailable" | "ok";
+
+function PersonAvatar({
+  person,
+  large,
+  onState,
+}: {
+  person: Person;
+  large?: boolean;
+  onState?: (s: FaceState) => void;
+}) {
   const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!person.hasFace && !(person.numOfFace && person.numOfFace > 0) && !person.faceUrl) {
+    const enrolled = person.hasFace || (person.numOfFace ?? 0) > 0 || Boolean(person.faceUrl);
+    if (!enrolled) {
       setSrc(null);
+      onState?.("none");
       return;
     }
+    onState?.("enrolled");
     let objectUrl: string | null = null;
     let cancelled = false;
     void integraPersonFaceBlob(person.id)
@@ -91,9 +113,13 @@ function PersonAvatar({ person, large }: { person: Person; large?: boolean }) {
         if (cancelled) return;
         objectUrl = URL.createObjectURL(blob);
         setSrc(objectUrl);
+        onState?.("ok");
       })
       .catch(() => {
-        if (!cancelled) setSrc(null);
+        if (!cancelled) {
+          setSrc(null);
+          onState?.("unavailable");
+        }
       });
     return () => {
       cancelled = true;
@@ -103,6 +129,8 @@ function PersonAvatar({ person, large }: { person: Person; large?: boolean }) {
       });
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
+    // `onState` es un setState estable; incluirlo relanzaría la descarga.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [person.id, person.hasFace, person.numOfFace, person.faceUrl]);
 
   return (
@@ -137,6 +165,7 @@ export default function IntegraPeoplePage() {
   const [people, setPeople] = useState<Person[]>([]);
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [selected, setSelected] = useState<Person | null>(null);
+  const [faceState, setFaceState] = useState<FaceState>("none");
   const [detail, setDetail] = useState<unknown>(null);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
@@ -338,7 +367,7 @@ export default function IntegraPeoplePage() {
             {detailPerson && selected ? (
               <div className={styles.personCard}>
                 <div className={styles.personCardHead}>
-                  <PersonAvatar person={detailPerson} large />
+                  <PersonAvatar person={detailPerson} large onState={setFaceState} />
                   <div>
                     <h3 className={styles.personCardName}>{detailPerson.name}</h3>
                     <p className={styles.personCardCode}>{detailPerson.code || detailPerson.id}</p>
@@ -367,12 +396,21 @@ export default function IntegraPeoplePage() {
                       </div>
                       <div>
                         <dt>Puertas</dt>
-                        <dd className={styles.personMono}>{detailPerson.doorRight || "—"}</dd>
+                        <dd>
+                          {detailPerson.doorNames?.length
+                            ? detailPerson.doorNames.join(" · ")
+                            : detailPerson.doorRight || "—"}
+                        </dd>
                       </div>
-                      {detailPerson.sourceIp && (
+                      {(detailPerson.sourceName || detailPerson.sourceIp) && (
                         <div>
                           <dt>Terminal</dt>
-                          <dd className={styles.personMono}>{detailPerson.sourceIp}</dd>
+                          <dd>
+                            {detailPerson.sourceName || detailPerson.sourceIp}
+                            {detailPerson.sourceName && detailPerson.sourceIp && (
+                              <span className={styles.personFactSub}>{detailPerson.sourceIp}</span>
+                            )}
+                          </dd>
                         </div>
                       )}
                     </dl>
@@ -382,6 +420,13 @@ export default function IntegraPeoplePage() {
                         <summary>Plan de puertas (RightPlan)</summary>
                         <pre>{JSON.stringify(detailPerson.rightPlan, null, 2)}</pre>
                       </details>
+                    )}
+                    {faceState === "unavailable" && (
+                      <p className={styles.personNote} data-tone="warn">
+                        El rostro está dado de alta, pero el terminal no entrega la foto: la
+                        guarda como modelo biométrico, no como imagen. Para ver caras hay que
+                        cargarlas desde aquí, o mirar la cámara de la puerta en vivo.
+                      </p>
                     )}
                     <p className={styles.personNote}>
                       Alta y edición facial/tarjeta se hacen en el terminal. Esta ficha es el

@@ -695,6 +695,33 @@
   }
 }
 
+/*
+ * Altavoz sobre el video. Arranca en 🔇 siempre: el navegador solo deja sonar
+ * un video tras un gesto del usuario, así que el gesto es este botón.
+ */
+.playerSound {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 0.22);
+  border-radius: 8px;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.playerSound:hover {
+  background: rgb(0 0 0 / 0.75);
+}
+
 .playerLiveBadge {
   position: absolute;
   top: 10px;
@@ -886,6 +913,16 @@
 
 .wallWorkbench[data-rail="closed"] {
   grid-template-columns: 44px minmax(0, 1fr);
+}
+
+/*
+ * El muro y el foco viven montados a la vez y se alternan con `hidden`. Un
+ * `display` de clase le gana al `hidden` del navegador, así que sin esto el
+ * muro seguía a la vista en modo Foco: se veían los mosaicos «En cola» —
+ * porque en Foco el muro deja de tener cupo— y el foco quedaba debajo, oculto.
+ */
+.wallWorkbench[hidden] {
+  display: none;
 }
 
 @media (max-width: 900px) {
@@ -2075,6 +2112,23 @@
   margin: 0;
   font-size: 11px;
   line-height: 1.4;
+  color: var(--ig-muted);
+}
+
+.personNote[data-tone="warn"] {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--ig-warn) 32%, transparent);
+  background: color-mix(in srgb, var(--ig-warn) 10%, var(--ig-panel));
+  color: var(--ig-text);
+}
+
+/* La IP del terminal, debajo de su nombre: dato de instalación, no titular. */
+.personFactSub {
+  display: block;
+  margin-top: 1px;
+  font-family: var(--ig-mono, ui-monospace, monospace);
+  font-size: 10px;
   color: var(--ig-muted);
 }
 

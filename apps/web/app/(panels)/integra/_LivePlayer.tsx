@@ -19,6 +19,11 @@ type Props = {
    * `mse` = Foco.
    */
   mode?: StreamMode;
+  /**
+   * Reproducir con sonido. Solo Foco: el muro va mudo por definición y el
+   * navegador bloquea el autoplay de cualquier cosa que suene.
+   */
+  audio?: boolean;
 };
 
 let loaderPromise: Promise<void> | null = null;
@@ -64,12 +69,16 @@ type VideoStreamEl = HTMLElement & {
   play?: () => void;
 };
 
-function hardenVideo(node: VideoStreamEl) {
+function hardenVideo(node: VideoStreamEl, unmuted = false) {
   const v = node.video || node.querySelector("video");
   if (!v) return null;
-  v.muted = true;
-  v.defaultMuted = true;
-  v.setAttribute("muted", "");
+  // Arranca siempre mudo: con sonido el navegador rechaza el play() y el
+  // cuadro se queda negro. El sonido se abre después, ya reproduciendo.
+  if (!unmuted) {
+    v.muted = true;
+    v.defaultMuted = true;
+    v.setAttribute("muted", "");
+  }
   v.playsInline = true;
   v.setAttribute("playsinline", "");
   v.controls = false;
@@ -98,6 +107,7 @@ type ShellProps = {
   className?: string;
   startDelayMs?: number;
   enabled?: boolean;
+  audio?: boolean;
 };
 
 /** Muro: JPEG HTTP refrescado. No usa el decodificador H.264 del navegador. */
@@ -215,10 +225,13 @@ function MseFocusPlayer({
   className,
   startDelayMs = 0,
   enabled = true,
+  audio = false,
 }: ShellProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
+  const nodeRef = useRef<VideoStreamEl | null>(null);
   const [visible, setVisible] = useState(true);
+  const [muted, setMuted] = useState(true);
   const [state, setState] = useState<"idle" | "queued" | "loading" | "live" | "error">(
     src ? (enabled ? "loading" : "queued") : "idle",
   );
@@ -273,7 +286,9 @@ function MseFocusPlayer({
           if (cancelled || !hostRef.current) return;
           const node = document.createElement("video-stream") as VideoStreamEl;
           node.mode = "mse";
-          node.media = "video";
+          // Pedir la pista de audio solo cuando la hay: si se declara y el
+          // stream no la trae, el componente espera por ella y no pinta nada.
+          node.media = audio ? "video,audio" : "video";
           node.background = false;
           node.visibilityCheck = false;
           node.style.width = "100%";
@@ -282,6 +297,7 @@ function MseFocusPlayer({
           hostRef.current.appendChild(node);
           node.src = `${parsed.base}/api/ws?src=${encodeURIComponent(parsed.name)}`;
           el = node;
+          nodeRef.current = node;
 
           const arm = () => {
             if (cancelled) return;
@@ -310,9 +326,29 @@ function MseFocusPlayer({
       if (playWatch != null) window.clearInterval(playWatch);
       for (const t of kickTimers) window.clearTimeout(t);
       el?.remove();
+      nodeRef.current = null;
       if (host) host.innerHTML = "";
     };
-  }, [src, shouldPlay, startDelayMs, enabled, visible]);
+  }, [src, shouldPlay, startDelayMs, enabled, visible, audio]);
+
+  // Un stream nuevo llega mudo otra vez: el gesto de abrir sonido no se hereda.
+  useEffect(() => {
+    setMuted(true);
+  }, [src, audio]);
+
+  const toggleSound = () => {
+    const node = nodeRef.current;
+    const v = node?.video || node?.querySelector("video");
+    if (!v) return;
+    const next = !v.muted;
+    v.muted = next;
+    if (!next) {
+      v.removeAttribute("muted");
+      v.volume = 1;
+      void v.play().catch(() => undefined);
+    }
+    setMuted(next);
+  };
 
   return (
     <div
@@ -323,6 +359,17 @@ function MseFocusPlayer({
       data-mode="mse"
     >
       <div ref={hostRef} className={styles.playerVideo} />
+      {audio && state === "live" && (
+        <button
+          type="button"
+          className={styles.playerSound}
+          onClick={toggleSound}
+          title={muted ? "Activar sonido" : "Silenciar"}
+          aria-label={muted ? "Activar sonido" : "Silenciar"}
+        >
+          {muted ? "🔇" : "🔊"}
+        </button>
+      )}
       {showLiveBadge && state === "live" && (
         <span className={styles.playerLiveBadge}>
           <span className={styles.playerLiveDot} /> LIVE
@@ -354,6 +401,9 @@ function MseFocusPlayer({
 }
 
 export function IntegraLivePlayer({ mode = "mse", ...rest }: Props) {
-  if (mode === "mjpeg") return <SnapshotWallPlayer {...rest} />;
+  if (mode === "mjpeg") {
+    const { audio: _audio, ...wall } = rest;
+    return <SnapshotWallPlayer {...wall} />;
+  }
   return <MseFocusPlayer {...rest} />;
 }
