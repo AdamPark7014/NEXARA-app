@@ -5033,6 +5033,7 @@ model CompanyProfile {
   integraFloorplans         IntegraFloorplan[]
   integraEdgeAgents         IntegraEdgeAgent[]
   integraPushEvents         IntegraPushEvent[]
+  integraRoomBookings       IntegraRoomBooking[]
 
   @@map("company_profile")
 }
@@ -5723,6 +5724,7 @@ model IntegraSite {
   floorplans IntegraFloorplan[]
   edgeAgent  IntegraEdgeAgent?
   pushEvents IntegraPushEvent[]
+  roomBookings IntegraRoomBooking[]
   /// sha256 del token que los equipos llevan en la URL de notificacion.
   /// Solo el hash: el token en claro se ensena una vez al configurarlos.
   pushTokenHash String?  @db.VarChar(64)

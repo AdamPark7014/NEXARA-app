@@ -19,6 +19,7 @@ const BROAD_FIELD_ASSIGN_SCOPE = new Set(['ceo', 'dir_operaciones', 'arquitecto'
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
   private readonly superAdminEmails = ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'];
   private readonly employeeNumberPrefix = 'NXR25SYS';
 
@@ -322,7 +323,46 @@ export class UsersService {
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => ChatService))
     private readonly chat: ChatService,
+    private readonly acsFanout: IntegraAcsFanoutService,
   ) {}
+
+  /**
+   * Push en vivo a ACS si hay sitio ISAPI.
+   * Clave: employeeNumber ↔ employeeNo del terminal (sibling identity-unification).
+   */
+  private async pushAcsFromErp(opts: {
+    companyId: number | null | undefined;
+    employeeNumber?: string | null;
+    name: string;
+    enable: boolean;
+  }) {
+    if (opts.companyId == null || !opts.employeeNumber) return undefined;
+    try {
+      const acsPush = await this.acsFanout.pushErpUser({
+        companyId: opts.companyId,
+        employeeNo: opts.employeeNumber,
+        name: opts.name,
+        enable: opts.enable,
+        createIfMissing: opts.enable,
+      });
+      if (!acsPush.skipped) {
+        const bad = acsPush.sites.flatMap((s) => s.results.filter((r) => !r.ok));
+        if (bad.length) {
+          this.logger.warn(
+            `ERP→ACS ${opts.employeeNumber}: ${bad.map((b) => `${b.deviceIp}=${b.error}`).join('; ')}`,
+          );
+        }
+      }
+      return acsPush;
+    } catch (e) {
+      this.logger.warn(`ERP→ACS push falló: ${e instanceof Error ? e.message : String(e)}`);
+      return {
+        skipped: true,
+        reason: e instanceof Error ? e.message : String(e),
+        sites: [],
+      };
+    }
+  }
 
   private async resolveRoleId(value: unknown) {
     if (value === undefined || value === null) {
