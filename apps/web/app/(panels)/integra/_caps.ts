@@ -8,6 +8,7 @@ export const MODULE_CAPABILITY: Record<string, keyof IntegraCapabilities | "alwa
   "integra-video": "video",
   "integra-access": "access",
   "integra-people": "people",
+  "integra-schedules": "access",
   "integra-events": "events",
   // La asistencia sale de los eventos de acceso: si el sitio no los tiene,
   // no hay nada que enseñar.

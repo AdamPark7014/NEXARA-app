@@ -411,13 +411,16 @@ export default function UsersPage() {
     setDrawerUser(u);
     setDrawerTab(tab);
     setDrawerLoading(true);
+    setIntegraSchedule(null);
     try {
-      const [sess, act] = await Promise.all([
+      const [sess, act, sched] = await Promise.all([
         apiFetch(`users/${u.id}/sessions`, token),
         apiFetch(`users/${u.id}/auth-activity`, token),
+        apiFetch(`users/${u.id}/integra-access-schedule`, token).catch(() => null),
       ]);
       setSessions(asList<UserSessionRow>(sess));
       setActivity(asList<AuthActivityRow>(act));
+      setIntegraSchedule(sched);
     } catch (e) {
       toast.error(formatApiError(e, "No se pudo cargar el detalle IAM"));
     } finally {

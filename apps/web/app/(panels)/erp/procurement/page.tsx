@@ -506,6 +506,39 @@ export default function ProcurementPage() {
     }
   };
 
+  const downloadReceiptPdf = async (id: number, receiptNumber?: string) => {
+    if (!token) return;
+    try {
+      const res = await fetch(buildApiUrl(`procurement/goods-receipts/${id}/pdf`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          typeof (data as { error?: string }).error === "string"
+            ? (data as { error: string }).error
+            : "No se pudo generar el PDF de recepción",
+        );
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `GR-${(receiptNumber || String(id)).replace(/[^\w.-]+/g, "_")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("PDF de recepción descargado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo generar el PDF");
+    }
+  };
+
+  const receiptLandedTotal = (r: GoodsReceipt) =>
+    Number(r.freightCost || 0) +
+    Number(r.insuranceCost || 0) +
+    Number(r.customsCost || 0) +
+    Number(r.otherLandedCost || 0);
+
   const loadReqDetail = async (id: number) => {
     if (!token) return;
     setDetailKind("req");
