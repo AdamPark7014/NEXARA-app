@@ -7,7 +7,6 @@ import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { toast } from "@/components/Toast";
 import { getApprovalsSectionConfig } from "@/lib/section-views";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
