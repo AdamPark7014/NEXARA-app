@@ -144,23 +144,19 @@ const DEFAULT_WARRANTY = [
   'No aplica por mal uso, daños de terceros o falta de mantenimiento.',
 ];
 
-const loadLogo = (): Buffer | null => {
-  const candidates = [
-    path.resolve(__dirname, '../assets/logo-nexara.png'),
-    path.resolve(process.cwd(), 'src/assets/logo-nexara.png'),
-    path.resolve(process.cwd(), 'dist/assets/logo-nexara.png'),
-    path.resolve(process.cwd(), '../web/public/logo-nexara-platform.png'),
-    path.resolve(process.cwd(), '../../apps/web/public/logo-nexara-platform.png'),
-  ];
-  for (const filePath of candidates) {
-    try {
-      if (fs.existsSync(filePath)) return fs.readFileSync(filePath);
-    } catch {
-      // ignore
-    }
-  }
-  return null;
-};
+const brandName = (company?: CotizacionPdfCompany | null) =>
+  company?.tradeName || company?.legalName || FALLBACK_COMPANY.name;
+
+const resolveCompany = (company?: CotizacionPdfCompany | null): CotizacionPdfCompany => ({
+  legalName: company?.legalName || FALLBACK_COMPANY.name,
+  tradeName: company?.tradeName || FALLBACK_COMPANY.name,
+  rfc: company?.rfc || null,
+  fiscalAddress: company?.fiscalAddress || null,
+  fiscalPostalCode: company?.fiscalPostalCode || null,
+  contactEmail: company?.contactEmail || FALLBACK_COMPANY.email,
+  contactPhone: company?.contactPhone || null,
+  websiteUrl: company?.websiteUrl || FALLBACK_COMPANY.web,
+});
 
 type PdfCtx = {
   doc: PDFKit.PDFDocument;
@@ -171,6 +167,7 @@ type PdfCtx = {
   pageBottom: number;
   pageNo: number;
   logo: Buffer | null;
+  companyShort: string;
 };
 
 const resetCursor = (doc: PDFKit.PDFDocument, x: number, y: number) => {
@@ -209,14 +206,14 @@ const boundedText = (
 
 const pageBottom = (doc: PDFKit.PDFDocument) => doc.page.height - FOOTER_ZONE;
 
-const drawFooter = (ctx: PdfCtx) => {
-  const { doc, margin, contentWidth, pageHeight, pageNo } = ctx;
-  const y = pageHeight - 30;
+const drawFooter = (ctx: PdfCtx, quoteNumber: string) => {
+  const { doc, margin, contentWidth, pageHeight, pageNo, companyShort } = ctx;
+  const y = pageHeight - 28;
   doc.save();
-  doc.moveTo(margin, y - 10).lineTo(margin + contentWidth, y - 10).strokeColor(COLORS.line).lineWidth(0.5).stroke();
+  doc.moveTo(margin, y - 8).lineTo(margin + contentWidth, y - 8).strokeColor(COLORS.line).lineWidth(0.5).stroke();
   doc.restore();
   doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7.5);
-  boundedText(doc, `${COMPANY.name} · ${COMPANY.web} · ${COMPANY.email}`, margin, y, {
+  boundedText(doc, `${companyShort} · Cotización ${quoteNumber} · Documento comercial`, margin, y, {
     width: contentWidth * 0.72,
     height: 10,
     ellipsis: true,
@@ -224,35 +221,28 @@ const drawFooter = (ctx: PdfCtx) => {
   boundedText(doc, `Página ${pageNo}`, margin, y, { width: contentWidth, height: 10, align: 'right' });
 };
 
-const startPage = (ctx: PdfCtx, withMiniHeader: boolean) => {
-  const { doc, margin, contentWidth, logo } = ctx;
-  if (withMiniHeader) {
-    doc.save();
-    doc.rect(0, 0, ctx.pageWidth, 4).fill(COLORS.teal);
-    doc.restore();
-    if (logo) {
-      try {
-        doc.image(logo, margin, 14, { fit: [52, 52] });
-      } catch {
-        // ignore
-      }
+const startContinuationPage = (ctx: PdfCtx): number => {
+  const { doc, margin, logo, companyShort } = ctx;
+  doc.save();
+  doc.rect(0, 0, ctx.pageWidth, 4).fill(COLORS.accent);
+  doc.restore();
+  if (logo) {
+    try {
+      doc.image(logo, margin, 12, { fit: [44, 44] });
+    } catch {
+      // ignore
     }
-    doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(11).text(COMPANY.name, margin + (logo ? 60 : 0), 18);
-    doc
-      .fillColor(COLORS.muted)
-      .font('Helvetica')
-      .fontSize(7.5)
-      .text('Cotización comercial', margin + (logo ? 60 : 0), 32);
-    return 52;
   }
-  return MARGIN;
+  doc.fillColor(COLORS.navy).font('Helvetica-Bold').fontSize(11).text(companyShort, margin + (logo ? 52 : 0), 16);
+  doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7.5).text('Cotización comercial (continuación)', margin + (logo ? 52 : 0), 30);
+  return 52;
 };
 
-const addPage = (ctx: PdfCtx): number => {
-  drawFooter(ctx);
+const addPage = (ctx: PdfCtx, quoteNumber: string): number => {
+  drawFooter(ctx, quoteNumber);
   ctx.doc.addPage();
   ctx.pageNo += 1;
-  const y = startPage(ctx, true);
+  const y = startContinuationPage(ctx);
   resetCursor(ctx.doc, ctx.margin, y);
   return y;
 };

@@ -420,7 +420,21 @@ export default function UsersPage() {
 
   const openCreate = () => {
     setTarget(null);
-    setForm({ ...emptyForm, managerId: resolveDefaultManagerId() });
+    const defaultRole =
+      roles.find((r) => /empleado|staff|operador/i.test(r.nombre))?.id ??
+      roles.find((r) => r.orgRoleKey && r.orgRoleKey !== "ceo" && r.orgRoleKey !== "super_admin")?.id ??
+      roles[0]?.id;
+    setForm({
+      ...emptyForm,
+      managerId: resolveDefaultManagerId(),
+      roleId: defaultRole != null ? String(defaultRole) : "",
+      departmentId: depts[0] ? String(depts[0].id) : "",
+      password: generateTempPassword(),
+      autoPassword: true,
+      autoEmployeeNumber: true,
+      employeeNumber: "",
+    });
+    setCreatedCreds(null);
     setSaveErr(null);
     setModal("create");
   };
@@ -433,6 +447,9 @@ export default function UsersPage() {
       roleId: userRoleId(u),
       departmentId: userDepartmentId(u),
       managerId: userManagerId(u),
+      employeeNumber: u.employeeNumber || "",
+      autoEmployeeNumber: !u.employeeNumber,
+      autoPassword: false,
     });
     setSaveErr(null); setModal("edit");
   };
@@ -457,26 +474,66 @@ export default function UsersPage() {
     setSaving(true); setSaveErr(null);
     try {
       if (modal === "create") {
-        if (!form.nombre || !form.email || !form.password || !form.roleId || !form.departmentId) {
-          setSaveErr("Nombre, email, contraseña, rol y departamento son requeridos."); setSaving(false); return;
+        const password = form.autoPassword ? (form.password || generateTempPassword()) : form.password;
+        if (!form.nombre.trim() || !form.email.trim() || !password || !form.roleId) {
+          setSaveErr("Nombre, correo, contraseña y rol son obligatorios.");
+          setSaving(false);
+          return;
         }
-        const body = {
-          nombre: form.nombre, email: form.email, password: form.password,
-          roleId: Number(form.roleId), departmentId: Number(form.departmentId),
+        if (!form.departmentId) {
+          setSaveErr("No hay departamento disponible. Crea uno antes de dar de alta.");
+          setSaving(false);
+          return;
+        }
+        if (!form.autoEmployeeNumber && !form.employeeNumber.trim()) {
+          setSaveErr("Indica el nº de empleado o deja el automático.");
+          setSaving(false);
+          return;
+        }
+        const body: Record<string, unknown> = {
+          nombre: form.nombre.trim(),
+          email: form.email.trim(),
+          password,
+          roleId: Number(form.roleId),
+          departmentId: Number(form.departmentId),
           ...(form.managerId ? { managerId: Number(form.managerId) } : {}),
+          ...(!form.autoEmployeeNumber && form.employeeNumber.trim()
+            ? { employeeNumber: form.employeeNumber.trim() }
+            : {}),
         };
-        await apiFetch("users", token, { method: "POST", body: JSON.stringify(body) });
+        const created = (await apiFetch("users", token, {
+          method: "POST",
+          body: JSON.stringify(body),
+        })) as ApiUser;
+        setCreatedCreds({
+          nombre: created?.nombre || form.nombre.trim(),
+          email: created?.email || form.email.trim(),
+          password,
+          employeeNumber: created?.employeeNumber ?? null,
+        });
+        setModal(null);
+        setTarget(null);
+        toast.success("Usuario creado — guarda la contraseña temporal");
+        void load();
+        return;
       } else if (modal === "edit" && target) {
         const body: Record<string, unknown> = {
-          nombre: form.nombre, email: form.email,
-          roleId: Number(form.roleId), departmentId: Number(form.departmentId),
+          nombre: form.nombre.trim(),
+          email: form.email.trim(),
+          roleId: Number(form.roleId),
+          departmentId: Number(form.departmentId),
           managerId: form.managerId ? Number(form.managerId) : null,
+          employeeNumber: form.autoEmployeeNumber ? undefined : (form.employeeNumber.trim() || null),
         };
+        if (!form.autoEmployeeNumber && form.employeeNumber.trim()) {
+          body.employeeNumber = form.employeeNumber.trim();
+        }
         await apiFetch(`users/${target.id}`, token, { method: "PATCH", body: JSON.stringify(body) });
+        toast.success("Usuario actualizado");
       }
       closeModal(); void load();
     } catch (e) {
-      setSaveErr(e instanceof Error ? e.message : "Error al guardar");
+      setSaveErr(formatApiError(e, "No se pudo guardar el usuario"));
     } finally { setSaving(false); }
   };
 

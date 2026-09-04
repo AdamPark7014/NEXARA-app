@@ -115,7 +115,7 @@ export class ActivityFeedService {
               deletedAt: null,
               clientId: { not: null },
               fechaEntregaEsperada: { lt: now },
-              estatus: { notIn: ['COMPLETADO', 'COMPLETADA', 'CANCELADO', 'CANCELADA'] },
+              estatus: { notIn: closedStatusVariants() },
             },
             orderBy: { fechaEntregaEsperada: 'asc' },
             take: 8,
@@ -246,6 +246,7 @@ export class ActivityFeedService {
           const pendingPos = await this.prisma.purchaseOrder.findMany({
             where: {
               ...scope,
+              deletedAt: null,
               status: 'DRAFT',
             },
             orderBy: { createdAt: 'desc' },
