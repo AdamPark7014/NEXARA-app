@@ -205,7 +205,70 @@ export default function MyProfilePage() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div><span style={lbl}>Nombre</span><div style={{ fontSize: 14, fontWeight: 600 }}>{profile.nombre}</div></div>
               <div><span style={lbl}>Email</span><div style={{ fontSize: 14, fontWeight: 600 }}>{profile.email}</div></div>
+              <div>
+                <span style={lbl}>Nº empleado (ACS)</span>
+                <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "ui-monospace, monospace" }}>
+                  {identity?.user.employeeNumber ||
+                    identity?.user.companyEmployeeNumber ||
+                    profile.employeeNumber ||
+                    "—"}
+                </div>
+              </div>
+              <div>
+                <span style={lbl}>Estado Integra</span>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>
+                  {identity?.status === "linked"
+                    ? `Vinculado · ${identity.acsPerson?.personName || identity.acsPerson?.personId}`
+                    : identity?.status === "erp_only"
+                      ? "Código ERP sin persona ACS"
+                      : identity?.status === "unlinked"
+                        ? "Sin número de empleado"
+                        : "—"}
+                </div>
+              </div>
             </div>
+          </Section>
+
+          <Section
+            title="Acceso y asistencia (hoy)"
+            subtitle="Misma identidad que el terminal ACS. El checador ERP sigue siendo la fuente de nómina."
+          >
+            {(() => {
+              const row = hybrid?.items?.[0];
+              const erp = row?.erp;
+              const acs = row?.acs;
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <div>
+                    <span style={lbl}>Checador ERP</span>
+                    <div style={{ fontSize: 13 }}>
+                      {erp?.checkIn
+                        ? `Entrada ${new Date(erp.checkIn).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
+                        : "Sin entrada"}
+                      {erp?.checkOut
+                        ? ` · Salida ${new Date(erp.checkOut).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
+                        : ""}
+                    </div>
+                  </div>
+                  <div>
+                    <span style={lbl}>Puertas ACS</span>
+                    <div style={{ fontSize: 13 }}>
+                      {acs?.firstAt
+                        ? `${acs.passes ?? 0} pases · ${acs.firstDoor || "puerta"} · desde ${new Date(acs.firstAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`
+                        : identity?.status === "linked"
+                          ? "Sin pases hoy"
+                          : "Sin vínculo ACS"}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+            {identity?.status !== "linked" && (
+              <p style={{ marginTop: 10, fontSize: 12.5, color: "var(--text-secondary)" }}>
+                {identity?.howToLink ||
+                  "Pide a RH que vincule tu nº de empleado con el employeeNo del terminal en Integra → Personas."}
+              </p>
+            )}
           </Section>
 
           <Section title="Datos personales" subtitle="Solo tú y RH/Dirección pueden ver esta información.">
