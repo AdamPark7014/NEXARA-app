@@ -299,7 +299,14 @@ export default function ClientsPage() {
             { key: "industry", label: "Industria" },
             { key: "status", label: "Estado" },
             { key: "billingEmail", label: "Email" },
-          ], "clientes")}>Excel</Button>
+            { key: "billingPhone", label: "Teléfono" },
+          ], "clientes", {
+            title: "CARTERA DE CLIENTES",
+            summaryRows: [
+              { label: "Clientes visibles", value: visibleItems.length },
+              { label: "Total en lista", value: items.length },
+            ],
+          })}>Descargar Excel</Button>
         ) : undefined}
       />
 

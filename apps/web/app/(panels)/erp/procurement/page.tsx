@@ -787,7 +787,7 @@ export default function ProcurementPage() {
               void downloadPoPdf(o.id, o.poNumber);
             }}
           >
-            PDF
+            Descargar PDF
           </Button>
         </div>
       ),
