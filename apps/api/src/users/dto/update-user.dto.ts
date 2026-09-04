@@ -17,4 +17,8 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
 	@Type(() => Number)
 	@IsInt()
 	managerId?: number | null;
+
+	/** Activa/desactiva cuenta ERP (+ empuje ACS enable). */
+	@IsOptional()
+	isActive?: boolean;
 }
