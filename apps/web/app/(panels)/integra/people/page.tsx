@@ -13,12 +13,8 @@ import {
   IgToolbar,
 } from "../_Console";
 import { getCachedProvider, subscribeProvider } from "../_caps";
-import {
-  inputStyle,
-  integraApi,
-  integraPersonFaceBlob,
-  selectStyle,
-} from "../_lib";
+import { PersonFaceThumb, invalidatePersonFaceCache, prefetchPersonFace } from "../_PersonFace";
+import { inputStyle, integraApi, selectStyle } from "../_lib";
 import styles from "../integra.module.css";
 
 type Person = {
@@ -39,18 +35,19 @@ type Person = {
   numOfCard?: number;
   faceUrl?: string | null;
   hasFace?: boolean;
+  hasLocalFace?: boolean;
+  localFpIds?: number[];
   sourceIp?: string;
   sourceName?: string;
   doorNames?: string[];
 };
 
 type Org = { id: string; name: string; parentId?: string };
-
+type AcsDev = { id: string; name: string; kind: string; ip?: string | null; deviceType?: string | null };
 type OpResult = { deviceIp: string; ok: boolean; error?: string };
-
 type ValidityFilter = "" | "ok" | "warn" | "expired" | "off" | "face" | "noface";
-
-type MutKind = "save" | "photo" | "faceDel" | "delete" | "create" | null;
+type MutKind = "save" | "photo" | "faceDel" | "delete" | "create" | "fp" | null;
+type AltaStep = 1 | 2 | 3 | 4;
 
 function genderLabel(g?: string) {
   const v = String(g || "").toLowerCase();
@@ -86,83 +83,38 @@ function formatWhen(iso?: string) {
   });
 }
 
-/**
- * `enrolled` = el terminal dice tener rostro; `unavailable` = lo tiene, pero no
- * lo entrega (modelo biométrico DS-K1T, faceURL 404).
- */
-type FaceState = "none" | "enrolled" | "unavailable" | "ok";
-
-function PersonAvatar({
-  person,
-  large,
-  onState,
-}: {
-  person: Person;
-  large?: boolean;
-  onState?: (s: FaceState) => void;
-}) {
-  const [src, setSrc] = useState<string | null>(null);
-
-  useEffect(() => {
-    const enrolled = person.hasFace || (person.numOfFace ?? 0) > 0 || Boolean(person.faceUrl);
-    if (!enrolled) {
-      setSrc(null);
-      onState?.("none");
-      return;
-    }
-    onState?.("enrolled");
-    let objectUrl: string | null = null;
-    let cancelled = false;
-    void integraPersonFaceBlob(person.id)
-      .then((blob) => {
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setSrc(objectUrl);
-        onState?.("ok");
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSrc(null);
-          onState?.("unavailable");
-        }
-      });
-    return () => {
-      cancelled = true;
-      setSrc((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+function fileToJpegBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
+    reader.onload = () => {
+      const dataUrl = String(reader.result || "");
+      const m = /^data:image\/(\w+);base64,(.+)$/i.exec(dataUrl);
+      if (!m) {
+        reject(new Error("Archivo no es imagen"));
+        return;
+      }
+      const kind = m[1].toLowerCase();
+      if (kind !== "jpeg" && kind !== "jpg") {
+        reject(new Error("Usa JPEG (.jpg). PNG no lo aceptan bien los DS-K1T."));
+        return;
+      }
+      resolve(m[2]);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [person.id, person.hasFace, person.numOfFace, person.faceUrl]);
-
-  return (
-    <div
-      className={large ? styles.personAvatarLg : styles.personAvatar}
-      data-empty={!src ? "1" : undefined}
-    >
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" />
-      ) : (
-        <span aria-hidden>{(person.name || "?").slice(0, 1).toUpperCase()}</span>
-      )}
-    </div>
-  );
+    reader.readAsDataURL(file);
+  });
 }
 
 function CredChips({ person }: { person: Person }) {
+  const faceOn = (person.numOfFace ?? 0) > 0 || person.hasFace || person.hasLocalFace;
   return (
     <div className={styles.personChips}>
-      <span
-        className={styles.personChip}
-        data-on={(person.numOfFace ?? 0) > 0 || person.hasFace ? "1" : undefined}
-      >
-        Face ID {person.numOfFace ?? (person.hasFace ? "·" : "0")}
+      <span className={styles.personChip} data-on={faceOn ? "1" : undefined}>
+        Face {person.hasLocalFace ? "NEXARA" : person.numOfFace ?? (faceOn ? "·" : "0")}
       </span>
       <span className={styles.personChip} data-on={(person.numOfFP ?? 0) > 0 ? "1" : undefined}>
         Huella {person.numOfFP ?? 0}
+        {person.localFpIds?.length ? ` · ${person.localFpIds.length} dig.` : ""}
       </span>
       <span className={styles.personChip} data-on={(person.numOfCard ?? 0) > 0 ? "1" : undefined}>
         Tarjeta {person.numOfCard ?? 0}
@@ -184,20 +136,44 @@ function OpFanout({ results }: { results: OpResult[] | null }) {
   );
 }
 
+function WizardSteps({ step }: { step: AltaStep }) {
+  const items: { n: AltaStep; label: string }[] = [
+    { n: 1, label: "Nombre" },
+    { n: 2, label: "Código" },
+    { n: 3, label: "Foto" },
+    { n: 4, label: "Guardar" },
+  ];
+  return (
+    <ol className={styles.personWizard}>
+      {items.map((it) => (
+        <li key={it.n} data-on={step >= it.n ? "1" : undefined} data-current={step === it.n ? "1" : undefined}>
+          <span>{it.n}</span>
+          {it.label}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export default function IntegraPeoplePage() {
   const [people, setPeople] = useState<Person[]>([]);
   const [orgs, setOrgs] = useState<Org[]>([]);
+  const [acsDevices, setAcsDevices] = useState<AcsDev[]>([]);
   const [selected, setSelected] = useState<Person | null>(null);
-  const [faceState, setFaceState] = useState<FaceState>("none");
   const [detail, setDetail] = useState<unknown>(null);
+  const [faceBust, setFaceBust] = useState(0);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [autoCode, setAutoCode] = useState(true);
+  const [altaStep, setAltaStep] = useState<AltaStep>(1);
+  const [altaJpegB64, setAltaJpegB64] = useState<string | null>(null);
+  const [altaPreview, setAltaPreview] = useState<string | null>(null);
   const [orgId, setOrgId] = useState("");
   const [editName, setEditName] = useState("");
   const [editValidFrom, setEditValidFrom] = useState("");
   const [editValidTo, setEditValidTo] = useState("");
   const [editValidEnable, setEditValidEnable] = useState(true);
+  const [fpDeviceIp, setFpDeviceIp] = useState("");
   const [opNote, setOpNote] = useState<string | null>(null);
   const [opOk, setOpOk] = useState<boolean | null>(null);
   const [opResults, setOpResults] = useState<OpResult[] | null>(null);
@@ -210,7 +186,6 @@ export default function IntegraPeoplePage() {
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [provider, setProvider] = useState<string | null>(() => getCachedProvider());
-  /** panel derecho: alta vs ficha */
   const [mode, setMode] = useState<"alta" | "ficha">("alta");
   const isArtemis = !provider || provider === "ARTEMIS";
   const isIsapi = provider === "ISAPI";
@@ -233,17 +208,36 @@ export default function IntegraPeoplePage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [p, o] = await Promise.all([
+      const [p, o, d] = await Promise.all([
         integraApi<{ items: Person[] }>(live ? "integra/people?live=1" : "integra/people"),
         integraApi<{ items: Org[] }>("integra/orgs").catch(() => ({ items: [] })),
+        isIsapi
+          ? integraApi<{ items: AcsDev[] }>("integra/devices").catch(() => ({ items: [] }))
+          : Promise.resolve({ items: [] as AcsDev[] }),
       ]);
       setPeople(p.items);
       setOrgs(o.items);
       setOrgId((prev) => prev || o.items[0]?.id || "");
+      const acs = (d.items || []).filter((x) => x.kind === "ACS" && x.ip);
+      setAcsDevices(acs);
+      setFpDeviceIp((prev) => prev || acs.find((x) => /341|FP|huella/i.test(`${x.deviceType || ""}${x.name || ""}`))?.ip || acs[0]?.ip || "");
+      // Prefetch faces en paralelo limitado — evita N+1 bloqueante en UI.
+      const ids = p.items
+        .filter((x) => x.hasFace || x.hasLocalFace || (x.numOfFace ?? 0) > 0 || x.faceUrl)
+        .slice(0, 40)
+        .map((x) => x.id);
+      let i = 0;
+      const workers = Array.from({ length: Math.min(6, ids.length) }, async () => {
+        while (i < ids.length) {
+          const id = ids[i++];
+          prefetchPersonFace(id);
+        }
+      });
+      void Promise.all(workers);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
     }
-  }, [live]);
+  }, [live, isIsapi]);
 
   useEffect(() => {
     void load();
@@ -254,9 +248,9 @@ export default function IntegraPeoplePage() {
       people.filter((p) => {
         if (orgFilter && p.orgId !== orgFilter) return false;
         if (validityFilter === "face") {
-          if (!p.hasFace && !(p.numOfFace && p.numOfFace > 0)) return false;
+          if (!p.hasFace && !p.hasLocalFace && !(p.numOfFace && p.numOfFace > 0)) return false;
         } else if (validityFilter === "noface") {
-          if (p.hasFace || (p.numOfFace && p.numOfFace > 0)) return false;
+          if (p.hasFace || p.hasLocalFace || (p.numOfFace && p.numOfFace > 0)) return false;
         } else if (validityFilter) {
           if (validityOf(p).key !== validityFilter) return false;
         }
@@ -276,6 +270,7 @@ export default function IntegraPeoplePage() {
     setDetail(null);
     setMode("ficha");
     setBusy(true);
+    prefetchPersonFace(p.id);
     try {
       setDetail(await integraApi(`integra/people/${encodeURIComponent(p.id)}`));
     } catch (e) {
@@ -293,6 +288,16 @@ export default function IntegraPeoplePage() {
     }
   };
 
+  const resetAlta = () => {
+    setName("");
+    setCode("");
+    setAutoCode(true);
+    setAltaStep(1);
+    setAltaJpegB64(null);
+    if (altaPreview) URL.revokeObjectURL(altaPreview);
+    setAltaPreview(null);
+  };
+
   const startAlta = () => {
     setSelected(null);
     setDetail(null);
@@ -301,15 +306,14 @@ export default function IntegraPeoplePage() {
     setOpOk(null);
     setOpResults(null);
     setError(null);
-    setName("");
-    setCode("");
-    setAutoCode(true);
+    resetAlta();
   };
 
   const syncNow = async () => {
     setSyncing(true);
     setError(null);
     try {
+      // Sync no bloquea el listado más de lo necesario: fire + refresh.
       await integraApi("integra/sync", { method: "POST" });
       await load();
     } catch (e) {
@@ -325,18 +329,78 @@ export default function IntegraPeoplePage() {
     return d.person || selected;
   }, [detail, selected]);
 
-  const withFace = people.filter((p) => p.hasFace || (p.numOfFace ?? 0) > 0).length;
+  const withFace = people.filter((p) => p.hasFace || p.hasLocalFace || (p.numOfFace ?? 0) > 0).length;
 
-  const applyOp = (r: {
-    success?: boolean;
-    note?: string;
-    results?: OpResult[];
-  }) => {
+  const applyOp = (r: { success?: boolean; note?: string; results?: OpResult[] }) => {
     setOpResults(r.results || null);
     setOpNote(r.note || (r.success ? "Listo" : "No se completó"));
     setOpOk(r.success === true);
-    if (!r.success) {
-      setError(r.note || "Revisa el resultado por terminal.");
+    if (!r.success) setError(r.note || "Revisa el resultado por terminal.");
+  };
+
+  const uploadFaceFor = async (personId: string, imageBase64: string) => {
+    return integraApi<{ success?: boolean; note?: string; results?: OpResult[]; hasLocalFace?: boolean }>(
+      `integra/people/${encodeURIComponent(personId)}/face`,
+      { method: "POST", body: JSON.stringify({ imageBase64 }) },
+    );
+  };
+
+  const runAlta = async () => {
+    if (!name.trim()) {
+      setError("Nombre requerido");
+      setAltaStep(1);
+      return;
+    }
+    if (!autoCode && !code.trim()) {
+      setError("Código requerido o activa auto");
+      setAltaStep(2);
+      return;
+    }
+    if (!altaJpegB64) {
+      setError("La foto JPEG es obligatoria en el alta (Face ID en terminales).");
+      setAltaStep(3);
+      return;
+    }
+    setMutKind("create");
+    setError(null);
+    setOpOk(null);
+    try {
+      const r = await integraApi<{
+        success?: boolean;
+        note?: string;
+        employeeNo?: string;
+        results?: OpResult[];
+      }>("integra/people", {
+        method: "POST",
+        body: JSON.stringify({
+          personName: name.trim(),
+          autoCode,
+          ...(autoCode ? {} : { employeeNo: code.trim(), personCode: code.trim() }),
+        }),
+      });
+      if (!r.success || !r.employeeNo) {
+        applyOp(r);
+        return;
+      }
+      const face = await uploadFaceFor(r.employeeNo, altaJpegB64);
+      invalidatePersonFaceCache(r.employeeNo);
+      setFaceBust((n) => n + 1);
+      applyOp({
+        success: Boolean(r.success && face.success !== false),
+        note: `${r.note || "Alta OK"} · ${face.note || "Foto empujada."}`,
+        results: [...(r.results || []), ...(face.results || [])],
+      });
+      resetAlta();
+      await load();
+      const created = (await integraApi<{ items: Person[] }>("integra/people")).items.find(
+        (p) => p.id === r.employeeNo,
+      );
+      if (created) void openDetail(created);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al dar de alta");
+      setOpOk(false);
+    } finally {
+      setMutKind(null);
     }
   };
 
@@ -344,7 +408,7 @@ export default function IntegraPeoplePage() {
     <IgPage>
       <IgToolbar
         title="Control de personal"
-        meta={`${filtered.length}/${people.length}${withFace ? ` · ${withFace} Face ID terminal` : ""}${
+        meta={`${filtered.length}/${people.length}${withFace ? ` · ${withFace} con Face` : ""}${
           orgs.length ? ` · ${orgs.length} orgs` : ""
         } · ${live ? "live" : "espejo"}`}
         actions={
@@ -366,18 +430,14 @@ export default function IntegraPeoplePage() {
       />
       <IgError>{error}</IgError>
       <p className={styles.personLead}>
-        Alta, foto Face ID y baja se empujan a <strong>todos los terminales ACS</strong> del
-        sitio. Face ID vive en el lector — las cámaras de oficina no identifican rostros.
+        Face ID vive en los <strong>terminales ACS</strong> (DS-K1T), no en cámaras de oficina.
+        La foto JPEG se guarda en NEXARA para que ficha y eventos siempre muestren imagen.
       </p>
 
       <IgFilters>
         {isArtemis && (
           <IgField label="Org">
-            <select
-              value={orgFilter}
-              onChange={(e) => setOrgFilter(e.target.value)}
-              style={selectStyle}
-            >
+            <select value={orgFilter} onChange={(e) => setOrgFilter(e.target.value)} style={selectStyle}>
               <option value="">Todas</option>
               {orgs.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -430,7 +490,13 @@ export default function IntegraPeoplePage() {
                     data-selected={sel ? "1" : undefined}
                     onClick={() => void openDetail(p)}
                   >
-                    <PersonAvatar person={p} />
+                    <PersonFaceThumb
+                      className={styles.personAvatar}
+                      size="md"
+                      personId={p.id}
+                      personName={p.name}
+                      bust={faceBust}
+                    />
                     <div className={styles.personRowMain}>
                       <div className={styles.personRowTop}>
                         <strong>{p.name}</strong>
@@ -452,7 +518,7 @@ export default function IntegraPeoplePage() {
                   <p>
                     {isArtemis
                       ? "No hay coincidencias en el directorio."
-                      : "El espejo está vacío o el filtro no deja nada. Sincroniza terminales o da de alta a alguien."}
+                      : "El espejo está vacío o el filtro no deja nada. Sincroniza o da de alta."}
                   </p>
                   {isIsapi && (
                     <IgBtn variant="primary" onClick={startAlta}>
@@ -467,114 +533,190 @@ export default function IntegraPeoplePage() {
         right={
           <IgPanel
             title={
-              mode === "alta"
-                ? "Alta nueva persona"
-                : selected
-                  ? "Ficha"
-                  : "Selecciona o da de alta"
+              mode === "alta" ? "Alta nueva persona" : selected ? "Ficha" : "Selecciona o da de alta"
             }
-            count={mode === "ficha" ? selected?.name || "—" : autoCode ? "código auto" : "código manual"}
+            count={
+              mode === "ficha"
+                ? selected?.name || "—"
+                : altaStep === 3
+                  ? "foto requerida"
+                  : autoCode
+                    ? "código auto"
+                    : "código manual"
+            }
           >
-            {/* ── ALTA ─────────────────────────────────────────────── */}
             {mode === "alta" && isIsapi && (
               <div className={styles.personCrud}>
-                <section className={styles.personSection} data-tone="accent">
-                  <header className={styles.personSectionHead}>
-                    <strong>1 · Datos</strong>
-                    <span>se propaga a todos los ACS</span>
-                  </header>
-                  <IgField label="Nombre completo">
-                    <input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      style={{ ...inputStyle, maxWidth: "100%" }}
-                      placeholder="Ej. Ariadna Sierra"
-                      autoFocus
-                    />
-                  </IgField>
-                  <label className={styles.personCheck}>
-                    <input
-                      type="checkbox"
-                      checked={autoCode}
-                      onChange={(e) => {
-                        setAutoCode(e.target.checked);
-                        if (e.target.checked) setCode("");
-                      }}
-                    />
-                    Generar código de empleado automáticamente
-                  </label>
-                  {!autoCode && (
-                    <IgField label="Código empleado (manual)">
+                <WizardSteps step={altaStep} />
+
+                {altaStep === 1 && (
+                  <section className={styles.personSection} data-tone="accent">
+                    <header className={styles.personSectionHead}>
+                      <strong>1 · Nombre</strong>
+                      <span>se propaga a todos los ACS</span>
+                    </header>
+                    <IgField label="Nombre completo">
                       <input
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
                         style={{ ...inputStyle, maxWidth: "100%" }}
-                        placeholder="máx. 32 caracteres"
+                        placeholder="Ej. Ariadna Sierra"
+                        autoFocus
                       />
                     </IgField>
-                  )}
-                  {autoCode && (
+                    <IgBtn
+                      variant="primary"
+                      disabled={!name.trim()}
+                      onClick={() => setAltaStep(2)}
+                    >
+                      Continuar →
+                    </IgBtn>
+                  </section>
+                )}
+
+                {altaStep === 2 && (
+                  <section className={styles.personSection} data-tone="accent">
+                    <header className={styles.personSectionHead}>
+                      <strong>2 · Código empleado</strong>
+                      <span>máx. 32</span>
+                    </header>
+                    <label className={styles.personCheck}>
+                      <input
+                        type="checkbox"
+                        checked={autoCode}
+                        onChange={(e) => {
+                          setAutoCode(e.target.checked);
+                          if (e.target.checked) setCode("");
+                        }}
+                      />
+                      Generar código automáticamente
+                    </label>
+                    {!autoCode && (
+                      <IgField label="Código manual">
+                        <input
+                          value={code}
+                          onChange={(e) => setCode(e.target.value)}
+                          style={{ ...inputStyle, maxWidth: "100%" }}
+                          placeholder="ej. 1042"
+                        />
+                      </IgField>
+                    )}
+                    {autoCode && (
+                      <p className={styles.personNote}>
+                        Siguiente número libre del espejo, o marca de tiempo.
+                      </p>
+                    )}
+                    <div className={styles.personBtnRow}>
+                      <IgBtn onClick={() => setAltaStep(1)}>← Atrás</IgBtn>
+                      <IgBtn
+                        variant="primary"
+                        disabled={!autoCode && !code.trim()}
+                        onClick={() => setAltaStep(3)}
+                      >
+                        Continuar →
+                      </IgBtn>
+                    </div>
+                  </section>
+                )}
+
+                {altaStep === 3 && (
+                  <section className={styles.personSection} data-tone="accent">
+                    <header className={styles.personSectionHead}>
+                      <strong>3 · Foto Face ID</strong>
+                      <span>JPEG obligatorio</span>
+                    </header>
                     <p className={styles.personNote}>
-                      El código se asigna al dar de alta (siguiente número libre del
-                      espejo, o marca de tiempo si no hay numéricos).
+                      Se guarda en NEXARA y se empuja a cada terminal (FaceDataRecord).
+                      Rostro frontal, buena luz, solo la cara.
                     </p>
-                  )}
-                  <IgBtn
-                    variant="primary"
-                    disabled={!name.trim() || mutating || (!autoCode && !code.trim())}
-                    onClick={async () => {
-                      setMutKind("create");
-                      setError(null);
-                      setOpOk(null);
-                      try {
-                        const r = await integraApi<{
-                          success?: boolean;
-                          note?: string;
-                          employeeNo?: string;
-                          results?: OpResult[];
-                        }>("integra/people", {
-                          method: "POST",
-                          body: JSON.stringify({
-                            personName: name.trim(),
-                            autoCode,
-                            ...(autoCode
-                              ? {}
-                              : {
-                                  employeeNo: code.trim(),
-                                  personCode: code.trim(),
-                                }),
-                          }),
-                        });
-                        applyOp(r);
-                        if (r.success) {
-                          setName("");
-                          setCode("");
-                          setAutoCode(true);
-                          await load();
-                          if (r.employeeNo) {
-                            const created = (
-                              await integraApi<{ items: Person[] }>("integra/people")
-                            ).items.find((p) => p.id === r.employeeNo);
-                            if (created) void openDetail(created);
+                    {altaPreview && (
+                      <div className={styles.personAltaPreview}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={altaPreview} alt="Vista previa" />
+                      </div>
+                    )}
+                    <label className={styles.personFileBtn}>
+                      {altaJpegB64 ? "Cambiar JPEG" : "Elegir foto JPEG"}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/jpg"
+                        hidden
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (!file) return;
+                          try {
+                            const b64 = await fileToJpegBase64(file);
+                            setAltaJpegB64(b64);
+                            if (altaPreview) URL.revokeObjectURL(altaPreview);
+                            setAltaPreview(URL.createObjectURL(file));
+                            setError(null);
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : "Foto inválida");
+                            setAltaJpegB64(null);
                           }
-                        }
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : "Error al dar de alta");
-                        setOpOk(false);
-                      } finally {
-                        setMutKind(null);
-                      }
-                    }}
-                  >
-                    {mutKind === "create" ? "Dando de alta…" : "Dar de alta en terminales"}
-                  </IgBtn>
-                  {opNote && mode === "alta" && (
-                    <p className={styles.personNote} data-tone={opOk ? "ok" : "warn"}>
-                      {opNote}
+                        }}
+                      />
+                    </label>
+                    <div className={styles.personBtnRow}>
+                      <IgBtn onClick={() => setAltaStep(2)}>← Atrás</IgBtn>
+                      <IgBtn
+                        variant="primary"
+                        disabled={!altaJpegB64}
+                        onClick={() => setAltaStep(4)}
+                      >
+                        Continuar →
+                      </IgBtn>
+                    </div>
+                  </section>
+                )}
+
+                {altaStep === 4 && (
+                  <section className={styles.personSection} data-tone="accent">
+                    <header className={styles.personSectionHead}>
+                      <strong>4 · Guardar en terminales</strong>
+                      <span>UserInfo + FaceDataRecord</span>
+                    </header>
+                    <dl className={styles.personFacts}>
+                      <div>
+                        <dt>Nombre</dt>
+                        <dd>{name}</dd>
+                      </div>
+                      <div>
+                        <dt>Código</dt>
+                        <dd>{autoCode ? "automático" : code}</dd>
+                      </div>
+                      <div>
+                        <dt>Foto</dt>
+                        <dd>{altaJpegB64 ? "JPEG listo" : "falta"}</dd>
+                      </div>
+                    </dl>
+                    {altaPreview && (
+                      <div className={styles.personAltaPreview}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={altaPreview} alt="" />
+                      </div>
+                    )}
+                    <p className={styles.personNote}>
+                      Tras el alta puedes enrolar huella en la ficha (terminales .162/.163 con
+                      sensor). Huella se digitaliza en NEXARA si el ACS exporta plantilla.
                     </p>
-                  )}
-                  {mode === "alta" && <OpFanout results={opResults} />}
-                </section>
+                    <div className={styles.personBtnRow}>
+                      <IgBtn onClick={() => setAltaStep(3)} disabled={mutating}>
+                        ← Atrás
+                      </IgBtn>
+                      <IgBtn variant="primary" disabled={mutating} onClick={() => void runAlta()}>
+                        {mutKind === "create" ? "Guardando…" : "Dar de alta + empujar foto"}
+                      </IgBtn>
+                    </div>
+                    {opNote && (
+                      <p className={styles.personNote} data-tone={opOk ? "ok" : "warn"}>
+                        {opNote}
+                      </p>
+                    )}
+                    <OpFanout results={opResults} />
+                  </section>
+                )}
               </div>
             )}
 
@@ -582,29 +724,15 @@ export default function IntegraPeoplePage() {
               <div className={styles.personCrud}>
                 <section className={styles.personSection}>
                   <IgField label="Nombre">
-                    <input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      style={{ ...inputStyle, maxWidth: "100%" }}
-                    />
+                    <input value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
                   </IgField>
                   <IgField label="Código">
-                    <input
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      style={{ ...inputStyle, maxWidth: "100%" }}
-                    />
+                    <input value={code} onChange={(e) => setCode(e.target.value)} style={{ ...inputStyle, maxWidth: "100%" }} />
                   </IgField>
                   <IgField label="Org">
-                    <select
-                      value={orgId}
-                      onChange={(e) => setOrgId(e.target.value)}
-                      style={{ ...selectStyle, maxWidth: "100%" }}
-                    >
+                    <select value={orgId} onChange={(e) => setOrgId(e.target.value)} style={{ ...selectStyle, maxWidth: "100%" }}>
                       {orgs.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.name}
-                        </option>
+                        <option key={o.id} value={o.id}>{o.name}</option>
                       ))}
                     </select>
                   </IgField>
@@ -638,11 +766,16 @@ export default function IntegraPeoplePage() {
               </div>
             )}
 
-            {/* ── FICHA ────────────────────────────────────────────── */}
             {mode === "ficha" && detailPerson && selected ? (
               <div className={styles.personCrud}>
                 <div className={styles.personCardHead}>
-                  <PersonAvatar person={detailPerson} large onState={setFaceState} />
+                  <PersonFaceThumb
+                    className={styles.personAvatarLg}
+                    size="xl"
+                    personId={detailPerson.id}
+                    personName={detailPerson.name}
+                    bust={faceBust}
+                  />
                   <div>
                     <h3 className={styles.personCardName}>{detailPerson.name}</h3>
                     <p className={styles.personCardCode}>{detailPerson.code || detailPerson.id}</p>
@@ -690,17 +823,17 @@ export default function IntegraPeoplePage() {
                     </dl>
                     <CredChips person={detailPerson} />
 
-                    {faceState === "unavailable" && (
-                      <p className={styles.personNote} data-tone="warn">
-                        Face ID enrolado en terminal, pero el equipo no entrega JPEG (modelo
-                        biométrico). Sube una foto desde aquí para actualizarla en todos los
-                        lectores.
-                      </p>
-                    )}
+                    {!detailPerson.hasLocalFace &&
+                      ((detailPerson.numOfFace ?? 0) > 0 || detailPerson.hasFace) && (
+                        <p className={styles.personNote} data-tone="warn">
+                          Face ID enrolado en terminal, pero sin JPEG en NEXARA (modelo biométrico).
+                          Sube una foto para verla en ficha, listado y eventos.
+                        </p>
+                      )}
 
                     <section className={styles.personSection}>
                       <header className={styles.personSectionHead}>
-                        <strong>2 · Editar ficha</strong>
+                        <strong>Editar ficha</strong>
                         <span>UserInfo/Modify</span>
                       </header>
                       <IgField label="Nombre">
@@ -775,19 +908,22 @@ export default function IntegraPeoplePage() {
 
                     <section className={styles.personSection}>
                       <header className={styles.personSectionHead}>
-                        <strong>3 · Face ID del terminal</strong>
-                        <span>FaceDataRecord · no es video</span>
+                        <strong>Face ID · foto</strong>
+                        <span>NEXARA + FaceDataRecord</span>
                       </header>
                       <p className={styles.personNote}>
-                        La foto se empuja a cada ACS. El terminal guarda un modelo biométrico;
-                        no se puede descargar de vuelta.
+                        JPEG se guarda en uploads y se empuja a cada ACS. El terminal puede no
+                        re-entregar la imagen (solo modelo).
                       </p>
                       <div className={styles.personBtnRow}>
-                        <label className={styles.personFileBtn} data-busy={mutKind === "photo" ? "1" : undefined}>
-                          {mutKind === "photo" ? "Subiendo…" : "Subir foto JPEG"}
+                        <label
+                          className={styles.personFileBtn}
+                          data-busy={mutKind === "photo" ? "1" : undefined}
+                        >
+                          {mutKind === "photo" ? "Subiendo…" : "Subir / actualizar JPEG"}
                           <input
                             type="file"
-                            accept="image/jpeg,image/jpg,image/png"
+                            accept="image/jpeg,image/jpg"
                             hidden
                             disabled={mutating}
                             onChange={async (e) => {
@@ -797,21 +933,10 @@ export default function IntegraPeoplePage() {
                               setMutKind("photo");
                               setError(null);
                               try {
-                                const buf = await file.arrayBuffer();
-                                const bytes = new Uint8Array(buf);
-                                let binary = "";
-                                for (let i = 0; i < bytes.length; i++) {
-                                  binary += String.fromCharCode(bytes[i]);
-                                }
-                                const imageBase64 = btoa(binary);
-                                const r = await integraApi<{
-                                  success?: boolean;
-                                  note?: string;
-                                  results?: OpResult[];
-                                }>(`integra/people/${encodeURIComponent(selected.id)}/face`, {
-                                  method: "POST",
-                                  body: JSON.stringify({ imageBase64 }),
-                                });
+                                const imageBase64 = await fileToJpegBase64(file);
+                                const r = await uploadFaceFor(selected.id, imageBase64);
+                                invalidatePersonFaceCache(selected.id);
+                                setFaceBust((n) => n + 1);
                                 applyOp(r);
                                 await load();
                                 await openDetail(selected);
@@ -829,13 +954,12 @@ export default function IntegraPeoplePage() {
                           onClick={async () => {
                             if (
                               !confirm(
-                                `¿Quitar el Face ID biométrico de ${selected.name} en todos los terminales?`,
+                                `¿Quitar Face ID de ${selected.name} en todos los terminales y la copia NEXARA?`,
                               )
                             ) {
                               return;
                             }
                             setMutKind("faceDel");
-                            setError(null);
                             try {
                               const r = await integraApi<{
                                 success?: boolean;
@@ -844,10 +968,11 @@ export default function IntegraPeoplePage() {
                               }>(`integra/people/${encodeURIComponent(selected.id)}/face`, {
                                 method: "DELETE",
                               });
+                              invalidatePersonFaceCache(selected.id);
+                              setFaceBust((n) => n + 1);
                               applyOp({
                                 ...r,
                                 note: r.success ? "Face ID quitado." : r.note || "No se quitó del todo.",
-                                success: r.results ? r.results.every((x) => x.ok) : r.success,
                               });
                               await load();
                             } catch (err) {
@@ -863,15 +988,76 @@ export default function IntegraPeoplePage() {
                       </div>
                     </section>
 
-                    <section className={styles.personSection} data-tone="danger">
+                    <section className={styles.personSection}>
                       <header className={styles.personSectionHead}>
-                        <strong>4 · Eliminar persona</strong>
-                        <span>DeleteProcess + verificación</span>
+                        <strong>Huella</strong>
+                        <span>CaptureFingerPrint → FingerPrintDownload</span>
                       </header>
                       <p className={styles.personNote}>
-                        Borra rostro y ficha en cada ACS, espera DeleteProcess y comprueba
-                        que ya no aparece en UserInfo. Solo entonces limpia el espejo — si un
-                        terminal falla, la persona se queda y verás el error por IP.
+                        Pon el dedo en el terminal con sensor (p. ej. .162 / .163). Se captura,
+                        se guarda plantilla en NEXARA si el ACS la entrega, y se aplica a todos
+                        los ACS. Terminales solo-rostro pueden rechazarla.
+                      </p>
+                      <IgField label="Terminal de captura">
+                        <select
+                          value={fpDeviceIp}
+                          onChange={(e) => setFpDeviceIp(e.target.value)}
+                          style={{ ...selectStyle, maxWidth: "100%" }}
+                        >
+                          {acsDevices.map((d) => (
+                            <option key={d.ip || d.id} value={d.ip || ""}>
+                              {d.name} ({d.ip})
+                            </option>
+                          ))}
+                        </select>
+                      </IgField>
+                      <div className={styles.personBtnRow}>
+                        <IgBtn
+                          variant="primary"
+                          disabled={mutating || !fpDeviceIp}
+                          onClick={async () => {
+                            setMutKind("fp");
+                            setError(null);
+                            try {
+                              const r = await integraApi<{
+                                success?: boolean;
+                                note?: string;
+                                results?: OpResult[];
+                              }>(`integra/people/${encodeURIComponent(selected.id)}/fingerprint`, {
+                                method: "POST",
+                                body: JSON.stringify({
+                                  deviceIp: fpDeviceIp,
+                                  fingerPrintID: 1,
+                                }),
+                              });
+                              applyOp(r);
+                              await load();
+                              await openDetail(selected);
+                            } catch (err) {
+                              setError(
+                                err instanceof Error
+                                  ? err.message
+                                  : "Error huella — ¿dedo en el sensor?",
+                              );
+                              setOpOk(false);
+                            } finally {
+                              setMutKind(null);
+                            }
+                          }}
+                        >
+                          {mutKind === "fp" ? "Esperando dedo…" : "Capturar y enrolar huella"}
+                        </IgBtn>
+                      </div>
+                    </section>
+
+                    <section className={styles.personDangerZone}>
+                      <header className={styles.personSectionHead}>
+                        <strong>Eliminar persona</strong>
+                        <span>zona de peligro</span>
+                      </header>
+                      <p className={styles.personNote}>
+                        Borra rostro, huella y ficha en cada ACS, verifica UserInfo y solo entonces
+                        limpia el espejo NEXARA. Si un terminal falla, la persona se queda.
                       </p>
                       <IgBtn
                         variant="danger"
@@ -879,7 +1065,7 @@ export default function IntegraPeoplePage() {
                         onClick={async () => {
                           if (
                             !confirm(
-                              `¿Eliminar a ${selected.name} (${selected.code || selected.id}) de TODOS los terminales?\n\nEsta acción no se puede deshacer desde aquí.`,
+                              `¿ELIMINAR a ${selected.name} (${selected.code || selected.id}) de TODOS los terminales?\n\nNo se puede deshacer desde aquí.`,
                             )
                           ) {
                             return;
@@ -898,6 +1084,7 @@ export default function IntegraPeoplePage() {
                             applyOp(r);
                             if (r.success) {
                               const gone = selected.id;
+                              invalidatePersonFaceCache(gone);
                               setPeople((prev) => prev.filter((p) => p.id !== gone));
                               setSelected(null);
                               setDetail(null);

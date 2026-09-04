@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { subscribePushEvents } from "./_DetectionOverlay";
+import { PersonFaceThumb, prefetchPersonFace } from "./_PersonFace";
 import { integraApi } from "./_lib";
 import styles from "./integra.module.css";
 
@@ -40,7 +41,9 @@ export function IntegraOccupancyPanel({ enabled }: { enabled: boolean }) {
           "integra/occupancy",
         );
         if (stop) return;
-        setItems(data.items || []);
+        const rows = data.items || [];
+        for (const r of rows) prefetchPersonFace(r.personId);
+        setItems(rows);
         setNote(data.note || null);
         setError(null);
       } catch (e) {
@@ -74,14 +77,13 @@ export function IntegraOccupancyPanel({ enabled }: { enabled: boolean }) {
       <ul className={styles.accessStripList}>
         {items.map((h) => (
           <li key={h.personId} className={styles.accessStripRow}>
-            <div className={styles.accessStripPhoto} data-empty={!h.lastPhoto ? "1" : undefined}>
-              {h.lastPhoto ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={h.lastPhoto} alt="" />
-              ) : (
-                <span aria-hidden>{(h.personName || "?").slice(0, 1).toUpperCase()}</span>
-              )}
-            </div>
+            <PersonFaceThumb
+              className={styles.accessStripPhoto}
+              size="md"
+              personId={h.personId}
+              personName={h.personName}
+              photoPath={h.lastPhoto}
+            />
             <div className={styles.accessStripBody}>
               <strong>{h.personName || h.personId}</strong>
               <span>{h.lastDoor || "Acceso"}{h.verifyMode ? ` · ${h.verifyMode}` : ""}</span>

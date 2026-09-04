@@ -402,7 +402,7 @@ function MseFocusPlayer({
       {state === "loading" && (
         <div className={styles.playerOverlay}>
           <span className={styles.playerSpinner} />
-          {!compact && <span>Conectando…</span>}
+          {!compact && <span>{attempt > 0 ? "Reintentando stream…" : "Conectando…"}</span>}
         </div>
       )}
       {state === "queued" && (

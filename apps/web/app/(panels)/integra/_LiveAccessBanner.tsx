@@ -48,19 +48,20 @@ export function IntegraLiveAccessBanner({ enabled }: { enabled: boolean }) {
         }
       }
       if (!best) return;
+      const next = best;
       setFlash((prev) => {
         // Misma fila SSE re-emitida con foto diferida: conservar id y enriquecer.
-        if (prev && prev.id === best.id) {
+        if (prev && prev.id === next.id) {
           return {
-            ...best,
-            photoPath: best.photoPath || prev.photoPath,
-            at: Math.min(prev.at, best.at),
+            ...next,
+            photoPath: next.photoPath || prev.photoPath,
+            at: Math.min(prev.at, next.at),
           };
         }
-        if (prev && best.at < prev.at && Date.now() - prev.at < FLASH_TTL_MS) {
+        if (prev && next.at < prev.at && Date.now() - prev.at < FLASH_TTL_MS) {
           return prev;
         }
-        return best;
+        return next;
       });
     });
   }, [enabled]);

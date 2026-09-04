@@ -16,6 +16,8 @@ import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
 import WholesalePanel from "@/components/WholesalePanel";
+import EmptyState from "@/components/ui/EmptyState";
+import chrome from "@/components/crm/crm-chrome.module.css";
 
 type ProcTab = "orders" | "requisitions" | "receipts" | "rfq" | "mayoristas";
 
@@ -721,7 +723,24 @@ export default function ProcurementPage() {
   ];
 
   const orderColumns: Column<PurchaseOrder>[] = [
-    { key: "poNumber", label: "OC", render: (o) => <code style={{ fontSize: 11.5 }}>{o.poNumber}</code>, width: 130 },
+    {
+      key: "poNumber",
+      label: "OC",
+      render: (o) => (
+        <button
+          type="button"
+          className={chrome.folioLink}
+          onClick={(e) => {
+            e.stopPropagation();
+            void loadOrderDetail(o.id);
+          }}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
+        >
+          {o.poNumber}
+        </button>
+      ),
+      width: 130,
+    },
     {
       key: "supplier",
       label: "Proveedor",
@@ -750,7 +769,7 @@ export default function ProcurementPage() {
       label: "Estado",
       render: (o) => (
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <Tag variant={o.status === "RECEIVED" ? "neutral" : o.status === "CANCELLED" ? "danger" : "accent"}>
+          <Tag variant={o.status === "RECEIVED" ? "positive" : o.status === "CANCELLED" ? "danger" : o.status === "DRAFT" ? "neutral" : "accent"}>
             {PO_STATUS[o.status] ?? o.status}
           </Tag>
           {o.status === "DRAFT" && cfg.canApprove && (
@@ -758,14 +777,18 @@ export default function ProcurementPage() {
               ✓
             </button>
           )}
-          <button
-            type="button"
+          <Button
+            size="sm"
+            variant="ghost"
+            iconLeft="📄"
             title="Descargar PDF"
-            onClick={(e) => { e.stopPropagation(); void downloadPoPdf(o.id, o.poNumber); }}
-            style={{ fontSize: 11, background: "transparent", color: "var(--primary)", border: "1px solid var(--border)", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              void downloadPoPdf(o.id, o.poNumber);
+            }}
           >
             PDF
-          </button>
+          </Button>
         </div>
       ),
       width: 200,
@@ -830,17 +853,6 @@ export default function ProcurementPage() {
     },
   ];
 
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    padding: "8px 14px",
-    borderRadius: 8,
-    border: active ? "1px solid var(--primary)" : "1px solid var(--border)",
-    background: active ? "color-mix(in srgb, var(--primary) 8%, transparent)" : "var(--surface)",
-    color: active ? "var(--primary)" : "var(--text-secondary)",
-    fontWeight: active ? 700 : 500,
-    fontSize: 13,
-    cursor: "pointer",
-  });
-
   return (
     <>
       <PageHeader
@@ -849,18 +861,18 @@ export default function ProcurementPage() {
         subtitle={cfg.subtitle}
         actions={
           <>
-            <Button variant="ghost" onClick={() => void load()}>Actualizar</Button>
+            <Button variant="ghost" size="sm" onClick={() => void load()}>Actualizar</Button>
             {cfg.canCreate && tab === "requisitions" && (
-              <Button variant="primary" iconLeft="+" onClick={() => { setShowReqForm(true); setShowPoForm(false); }}>Nueva requisición</Button>
+              <Button variant="primary" size="sm" onClick={() => { setShowReqForm(true); setShowPoForm(false); }}>Nueva requisición</Button>
             )}
             {cfg.canCreate && tab === "orders" && (
-              <Button variant="primary" iconLeft="+" onClick={() => { setShowPoForm(true); setShowReqForm(false); }}>Nueva OC</Button>
+              <Button variant="primary" size="sm" onClick={() => { setShowPoForm(true); setShowReqForm(false); }}>Nueva OC</Button>
             )}
             {cfg.canCreate && tab === "receipts" && (
-              <Button variant="primary" iconLeft="+" onClick={() => setShowReceiptForm(true)}>Registrar recepción</Button>
+              <Button variant="primary" size="sm" onClick={() => setShowReceiptForm(true)}>Registrar recepción</Button>
             )}
             {cfg.canCreate && tab === "rfq" && (
-              <Button variant="primary" iconLeft="+" onClick={() => setShowRfqForm(true)}>Nueva RFQ</Button>
+              <Button variant="primary" size="sm" onClick={() => setShowRfqForm(true)}>Nueva RFQ</Button>
             )}
           </>
         }
@@ -1139,23 +1151,18 @@ export default function ProcurementPage() {
         );
       })()}
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        <button type="button" style={tabStyle(tab === "requisitions")} onClick={() => setTab("requisitions")}>
-          Requisiciones
-        </button>
-        <button type="button" style={tabStyle(tab === "orders")} onClick={() => setTab("orders")}>
-          Órdenes de compra
-        </button>
-        <button type="button" style={tabStyle(tab === "receipts")} onClick={() => setTab("receipts")}>
-          Recepciones
-        </button>
-        <button type="button" style={tabStyle(tab === "rfq")} onClick={() => setTab("rfq")}>
-          RFQ · Comparar proveedores
-        </button>
-        <button type="button" style={tabStyle(tab === "mayoristas")} onClick={() => setTab("mayoristas")}>
-          Mayoristas
-        </button>
-      </div>
+      <PanelTabs
+        ariaLabel="Secciones de compras"
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { key: "requisitions", label: "Requisiciones" },
+          { key: "orders", label: "Órdenes de compra" },
+          { key: "receipts", label: "Recepciones" },
+          { key: "rfq", label: "RFQ · Comparar" },
+          { key: "mayoristas", label: "Mayoristas" },
+        ]}
+      />
 
       {/* Mayoristas trae su propia tabla y su propio detalle: el FilterToolbar
           y la Section de abajo filtran órdenes y requisiciones, que aquí no
@@ -1332,10 +1339,10 @@ export default function ProcurementPage() {
       )}
 
       {(detailKind === "order" || detailKind === "req") && (
-        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 8, flexWrap: "wrap" }}>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>
-              {detailKind === "order" ? `Detalle OC ${poDetail?.poNumber ?? ""}` : `Detalle requisición ${reqDetail?.reqNumber ?? ""}`}
+        <div className={chrome.poDetail}>
+          <div className={chrome.poDetailHead}>
+            <p className={chrome.poDetailTitle}>
+              {detailKind === "order" ? `Orden de compra ${poDetail?.poNumber ?? ""}` : `Requisición ${reqDetail?.reqNumber ?? ""}`}
             </p>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               {detailKind === "order" && poDetail ? (
@@ -1343,10 +1350,12 @@ export default function ProcurementPage() {
                   Descargar PDF
                 </Button>
               ) : null}
-              <Button variant="ghost" onClick={() => { setDetailKind(null); setPoDetail(null); setReqDetail(null); setDetailErr(null); }}>Cerrar</Button>
+              <Button variant="ghost" size="sm" onClick={() => { setDetailKind(null); setPoDetail(null); setReqDetail(null); setDetailErr(null); }}>Cerrar</Button>
             </div>
           </div>
-          {detailLoading && <p style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Cargando detalle…</p>}
+          {detailLoading && (
+            <EmptyState variant="compact" icon="⏳" title="Cargando detalle…" description="Consultando líneas y estado." />
+          )}
           {detailErr && (
             <div role="alert" style={{ padding: "8px 12px", background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
               {detailErr}
@@ -1354,33 +1363,51 @@ export default function ProcurementPage() {
           )}
           {!detailLoading && detailKind === "order" && poDetail && (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12, fontSize: 12.5 }}>
-                <div><strong>Proveedor:</strong> {poDetail.supplier?.name ?? "—"}</div>
-                <div><strong>Estado:</strong> {PO_STATUS[poDetail.status] ?? poDetail.status}</div>
-                <div><strong>Monto:</strong> <Money value={Number(poDetail.totalAmount)} /></div>
-                <div><strong>Creada por:</strong> {poDetail.createdBy?.nombre ?? "—"}</div>
+              <div className={chrome.poMetaGrid}>
+                <div className={chrome.poMetaItem}>
+                  <span className={chrome.poMetaLabel}>Proveedor</span>
+                  <div className={chrome.poMetaValue}>{poDetail.supplier?.name ?? "—"}</div>
+                </div>
+                <div className={chrome.poMetaItem}>
+                  <span className={chrome.poMetaLabel}>Estado</span>
+                  <div className={chrome.poMetaValue}>
+                    <Tag variant={poDetail.status === "RECEIVED" ? "positive" : poDetail.status === "CANCELLED" ? "danger" : "accent"}>
+                      {PO_STATUS[poDetail.status] ?? poDetail.status}
+                    </Tag>
+                  </div>
+                </div>
+                <div className={chrome.poMetaItem}>
+                  <span className={chrome.poMetaLabel}>Monto</span>
+                  <div className={chrome.poMetaValue}><Money value={Number(poDetail.totalAmount)} /></div>
+                </div>
+                <div className={chrome.poMetaItem}>
+                  <span className={chrome.poMetaLabel}>Creada por</span>
+                  <div className={chrome.poMetaValue}>{poDetail.createdBy?.nombre ?? "—"}</div>
+                </div>
               </div>
-              {(poDetail.items ?? []).length > 0 && (
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, marginBottom: 12 }}>
+              {(poDetail.items ?? []).length > 0 ? (
+                <table className={chrome.poTable}>
                   <thead>
-                    <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-secondary)" }}>
-                      <th style={{ textAlign: "left", padding: "6px 8px" }}>Artículo</th>
-                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Cant.</th>
-                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Recibido</th>
-                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Precio</th>
+                    <tr>
+                      <th>Artículo</th>
+                      <th style={{ textAlign: "right" }}>Cant.</th>
+                      <th style={{ textAlign: "right" }}>Recibido</th>
+                      <th style={{ textAlign: "right" }}>Precio</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(poDetail.items ?? []).map((i) => (
-                      <tr key={i.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                        <td style={{ padding: "8px" }}>{i.description}</td>
-                        <td style={{ padding: "8px", textAlign: "right" }}>{Number(i.quantity)}</td>
-                        <td style={{ padding: "8px", textAlign: "right" }}>{Number(i.receivedQty ?? 0)}</td>
-                        <td style={{ padding: "8px", textAlign: "right" }}><Money value={Number(i.unitPrice ?? 0)} /></td>
+                      <tr key={i.id}>
+                        <td>{i.description}</td>
+                        <td style={{ textAlign: "right" }}>{Number(i.quantity)}</td>
+                        <td style={{ textAlign: "right" }}>{Number(i.receivedQty ?? 0)}</td>
+                        <td style={{ textAlign: "right" }}><Money value={Number(i.unitPrice ?? 0)} /></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              ) : (
+                <EmptyState variant="compact" icon="📋" title="Sin partidas" description="Esta OC no tiene líneas registradas." />
               )}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <Button variant="secondary" iconLeft="📄" onClick={() => void downloadPoPdf(poDetail.id, poDetail.poNumber)}>
@@ -1394,34 +1421,48 @@ export default function ProcurementPage() {
           )}
           {!detailLoading && detailKind === "req" && reqDetail && (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12, fontSize: 12.5 }}>
-                <div><strong>Título:</strong> {reqDetail.title}</div>
-                <div><strong>Estado:</strong> {REQ_STATUS[reqDetail.status] ?? reqDetail.status}</div>
-                <div><strong>Prioridad:</strong> {reqDetail.priority ?? "NORMAL"}</div>
-                <div><strong>Solicitó:</strong> {reqDetail.requestedBy?.nombre ?? "—"}</div>
+              <div className={chrome.poMetaGrid}>
+                <div className={chrome.poMetaItem}>
+                  <span className={chrome.poMetaLabel}>Título</span>
+                  <div className={chrome.poMetaValue}>{reqDetail.title}</div>
+                </div>
+                <div className={chrome.poMetaItem}>
+                  <span className={chrome.poMetaLabel}>Estado</span>
+                  <div className={chrome.poMetaValue}>{REQ_STATUS[reqDetail.status] ?? reqDetail.status}</div>
+                </div>
+                <div className={chrome.poMetaItem}>
+                  <span className={chrome.poMetaLabel}>Prioridad</span>
+                  <div className={chrome.poMetaValue}>{reqDetail.priority ?? "NORMAL"}</div>
+                </div>
+                <div className={chrome.poMetaItem}>
+                  <span className={chrome.poMetaLabel}>Solicitó</span>
+                  <div className={chrome.poMetaValue}>{reqDetail.requestedBy?.nombre ?? "—"}</div>
+                </div>
               </div>
               {reqDetail.rejectionReason && (
                 <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 10 }}>Motivo rechazo: {reqDetail.rejectionReason}</p>
               )}
-              {(reqDetail.items ?? []).length > 0 && (
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+              {(reqDetail.items ?? []).length > 0 ? (
+                <table className={chrome.poTable}>
                   <thead>
-                    <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-secondary)" }}>
-                      <th style={{ textAlign: "left", padding: "6px 8px" }}>Artículo</th>
-                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Cant.</th>
-                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Costo est.</th>
+                    <tr>
+                      <th>Artículo</th>
+                      <th style={{ textAlign: "right" }}>Cant.</th>
+                      <th style={{ textAlign: "right" }}>Costo est.</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(reqDetail.items ?? []).map((i) => (
-                      <tr key={i.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                        <td style={{ padding: "8px" }}>{i.description}</td>
-                        <td style={{ padding: "8px", textAlign: "right" }}>{Number(i.quantity)}</td>
-                        <td style={{ padding: "8px", textAlign: "right" }}><Money value={Number(i.estimatedCost ?? 0)} /></td>
+                      <tr key={i.id}>
+                        <td>{i.description}</td>
+                        <td style={{ textAlign: "right" }}>{Number(i.quantity)}</td>
+                        <td style={{ textAlign: "right" }}><Money value={Number(i.estimatedCost ?? 0)} /></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              ) : (
+                <EmptyState variant="compact" icon="📋" title="Sin partidas" description="Esta requisición no tiene líneas." />
               )}
             </>
           )}
@@ -1443,7 +1484,7 @@ export default function ProcurementPage() {
         }
       >
         {loading ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+          <EmptyState icon="⏳" title="Cargando compras…" description="Consultando órdenes, requisiciones y recepciones." />
         ) : tab === "rfq" ? (
           <DataTable
             columns={rfqColumns}

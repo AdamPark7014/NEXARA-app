@@ -8,6 +8,7 @@ import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
+import HrModuleRail from "@/components/hr/HrModuleRail";
 import { useUser } from "@/components/UserContext";
 import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
 import { getHrSubmoduleConfig } from "@/lib/section-views";
@@ -359,13 +360,15 @@ export default function FinesPage() {
                 { key: "fechaCreacion", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
               ], "sanciones")}>Exportar Excel</Button>
             )}
-            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva sanción</Button>}
+            {cfg.canCreate && <Button variant="primary" onClick={openNew}>Nueva sanción</Button>}
           </div>
         }
       />
 
+      <HrModuleRail />
+
       {showForm && (
-        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={{ background: "var(--nx-panel-surface-overlay)", border: "1px solid var(--nx-panel-hairline)", borderRadius: "var(--nx-panel-radius-sm)", padding: 18, marginBottom: 18, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, boxShadow: "var(--nx-panel-elev-1)" }}>
           <div style={{ gridColumn: "1 / -1" }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>
               Empleado <span style={{ color: "var(--danger)" }}>*</span>

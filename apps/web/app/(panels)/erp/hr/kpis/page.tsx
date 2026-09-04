@@ -13,6 +13,7 @@ import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterToolbar from "@/components/FilterToolbar";
+import HrModuleRail from "@/components/hr/HrModuleRail";
 import { exportToExcel } from "@/lib/export-excel";
 import { useUser } from "@/components/UserContext";
 import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
@@ -164,13 +165,14 @@ export default function HrKpisPage() {
         subtitle={viewCfg.subtitle || "Asistencia, puntualidad, carga laboral, rotación, permisos y productividad de campo."}
         actions={
           <div style={{ display: "flex", gap: 8 }}>
-            <Link href="/erp/hr/attendance"><Button variant="secondary" size="sm">Asistencia</Button></Link>
-            <Button variant="ghost" onClick={() => void load()}>Actualizar</Button>
+            <Button variant="ghost" size="sm" onClick={() => void load()}>Actualizar</Button>
           </div>
         }
       />
 
-      {loading && <EmptyState icon="⏳" title="Cargando KPIs…" description="Calculando métricas de personas." />}
+      <HrModuleRail />
+
+      {loading && <EmptyState title="Cargando KPIs…" description="Calculando métricas de personas." />}
       {!loading && error && (
         <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
       )}
