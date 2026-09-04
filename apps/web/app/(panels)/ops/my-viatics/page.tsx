@@ -268,14 +268,45 @@ export default function MyViaticsPage() {
         }]}
         onClear={() => { setSearchQ(""); setFilterEstatus(""); }}
         resultCount={loading ? null : visibleItems.length}
-        rightActions={items.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleItems, [
-            { key: "concepto", label: "Concepto" },
-            { key: "montoSolicitado", label: "Monto" },
-            { key: "estatus", label: "Estado" },
-            { key: "fechaSolicitud", label: "Fecha", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "mis-viaticos")}>Excel</Button>
-        ) : undefined}
+        rightActions={
+          <ListExportActions
+            onExcel={
+              items.length > 0
+                ? () =>
+                    exportToExcel(
+                      visibleItems,
+                      [
+                        { key: "concepto", label: "Concepto" },
+                        { key: "montoSolicitado", label: "Monto" },
+                        { key: "estatus", label: "Estado" },
+                        { key: "fechaSolicitud", label: "Fecha", format: (v) => (v ? String(v).slice(0, 10) : "") },
+                      ],
+                      "mis-viaticos",
+                      { title: "Mis viáticos" },
+                    )
+                : undefined
+            }
+            onPdf={
+              token
+                ? () => {
+                    void (async () => {
+                      setPdfBusy(true);
+                      try {
+                        const to = new Date().toISOString().slice(0, 10);
+                        const from = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+                        await downloadViaticsReportPdf(token, { from, to });
+                      } catch (e) {
+                        toast.error(e instanceof Error ? e.message : "No se pudo generar el PDF");
+                      } finally {
+                        setPdfBusy(false);
+                      }
+                    })();
+                  }
+                : undefined
+            }
+            pdfBusy={pdfBusy}
+          />
+        }
       />
       <Section title={loading ? "Cargando…" : `${visibleItems.length} solicitudes`}>
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando tus viáticos." />}

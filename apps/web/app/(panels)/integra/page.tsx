@@ -833,6 +833,7 @@ export default function IntegraHome() {
                 {openAlarms > 0 && (
                   <IgBtn onClick={() => router.push("/integra/alarms")}>Alarmas</IgBtn>
                 )}
+                <IgBtn onClick={() => router.push("/integra/events")}>Ver todos</IgBtn>
                 <IgBtn onClick={() => void refreshEvents()}>↻</IgBtn>
               </>
             }

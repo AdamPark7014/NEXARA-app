@@ -1515,9 +1515,20 @@ export class IntegraArtemisService {
     // el terminal solo guarde modelo biométrico y no re-entregue JPEG.
     writeLocalPersonFace(companyId, personId, jpeg);
 
-    const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
-      await uploadFaceData(client, { employeeNo: personId, jpeg });
-    });
+    const results = await this.fanoutAcs(
+      companyId,
+      resolved.siteId,
+      personId,
+      'person.face',
+      resolved.isapiForHost,
+      async (client) => {
+        await uploadFaceData(client, { employeeNo: personId, jpeg });
+      },
+      {
+        op: 'faceUpload',
+        user: { employeeNo: personId, name: personId },
+      },
+    );
 
     // Verificar enrolo con FDSearch (Postman) en terminales que aceptaron.
     const verify: Array<{ deviceIp: string; enrolled: boolean; detail?: string }> = [];
