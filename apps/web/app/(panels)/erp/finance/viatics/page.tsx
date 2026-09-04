@@ -557,7 +557,9 @@ export default function ViaticosPage() {
                 <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inp} />
               </FinanceField>
               <Button size="sm" variant="secondary" onClick={() => void loadAnalytics()}>Aplicar</Button>
-              <Button size="sm" variant="primary" onClick={() => void downloadPdf()}>Descargar PDF</Button>
+              <Button size="sm" variant="primary" onClick={() => void downloadPdf()} disabled={pdfBusy}>
+                {pdfBusy ? "Generando…" : "Exportar PDF"}
+              </Button>
             </div>
             {analyticsLoading && <EmptyState icon="⏳" title="Calculando…" description="Agregando gastos de viáticos." />}
             {!analyticsLoading && analytics && (

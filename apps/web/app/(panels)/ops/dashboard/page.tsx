@@ -55,10 +55,31 @@ interface NocAlert {
 interface SupportTicket {
   id: number;
   folio?: string;
-  title: string;
+  title?: string;
+  description?: string;
   status: string;
   priority?: string;
+  urgency?: string;
   client?: { name: string } | null;
+}
+
+interface ActionNotif {
+  id: number;
+  title: string;
+  message: string;
+  category: string;
+  priority: string | null;
+  isRead: boolean;
+  relatedUrl?: string | null;
+  createdAt: string;
+}
+
+interface SlaBrief {
+  responseSla?: { compliancePct: number };
+  resolutionSla?: { compliancePct: number };
+  backlog?: { open: number; aging?: { d7_plus: number } };
+  breaches?: unknown[];
+  inboxByStatus?: Record<string, number>;
 }
 
 async function apiFetch(path: string, token: string) {
