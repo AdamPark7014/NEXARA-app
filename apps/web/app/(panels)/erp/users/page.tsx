@@ -31,6 +31,7 @@ interface ApiUser {
   nombre: string;
   email: string;
   isActive: boolean;
+  employeeNumber?: string | null;
   orgRoleKey?: string | null;
   roleId?: number;
   departmentId?: number;
