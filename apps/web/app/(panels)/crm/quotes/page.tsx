@@ -342,7 +342,7 @@ export default function QuotesPage() {
           </Button>
         </div>
       ),
-      width: 140,
+      width: 200,
     },
   ];
 

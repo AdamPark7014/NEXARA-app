@@ -8,7 +8,7 @@ import ContextRail from "@/components/ui/ContextRail";
  */
 const HR_LINKS = [
   { id: "plantilla", label: "Plantilla", href: "/erp/hr" },
-  { id: "asistencia", label: "Asistencia · híbrido", href: "/erp/hr/attendance" },
+  { id: "asistencia", label: "Asistencia", href: "/erp/hr/attendance" },
   { id: "org", label: "Organigrama", href: "/erp/hr/orgchart" },
   { id: "kpis", label: "KPIs", href: "/erp/hr/kpis" },
   { id: "multas", label: "Incidencias", href: "/erp/hr/fines" },

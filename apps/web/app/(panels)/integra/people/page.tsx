@@ -232,13 +232,25 @@ function WizardSteps({ step, mode }: { step: AltaStep; mode: AltaMode }) {
 
 export default function IntegraPeoplePage() {
   const router = useRouter();
+  const { user: currentUser } = useUser();
+  const token = currentUser?.token ?? "";
   const [people, setPeople] = useState<Person[]>([]);
+  const [erpUsers, setErpUsers] = useState<ApiUserRow[]>([]);
+  const [erpRoles, setErpRoles] = useState<ErpRole[]>([]);
+  const [erpDepts, setErpDepts] = useState<ErpDept[]>([]);
+  const [erpLoading, setErpLoading] = useState(false);
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [acsDevices, setAcsDevices] = useState<AcsDev[]>([]);
   const [selected, setSelected] = useState<Person | null>(null);
   const [detail, setDetail] = useState<unknown>(null);
   const [faceBust, setFaceBust] = useState(0);
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [roleId, setRoleId] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
+  const [linkUserId, setLinkUserId] = useState("");
+  const [altaMode, setAltaMode] = useState<AltaMode>("unified");
+  const [tempPassword, setTempPassword] = useState("");
   const [code, setCode] = useState("");
   const [autoCode, setAutoCode] = useState(true);
   const [altaStep, setAltaStep] = useState<AltaStep>(1);
@@ -260,6 +272,7 @@ export default function IntegraPeoplePage() {
   const [q, setQ] = useState("");
   const [live, setLive] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [loadingPeople, setLoadingPeople] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [provider, setProvider] = useState<string | null>(() => getCachedProvider());
   const [mode, setMode] = useState<"alta" | "ficha">("alta");
@@ -281,8 +294,40 @@ export default function IntegraPeoplePage() {
     setMode("ficha");
   }, [selected?.id]);
 
+  const loadErpDirectory = useCallback(async () => {
+    if (!token) {
+      setErpUsers([]);
+      return;
+    }
+    setErpLoading(true);
+    try {
+      const [users, rolesRaw, deptsRaw] = await Promise.all([
+        listUsers(token),
+        erpApiFetch<unknown>("users/roles", token).catch(() => []),
+        erpApiFetch<unknown>("users/departments", token).catch(() => []),
+      ]);
+      setErpUsers(users.filter((u) => u.isActive !== false));
+      const roles = asList<ErpRole>(rolesRaw);
+      const depts = asList<ErpDept>(deptsRaw);
+      setErpRoles(roles);
+      setErpDepts(depts);
+      setRoleId((prev) => {
+        if (prev) return prev;
+        const preferred =
+          roles.find((r) => /empleado|staff|operador/i.test(r.nombre))?.id ?? roles[0]?.id;
+        return preferred != null ? String(preferred) : "";
+      });
+      setDepartmentId((prev) => prev || (depts[0] ? String(depts[0].id) : ""));
+    } catch (e) {
+      toast.error(formatApiError(e, "No se pudo cargar el directorio ERP"));
+    } finally {
+      setErpLoading(false);
+    }
+  }, [token]);
+
   const load = useCallback(async () => {
     setError(null);
+    setLoadingPeople(true);
     try {
       const [p, o, d] = await Promise.all([
         integraApi<{ items: Person[] }>(live ? "integra/people?live=1" : "integra/people"),
@@ -311,13 +356,42 @@ export default function IntegraPeoplePage() {
       });
       void Promise.all(workers);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setError(formatApiError(e, "No se pudo cargar Personas"));
+    } finally {
+      setLoadingPeople(false);
     }
   }, [live, isIsapi]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void loadErpDirectory();
+  }, [loadErpDirectory]);
+
+  const erpByKey = useMemo(() => buildErpByKey(erpUsers), [erpUsers]);
+
+  const acsKeySet = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of people) {
+      for (const k of [p.id, p.code]) {
+        const n = String(k || "").trim().toLowerCase();
+        if (n) s.add(n);
+      }
+    }
+    return s;
+  }, [people]);
+
+  const erpOnlyUsers = useMemo(
+    () =>
+      erpUsers.filter((u) => {
+        const emp = String(u.employeeNumber || "").trim().toLowerCase();
+        if (!emp) return true;
+        return !acsKeySet.has(emp);
+      }),
+    [erpUsers, acsKeySet],
+  );
 
   const filtered = useMemo(
     () =>
