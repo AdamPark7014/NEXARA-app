@@ -1,7 +1,5 @@
 import PDFDocument from 'pdfkit';
 import {
-  PDF_COLORS,
-  PDF_CONTENT_START_Y,
   PDF_MODULE_ACCENTS,
   drawInfoCard,
   drawKpiCards,

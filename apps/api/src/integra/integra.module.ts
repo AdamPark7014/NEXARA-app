@@ -17,9 +17,10 @@ import {
 import { IntegraPushService } from './integra-push.service';
 import { IntegraPushController } from './integra-push.controller';
 import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
+import { IdentityModule } from '../identity/identity.module';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, AuditModule, ServiceClientsModule],
+  imports: [ConfigModule, PrismaModule, AuditModule, ServiceClientsModule, IdentityModule],
   controllers: [
     IntegraController,
     IntegraEdgeController,

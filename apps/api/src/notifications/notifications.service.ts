@@ -257,13 +257,7 @@ export class NotificationsService {
   async markAllAsRead(userId: number, companyId?: number | null) {
     await this.prisma.notification.updateMany({
       where: { userId, isRead: false, ...this.inboxScope(companyId) },
-      data: {
-        isRead: true,
-        readAt: new Date(),
-        ...(companyId != null && Number(companyId) > 0
-          ? { companyId: Number(companyId) }
-          : {}),
-      },
+      data: { isRead: true, readAt: new Date() },
     });
 
     this.gateway?.notifyUser(userId, {
