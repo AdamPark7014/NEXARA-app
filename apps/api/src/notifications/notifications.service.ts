@@ -59,7 +59,7 @@ export class NotificationsService {
           },
         },
       },
-      orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+      orderBy: { createdAt: 'desc' },
       take: limit,
       skip: offset,
     });
@@ -117,7 +117,7 @@ export class NotificationsService {
           },
         },
       },
-      orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+      orderBy: { createdAt: 'desc' },
       take: limit,
       skip: offset,
     });
@@ -377,7 +377,7 @@ export class NotificationsService {
           },
         },
       },
-      orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+      orderBy: { createdAt: 'desc' },
       take: limit,
     });
   }
