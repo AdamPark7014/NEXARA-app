@@ -1368,6 +1368,132 @@ export class IntegraController {
   }
 
   // ── Horarios ACS (ISAPI UserRight* + UserInfo.Valid/RightPlan) ───
+  /** Alias canónico UI `/integra/schedules` → catálogo + puertas. */
+  @Get('schedules')
+  @ApiOperation({ summary: 'Catálogo de horarios ACS (alias UI de access-schedules)' })
+  async schedulesCatalog(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    const raw = await this.schedules.listSiteSchedules(
+      companyId,
+      siteId ? parseInt(siteId, 10) : null,
+    );
+    const doors = (raw.devices || []).map((d: any) => ({
+      id: String(d.doorIndexCode || `${d.deviceIp}|1`),
+      name: String(d.doorName || d.deviceName || d.deviceIp),
+      location: d.deviceName || undefined,
+      deviceIp: d.deviceIp,
+      doorNo: 1,
+      online: d.ok !== false,
+    }));
+    const templateMap = new Map<string, { id: string; name: string; summary?: string }>();
+    for (const d of raw.devices || []) {
+      for (const t of d.templates || []) {
+        const id = String(t.id ?? t.planTemplateNo ?? '');
+        if (!id || templateMap.has(id)) continue;
+        templateMap.set(id, {
+          id,
+          name: String(t.templateName || t.name || `Plantilla ${id}`),
+          summary: t.summary != null ? String(t.summary) : undefined,
+        });
+      }
+    }
+    if (!templateMap.size) {
+      templateMap.set('1', { id: '1', name: '24/7', summary: 'Siempre' });
+    }
+    const meeting =
+      doors.find((d) => /juntas|meeting/i.test(d.name))?.id || null;
+    return {
+      ...raw,
+      doors,
+      templates: [...templateMap.values()],
+      meetingRoomDoorId: meeting,
+      source: 'live' as const,
+      presets: raw.presets,
+    };
+  }
+
+  @Get('schedules/templates')
+  @ApiOperation({ summary: 'Plantillas de horario (alias)' })
+  async schedulesTemplates(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    const cat = await this.schedulesCatalog(companyId, siteId);
+    return { items: cat.templates };
+  }
+
+  @Get('schedules/people/:id')
+  @ApiOperation({ summary: 'Horario / vigencia de una persona (alias UI)' })
+  schedulesPerson(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.schedules.getPersonAccess(
+      companyId,
+      id,
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Patch('schedules/people/:id')
+  @ApiOperation({ summary: 'Guardar horario / vigencia persona (alias UI)' })
+  schedulesPersonPatch(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() dto: PersonAccessPatchDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para horarios ACS');
+    }
+    return this.schedules.patchPersonAccess(
+      companyId,
+      id,
+      dto,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Get('schedules/doors/:doorId')
+  @ApiOperation({ summary: 'Quién tiene una puerta (espejo + Valid)' })
+  async schedulesDoor(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('doorId') doorId: string,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    const detail = await this.spaces.detail(
+      companyId,
+      decodeURIComponent(doorId),
+      siteId ? parseInt(siteId, 10) : null,
+    );
+    return {
+      door: {
+        id: detail.id,
+        name: detail.name,
+        location: detail.regionName || undefined,
+        online: detail.online,
+      },
+      people: (detail.people || []).map((p) => ({
+        personId: p.personId,
+        name: p.personName,
+        planTemplateNo: '1',
+        planName: p.kindLabel,
+        validEnable: p.validEnable !== false,
+        validFrom: p.validFrom,
+        validTo: p.validTo,
+        indefinite: p.kind === 'indefinite',
+      })),
+      source: 'mirror',
+      note: 'Listado desde espejo RightPlan/Valid; empujar cambios en Horarios o Personas.',
+    };
+  }
+
   @Get('access-schedules')
   @ApiOperation({
     summary:

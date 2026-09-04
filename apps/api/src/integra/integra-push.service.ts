@@ -111,6 +111,7 @@ export class IntegraPushService {
     private readonly prisma: PrismaService,
     private readonly sites: IntegraSiteService,
     private readonly acsFanout: IntegraAcsFanoutService,
+    private readonly acsOps: AcsOpsBridgeService,
   ) {}
 
   stream(siteId: number): Observable<PushEventDto> {
@@ -1084,6 +1085,15 @@ export class IntegraPushService {
           personName: ev.personName,
         })
         .catch(() => undefined);
+    }
+
+    // ACS concedido/denegado → sellos Ops (check-in / salida / aviso). Best-effort.
+    if (ev.eventType === 'AccessControllerEvent' && ev.major === 5) {
+      void this.acsOps.handlePushEvent(site, ev).catch((e) => {
+        this.logger.warn(
+          `ACS→Ops: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      });
     }
 
     // Snapshot de canal siempre en fresco (aunque ya haya cara enrolada):

@@ -207,6 +207,7 @@ export default function IntegraAccessPage() {
         meta={`${onlineN}/${doors.length} puertas online · ${devices.length} equipos · ${groups.length} grupos`}
         actions={
           <>
+            <IgBtn onClick={() => router.push("/integra/espacios")}>Espacios</IgBtn>
             <IgBtn onClick={() => router.push("/integra/people")}>Alta persona</IgBtn>
             <IgBtn onClick={() => router.push("/integra/schedules")}>Horarios</IgBtn>
             <IgBtn onClick={() => router.push("/integra/events")}>Eventos Face</IgBtn>

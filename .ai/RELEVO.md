@@ -8,53 +8,35 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Identidad unificada ERP ↔ ACS
+## Este turno — Live detection hotpath (ráfagas + sticky)
 
-**Una persona = un código.** Sin Face ID inventado ni sync biométrico manual.
+UI lista para más FieldDetection tras wire sibling. Sin Face ID óptico.
 
-### Clave canónica
+### Qué cambió
 
-`User.employeeNumber` (+ `UserCompany.employeeNumber` del tenant)
-**=** `IntegraPerson.personId` (ACS `employeeNo` / `employeeNoString`).
-
-Roles en ERP. Actividades y asistencia híbrida resuelven al mismo `User`
-cuando el código coincide con el del terminal.
-
-### Entregado (identidad)
-
-1. `IdentityLinkService` / `IdentityModule`
-2. `GET integra/identity/me` · `candidates` · `POST/DELETE people/:id/link`
-3. `listPeople`/`getPerson` con `erpUser` (nombre, rol, email)
-4. Users: códigos ACS literales (sin expandir dígitos a NXR)
-5. Personas: badges En ERP + Vincular/Desvincular; alta → link API
-6. Portal empleado `/erp/my-profile`: nº ACS, estado Integra, híbrido del día
-
-### Concurrente (siblings — ya en rama, no pisar)
-
-- ACS fan-out en vivo (`IntegraAcsFanoutService`)
-- Stock/compras PDF+Excel (kardex, GR, almacén)
-- ERP rol→plantilla ACS · CRM cotizaciones · PTZ/live
+1. **Bus SSE/poll**: fan-out coalescido 32 ms + dedupe por id; poll 1.2 s
+   (SSE sano) / 280 ms (degradado); reconnect 800 ms.
+2. **Paint ~30 fps**: merge sticky en refs + rAF; edad placa 1 Hz.
+3. **Multi-caja**: nombres distintos no se fusionan; tope 12; VMD 90 s.
+4. **Stream**: `preloadGo2rtcPlayer`; remount 2.6 s; stagger muro 90 ms;
+   fallback MSE 4.5 s.
+5. Placa óptica: «Humano · sin ID».
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` → `./deploy/update.sh`
+`/var/www/nexara-app` → `./deploy/update.sh --force-all --with-migrate`
 
-### Verificar
+### Verificar (hard refresh Video)
 
-1. Personas → Vincular/Desvincular ERP; badge rol.
-2. Mi perfil → Integra + checador vs pases ACS.
-3. Asistencia híbrida: `linked` si códigos iguales.
-4. (Sibling) Alta ACS → push vivo sin Reconciliar.
-
-Hard-refresh tras deploy.
+1. Sticky multi-caja Meeting Room sin lag bajo ráfagas.
+2. Banner ACS &lt;1 s; Eventos con cara.
+3. Stream no se queda eterno en «Conectando…».
 
 ## A medias
 
-1. ANPR ITC · micros · TCPMSS · NVR httpHost.
-2. FieldDetection re-wire si cambia PUBLIC_API_URL.
-3. CaptureFaceData en sensor (si firmware Oficinas lo expone).
-4. Hub `/erp/exports` cards stock (opcional).
+Portal empleado · ANPR · confirmar tasa eventos tras wire AcuSense.
+Schedules ACS UI (sibling) — build api debe quedar limpio.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales.
-**No** Face ID óptico inventado sobre AcuSense/RTSP.
+Puente NAS, Traefik, credenciales, Face ID inventado.
+Personas enroll / FieldDetection wire del sibling.

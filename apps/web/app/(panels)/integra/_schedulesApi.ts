@@ -1,12 +1,14 @@
 /**
- * Cliente de horarios ACS (ISAPI UserRight* / RightPlan / Valid).
- * Consume `integra/schedules*` del sibling; si aún no aterriza, cae a
- * personas/puertas + PATCH people (rightPlan + Valid) sin inventar ISAPI.
+ * Cliente de horarios ACS — consume APIs reales:
+ *   GET  integra/access-schedules
+ *   GET  integra/people/:id/access
+ *   PATCH integra/people/:id/access
+ *   GET  integra/spaces/:doorId  (quién en una puerta)
+ * Fallback a doors/people + PATCH people si el endpoint aún no responde.
  */
 
 import { integraApi } from "./_lib";
 
-/** Fin “indefinido” que usan los DS-K1T / doc HikGateway. */
 export const ISAPI_INDEFINITE_END = "2037-12-31T23:59:59";
 export const ISAPI_DEFAULT_BEGIN = "2020-01-01T00:00:00";
 
@@ -29,34 +31,18 @@ export const WEEK_DAYS: { key: WeekDay; short: string; label: string }[] = [
   { key: "Sunday", short: "Dom", label: "Domingo" },
 ];
 
-export type TimeSegment = {
-  id: number;
-  enable: boolean;
-  beginTime: string; // HH:mm:ss o HH:mm
-  endTime: string;
-};
-
-export type DayPlan = {
-  week: WeekDay;
-  segments: TimeSegment[];
-};
-
 export type ScheduleTemplate = {
   id: string;
   name: string;
   weekPlanNo?: number;
   enable?: boolean;
-  deviceIp?: string | null;
-  /** Resumen corto p.ej. "Lun–Vie 09:00–18:00" */
   summary?: string;
-  days?: DayPlan[];
 };
 
 export type ScheduleDoor = {
   id: string;
   name: string;
-  location?: string;
-  deviceIp?: string | null;
+  deviceIp: string;
   doorNo?: number;
   online?: boolean;
 };
@@ -64,10 +50,13 @@ export type ScheduleDoor = {
 export type DoorPlanAssignment = {
   doorId: string;
   doorName?: string;
+  deviceIp: string;
   doorNo?: number;
-  /** "0" / vacío = sin acceso a esa puerta */
+  /** "0" = sin acceso (disable en ese terminal) */
   planTemplateNo: string;
   planName?: string;
+  present?: boolean;
+  error?: string;
 };
 
 export type PersonSchedule = {
@@ -78,8 +67,9 @@ export type PersonSchedule = {
   validFrom: string;
   validTo: string;
   indefinite: boolean;
+  validMode: "indefinite" | "window" | "disabled";
   doorPlans: DoorPlanAssignment[];
-  source?: "live" | "mirror" | "mock" | "fallback";
+  source?: "live" | "fallback";
   note?: string;
 };
 
@@ -109,8 +99,9 @@ export type SchedulesCatalog = {
   doors: ScheduleDoor[];
   templates: ScheduleTemplate[];
   meetingRoomDoorId?: string | null;
-  source: "live" | "mock" | "fallback";
+  source: "live" | "fallback";
   note?: string;
+  apiPresets?: Array<{ key: string; label: string }>;
 };
 
 export type AccessPresetId =
@@ -126,6 +117,13 @@ export type AccessPreset = {
   title: string;
   blurb: string;
   tone: "ok" | "accent" | "warn" | "danger" | "neutral";
+  /** Clave del PATCH people/:id/access cuando aplica a todo el sitio. */
+  apiPreset?:
+    | "always"
+    | "never"
+    | "office_hours"
+    | "visitor_today"
+    | "contractor";
 };
 
 export const ACCESS_PRESETS: AccessPreset[] = [
@@ -134,17 +132,19 @@ export const ACCESS_PRESETS: AccessPreset[] = [
     title: "Indefinido 24/7",
     blurb: "Todas las puertas, todo el día, sin fecha fin",
     tone: "ok",
+    apiPreset: "always",
   },
   {
     id: "office_hours",
     title: "Horario oficina",
     blurb: "Lun–Vie laborables · vigencia indefinida",
     tone: "accent",
+    apiPreset: "office_hours",
   },
   {
     id: "meeting_only",
     title: "Solo sala juntas",
-    blurb: "Acceso a Sala de Juntas; resto cerrado",
+    blurb: "Acceso a Sala de Juntas; resto deshabilitado",
     tone: "accent",
   },
   {
@@ -152,51 +152,30 @@ export const ACCESS_PRESETS: AccessPreset[] = [
     title: "Contratista temporal",
     blurb: "Ventana de fechas + horario de oficina",
     tone: "warn",
+    apiPreset: "contractor",
   },
   {
     id: "visit_1day",
     title: "Visita 1 día",
-    blurb: "Solo hoy, horario diurno, puertas elegidas",
+    blurb: "Solo hoy · pase de visitante",
     tone: "warn",
+    apiPreset: "visitor_today",
   },
   {
     id: "no_access",
     title: "Sin acceso",
     blurb: "Deshabilita vigencia en todos los terminales",
     tone: "danger",
+    apiPreset: "never",
   },
 ];
 
-/** Plantillas locales cuando el API de calendarios aún no responde. */
 export const FALLBACK_TEMPLATES: ScheduleTemplate[] = [
-  {
-    id: "1",
-    name: "24/7 todo el día",
-    weekPlanNo: 1,
-    enable: true,
-    summary: "Todos los días 00:00–24:00",
-  },
-  {
-    id: "2",
-    name: "Horario oficina",
-    weekPlanNo: 2,
-    enable: true,
-    summary: "Lun–Vie 09:00–18:00",
-  },
-  {
-    id: "3",
-    name: "Diurno restringido",
-    weekPlanNo: 3,
-    enable: true,
-    summary: "Lun–Vie 08:00–20:00",
-  },
-  {
-    id: "0",
-    name: "Sin acceso",
-    weekPlanNo: 0,
-    enable: false,
-    summary: "No abre esta puerta",
-  },
+  { id: "1", name: "24/7 todo el día", weekPlanNo: 1, summary: "Todos los días 00:00–24:00" },
+  { id: "2", name: "Horario oficina", weekPlanNo: 2, summary: "Lun–Vie 08:00–18:00" },
+  { id: "3", name: "Fuera de horario", weekPlanNo: 3, summary: "Lun–Vie noches / reducido" },
+  { id: "4", name: "Fin de semana", weekPlanNo: 4, summary: "Sáb–Dom" },
+  { id: "0", name: "Sin acceso", weekPlanNo: 0, summary: "No abre esta puerta" },
 ];
 
 function isNotReady(err: unknown): boolean {
@@ -204,20 +183,6 @@ function isNotReady(err: unknown): boolean {
   return /404|501|503|Cannot GET|Cannot PUT|Cannot PATCH|Not Found|no implement|aún no/i.test(
     msg,
   );
-}
-
-function todayLocalDate(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function addDaysLocal(isoDate: string, days: number): string {
-  const [y, m, d] = isoDate.split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
-  dt.setDate(dt.getDate() + days);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
 }
 
 export function isIndefiniteEnd(end?: string | null): boolean {
@@ -230,185 +195,109 @@ export function formatValidityLabel(p: {
   validFrom?: string;
   validTo?: string;
   indefinite?: boolean;
+  validMode?: string;
 }): string {
-  if (p.validEnable === false) return "Sin acceso";
-  if (p.indefinite || isIndefiniteEnd(p.validTo)) return "Indefinido";
+  if (p.validMode === "disabled" || p.validEnable === false) return "Sin acceso";
+  if (p.validMode === "indefinite" || p.indefinite || isIndefiniteEnd(p.validTo)) {
+    return "Indefinido";
+  }
   const from = (p.validFrom || "").slice(0, 10) || "—";
   const to = (p.validTo || "").slice(0, 10) || "—";
   return `${from} → ${to}`;
 }
 
 export function findMeetingRoomDoor(doors: ScheduleDoor[]): ScheduleDoor | null {
-  const hit = doors.find((d) => /junta|meeting|sala/i.test(d.name));
-  return hit || null;
+  return doors.find((d) => /junta|meeting|sala/i.test(d.name)) || null;
 }
 
-export function templateLabel(
-  templates: ScheduleTemplate[],
-  planTemplateNo: string,
-): string {
+export function templateLabel(templates: ScheduleTemplate[], planTemplateNo: string): string {
   if (!planTemplateNo || planTemplateNo === "0") return "Sin acceso";
-  const t = templates.find((x) => x.id === planTemplateNo);
-  return t?.name || `Plantilla ${planTemplateNo}`;
+  return templates.find((x) => x.id === planTemplateNo)?.name || `Plantilla ${planTemplateNo}`;
 }
 
-function parseRightPlan(
-  rightPlan: unknown,
-  doors: ScheduleDoor[],
-  templates: ScheduleTemplate[],
-): DoorPlanAssignment[] {
-  const byDoor = new Map<string, DoorPlanAssignment>();
-  for (const d of doors) {
-    byDoor.set(d.id, {
-      doorId: d.id,
-      doorName: d.name,
-      doorNo: d.doorNo ?? 1,
-      planTemplateNo: "0",
-      planName: "Sin acceso",
-    });
-  }
-
-  const rows = Array.isArray(rightPlan)
-    ? rightPlan
-    : rightPlan && typeof rightPlan === "object"
-      ? [rightPlan]
-      : [];
-
-  for (const raw of rows) {
-    if (!raw || typeof raw !== "object") continue;
-    const r = raw as Record<string, unknown>;
-    const doorNo = Number(r.doorNo ?? r.door ?? 1);
-    const plan = String(r.planTemplateNo ?? r.planTemplate ?? "1");
-    const doorIdHint = r.doorId != null ? String(r.doorId) : null;
-    const match =
-      (doorIdHint && doors.find((d) => d.id === doorIdHint)) ||
-      doors.find((d) => (d.doorNo ?? 1) === doorNo) ||
-      doors[0];
-    if (!match) continue;
-    byDoor.set(match.id, {
-      doorId: match.id,
-      doorName: match.name,
-      doorNo: match.doorNo ?? doorNo,
-      planTemplateNo: plan === "0" ? "0" : plan,
-      planName: templateLabel(templates, plan),
-    });
-  }
-
-  // Si RightPlan trae un plan genérico y hay una sola entrada, aplicar a todas
-  // las puertas del sitio (comportamiento típico de fan-out 1 puerta/terminal).
-  if (rows.length === 1 && doors.length > 1) {
-    const only = rows[0] as Record<string, unknown>;
-    const plan = String(only.planTemplateNo ?? only.planTemplate ?? "");
-    if (plan && plan !== "0") {
-      for (const d of doors) {
-        byDoor.set(d.id, {
-          doorId: d.id,
-          doorName: d.name,
-          doorNo: d.doorNo ?? 1,
-          planTemplateNo: plan,
-          planName: templateLabel(templates, plan),
-        });
-      }
-    }
-  }
-
-  return Array.from(byDoor.values());
-}
-
-async function loadDoorsPeople(): Promise<{
-  doors: ScheduleDoor[];
-  people: Array<{
-    id: string;
-    name: string;
-    code?: string;
-    validEnable?: boolean;
-    validFrom?: string;
-    validTo?: string;
-    rightPlan?: unknown;
-    doorNames?: string[];
-  }>;
-}> {
-  const [d, p] = await Promise.all([
-    integraApi<{ items: Array<Record<string, unknown>> }>("integra/doors").catch(() => ({
-      items: [],
-    })),
-    integraApi<{ items: Array<Record<string, unknown>> }>("integra/people").catch(() => ({
-      items: [],
-    })),
-  ]);
-
-  const doors: ScheduleDoor[] = (d.items || []).map((row) => {
+async function loadDoorsFallback(): Promise<ScheduleDoor[]> {
+  const d = await integraApi<{ items: Array<Record<string, unknown>> }>("integra/doors").catch(
+    () => ({ items: [] }),
+  );
+  return (d.items || []).map((row) => {
     const id = String(row.id || "");
     const parts = id.split("|");
     const doorNo = parts.length > 1 ? Number(parts[1]) : 1;
     return {
       id,
       name: String(row.name || id),
-      location: row.location != null ? String(row.location) : undefined,
-      deviceIp: parts[0] || (row.ip != null ? String(row.ip) : null),
+      deviceIp: parts[0] || "",
       doorNo: Number.isFinite(doorNo) ? doorNo : 1,
       online: row.online !== false,
     };
   });
-
-  const people = (p.items || []).map((row) => ({
-    id: String(row.id || ""),
-    name: String(row.name || row.id || ""),
-    code: row.code != null ? String(row.code) : undefined,
-    validEnable: row.validEnable as boolean | undefined,
-    validFrom: row.validFrom != null ? String(row.validFrom) : undefined,
-    validTo: row.validTo != null ? String(row.validTo) : undefined,
-    rightPlan: row.rightPlan,
-    doorNames: Array.isArray(row.doorNames) ? (row.doorNames as string[]) : undefined,
-  }));
-
-  return { doors, people };
 }
 
 export async function fetchSchedulesCatalog(): Promise<SchedulesCatalog> {
   try {
-    const raw = await integraApi<Partial<SchedulesCatalog> & { items?: ScheduleTemplate[] }>(
-      "integra/schedules",
-    );
-    if (raw?.doors?.length || raw?.templates?.length) {
-      const templates =
-        raw.templates?.length ? raw.templates : FALLBACK_TEMPLATES;
-      return {
-        doors: raw.doors || [],
-        templates,
-        meetingRoomDoorId:
-          raw.meetingRoomDoorId ?? findMeetingRoomDoor(raw.doors || [])?.id ?? null,
-        source: raw.source === "live" ? "live" : "fallback",
-        note: raw.note,
-      };
-    }
-  } catch (e) {
-    if (!isNotReady(e)) throw e;
-  }
+    const raw = await integraApi<{
+      provider?: string;
+      presets?: Array<{ key: string; label: string }>;
+      devices?: Array<{
+        deviceIp: string;
+        deviceName?: string;
+        doorIndexCode?: string;
+        doorName?: string;
+        ok?: boolean;
+        templates?: Array<{ id?: number; templateName?: string; weekPlanNo?: number; enable?: boolean }>;
+        weekPlans?: Array<{ id?: number; summary?: string }>;
+        error?: string;
+      }>;
+      model?: { useCases?: string };
+    }>("integra/access-schedules");
 
-  try {
-    const tpl = await integraApi<{ items: ScheduleTemplate[] }>(
-      "integra/schedules/templates",
-    );
-    const { doors } = await loadDoorsPeople();
+    const doors: ScheduleDoor[] = (raw.devices || []).map((d) => ({
+      id: d.doorIndexCode || `${d.deviceIp}|1`,
+      name: d.doorName || d.deviceName || d.deviceIp,
+      deviceIp: d.deviceIp,
+      doorNo: 1,
+      online: d.ok !== false,
+    }));
+
+    const templatesMap = new Map<string, ScheduleTemplate>();
+    for (const t of FALLBACK_TEMPLATES) templatesMap.set(t.id, t);
+    for (const d of raw.devices || []) {
+      for (const t of d.templates || []) {
+        const id = String(t.id ?? "");
+        if (!id) continue;
+        templatesMap.set(id, {
+          id,
+          name: t.templateName || `Plantilla ${id}`,
+          weekPlanNo: t.weekPlanNo,
+          enable: t.enable,
+          summary: d.weekPlans?.find((w) => String(w.id) === id)?.summary,
+        });
+      }
+    }
+    templatesMap.set("0", FALLBACK_TEMPLATES.find((t) => t.id === "0")!);
+
     return {
       doors,
-      templates: tpl.items?.length ? tpl.items : FALLBACK_TEMPLATES,
+      templates: Array.from(templatesMap.values()).sort((a, b) => Number(a.id) - Number(b.id)),
       meetingRoomDoorId: findMeetingRoomDoor(doors)?.id ?? null,
       source: "live",
+      apiPresets: raw.presets,
+      note: doors.some((d) => d.online === false)
+        ? "Algunos terminales no respondieron; se muestran igual para editar."
+        : undefined,
     };
   } catch (e) {
     if (!isNotReady(e)) throw e;
   }
 
-  const { doors } = await loadDoorsPeople();
+  const doors = await loadDoorsFallback();
   return {
     doors,
     templates: FALLBACK_TEMPLATES,
     meetingRoomDoorId: findMeetingRoomDoor(doors)?.id ?? null,
     source: "fallback",
     note:
-      "API de horarios aún no disponible: se usan plantillas locales y el guardado va por ficha de persona (Valid + RightPlan).",
+      "API access-schedules no disponible: catálogo local. El guardado intenta people/:id/access y cae a ficha.",
   };
 }
 
@@ -417,52 +306,117 @@ export async function fetchPersonSchedule(
   catalog: SchedulesCatalog,
 ): Promise<PersonSchedule> {
   try {
-    const raw = await integraApi<Partial<PersonSchedule>>(
-      `integra/schedules/people/${encodeURIComponent(personId)}`,
-    );
-    if (raw?.personId || raw?.doorPlans) {
-      const validTo = raw.validTo || ISAPI_INDEFINITE_END;
+    const raw = await integraApi<{
+      personId: string;
+      name?: string;
+      valid?: { enable?: boolean; beginTime?: string; endTime?: string } | null;
+      validMode?: "indefinite" | "window" | "disabled";
+      doors?: Array<{
+        deviceIp: string;
+        doorIndexCode?: string;
+        doorName?: string;
+        present?: boolean;
+        doorNo?: number;
+        planTemplateNo?: string | null;
+        templateName?: string | null;
+        Valid?: { enable?: boolean; beginTime?: string; endTime?: string } | null;
+        error?: string;
+      }>;
+    }>(`integra/people/${encodeURIComponent(personId)}/access`);
+
+    const valid = raw.valid;
+    const mode =
+      raw.validMode ||
+      (valid?.enable === false
+        ? "disabled"
+        : isIndefiniteEnd(valid?.endTime)
+          ? "indefinite"
+          : "window");
+
+    const doorPlans: DoorPlanAssignment[] = (raw.doors?.length
+      ? raw.doors
+      : catalog.doors.map((d) => ({
+          deviceIp: d.deviceIp,
+          doorIndexCode: d.id,
+          doorName: d.name,
+          present: false,
+          doorNo: 1,
+          planTemplateNo: null,
+        }))
+    ).map((d) => {
+      const doorId = d.doorIndexCode || `${d.deviceIp}|1`;
+      const plan =
+        d.present === false || d.planTemplateNo == null || d.Valid?.enable === false
+          ? "0"
+          : String(d.planTemplateNo);
       return {
-        personId: raw.personId || personId,
-        name: raw.name || personId,
-        code: raw.code,
-        validEnable: raw.validEnable !== false,
-        validFrom: raw.validFrom || ISAPI_DEFAULT_BEGIN,
-        validTo,
-        indefinite: raw.indefinite ?? isIndefiniteEnd(validTo),
-        doorPlans:
-          raw.doorPlans?.length
-            ? raw.doorPlans
-            : parseRightPlan(null, catalog.doors, catalog.templates),
-        source: raw.source || "live",
-        note: raw.note,
+        doorId,
+        doorName: d.doorName || catalog.doors.find((x) => x.deviceIp === d.deviceIp)?.name,
+        deviceIp: d.deviceIp,
+        doorNo: d.doorNo ?? 1,
+        planTemplateNo: plan,
+        planName: d.templateName || templateLabel(catalog.templates, plan),
+        present: d.present,
+        error: d.error,
       };
+    });
+
+    // Completar puertas del catálogo que no vinieron en la respuesta.
+    for (const d of catalog.doors) {
+      if (!doorPlans.some((x) => x.deviceIp === d.deviceIp)) {
+        doorPlans.push({
+          doorId: d.id,
+          doorName: d.name,
+          deviceIp: d.deviceIp,
+          doorNo: d.doorNo ?? 1,
+          planTemplateNo: "0",
+          planName: "Sin acceso",
+          present: false,
+        });
+      }
     }
+
+    return {
+      personId: raw.personId || personId,
+      name: raw.name || personId,
+      validEnable: mode !== "disabled",
+      validFrom: valid?.beginTime || ISAPI_DEFAULT_BEGIN,
+      validTo: valid?.endTime || ISAPI_INDEFINITE_END,
+      indefinite: mode === "indefinite",
+      validMode: mode,
+      doorPlans,
+      source: "live",
+    };
   } catch (e) {
     if (!isNotReady(e)) throw e;
   }
 
   const detail = await integraApi<Record<string, unknown>>(
     `integra/people/${encodeURIComponent(personId)}`,
-  ).catch(async () => {
-    const list = await integraApi<{ items: Array<Record<string, unknown>> }>("integra/people");
-    return (list.items || []).find((p) => String(p.id) === personId) || {};
-  });
+  ).catch(() => ({}));
 
   const validTo =
     detail.validTo != null ? String(detail.validTo) : ISAPI_INDEFINITE_END;
+  const enable = detail.validEnable !== false;
   return {
     personId,
     name: String(detail.name || personId),
     code: detail.code != null ? String(detail.code) : undefined,
-    validEnable: detail.validEnable !== false,
-    validFrom:
-      detail.validFrom != null ? String(detail.validFrom) : ISAPI_DEFAULT_BEGIN,
+    validEnable: enable,
+    validFrom: detail.validFrom != null ? String(detail.validFrom) : ISAPI_DEFAULT_BEGIN,
     validTo,
     indefinite: isIndefiniteEnd(validTo),
-    doorPlans: parseRightPlan(detail.rightPlan, catalog.doors, catalog.templates),
+    validMode: !enable ? "disabled" : isIndefiniteEnd(validTo) ? "indefinite" : "window",
+    doorPlans: catalog.doors.map((d) => ({
+      doorId: d.id,
+      doorName: d.name,
+      deviceIp: d.deviceIp,
+      doorNo: d.doorNo ?? 1,
+      planTemplateNo: "1",
+      planName: templateLabel(catalog.templates, "1"),
+    })),
     source: "fallback",
-    note: "Leído desde ficha de persona (espejo/live).",
+    note: "Leído desde ficha (espejo). Guarda con people/:id/access cuando el API esté up.",
   };
 }
 
@@ -470,61 +424,80 @@ export async function fetchDoorAccess(
   doorId: string,
   catalog: SchedulesCatalog,
 ): Promise<{ door: ScheduleDoor; people: DoorAccessRow[]; source: string; note?: string }> {
-  try {
-    const raw = await integraApi<{
-      door?: ScheduleDoor;
-      people?: DoorAccessRow[];
-      source?: string;
-      note?: string;
-    }>(`integra/schedules/doors/${encodeURIComponent(doorId)}`);
-    if (raw?.people) {
-      return {
-        door: raw.door || catalog.doors.find((d) => d.id === doorId) || {
-          id: doorId,
-          name: doorId,
-        },
-        people: raw.people,
-        source: raw.source || "live",
-        note: raw.note,
-      };
-    }
-  } catch (e) {
-    if (!isNotReady(e)) throw e;
-  }
-
-  const { people } = await loadDoorsPeople();
   const door = catalog.doors.find((d) => d.id === doorId) || {
     id: doorId,
     name: doorId,
+    deviceIp: doorId.split("|")[0] || "",
   };
+
+  try {
+    const raw = await integraApi<{
+      door?: { name?: string };
+      people?: Array<{
+        personId?: string;
+        id?: string;
+        name?: string;
+        code?: string;
+        planTemplateNo?: string;
+        planName?: string;
+        validEnable?: boolean;
+        validFrom?: string;
+        validTo?: string;
+        validMode?: string;
+        weekSummary?: string;
+      }>;
+    }>(`integra/spaces/${encodeURIComponent(doorId)}`);
+    if (raw?.people) {
+      return {
+        door: { ...door, name: raw.door?.name || door.name },
+        people: raw.people.map((p) => ({
+          personId: String(p.personId || p.id || ""),
+          name: String(p.name || p.personId || ""),
+          code: p.code,
+          planTemplateNo: String(p.planTemplateNo || "1"),
+          planName: p.planName,
+          validEnable: p.validEnable,
+          validFrom: p.validFrom,
+          validTo: p.validTo,
+          indefinite: p.validMode === "indefinite" || isIndefiniteEnd(p.validTo),
+          weekSummary: p.weekSummary,
+        })),
+        source: "live",
+      };
+    }
+  } catch (e) {
+    if (!isNotReady(e)) {
+      /* spaces puede no estar; seguir con people scan */
+    }
+  }
+
+  const list = await integraApi<{ items: Array<Record<string, unknown>> }>("integra/people").catch(
+    () => ({ items: [] }),
+  );
   const rows: DoorAccessRow[] = [];
-  for (const p of people) {
-    const plans = parseRightPlan(p.rightPlan, catalog.doors, catalog.templates);
-    const hit = plans.find((x) => x.doorId === doorId && x.planTemplateNo !== "0");
-    const byName =
-      !hit &&
-      p.doorNames?.some((n) => n.toLowerCase() === door.name.toLowerCase());
-    if (!hit && !byName) continue;
+  for (const p of list.items || []) {
+    const names = Array.isArray(p.doorNames) ? (p.doorNames as string[]) : [];
+    if (!names.some((n) => n.toLowerCase() === door.name.toLowerCase()) && names.length) {
+      continue;
+    }
     if (p.validEnable === false) continue;
     rows.push({
-      personId: p.id,
-      name: p.name,
-      code: p.code,
-      planTemplateNo: hit?.planTemplateNo || "1",
-      planName: hit?.planName || templateLabel(catalog.templates, hit?.planTemplateNo || "1"),
-      validEnable: p.validEnable,
-      validFrom: p.validFrom,
-      validTo: p.validTo,
-      indefinite: isIndefiniteEnd(p.validTo),
-      weekSummary: catalog.templates.find((t) => t.id === (hit?.planTemplateNo || "1"))
-        ?.summary,
+      personId: String(p.id),
+      name: String(p.name || p.id),
+      code: p.code != null ? String(p.code) : undefined,
+      planTemplateNo: "1",
+      planName: templateLabel(catalog.templates, "1"),
+      validEnable: p.validEnable as boolean | undefined,
+      validFrom: p.validFrom != null ? String(p.validFrom) : undefined,
+      validTo: p.validTo != null ? String(p.validTo) : undefined,
+      indefinite: isIndefiniteEnd(p.validTo != null ? String(p.validTo) : null),
     });
   }
   return {
     door,
     people: rows,
     source: "fallback",
-    note: "Quién tiene esta puerta según RightPlan / nombres del espejo.",
+    note: "Lista aproximada desde espejo de personas. Abre «Por persona» para el detalle live por terminal.",
   };
 }
 
@@ -535,14 +508,17 @@ export function applyPreset(
 ): PersonSchedule {
   const doors = catalog.doors;
   const meeting = findMeetingRoomDoor(doors);
-  const today = todayLocalDate();
-  const allWith = (plan: string): DoorPlanAssignment[] =>
+  const today = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  const allWith = (plan: string, enable = true): DoorPlanAssignment[] =>
     doors.map((d) => ({
       doorId: d.id,
       doorName: d.name,
+      deviceIp: d.deviceIp,
       doorNo: d.doorNo ?? 1,
-      planTemplateNo: plan,
-      planName: templateLabel(catalog.templates, plan),
+      planTemplateNo: enable ? plan : "0",
+      planName: templateLabel(catalog.templates, enable ? plan : "0"),
     }));
 
   switch (preset) {
@@ -550,6 +526,7 @@ export function applyPreset(
       return {
         ...current,
         validEnable: true,
+        validMode: "indefinite",
         validFrom: ISAPI_DEFAULT_BEGIN,
         validTo: ISAPI_INDEFINITE_END,
         indefinite: true,
@@ -559,25 +536,28 @@ export function applyPreset(
       return {
         ...current,
         validEnable: true,
+        validMode: "indefinite",
         validFrom: ISAPI_DEFAULT_BEGIN,
         validTo: ISAPI_INDEFINITE_END,
         indefinite: true,
         doorPlans: allWith("2"),
       };
     case "meeting_only": {
-      const targetId = meeting?.id || catalog.meetingRoomDoorId;
+      const targetIp = meeting?.deviceIp;
       return {
         ...current,
         validEnable: true,
+        validMode: "indefinite",
         validFrom: ISAPI_DEFAULT_BEGIN,
         validTo: ISAPI_INDEFINITE_END,
         indefinite: true,
         doorPlans: doors.map((d) => {
-          const on = targetId ? d.id === targetId : /junta|meeting/i.test(d.name);
+          const on = targetIp ? d.deviceIp === targetIp : /junta|meeting/i.test(d.name);
           const plan = on ? "1" : "0";
           return {
             doorId: d.id,
             doorName: d.name,
+            deviceIp: d.deviceIp,
             doorNo: d.doorNo ?? 1,
             planTemplateNo: plan,
             planName: templateLabel(catalog.templates, plan),
@@ -585,118 +565,123 @@ export function applyPreset(
         }),
       };
     }
-    case "contractor":
+    case "contractor": {
+      const end = new Date(today);
+      end.setDate(end.getDate() + 30);
+      const endStr = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`;
       return {
         ...current,
         validEnable: true,
-        validFrom: `${today}T00:00:00`,
-        validTo: `${addDaysLocal(today, 30)}T23:59:59`,
+        validMode: "window",
+        validFrom: `${todayStr}T00:00:00`,
+        validTo: `${endStr}T23:59:59`,
         indefinite: false,
         doorPlans: allWith("2"),
       };
+    }
     case "visit_1day":
       return {
         ...current,
         validEnable: true,
-        validFrom: `${today}T08:00:00`,
-        validTo: `${today}T20:00:00`,
+        validMode: "window",
+        validFrom: `${todayStr}T00:00:00`,
+        validTo: `${todayStr}T23:59:59`,
         indefinite: false,
-        doorPlans: doors.map((d) => {
-          const on = /junta|general|acceso/i.test(d.name);
-          const plan = on ? "3" : "0";
-          return {
-            doorId: d.id,
-            doorName: d.name,
-            doorNo: d.doorNo ?? 1,
-            planTemplateNo: plan,
-            planName: templateLabel(catalog.templates, plan),
-          };
-        }),
+        doorPlans: allWith("1"),
       };
     case "no_access":
       return {
         ...current,
         validEnable: false,
+        validMode: "disabled",
         indefinite: false,
-        doorPlans: allWith("0"),
+        doorPlans: allWith("0", false),
       };
     default:
       return current;
   }
 }
 
-function rightPlanFromDoorPlans(doorPlans: DoorPlanAssignment[]): Array<{
-  doorNo: number;
-  planTemplateNo: string;
-  doorId?: string;
-}> {
-  return doorPlans
-    .filter((d) => d.planTemplateNo && d.planTemplateNo !== "0")
-    .map((d) => ({
-      doorNo: d.doorNo ?? 1,
-      planTemplateNo: d.planTemplateNo,
-      doorId: d.doorId,
-    }));
-}
-
 export async function savePersonSchedule(
   draft: PersonSchedule,
+  opts?: { preset?: AccessPresetId | null },
 ): Promise<SaveScheduleResult> {
-  const validTo = draft.indefinite
-    ? ISAPI_INDEFINITE_END
-    : draft.validTo || ISAPI_INDEFINITE_END;
-  const validFrom = draft.validFrom || ISAPI_DEFAULT_BEGIN;
-  const body = {
-    validEnable: draft.validEnable,
-    validFrom,
-    validTo,
-    indefinite: draft.indefinite,
-    doorPlans: draft.doorPlans,
-    rightPlan: rightPlanFromDoorPlans(draft.doorPlans),
-    doorRight: draft.doorPlans.some((d) => d.planTemplateNo !== "0") ? "1" : "",
+  const presetMeta = ACCESS_PRESETS.find((p) => p.id === opts?.preset);
+  const doorPlans = draft.doorPlans.map((d) => ({
+    deviceIp: d.deviceIp,
+    doorNo: d.doorNo ?? 1,
+    planTemplateNo: d.planTemplateNo === "0" ? undefined : d.planTemplateNo,
+    disable: d.planTemplateNo === "0" || !draft.validEnable,
+  }));
+
+  const body: Record<string, unknown> = {
+    validMode: draft.validEnable
+      ? draft.indefinite
+        ? "indefinite"
+        : "window"
+      : "disabled",
+    beginTime: draft.validFrom || ISAPI_DEFAULT_BEGIN,
+    endTime: draft.indefinite ? ISAPI_INDEFINITE_END : draft.validTo,
+    doorPlans,
+    ensurePresetsOnDevices: true,
   };
 
+  // Presets globales del API (excepto meeting_only que es por puerta).
+  if (presetMeta?.apiPreset && opts?.preset !== "meeting_only") {
+    body.preset = presetMeta.apiPreset;
+    if (presetMeta.apiPreset === "contractor") body.contractorDays = 30;
+  } else if (opts?.preset === "meeting_only") {
+    // Solo doorPlans con disable en el resto.
+    delete body.preset;
+  }
+
   try {
-    const r = await integraApi<SaveScheduleResult>(
-      `integra/schedules/people/${encodeURIComponent(draft.personId)}`,
-      { method: "PUT", body: JSON.stringify(body) },
-    );
+    const r = await integraApi<{
+      success?: boolean;
+      partial?: boolean;
+      note?: string;
+      results?: OpResult[];
+    }>(`integra/people/${encodeURIComponent(draft.personId)}/access`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+    const ok = r.success !== false && !r.partial;
     return {
-      success: r.success !== false,
-      note: r.note,
+      success: ok,
+      note:
+        r.note ||
+        (ok
+          ? "Horario empujado a los terminales."
+          : "Guardado parcial — revisa el detalle por IP."),
       results: r.results,
-      source: r.source || "live",
+      source: "live",
     };
   } catch (e) {
     if (!isNotReady(e)) throw e;
   }
 
-  // Fallback: ficha ISAPI ya soporta Valid + RightPlan.
-  const r = await integraApi<{
-    success?: boolean;
-    note?: string;
-    results?: OpResult[];
-  }>(`integra/people/${encodeURIComponent(draft.personId)}`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      validEnable: draft.validEnable,
-      validFrom,
-      validTo,
-      doorRight: body.doorRight || undefined,
-      rightPlan: body.rightPlan.length
-        ? body.rightPlan.map(({ doorNo, planTemplateNo }) => ({
-            doorNo,
-            planTemplateNo,
-          }))
-        : [{ doorNo: 1, planTemplateNo: "1" }],
-    }),
-  });
-
+  const active = draft.doorPlans.filter((d) => d.planTemplateNo !== "0");
+  const r = await integraApi<{ success?: boolean; note?: string; results?: OpResult[] }>(
+    `integra/people/${encodeURIComponent(draft.personId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        validEnable: draft.validEnable,
+        validFrom: draft.validFrom,
+        validTo: draft.indefinite ? ISAPI_INDEFINITE_END : draft.validTo,
+        doorRight: active.length ? "1" : "",
+        rightPlan: active.length
+          ? active.map((d) => ({
+              doorNo: d.doorNo ?? 1,
+              planTemplateNo: d.planTemplateNo,
+            }))
+          : [{ doorNo: 1, planTemplateNo: "1" }],
+      }),
+    },
+  );
   return {
     success: r.success !== false,
-    note:
-      r.note ||
-      "Guardado vía ficha de persona (Valid + RightPlan). Plantillas semanales detalladas cuando aterrice el API de calendarios.",
+    note: r.note || "Guardado vía ficha (fallback Valid + RightPlan).",
     results: r.results,
     source: "fallback",
   };
@@ -705,6 +690,12 @@ export async function savePersonSchedule(
 export async function listPeopleBrief(): Promise<
   Array<{ id: string; name: string; code?: string }>
 > {
-  const { people } = await loadDoorsPeople();
-  return people.map((p) => ({ id: p.id, name: p.name, code: p.code }));
+  const list = await integraApi<{ items: Array<Record<string, unknown>> }>("integra/people").catch(
+    () => ({ items: [] }),
+  );
+  return (list.items || []).map((p) => ({
+    id: String(p.id),
+    name: String(p.name || p.id),
+    code: p.code != null ? String(p.code) : undefined,
+  }));
 }
