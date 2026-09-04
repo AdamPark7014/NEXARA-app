@@ -156,6 +156,33 @@ function CredChips({ person }: { person: Person }) {
   );
 }
 
+function IdentityStatusBadges({
+  person,
+  erp,
+}: {
+  person: Person;
+  erp: ApiUserRow | null;
+}) {
+  const faceOn = (person.numOfFace ?? 0) > 0 || person.hasFace || person.hasLocalFace;
+  const roleLabel = erp?.role?.nombre || null;
+  return (
+    <div className={styles.personStatusRow}>
+      <span className={styles.personStatusChip} data-on={erp ? "1" : undefined} data-tone={erp ? "ok" : "off"}>
+        {erp ? "En ERP" : "Sin ERP"}
+      </span>
+      <span className={styles.personStatusChip} data-on="1" data-tone="ok">
+        En terminales
+      </span>
+      <span className={styles.personStatusChip} data-on={faceOn ? "1" : undefined} data-tone={faceOn ? "ok" : "off"}>
+        {faceOn ? "Foto" : "Sin foto"}
+      </span>
+      <span className={styles.personStatusChip} data-on={roleLabel ? "1" : undefined} data-tone={roleLabel ? "ok" : "off"}>
+        {roleLabel ? `Rol · ${roleLabel}` : "Sin rol"}
+      </span>
+    </div>
+  );
+}
+
 function OpFanout({ results }: { results: OpResult[] | null }) {
   if (!results?.length) return null;
   return (
@@ -169,13 +196,28 @@ function OpFanout({ results }: { results: OpResult[] | null }) {
   );
 }
 
-function WizardSteps({ step }: { step: AltaStep }) {
-  const items: { n: AltaStep; label: string }[] = [
-    { n: 1, label: "Nombre" },
-    { n: 2, label: "Código" },
-    { n: 3, label: "Foto" },
-    { n: 4, label: "Guardar" },
-  ];
+function WizardSteps({ step, mode }: { step: AltaStep; mode: AltaMode }) {
+  const items: { n: AltaStep; label: string }[] =
+    mode === "link"
+      ? [
+          { n: 1, label: "Usuario ERP" },
+          { n: 2, label: "Código" },
+          { n: 3, label: "Foto" },
+          { n: 4, label: "Guardar" },
+        ]
+      : mode === "unified"
+        ? [
+            { n: 1, label: "Identidad" },
+            { n: 2, label: "Código" },
+            { n: 3, label: "Foto" },
+            { n: 4, label: "Crear" },
+          ]
+        : [
+            { n: 1, label: "Nombre" },
+            { n: 2, label: "Código" },
+            { n: 3, label: "Foto" },
+            { n: 4, label: "Guardar" },
+          ];
   return (
     <ol className={styles.personWizard}>
       {items.map((it) => (

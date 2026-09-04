@@ -109,6 +109,7 @@ export class IntegraPushService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sites: IntegraSiteService,
+    private readonly acsFanout: IntegraAcsFanoutService,
   ) {}
 
   stream(siteId: number): Observable<PushEventDto> {

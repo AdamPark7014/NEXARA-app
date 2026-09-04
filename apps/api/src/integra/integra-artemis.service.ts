@@ -1083,7 +1083,13 @@ export class IntegraArtemisService {
           };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
-      return { total: items.length, source: 'live' as const, items };
+      const withErp = await this.identity.attachErpUsers(companyId, items);
+      return {
+        total: withErp.length,
+        source: 'live' as const,
+        linkModel: 'User.employeeNumber ↔ ACS employeeNo',
+        items: withErp,
+      };
     }
 
     try {
@@ -1122,19 +1128,27 @@ export class IntegraArtemisService {
       const label = await this.personLabels(row.siteId);
       const localFace = hasLocalPersonFace(companyId, personId);
       const localFpIds = listLocalFingerIds(companyId, personId);
+      const person = {
+        ...dto,
+        hasLocalFace: localFace,
+        hasFace: Boolean(dto.hasFace || localFace),
+        localFpIds,
+        sourceName: label.name(dto.sourceIp),
+        doorNames: label.doors(dto.sourceIp, dto.rightPlan),
+      };
+      const erpUser = await this.identity.resolvePerson(
+        companyId,
+        personId,
+        row.personCode,
+      );
       return {
         personId,
         source: 'mirror' as const,
         provider: 'ISAPI',
+        linkModel: 'User.employeeNumber ↔ ACS employeeNo',
         note: 'Edita y sube foto desde esta ficha; se propaga a los terminales DS-K1T.',
-        person: {
-          ...dto,
-          hasLocalFace: localFace,
-          hasFace: Boolean(dto.hasFace || localFace),
-          localFpIds,
-          sourceName: label.name(dto.sourceIp),
-          doorNames: label.doors(dto.sourceIp, dto.rightPlan),
-        },
+        person: { ...person, erpUser },
+        erpUser,
         raw: row.raw,
       };
     }

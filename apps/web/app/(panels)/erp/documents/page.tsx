@@ -301,45 +301,9 @@ export default function DocumentsPage() {
         );
       })()}
 
-      <FilterToolbar
-        search={{ value: search, onChange: setSearch, placeholder: "Buscar por título o folio…" }}
-        selects={[
-          {
-            label: "Estado",
-            value: filterStatus,
-            onChange: setFilterStatus,
-            options: [
-              { value: "DRAFT", label: "Borrador" },
-              { value: "PENDING_APPROVAL", label: "Pendiente aprobación" },
-              { value: "APPROVED", label: "Aprobado" },
-              { value: "ARCHIVED", label: "Archivado" },
-            ],
-            allowAll: true,
-          },
-          ...(cats.length > 0 ? [{
-            label: "Categoría",
-            value: filterCategory,
-            onChange: setFilterCategory,
-            options: cats.map((c) => ({ value: String(c.id), label: c.name })),
-            allowAll: true,
-          }] : []),
-        ]}
-        onClear={() => { setSearch(""); setFilterStatus(""); setFilterCategory(""); }}
-        resultCount={loading ? null : filtered.length}
-        rightActions={docs.length > 0 ? (
-          <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(filtered, [
-            { key: "documentNumber", label: "Folio" },
-            { key: "title", label: "Título" },
-            { key: "category", label: "Categoría", format: (v) => (v as ManagedDoc["category"])?.name ?? "—" },
-            { key: "status", label: "Estado", format: (v) => String(v ?? "").replace(/_/g, " ") },
-            { key: "createdAt", label: "Creado", format: (v) => v ? String(v).slice(0, 10) : "" },
-          ], "documentos")}>Excel</Button>
-        ) : undefined}
-      />
-
-      <Section title={loading ? "Cargando…" : `${filtered.length} documentos`}>
-        {loading && <EmptyState icon="⏳" title="Cargando documentos…" description="Consultando el repositorio." />}
-        {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
+      <Section title={loading ? "Cargando…" : `${filtered.length} documentos`} dense>
+        {loading && <EmptyState icon="⏳" title="Cargando documentos…" description="Consultando el repositorio." variant="compact" />}
+        {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} variant="compact" />}
         {!loading && !error && <DataTable columns={columns} rows={filtered} rowKey={(d) => d.id} emptyTitle="Sin documentos" emptyDescription="Sube el primer documento al repositorio." />}
       </Section>
 
@@ -373,6 +337,6 @@ export default function DocumentsPage() {
         </div>
       )}
       <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
-    </>
+    </PageChrome>
   );
 }

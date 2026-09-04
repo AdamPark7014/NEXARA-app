@@ -235,11 +235,54 @@ export default function QuoteDetailPage() {
               </Button>
             </Link>
             <Button variant="secondary" iconLeft="📄" onClick={() => void downloadPdf()}>
-              PDF cliente
+              Descargar PDF
             </Button>
             <Button variant="ghost" iconLeft="📊" onClick={() => void downloadPdf(true)}>
               PDF interno
             </Button>
+            {quote.items.length > 0 && (
+              <Button
+                variant="ghost"
+                iconLeft="⬇"
+                onClick={() => {
+                  const { exportToExcel } = require("@/lib/export-excel") as typeof import("@/lib/export-excel");
+                  exportToExcel(
+                    quote.items.map((it, idx) => ({
+                      num: idx + 1,
+                      name: it.name,
+                      sku: it.sku ?? "",
+                      qty: it.qty,
+                      unit: it.unit ?? "PZA",
+                      unitPrice: Number(it.unitPrice),
+                      tax: it.tax,
+                      lineTotal: Number(it.lineTotal),
+                    })),
+                    [
+                      { key: "num", label: "#" },
+                      { key: "name", label: "Descripción" },
+                      { key: "sku", label: "SKU" },
+                      { key: "qty", label: "Cant." },
+                      { key: "unit", label: "UdM" },
+                      { key: "unitPrice", label: "P. unitario" },
+                      { key: "tax", label: "IVA %" },
+                      { key: "lineTotal", label: "Importe" },
+                    ],
+                    `cotizacion-${quote.quoteNumber}-partidas`,
+                    {
+                      title: `PARTIDAS · ${quote.quoteNumber}`,
+                      subtitle: [quote.clientCompany, quote.projectName].filter(Boolean).join(" · ") || undefined,
+                      summaryRows: [
+                        { label: "Subtotal", value: Number(quote.subtotal) },
+                        { label: "IVA", value: Number(quote.taxTotal) },
+                        { label: "Total", value: Number(quote.total) },
+                      ],
+                    },
+                  );
+                }}
+              >
+                Descargar Excel
+              </Button>
+            )}
             {cfg.canEdit && quote.status === "DRAFT" && (
               <Button variant="primary" iconLeft="✉️" onClick={() => setShowSend(true)}>
                 Enviar cotización
