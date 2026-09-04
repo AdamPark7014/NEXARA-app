@@ -20,7 +20,7 @@ Deploy: `ssh -p 2222 root@5.78.215.109` → `/var/www/nexara-app`
 
 ## A medias / siguiente
 
-1. Verificar en prod que 3×3 / 4×4 muestran todas (MJPEG).
+1. Verificado deploy MJPEG be2ec76; falta hard-refresh del usuario. Fix IgBadge muted→neutral pendiente en prod si rebuild limpio que 3×3 / 4×4 muestran todas (MJPEG).
 2. Personas UI+API ya en rama; sync + fotos.
 3. TCPMSS / biblioteca init / empresas 1-2.
 
