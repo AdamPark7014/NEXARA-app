@@ -8,53 +8,53 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Exports PDF/Excel HR·Ops·Finance + UX listas
+## Este turno — CRM docs: cotización PDF = familia OC + Excel/UI
 
-Gaps ERP de documentos: PDFs/Excels faltantes y botones «Excel» sueltos.
-Sin tocar cámaras Integra ni núcleo CRM OC / stock / FieldDetection.
+Ownership Sales/CRM document outputs. **No** se tocó Integra Hikvision.
 
-### Exports añadidos / cableados
+### Cotización PDF (unificado con OC)
 
-1. **Actividades OPS PDF** — `GET activities/report.pdf` (landscape, KPIs
-   estatus/prioridad, detalle OT). UI en `OpsActivitiesBoard` + pack
-   `/erp/exports`.
-2. **Viáticos PDF** — API ya existía; cableado en OPS campo, Mis viáticos y
-   ERP finance con patrón **Exportar PDF / Exportar Excel**.
-3. **Asistencia híbrida Excel** — `GET attendance/hybrid/export.xlsx` +
-   botón en `HybridAttendancePanel` + tarjeta en `/erp/exports`.
-4. **Componente** `ListExportActions` — labels consistentes en listas.
+1. `cotizacion-pdf.ts` alineado a la familia de `purchase-order-pdf.ts`:
+   membrete con **CompanyProfile** (razón social, RFC, domicilio fiscal,
+   contacto), acento CRM, logo compartido, multipágina con pie.
+2. Filas de **altura dinámica** (ya no recorta descripción/SKU).
+3. Tabla con UdM + columnas escaladas al ancho; totales MXN es-MX.
+4. `CotizacionesService.buildPdf` / `findOne` cargan `company`.
 
-### UX polish
+### Excel + botones claros
 
-- OT: empty con Limpiar filtros + Nueva OT; Excel con más columnas.
-- Viáticos ops/mis: empty con CTA primaria; PDF últimos 90 días.
-- Finance viáticos: «Exportar PDF» (antes «PDF control»).
-- Asistencia HR: «Exportar Excel».
+1. Lista cotizaciones: **Descargar PDF** / **Descargar Excel** (periodo).
+2. Detalle cotización: **Descargar PDF**, PDF interno, **Descargar Excel**
+   de partidas con resumen subtotal/IVA/total.
+3. Clientes: **Descargar Excel** con teléfono + resumen.
+4. Compras (OC libre): etiquetas **Descargar PDF** / **Descargar Excel**
+   (PDF OC ya estaba listo; no se reescribió el generador).
 
 ### Concurrente — no pisar
 
-ACS face JPEG / FDSearch · Integra UX Video/Personas · FieldDetection ·
-identity-link · stock · CRM OC PDF · accounting/banking UI siblings.
+ACS face / live detection / FieldDetection / hybrid warehouse.
+**No** matching Face ID inventado.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` · `./deploy/update.sh --force-all`
+`/var/www/nexara-app` → `./deploy/update.sh`
 
 ### Verificar (hard refresh)
 
-1. `/ops/activities` → Exportar Excel + Exportar PDF.
-2. `/ops/viatics` y `/ops/my-viatics` → Exportar PDF/Excel.
-3. `/erp/finance/viatics` → Exportar PDF + Excel.
-4. `/erp/hr/attendance` híbrido → Exportar Excel; `/erp/exports` Actividades PDF
-   + Asistencia híbrida.
+1. CRM → Cotizaciones → **Descargar PDF** en lista o ficha: membrete
+   fiscal, partidas legibles, totales, páginas numeradas.
+2. En ficha → **Descargar Excel** de partidas.
+3. Lista → **Descargar Excel** del periodo (con KPIs arriba).
+4. ERP → Compras → **Descargar PDF** en OC (sin regresión).
 
 ## A medias
 
-1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
-2. PDF nómina/pagos en UI (API `employee-payments/report.pdf` ya existe).
-3. identity-link WIP — no cableado a AppModule.
+1. Portal empleado · ANPR ITC · micros · TCPMSS.
+2. Re-wire httpHosts si cambia PUBLIC_API_URL.
+3. CaptureFaceData en sensor (si firmware Oficinas lo expone).
+4. PDF legacy `ventas/pdf-generator.service.ts` (oportunidad/template) —
+   aún paralelo; el camino CRM principal es `cotizaciones/:id/pdf`.
 
 ## No tocar
 
 Puente NAS, Traefik, credenciales.
-Face ID óptico inventado. No pelear PTZ / biometrics CRUD / FieldDetection /
-stock detail / OC PDF del sibling.
+**No** matching Face ID inventado sobre RTSP/AcuSense.

@@ -680,17 +680,22 @@ export default function IntegraPeoplePage() {
   return (
     <IgPage>
       <IgToolbar
-        title="Personas · alta ACS"
-        meta={`${filtered.length}/${people.length}${withFace ? ` · ${withFace} con Face` : ""}${
-          orgs.length ? ` · ${orgs.length} orgs` : ""
-        } · ${live ? "consulta live" : "espejo sync"}`}
+        title="Personas"
+        meta={`${filtered.length}/${people.length}${linkedCount ? ` · ${linkedCount} en ERP` : ""}${
+          withFace ? ` · ${withFace} con Face` : ""
+        }${erpOnlyUsers.length ? ` · ${erpOnlyUsers.length} solo ERP` : ""} · ${
+          live ? "consulta live" : "espejo"
+        }${erpLoading || loadingPeople ? " · cargando…" : ""}`}
         actions={
           <>
             {(isIsapi || isArtemis) && (
-              <IgBtn variant="primary" onClick={startAlta}>
-                + Nueva persona
+              <IgBtn variant="primary" onClick={() => startAlta("unified")}>
+                + Alta unificada
               </IgBtn>
             )}
+            <IgBtn onClick={() => router.push("/erp/users")} title="Directorio IAM ERP">
+              Usuarios ERP
+            </IgBtn>
             <IgBtn onClick={() => router.push("/integra/events")} title="Timeline ACS con foto">
               Eventos Face
             </IgBtn>
@@ -702,7 +707,7 @@ export default function IntegraPeoplePage() {
                   : "Listado del espejo sincronizado"
               }
             >
-              {live ? "Live ACS ON" : "Espejo sync"}
+              {live ? "Live ACS ON" : "Espejo"}
             </IgBtn>
             {isIsapi && (
               <IgBtn
@@ -713,16 +718,22 @@ export default function IntegraPeoplePage() {
                 {syncing ? "Reconciliando…" : "Reconciliar"}
               </IgBtn>
             )}
-            <IgBtn onClick={() => void load()}>Actualizar</IgBtn>
+            <IgBtn
+              onClick={() => {
+                void load();
+                void loadErpDirectory();
+              }}
+            >
+              Actualizar
+            </IgBtn>
           </>
         }
       />
       <IgError>{error}</IgError>
       <p className={styles.personLead}>
-        <strong>Cambios en vivo a terminales.</strong> Alta, edición, Face ID y baja se empujan
-        al instante a todos los ACS. «Reconciliar» solo relee el inventario si el espejo se
-        desfasó — no es un paso obligatorio. Face ID vive en los terminales (DS-K1T), no en
-        cámaras de oficina.
+        Una persona = <strong>usuario ERP</strong> (rol + correo) + <strong>código ACS</strong>{" "}
+        (mismo nº de empleado) + <strong>foto Face ID</strong>. El alta unificada crea ambos;
+        «Vincular» enrola en terminales a alguien que ya está en ERP.
       </p>
 
       <IgFilters>
@@ -746,6 +757,8 @@ export default function IntegraPeoplePage() {
               style={selectStyle}
             >
               <option value="">Todas</option>
+              <option value="erp">En ERP</option>
+              <option value="noerp">Sin ERP</option>
               <option value="ok">Vigentes</option>
               <option value="warn">Por vencer</option>
               <option value="expired">Vencidas</option>
@@ -760,7 +773,7 @@ export default function IntegraPeoplePage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             style={inputStyle}
-            placeholder="nombre / código"
+            placeholder="nombre / código / rol / correo"
           />
         </IgField>
       </IgFilters>
