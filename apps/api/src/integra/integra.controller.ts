@@ -321,6 +321,29 @@ export class IntegraController {
     });
   }
 
+  @Post('cameras/:id/audio')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Enciende/apaga el micrófono del canal en el propio equipo' })
+  cameraAudio(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() body: { enabled?: boolean },
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    // Escribe en el equipo del cliente: mismo listón que abrir una puerta.
+    if (!integraCanControlDoors(user)) {
+      throw new BadRequestException('Sin permiso para cambiar la configuración del equipo');
+    }
+    return this.integra.setCameraAudio(
+      companyId,
+      id,
+      body?.enabled !== false,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
   @Post('cameras/:id/playback')
   @HttpCode(HttpStatus.OK)
   playback(
