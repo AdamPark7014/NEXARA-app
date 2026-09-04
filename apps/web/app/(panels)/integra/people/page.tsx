@@ -800,8 +800,15 @@ export default function IntegraPeoplePage() {
         left={
           <IgPanel title="Directorio" count={filtered.length} flush>
             <div className={styles.personDirectory}>
+              {loadingPeople && filtered.length === 0 && (
+                <div className={styles.personEmptyBox}>
+                  <strong>Cargando personas…</strong>
+                  <p>Espejo ACS y enlace ERP.</p>
+                </div>
+              )}
               {filtered.map((p) => {
                 const v = validityOf(p);
+                const erp = findErpForPerson(p, erpByKey);
                 const sel = selected?.id === p.id && mode === "ficha";
                 return (
                   <button
@@ -829,26 +836,46 @@ export default function IntegraPeoplePage() {
                       </div>
                       <div className={styles.personRowMeta}>
                         <span className={styles.personMono}>{p.code || p.id}</span>
-                        {(p.userType || p.orgName) && <span>{p.userType || p.orgName}</span>}
+                        {erp?.email && <span>{erp.email}</span>}
+                        {!erp && (p.userType || p.orgName) && <span>{p.userType || p.orgName}</span>}
                         {genderLabel(p.gender) && <span>{genderLabel(p.gender)}</span>}
                       </div>
-                      <IdentityStatusBadges person={p} erp={findErpForPerson(p, erpByKey)} />
+                      <IdentityStatusBadges person={p} erp={erp} />
                       {isIsapi && <CredChips person={p} />}
                     </div>
                   </button>
                 );
               })}
-              {filtered.length === 0 && (
+              {erpOnlyUsers.length > 0 && isIsapi && (
+                <div className={styles.personErpOnly}>
+                  <header>
+                    <strong>En ERP · sin terminales</strong>
+                    <span>{erpOnlyUsers.length}</span>
+                  </header>
+                  {erpOnlyUsers.slice(0, 12).map((u) => (
+                    <div key={u.id} className={styles.personErpOnlyRow}>
+                      <div>
+                        <strong>{u.nombre}</strong>
+                        <span>
+                          {u.employeeNumber || "sin nº"} · {u.role?.nombre || "sin rol"}
+                        </span>
+                      </div>
+                      <IgBtn onClick={() => startLinkFromErp(u)}>Enrolar ACS</IgBtn>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!loadingPeople && filtered.length === 0 && (
                 <div className={styles.personEmptyBox}>
                   <strong>Sin personas</strong>
                   <p>
                     {isArtemis
-                      ? "No hay coincidencias en el directorio. Prueba otro filtro o sincroniza el sitio."
-                      : "El espejo está vacío o el filtro no deja nada. Da de alta o reconciliá."}
+                      ? "No hay coincidencias en el directorio."
+                      : "El espejo está vacío o el filtro no deja nada. Da de alta unificada o reconciliá."}
                   </p>
                   {(isIsapi || isArtemis) && (
-                    <IgBtn variant="primary" onClick={startAlta}>
-                      + Nueva persona
+                    <IgBtn variant="primary" onClick={() => startAlta("unified")}>
+                      + Alta unificada
                     </IgBtn>
                   )}
                 </div>

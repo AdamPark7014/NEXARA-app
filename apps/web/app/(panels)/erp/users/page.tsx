@@ -1366,6 +1366,12 @@ export default function UsersPage() {
                     El backend asigna el siguiente libre del tenant. Ese código es el enlace con Integra / ACS.
                   </p>
                 )}
+                <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                  <strong style={{ fontWeight: 600 }}>Horario de acceso Integra:</strong> al crear o
+                  cambiar rol/activo se aplica la plantilla (oficina, 24/7, contratista, visitante Sala
+                  de Juntas o deshabilitado) al mismo Nº empleado en los terminales. El editor semanal
+                  completo está en Integra → Personas.
+                </p>
               </div>
               {modal === "edit" && (
                 <div style={{ gridColumn: "1 / -1" }}>
