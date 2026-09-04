@@ -1804,35 +1804,32 @@ export class IntegraArtemisService {
     };
   }
 
-  /** Propaga una operación a todos los terminales ACS del sitio. */
+  /** Propaga una operación a todos los terminales ACS del sitio (con reintento). */
   private async fanoutAcs(
+    companyId: number,
     siteId: number,
+    employeeNo: string,
+    op: string,
     isapiForHost: (ip: string) => import('../hikvision-isapi/index').HikvisionIsapiClient | null,
     fn: (client: import('../hikvision-isapi/index').HikvisionIsapiClient) => Promise<void>,
-  ): Promise<Array<{ deviceIp: string; ok: boolean; error?: string }>> {
-    const acs = await this.prisma.integraDevice.findMany({
-      where: { siteId, kind: 'ACS', ip: { not: null } },
-      select: { ip: true },
+    retry?: {
+      op: 'userUpsert' | 'userDisable' | 'userDelete' | 'faceUpload' | 'faceDelete';
+      user: UserInfoWrite;
+    },
+  ): Promise<Array<{ deviceIp: string; ok: boolean; error?: string; attempts?: number }>> {
+    const results = await this.acsFanout.fanout({
+      companyId,
+      siteId,
+      op,
+      employeeNo,
+      isapiForHost,
+      fn,
+      retry: retry
+        ? { companyId, siteId, op: retry.op, user: retry.user }
+        : undefined,
     });
-    if (acs.length === 0) throw new BadRequestException('Sin terminales ACS en el sitio');
-    const results: Array<{ deviceIp: string; ok: boolean; error?: string }> = [];
-    for (const d of acs) {
-      const ip = d.ip as string;
-      const client = isapiForHost(ip);
-      if (!client) {
-        results.push({ deviceIp: ip, ok: false, error: 'Sin cliente ISAPI' });
-        continue;
-      }
-      try {
-        await fn(client);
-        results.push({ deviceIp: ip, ok: true });
-      } catch (e) {
-        results.push({
-          deviceIp: ip,
-          ok: false,
-          error: e instanceof Error ? e.message : String(e),
-        });
-      }
+    if (results.length === 0) {
+      throw new BadRequestException('Sin terminales ACS en el sitio');
     }
     return results;
   }
