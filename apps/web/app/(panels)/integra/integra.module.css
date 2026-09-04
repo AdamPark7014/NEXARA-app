@@ -3690,3 +3690,390 @@ button.evCard {
   font-size: 13px;
   font-weight: 750;
 }
+
+/* ── Horarios de acceso (schedules) ─────────────────────────────── */
+
+.schedTabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  background: color-mix(in srgb, var(--ig-ink) 4%, var(--ig-panel));
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius);
+  margin-bottom: 4px;
+}
+
+.schedTab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ig-ink-soft);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  padding: 7px 12px;
+  border-radius: var(--ig-radius-sm);
+  cursor: pointer;
+}
+
+.schedTab:hover {
+  color: var(--ig-ink);
+  background: color-mix(in srgb, var(--ig-accent) 8%, transparent);
+}
+
+.schedTab[data-on="1"] {
+  background: var(--ig-panel);
+  color: var(--ig-ink);
+  box-shadow: var(--ig-elev-1);
+}
+
+.schedLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .schedLayout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.schedMain {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.schedSide {
+  position: sticky;
+  top: 8px;
+}
+
+.schedPresets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.schedPreset {
+  appearance: none;
+  text-align: left;
+  border: 1px solid var(--ig-line);
+  background: var(--ig-panel);
+  border-radius: var(--ig-radius);
+  padding: 10px 11px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 72px;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.schedPreset strong {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ig-ink);
+}
+
+.schedPreset span {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--ig-muted);
+}
+
+.schedPreset:hover {
+  border-color: color-mix(in srgb, var(--ig-accent) 45%, var(--ig-line));
+}
+
+.schedPreset[data-on="1"] {
+  border-color: color-mix(in srgb, var(--ig-accent) 65%, var(--ig-line));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ig-accent) 35%, transparent);
+  background: color-mix(in srgb, var(--ig-accent) 6%, var(--ig-panel));
+}
+
+.schedPreset[data-tone="ok"][data-on="1"] {
+  border-color: color-mix(in srgb, var(--ig-ok) 55%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-ok) 8%, var(--ig-panel));
+}
+
+.schedPreset[data-tone="warn"][data-on="1"] {
+  border-color: color-mix(in srgb, var(--ig-warn) 55%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-warn) 8%, var(--ig-panel));
+}
+
+.schedPreset[data-tone="danger"][data-on="1"] {
+  border-color: color-mix(in srgb, var(--ig-danger) 55%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-danger) 8%, var(--ig-panel));
+}
+
+.schedValidGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  align-items: end;
+}
+
+@media (max-width: 640px) {
+  .schedValidGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.schedDoorList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.schedDoorRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(140px, 220px) minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius);
+  background: color-mix(in srgb, var(--ig-ink) 1.5%, var(--ig-panel));
+}
+
+.schedDoorRow[data-on="1"] {
+  border-color: color-mix(in srgb, var(--ig-ok) 35%, var(--ig-line));
+}
+
+.schedDoorRow[data-active="1"] {
+  box-shadow: inset 3px 0 0 var(--ig-accent);
+}
+
+@media (max-width: 720px) {
+  .schedDoorRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.schedDoorName {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.schedDoorName strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ig-ink);
+}
+
+.schedDoorName span {
+  font-size: 11px;
+  font-family: var(--ig-font-mono);
+  color: var(--ig-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedWeekSummary {
+  font-size: 11.5px;
+  color: var(--ig-ink-soft);
+}
+
+.schedWeekMuted {
+  font-size: 11.5px;
+  color: var(--ig-muted);
+}
+
+.schedWeekGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.schedWeekRow {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+}
+
+.schedWeekDay {
+  font-weight: 700;
+  color: var(--ig-ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.schedWeekRanges {
+  color: var(--ig-ink);
+  font-family: var(--ig-font-mono);
+  font-size: 11.5px;
+}
+
+.schedWeekRanges[data-off="1"] {
+  color: var(--ig-muted);
+}
+
+.schedWeekEmpty {
+  font-size: 12.5px;
+  color: var(--ig-muted);
+  padding: 8px 0;
+}
+
+.schedSaveBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.schedOpList {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.schedOpList li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: var(--ig-radius-sm);
+  border: 1px solid var(--ig-line);
+}
+
+.schedOpList li[data-ok="1"] {
+  border-color: color-mix(in srgb, var(--ig-ok) 40%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-ok) 6%, var(--ig-panel));
+}
+
+.schedOpList li[data-ok="0"] {
+  border-color: color-mix(in srgb, var(--ig-danger) 40%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-danger) 6%, var(--ig-panel));
+}
+
+.schedOpIp {
+  font-family: var(--ig-font-mono);
+  font-size: 11.5px;
+  color: var(--ig-ink-soft);
+  min-width: 9ch;
+}
+
+.schedDoorPeople {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.schedDoorPeople > li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius);
+  align-items: center;
+}
+
+.schedDoorPeople > li strong {
+  display: block;
+  font-size: 13px;
+}
+
+.schedDoorPeopleRight {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.schedMeta {
+  font-size: 11.5px;
+  color: var(--ig-muted);
+}
+
+.schedMatrixWrap {
+  overflow: auto;
+  max-width: 100%;
+}
+
+.schedMatrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.schedMatrix th,
+.schedMatrix td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ig-line);
+  vertical-align: top;
+}
+
+.schedMatrix th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ig-muted);
+  font-weight: 650;
+}
+
+.schedAllDoors {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.schedAllDoorBtn {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--ig-line);
+  background: var(--ig-panel);
+  border-radius: var(--ig-radius);
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.schedAllDoorBtn strong {
+  font-size: 13px;
+  color: var(--ig-ink);
+}
+
+.schedAllDoorBtn span {
+  font-size: 11px;
+  font-family: var(--ig-font-mono);
+  color: var(--ig-muted);
+}
+
+.schedAllDoorBtn[data-on="1"],
+.schedAllDoorBtn:hover {
+  border-color: color-mix(in srgb, var(--ig-accent) 45%, var(--ig-line));
+}
