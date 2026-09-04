@@ -250,6 +250,35 @@ export default function ActivityDetailPage() {
               <DetailField label="Creador" value={activity.creador?.nombre} />
               <DetailField label="Asignación" value={formatDateTime(activity.fechaAsignacion)} />
               <DetailField label="Inicio" value={formatDateTime(activity.fechaInicio)} />
+              {activity.acsEnteredAt && (
+                <DetailField
+                  label="ACS"
+                  value={
+                    <span style={{ color: "var(--success, #15803d)", fontWeight: 600 }}>
+                      {(() => {
+                        try {
+                          const hhmm = new Intl.DateTimeFormat("es-MX", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: false,
+                            timeZone: "America/Mexico_City",
+                          }).format(new Date(activity.acsEnteredAt));
+                          const who = activity.acsEnteredByUser?.nombre
+                            ? ` · ${activity.acsEnteredByUser.nombre}`
+                            : "";
+                          const door = activity.acsEntryDoor ? ` (${activity.acsEntryDoor})` : "";
+                          return `Entró por ACS a las ${hhmm}${who}${door}`;
+                        } catch {
+                          return "Entró por ACS";
+                        }
+                      })()}
+                      {activity.acsLeftSite && activity.acsExitedAt
+                        ? ` · Salió ${formatDateTime(activity.acsExitedAt)}`
+                        : ""}
+                    </span>
+                  }
+                />
+              )}
               <DetailField label="Entrega esperada" value={formatDate(activity.fechaEntregaEsperada)} />
               <DetailField label="Finalización" value={formatDateTime(activity.fechaFinalizacion)} />
             </DetailFieldGrid>

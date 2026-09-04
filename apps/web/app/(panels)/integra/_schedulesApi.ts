@@ -107,6 +107,8 @@ export type SchedulesCatalog = {
 export type AccessPresetId =
   | "indefinite_247"
   | "office_hours"
+  | "after_hours"
+  | "weekend"
   | "meeting_only"
   | "contractor"
   | "visit_1day"
@@ -122,6 +124,8 @@ export type AccessPreset = {
     | "always"
     | "never"
     | "office_hours"
+    | "after_hours"
+    | "weekend"
     | "visitor_today"
     | "contractor";
 };
@@ -142,6 +146,20 @@ export const ACCESS_PRESETS: AccessPreset[] = [
     apiPreset: "office_hours",
   },
   {
+    id: "after_hours",
+    title: "Fuera de horario",
+    blurb: "Lun–Vie 18:00–08:00 (2 franjas / medianoche)",
+    tone: "warn",
+    apiPreset: "after_hours",
+  },
+  {
+    id: "weekend",
+    title: "Solo fin de semana",
+    blurb: "Sábado y domingo todo el día",
+    tone: "accent",
+    apiPreset: "weekend",
+  },
+  {
     id: "meeting_only",
     title: "Solo sala juntas",
     blurb: "Acceso a Sala de Juntas; resto deshabilitado",
@@ -157,7 +175,7 @@ export const ACCESS_PRESETS: AccessPreset[] = [
   {
     id: "visit_1day",
     title: "Visita 1 día",
-    blurb: "Solo hoy · pase de visitante",
+    blurb: "Solo hoy · pase de visitante (hora México)",
     tone: "warn",
     apiPreset: "visitor_today",
   },
@@ -173,8 +191,9 @@ export const ACCESS_PRESETS: AccessPreset[] = [
 export const FALLBACK_TEMPLATES: ScheduleTemplate[] = [
   { id: "1", name: "24/7 todo el día", weekPlanNo: 1, summary: "Todos los días 00:00–24:00" },
   { id: "2", name: "Horario oficina", weekPlanNo: 2, summary: "Lun–Vie 08:00–18:00" },
-  { id: "3", name: "Fuera de horario", weekPlanNo: 3, summary: "Lun–Vie noches / reducido" },
-  { id: "4", name: "Fin de semana", weekPlanNo: 4, summary: "Sáb–Dom" },
+  { id: "3", name: "Diurno restringido", weekPlanNo: 3, summary: "Lun–Vie 08:00–20:00" },
+  { id: "4", name: "Fuera de horario", weekPlanNo: 4, summary: "Lun–Vie 18:00–08:00 (2 franjas)" },
+  { id: "5", name: "Fin de semana", weekPlanNo: 5, summary: "Sáb–Dom 00:00–24:00" },
   { id: "0", name: "Sin acceso", weekPlanNo: 0, summary: "No abre esta puerta" },
 ];
 
@@ -541,6 +560,26 @@ export function applyPreset(
         validTo: ISAPI_INDEFINITE_END,
         indefinite: true,
         doorPlans: allWith("2"),
+      };
+    case "after_hours":
+      return {
+        ...current,
+        validEnable: true,
+        validMode: "indefinite",
+        validFrom: ISAPI_DEFAULT_BEGIN,
+        validTo: ISAPI_INDEFINITE_END,
+        indefinite: true,
+        doorPlans: allWith("4"),
+      };
+    case "weekend":
+      return {
+        ...current,
+        validEnable: true,
+        validMode: "indefinite",
+        validFrom: ISAPI_DEFAULT_BEGIN,
+        validTo: ISAPI_INDEFINITE_END,
+        indefinite: true,
+        doorPlans: allWith("5"),
       };
     case "meeting_only": {
       const targetIp = meeting?.deviceIp;
