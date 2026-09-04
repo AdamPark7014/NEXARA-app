@@ -622,6 +622,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/integra/push/stream', methods: ['GET'], scope: 'read' },
     { path: '/api/integra/attendance', methods: ['GET'], scope: 'read' },
     { path: '/api/integra/occupancy', methods: ['GET'], scope: 'read' },
+    { path: '/api/integra/presence/**', methods: ['GET'], scope: 'read' },
     { path: '/api/integra/orgs', methods: ['GET'], scope: 'read' },
     { path: '/api/integra/people', methods: ['GET'], scope: 'read' },
     { path: '/api/integra/schedules', methods: ['GET'], scope: 'read' },

@@ -175,6 +175,14 @@ Límites verificados en Oficinas NEXARA (`192.168.9.34`):
 - El muro sigue en vivo; solo el foco cambia a playback.
 - Sin segmentos: la API devuelve `url: null` y nota clara (no inventa video).
 
+**Horarios de acceso (verificado Oficinas DS-K1T .160–.163):** tres capas —
+`UserRightWeekPlanCfg` → `UserRightPlanTemplate` → `UserInfo.RightPlan.planTemplateNo`,
+más `UserInfo.Valid` (enable / beginTime / endTime). API NEXARA:
+`GET /integra/access-schedules`, `PATCH /integra/people/:id/access` (presets
+always / never / office_hours / after_hours / weekend / visitor_today /
+contractor; `doorPlans[]` por IP). Socket `integra:access-updated` al cambiar.
+No inventar endpoints: Holidays también responden GET pero la UI puede omitirlos.
+
 Personas ISAPI: CRUD UserInfo + FaceDataRecord. El delete es idempotente
 (face → `UserInfoDetail/Delete` → `DeleteProcess` → reintento → listado
 UserInfo autoritativo). El espejo solo se limpia si **todos** los ACS OK.

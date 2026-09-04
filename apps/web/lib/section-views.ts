@@ -499,6 +499,10 @@ export function adaptModulePresentation(
       v2 === ROLES.CLIENTE
         ? { label: 'Horarios', description: 'Cuándo pueden entrar y a qué puertas' }
         : { label: 'Horarios', description: 'Vigencia, presets y plan por puerta' },
+    'integra-espacios':
+      v2 === ROLES.CLIENTE
+        ? { label: 'Espacios', description: 'Uso de salas y quién entra a cada puerta' }
+        : { label: 'Espacios', description: 'Indefinido vs temporal · uso planificado · vivo' },
     'integra-events':
       v2 === ROLES.CLIENTE
         ? { label: 'Actividad', description: 'Entradas y salidas con foto' }
