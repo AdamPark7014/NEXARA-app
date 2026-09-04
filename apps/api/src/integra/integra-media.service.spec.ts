@@ -159,7 +159,7 @@ describe('IntegraMediaService', () => {
       expect(out.segments).toHaveLength(2);
       expect(out.hls).toContain('stream.m3u8');
       expect(fetchMock).toHaveBeenCalledWith(
-        'http://go2rtc.test/api/streams',
+        expect.stringContaining('/api/streams?name='),
         expect.objectContaining({ method: 'PUT' }),
       );
       fetchMock.mockRestore();

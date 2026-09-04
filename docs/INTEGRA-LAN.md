@@ -163,7 +163,8 @@ Vehículos/ANPR (sin ITC), visitas y **playback Artemis** responden 400 en un
 sitio ISAPI. El playback **local del NVR** sí está soportado vía
 `POST /ISAPI/ContentMgmt/search` (**cuerpo XML** — el DS-7616 rechaza JSON con
 `badXmlFormat`) → RTSP `playbackURI` (`/Streaming/tracks/{trackID}/?starttime…`)
-→ go2rtc (registro JSON; el PUT `?src=` falla si la URI lleva query) → MSE en el
+→ go2rtc (`PUT /api/streams?name=&src=`, aunque el YAML del disco a veces
+responda 400 el stream queda en memoria) → MSE en el
 foco (`POST /integra/cameras/:id/playback`).
 
 Límites verificados en Oficinas NEXARA (`192.168.9.34`):
