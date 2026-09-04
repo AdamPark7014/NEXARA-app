@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import PageHeader from "@/components/ui/PageHeader";
+import PageChrome from "@/components/ui/PageChrome";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
@@ -14,6 +14,7 @@ import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog"
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import chrome from "@/components/erp/erp-chrome.module.css";
 
 interface DocCategory { id: number; name: string }
 interface ManagedDoc {

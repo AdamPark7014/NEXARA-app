@@ -14,6 +14,7 @@ export class AttendanceController {
   constructor(
     private readonly attendanceService: AttendanceService,
     private readonly hybridService: AttendanceHybridService,
+    private readonly excelExport: ExcelExportService,
   ) {}
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
