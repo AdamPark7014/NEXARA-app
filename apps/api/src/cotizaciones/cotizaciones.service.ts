@@ -774,6 +774,11 @@ export class CotizacionesService {
       lineTotal: Number(item.lineTotal),
     }));
 
+    let company = quote.company;
+    if (!company && quote.companyId) {
+      company = await this.db.companyProfile.findUnique({ where: { id: quote.companyId } });
+    }
+
     return generateCotizacionPdf(
       {
       quoteNumber: quote.quoteNumber,
@@ -800,6 +805,18 @@ export class CotizacionesService {
       iepsTotal: Number(quote.iepsTotal || 0),
       retentionTotal: Number(quote.retentionTotal || 0),
       total: Number(quote.total),
+      company: company
+        ? {
+            legalName: company.legalName || 'NEXARA',
+            tradeName: company.tradeName,
+            rfc: company.rfc,
+            fiscalAddress: company.fiscalAddress,
+            fiscalPostalCode: company.fiscalPostalCode,
+            contactEmail: company.contactEmail,
+            contactPhone: company.contactPhone,
+            websiteUrl: company.websiteUrl,
+          }
+        : null,
       items,
     },
     { internal },
