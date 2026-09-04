@@ -180,6 +180,7 @@ export class IntegraController {
     private readonly serviceClients: ServiceClientsService,
     private readonly push: IntegraPushService,
     private readonly acsFanout: IntegraAcsFanoutService,
+    private readonly identity: IdentityLinkService,
   ) {}
 
   @Get('health')
@@ -590,6 +591,30 @@ export class IntegraController {
     return this.integra.listOrgs(companyId, siteId ? parseInt(siteId, 10) : null);
   }
 
+  @Get('identity/me')
+  @ApiOperation({
+    summary: 'Identidad ERP↔ACS del usuario en sesión (portal empleado)',
+  })
+  myIdentity(
+    @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
+  ) {
+    return this.identity.getMyIdentity(user?.id, companyId);
+  }
+
+  @Get('identity/candidates')
+  @ApiOperation({ summary: 'Usuarios ERP candidatos para vincular a una persona ACS' })
+  identityCandidates(
+    @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
+    @Query('q') q?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para vincular identidades');
+    }
+    return this.identity.listCandidates(companyId, q);
+  }
+
   @Get('people')
   people(
     @CurrentCompanyId() companyId: number | null,
@@ -610,6 +635,36 @@ export class IntegraController {
     @Query('siteId') siteId?: string,
   ) {
     return this.integra.getPerson(companyId, id, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  @Post('people/:id/link')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Vincular persona ACS → usuario ERP (employeeNumber = personId)',
+  })
+  linkPerson(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() dto: LinkPersonDto,
+    @CurrentUser() user: any,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para vincular identidades');
+    }
+    return this.identity.linkPersonToUser(companyId, id, dto.userId);
+  }
+
+  @Delete('people/:id/link')
+  @ApiOperation({ summary: 'Desvincular persona ACS del usuario ERP' })
+  unlinkPerson(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para desvincular identidades');
+    }
+    return this.identity.unlinkPerson(companyId, id);
   }
 
   @Get('people/:id/face')

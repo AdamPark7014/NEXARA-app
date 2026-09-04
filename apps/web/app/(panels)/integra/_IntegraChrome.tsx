@@ -162,9 +162,9 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
       await refreshHealth();
       await refreshCaps();
       setTick((t) => t + 1);
-      toast.success("Inventario sincronizado");
+      toast.success("Espejo reconciliado (inventario)");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo sincronizar el sitio");
+      toast.error(e instanceof Error ? e.message : "No se pudo reconciliar el sitio");
     } finally {
       setSyncing(false);
     }
@@ -282,8 +282,9 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
               loading={syncing}
               disabled={syncing}
               onClick={() => void syncNow()}
+              title="Reconciliar espejo desde equipos (recuperación). Los cambios de personas ya van en vivo."
             >
-              {syncing ? "Sincronizando…" : "Sincronizar"}
+              {syncing ? "Reconciliando…" : "Reconciliar"}
             </Button>
           )}
         </div>
