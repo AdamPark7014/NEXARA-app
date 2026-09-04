@@ -377,7 +377,7 @@ export default function HybridAttendancePanel({
           }
           density="compact"
           emptyTitle="Sin señales ese día"
-          emptyDescription="No hay fichajes ERP ni accesos ACS para contrastar."
+          emptyDescription="No hay fichajes ERP ni accesos ACS para contrastar. Prueba otra fecha o verifica el vínculo de nº empleado."
         />
       )}
     </Section>
