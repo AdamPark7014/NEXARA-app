@@ -8,51 +8,38 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Identidad unificada ERP ↔ ACS
+## Este turno — ACS fan-out en vivo + identidad employeeNumber
 
-**Una persona = un código.** Sin Face ID inventado ni sync biométrico manual.
+Adam: cambios ACS en tiempo real (sin Sync obligatorio).
+Clave canónica (sibling identity): `employeeNumber` = ACS `employeeNo`/`personId`.
 
-### Clave canónica
+### Qué dispara el push en vivo
 
-`User.employeeNumber` (y `UserCompany.employeeNumber` del tenant)
-**=** `IntegraPerson.personId` (ACS `employeeNo` / `employeeNoString` del push).
+1. Integra Personas: alta/editar/Face/baja → UserInfo + FaceDataRecord a todos los ACS.
+2. ERP Usuarios: create/update nombre·employeeNumber / HR isActive / bulk → push ISAPI.
+3. RightPlan/doorRight en PATCH de persona.
+4. Push ACS: personName al espejo sin sync full.
 
-Roles viven en ERP (`User.role` / `roleKey`). Actividades y asistencia híbrida
-ya usan `User`; con el mismo código resuelven al mismo humano en puertas ACS.
+### Código
 
-### Qué cambió
+- `IntegraAcsFanoutService` + cola `integra.acs.fanout.retry` + `GET integra/acs-fanout/status`.
+- Espejo upsert inmediato; Sync UI → «Reconciliar».
+- Copy: «Cambios en vivo a terminales».
 
-1. **API** `IdentityLinkService` + `IdentityModule`:
-   - `GET integra/identity/me` — portal empleado (estado vínculo + persona ACS)
-   - `GET integra/identity/candidates` — candidatos ERP
-   - `POST/DELETE integra/people/:id/link` — vincular / desvincular
-   - `listPeople` / `getPerson` enriquecen con `erpUser` (nombre, rol, email)
-2. **Users**: `normalizeEmployeeNumber` ya no convierte dígitos a `NXR25SYS###`
-   (los códigos ACS literales se conservan). Auto-NXR solo si el campo viene vacío.
-3. **UI Personas**: badges En ERP / rol; ficha con Vincular / Desvincular;
-   alta unificada llama `…/link` para fijar la clave canónica.
-4. **Portal empleado** (`/erp/my-profile`): nº empleado ACS, estado Integra,
-   checador ERP vs pases ACS del día (híbrido self).
-
-Push en vivo a terminales = sibling. Este turno = modelo DB/API + enlace UI.
-
-SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` → `./deploy/update.sh`
+SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` → `./deploy/update.sh`
 
 ### Verificar
 
-1. Personas → ficha: Vincular usuario ERP → badge «En ERP» + rol.
-2. Misma persona: Desvincular → código limpio en User; terminal intacto.
-3. Mi perfil: estado Integra + pases/checador de hoy.
-4. Asistencia híbrida ERP: filas `linked` cuando códigos coinciden.
+1. Personas alta/editar/foto → OK por IP sin Reconciliar.
+2. ERP create con employeeNumber → ACS.
+3. Desactivar HR → Valid.enable=false.
+4. Fallo IP → no success silencioso; retry/status.
 
 ## A medias
 
-1. ANPR ITC · micros · TCPMSS · NVR httpHost.
-2. FieldDetection re-wire si cambia PUBLIC_API_URL.
-3. CaptureFaceData en sensor (si firmware Oficinas lo expone).
+1. Portal empleado · ANPR · micros · TCPMSS.
+2. CaptureFaceData sensor; httpHosts re-wire.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales.
-**No** Face ID óptico inventado sobre AcuSense/RTSP.
+Puente NAS, Traefik, credenciales. No Face ID óptico inventado.

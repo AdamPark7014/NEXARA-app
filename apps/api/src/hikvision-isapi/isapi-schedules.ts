@@ -471,4 +471,7 @@ export const ACCESS_SCHEDULE_MODEL_ES = {
     never: 'Valid.enable=false',
     perDoor: 'RightPlan por doorNo; entre terminales, Modify distinto por IP',
     contractor: 'Valid endTime cercano',
-    visi
+    visitorDayPass: 'Valid del día + plantilla deseada',
+    afterHoursOrWeekend: 'Preset week plan en slot ≥2 + asignar plantilla',
+  },
+} as const;
