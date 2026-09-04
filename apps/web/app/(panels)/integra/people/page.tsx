@@ -540,10 +540,10 @@ export default function IntegraPeoplePage() {
                   <strong>Sin personas</strong>
                   <p>
                     {isArtemis
-                      ? "No hay coincidencias en el directorio."
+                      ? "No hay coincidencias en el directorio. Prueba otro filtro o sincroniza el sitio."
                       : "El espejo está vacío o el filtro no deja nada. Sincroniza o da de alta."}
                   </p>
-                  {isIsapi && (
+                  {(isIsapi || isArtemis) && (
                     <IgBtn variant="primary" onClick={startAlta}>
                       + Nueva persona
                     </IgBtn>

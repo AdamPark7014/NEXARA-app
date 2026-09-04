@@ -565,6 +565,13 @@
   border-left-color: var(--ig-warn);
 }
 
+.igNotice[data-tone="ok"] {
+  color: var(--ig-ok);
+  background: color-mix(in srgb, var(--ig-ok) 8%, var(--ig-panel));
+  border-color: color-mix(in srgb, var(--ig-ok) 28%, var(--ig-line));
+  border-left-color: var(--ig-ok);
+}
+
 @media (max-width: 720px) {
   .hud {
     grid-template-columns: 1fr;

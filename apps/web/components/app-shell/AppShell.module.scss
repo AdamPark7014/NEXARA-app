@@ -465,9 +465,10 @@
 /* ERP / OPS: misma densidad profesional que Integra (sin glow de marketing) */
 .shell[data-panel="erp"] .menuItem,
 .shell[data-panel="ops"] .menuItem {
-  padding: 7px 10px;
-  border-radius: 8px;
-  gap: 10px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  gap: 9px;
+  font-size: 12.5px;
 }
 
 .shell[data-panel="erp"] .menuItem.active,
@@ -484,13 +485,23 @@
 
 .shell[data-panel="erp"] .groupTitle,
 .shell[data-panel="ops"] .groupTitle {
-  letter-spacing: 0.1em;
-  padding: 2px 12px 6px;
+  letter-spacing: 0.08em;
+  padding: 2px 10px 5px;
 }
 
 .shell[data-panel="erp"] .main,
 .shell[data-panel="ops"] .main {
-  padding: 22px 28px 56px;
+  padding: 16px 22px 48px;
+}
+
+.shell[data-panel="erp"]::before,
+.shell[data-panel="ops"]::before {
+  opacity: 0.28;
+}
+
+body.dark .shell[data-panel="erp"]::before,
+body.dark .shell[data-panel="ops"]::before {
+  opacity: 0.18;
 }
 
 .menuItemLabel {
