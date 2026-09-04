@@ -632,7 +632,14 @@ export default function AttendancePage() {
       {viewMode === "register" && <WeeklyBar token={token} />}
 
       {(viewMode === "manage" || viewMode === "manage_register") && (
-        <TeamAttendanceView token={token} dateFilter={dateFilter} visibilityHint={attCfg.visibilityHint} highlightId={highlightId} />
+        <>
+          <TeamAttendanceView token={token} dateFilter={dateFilter} visibilityHint={attCfg.visibilityHint} highlightId={highlightId} />
+          <HybridAttendancePanel token={token} date={dateFilter} />
+        </>
+      )}
+
+      {viewMode === "register" && token && (
+        <HybridAttendancePanel token={token} date={new Date().toLocaleDateString("sv-SE")} />
       )}
     </>
   );
