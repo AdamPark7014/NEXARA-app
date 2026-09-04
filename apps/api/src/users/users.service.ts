@@ -316,6 +316,15 @@ export class UsersService {
     } else if (body.isActive === true) {
       await this.chat.addUserToOrgChannels(id);
     }
+    if (body.isActive !== undefined || body.puesto !== undefined) {
+      const acsPush = await this.pushAcsFromErp({
+        companyId,
+        employeeNumber: updated.employeeNumber,
+        name: updated.nombre,
+        enable: updated.isActive !== false,
+      });
+      return acsPush ? { ...updated, acsPush } : updated;
+    }
     return updated;
   }
 
@@ -940,6 +949,10 @@ export class UsersService {
     }
 
     try {
+      const before = await this.prisma['user'].findUnique({
+        where: { id },
+        select: { nombre: true, employeeNumber: true, isActive: true },
+      });
       const user = await this.prisma['user'].update({
         where: { id },
         data,
@@ -953,7 +966,27 @@ export class UsersService {
         });
       }
 
-      return this.withEmployeeNumber(user);
+      const enriched = this.withEmployeeNumber(user);
+      const shouldPushAcs =
+        updateUserDto.nombre !== undefined ||
+        updateUserDto.employeeNumber !== undefined ||
+        updateUserDto.isActive !== undefined ||
+        (before &&
+          (before.nombre !== user.nombre ||
+            before.employeeNumber !== user.employeeNumber ||
+            before.isActive !== user.isActive));
+
+      if (shouldPushAcs) {
+        const acsPush = await this.pushAcsFromErp({
+          companyId,
+          employeeNumber: enriched.employeeNumber,
+          name: enriched.nombre,
+          enable: enriched.isActive !== false,
+        });
+        return acsPush ? { ...enriched, acsPush } : enriched;
+      }
+
+      return enriched;
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError) {
         const mapped = this.mapUserUniqueConstraintError(e);

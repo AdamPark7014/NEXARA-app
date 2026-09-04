@@ -8,40 +8,55 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Asistencia híbrida Integra ↔ ERP (desplegado)
+## Este turno — AcuSense al límite (Field/Line/Face/Motion + push)
 
-**ACS = puertas** (eventos push). **ERP = checador / nómina**. Contraste
-read-only: no inventa fichajes ni biometría.
+Adam: maximizar cajas y tasa de eventos en cámaras LAN `.171–.178`
+(DS-2CD2123G2-LIS2U). Sin Face ID óptico inventado.
 
-### Entregado
+### Qué cambió (código)
 
-1. **API** `GET /api/attendance/hybrid?date=YYYY-MM-DD`
-   - Match `employeeNumber` / `UserCompany.employeeNumber` ↔ `personId` / `personCode`
-   - Estados `linked` | `erp_only` | `acs_only` + flags (desfase, sin salida…)
-2. **UI** `/erp/hr/attendance` — panel **Híbrido Integra ↔ ERP** + rail RRHH
-3. **UI** `/integra/attendance` — badge/link ERP si hay match
-4. Commit UI/copy `5801d73`; build+deploy `--force-all` con hybrid en
-   `dist/attendance/attendance-hybrid*.js` y `HybridAttendancePanel.tsx`
+1. **`enableMaxSmartDetection`** (hikvision-isapi): FieldDetection todas las
+   regiones, polígono full-frame, `sensitivityLevel=100`, `timeThreshold=0`,
+   `alarmConfidence=low`, `detectionTarget=human` (Almacén → `human,vehicle`).
+2. **Bugfix**: el tag real es `sensitivityLevel` (antes se escribía
+   `sensitivity` y el firmware lo ignoraba — regiones seguían a 50 / off).
+3. **LineDetection** línea horizontal mid-frame; **FaceDetect** (cajas, no ID);
+   **Motion** sens. 80; **substream H.264** confirmado; audio ON si hay mic.
+4. **`ensureSmartEventTriggersCenter`**: field/line/face/VMD → `center`
+   (httpHosts). `uploadImagesDataType=binary` + `httpBroken=false`.
+5. **`wireDevices(detection)`** usa `enableMaxSmartDetection` en AcuSense;
+   NVR PoE vehicle y PTZ motion intactos (sibling PTZ/NVR).
+6. Parser: `facedetection` usa `FaceRect` de la raíz del alert.
+7. Docs `INTEGRA-LAN.md` rutas Smart verificadas en vivo contra .178.
 
-### Cómo usarlo (Adam)
+### Probe real (prod → NAS → cámaras)
 
-1. Mismo código en ficha RRHH y en `employeeNo` del terminal.
-2. **ERP → Asistencia** (rail «Asistencia · híbrido»): checador + contraste.
-3. Alertas = contraste. **Nómina solo del checador app.**
+- SmartCap: Field+Line+FaceDetect true; IntrusionDetection 404; Parking false.
+- Antes del wire: regiones FieldDetection **disabled**; httpHosts sin binary.
+- Substream ya H.264 640×360; audio true en AcuSense.
 
-### Concurrente (siblings — no pisar)
+SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
+`/var/www/nexara-app` → `./deploy/update.sh --force-all`
 
-Integra Eventos ACS UI · identity-link WIP · CRM · stock · PTZ · Personas · OC PDF.
+### Verificar
 
-SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109`
+1. Tras deploy: wire site 1 con `detection:true`.
+2. GET FieldDetection/1 en .178 → 4 regiones enabled, sens 100, poly full.
+3. httpHosts/1 → `uploadImagesDataType=binary`.
+4. Eventos fielddetection↑; Meeting Room multi-caja sticky.
+
+## Concurrente (siblings — no pisar)
+
+Asistencia híbrida ERP↔Integra (desplegada) · CRM · stock · Personas ACS ·
+identity-link WIP · Eventos UI.
 
 ## A medias
 
-1. Portal empleado · alinear códigos Oficinas employeeNumber↔personId.
-2. `identity-link` / `identity._wip_sibling` (rescate) — no cableado a AppModule.
-3. httpHost NVR · ANPR · FieldDetection re-apply.
+1. Portal empleado · ANPR ITC · micros · TCPMSS.
+2. Confirmar wire+event rate en prod tras este deploy.
+3. Alinear employeeNumber↔personId Oficinas (asistencia).
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales, ISAPI no verificada.
-Face ID óptico inventado. No CRM / stock / PTZ / Eventos ACS del sibling.
+Puente NAS, Traefik, credenciales, Face ID inventado sobre AcuSense.
+CRM/stock/asistencia siblings.
