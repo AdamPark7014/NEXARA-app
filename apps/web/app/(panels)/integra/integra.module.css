@@ -2652,22 +2652,39 @@ select.igControl {
   left: -2px;
   margin-bottom: 2px;
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
-  max-width: min(220px, 70vw);
-  padding: 2px 6px;
-  border-radius: 2px;
-  background: rgb(4 18 26 / 0.88);
+  max-width: min(240px, 72vw);
+  padding: 2px 6px 2px 2px;
+  border-radius: 3px;
+  background: rgb(4 18 26 / 0.9);
   color: #e8f7ff;
   border: 1px solid color-mix(in srgb, var(--ig-accent, #22d3ee) 70%, #fff);
   font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 650;
   letter-spacing: 0.02em;
-  line-height: 1.35;
+  line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  z-index: 2;
+}
+
+.detTag[data-inside="1"] {
+  bottom: auto;
+  top: 2px;
+  left: 2px;
+  margin-bottom: 0;
+}
+
+.detTagFace {
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: rgb(255 255 255 / 0.1);
 }
 
 .detTag[data-named="1"] {
@@ -2715,28 +2732,40 @@ select.igControl {
 .liveAccessBanner {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   margin: 0 0 10px;
-  padding: 8px 12px;
-  border-radius: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
   border: 1px solid color-mix(in srgb, #22d3ee 55%, transparent);
-  background: linear-gradient(90deg, rgb(2 28 36 / 0.92), rgb(8 40 52 / 0.88));
+  background: linear-gradient(90deg, rgb(2 28 36 / 0.94), rgb(8 40 52 / 0.9));
   color: #e8f7ff;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
-  animation: liveAccessIn 280ms ease-out;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.22);
+  animation: liveAccessIn 220ms ease-out;
+}
+
+.liveAccessBanner[data-fresh="1"] {
+  border-color: #67e8f9;
+  box-shadow: 0 0 0 1px rgb(103 232 249 / 0.35), 0 12px 32px rgb(0 0 0 / 0.28);
 }
 
 .liveAccessPhoto {
-  width: 40px;
-  height: 40px;
-  border-radius: 6px;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
   overflow: hidden;
   flex-shrink: 0;
   background: rgb(255 255 255 / 0.08);
   display: grid;
   place-items: center;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 22px;
+}
+
+.liveAccessPhoto[data-size="lg"],
+.liveAccessPhoto[data-size="xl"] {
+  width: 72px;
+  height: 72px;
+  font-size: 26px;
 }
 
 .liveAccessPhoto img {
@@ -2756,15 +2785,25 @@ select.igControl {
   min-width: 0;
 }
 
-.liveAccessBody strong {
-  font-size: 14px;
+.liveAccessEyebrow {
+  font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #67e8f9;
+  opacity: 0.9;
+}
+
+.liveAccessBody strong {
+  font-size: 17px;
+  font-weight: 750;
   letter-spacing: 0.01em;
+  line-height: 1.2;
 }
 
 .liveAccessBody span {
-  font-size: 11px;
-  opacity: 0.78;
+  font-size: 12px;
+  opacity: 0.8;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2878,24 +2917,42 @@ select.igControl {
   overflow: auto;
 }
 
-.accessStripRow {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-}
-
 .accessStripPhoto {
-  width: 36px;
-  height: 36px;
-  border-radius: 6px;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
   overflow: hidden;
   background: color-mix(in srgb, var(--ig-accent) 12%, var(--ig-panel));
   display: grid;
   place-items: center;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--ig-muted);
+}
+
+.accessStripPhoto[data-size="md"] {
+  width: 52px;
+  height: 52px;
+}
+
+.accessStripPhoto[data-size="lg"],
+.accessStripPhoto[data-size="xl"] {
+  width: 64px;
+  height: 64px;
+  font-size: 20px;
+}
+
+.accessStripRow {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.accessStripRow[data-fresh="1"] {
+  background: color-mix(in srgb, var(--ig-accent) 10%, transparent);
 }
 
 .accessStripPhoto img {
@@ -3233,4 +3290,348 @@ select.igControl {
   font-size: 12.5px;
   font-weight: 650;
   letter-spacing: 0.02em;
+}
+
+/* Personas: wizard alta + danger zone + preview */
+.personWizard {
+  display: flex;
+  gap: 6px;
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  flex-wrap: wrap;
+}
+
+.personWizard li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ig-muted);
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--ig-line);
+  background: var(--ig-panel);
+}
+
+.personWizard li span {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--ig-muted) 14%, transparent);
+}
+
+.personWizard li[data-on="1"] {
+  color: var(--ig-ink);
+  border-color: color-mix(in srgb, var(--ig-accent) 40%, var(--ig-line));
+}
+
+.personWizard li[data-current="1"] {
+  background: color-mix(in srgb, var(--ig-accent) 10%, var(--ig-panel));
+  border-color: color-mix(in srgb, var(--ig-accent) 55%, var(--ig-line));
+  font-weight: 650;
+}
+
+.personWizard li[data-on="1"] span {
+  background: var(--ig-accent);
+  color: #fff;
+}
+
+.personAltaPreview {
+  width: 140px;
+  height: 140px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--ig-line);
+  background: var(--ig-surface);
+}
+
+.personAltaPreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.personDangerZone {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 2px solid color-mix(in srgb, var(--ig-danger) 55%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-danger) 9%, var(--ig-panel));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ig-danger) 18%, transparent);
+}
+
+.personDangerZone .personSectionHead strong {
+  color: var(--ig-danger);
+  font-size: 14px;
+}
+
+/* Eventos: cards con cara */
+.eventTimeline {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  max-height: min(68vh, 720px);
+  overflow: auto;
+}
+
+.eventCard {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--ig-line);
+  background: var(--ig-panel);
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.eventCard:hover {
+  border-color: color-mix(in srgb, var(--ig-accent) 35%, var(--ig-line));
+}
+
+.eventCard[data-selected="1"] {
+  border-color: color-mix(in srgb, var(--ig-accent) 55%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-accent) 8%, var(--ig-panel));
+  box-shadow: inset 2px 0 0 var(--ig-accent);
+}
+
+.eventCardFace,
+.eventIdentityFace {
+  border-radius: 8px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ig-accent) 10%, var(--ig-panel));
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: var(--ig-accent-deep);
+  flex-shrink: 0;
+}
+
+.eventCardFace {
+  width: 48px;
+  height: 48px;
+  font-size: 16px;
+}
+
+.eventCardFace img,
+.eventIdentityFace img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.eventCardFace[data-empty="1"],
+.eventIdentityFace[data-empty="1"] {
+  border: 1px solid var(--ig-line);
+}
+
+.eventCardBody {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.eventCardBody strong {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eventCardMeta {
+  font-size: 11px;
+  color: var(--ig-muted);
+}
+
+.eventIdentity {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.eventIdentity h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-family: var(--ig-font-display);
+}
+
+.eventIdentityFace {
+  width: 160px;
+  height: 160px;
+  font-size: 42px;
+  border-radius: 12px;
+}
+
+.eventCapture {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.eventCapture span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ig-muted);
+}
+
+.eventCapture img {
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--ig-line);
+}
+
+.accessStripRow[data-fresh="1"] {
+  background: color-mix(in srgb, var(--ig-accent) 8%, transparent);
+}
+
+/* ── Eventos ACS: tarjetas de identidad ─────────────────────────────── */
+.evGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.evCard {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  text-align: left;
+  padding: 12px;
+  border: 1px solid var(--ig-line);
+  border-radius: 10px;
+  background: var(--ig-panel);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: var(--ig-elev-1);
+}
+
+button.evCard {
+  width: 100%;
+}
+
+.evCard:hover {
+  border-color: color-mix(in srgb, var(--ig-accent) 45%, var(--ig-line));
+}
+
+.evCard[data-selected="1"],
+.evCard[data-fresh="1"] {
+  border-color: color-mix(in srgb, var(--ig-accent) 65%, var(--ig-line));
+  background: color-mix(in srgb, var(--ig-accent) 7%, var(--ig-panel));
+}
+
+.evCard[data-live="1"] {
+  border-color: color-mix(in srgb, #22d3ee 50%, var(--ig-line));
+}
+
+.evPhoto {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ig-accent) 12%, var(--ig-panel));
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ig-accent-deep, var(--ig-accent));
+}
+
+.evPhoto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.evBody {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.evName {
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.evMeta,
+.evTime {
+  font-size: 11.5px;
+  color: var(--ig-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.evChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.evPager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.evPagerMeta {
+  font-size: 11px;
+  color: var(--ig-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.evDetail {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.evDetailPhoto {
+  width: 96px;
+  height: 96px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ig-accent) 12%, var(--ig-panel));
+  display: grid;
+  place-items: center;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.evDetailPhoto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.evDetailBody {
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+}
+
+.evDetailBody strong {
+  font-size: 16px;
+}
+
+.accessStripBody strong {
+  font-size: 13px;
+  font-weight: 750;
 }

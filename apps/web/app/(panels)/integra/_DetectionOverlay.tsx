@@ -46,7 +46,7 @@ type Box = PushTarget & {
  *  alguien sigue sentado y solo llega VMD / re-intrusiones esporádicas. */
 const BOX_TTL_OPTICAL_MS = 90_000;
 /** ACS FaceRect + nombre: sticky más largo — el pase es un flash, la placa no. */
-const BOX_TTL_NAMED_MS = 60_000;
+const BOX_TTL_NAMED_MS = 75_000;
 /** Sondeo incremental si SSE cae o aún no conectó. */
 const POLL_MS = 250;
 const SEED_MS = 120_000;

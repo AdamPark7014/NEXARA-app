@@ -9,10 +9,10 @@ import {
   IgFilters,
   IgPage,
   IgPanel,
-  IgSplit,
-  IgTable,
   IgToolbar,
 } from "../_Console";
+import { subscribePushEvents, type PushEvent } from "../_DetectionOverlay";
+import { PersonFaceThumb, prefetchPersonFace } from "../_PersonFace";
 import {
   defaultRangeHours,
   fromDatetimeLocalValue,
@@ -38,6 +38,30 @@ type Ev = {
 
 type Door = { id: string; name: string };
 
+type LiveHit = {
+  id: number;
+  at: number;
+  personName: string;
+  personId: string | null;
+  door: string;
+  photoPath: string | null;
+  verifyMode: string | null;
+  label: string | null;
+};
+
+const LIVE_TTL_MS = 90_000;
+
+function fmt(iso?: string) {
+  return iso ? new Date(iso).toLocaleString("es-MX", { hour12: false }) : "—";
+}
+
+function relAge(at: number): string {
+  const s = Math.max(0, Math.round((Date.now() - at) / 1000));
+  if (s < 1) return "ahora";
+  if (s < 60) return `hace ${s}s`;
+  return `hace ${Math.floor(s / 60)}m`;
+}
+
 export default function IntegraEventsPage() {
   const range0 = useMemo(() => defaultRangeHours(24), []);
   const [items, setItems] = useState<Ev[]>([]);
@@ -52,10 +76,12 @@ export default function IntegraEventsPage() {
   const [limit, setLimit] = useState(100);
   const [pageNo, setPageNo] = useState(1);
   const [selected, setSelected] = useState<Ev | null>(null);
-  const [thumb, setThumb] = useState<string | null>(null);
+  const [picByUri, setPicByUri] = useState<Record<string, string>>({});
+  const [liveHits, setLiveHits] = useState<LiveHit[]>([]);
   const [auto, setAuto] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [, setTick] = useState(0);
 
   useEffect(() => {
     void integraApi<{ items: Door[] }>("integra/doors")
@@ -81,6 +107,9 @@ export default function IntegraEventsPage() {
       const data = await integraApi<{ items: Ev[]; total?: number }>(`integra/events?${q}`);
       setItems(data.items);
       setTotal(data.total ?? data.items.length);
+      for (const e of data.items) {
+        if (e.personId) prefetchPersonFace(e.personId);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
     } finally {
@@ -98,7 +127,51 @@ export default function IntegraEventsPage() {
     return () => clearInterval(t);
   }, [auto, load]);
 
-  const loadPic = async (picUri: string) => {
+  // Flash ACS en vivo (<1 s vía SSE) encima del historial Artemis/ISAPI.
+  useEffect(() => {
+    return subscribePushEvents((events: PushEvent[]) => {
+      const fresh: LiveHit[] = [];
+      for (const ev of events) {
+        const name = ev.personName?.trim();
+        if (!name) continue;
+        const at = Date.parse(ev.occurredAt);
+        if (!Number.isFinite(at) || Date.now() - at > LIVE_TTL_MS) continue;
+        if (ev.personId) prefetchPersonFace(ev.personId);
+        fresh.push({
+          id: ev.id,
+          at,
+          personName: name,
+          personId: ev.personId ?? null,
+          door: ev.deviceName || ev.deviceIp || "Acceso",
+          photoPath: ev.photoPath ?? null,
+          verifyMode: ev.verifyMode ?? null,
+          label: ev.label ?? null,
+        });
+      }
+      if (!fresh.length) return;
+      setLiveHits((prev) => {
+        const map = new Map(prev.map((h) => [h.id, h]));
+        for (const h of fresh) {
+          const old = map.get(h.id);
+          map.set(h.id, old ? { ...h, photoPath: h.photoPath || old.photoPath } : h);
+        }
+        return [...map.values()].sort((a, b) => b.at - a.at).slice(0, 24);
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (liveHits.length === 0) return;
+    const id = window.setInterval(() => {
+      const cut = Date.now() - LIVE_TTL_MS;
+      setLiveHits((prev) => prev.filter((h) => h.at > cut));
+      setTick((n) => n + 1);
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [liveHits.length]);
+
+  const loadPic = useCallback(async (picUri: string) => {
+    if (!picUri || picByUri[picUri]) return;
     try {
       const data = await integraApi<Record<string, unknown>>("integra/events/picture", {
         method: "POST",
@@ -110,11 +183,17 @@ export default function IntegraEventsPage() {
         (typeof data.picture === "string" && data.picture.startsWith("data:")
           ? data.picture
           : null);
-      setThumb(src || JSON.stringify(data).slice(0, 240));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error foto");
+      if (src) setPicByUri((prev) => ({ ...prev, [picUri]: src }));
+    } catch {
+      /* la tarjeta sigue con foto enrolada */
     }
-  };
+  }, [picByUri]);
+
+  // Prefetch fotos de evento (pocas en paralelo) para la rejilla.
+  useEffect(() => {
+    const need = items.filter((e) => e.picUri && !picByUri[e.picUri!]).slice(0, 12);
+    for (const e of need) void loadPic(e.picUri!);
+  }, [items, picByUri, loadPic]);
 
   const preset = (hours: number) => {
     const r = defaultRangeHours(hours);
@@ -123,14 +202,15 @@ export default function IntegraEventsPage() {
     setPageNo(1);
   };
 
-  const fmt = (iso?: string) =>
-    iso ? new Date(iso).toLocaleString("es-MX", { hour12: false }) : "—";
-
   return (
     <IgPage>
       <IgToolbar
         title="Eventos ACS"
-        meta={`pág ${pageNo} · ${items.length}/${total} · auto ${auto ? "20s" : "off"}`}
+        meta={
+          busy
+            ? "Cargando…"
+            : `pág ${pageNo} · ${items.length}/${total} · vivo ${liveHits.length} · auto ${auto ? "20s" : "off"}`
+        }
         actions={
           <>
             <IgBtn onClick={() => setAuto((v) => !v)}>Auto {auto ? "ON" : "OFF"}</IgBtn>
@@ -141,6 +221,10 @@ export default function IntegraEventsPage() {
         }
       />
       <IgError>{error}</IgError>
+      <p className={styles.attNote}>
+        Identidad solo desde terminales ACS (nombre + foto). Las cajas ópticas de
+        oficina dicen «Humano · sin ID» — no es Face ID sobre AcuSense.
+      </p>
 
       <IgFilters>
         <IgField label="Desde">
@@ -182,98 +266,129 @@ export default function IntegraEventsPage() {
         </IgField>
       </IgFilters>
 
-      <IgSplit
-        leftWidth="68%"
-        left={
-          <IgPanel title="Timeline" count={`${items.length}`} flush>
-            <IgTable
-              selectedKey={selected?.id}
-              onRowClick={(key) => {
-                const row = items.find((e) => (e.id || `${e.timestamp}`) === key) || null;
-                setSelected(row);
-                setThumb(null);
-              }}
-              columns={[
-                { key: "t", label: "Hora", width: "18%", mono: true },
-                { key: "p", label: "Persona" },
-                { key: "d", label: "Puerta" },
-                { key: "ty", label: "Tipo" },
-                { key: "c", label: "Card", mono: true },
-                { key: "r", label: "Reader" },
-                { key: "f", label: "Foto", width: "70px" },
-              ]}
-              rows={items.map((e) => ({
-                key: e.id || `${e.timestamp}-${e.doorId}-${e.personId}`,
-                cells: {
-                  t: fmt(e.timestamp),
-                  p: e.personName || e.personId || "—",
-                  d: e.doorName || e.doorId || "—",
-                  ty: (
-                    <>
-                      {e.eventType || "—"}{" "}
+      {liveHits.length > 0 && (
+        <IgPanel title="En vivo · ACS" count={liveHits.length}>
+          <div className={styles.evGrid}>
+            {liveHits.map((h) => (
+              <article
+                key={h.id}
+                className={styles.evCard}
+                data-live="1"
+                data-fresh={Date.now() - h.at < 4000 ? "1" : undefined}
+              >
+                <PersonFaceThumb
+                  className={styles.evPhoto}
+                  size="xl"
+                  personId={h.personId}
+                  personName={h.personName}
+                  photoPath={h.photoPath}
+                />
+                <div className={styles.evBody}>
+                  <strong className={styles.evName}>{h.personName}</strong>
+                  <span className={styles.evMeta}>{h.door}</span>
+                  <span className={styles.evTime}>{relAge(h.at)}</span>
+                  <div className={styles.evChips}>
+                    <IgBadge tone="ok">{h.label || "Acceso"}</IgBadge>
+                    {h.verifyMode && <IgBadge tone="accent">{h.verifyMode}</IgBadge>}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </IgPanel>
+      )}
+
+      <IgPanel title="Timeline" count={`${items.length}`}>
+        {items.length === 0 && !busy ? (
+          <div className={styles.igEmpty}>
+            <strong className={styles.igEmptyTitle}>Sin eventos en el rango</strong>
+            <span className={styles.igEmptyHint}>Prueba 24h o quita filtros de puerta/persona.</span>
+          </div>
+        ) : (
+          <div className={styles.evGrid}>
+            {items.map((e) => {
+              const key = e.id || `${e.timestamp}-${e.doorId}-${e.personId}`;
+              const pic = e.picUri ? picByUri[e.picUri] : null;
+              const sel = selected?.id === e.id;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className={styles.evCard}
+                  data-selected={sel ? "1" : undefined}
+                  onClick={() => {
+                    setSelected(e);
+                    if (e.picUri) void loadPic(e.picUri);
+                  }}
+                >
+                  <PersonFaceThumb
+                    className={styles.evPhoto}
+                    size="xl"
+                    personId={e.personId}
+                    personName={e.personName || null}
+                    photoPath={pic}
+                  />
+                  <div className={styles.evBody}>
+                    <strong className={styles.evName}>
+                      {e.personName || e.personId || "Sin identidad ACS"}
+                    </strong>
+                    <span className={styles.evMeta}>
+                      {e.doorName || e.doorId || "Puerta"}
+                      {e.readerName ? ` · ${e.readerName}` : ""}
+                    </span>
+                    <span className={styles.evTime}>{fmt(e.timestamp)}</span>
+                    <div className={styles.evChips}>
+                      <IgBadge tone="neutral">{e.eventType || "evento"}</IgBadge>
                       {e.eventTypeCode != null && (
                         <IgBadge tone="neutral">#{e.eventTypeCode}</IgBadge>
                       )}
-                    </>
-                  ),
-                  c: e.cardNo || "—",
-                  r: e.readerName || "—",
-                  f: e.picUri ? (
-                    <IgBtn
-                      onClick={(ev) => {
-                        ev.stopPropagation();
-                        void loadPic(e.picUri!);
-                        setSelected(e);
-                      }}
-                    >
-                      Ver
-                    </IgBtn>
-                  ) : (
-                    "—"
-                  ),
-                },
-              }))}
-              empty="Sin eventos en el rango"
+                      {e.cardNo && <IgBadge tone="accent">{e.cardNo}</IgBadge>}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <div className={styles.evPager}>
+          <IgBtn disabled={pageNo <= 1} onClick={() => setPageNo((p) => Math.max(1, p - 1))}>
+            ← Anterior
+          </IgBtn>
+          <span className={styles.evPagerMeta}>Página {pageNo}</span>
+          <IgBtn onClick={() => setPageNo((p) => p + 1)}>Siguiente →</IgBtn>
+        </div>
+      </IgPanel>
+
+      {selected && (
+        <IgPanel title="Detalle" count={selected.id.slice(0, 16)}>
+          <div className={styles.evDetail}>
+            <PersonFaceThumb
+              className={styles.evDetailPhoto}
+              size="xl"
+              personId={selected.personId}
+              personName={selected.personName || null}
+              photoPath={selected.picUri ? picByUri[selected.picUri] : null}
             />
-            <div style={{ display: "flex", gap: 6, padding: 8 }}>
-              <IgBtn disabled={pageNo <= 1} onClick={() => setPageNo((p) => Math.max(1, p - 1))}>
-                ←
-              </IgBtn>
-              <IgBtn onClick={() => setPageNo((p) => p + 1)}>→</IgBtn>
+            <div className={styles.evDetailBody}>
+              <strong>{selected.personName || "Sin persona ACS"}</strong>
+              <span>{fmt(selected.timestamp)}</span>
+              <span>Puerta: {selected.doorName || selected.doorId || "—"}</span>
+              <span>
+                Tipo: {selected.eventType || "—"}
+                {selected.eventTypeCode != null ? ` (${selected.eventTypeCode})` : ""}
+              </span>
+              <span>Tarjeta: {selected.cardNo || "—"}</span>
+              <span>Lector: {selected.readerName || "—"}</span>
+              <span className={styles.doorCellMeta}>ID {selected.personId || "—"}</span>
+              {selected.picUri && !picByUri[selected.picUri] && (
+                <IgBtn variant="primary" onClick={() => void loadPic(selected.picUri!)}>
+                  Cargar foto del evento
+                </IgBtn>
+              )}
             </div>
-          </IgPanel>
-        }
-        right={
-          <IgPanel title="Detalle" count={selected ? selected.id.slice(0, 12) : "—"}>
-            {!selected ? (
-              <p className={styles.igEmpty}>Selecciona una fila</p>
-            ) : (
-              <div style={{ display: "grid", gap: 8, fontSize: 12 }}>
-                <div><strong>{selected.personName || "Sin persona"}</strong></div>
-                <div className={styles.doorCellMeta}>{fmt(selected.timestamp)}</div>
-                <div>Puerta: {selected.doorName || selected.doorId}</div>
-                <div>Tipo: {selected.eventType} {selected.eventTypeCode != null ? `(${selected.eventTypeCode})` : ""}</div>
-                <div>Card: {selected.cardNo || "—"}</div>
-                <div>Reader: {selected.readerName || "—"}</div>
-                <div className={styles.doorCellMeta}>ID persona {selected.personId || "—"}</div>
-                {selected.picUri && (
-                  <IgBtn variant="primary" onClick={() => void loadPic(selected.picUri!)}>
-                    Cargar foto
-                  </IgBtn>
-                )}
-                {thumb && (
-                  thumb.startsWith("http") || thumb.startsWith("data:") ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={thumb} alt="evento" style={{ maxWidth: "100%", border: "1px solid var(--ig-line)" }} />
-                  ) : (
-                    <code style={{ fontSize: 10, wordBreak: "break-all" }}>{thumb}</code>
-                  )
-                )}
-              </div>
-            )}
-          </IgPanel>
-        }
-      />
+          </div>
+        </IgPanel>
+      )}
     </IgPage>
   );
 }

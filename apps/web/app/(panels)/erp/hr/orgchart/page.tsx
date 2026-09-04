@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import { Tag } from "@/components/ui/DataTable";
+import HrModuleRail from "@/components/hr/HrModuleRail";
 import { useUser } from "@/components/UserContext";
 import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
 import { getHrSubmoduleConfig } from "@/lib/section-views";
@@ -255,6 +256,8 @@ export default function OrgChartPage() {
           ? `${viewCfg.subtitle} Haz clic en ✎ en cualquier nodo para reasignar su manager.`
           : `${viewCfg.subtitle} Solo Dirección puede reasignar managers.`}
       />
+
+      <HrModuleRail />
 
       {!loading && allUsers.length > 0 && (() => {
         const withManager = allUsers.filter((u) => !!u.managerId).length;

@@ -181,6 +181,17 @@ UserInfo autoritativo). El espejo solo se limpia si **todos** los ACS OK.
 Alta puede omitir código (`autoCode`): asigna el siguiente numérico libre
 del espejo (o marca de tiempo).
 
+**Foto en NEXARA:** al subir JPEG (`POST /integra/people/:id/face`) se guarda
+copia en `uploads/integra-faces/{companyId}/{personId}.jpg`. El proxy
+`GET /integra/people/:id/face` sirve primero esa copia; si no hay, intenta
+`faceURL` del terminal. Muchos DS-K1T solo guardan modelo biométrico (sin JPEG
+descargable) — por eso la ficha queda en blanco hasta que alguien sube foto.
+
+**Huella (verificado HikGateway §5.11 / Postman):** `CaptureFingerPrint` →
+`FingerPrintDownload` (aplicar) → `FingerPrintUpload` (obtener plantilla) →
+`FingerPrint/Delete`. Plantilla Base64 en `uploads/integra-fp/` cuando el ACS
+la exporta; si no, solo se muestra `numOfFP` del UserInfo.
+
 ## Rutas ISAPI empleadas
 
 Todas documentadas en `HIKVISION-apps/docs/API-DOCS/HIKVISION/` (salvo InputProxy):
@@ -193,6 +204,13 @@ Todas documentadas en `HIKVISION-apps/docs/API-DOCS/HIKVISION/` (salvo InputProx
 | `GET /ISAPI/PTZCtrl/channels/{id}/presets` | ¿el canal es motorizado? |
 | `PUT /ISAPI/AccessControl/RemoteControl/door/{id}` | apertura remota |
 | `POST /ISAPI/AccessControl/UserInfo/Search?format=json` | personas del terminal → espejo `IntegraPerson` |
+| `POST /ISAPI/AccessControl/UserInfo/Record?format=json` | alta persona |
+| `PUT /ISAPI/AccessControl/UserInfo/Modify?format=json` | editar ficha |
+| `POST /ISAPI/Intelligent/FDLib/FaceDataRecord?format=json` | empujar JPEG Face ID |
+| `POST /ISAPI/AccessControl/CaptureFingerPrint?format=json` | capturar huella en sensor |
+| `POST /ISAPI/AccessControl/FingerPrintDownload?format=json` | aplicar plantilla a persona |
+| `POST /ISAPI/AccessControl/FingerPrintUpload?format=json` | obtener plantilla del ACS |
+| `PUT /ISAPI/AccessControl/FingerPrint/Delete?format=json` | borrar huellas |
 | `POST /ISAPI/AccessControl/AcsEvent?format=json` | eventos de acceso (live, tope 30/página) |
 | `PUT /ISAPI/AccessControl/UserInfoDetail/Delete` + `DeleteProcess` | baja de persona en ACS |
 | `POST /ISAPI/ContentMgmt/search` (XML) | segmentos de grabación NVR → playbackURI |

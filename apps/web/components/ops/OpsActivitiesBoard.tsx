@@ -37,13 +37,13 @@ type ActivityRow = {
 function evidenceLabel(row: ActivityRow): string {
   const ev = row.activityEvidence;
   if (!ev) return "Sin iniciar";
-  if (ev.reviewStatus === "APPROVED") return `✅ ${ev.reviewedBy?.nombre ?? "Admin"}`;
-  if (ev.reviewStatus === "REJECTED") return `❌ Rechazado`;
+  if (ev.reviewStatus === "APPROVED") return `Aprobado · ${ev.reviewedBy?.nombre ?? "Admin"}`;
+  if (ev.reviewStatus === "REJECTED") return "Rechazado";
   const map: Record<string, string> = {
-    ENTRY_PHOTO: "📸 Entrada",
-    EVIDENCE_PHOTOS: "📷 Evidencias",
-    SERVICE_SHEET_PDF: "📄 PDF",
-    COMPLETED: "✅ Completado",
+    ENTRY_PHOTO: "Foto de entrada",
+    EVIDENCE_PHOTOS: "Evidencias",
+    SERVICE_SHEET_PDF: "Hoja de servicio",
+    COMPLETED: "Completado",
   };
   return map[ev.status ?? ""] ?? ev.status ?? "En curso";
 }
@@ -210,14 +210,13 @@ export default function OpsActivitiesBoard() {
             {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
               <OpsActivitiesImport token={token} onImported={() => void load()} />
             )}
+            <Button variant="ghost" size="sm" onClick={() => void load()}>Actualizar</Button>
             <Link href="/ops/activities/new" style={{ textDecoration: "none" }}>
               <Button variant="primary" size="sm">Nueva OT</Button>
             </Link>
-            <Button variant="ghost" size="sm" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
             <Button
               variant="ghost"
               size="sm"
-              iconLeft="⬇"
               onClick={() => exportToExcel(visible, [
                 { key: "anNumber", label: "AN" },
                 { key: "titulo", label: "Título" },
