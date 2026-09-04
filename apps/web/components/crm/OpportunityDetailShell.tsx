@@ -4,8 +4,15 @@ import Link from "next/link";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { TabBar, type TabItem } from "@/components/rbac/TabBar";
 import { useUser } from "@/components/UserContext";
-import { getSalesOpportunity, type SalesOpportunity } from "@/lib/sales-api";
+import {
+  formatOpportunityStage,
+  getSalesOpportunity,
+  isHotOpportunityStage,
+  type SalesOpportunity,
+} from "@/lib/sales-api";
 import { DetailLoading } from "@/components/detail/DetailFrame";
+import { Money, Tag } from "@/components/ui/DataTable";
+import chrome from "@/components/crm/crm-chrome.module.css";
 
 type Ctx = {
   id: number;
@@ -67,16 +74,41 @@ export default function OpportunityDetailShell({ id, children }: { id: string; c
     [numericId, opportunity, loading, error, load],
   );
 
+  const stageVariant =
+    opportunity?.stage === "WON"
+      ? "positive"
+      : opportunity?.stage === "LOST"
+        ? "danger"
+        : isHotOpportunityStage(opportunity?.stage)
+          ? "accent"
+          : "warning";
+
   return (
     <OpportunityDetailContext.Provider value={ctx}>
-      <div style={{ padding: "24px 32px", maxWidth: 1200, margin: "0 auto" }}>
-        <header style={{ marginBottom: 16 }}>
-          <Link href="/crm/opportunities" style={{ fontSize: 13, color: "var(--text-secondary, #64748b)", textDecoration: "none" }}>
+      <div className={chrome.detailShell}>
+        <header style={{ marginBottom: 14 }}>
+          <Link href="/crm/opportunities" className={chrome.detailBack}>
             ← Oportunidades
           </Link>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: "6px 0 0" }}>
+          <h1 className={chrome.detailTitle}>
             {loading ? `Oportunidad #${id}` : opportunity?.title ?? `Oportunidad #${id}`}
           </h1>
+          {!loading && opportunity && (
+            <div className={chrome.detailMeta}>
+              <Tag variant={stageVariant}>{formatOpportunityStage(opportunity.stage)}</Tag>
+              <span className={`${chrome.metaChip} ${chrome.metaChipStrong}`}>
+                <Money value={Number(opportunity.value ?? 0)} />
+              </span>
+              {opportunity.probability != null && (
+                <span className={chrome.metaChip}>{opportunity.probability}% prob.</span>
+              )}
+              {(opportunity.client?.name ?? opportunity.clientName) && (
+                <span className={chrome.metaChip}>
+                  {opportunity.client?.name ?? opportunity.clientName}
+                </span>
+              )}
+            </div>
+          )}
         </header>
         <TabBar tabs={tabs} />
         <section style={{ marginTop: 8 }}>

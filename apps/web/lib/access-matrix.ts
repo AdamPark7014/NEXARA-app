@@ -439,7 +439,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   attendance: {
     id: "attendance", panel: PANELS.ERP, path: "/hr/attendance",
-    label: "Asistencia", description: "Check-in y jornadas",
+    label: "Asistencia", description: "Checador ERP + contraste ACS Integra",
     icon: "⏰", allowedRoles: SELF_ATTENDANCE_TEAM,
     group: "Personas", visible: true,
   },
@@ -921,7 +921,7 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "integra-attendance": {
     id: "integra-attendance", panel: PANELS.INTEGRA, path: "/attendance",
-    label: "Asistencia", description: "Quién pasó hoy (ACS + foto)",
+    label: "Asistencia", description: "Puertas ACS; contraste ERP en /hr/attendance",
     icon: "🕘", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD],
     group: "Acceso", visible: true,
   },
