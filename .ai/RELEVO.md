@@ -8,32 +8,37 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Integra UX intuitiveness (Video / Personas / Eventos / Accesos)
+## Este turno — Business events ROI (ops/CRM, no Integra push)
 
-Auditoría + fixes quirúrgicos de discoverability y feedback. Sin pelear
-FieldDetection / ISAPI discovery / biometrics profundos del sibling.
+Elevé streams que más mueven el negocio: SLA/OT, tickets portal,
+cotizaciones por expirar, seguimientos CRM y OC pendientes. Inbox +
+dashboards accionables. **No toqué** Integra push/FieldDetection ni
+PDF OC / stock detail.
+
+Nota: en paralelo hubo polish Integra Video/Personas/Accesos/Eventos
+Face (chrome CTAs) — no pisar ese trabajo.
 
 ### Qué hay
 
-1. **Chrome** — accesos rápidos permanentes: Video · 24h, Accesos, Alta persona,
-   Eventos Face. Sync con toast éxito/error (ya no silencioso).
-2. **Video** — CTA toolbar «Playback 24h» (un clic fija rango + reproduce).
-   Presets 1h/24h ya no dejan el callejón «solo cambiaron fechas». Copy ES
-   sobre límites NVR/disco. Labels muro/foco más claros.
-3. **Accesos** — título Accesos; doble clic = abrir momentáneo; toast en
-   control/privilegios; empty → Personas; aviso stream puerta sin señal.
-4. **Personas** — título «Personas · alta ACS»; CTA Alta también en Artemis;
-   link Eventos Face; toast sync; copy Face ID = terminales, no cámaras.
-5. **Eventos Face** (sobre vista ACS push del sibling) — título, Hoy + Alta
-   persona en toolbar, IgNotice límites hardware, empty states con CTAs,
-   detalle sin personId → alta.
-6. **Nav** — labels matriz/section-views: Video · 24h, Eventos Face, Accesos.
-7. **Ops home** — CTAs Alta / Eventos Face / Video · 24h + «Ver todos» en feed.
+1. **Inbox notificaciones visible** — soft-scope (`companyId` null
+   legacy) + stamp al crear + heal al marcar leída. Antes hard-scope
+   dejaba el centro casi vacío.
+2. **`client-ticket-requests` RBAC** — SUPPORT_*/ACTIVITIES_* (no solo
+   CONSOLE_ADMIN). `/ops/support` y dashboard dejan de fallar en silencio.
+3. **`activity-feed`** — OT SLA vencidas, tickets NEW/APPROVED,
+   seguimientos CRM vencidos, cotiz SENT por expirar, OC DRAFT.
+4. **Centro notificaciones** — Acción ahora / Inbox / Señales; filtro
+   Ops·CRM·ERP; densidad sin KPIs vanity.
+5. **Ops dashboard** — «Decisiones ahora» + KPI SLA + tickets deep-link.
+6. **CRM dashboard** — fix `leads`→`ventas/leads`; decisiones comerciales
+   (vencidos + notifs ventas).
+7. **CommandCenterRail** — Ops: SLA+notifs; Sales: notifs.
+8. **Ticket SLA alerts** — stamp `companyId` desde Activity.
 
 ### Concurrente (siblings — no pisar)
 
-Eventos ACS push KPIs/índices · FieldDetection/AcuSense · Face ACS JPEG /
-Personas biometrics CRUD · CRM OC PDF · stock historial · PTZ · hybrid
+Integra Video/Personas/Eventos Face chrome · FieldDetection · Face ACS
+JPEG / Personas biometrics · CRM OC PDF · stock historial · PTZ · hybrid
 attendance · identity-link WIP.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
@@ -41,11 +46,11 @@ SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
 
 ### Verificar (hard refresh)
 
-1. Barra Integra: Video · 24h / Accesos / Alta persona / Eventos Face en 1 clic.
-2. `/integra/video` → Playback 24h abre foco y pide grabación (o error NVR claro).
-3. `/integra/events` → Hoy + KPIs; empty con Ir a Personas; sin ruido VMD.
-4. `/integra/access` → doble clic puerta pide confirmación; toast al ejecutar.
-5. `/integra/people` → + Nueva persona visible; sync con toast.
+1. `/erp/notifications-center` — inbox con filas; Acción ahora.
+2. `/ops/dashboard` — Decisiones ahora + tickets (rol soporte).
+3. `/ops/support` — listado sin 403.
+4. `/crm/dashboard` — leads + seguimientos vencidos.
+5. Feed `?view=feed` — OT/cotiz/OC según permisos.
 
 ## A medias
 
@@ -53,11 +58,12 @@ SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
 2. Alinear códigos employeeNumber↔personId en plantilla real Oficinas.
 3. go2rtc.yaml en disco corruptible — streams viven en RAM.
 4. FieldDetection re-apply tras sync/push install.
-5. identity-link WIP (rescate) — no cableado a AppModule.
+5. Backfill masivo `notifications.companyId` (heal parcial al marcar).
+6. identity-link WIP (rescate) — no cableado a AppModule.
 
 ## No tocar
 
 Puente NAS, Traefik, credenciales, ISAPI no verificada.
-Face ID óptico inventado. No pelear PTZ pad / Personas biometrics CRUD /
-hybrid attendance internals / stock detail / OC PDF / FieldDetection XML
-del sibling.
+Face ID óptico inventado. No pelear PTZ / Personas biometrics CRUD /
+hybrid attendance / stock detail / OC PDF / FieldDetection /
+Integra push del sibling.
