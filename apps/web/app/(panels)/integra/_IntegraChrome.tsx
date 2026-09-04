@@ -162,8 +162,9 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
       await refreshHealth();
       await refreshCaps();
       setTick((t) => t + 1);
-    } catch {
-      /* página muestra error */
+      toast.success("Inventario sincronizado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo sincronizar el sitio");
     } finally {
       setSyncing(false);
     }
@@ -174,14 +175,19 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
   const healthLabel = health?.connected
     ? "Sitio conectado"
     : health?.configured
-      ? "Sin enlace"
+      ? "Sin enlace al servidor"
       : isClient
-        ? "Pendiente"
+        ? "Pendiente de activación"
         : "Sin sitio";
 
   const showKpis = Boolean(
     dash && ((dash.cameras ?? 0) > 0 || (dash.doors ?? 0) > 0 || (dash.people ?? 0) > 0),
   );
+
+  const showVideo = caps?.video !== false;
+  const showPeople = caps?.people !== false && health?.provider !== "HCT";
+  const showEvents = caps?.events !== false;
+  const showAccess = caps?.access !== false;
 
   return (
     <div className={styles.shell} data-client={isClient ? "1" : undefined}>
@@ -192,7 +198,11 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
             {healthLabel}
           </span>
           {mediaDown && (
-            <span className={styles.healthPill} data-tone="warn" title="Servicio de video (go2rtc)">
+            <span
+              className={styles.healthPill}
+              data-tone="warn"
+              title="go2rtc no responde. El vivo y el playback 24h pueden fallar hasta que vuelva."
+            >
               Video offline
             </span>
           )}
@@ -223,17 +233,48 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
           )}
         </div>
         <div className={styles.contextRight}>
-          {(dash?.cameras ?? 0) > 0 && (
-            <div className={styles.contextQuick}>
+          <div className={styles.contextQuick} aria-label="Accesos rápidos">
+            {showVideo && (
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={() => router.push("/integra/video")}
+                title="Muro en vivo y playback de las últimas 24 h"
               >
-                Video wall
+                Video · 24h
               </Button>
-            </div>
-          )}
+            )}
+            {showAccess && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => router.push("/integra/access")}
+                title="Puertas y privilegios ACS"
+              >
+                Accesos
+              </Button>
+            )}
+            {showPeople && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => router.push("/integra/people")}
+                title="Alta de persona y Face ID en terminales"
+              >
+                Alta persona
+              </Button>
+            )}
+            {showEvents && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => router.push("/integra/events")}
+                title="Timeline ACS con foto de rostros"
+              >
+                Eventos Face
+              </Button>
+            )}
+          </div>
           {!isClient && caps?.settings !== false && (
             <Button
               variant="secondary"
