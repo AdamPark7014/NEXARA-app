@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import {
   ptzGoToPreset,
   ptzMove,
@@ -345,6 +346,133 @@ export class IntegraMediaService {
   }
 
   /**
+   * Playback ISAPI vía NVR: `POST /ISAPI/ContentMgmt/search` (doc HikGateway 5.5.2)
+   * → `playbackURI` RTSP → go2rtc HLS.
+   *
+   * Las grabaciones viven en el grabador (host del sitio), no en la cámara LAN.
+   */
+  async playbackIsapi(
+    companyId: number | null,
+    cameraIndexCode: string,
+    beginTime: string,
+    endTime: string,
+    siteId?: number | null,
+  ) {
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
+    if (resolved.provider !== 'ISAPI' || !resolved.isapi || !resolved.siteId) {
+      throw new BadRequestException('Playback ISAPI solo en sitios ISAPI');
+    }
+
+    const camera = await this.prisma.integraCamera.findUnique({
+      where: { siteId_cameraIndexCode: { siteId: resolved.siteId, cameraIndexCode } },
+      select: { raw: true, name: true },
+    });
+    if (!camera) throw new NotFoundException(`Cámara ${cameraIndexCode} no está en el espejo`);
+
+    const raw = (camera.raw ?? {}) as { channelId?: string; channelNumber?: number };
+    let trackId = Number(raw.channelId);
+    if (!Number.isFinite(trackId) || trackId <= 0) {
+      const ch = Number(raw.channelNumber) || 1;
+      trackId = ch * 100 + 1; // canal N → track main N01
+    }
+    // Preferir principal (…01) para revisión.
+    if (trackId % 10 === 2) trackId -= 1;
+
+    const start = toUtcIsapi(beginTime);
+    const end = toUtcIsapi(endTime);
+    if (!start || !end) throw new BadRequestException('Rango begin/end inválido');
+
+    const searchID = randomUUID();
+    const body = {
+      CMSearchDescription: {
+        searchID,
+        trackIDList: [{ trackID: trackId }],
+        timeSpanList: [{ timeSpan: { startTime: start, endTime: end } }],
+        contentTypeList: [{ contentType: 'video' }],
+        maxResults: 40,
+        searchResultPostion: 0,
+        metadataList: [{ metadataDescriptor: 'recordType.meta.hikvision.com' }],
+      },
+    };
+
+    let rawResp: Record<string, unknown>;
+    try {
+      rawResp = (await resolved.isapi.postJson(
+        '/ISAPI/ContentMgmt/search?format=json',
+        body,
+      )) as Record<string, unknown>;
+    } catch (e) {
+      throw new BadRequestException(
+        `ContentMgmt/search falló: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+
+    const result = (rawResp.CMSearchResult ?? rawResp) as Record<string, unknown>;
+    const matches = asList(result.matchList).flatMap((m) => {
+      const item = (m as Record<string, unknown>)?.searchMatchItem ?? m;
+      const seg = (item as Record<string, unknown>)?.mediaSegmentDescriptor as
+        | Record<string, unknown>
+        | undefined;
+      const uri = String(seg?.playbackURI || '').trim();
+      if (!uri) return [];
+      const span = (item as Record<string, unknown>)?.timeSpan as
+        | { startTime?: string; endTime?: string }
+        | undefined;
+      return [
+        {
+          playbackURI: uri,
+          startTime: span?.startTime ? String(span.startTime) : null,
+          endTime: span?.endTime ? String(span.endTime) : null,
+          name: seg?.name != null ? String(seg.name) : null,
+          size: seg?.size != null ? Number(seg.size) : null,
+        },
+      ];
+    });
+
+    if (matches.length === 0) {
+      return {
+        cameraIndexCode,
+        provider: 'ISAPI' as const,
+        url: null,
+        hls: null,
+        beginTime,
+        endTime,
+        segments: [],
+        note: 'Sin grabaciones en ese rango (o el NVR no indexó el canal).',
+      };
+    }
+
+    const first = matches[0];
+    const rtsp = resolved.isapi.authorizeRtsp(first.playbackURI);
+    const redacted = resolved.isapi.authorizeRtspRedacted(first.playbackURI);
+    const published = await this.publish(
+      'ISAPI',
+      `pb_${cameraIndexCode}_${Date.now()}`,
+      rtsp,
+      redacted,
+      `Playback NVR track ${trackId} · ${matches.length} segmento(s)`,
+    );
+
+    return {
+      cameraIndexCode,
+      provider: 'ISAPI' as const,
+      url: published.hls || redacted,
+      hls: published.hls,
+      rtsp: redacted,
+      beginTime,
+      endTime,
+      trackId,
+      segments: matches.map((m) => ({
+        startTime: m.startTime,
+        endTime: m.endTime,
+        name: m.name,
+        size: m.size,
+      })),
+      note: published.note,
+    };
+  }
+
+  /**
    * Registra el RTSP en go2rtc y devuelve la URL HLS.
    *
    * `rtspForResponse` es lo que ve el cliente: en ISAPI lleva la contraseña
@@ -408,4 +536,15 @@ export class IntegraMediaService {
       };
     }
   }
+}
+
+function toUtcIsapi(iso: string): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+function asList<T>(v: T | T[] | null | undefined): T[] {
+  if (v == null) return [];
+  return Array.isArray(v) ? v : [v];
 }

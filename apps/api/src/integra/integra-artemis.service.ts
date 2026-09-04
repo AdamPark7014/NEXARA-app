@@ -495,10 +495,17 @@ export class IntegraArtemisService {
     endTime: string,
     siteId?: number | null,
   ) {
+    const resolved = await this.sites.resolveClient({ companyId, siteId });
+    if (resolved.provider === 'ISAPI') {
+      return this.media.playbackIsapi(companyId, cameraIndexCode, beginTime, endTime, siteId);
+    }
+    if (resolved.provider === 'HCT') {
+      throw new BadRequestException('Playback histórico no aplica en sitios HCT');
+    }
     try {
-      const { client } = await this.client(companyId, siteId);
-      const data = await client.playbackUrls(cameraIndexCode, beginTime, endTime);
-      return { cameraIndexCode, url: data?.url ?? null, beginTime, endTime };
+      if (!resolved.client) throw new BadRequestException('Sin cliente Artemis');
+      const data = await resolved.client.playbackUrls(cameraIndexCode, beginTime, endTime);
+      return { cameraIndexCode, url: data?.url ?? null, beginTime, endTime, provider: 'ARTEMIS' as const };
     } catch (error) {
       rethrowArtemis(error, 'No se pudo obtener playback');
     }
@@ -1257,17 +1264,39 @@ export class IntegraArtemisService {
   ) {
     const resolved = await this.client(companyId, siteId);
     if (resolved.provider === 'ISAPI' && resolved.isapiForHost && resolved.siteId && companyId) {
+      const id = decodeURIComponent(String(personId || '').trim());
+      if (!id) throw new BadRequestException('personId requerido');
+
       const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
-        await deleteUserInfo(client, personId);
+        await deleteUserInfo(client, id);
       });
       await this.auditMut('integra.person.delete', actor, companyId, resolved.siteId, {
-        personId,
+        personId: id,
         results,
       });
-      await this.prisma.integraPerson.deleteMany({
-        where: { companyId, personId, siteId: resolved.siteId },
-      });
-      return { success: results.some((r) => r.ok), results, provider: 'ISAPI' as const };
+
+      const allOk = results.length > 0 && results.every((r) => r.ok);
+      const anyOk = results.some((r) => r.ok);
+
+      // Solo borramos el espejo si TODOS los terminales confirman. Si no, el sync
+      // de 15 min (o live) volvería a meter a la persona y parece que «no borra».
+      if (allOk) {
+        await this.prisma.integraPerson.deleteMany({
+          where: { companyId, personId: id, siteId: resolved.siteId },
+        });
+      }
+
+      return {
+        success: allOk,
+        partial: anyOk && !allOk,
+        results,
+        provider: 'ISAPI' as const,
+        note: allOk
+          ? 'Eliminado en todos los terminales y en el espejo.'
+          : anyOk
+            ? 'Borrado parcial: sigue en algún terminal; el espejo se conserva. Reintenta o revisa el error por IP.'
+            : 'No se pudo eliminar en ningún terminal; el espejo no se tocó.',
+      };
     }
     try {
       await resolved.client.personDelete(personId);

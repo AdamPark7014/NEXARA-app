@@ -574,13 +574,25 @@ export default function IntegraPeoplePage() {
                           onClick={async () => {
                             if (!confirm(`¿Eliminar ${selected.name} de todos los terminales?`)) return;
                             setMutating(true);
+                            setError(null);
                             try {
                               const r = await integraApi<{
+                                success?: boolean;
+                                partial?: boolean;
+                                note?: string;
                                 results?: Array<{ deviceIp: string; ok: boolean; error?: string }>;
                               }>(`integra/people/${encodeURIComponent(selected.id)}`, {
                                 method: "DELETE",
                               });
                               setOpResults(r.results || null);
+                              setOpNote(r.note || (r.success ? "Eliminado" : "No se eliminó"));
+                              if (!r.success) {
+                                setError(
+                                  r.note ||
+                                    "La persona sigue en uno o más terminales. Revisa el detalle por IP.",
+                                );
+                                return;
+                              }
                               setSelected(null);
                               setDetail(null);
                               await load();

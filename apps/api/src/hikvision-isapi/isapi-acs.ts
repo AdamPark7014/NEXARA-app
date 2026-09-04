@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { HikvisionIsapiClient } from './isapi.client';
+import { IsapiApiError, type HikvisionIsapiClient } from './isapi.client';
 
 /**
  * Personas y eventos ACS por ISAPI directo (sin HikCentral).
@@ -371,17 +371,100 @@ export async function modifyUserInfo(
   });
 }
 
-/** Baja. Doc HikGateway 5.8.2 — UserInfoDetail/Delete. */
+/** Baja. Doc HikGateway 5.8.2 — UserInfoDetail/Delete (+ DeleteProcess). */
 export async function deleteUserInfo(
   client: HikvisionIsapiClient,
   employeeNo: string,
 ): Promise<void> {
+  const no = String(employeeNo).trim();
+  if (!no) throw new Error('employeeNo vacío');
+
+  // Rostro primero: algunos firmwares dejan el UserInfo “pegado” si queda FaceData.
+  try {
+    await deleteFaceData(client, no);
+  } catch {
+    // Sin rostro o sin FDLib: seguir con la baja de UserInfo.
+  }
+
   await client.putJson('/ISAPI/AccessControl/UserInfoDetail/Delete?format=json', {
     UserInfoDetail: {
       mode: 'byEmployeeNo',
-      EmployeeNoList: [{ employeeNo }],
+      EmployeeNoList: [{ employeeNo: no }],
     },
   });
+
+  await waitUserInfoDeleteProcess(client);
+
+  // Comprueba que ya no está en el directorio del terminal (si sigue, falló).
+  const still = await userStillOnDevice(client, no);
+  if (still) {
+    throw new Error(`El terminal aún lista a ${no} tras Delete`);
+  }
+}
+
+/** Progreso async del borrado. Doc HikGateway §4.3.2 / DeleteProcess. */
+async function waitUserInfoDeleteProcess(
+  client: HikvisionIsapiClient,
+  timeoutMs = 20_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let sawProcess = false;
+  while (Date.now() < deadline) {
+    await sleep(450);
+    try {
+      const raw = await client.get('/ISAPI/AccessControl/UserInfoDetail/DeleteProcess?format=json');
+      sawProcess = true;
+      const block = (raw.UserInfoDetailDeleteProcess ??
+        raw.UserInfoDetailDeleteProcessStatus ??
+        raw) as Record<string, unknown>;
+      const status = String(
+        block.status ?? block.processStatus ?? block.responseStatusStrg ?? '',
+      ).toLowerCase();
+      if (!status) continue;
+      if (
+        status === 'success' ||
+        status === 'ok' ||
+        status === 'completed' ||
+        status === 'complete' ||
+        status === 'idle' ||
+        status === 'true'
+      ) {
+        return;
+      }
+      if (status === 'failed' || status === 'error' || status === 'false') {
+        throw new Error(`DeleteProcess=${status}`);
+      }
+      // processing / running → seguir
+    } catch (e) {
+      // Firmware sin DeleteProcess (404): el PUT ya aceptó la baja.
+      if (e instanceof IsapiApiError && (e.status === 404 || e.status === 400)) {
+        if (!sawProcess) return;
+      }
+      if (e instanceof Error && /DeleteProcess=/.test(e.message)) throw e;
+      // Otros errores temporales: reintentar hasta timeout.
+    }
+  }
+  if (sawProcess) {
+    // Timeout con proceso visto: no fallar duro — la verificación UserInfo decide.
+    return;
+  }
+}
+
+async function userStillOnDevice(
+  client: HikvisionIsapiClient,
+  employeeNo: string,
+): Promise<boolean> {
+  try {
+    const users = await listAllUserInfo(client, 80);
+    return users.some((u) => String(u.employeeNo).trim() === employeeNo);
+  } catch {
+    // Si no se puede listar, no inventamos éxito ni fracaso extra.
+    return false;
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 /**
