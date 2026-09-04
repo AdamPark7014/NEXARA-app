@@ -399,13 +399,15 @@ export class IntegraPushService {
         where: { ...baseWhere, minor: { in: GRANTED_MINORS } },
         select: { personId: true, occurredAt: true },
       }),
-      this.prisma.integraPushEvent.count({
+      this.prisma.integraPushEvent.findMany({
         where: { ...baseWhere, minor: { in: DENIED_MINORS } },
+        select: { occurredAt: true },
       }),
       this.occupancy(companyId, { siteId: opts.siteId, tz }),
     ]);
 
     const grantedToday = grantedRows.filter((r) => dayIn(r.occurredAt, tz) === today);
+    const deniedToday = deniedRows.filter((r) => dayIn(r.occurredAt, tz) === today);
     const unique = new Set(
       grantedToday.map((r) => r.personId).filter((id): id is string => Boolean(id)),
     );
@@ -413,7 +415,7 @@ export class IntegraPushService {
     return {
       day: today,
       entradas: grantedToday.length,
-      denegados: deniedRows,
+      denegados: deniedToday.length,
       unicos: unique.size,
       enSitio: occupancy.total,
       ms: Date.now() - t0,
