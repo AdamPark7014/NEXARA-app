@@ -37,12 +37,13 @@ export class TicketAlertsService {
     const alertAt = new Date(now.getTime() + 30 * 60 * 1000);
 
     const upcoming = await this.prisma.$queryRaw<
-      Array<{ id: number; anNumber: string; clientName: string | null }>
+      Array<{ id: number; anNumber: string; clientName: string | null; companyId: number }>
     >`
       SELECT
         a.id,
         a."anNumber",
-        c.name AS "clientName"
+        c.name AS "clientName",
+        a."companyId"
       FROM "Activity" a
       LEFT JOIN service_clients c ON c.id = a."clientId"
       WHERE a."clientId" IS NOT NULL
@@ -71,11 +72,12 @@ export class TicketAlertsService {
               type: 'SLA_ALERT' as any,
               category: 'sla-alert',
               priority: 'high',
-              title: '⏰ Ticket por vencer',
+              title: 'Ticket por vencer',
               message,
               entityType: 'Activity',
               relatedEntityId: activity.id,
               relatedUrl: `/ops/activities/${activity.id}`,
+              companyId: activity.companyId,
             })
             .catch((err) => this.logger.warn(`SLA notify: ${err?.message || err}`)),
         ),

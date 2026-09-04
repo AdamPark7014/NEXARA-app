@@ -78,12 +78,12 @@ export default function FilterToolbar({
       style={{
         display: "flex",
         flexWrap: "wrap",
-        gap: 10,
+        gap: 8,
         alignItems: "center",
-        padding: 12,
-        background: "var(--bg-primary)",
-        border: "1px solid var(--border)",
-        borderRadius: 12,
+        padding: "10px 12px",
+        background: "var(--nx-panel-surface-overlay, var(--bg-primary))",
+        border: "1px solid var(--nx-panel-hairline, var(--border))",
+        borderRadius: 10,
       }}
     >
       {search && (
