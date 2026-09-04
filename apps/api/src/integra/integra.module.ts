@@ -20,6 +20,7 @@ import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
 import { IntegraSpacesService } from './integra-spaces.service';
 import { IntegraSchedulesService } from './integra-schedules.service';
 import { IntegraPresenceService } from './integra-presence.service';
+import { IntegraRecurringVisitorsService } from './integra-recurring-visitors.service';
 import { AcsOpsBridgeService } from './acs-ops-bridge.service';
 import { IdentityModule } from '../identity/identity.module';
 import { NotificationsModule } from '../notifications/notifications.module.js';
@@ -51,6 +52,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
     IntegraSpacesService,
     IntegraSchedulesService,
     IntegraPresenceService,
+    IntegraRecurringVisitorsService,
     AcsOpsBridgeService,
   ],
   exports: [
@@ -64,6 +66,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
     IntegraSpacesService,
     IntegraSchedulesService,
     IntegraPresenceService,
+    IntegraRecurringVisitorsService,
     AcsOpsBridgeService,
   ],
 })

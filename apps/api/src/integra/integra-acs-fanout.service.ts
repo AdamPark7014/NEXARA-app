@@ -488,6 +488,51 @@ export class IntegraAcsFanoutService implements OnModuleInit {
         { ...payload, failedIps: stillFailed, attempt: attempt + 1 },
         { delayMs: 8_000 * attempt, maxAttempts: 2 },
       );
+      if (op === 'userDelete') {
+        await this.prisma.integraPersonDeletePending.upsert({
+          where: { siteId_personId: { siteId, personId: user.employeeNo } },
+          create: {
+            companyId,
+            siteId,
+            personId: user.employeeNo,
+            personName: user.name,
+            failedIps: stillFailed,
+            force: true,
+            note: `Reintento ${attempt}: quedan ${stillFailed.join(', ')}`,
+          },
+          update: {
+            failedIps: stillFailed,
+            note: `Reintento ${attempt}: quedan ${stillFailed.join(', ')}`,
+          },
+        });
+      }
+    } else if (op === 'userDelete') {
+      // Nunca re-crear el espejo tras un Delete. Limpiar tombstone si ya no hay fallos.
+      if (!stillFailed.length) {
+        await this.prisma.integraPerson.deleteMany({
+          where: { companyId, siteId, personId: user.employeeNo },
+        });
+        await this.prisma.integraPersonDeletePending.deleteMany({
+          where: { siteId, personId: user.employeeNo },
+        });
+      } else {
+        await this.prisma.integraPersonDeletePending.upsert({
+          where: { siteId_personId: { siteId, personId: user.employeeNo } },
+          create: {
+            companyId,
+            siteId,
+            personId: user.employeeNo,
+            personName: user.name,
+            failedIps: stillFailed,
+            force: true,
+            note: `Agotados reintentos; huérfana en ${stillFailed.join(', ')}`,
+          },
+          update: {
+            failedIps: stillFailed,
+            note: `Agotados reintentos; huérfana en ${stillFailed.join(', ')}`,
+          },
+        });
+      }
     } else if (results.some((r) => r.ok)) {
       await this.upsertMirror({
         companyId,

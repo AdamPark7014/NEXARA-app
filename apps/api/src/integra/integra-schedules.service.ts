@@ -16,6 +16,8 @@ import {
   putWeekPlan,
   buildWeekPlanCfg,
   validFromMode,
+  PRESET_TEMPLATE_SLOTS,
+  presetSlot,
   type AccessPresetKey,
   type PlanTemplate,
   type RightPlanEntry,
@@ -137,19 +139,22 @@ export class IntegraSchedulesService {
         {
           key: 'office_hours',
           label: 'Horario de oficina (L–V)',
-          ensuresTemplateId: 2,
+          ensuresTemplateId: PRESET_TEMPLATE_SLOTS.office_hours,
+          planTemplateNo: String(PRESET_TEMPLATE_SLOTS.office_hours),
           validMode: 'indefinite',
         },
         {
           key: 'after_hours',
           label: 'Fuera de horario (L–V noches)',
-          ensuresTemplateId: 3,
+          ensuresTemplateId: PRESET_TEMPLATE_SLOTS.after_hours,
+          planTemplateNo: String(PRESET_TEMPLATE_SLOTS.after_hours),
           validMode: 'indefinite',
         },
         {
           key: 'weekend',
           label: 'Solo fin de semana',
-          ensuresTemplateId: 4,
+          ensuresTemplateId: PRESET_TEMPLATE_SLOTS.weekend,
+          planTemplateNo: String(PRESET_TEMPLATE_SLOTS.weekend),
           validMode: 'indefinite',
         },
         { key: 'visitor_today', label: 'Pase del día (visitante)', validMode: 'window' },
@@ -295,8 +300,7 @@ export class IntegraSchedulesService {
       : devices;
     if (!targets.length) throw new NotFoundException('ACS no encontrado');
 
-    const defaultSlot =
-      input.preset === 'office_hours' ? 2 : input.preset === 'after_hours' ? 3 : 4;
+    const defaultSlot = presetSlot(input.preset);
     const results = [];
     for (const d of targets) {
       const client = resolved.isapiForHost(d.deviceIp);
@@ -514,7 +518,7 @@ export class IntegraSchedulesService {
       planTemplateNo = planTemplateNo || '1';
     } else if (preset === 'office_hours' || preset === 'after_hours' || preset === 'weekend') {
       validMode = validMode || 'indefinite';
-      const slot = preset === 'office_hours' ? 2 : preset === 'after_hours' ? 3 : 4;
+      const slot = presetSlot(preset);
       planTemplateNo = planTemplateNo || String(slot);
       if (input.ensurePresetsOnDevices !== false) {
         await this.ensurePresets(
@@ -526,26 +530,27 @@ export class IntegraSchedulesService {
       }
     }
 
-    // Si doorPlans piden plantillas 2/3/4, materializar franjas aunque el
-    // preset sea contractor / meeting_only / window libre.
+    // Si doorPlans piden plantillas 2/4/5, materializar franjas aunque el
+    // preset sea contractor / meeting_only / window libre. Slot 3 = contratista.
     if (input.ensurePresetsOnDevices !== false) {
-      const needed = new Set<string>();
+      const needed = new Set<keyof typeof PRESET_TEMPLATE_SLOTS>();
+      const consider = (n: string) => {
+        if (n === String(PRESET_TEMPLATE_SLOTS.office_hours)) needed.add('office_hours');
+        if (n === String(PRESET_TEMPLATE_SLOTS.after_hours)) needed.add('after_hours');
+        if (n === String(PRESET_TEMPLATE_SLOTS.weekend)) needed.add('weekend');
+      };
       for (const dp of input.doorPlans || []) {
-        const n = String(dp.planTemplateNo ?? '');
-        if (n === '2') needed.add('office_hours');
-        if (n === '3') needed.add('after_hours');
-        if (n === '4') needed.add('weekend');
+        consider(String(dp.planTemplateNo ?? ''));
       }
-      if (planTemplateNo === '2') needed.add('office_hours');
-      if (planTemplateNo === '3') needed.add('after_hours');
-      if (planTemplateNo === '4') needed.add('weekend');
+      if (planTemplateNo) consider(planTemplateNo);
       for (const p of needed) {
+        const slot = presetSlot(p);
         await this.ensurePresets(
           companyId,
           {
-            preset: p as 'office_hours' | 'after_hours' | 'weekend',
-            templateId: p === 'office_hours' ? 2 : p === 'after_hours' ? 3 : 4,
-            weekPlanId: p === 'office_hours' ? 2 : p === 'after_hours' ? 3 : 4,
+            preset: p,
+            templateId: slot,
+            weekPlanId: slot,
           },
           actor,
           resolved.siteId,

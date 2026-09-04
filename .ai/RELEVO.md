@@ -8,38 +8,41 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Estabilizar build API (desbloqueo deploy)
+## Este turno — Personas force-delete (Ariadna)
 
-WIP concurrente de siblings rompía `nest build` / deploy Hetzner.
-Sin expandir features: solo tipos, imports y stubs incompletos.
+### Causa raíz
 
-### Qué hay
+1. `deletePerson` solo borraba el espejo si **todos** los ACS OK.
+2. Sync cada 15 min reimportaba desde cualquier terminal que aún la tuviera.
+3. Bug: retry de `userDelete` hacía **upsert** del espejo (deshacía la baja).
+4. Ariadna Sierra `2632768193` vivía solo en Acceso General **192.168.9.163**
+   (no .155 — .155 ECONNREFUSED; lista ACS real `.160–.163`).
 
-1. **`npx prisma generate`** — cliente al día con SpacePolicy / RoomBooking /
-   SocAlarm / acsEnteredAt (schema ya en disco).
-2. **Compile fixes** — `normalizeEmpKey` import en `acs-ops-bridge`;
-   narrowing `doorRole` en `integra-event-router`; plantillas schedules
-   tipadas en controller; `filter` null-safe en `integra-spaces.detail`
-   people.
-3. **`nest build` apps/api** — OK (exit 0) tras clean dist.
+### Fix
+
+- `DELETE integra/people/:id?force=1` — espejo fuera aunque falle un ACS;
+  tombstone `integra_person_delete_pending` + cola retry; sync no reimporta.
+- UI checkbox «Eliminar de NEXARA aunque un terminal falle» + errores por IP.
+- Retry `userDelete` ya no recrea espejo.
+
+### Ariadna (prod)
+
+ISAPI Delete OK en `.163`; espejo `integra_people` borrado. Verificar lista Personas.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` · `bash deploy/update.sh --force-all`
+`/var/www/nexara-app` · `./deploy/update.sh --force-all --with-migrate`
 
 ### Verificar
 
-1. Contenedores `nexara-api` / `nexara-web` Up.
-2. Logs API: Nest started / sin crash loop.
-3. Hard refresh panels no 502.
+1. Personas: Ariadna no aparece.
+2. Danger zone: checkbox force + detalle por IP si falla.
+3. Migración `20260904230000_integra_person_delete_pending`.
 
 ## A medias
 
-1. Portal empleado · ANPR ITC · micros · TCPMSS.
-2. Features sibling (Espacios UI, Horarios ACS, presence, SOC alarms) —
-   compilan; no validadas en prod en este turno.
-3. FieldDetection re-apply · employeeNumber↔personId Oficinas.
+1. Portal empleado · ANPR · micros · TCPMSS.
+2. Features sibling Espacios/Horarios — no pelear.
 
 ## No tocar
 
 Puente NAS, Traefik, credenciales. Face ID óptico inventado.
-No pelear hotpath push / PDF / PTZ del sibling mientras deploya.

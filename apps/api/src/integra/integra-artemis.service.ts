@@ -1441,11 +1441,18 @@ export class IntegraArtemisService {
     personId: string,
     actor?: Actor,
     siteId?: number | null,
+    force = false,
   ) {
     const resolved = await this.client(companyId, siteId);
     if (resolved.provider === 'ISAPI' && resolved.isapiForHost && resolved.siteId && companyId) {
       const id = decodeURIComponent(String(personId || '').trim());
       if (!id) throw new BadRequestException('personId requerido');
+
+      const mirrored = await this.prisma.integraPerson.findFirst({
+        where: { companyId, siteId: resolved.siteId, personId: id },
+        select: { personName: true },
+      });
+      const displayName = mirrored?.personName || id;
 
       const results = await this.fanoutAcs(
         companyId,
@@ -1458,36 +1465,79 @@ export class IntegraArtemisService {
         },
         {
           op: 'userDelete',
-          user: { employeeNo: id, name: id },
+          user: { employeeNo: id, name: displayName },
         },
       );
-      await this.auditMut('integra.person.delete', actor, companyId, resolved.siteId, {
-        personId: id,
-        results,
-      });
-
       const allOk = results.length > 0 && results.every((r) => r.ok);
       const anyOk = results.some((r) => r.ok);
+      const failedIps = results.filter((r) => !r.ok).map((r) => r.deviceIp);
+      const removeMirror = allOk || force;
 
-      // Solo borramos el espejo si TODOS los terminales confirman. Si no, el sync
-      // de 15 min (o live) volvería a meter a la persona y parece que «no borra».
-      if (allOk) {
+      if (removeMirror) {
         await this.prisma.integraPerson.deleteMany({
           where: { companyId, personId: id, siteId: resolved.siteId },
         });
         deleteAllLocalPersonMedia(companyId, id);
       }
 
+      if (failedIps.length) {
+        await this.prisma.integraPersonDeletePending.upsert({
+          where: { siteId_personId: { siteId: resolved.siteId, personId: id } },
+          create: {
+            companyId,
+            siteId: resolved.siteId,
+            personId: id,
+            personName: displayName,
+            failedIps,
+            force,
+            note: force
+              ? 'Espejo quitado; reintento Delete en IPs fallidas'
+              : 'Espejo conservado hasta que todos los ACS confirmen',
+          },
+          update: {
+            personName: displayName,
+            failedIps,
+            force: force || undefined,
+            note: force
+              ? 'Espejo quitado; reintento Delete en IPs fallidas'
+              : 'Espejo conservado hasta que todos los ACS confirmen',
+          },
+        });
+      } else {
+        await this.prisma.integraPersonDeletePending.deleteMany({
+          where: { siteId: resolved.siteId, personId: id },
+        });
+      }
+
+      await this.auditMut('integra.person.delete', actor, companyId, resolved.siteId, {
+        personId: id,
+        force,
+        removeMirror,
+        results,
+      });
+
+      const failSummary = failedIps.length
+        ? ` Fallos: ${results
+            .filter((r) => !r.ok)
+            .map((r) => `${r.deviceIp} (${r.error || 'error'})`)
+            .join('; ')}.`
+        : '';
+
       return {
-        success: allOk,
+        success: allOk || (force && removeMirror),
         partial: anyOk && !allOk,
+        forced: Boolean(force && !allOk),
+        mirrorRemoved: removeMirror,
+        pendingIps: failedIps,
         results,
         provider: 'ISAPI' as const,
         note: allOk
           ? 'Eliminado en todos los terminales y en el espejo.'
-          : anyOk
-            ? 'Borrado parcial: sigue en algún terminal; el espejo se conserva. Reintenta o revisa el error por IP.'
-            : 'No se pudo eliminar en ningún terminal; el espejo no se tocó.',
+          : force && removeMirror
+            ? `Forzado: fuera del espejo NEXARA. Reintento en cola para ${failedIps.join(', ')}.${failSummary}`
+            : anyOk
+              ? `Borrado parcial: el espejo se conserva. Marca «Eliminar de NEXARA aunque un terminal falle» o revisa por IP.${failSummary}`
+              : `No se pudo eliminar en ningún terminal; el espejo no se tocó.${failSummary}`,
       };
     }
     try {

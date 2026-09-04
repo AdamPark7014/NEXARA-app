@@ -46,6 +46,7 @@ import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
 import { IntegraSpacesService } from './integra-spaces.service';
 import { IntegraSchedulesService } from './integra-schedules.service';
 import { IntegraPresenceService } from './integra-presence.service';
+import { IntegraRecurringVisitorsService } from './integra-recurring-visitors.service';
 import { IdentityLinkService } from '../identity/identity-link.service';
 
 export function integraCanSettings(user: { roleKey?: string; isSuperAdmin?: boolean } | null) {
@@ -260,6 +261,27 @@ class PersonAccessPatchDto {
   @IsOptional() @IsBoolean() ensurePresetsOnDevices?: boolean;
 }
 
+/** Visita recurrente ISAPI: Valid + WeekPlan en puertas limitadas. */
+class RecurringVisitorCreateDto {
+  @IsString() visitorName!: string;
+  @IsOptional() @IsString() phone?: string;
+  @IsOptional() @IsString() hostEmployeeId?: string;
+  @IsOptional() @IsString() hostPersonId?: string;
+  @IsOptional() @IsString() hostEmployeeName?: string;
+  @IsOptional() @IsString() hostName?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) doorIds?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) doorIndexCodes?: string[];
+  @IsArray() @ArrayNotEmpty() @IsString({ each: true }) weekdays!: string[];
+  @IsString() timeFrom!: string;
+  @IsString() timeTo!: string;
+  @IsOptional() @IsString() beginTime?: string;
+  @IsOptional() @IsString() endTime?: string;
+  @IsString() validFrom!: string;
+  @IsString() validTo!: string;
+  @IsOptional() @IsString() faceBase64?: string;
+  @IsOptional() @IsString() notes?: string;
+}
+
 @ApiTags('Integra · Artemis')
 @ApiBearerAuth()
 @UseGuards(RbacGuard)
@@ -276,6 +298,7 @@ export class IntegraController {
     private readonly spaces: IntegraSpacesService,
     private readonly schedules: IntegraSchedulesService,
     private readonly presence: IntegraPresenceService,
+    private readonly recurringVisitors: IntegraRecurringVisitorsService,
   ) {}
 
   @Get('health')
@@ -820,20 +843,27 @@ export class IntegraController {
   }
 
   @Delete('people/:id')
+  @ApiOperation({
+    summary:
+      'Baja persona en todos los ACS. ?force=1 quita el espejo aunque un terminal falle y encola reintento.',
+  })
   deletePerson(
     @CurrentCompanyId() companyId: number | null,
     @Param('id') id: string,
     @CurrentUser() user: any,
     @Query('siteId') siteId?: string,
+    @Query('force') force?: string,
   ) {
     if (!integraCanSettings(user)) {
       throw new BadRequestException('Sin permiso para gestionar personas');
     }
+    const forceDelete = force === '1' || force === 'true' || force === 'yes';
     return this.integra.deletePerson(
       companyId,
       id,
       { id: user?.id, email: user?.email },
       siteId ? parseInt(siteId, 10) : null,
+      forceDelete,
     );
   }
 
@@ -1493,12 +1523,22 @@ export class IntegraController {
         .map((p) => ({
           personId: p.personId,
           name: p.personName,
-          planTemplateNo: '1',
+          planTemplateNo: String(
+            (p as { planTemplateNo?: string }).planTemplateNo || '1',
+          ),
           planName: p.kindLabel,
           validEnable: p.validEnable !== false,
           validFrom: p.validFrom,
           validTo: p.validTo,
           indefinite: p.kind === 'indefinite',
+          validMode:
+            p.kind === 'indefinite'
+              ? 'indefinite'
+              : p.kind === 'off'
+                ? 'disabled'
+                : p.kind === 'timed'
+                  ? 'window'
+                  : undefined,
         })),
       source: 'mirror',
       note: 'Listado desde espejo RightPlan/Valid; empujar cambios en Horarios o Personas.',
@@ -1851,6 +1891,96 @@ export class IntegraController {
     @Query('siteId') siteId?: string,
   ) {
     return this.integra.visitorQr(companyId, body, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  @Get('visitors/recurring')
+  @ApiOperation({
+    summary:
+      'Visitas recurrentes ISAPI: acceso ACS limitado (Valid + RightPlan) para que entren al llegar',
+  })
+  listRecurringVisitors(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    return this.recurringVisitors.list(
+      companyId,
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Post('visitors/recurring')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary:
+      'Alta visita recurrente: empuja UserInfo + WeekPlan a puertas marcadas (Oficinas ISAPI)',
+  })
+  createRecurringVisitor(
+    @CurrentCompanyId() companyId: number | null,
+    @Body() dto: RecurringVisitorCreateDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    if (!integraCanControlDoors(user)) {
+      throw new BadRequestException('Sin permiso para altas ACS de visitantes');
+    }
+    return this.recurringVisitors.create(
+      companyId,
+      {
+        visitorName: dto.visitorName,
+        phone: dto.phone,
+        hostEmployeeId: dto.hostEmployeeId,
+        hostPersonId: dto.hostPersonId,
+        hostEmployeeName: dto.hostEmployeeName,
+        hostName: dto.hostName,
+        doorIds: dto.doorIds,
+        doorIndexCodes: dto.doorIndexCodes,
+        weekdays: dto.weekdays,
+        timeFrom: dto.timeFrom || dto.beginTime || '',
+        timeTo: dto.timeTo || dto.endTime || '',
+        beginTime: dto.beginTime,
+        endTime: dto.endTime,
+        validFrom: dto.validFrom,
+        validTo: dto.validTo,
+        faceBase64: dto.faceBase64,
+        notes: dto.notes,
+      },
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Post('visitors/recurring/:id/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cancela recurrencia y deshabilita Valid en terminales' })
+  cancelRecurringVisitor(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!companyId) throw new BadRequestException('Empresa requerida');
+    if (!integraCanControlDoors(user)) {
+      throw new BadRequestException('Sin permiso para cancelar acceso ACS');
+    }
+    return this.recurringVisitors.cancel(
+      companyId,
+      id,
+      { id: user?.id, email: user?.email },
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Delete('visitors/recurring/:id')
+  @ApiOperation({ summary: 'Alias cancelación visita recurrente (DELETE)' })
+  deleteRecurringVisitor(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.cancelRecurringVisitor(companyId, id, user, siteId);
   }
 
   // ── P4 ANPR ────────────────────────────────────────────────────────

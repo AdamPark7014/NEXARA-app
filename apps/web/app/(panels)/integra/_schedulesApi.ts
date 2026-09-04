@@ -253,6 +253,55 @@ async function loadDoorsFallback(): Promise<ScheduleDoor[]> {
 }
 
 export async function fetchSchedulesCatalog(): Promise<SchedulesCatalog> {
+  // Preferir alias UI (doors + templates ya aplanados).
+  try {
+    const shaped = await integraApi<{
+      doors?: ScheduleDoor[];
+      templates?: ScheduleTemplate[];
+      meetingRoomDoorId?: string | null;
+      presets?: Array<{ key: string; label: string }>;
+      note?: string;
+      source?: string;
+    }>("integra/schedules");
+    if (shaped?.doors?.length || shaped?.templates?.length) {
+      const doors = (shaped.doors || []).map((d) => ({
+        id: d.id,
+        name: d.name,
+        deviceIp: d.deviceIp || String(d.id).split("|")[0] || "",
+        doorNo: d.doorNo ?? 1,
+        online: d.online !== false,
+      }));
+      const templatesMap = new Map<string, ScheduleTemplate>();
+      for (const t of FALLBACK_TEMPLATES) templatesMap.set(t.id, t);
+      for (const t of shaped.templates || []) {
+        if (!t?.id) continue;
+        templatesMap.set(String(t.id), {
+          id: String(t.id),
+          name: t.name || `Plantilla ${t.id}`,
+          weekPlanNo: t.weekPlanNo,
+          enable: t.enable,
+          summary: t.summary || templatesMap.get(String(t.id))?.summary,
+        });
+      }
+      templatesMap.set("0", FALLBACK_TEMPLATES.find((t) => t.id === "0")!);
+      return {
+        doors,
+        templates: Array.from(templatesMap.values()).sort(
+          (a, b) => Number(a.id) - Number(b.id),
+        ),
+        meetingRoomDoorId:
+          shaped.meetingRoomDoorId ?? findMeetingRoomDoor(doors)?.id ?? null,
+        source: "live",
+        apiPresets: shaped.presets,
+        note: shaped.note,
+      };
+    }
+  } catch (e) {
+    if (!isNotReady(e)) {
+      /* seguir con access-schedules */
+    }
+  }
+
   try {
     const raw = await integraApi<{
       provider?: string;
@@ -264,7 +313,7 @@ export async function fetchSchedulesCatalog(): Promise<SchedulesCatalog> {
         doorName?: string;
         ok?: boolean;
         templates?: Array<{ id?: number; templateName?: string; weekPlanNo?: number; enable?: boolean }>;
-        weekPlans?: Array<{ id?: number; summary?: string }>;
+        weekPlans?: Array<{ id?: number; summary?: string; enabledSegments?: Array<{ week: string; beginTime: string; endTime: string }> }>;
         error?: string;
       }>;
       model?: { useCases?: string };
@@ -284,12 +333,21 @@ export async function fetchSchedulesCatalog(): Promise<SchedulesCatalog> {
       for (const t of d.templates || []) {
         const id = String(t.id ?? "");
         if (!id) continue;
+        const week = d.weekPlans?.find((w) => String(w.id) === id);
+        const summary =
+          week?.summary ||
+          (week?.enabledSegments?.length
+            ? week.enabledSegments
+                .slice(0, 3)
+                .map((s) => `${s.week.slice(0, 3)} ${String(s.beginTime).slice(0, 5)}–${String(s.endTime).slice(0, 5)}`)
+                .join(" · ")
+            : undefined);
         templatesMap.set(id, {
           id,
           name: t.templateName || `Plantilla ${id}`,
           weekPlanNo: t.weekPlanNo,
           enable: t.enable,
-          summary: d.weekPlans?.find((w) => String(w.id) === id)?.summary,
+          summary: summary || templatesMap.get(id)?.summary,
         });
       }
     }
@@ -449,6 +507,63 @@ export async function fetchDoorAccess(
     deviceIp: doorId.split("|")[0] || "",
   };
 
+  const mapPeople = (
+    people: Array<{
+      personId?: string;
+      id?: string;
+      name?: string;
+      code?: string;
+      planTemplateNo?: string;
+      planName?: string;
+      validEnable?: boolean;
+      validFrom?: string;
+      validTo?: string;
+      validMode?: string;
+      indefinite?: boolean;
+      weekSummary?: string;
+    }>,
+  ): DoorAccessRow[] =>
+    people.map((p) => {
+      const plan = String(p.planTemplateNo || "1");
+      return {
+        personId: String(p.personId || p.id || ""),
+        name: String(p.name || p.personId || ""),
+        code: p.code,
+        planTemplateNo: plan,
+        planName: p.planName || templateLabel(catalog.templates, plan),
+        validEnable: p.validEnable,
+        validFrom: p.validFrom,
+        validTo: p.validTo,
+        indefinite:
+          p.indefinite === true ||
+          p.validMode === "indefinite" ||
+          isIndefiniteEnd(p.validTo),
+        weekSummary:
+          p.weekSummary || catalog.templates.find((t) => t.id === plan)?.summary,
+      };
+    });
+
+  try {
+    const raw = await integraApi<{
+      door?: { name?: string };
+      people?: Array<Record<string, unknown>>;
+      note?: string;
+      source?: string;
+    }>(`integra/schedules/doors/${encodeURIComponent(doorId)}`);
+    if (raw?.people) {
+      return {
+        door: { ...door, name: (raw.door?.name as string) || door.name },
+        people: mapPeople(raw.people as Parameters<typeof mapPeople>[0]),
+        source: raw.source || "live",
+        note: raw.note,
+      };
+    }
+  } catch (e) {
+    if (!isNotReady(e)) {
+      /* seguir */
+    }
+  }
+
   try {
     const raw = await integraApi<{
       door?: { name?: string };
@@ -469,18 +584,7 @@ export async function fetchDoorAccess(
     if (raw?.people) {
       return {
         door: { ...door, name: raw.door?.name || door.name },
-        people: raw.people.map((p) => ({
-          personId: String(p.personId || p.id || ""),
-          name: String(p.name || p.personId || ""),
-          code: p.code,
-          planTemplateNo: String(p.planTemplateNo || "1"),
-          planName: p.planName,
-          validEnable: p.validEnable,
-          validFrom: p.validFrom,
-          validTo: p.validTo,
-          indefinite: p.validMode === "indefinite" || isIndefiniteEnd(p.validTo),
-          weekSummary: p.weekSummary,
-        })),
+        people: mapPeople(raw.people),
         source: "live",
       };
     }

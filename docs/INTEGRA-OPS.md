@@ -66,6 +66,9 @@ Sitios se crean en UI `/integra/settings` (roles altos). Rotar keys = editar sit
 Alta y barrido en [INTEGRA-LAN](INTEGRA-LAN.md). **go2rtc debe correr dentro de
 la LAN del sitio**; el del droplet no alcanza el RTSP de los equipos.
 
+**Visitas recurrentes** (acceso ACS limitado al llegar): UI `/integra/visitors`
+pestaña Recurrente · guía [INTEGRA-VISITAS-RECURRENTES](INTEGRA-VISITAS-RECURRENTES.md).
+
 ## Caja on-site: alta y estado (ADR-0021)
 
 Un sitio ISAPI necesita una caja en la sucursal que cierre el túnel y corra
