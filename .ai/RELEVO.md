@@ -1,6 +1,6 @@
 # RELEVO
 
-- **Último turno:** claude-code
+- **Último turno:** cursor
 - **Fecha:** 2026-09-04
 - **Rama:** mejora/calidad-y-web
 
@@ -8,16 +8,32 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
+## Este turno (cursor) — en vivo profesional
+
+Tras ff de `origin` (`2d9e868`, overlay/PTZ/push/asistencia ya en disco):
+
+1. **Nameplates:** overlay usa `personName` del `AccessControllerEvent` cuando
+   viene; si no, etiqueta de tipo (`Persona`/`Vehículo`/`Rostro`). Sin matching
+   facial inventado.
+2. **Últimos accesos (30 s)** en Foco de cámara-puerta (`_RecentAccess.tsx`),
+   con foto `/uploads/integra/...` si existe.
+3. **PTZ hold-to-move:** ráfagas `momentary` + `stop` en pointerup / blur /
+   visibilitychange / unmount. Presets y HUD compacto.
+4. **Chrome:** badges vivo/det/off en rail; contador de detecciones en toolbar;
+   muro sigue en `mode="auto"` (MSE → snapshot).
+
+SSH: `-p 2222 root@5.78.215.109` → `/var/www/nexara-app`
+
 ## Muro: por qué se quedaba en «Conectando»
 
 `video-stream mode=mjpeg` **no entrega frames** con estos RTSP. Medido:
 `/api/frame.jpeg?src=cam_…_101` → **200 / 16 KB**; el WS mjpeg del
 componente se queda vacío → spinner eterno.
 
-### Arreglo
+### Arreglo actual
 
-- **Muro** → `<img>` a `/go2rtc/api/frame.jpeg?src=…` refrescado ~1 fps
-  (escalonado). Se ven todas sin decodificar H.264 × N.
+- **Muro** → `mode="auto"`: intenta MSE y, si un mosaico no da imagen ~7 s,
+  cae a snapshots HTTP `frame.jpeg` él solo.
 - **Foco** → MSE (`video-stream`), `src` se asigna **después** de
   `appendChild` (si no, `onconnect` sale con `isConnected=false`).
 
@@ -69,8 +85,6 @@ Los cuatro DS-K1T publican `/ISAPI/Streaming/channels/101` (H.264 720p +
 audio). El sync los da de alta en `integra_cameras` con
 `streamId: '101'` — **no** se les deriva sub-stream: solo tienen ese.
 Aparecen en el muro como «<nombre> (puerta)».
-
-SSH: `-p 2222 root@5.78.215.109` → `/var/www/nexara-app`
 
 ## Puesto de puerta
 
@@ -238,6 +252,8 @@ Hace falta cámara dedicada (serie ITC/checkpoint).
 parada dentro: con el modo continuo, si se cae la red entre el «muévete» y el
 «para», la domo se queda girando contra el tope.
 
+UX consola: hold-to-move + stop garantizado al soltar; presets en Foco.
+
 ## Asistencia
 
 Módulo nuevo `integra-attendance` en `/integra/attendance` (alta en
@@ -275,12 +291,13 @@ arranque. **No es de esto**: siembra definiciones que ya existen. Venía de ante
 ## A medias
 
 1. Portal del empleado (Adam pidió asistencia + credencial: falta que el
-   empleado entre y vea lo suyo).
+   empleado entre y vea lo suyo). Requiere User↔`employeeNo`.
 2. El `httpHost` del grabador (ver arriba). Sin él, Escalera 01, Escaleras 02,
    Azotea y Office Entrance no empujan eventos; su video va bien.
 3. La PTZ `.179` no tiene `FieldDetection`: sin recuadros en el estacionamiento.
 4. Decidir si se encienden los micros de las cámaras (el botón ya está).
-5. TCPMSS / biblioteca `init: true` / empresas 1-2.
+5. Desplegar este turno (nameplates + PTZ hold) y hard-refresh del en vivo.
+6. TCPMSS / biblioteca `init: true` / empresas 1-2.
 
 ## No tocar
 
