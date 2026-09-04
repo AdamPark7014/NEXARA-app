@@ -8,32 +8,47 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Stock historial hiper-detallado (FIN)
+## Este turno — ACS fan-out en vivo (sin Sync obligatorio)
 
-Kardex por producto desplegado: quién / cuándo / por qué / origen→destino /
-saldo before→after / docs OC·OP·AN / notas. Excel + PDF kardex + vale PDF.
+Adam: cada cambio debe empujar ISAPI en tiempo real a todos los ACS.
+Sync queda como reconciliación / recuperación.
 
-### Entregado
+### Qué dispara el push en vivo
 
-1. Migración `20260904180000_stock_movement_qty_audit` (columnas en prod).
-2. `createStockMovement` audita saldos; list con PO/OP/actividad.
-3. PDF: `GET stock/movements/pdf` + `GET stock/movements/:id/pdf`.
-4. UI `/erp/warehouse`: filtros, drawer, Excel, PDF kardex, PDF por fila.
+1. **Integra Personas** — alta / editar ficha / Face upload-delete / baja →
+   `UserInfo` + `FaceDataRecord` a todos los ACS del sitio (await DeleteProcess).
+2. **ERP Usuarios** — create / update nombre·employeeNumber / HR isActive /
+   bulk deactivate → si hay sitio ISAPI, `employeeNumber` = `employeeNo` ACS.
+3. **RightPlan / doorRight** — van en UserInfo/Modify cuando llegan en el PATCH.
+4. **Push ACS** — evento con personId+personName actualiza espejo sin sync full.
 
-Commit base `8a17b9f`. Redeploy Hetzner con migrate (ya aplicada).
+### Código
 
-Verificar: ERP → Almacén → Movimientos.
+- `IntegraAcsFanoutService`: fan-out + reintento en línea + cola
+  `integra.acs.fanout.retry` + `GET integra/acs-fanout/status`.
+- Espejo upsert inmediato (no esperar sync completo).
+- UI: «Reconciliar» + copy «Cambios en vivo a terminales».
 
-### Concurrente (siblings — no pisar)
+Clave identidad (sibling): `employeeNumber` ↔ `personId`/`employeeNo`.
 
-Live detection / PTZ / Eventos ACS / asistencia / OC PDF / Personas / ACS fan-out.
+SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109`
+→ `/var/www/nexara-app` → `./deploy/update.sh`
+
+### Verificar
+
+1. Personas: alta/editar/foto → detalle por IP OK sin pulsar Reconciliar.
+2. ERP: crear usuario con employeeNumber → aparece en ACS (o status por IP).
+3. Desactivar en HR → Valid.enable=false en terminales.
+4. Fallo de un IP → no success total; reintento en cola / status.
 
 ## A medias
 
-1. Portal empleado · NVR httpHost · ANPR · micros · TCPMSS.
-2. FieldDetection; employeeNumber↔personId.
+1. Portal empleado · ANPR ITC · micros · TCPMSS.
+2. CaptureFaceData en sensor si firmware lo expone.
+3. Re-wire httpHosts tras cambios de PUBLIC_API_URL.
+4. Sibling dejó `_lib.ts` sin commitear — no tocar salvo su turno.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales, ISAPI no verificada.
-No pelear siblings PTZ/Personas/Eventos/asistencia/OC PDF/ACS.
+Puente NAS, Traefik, credenciales.
+No Face ID óptico inventado. No pisar stock/CRM/PTZ siblings.
