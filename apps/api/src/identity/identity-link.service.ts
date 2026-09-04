@@ -373,15 +373,15 @@ export class IdentityLinkService {
     });
 
     return rows
-      .filter((r) => r.user?.isActive !== false)
+      .filter((r): r is typeof r & { user: NonNullable<(typeof r)['user']> } => Boolean(r.user) && r.user.isActive !== false)
       .map((r) => ({
         id: r.user.id,
         nombre: r.user.nombre,
         email: r.user.email,
         employeeNumber: r.user.employeeNumber,
         companyEmployeeNumber: r.employeeNumber,
-        role: r.user.role,
-        department: r.user.department,
+        role: r.user.role ?? null,
+        department: r.user.department ?? null,
       }));
   }
 }

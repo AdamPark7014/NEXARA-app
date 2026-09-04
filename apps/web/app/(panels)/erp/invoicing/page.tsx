@@ -17,6 +17,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import Modal from "@/components/ui/Modal";
 import { toast } from "@/components/Toast";
+import FinanceModuleRail from "@/components/erp/FinanceModuleRail";
 
 interface InvoiceRow {
   id: number;

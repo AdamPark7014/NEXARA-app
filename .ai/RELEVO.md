@@ -8,57 +8,54 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Event ingest + API performance
+## Este turno — Exports PDF/Excel HR·Ops·Finance + UX listas
 
-Perfil prod (última hora): **VMD 10906 / duration 1857 / heartBeat 236 /
-fielddetection 134 / ACS 58** · ~205 evt/min · tabla ~92k filas / 71 MB.
+Gaps ERP de documentos: PDFs/Excels faltantes y botones «Excel» sueltos.
+Sin tocar cámaras Integra ni núcleo CRM OC / stock / FieldDetection.
 
-### Qué hay (API)
+### Exports añadidos / cableados
 
-1. **Skip store** — `heartBeat`/`duration`/`VMD`/`videoloss` no se insertan
-   ni emiten SSE (~97 % del tráfico medido).
-2. **listEvents** — default excluye ruido; `scope=acs|noise|all`; `afterId` /
-   `beforeId`; select lean; `outcome` granted/denied.
-3. **SSE** — `publish` solo si hay oyentes (`Subject.observed`).
-4. **Token cache** 30 s en `siteForToken`.
-5. **Poda** — hourly wipe de ruido + nocturna business TTL 90 d.
-6. **Índices** — `(companyId,id)`, `(siteId,id)`, major/occurredAt,
-   eventType/occurredAt.
-7. **`GET integra/push/events/stats`** — `entradas`/`denegados`/`unicos`/
-   `enSitio` + aliases EN `granted`/`denied`/`uniquePersons`/`onSite`.
+1. **Actividades OPS PDF** — `GET activities/report.pdf` (landscape, KPIs
+   estatus/prioridad, detalle OT). UI en `OpsActivitiesBoard` + pack
+   `/erp/exports`.
+2. **Viáticos PDF** — ya existía API; ahora en OPS campo, Mis viáticos y
+   ERP finance con patrón **Exportar PDF / Exportar Excel**.
+3. **Asistencia híbrida Excel** — `GET attendance/hybrid/export.xlsx` +
+   botón en `HybridAttendancePanel` + tarjeta en `/erp/exports`.
+4. **Componente** `ListExportActions` — labels consistentes en listas.
 
-### Contrato Eventos UI sibling
+### UX polish
 
-- `GET integra/push/events?scope=acs&outcome=&afterId=&beforeId=`
-- `GET integra/push/events/stats?siteId=`
-- Overlay/poll: sin `scope` ⇒ útil (sin VMD); `scope=all` diagnóstico.
+- OT: empty con Limpiar filtros + Nueva OT; Excel con más columnas.
+- Viáticos ops/mis: empty con CTA primaria; PDF 90 días.
+- Finance viáticos: «Exportar PDF» (antes «PDF control»).
+- Asistencia HR: «Exportar Excel».
 
-### Concurrente (siblings — no pisar)
+### Concurrente — no pisar
 
-Integra UX chrome · Eventos ACS UI · Business events ops/CRM · Face ACS ·
-AcuSense FieldDetection · PTZ/vehicle · hybrid · stock/OC PDF · People.
-
-### No toqué
-
-FieldDetection XML (AcuSense). No reescribí UI Eventos del sibling.
+Integra UX Video/Personas/Eventos · ACS face JPEG · FieldDetection ·
+identity-link · stock historial · CRM OC PDF · facilities access.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` · `deploy/update.sh --force-all` (api + migrate)
+`/var/www/nexara-app` · `./deploy/update.sh --force-all`
 
-### Verificar
+### Verificar (hard refresh)
 
-1. Inserts/min caen (ACS + fielddetection).
-2. `/push/events/stats` KPIs del día.
-3. Poll `afterId` sin VMD; SSE sin flood.
+1. `/ops/activities` → Exportar Excel + Exportar PDF.
+2. `/ops/viatics` y `/ops/my-viatics` → Exportar PDF/Excel.
+3. `/erp/finance/viatics` → Exportar PDF + Excel en toolbar.
+4. `/erp/hr/attendance` → híbrido Exportar Excel; pack `/erp/exports`
+   Actividades PDF + Asistencia híbrida.
 
 ## A medias
 
-1. Portal empleado · ANPR ITC · micros · TCPMSS.
-2. employeeNumber↔personId Oficinas.
-3. go2rtc.yaml corruptible — streams en RAM.
-4. FieldDetection re-apply tras sync/push.
-5. Vaciar histórico VMD vía poda hourly.
+1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
+2. PDF nómina/pagos empleado si falta en UI (API `employee-payments/report.pdf` ya existe).
+3. identity-link WIP — no cableado a AppModule.
+4. go2rtc.yaml en disco corruptible — streams en RAM.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales. Face ID óptico inventado.
+Puente NAS, Traefik, credenciales.
+Face ID óptico inventado. No pelear PTZ / biometrics CRUD / FieldDetection /
+stock detail / OC PDF del sibling.

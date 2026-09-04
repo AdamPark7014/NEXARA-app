@@ -16,6 +16,7 @@ import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog"
 import { toast } from "@/components/Toast";
 import FilterToolbar from "@/components/FilterToolbar";
 import { exportToExcel } from "@/lib/export-excel";
+import FinanceModuleRail from "@/components/erp/FinanceModuleRail";
 
 interface JournalEntry {
   id: number;

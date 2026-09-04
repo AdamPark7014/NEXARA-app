@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, Res, UseGuards, ParseIntPipe } from '@nestjs/common';
+import type { Response } from 'express';
 import { WarehouseService } from './warehouse.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js';
@@ -51,6 +52,62 @@ export class StockController {
   @RBAC({ permissions: [PERMISSIONS.STOCK_MANAGE] })
   createMovement(@CurrentUser() user: any, @CurrentCompanyId() companyId: number | null, @Body() dto: any) {
     return this.service.createStockMovement(dto, user.id, companyId);
+  }
+
+  /** Kardex PDF — debe ir antes de movements/:id */
+  @Get('movements/pdf')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_VIEW] })
+  async movementsPdf(
+    @CurrentCompanyId() companyId: number | null,
+    @Res() res: Response,
+    @Query('productId') productId?: string,
+    @Query('warehouseId') warehouseId?: string,
+    @Query('type') type?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    try {
+      const { pdf, filename } = await this.service.getStockMovementsPdfBuffer(
+        {
+          productId: productId ? +productId : undefined,
+          warehouseId: warehouseId ? +warehouseId : undefined,
+          type,
+          from,
+          to,
+        },
+        companyId,
+      );
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+      res.send(pdf);
+    } catch (error) {
+      const status = (error as { status?: number })?.status ?? 500;
+      res.status(status).json({
+        error: error instanceof Error ? error.message : 'Error al generar PDF de movimientos',
+      });
+    }
+  }
+
+  @Get('movements/:id/pdf')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.STOCK_VIEW] })
+  async movementSlipPdf(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+    @Res() res: Response,
+  ) {
+    try {
+      const { pdf, filename } = await this.service.getStockMovementSlipPdfBuffer(id, companyId);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+      res.send(pdf);
+    } catch (error) {
+      const status = (error as { status?: number })?.status ?? 500;
+      res.status(status).json({
+        error: error instanceof Error ? error.message : 'Error al generar comprobante de movimiento',
+      });
+    }
   }
 
   @Get('movements')
