@@ -2375,3 +2375,96 @@
 .ptzHint[data-tone="error"] {
   color: var(--ig-danger, #dc2626);
 }
+
+/* ── Asistencia ─────────────────────────────────────────────────────────
+ * Fichas y no tabla: lo primero que se busca es la cara y la hora de entrada,
+ * y en una fila de tabla la foto no cabe sin encogerla hasta ser inútil.
+ */
+.attGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+}
+
+.attCard {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--ig-line);
+  border-radius: 10px;
+  background: var(--ig-panel);
+}
+
+.attPhoto {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ig-accent) 12%, var(--ig-panel));
+  display: grid;
+  place-items: center;
+}
+
+.attPhoto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attPhoto[data-empty="1"] span {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ig-accent-deep, var(--ig-accent));
+}
+
+.attBody {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-width: 0;
+}
+
+.attName {
+  font-size: 13px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.attCode {
+  font-family: var(--ig-mono, ui-monospace, monospace);
+  font-size: 10px;
+  color: var(--ig-muted);
+}
+
+.attTimes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--ig-muted);
+}
+
+.attTimes b {
+  color: var(--ig-text);
+  font-size: 13px;
+}
+
+.attChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.attDoor {
+  font-size: 11px;
+  color: var(--ig-muted);
+}
+
+.attNote {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ig-muted);
+}
