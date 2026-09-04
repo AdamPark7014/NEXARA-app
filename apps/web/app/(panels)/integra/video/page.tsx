@@ -15,7 +15,7 @@ import {
 } from "../_Console";
 import { IntegraEzuiKitPlayer } from "../_EzuiKitPlayer";
 import { IntegraDetectionOverlay, subscribePushEvents } from "../_DetectionOverlay";
-import { IntegraLivePlayer } from "../_LivePlayer";
+import { IntegraLivePlayer, preloadGo2rtcPlayer } from "../_LivePlayer";
 import { IntegraLiveAccessBanner } from "../_LiveAccessBanner";
 import { IntegraAcsIdentityStrip } from "../_AcsIdentityStrip";
 import { IntegraPtzPad } from "../_PtzPad";
@@ -73,7 +73,7 @@ const LAYOUT_KEY = "nexara_integra_video_layout";
 const MODE_KEY = "nexara_integra_video_mode";
 const AUTOOPEN_KEY = "nexara_integra_video_autoopen";
 /** Stagger suave al abrir muchos MJPEG a la vez (no decodifican H.264). */
-const STAGGER_MS = 180;
+const STAGGER_MS = 90;
 
 function colsFor(layout: LayoutN): number {
   if (layout === 1) return 1;
@@ -817,11 +817,19 @@ export default function IntegraVideoPage() {
                           canControl={Boolean(caps?.canControlDoors)}
                         />
                         <div className={styles.ptzChromeMeta}>
+                          <div className={styles.ptzCapChips} aria-label="Capacidades PTZ">
+                            <span data-on="1">Video</span>
+                            <span data-on="1">PTZ</span>
+                            <span data-on="1">Motion</span>
+                            <span data-on="0">Vehicle</span>
+                            <span data-on="0">Placas</span>
+                          </div>
                           {focusCam?.anprCapable !== true && (
-                            <p className={styles.ptzHint}>
-                              Esta PTZ no clasifica vehículo ni lee placa
-                              (FieldDetection/ANPR no soportados). Solo video +
-                              mando. Hace falta cámara ITC/AcuSense con vehicle.
+                            <p className={styles.ptzCapBanner} data-tone="limit">
+                              Esta domo no clasifica vehículos ni lee placas —
+                              video + PTZ only. Necesitas cámara ITC/ANPR o
+                              AcuSense/NVR con vehicle (Office Entrance, Azotea,
+                              Escalera).
                             </p>
                           )}
                           {!focus.hls && (

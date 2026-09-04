@@ -8,11 +8,15 @@ import {
   clearHttpNotificationHost,
   disableFieldDetection,
   enableHumanFieldDetection,
+  enableMotionDetection,
+  enableNvrParkingVehicleDetection,
+  readHttpNotificationHosts,
   setHttpNotificationHost,
 } from '../hikvision-isapi';
 import { resolveUploadsDir } from '../common/uploads-path';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { IntegraSiteService } from './integra-site.service';
+import { readLocalPersonFace } from './integra-person-media';
 
 /** Fila lista para consola / SSE (ISO dates, sin `raw`). */
 export type PushEventDto = {
@@ -642,9 +646,22 @@ export class IntegraPushService {
     }> = [];
 
     for (const [ip, info] of byIp) {
+      // PoE interno del NVR: no existe en la LAN; el smart va por el grabador.
+      if (ip.startsWith('192.168.254.')) {
+        results.push({
+          ip,
+          name: info.name,
+          kind: info.kind,
+          push: 'skip-plugplay',
+        });
+        continue;
+      }
       const client = resolved.isapiForHost(ip);
       if (!client) continue;
       const isCamera = info.kind !== 'ACS';
+      const isNvrHead =
+        ip === resolved.host.replace(/^https?:\/\//, '').split(':')[0];
+      const isPtz = /ptz|\.179$/i.test(`${info.name} ${ip}`);
       const entry: (typeof results)[number] = {
         ip,
         name: info.name,
@@ -662,7 +679,23 @@ export class IntegraPushService {
 
       if (opts.detection && isCamera) {
         try {
-          entry.detection = (await enableHumanFieldDetection(client)) ? 'ok' : 'no-soportado';
+          if (isNvrHead) {
+            const nvr = await enableNvrParkingVehicleDetection(client);
+            const ok = nvr.filter((r) => r.ok).length;
+            entry.detection =
+              ok > 0
+                ? `nvr-vehicle-ok:${ok}/${nvr.length}`
+                : nvr.map((r) => r.error || 'fail').join(';') || 'no-soportado';
+          } else if (isPtz) {
+            // DarkFighter: FieldDetection 403; motion sí (sensibilidad > 0).
+            entry.detection = (await enableMotionDetection(client, 1, 70))
+              ? 'motion-ok'
+              : 'no-soportado';
+          } else {
+            entry.detection = (await enableHumanFieldDetection(client))
+              ? 'ok'
+              : 'no-soportado';
+          }
         } catch (e) {
           entry.detection = describeErr(e);
         }
@@ -677,6 +710,34 @@ export class IntegraPushService {
       ok: results.filter((r) => r.push === 'ok').length,
       total: results.length,
     };
+  }
+
+  /**
+   * Recupera la URL de empuje ya escrita en algún equipo (p. ej. PTZ), para
+   * cablear el NVR sin rotar el token y tumbar el resto.
+   */
+  private async livePushUrlFromDevices(
+    resolved: Awaited<ReturnType<IntegraSiteService['resolveClient']>>,
+  ): Promise<string | null> {
+    if (!resolved.isapiForHost) return null;
+    const candidates = [
+      '192.168.9.179',
+      '192.168.9.173',
+      '192.168.9.160',
+      resolved.host.replace(/^https?:\/\//, '').split(':')[0],
+    ].filter(Boolean);
+    for (const ip of candidates) {
+      try {
+        const client = resolved.isapiForHost(ip);
+        if (!client) continue;
+        const hosts = await readHttpNotificationHosts(client);
+        const hit = hosts.find((h) => /\/api\/integra\/hik\//.test(h.url));
+        if (hit) return hit.url;
+      } catch {
+        /* siguiente */
+      }
+    }
+    return null;
   }
 
   /** Deshace lo anterior: los equipos dejan de avisar y de detectar. */
@@ -723,9 +784,13 @@ export class IntegraPushService {
    * detectada—: disparar una captura por cada latido del equipo llenaría el
    * disco de fotos de un pasillo vacío.
    *
-   * Publica por SSE **antes** del snapshot ISAPI (~300 ms): el nombre y el
-   * FaceRect no deben esperar a la JPEG. Si llega foto después, se re-emite
-   * el mismo id con `photoPath` para que banner/tira/overlay la enganchen.
+   * Orden de foto (rápido → lento):
+   * 1. JPEG que el equipo empujó (cámaras con httpHosts+images)
+   * 2. JPEG enrolado en NEXARA (Face ID) — **inmediato**, sin ISAPI
+   * 3. Snapshot canal 102→101 en background (~100–300 ms) y re-SSE
+   *
+   * Publica por SSE **antes** del snapshot ISAPI: el nombre y el FaceRect
+   * no deben esperar a la JPEG del canal.
    */
   async ingest(
     site: { id: number; companyId: number },
@@ -737,6 +802,19 @@ export class IntegraPushService {
       // Si el equipo mandó la imagen, esa es la buena: es el fotograma exacto
       // del evento. Solo las cámaras la mandan; los terminales, nunca.
       photoPath = await this.savePhoto(site, ev, pushedImage).catch(() => null);
+    }
+
+    // Acceso ACS con personId: cara enrolada al instante (banner/events).
+    if (
+      !photoPath &&
+      ev.personId &&
+      ev.eventType === 'AccessControllerEvent' &&
+      ev.major === 5
+    ) {
+      const local = readLocalPersonFace(site.companyId, ev.personId);
+      if (local?.buffer?.length) {
+        photoPath = await this.savePhoto(site, ev, local.buffer).catch(() => null);
+      }
     }
 
     const row = await this.prisma.integraPushEvent.create({
@@ -762,7 +840,9 @@ export class IntegraPushService {
 
     this.publish(site.id, this.toDto(row));
 
-    if (!photoPath && worthAPhoto(ev) && isFresh(ev.occurredAt)) {
+    // Snapshot de canal siempre en fresco (aunque ya haya cara enrolada):
+    // captura el instante en puerta; sustituye photoPath si llega.
+    if (worthAPhoto(ev) && isFresh(ev.occurredAt)) {
       void this.attachSnapshotLater(site, row.id, ev);
     }
     return row;
@@ -801,7 +881,10 @@ export class IntegraPushService {
     }
   }
 
-  /** Captura del propio equipo que mandó el evento. */
+  /**
+   * Captura del propio equipo que mandó el evento.
+   * Sub-stream `102` primero (más rápido / H.264 bajo); fallback `101`.
+   */
   private async snapshot(
     site: { id: number; companyId: number },
     ev: NormalizedEvent,
@@ -814,11 +897,19 @@ export class IntegraPushService {
     const client = resolved.isapiForHost(ev.deviceIp);
     if (!client) return null;
 
-    const { buffer, contentType } = await client.getBinary(
-      '/ISAPI/Streaming/channels/101/picture',
-    );
-    if (!contentType.includes('image')) return null;
-    return this.savePhoto(site, ev, buffer);
+    for (const ch of ['102', '101']) {
+      try {
+        const { buffer, contentType } = await client.getBinary(
+          `/ISAPI/Streaming/channels/${ch}/picture`,
+        );
+        if (contentType.includes('image') && buffer.length > 500) {
+          return this.savePhoto(site, ev, buffer);
+        }
+      } catch {
+        // probar siguiente canal
+      }
+    }
+    return null;
   }
 
   private async savePhoto(

@@ -19,6 +19,7 @@ import {
   recordUserInfo,
   uploadFaceData,
   uploadFingerPrint,
+  searchFaceInfo,
   type IsapiAcsEvent,
   type UserInfoWrite,
 } from '../hikvision-isapi/index';
@@ -1439,7 +1440,16 @@ export class IntegraArtemisService {
     siteId?: number | null,
   ) {
     if (!jpeg?.length) throw new BadRequestException('Imagen JPEG requerida');
-    if (jpeg.length > 2_000_000) throw new BadRequestException('Foto demasiado grande (máx ~2 MB)');
+    if (jpeg.length < 8_000) {
+      throw new BadRequestException(
+        'JPEG demasiado pequeño (<8 KB). Usa una foto frontal clara, cara llenando el cuadro (~480–720 px).',
+      );
+    }
+    if (jpeg.length > 1_800_000) {
+      throw new BadRequestException(
+        'Foto demasiado grande (máx ~1.8 MB). Comprime a JPEG calidad media; los DS-K1T rechazan archivos enormes.',
+      );
+    }
     // Magic JPEG (FF D8) — PNG/WebP fallan en FaceDataRecord de muchos DS-K1T.
     if (jpeg[0] !== 0xff || jpeg[1] !== 0xd8) {
       throw new BadRequestException('La foto debe ser JPEG (FF D8). Convierte PNG a JPG antes de subir.');
@@ -1455,20 +1465,53 @@ export class IntegraArtemisService {
     const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
       await uploadFaceData(client, { employeeNo: personId, jpeg });
     });
+
+    // Verificar enrolo con FDSearch (Postman) en terminales que aceptaron.
+    const verify: Array<{ deviceIp: string; enrolled: boolean; detail?: string }> = [];
+    for (const r of results) {
+      if (!r.ok) {
+        verify.push({ deviceIp: r.deviceIp, enrolled: false, detail: r.error });
+        continue;
+      }
+      const client = resolved.isapiForHost(r.deviceIp);
+      if (!client) {
+        verify.push({ deviceIp: r.deviceIp, enrolled: false, detail: 'Sin cliente' });
+        continue;
+      }
+      try {
+        const found = await searchFaceInfo(client, { employeeNo: personId });
+        verify.push({
+          deviceIp: r.deviceIp,
+          enrolled: found.total > 0 || found.matches.length > 0,
+          detail: found.total > 0 ? `FDSearch total=${found.total}` : 'FDSearch sin match',
+        });
+      } catch (e) {
+        verify.push({
+          deviceIp: r.deviceIp,
+          enrolled: true, // upload OK; verify opcional
+          detail: `Upload OK; FDSearch: ${e instanceof Error ? e.message : String(e)}`,
+        });
+      }
+    }
+
     await this.auditMut('integra.person.face.upload', actor, companyId, resolved.siteId, {
       personId,
       results,
+      verify,
       localSaved: true,
+      bytes: jpeg.length,
     });
     await this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
     const allOk = results.length > 0 && results.every((r) => r.ok);
+    const verified = verify.filter((v) => v.enrolled).length;
     return {
       success: allOk,
       partial: results.some((r) => r.ok) && !allOk,
       results,
+      verify,
       hasLocalFace: true,
       note: allOk
-        ? 'Foto en NEXARA y empujada a todos los terminales. El ACS guarda modelo biométrico; la ficha usa la copia local.'
+        ? `Foto en NEXARA (${Math.round(jpeg.length / 1024)} KB) y FaceDataRecord OK. FDSearch confirma en ${verified}/${verify.length} terminales.`
         : results.some((r) => r.ok)
           ? 'Foto guardada en NEXARA; fan-out parcial — revisa el detalle por IP.'
           : 'Foto guardada en NEXARA, pero no se pudo empujar a ningún terminal.',

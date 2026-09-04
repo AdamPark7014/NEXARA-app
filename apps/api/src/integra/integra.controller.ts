@@ -1008,14 +1008,17 @@ export class IntegraController {
   async wirePush(
     @CurrentCompanyId() companyId: number | null,
     @Param('siteId', ParseIntPipe) siteId: number,
-    @Body() body: { detection?: boolean },
+    @Body() body: { detection?: boolean; rotateToken?: boolean },
     @CurrentUser() user: any,
   ) {
     if (!integraCanSettings(user)) {
       throw new BadRequestException('Sin permiso para configurar equipos');
     }
     if (!companyId) throw new BadRequestException('Empresa requerida');
-    return this.push.wireDevices(companyId, siteId, { detection: body?.detection === true });
+    return this.push.wireDevices(companyId, siteId, {
+      detection: body?.detection === true,
+      rotateToken: body?.rotateToken !== false,
+    });
   }
 
   @Post('sites/:siteId/push/unwire')

@@ -51,6 +51,23 @@ function loadVideoStream(base: string): Promise<void> {
   return loaderPromise;
 }
 
+/** Precarga el custom element antes de abrir el primer mosaico (quita ~200–400 ms). */
+export function preloadGo2rtcPlayer(hlsOrBase?: string | null): void {
+  if (typeof window === "undefined") return;
+  let base = "/go2rtc";
+  if (hlsOrBase) {
+    try {
+      const u = new URL(hlsOrBase, window.location.origin);
+      const b = u.pathname.replace(/\/api\/stream\.m3u8$/, "");
+      if (b !== u.pathname) base = `${u.origin}${b}`;
+      else if (/^https?:\/\//.test(hlsOrBase)) base = hlsOrBase.replace(/\/$/, "");
+    } catch {
+      /* default */
+    }
+  }
+  void loadVideoStream(base).catch(() => undefined);
+}
+
 function parseHls(src: string): { base: string; name: string } | null {
   try {
     const u = new URL(src, window.location.origin);
@@ -314,8 +331,8 @@ function MseFocusPlayer({
             kickPlay(node);
           };
           arm();
-          // PTZ / go2rtc a veces abre WS tarde: patadas densas al inicio.
-          kickTimers = [0, 40, 120, 280, 600, 1200, 2400].map((ms) =>
+          // PTZ / go2rtc: patadas densas al abrir WS (primer frame lo antes posible).
+          kickTimers = [0, 16, 50, 100, 200, 400, 800, 1600].map((ms) =>
             window.setTimeout(arm, ms),
           );
 
@@ -329,13 +346,13 @@ function MseFocusPlayer({
               setState("live");
               onLive?.(true);
             }
-          }, 350);
+          }, 180);
 
           // Si se queda en «Conectando…», remonta el <video-stream> una vez.
           stuckTimer = window.setTimeout(() => {
             if (cancelled || sawLive || attempt >= 1) return;
             setAttempt((n) => n + 1);
-          }, 3800);
+          }, 2600);
         })
         .catch(() => {
           if (!cancelled) setState("error");
