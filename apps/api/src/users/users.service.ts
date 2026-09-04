@@ -970,7 +970,6 @@ export class UsersService {
       const shouldPushAcs =
         updateUserDto.nombre !== undefined ||
         updateUserDto.employeeNumber !== undefined ||
-        updateUserDto.isActive !== undefined ||
         (before &&
           (before.nombre !== user.nombre ||
             before.employeeNumber !== user.employeeNumber ||
