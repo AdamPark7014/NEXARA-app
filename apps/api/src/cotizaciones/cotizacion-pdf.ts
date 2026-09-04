@@ -611,7 +611,26 @@ export const generateCotizacionPdf = (
       pageHeight: doc.page.height,
       pageBottom: pageBottom(doc),
       pageNo: 1,
-      logo: loadNexaraLogo(),
+      logo: (() => {
+        const fromTheme = loadNexaraLogo();
+        if (fromTheme) return fromTheme;
+        try {
+          const fs = require('fs') as typeof import('fs');
+          const path = require('path') as typeof import('path');
+          const candidates = [
+            path.resolve(__dirname, '../assets/logo-nexara.png'),
+            path.resolve(process.cwd(), 'src/assets/logo-nexara.png'),
+            path.resolve(process.cwd(), 'dist/assets/logo-nexara.png'),
+            path.resolve(process.cwd(), '../../apps/web/public/logo-nexara.png'),
+          ];
+          for (const filePath of candidates) {
+            if (fs.existsSync(filePath)) return fs.readFileSync(filePath);
+          }
+        } catch {
+          // ignore
+        }
+        return null;
+      })(),
       companyShort: brand,
     };
 
