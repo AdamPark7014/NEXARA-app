@@ -203,11 +203,22 @@ export default function IntegraAccessPage() {
   return (
     <IgPage>
       <IgToolbar
-        title="Control de acceso"
+        title="Accesos"
         meta={`${onlineN}/${doors.length} puertas online · ${devices.length} equipos · ${groups.length} grupos`}
         actions={
           <>
-            <IgBtn onClick={() => setLiveDoors((v) => !v)}>{liveDoors ? "Live ON" : "Espejo"}</IgBtn>
+            <IgBtn onClick={() => router.push("/integra/people")}>Alta persona</IgBtn>
+            <IgBtn onClick={() => router.push("/integra/events")}>Eventos Face</IgBtn>
+            <IgBtn
+              onClick={() => setLiveDoors((v) => !v)}
+              title={
+                liveDoors
+                  ? "Consultando estado en vivo al ACS"
+                  : "Usando el espejo sincronizado (más rápido)"
+              }
+            >
+              {liveDoors ? "Estado live ON" : "Espejo sync"}
+            </IgBtn>
             <IgBtn onClick={() => void load()}>Actualizar</IgBtn>
           </>
         }
@@ -215,13 +226,19 @@ export default function IntegraAccessPage() {
       <IgError>{error}</IgError>
       {!canControl && (
         <IgNotice tone="warn">
-          Modo consulta: no puedes abrir ni cerrar puertas con esta cuenta.
+          Modo consulta: esta cuenta no puede abrir ni cerrar puertas.
+        </IgNotice>
+      )}
+      {canControl && (
+        <IgNotice>
+          Clic en una puerta = seleccionar · Doble clic = abrir (momentáneo) con
+          confirmación. Toda acción pide motivo y queda en auditoría.
         </IgNotice>
       )}
 
       <IgFilters>
         {canControl && (
-          <IgField label="Acción">
+          <IgField label="Acción por defecto">
             <select
               value={controlType}
               onChange={(e) => setControlType(e.target.value as DoorControlType)}
@@ -275,7 +292,21 @@ export default function IntegraAccessPage() {
             className={styles.doorCell}
             data-online={d.online === false ? "0" : "1"}
             onClick={() => setSelectedDoor(d)}
+            onDoubleClick={() => {
+              if (!canControl) {
+                setError("Sin permiso para controlar puertas");
+                return;
+              }
+              setSelectedDoor(d);
+              setControlType("2");
+              setConfirmDoor(d);
+            }}
             data-selected={selectedDoor?.id === d.id ? "1" : undefined}
+            title={
+              canControl
+                ? `${d.name} · clic = detalle · doble clic = abrir`
+                : `${d.name} · solo consulta`
+            }
           >
             <span className={styles.doorCellName}>{d.name}</span>
             <span className={styles.doorCellMeta}>{d.location || d.id}</span>
@@ -290,7 +321,7 @@ export default function IntegraAccessPage() {
           <strong className={styles.igEmptyTitle}>Sin puertas</strong>
           <span className={styles.igEmptyHint}>
             {doors.length === 0
-              ? "Sincroniza el sitio para cargar el inventario ACS."
+              ? "Sincroniza el sitio (barra superior) para cargar el inventario ACS."
               : "Ninguna puerta coincide con el filtro."}
           </span>
         </div>
@@ -304,16 +335,27 @@ export default function IntegraAccessPage() {
           <div className={styles.doorConsole}>
             <div className={styles.doorConsoleVideo}>
               {doorCam ? (
-                <IntegraLivePlayer
-                  src={doorFeed?.id === doorCam.id ? doorFeed.hls : null}
-                  mode="mse"
-                  audio={Boolean(doorFeed?.audio)}
-                />
+                doorFeed?.id === doorCam.id && doorFeed.hls === null ? (
+                  <div className={styles.doorConsoleNoCam}>
+                    <strong>No hay señal de video</strong>
+                    <span>
+                      La terminal tiene cámara en el espejo, pero el stream no abrió.
+                      Revisa go2rtc o pulsa Actualizar.
+                    </span>
+                  </div>
+                ) : (
+                  <IntegraLivePlayer
+                    src={doorFeed?.id === doorCam.id ? doorFeed.hls : null}
+                    mode="mse"
+                    audio={Boolean(doorFeed?.audio)}
+                  />
+                )
               ) : (
                 <div className={styles.doorConsoleNoCam}>
                   <strong>Esta puerta no tiene cámara</strong>
                   <span>
-                    Las terminales con cámara aparecen aquí en vivo tras sincronizar el sitio.
+                    Solo terminales con lente (p. ej. DS-K1T) muestran vivo aquí tras
+                    sincronizar.
                   </span>
                 </div>
               )}
@@ -321,7 +363,7 @@ export default function IntegraAccessPage() {
             <div className={styles.doorConsoleSide}>
               <p className={styles.doorConsoleHint}>
                 {canControl
-                  ? "Cada acción pide un motivo y queda en auditoría."
+                  ? "Elige una acción. Se pedirá un motivo antes de enviarla al ACS."
                   : "Modo consulta: esta cuenta no puede accionar la puerta."}
               </p>
               <div className={styles.doorConsoleActions}>
@@ -332,7 +374,9 @@ export default function IntegraAccessPage() {
                     disabled={!canControl || busy === selectedDoor.id}
                     onClick={() => runAction(selectedDoor, o.value)}
                   >
-                    {o.label}
+                    {busy === selectedDoor.id && controlType === o.value
+                      ? "Enviando…"
+                      : o.label}
                   </IgBtn>
                 ))}
               </div>
@@ -342,8 +386,17 @@ export default function IntegraAccessPage() {
                   <dd>{selectedDoor.location || selectedDoor.id}</dd>
                 </div>
                 <div>
-                  <dt>Con acceso</dt>
-                  <dd>{people.length} personas dadas de alta en el sitio</dd>
+                  <dt>Personas en sitio</dt>
+                  <dd>
+                    {people.length}{" "}
+                    <button
+                      type="button"
+                      className={styles.techToggle}
+                      onClick={() => router.push("/integra/people")}
+                    >
+                      gestionar →
+                    </button>
+                  </dd>
                 </div>
               </dl>
             </div>
@@ -371,7 +424,7 @@ export default function IntegraAccessPage() {
                 },
                 tone: d.online === false ? "warn" : "ok",
               }))}
-              empty="Sin equipos"
+              empty="Sin equipos — sincroniza el sitio"
             />
           </IgPanel>
         }
@@ -384,7 +437,7 @@ export default function IntegraAccessPage() {
                   onChange={(e) => setSelectedGroup(e.target.value)}
                   style={selectStyle}
                 >
-                  <option value="">—</option>
+                  <option value="">— elige un grupo —</option>
                   {groups.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.name}
@@ -397,6 +450,7 @@ export default function IntegraAccessPage() {
                   value={personFilter}
                   onChange={(e) => setPersonFilter(e.target.value)}
                   style={inputStyle}
+                  placeholder="filtrar…"
                 />
               </IgField>
             </IgFilters>
@@ -420,14 +474,21 @@ export default function IntegraAccessPage() {
               {filteredPeople.length === 0 && (
                 <div className={styles.igEmpty}>
                   <strong className={styles.igEmptyTitle}>Sin personas</strong>
-                  <span className={styles.igEmptyHint}>Ajusta el filtro o sincroniza el sitio.</span>
+                  <span className={styles.igEmptyHint}>
+                    Da de alta en Personas o sincroniza el directorio ACS.
+                  </span>
+                  <IgBtn variant="primary" onClick={() => router.push("/integra/people")}>
+                    Ir a Personas
+                  </IgBtn>
                 </div>
               )}
             </div>
             <IgBtn
               variant="primary"
-              disabled={!selectedGroup || selectedPeople.length === 0}
+              disabled={!selectedGroup || selectedPeople.length === 0 || assignBusy}
               onClick={async () => {
+                setAssignBusy(true);
+                setError(null);
                 try {
                   await integraApi(
                     `integra/privilege-groups/${encodeURIComponent(selectedGroup)}/persons`,
@@ -436,13 +497,20 @@ export default function IntegraAccessPage() {
                       body: JSON.stringify({ personIds: selectedPeople }),
                     },
                   );
+                  toast.success(
+                    `${selectedPeople.length} persona(s) asignada(s) al grupo`,
+                  );
                   setSelectedPeople([]);
                 } catch (e) {
-                  setError(e instanceof Error ? e.message : "Error");
+                  const msg = e instanceof Error ? e.message : "No se pudo asignar al grupo";
+                  setError(msg);
+                  toast.error(msg);
+                } finally {
+                  setAssignBusy(false);
                 }
               }}
             >
-              Asignar al grupo
+              {assignBusy ? "Asignando…" : "Asignar al grupo"}
             </IgBtn>
           </IgPanel>
         }

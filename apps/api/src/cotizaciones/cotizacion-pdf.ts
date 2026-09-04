@@ -350,35 +350,49 @@ const drawLetterhead = (ctx: PdfCtx, payload: CotizacionPdfPayload): number => {
 
 type TableCol = { key: string; label: string; width: number; align: 'left' | 'right' | 'center' };
 
-const TABLE_COLS: TableCol[] = [
+const BASE_TABLE_COLS: TableCol[] = [
   { key: 'num', label: '#', width: 22, align: 'center' },
-  { key: 'desc', label: 'Descripción', width: 240, align: 'left' },
-  { key: 'qty', label: 'Cant.', width: 38, align: 'center' },
-  { key: 'unit', label: 'P. venta neto', width: 76, align: 'right' },
-  { key: 'tax', label: 'IVA', width: 40, align: 'center' },
-  { key: 'total', label: 'Importe', width: 78, align: 'right' },
+  { key: 'desc', label: 'Descripción', width: 230, align: 'left' },
+  { key: 'qty', label: 'Cant.', width: 36, align: 'center' },
+  { key: 'unit', label: 'UdM', width: 34, align: 'center' },
+  { key: 'price', label: 'P. venta neto', width: 72, align: 'right' },
+  { key: 'tax', label: 'IVA', width: 36, align: 'center' },
+  { key: 'total', label: 'Importe', width: 74, align: 'right' },
 ];
 
-const drawTableHeader = (ctx: PdfCtx, y: number): number => {
+const scaleTableCols = (contentWidth: number): TableCol[] => {
+  const sum = BASE_TABLE_COLS.reduce((a, c) => a + c.width, 0);
+  const factor = contentWidth / sum;
+  return BASE_TABLE_COLS.map((col) => ({ ...col, width: Math.floor(col.width * factor) }));
+};
+
+const drawTableHeader = (ctx: PdfCtx, y: number, cols: TableCol[]): number => {
   const { doc, margin } = ctx;
   doc.save();
   doc.rect(margin, y, ctx.contentWidth, TABLE_HEADER_H).fill(COLORS.navy);
   doc.restore();
   doc.fillColor(COLORS.white).font('Helvetica-Bold').fontSize(7.5);
-  let x = margin + 4;
-  for (const col of TABLE_COLS) {
-    doc.text(col.label, x, y + 7, { width: col.width - 6, align: col.align });
+  let x = margin + 3;
+  for (const col of cols) {
+    doc.text(col.label, x, y + 7, { width: col.width - 4, align: col.align });
     x += col.width;
   }
-  return y + TABLE_HEADER_H + 4;
+  return y + TABLE_HEADER_H + 3;
 };
 
 const itemDescription = (item: CotizacionPdfItem) => {
   const meta = [item.brand, item.model, item.sku ? `SKU ${item.sku}` : null].filter(Boolean).join(' · ');
-  return meta ? `${item.name}\n${meta}` : item.name;
+  const desc = item.description?.trim();
+  const lines = [item.name, meta || null, desc || null].filter(Boolean);
+  return lines.join('\n');
 };
 
-const measureRow = () => TABLE_ROW_H;
+const measureRow = (ctx: PdfCtx, item: CotizacionPdfItem, cols: TableCol[]): number => {
+  const { doc } = ctx;
+  doc.font('Helvetica').fontSize(8);
+  const descH = doc.heightOfString(itemDescription(item), { width: cols[1].width - 6 });
+  return Math.max(28, descH + ROW_PAD * 2);
+};
 
 const drawTableRow = (
   ctx: PdfCtx,
@@ -387,13 +401,14 @@ const drawTableRow = (
   index: number,
   currency: string,
   stripe: boolean,
+  cols: TableCol[],
 ): number => {
   const { doc, margin } = ctx;
-  const rowH = measureRow();
+  const rowH = measureRow(ctx, item, cols);
 
   if (stripe) {
     doc.save();
-    doc.rect(margin, y - 2, ctx.contentWidth, rowH).fill(COLORS.fill);
+    doc.rect(margin, y - 1, ctx.contentWidth, rowH).fill(COLORS.fill);
     doc.restore();
   }
 
@@ -401,22 +416,22 @@ const drawTableRow = (
     String(index + 1),
     itemDescription(item),
     String(item.qty),
+    item.unit || 'PZA',
     formatMoney(item.unitPrice, currency),
     `${item.tax || 0}%`,
     formatMoney(item.lineTotal, currency),
   ];
 
-  let x = margin + 4;
-  const textHeight = rowH - ROW_PAD * 2;
+  let x = margin + 3;
   cells.forEach((cell, i) => {
-    const col = TABLE_COLS[i];
-    if (i === 0) doc.font('Helvetica').fontSize(8).fillColor(COLORS.muted);
-    else if (i === 1) doc.font('Helvetica').fontSize(8.5).fillColor(COLORS.text);
-    else if (i === 5) doc.font('Helvetica-Bold').fontSize(8.5).fillColor(COLORS.navy);
+    const col = cols[i];
+    if (i === 0 || i === 3 || i === 5) doc.font('Helvetica').fontSize(7.5).fillColor(COLORS.muted);
+    else if (i === 1) doc.font('Helvetica').fontSize(8).fillColor(COLORS.text);
+    else if (i === 6) doc.font('Helvetica-Bold').fontSize(8).fillColor(COLORS.navy);
     else doc.font('Helvetica').fontSize(8).fillColor(COLORS.text);
     boundedText(doc, cell, x, y + ROW_PAD, {
-      width: col.width - 8,
-      height: textHeight,
+      width: col.width - 6,
+      height: rowH - ROW_PAD * 2,
       align: col.align,
       ellipsis: i === 1,
       lineGap: 0,
@@ -424,20 +439,21 @@ const drawTableRow = (
     x += col.width;
   });
 
-  doc.moveTo(margin, y + rowH - 2).lineTo(margin + ctx.contentWidth, y + rowH - 2).strokeColor(COLORS.line).lineWidth(0.3).stroke();
+  doc.moveTo(margin, y + rowH - 1).lineTo(margin + ctx.contentWidth, y + rowH - 1).strokeColor(COLORS.line).lineWidth(0.3).stroke();
   return y + rowH;
 };
 
 const drawItemsTable = (ctx: PdfCtx, payload: CotizacionPdfPayload, startY: number): number => {
-  let y = drawTableHeader(ctx, startY);
+  const cols = scaleTableCols(ctx.contentWidth);
+  let y = drawTableHeader(ctx, startY, cols);
 
   payload.items.forEach((item, index) => {
-    const rowH = measureRow();
+    const rowH = measureRow(ctx, item, cols);
     if (y + rowH > ctx.pageBottom) {
-      y = addPage(ctx);
-      y = drawTableHeader(ctx, y);
+      y = addPage(ctx, payload.quoteNumber);
+      y = drawTableHeader(ctx, y, cols);
     }
-    y = drawTableRow(ctx, y, item, index, payload.currency, index % 2 === 1);
+    y = drawTableRow(ctx, y, item, index, payload.currency, index % 2 === 1, cols);
   });
 
   return y + 8;
@@ -467,7 +483,7 @@ const drawSummary = (ctx: PdfCtx, payload: CotizacionPdfPayload, y: number): num
   }
 
   const boxH = 16 + rows.length * 15 + 12;
-  y = ensureY(ctx, y, boxH + 20);
+  y = ensureY(ctx, y, boxH + 20, payload.quoteNumber);
   const boxX = margin + contentWidth - boxW;
 
   doc.save();

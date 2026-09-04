@@ -101,12 +101,13 @@ export class TicketAlertsService {
   private async scanBreachedDeadlines() {
     const now = new Date();
     const breached = await this.prisma.$queryRaw<
-      Array<{ id: number; anNumber: string; clientName: string | null }>
+      Array<{ id: number; anNumber: string; clientName: string | null; companyId: number }>
     >`
       SELECT
         a.id,
         a."anNumber",
-        c.name AS "clientName"
+        c.name AS "clientName",
+        a."companyId"
       FROM "Activity" a
       LEFT JOIN service_clients c ON c.id = a."clientId"
       WHERE a."clientId" IS NOT NULL
@@ -135,11 +136,12 @@ export class TicketAlertsService {
               type: 'SLA_BREACH' as any,
               category: 'sla-breach',
               priority: 'high',
-              title: '🚨 SLA vencido',
+              title: 'SLA vencido',
               message,
               entityType: 'Activity',
               relatedEntityId: activity.id,
               relatedUrl: `/ops/activities/${activity.id}`,
+              companyId: activity.companyId,
             })
             .catch((err) => this.logger.warn(`SLA breach notify: ${err?.message || err}`)),
         ),

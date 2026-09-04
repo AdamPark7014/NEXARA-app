@@ -1057,8 +1057,9 @@ export class IntegraController {
   ) {
     if (!companyId) throw new BadRequestException('Empresa requerida');
     const take = Math.min(Math.max(parseInt(limit || '60', 10) || 60, 1), 300);
+    // Default: útil (sin VMD/heartBeat). `scope=all` solo para diagnóstico.
     const scopeNorm =
-      scope === 'acs' || scope === 'noise' || scope === 'all' ? scope : 'all';
+      scope === 'acs' || scope === 'noise' || scope === 'all' ? scope : null;
     const outcomeNorm =
       outcome === 'granted' || outcome === 'denied' ? outcome : null;
     const fromDate = from ? new Date(from) : null;
