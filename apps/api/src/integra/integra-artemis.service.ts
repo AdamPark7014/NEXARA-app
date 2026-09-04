@@ -81,6 +81,7 @@ export class IntegraArtemisService {
     private readonly sync: IntegraSyncService,
     private readonly portfolioSvc: IntegraPortfolioService,
     private readonly acsFanout: IntegraAcsFanoutService,
+    private readonly identity: IdentityLinkService,
   ) {}
 
   /** Artemis-only; sitios HCT e ISAPI → 400 con mensaje claro (ADR-0019). */
