@@ -18,7 +18,6 @@ import { IntegraDetectionOverlay, subscribePushEvents } from "../_DetectionOverl
 import { IntegraLivePlayer } from "../_LivePlayer";
 import { IntegraLiveAccessBanner } from "../_LiveAccessBanner";
 import { IntegraAcsIdentityStrip } from "../_AcsIdentityStrip";
-import { IntegraOccupancyPanel } from "../_OccupancyPanel";
 import { IntegraPtzPad } from "../_PtzPad";
 import { IntegraRecentAccess } from "../_RecentAccess";
 import { IntegraVehicleStrip } from "../_VehicleStrip";
@@ -745,10 +744,7 @@ export default function IntegraVideoPage() {
                     )}
                     <div className={styles.focusSide}>
                       {!focusCam?.isDoorCamera && (
-                        <>
-                          <IntegraOccupancyPanel enabled={mode === "focus"} />
-                          <IntegraAcsIdentityStrip enabled={mode === "focus"} />
-                        </>
+                        <IntegraAcsIdentityStrip enabled={mode === "focus"} />
                       )}
                       {focusCam?.isDoorCamera && (
                         <IntegraRecentAccess

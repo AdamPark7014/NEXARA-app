@@ -1179,8 +1179,22 @@ export class IntegraArtemisService {
         employeeNo,
         results,
       });
-      await this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
-      return { success: results.some((r) => r.ok), results, provider: 'ISAPI' as const };
+      const allOk = results.length > 0 && results.every((r) => r.ok);
+      const anyOk = results.some((r) => r.ok);
+      if (anyOk) {
+        await this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
+      }
+      return {
+        success: allOk,
+        partial: anyOk && !allOk,
+        results,
+        provider: 'ISAPI' as const,
+        note: allOk
+          ? 'Alta en todos los terminales.'
+          : anyOk
+            ? 'Alta parcial: revisa el detalle por IP.'
+            : 'No se pudo crear en ningún terminal.',
+      };
     }
     try {
       if (!input.orgIndexCode) throw new BadRequestException('orgIndexCode requerido en Artemis');
@@ -1253,7 +1267,13 @@ export class IntegraArtemisService {
       results,
     });
     await this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
-    return { success: results.some((r) => r.ok), results, provider: 'ISAPI' as const };
+    const allOk = results.length > 0 && results.every((r) => r.ok);
+    return {
+      success: allOk,
+      partial: results.some((r) => r.ok) && !allOk,
+      results,
+      provider: 'ISAPI' as const,
+    };
   }
 
   async deletePerson(
@@ -1333,10 +1353,16 @@ export class IntegraArtemisService {
       results,
     });
     await this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
+    const allOk = results.length > 0 && results.every((r) => r.ok);
     return {
-      success: results.some((r) => r.ok),
+      success: allOk,
+      partial: results.some((r) => r.ok) && !allOk,
       results,
-      note: 'El terminal guarda un modelo biométrico; no se puede volver a descargar el JPEG.',
+      note: allOk
+        ? 'Foto empujada a todos los terminales. El equipo guarda un modelo biométrico; no se puede volver a descargar el JPEG.'
+        : results.some((r) => r.ok)
+          ? 'Foto parcial: revisa el detalle por IP.'
+          : 'No se pudo subir la foto en ningún terminal.',
     };
   }
 
