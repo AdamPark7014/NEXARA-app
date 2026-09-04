@@ -17,6 +17,7 @@ import {
 import { IntegraPushService } from './integra-push.service';
 import { IntegraPushController } from './integra-push.controller';
 import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
+import { IntegraSpacesService } from './integra-spaces.service';
 import { IdentityModule } from '../identity/identity.module';
 
 @Module({
@@ -36,6 +37,7 @@ import { IdentityModule } from '../identity/identity.module';
     IntegraEdgeService,
     IntegraPushService,
     IntegraAcsFanoutService,
+    IntegraSpacesService,
   ],
   exports: [
     IntegraArtemisService,
@@ -45,6 +47,7 @@ import { IdentityModule } from '../identity/identity.module';
     IntegraEdgeService,
     IntegraPushService,
     IntegraAcsFanoutService,
+    IntegraSpacesService,
   ],
 })
 export class IntegraModule {}
