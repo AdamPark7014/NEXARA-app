@@ -126,6 +126,8 @@ export default function OpsDashboardPage() {
   const [activities, setActivities] = useState<ActivityRow[]>([]);
   const [alerts, setAlerts] = useState<NocAlert[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [actionNotifs, setActionNotifs] = useState<ActionNotif[]>([]);
+  const [slaBrief, setSlaBrief] = useState<SlaBrief | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [alertsErr, setAlertsErr] = useState<string | null>(null);
@@ -136,7 +138,8 @@ export default function OpsDashboardPage() {
     setError(null);
     setAlertsErr(null);
     try {
-      const [actData, alertData, ticketData] = await Promise.all([
+      const from = new Date(Date.now() - 30 * 86400000).toISOString();
+      const [actData, alertData, ticketData, notifData, slaData] = await Promise.all([
         apiFetch("activities", token),
         cfg.viewMode === "execute"
           ? Promise.resolve([])
@@ -145,13 +148,24 @@ export default function OpsDashboardPage() {
               return [];
             }),
         cfg.viewMode !== "execute"
-          ? apiFetch("client-ticket-requests?limit=5", token).catch(() => [])
+          ? apiFetch("client-ticket-requests?limit=8", token).catch(() => [])
           : Promise.resolve([]),
+        apiFetch("notifications?limit=30", token).catch(() => []),
+        cfg.viewMode !== "execute"
+          ? apiFetch(`sla/insights?from=${from}`, token).catch(() => null)
+          : Promise.resolve(null),
       ]);
       setActivities(Array.isArray(actData) ? actData : (actData?.data ?? []));
       setAlerts(Array.isArray(alertData) ? alertData : []);
       const tArr = Array.isArray(ticketData) ? ticketData : (ticketData?.data ?? []);
-      setTickets(tArr.slice(0, 5));
+      setTickets(tArr.slice(0, 6));
+      const nArr: ActionNotif[] = Array.isArray(notifData) ? notifData : (notifData?.data ?? []);
+      setActionNotifs(
+        nArr
+          .filter((n) => !n.isRead && (n.priority === "high" || /sla|activity|evidence|noc/i.test(n.category)))
+          .slice(0, 6),
+      );
+      setSlaBrief(slaData);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar el panel de operaciones");
     } finally { setLoading(false); }

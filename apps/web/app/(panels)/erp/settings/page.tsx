@@ -115,49 +115,27 @@ export default function SettingsPage() {
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
 
   return (
-    <>
-      <PageHeader
-        eyebrow="ERP · Gobierno"
-        title="Centro de control"
-        subtitle="Tenant SaaS: integraciones, facturación, API y parámetros de la empresa activa."
-        actions={
-          <>
-            <Button variant="ghost" onClick={() => void load()}>Actualizar</Button>
-            {cfg.canCreate && <Button variant="primary" onClick={openNew}>Nuevo parámetro</Button>}
-          </>
-        }
-      />
-
-      <Section title="Integraciones enterprise">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-          {[
-            { href: "/erp/settings/billing", title: "Billing & seats", desc: "Plan, asientos, Stripe Checkout / Portal", tone: "accent" as const },
-            { href: "/erp/settings/webhooks", title: "Outbound webhooks", desc: "Eventos firmados HMAC por empresa", tone: "default" as const },
-            { href: "/erp/settings/api-keys", title: "API keys", desc: "Machine auth + scope SCIM", tone: "default" as const },
-            { href: "/erp/companies", title: "Empresas", desc: "Multi-tenant y membresías", tone: "default" as const },
-          ].map((card) => (
-            <a
-              key={card.href}
-              href={card.href}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-                padding: 16,
-                borderRadius: 12,
-                border: "1px solid var(--border)",
-                background: "var(--surface)",
-                color: "var(--foreground)",
-                textDecoration: "none",
-                minHeight: 96,
-              }}
-            >
-              <span style={{ fontSize: 14, fontWeight: 700 }}>{card.title}</span>
-              <span style={{ fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.45 }}>{card.desc}</span>
-              <span style={{ marginTop: "auto", fontSize: 12, fontWeight: 600, color: "var(--primary)" }}>Abrir →</span>
-            </a>
-          ))}
-        </div>
+    <PageChrome
+      eyebrow="ERP · Gobierno"
+      title="Configuración"
+      subtitle="Parámetros de la empresa activa, integraciones y facturación del tenant."
+      primaryAction={
+        cfg.canCreate ? <Button variant="primary" onClick={openNew}>Nuevo parámetro</Button> : undefined
+      }
+      secondaryActions={
+        <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
+      }
+      context={<SettingsModuleRail />}
+    >
+      <Section title="Integraciones" dense>
+        <ErpModuleCards
+          items={[
+            { href: "/erp/settings/billing", title: "Facturación y asientos", description: "Plan, asientos y portal de cobro", icon: "💳" },
+            { href: "/erp/settings/webhooks", title: "Webhooks salientes", description: "Eventos firmados HMAC por empresa", icon: "🔗" },
+            { href: "/erp/settings/api-keys", title: "Claves API", description: "Autenticación máquina y alcance SCIM", icon: "🔑" },
+            { href: "/erp/companies", title: "Empresas", description: "Multi-empresa y membresías", icon: "🏛️" },
+          ]}
+        />
       </Section>
 
       {!loading && settings.length > 0 && (
