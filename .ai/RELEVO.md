@@ -8,44 +8,44 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Detección Video 24h: cajas sin ghost
+## Este turno — PTZ estacionamiento: vehículos honestos
 
-Bug: overlays «Humano · sin ID» y PRESENCIA inflada (68–89s) en sillas
-vacías / puerta de cristal (Meeting Room + muro).
+Adam: «aquí ni detecta los autos en la PTZ». Hardware ya era honesto en UI.
 
-### Causa
+### Verdad de hardware (prod + docs)
 
-`_DetectionOverlay.tsx` tenía sticky intencional exagerado:
-- `BOX_TTL_OPTICAL_MS=90s`, `BOX_TTL_NAMED_MS=75s`, `PRESENCE_HOLD_MS=90s`
-- VMD/fielddetection **reiniciaba `at` y alargaba TTL** de todas las cajas
-  sin TargetRect fresco → fantasmas eternos mientras hubiera movimiento
-- Semilla `SEED_MS=120s` re-pintaba fantasmas al montar
+- **PTZ DS-2DF8C442 (.179):** FieldDetection/ANPR/ITC = `notSupport`. Motion sí.
+- **Fuentes vehicle:** NVR PoE ch 1/2/9/10 — Escalera 01, Office Entrance,
+  Escaleras 02, Azotea (`human,vehicle`). Canal 13 PTZ → 403.
+- **Prod DB:** 0 eventos `vehicle` jamás. NVR PoE **no empuja** nada a NEXARA
+  (solo AcuSense LAN con `human`). Autos quietos tampoco disparan inventario.
 
 ### Qué hay
 
-1. Optical TTL **3.5s**; ACS named **10s**; chip movimiento **4s**; seed **12s**.
-2. VMD solo alimenta chip «Movimiento» — **no** resucita tracks.
-3. Merge prefiere rect fresco (88/12) y `ttl` del evento nuevo.
-4. Solo web (`_DetectionOverlay.tsx`). Provider ISAPI sin tocar. Sin ISAPI FieldDetection retune.
-
-SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` (rebuild `web`).
+1. `plateEvents` enriquece: fuentes con lastSeen, `siblingActivity`,
+   `ptzMotion`, `nvrPushActive`, nota honesty (no inventario de estacionados).
+2. `_VehicleStrip` en foco PTZ: banner hardware + lista de fuentes NVR +
+   hits vehicle si llegan + actividad hermana etiquetada «no es ID vehicle».
+3. Script `apps/api/scripts/wire-parking-nvr.cjs` — wire detection sin rotar
+   token (`rotateToken: false`).
+4. No se tocó `_DetectionOverlay` (otro agente TTL humanos).
 
 ### Cómo verificar (ops)
 
-1. Hard refresh Video 24h / Meeting Room.
-2. Cajas «sin ID» no deben pasar de ~4s sin evento nuevo; al vaciarse la
-   escena, fantasmas y PRESENCIA caen en pocos segundos.
-3. ACS con nombre puede quedar ~10s; nunca 60–90s en silla vacía.
+1. Hard refresh Video → PTZ.
+2. Panel Vehículos: fuentes Azotea/Entrance/Escalera + aviso NVR sin empuje
+   (hasta cablear).
+3. Tras `node …/wire-parking-nvr.cjs`: si NVR httpHosts OK, movimiento en
+   zona PoE debe listar vehicle con nombre de cámara fuente.
 
 ## A medias
 
 1. Portal empleado · ANPR ITC · micros · TCPMSS.
-2. Espacios / Horarios ACS / presence / SOC — validar en prod aparte.
-3. FieldDetection re-apply · employeeNumber↔personId Oficinas.
-4. Redis eviction `allkeys-lru` (BullMQ pide `noeviction`) — no tocado.
-5. Vehículos / otros métodos que aún llaman `this.client()` antes del branch ISAPI — mismo patrón; no tocados.
+2. FieldDetection re-apply NVR (script wire) — ejecutar post-deploy y validar.
+3. Redis eviction `allkeys-lru` — no tocado.
+4. Personas/vehículos Artemis `this.client()` pre-branch ISAPI — pendiente.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales. Face ID óptico inventado. Provider del sitio no cambiar a ARTEMIS.
+Puente NAS, Traefik, credenciales. Face ID óptico inventado. Provider ISAPI.
+No inventar ANPR/FieldDetection en PTZ .179. No hls.js.

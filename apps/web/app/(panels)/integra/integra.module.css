@@ -3059,13 +3059,47 @@ select.igControl {
   font-weight: 700;
 }
 
+.vehicleSourceList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.vehicleSourceList li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--ig-line);
+  background: color-mix(in srgb, var(--ig-panel) 92%, var(--ig-muted));
+}
+
+.vehicleSourceList li[data-fresh="1"] {
+  border-color: color-mix(in srgb, var(--ig-accent) 40%, var(--ig-line));
+}
+
+.vehicleSourceList li strong {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--ig-text);
+}
+
+.vehicleSourceList li span {
+  color: var(--ig-muted);
+}
+
 .accessStripList {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   gap: 6px;
-  max-height: 220px;
+  max-height: 280px;
   overflow: auto;
 }
 
@@ -3105,6 +3139,11 @@ select.igControl {
 
 .accessStripRow[data-fresh="1"] {
   background: color-mix(in srgb, var(--ig-accent) 10%, transparent);
+}
+
+.accessStripRow[data-kind="activity"] {
+  opacity: 0.88;
+  border: 1px dashed color-mix(in srgb, var(--ig-line) 80%, transparent);
 }
 
 .accessStripPhoto img {
@@ -3244,6 +3283,10 @@ select.igControl {
 
 .ptzHint[data-tone="error"] {
   color: var(--ig-danger, #dc2626);
+}
+
+.ptzHint[data-tone="ok"] {
+  color: color-mix(in srgb, var(--ig-accent) 70%, var(--ig-text));
 }
 
 /* ── Asistencia ─────────────────────────────────────────────────────────

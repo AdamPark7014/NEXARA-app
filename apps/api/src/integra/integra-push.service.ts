@@ -675,6 +675,9 @@ export class IntegraPushService {
    * Eventos de vehículo (fielddetection con target vehicle / human,vehicle).
    * Sin texto de placa en este parque: no hay ITC/ANPR. Listo para OCR cuando
    * llegue cámara de placas.
+   *
+   * En vista PTZ el panel también pide actividad de cámaras hermanas de
+   * estacionamiento (NVR PoE) y motion de la propia domo — sin fingir ANPR.
    */
   async plateEvents(
     companyId: number,
@@ -682,14 +685,16 @@ export class IntegraPushService {
   ) {
     const take = Math.min(Math.max(opts.limit ?? 40, 1), 100);
     const siteId = opts.siteId ?? null;
+    const sinceVehicle = new Date(Date.now() - 30 * 60_000);
+    const sinceActivity = new Date(Date.now() - 2 * 60 * 60_000);
     const rows = await this.prisma.integraPushEvent.findMany({
       where: {
         companyId,
         ...(siteId ? { siteId } : {}),
-        occurredAt: { gte: new Date(Date.now() - 30 * 60_000) },
+        occurredAt: { gte: sinceActivity },
       },
       orderBy: { id: 'desc' },
-      take: take * 4,
+      take: Math.max(take * 8, 120),
       select: {
         id: true,
         deviceIp: true,
@@ -714,15 +719,19 @@ export class IntegraPushService {
       anpr: boolean;
     }> = [];
 
-    for (const r of rows) {
-      const targets = Array.isArray(r.targets) ? (r.targets as Array<{ type?: string }>) : [];
-      // AcuSense/NVR mandan "vehicle" o "human,vehicle" — no exigir igualdad exacta.
-      const hasVehicle = targets.some((t) =>
-        String(t?.type || '')
+    const targetHasVehicle = (targets: unknown): boolean => {
+      if (!Array.isArray(targets)) return false;
+      return targets.some((t) =>
+        String((t as { type?: string })?.type || '')
           .toLowerCase()
           .split(/[,\s]+/)
           .includes('vehicle'),
       );
+    };
+
+    for (const r of rows) {
+      if (r.occurredAt < sinceVehicle) continue;
+      const hasVehicle = targetHasVehicle(r.targets);
       const raw = (r.raw && typeof r.raw === 'object' ? r.raw : {}) as Record<string, unknown>;
       const plate =
         (typeof raw.licensePlate === 'string' && raw.licensePlate) ||
@@ -743,22 +752,144 @@ export class IntegraPushService {
     }
 
     const vehicleSources = await this.vehicleCapableCameras(companyId, siteId);
+    const nvrHost = await this.siteNvrHost(companyId, siteId);
+    const parkingIp = new Set(
+      vehicleSources.map((s) => s.sourceIp).filter((ip): ip is string => Boolean(ip)),
+    );
+    if (nvrHost) parkingIp.add(nvrHost);
+
+    const isParkingSource = (deviceIp: string, deviceName: string | null) => {
+      if (parkingIp.has(deviceIp)) return true;
+      return /entrance|azotea|escalera|office|parking|almacen|warehouse/i.test(
+        deviceName || '',
+      );
+    };
+
+    type ActivityRow = {
+      id: number;
+      deviceIp: string;
+      deviceName: string | null;
+      occurredAt: string;
+      kind: 'fielddetection' | 'motion' | 'line' | 'other';
+      label: string;
+      photoPath: string | null;
+      /** true = no es clasificación vehicle; actividad de cámara hermana / VMD */
+      notVehicleClassified: true;
+    };
+    const siblingActivity: ActivityRow[] = [];
+    let ptzMotion: ActivityRow | null = null;
+
+    for (const r of rows) {
+      const et = String(r.eventType || '');
+      const isMotion = et === 'VMD';
+      const isField = et === 'fielddetection';
+      const isLine = et === 'linedetection';
+      if (!isMotion && !isField && !isLine) continue;
+      if (targetHasVehicle(r.targets)) continue; // ya van en items
+
+      const kind: ActivityRow['kind'] = isMotion
+        ? 'motion'
+        : isField
+          ? 'fielddetection'
+          : isLine
+            ? 'line'
+            : 'other';
+      const row: ActivityRow = {
+        id: r.id,
+        deviceIp: r.deviceIp,
+        deviceName: r.deviceName,
+        occurredAt: r.occurredAt.toISOString(),
+        kind,
+        label:
+          kind === 'motion'
+            ? 'Movimiento'
+            : kind === 'fielddetection'
+              ? 'FieldDetection · sin vehicle'
+              : kind === 'line'
+                ? 'Cruce de línea'
+                : et,
+        photoPath: r.photoPath,
+        notVehicleClassified: true,
+      };
+
+      const isPtzCam =
+        r.deviceIp === '192.168.9.179' || /(?:^|\b)ptz(?:\b|$)/i.test(r.deviceName || '');
+      if (isPtzCam && isMotion && !ptzMotion) {
+        ptzMotion = row;
+      }
+      if (
+        isParkingSource(r.deviceIp, r.deviceName) &&
+        siblingActivity.length < 12 &&
+        !siblingActivity.some((s) => s.id === r.id)
+      ) {
+        siblingActivity.push(row);
+      }
+    }
+
+    const sourcesWithPulse = vehicleSources.map((s) => {
+      const nameRe = new RegExp(
+        s.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').slice(0, 48),
+        'i',
+      );
+      const hit = rows.find((r) => {
+        if (s.sourceIp && r.deviceIp === s.sourceIp) return true;
+        if (r.deviceName && nameRe.test(r.deviceName)) return true;
+        if (s.via === 'nvr' && nvrHost && r.deviceIp === nvrHost && nameRe.test(r.deviceName || '')) {
+          return true;
+        }
+        return false;
+      });
+      return {
+        ...s,
+        lastSeenAt: hit?.occurredAt?.toISOString() ?? null,
+        lastEventType: hit?.eventType ?? null,
+      };
+    });
+
+    const nvrPushActive = sourcesWithPulse.some(
+      (s) => s.via === 'nvr' && s.lastSeenAt != null,
+    );
 
     return {
       items,
       total: items.length,
       note:
         items.length === 0
-          ? 'Sin detecciones vehicle en los últimos 30 min. La PTZ DarkFighter no clasifica vehículos ni lee placas; mira Office Entrance / Azotea / Escalera (FieldDetection en NVR). OCR solo con cámara ITC.'
+          ? nvrPushActive
+            ? 'Sin clasificación vehicle en 30 min (suele ser movimiento en zona, no autos estacionados quietos). OCR solo con cámara ITC.'
+            : 'Sin detecciones vehicle. El NVR PoE (Azotea / Office Entrance / Escalera) no está empujando FieldDetection a NEXARA — la PTZ no clasifica. OCR solo con ITC.'
           : 'Sin OCR en este parque: solo clasificación vehicle (FieldDetection). plate llega con cámara ITC/ANPR.',
+      honesty:
+        'Vehicle = movimiento en zona AcuSense/NVR, no inventario de autos estacionados. PTZ DS-2DF8C442: no FieldDetection/ANPR.',
       ptz: {
         fieldDetection: false,
         anpr: false,
         motion: true,
         note: 'DS-2DF8C442: video + PTZ + motion. FieldDetection/ANPR/ITC = notSupport.',
+        lastMotionAt: ptzMotion?.occurredAt ?? null,
       },
-      vehicleSources,
+      vehicleSources: sourcesWithPulse,
+      siblingActivity,
+      ptzMotion,
+      nvrPushActive,
     };
+  }
+
+  private async siteNvrHost(
+    companyId: number,
+    siteId: number | null,
+  ): Promise<string | null> {
+    const site = await this.prisma.integraSite.findFirst({
+      where: {
+        companyId,
+        ...(siteId ? { id: siteId } : {}),
+        isActive: true,
+      },
+      orderBy: [{ isDefault: 'desc' }, { id: 'asc' }],
+      select: { host: true },
+    });
+    if (!site?.host) return null;
+    return site.host.replace(/^https?:\/\//, '').split(':')[0] || null;
   }
 
   /** Cámaras del sitio con FieldDetection que admite vehicle (espejo + heurística PoE). */
