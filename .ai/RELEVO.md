@@ -8,41 +8,37 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — PTZ estacionamiento: vehículos honestos
+## Este turno — Detección personas: live sin ghosts ni apagón
 
-Adam: «aquí ni detecta los autos en la PTZ». Hardware ya era honesto en UI.
+Adam: «ahora ya no hace detección de personas» tras el corte TTL 90s→3.5s.
 
-### Verdad de hardware (prod + docs)
+### Causa raíz
 
-- **PTZ DS-2DF8C442 (.179):** FieldDetection/ANPR/ITC = `notSupport`. Motion sí.
-- **Fuentes vehicle:** NVR PoE ch 1/2/9/10 — Escalera 01, Office Entrance,
-  Escaleras 02, Azotea (`human,vehicle`). Canal 13 PTZ → 403.
-- **Prod DB:** 0 eventos `vehicle` jamás. NVR PoE **no empuja** nada a NEXARA
-  (solo AcuSense LAN con `human`). Autos quietos tampoco disparan inventario.
+Eventos FieldDetection **sí llegaban** (prod 2h: 493 field + 83 line). Cadencia con
+TargetRect: Meeting **p50≈16s**, Support 01/02 **p50≈12–13s**, Planning p90≈48s.
+`BOX_TTL_OPTICAL_MS=3500` caducaba la caja **antes del siguiente evento** → sensación
+de apagón. VMD ya no revive cajas (correcto; eso era el ghost).
 
 ### Qué hay
 
-1. `plateEvents` enriquece: fuentes con lastSeen, `siblingActivity`,
-   `ptzMotion`, `nvrPushActive`, nota honesty (no inventario de estacionados).
-2. `_VehicleStrip` en foco PTZ: banner hardware + lista de fuentes NVR +
-   hits vehicle si llegan + actividad hermana etiquetada «no es ID vehicle».
-3. Script `apps/api/scripts/wire-parking-nvr.cjs` — wire detection sin rotar
-   token (`rotateToken: false`).
-4. Fix NVR `httpHosts`: plantilla XML + **solo HTTP:80** (HTTPS →
-   `badXmlContent`). Traefik: ruta HTTP `/api/integra/hik` sin redirect.
-5. FieldDetection PoE 4/4 OK. No se tocó `_DetectionOverlay`.
+1. Óptica **15s** / ACS nombrada **20s** (puente p50; no 90s, no 3.5s).
+2. VMD → solo chip «Movimiento · sin caja»; **nunca** reinicia `at` de tracks.
+3. `Presencia · N` = solo cajas humanas/face **frescas** (no VMD stale).
+4. Foco: empty «Sin detección reciente · FieldDetection». Muro sin empty spam.
+5. Placas: «Humano · sin ID» / nombre ACS / «Vehículo · sin placa»; edad ≥2s;
+   tooltip fuente (AcuSense vs ACS). Badge DET rail = 15s (`LIVE_DET_BADGE_MS`).
 
-### Cómo verificar (ops)
+### Cómo verificar
 
-1. Hard refresh Video → PTZ.
-2. Panel Vehículos: fuentes Azotea/Entrance/Escalera.
-3. `curl -sI http://integra.nexara.com.mx/api/integra/hik/1/x` → **no** 308.
-4. Movimiento en zona PoE → vehicle en panel (fuente = cam NVR, no PTZ).
+1. Hard refresh Video 24h → Meeting / Support / Escalera.
+2. Persona en escena → caja ~15s, sigue al moverse, caduca sin event fresco.
+3. Foco vacío → mensaje FieldDetection. Rail `det` solo con detección viva.
+4. No inventar Face ID en AcuSense. PTZ .179 sin FieldDetection (otro turno).
 
 ## A medias
 
 1. Portal empleado · ANPR ITC · micros · TCPMSS.
-2. FieldDetection re-apply NVR (script wire) — ejecutar post-deploy y validar.
+2. FieldDetection re-apply NVR (script wire) — validar push vehicle post-cable.
 3. Redis eviction `allkeys-lru` — no tocado.
 4. Personas/vehículos Artemis `this.client()` pre-branch ISAPI — pendiente.
 

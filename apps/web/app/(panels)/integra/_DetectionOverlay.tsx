@@ -46,19 +46,27 @@ type Box = PushTarget & {
   ttl: number;
 };
 
-/** AcuSense FieldDetection: caduca rápido si no llega rect fresco.
- *  Sticky 90s dejó fantasmas en sillas vacías (68–89s) — ver Video 24h. */
-const BOX_TTL_OPTICAL_MS = 3_500;
-/** ACS FaceRect + nombre: un poco más (pase es flash), nunca ~90s. */
-const BOX_TTL_NAMED_MS = 10_000;
+/**
+ * Cadencia real Oficinas (prod, 2h, FieldDetection+line con TargetRect):
+ * Meeting p50≈16s · Support 01/02 p50≈12–13s · Planning p90≈48s.
+ * 3.5s apagaba cajas entre ráfagas; 90s + VMD hold = fantasmas en sillas.
+ * Puente el p50 con margen corto; sin VMD que reinicie `at`.
+ */
+const BOX_TTL_OPTICAL_MS = 15_000;
+/** ACS FaceRect + nombre: pase es flash; un poco más que óptica, no ~75–90s. */
+const BOX_TTL_NAMED_MS = 20_000;
+/** Badge DET del rail / toolbar: misma ventana que óptica fresca. */
+export const LIVE_DET_BADGE_MS = BOX_TTL_OPTICAL_MS;
 /** Poll de respaldo cuando SSE está sano (ráfagas las come SSE). */
 const POLL_HEALTHY_MS = 1200;
 /** Poll agresivo si SSE cayó. */
 const POLL_DEGRADED_MS = 280;
-/** Semilla: solo eventos dentro del TTL útil (no pintar fantasmas de 2 min). */
-const SEED_MS = 12_000;
+/** Semilla: alinear al TTL nombrado (no 2 min de fantasmas). */
+const SEED_MS = BOX_TTL_NAMED_MS;
 /** Chip «Movimiento» sin caja: VMD no debe resucitar tracks ópticos. */
 const MOTION_CHIP_MS = 4_000;
+/** Edad en placa solo si aporta (evitar parpadeo «ahora»/1s). */
+const AGE_LABEL_MIN_S = 2;
 /** Distancia de centros (0..1) bajo la cual dos humanos se consideran el mismo.
  *  Conservador: Meeting Room tres sentados lejos → no fusionar. */
 const SOFT_CENTER_DIST = 0.1;
@@ -396,17 +404,27 @@ export function plateLabel(type: string, personName?: string | null): string {
   return `${type} · sin ID`;
 }
 
-function relAge(at: number): string {
+function relAge(at: number): string | null {
   const s = Math.max(0, Math.round((Date.now() - at) / 1000));
-  if (s < 1) return "ahora";
+  if (s < AGE_LABEL_MIN_S) return null;
   return `${s}s`;
+}
+
+function isHumanish(type: string): boolean {
+  return type === "human" || type === "unknown" || type === "face";
 }
 
 export function IntegraDetectionOverlay({
   deviceIp,
+  showEmpty = false,
 }: {
   /** IP del equipo cuyo video se está viendo: las cajas son suyas. */
   deviceIp: string | null;
+  /**
+   * Foco: mensaje corto si no hay caja fresca.
+   * Muro: false (16 celdas no deben gritar «sin detección»).
+   */
+  showEmpty?: boolean;
 }) {
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [motionAt, setMotionAt] = useState<number | null>(null);
@@ -552,25 +570,52 @@ export function IntegraDetectionOverlay({
     }, AGE_TICK_MS);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boxes.length, motionAt]);
+  }, [boxes.length, motionAt, showEmpty]);
 
   if (!deviceIp) return null;
-  if (boxes.length === 0 && motionAt == null) return null;
+
+  const humanCount = boxes.filter((b) => isHumanish(b.type)).length;
+  const vehicleCount = boxes.filter((b) => b.type === "vehicle").length;
+  const hasMotionOnly = motionAt != null && boxes.length === 0;
+  const idle = boxes.length === 0 && motionAt == null;
+
+  if (idle && !showEmpty) return null;
 
   return (
     <div className={styles.detOverlay} aria-hidden>
-      {motionAt != null && (
-        <div className={styles.detMotionChip} data-boxes={boxes.length ? "1" : undefined}>
-          {boxes.length
-            ? `Presencia · ${boxes.length}`
-            : "Movimiento · sin caja AcuSense"}
+      {humanCount > 0 && (
+        <div className={styles.detPresenceChip} title="Cajas humanas con TargetRect fresco">
+          Presencia · {humanCount}
+          {vehicleCount > 0 ? ` · ${vehicleCount} veh.` : ""}
+        </div>
+      )}
+      {humanCount === 0 && vehicleCount > 0 && (
+        <div className={styles.detPresenceChip} data-kind="vehicle">
+          Vehículos · {vehicleCount}
+        </div>
+      )}
+      {hasMotionOnly && (
+        <div className={styles.detMotionChip}>
+          Movimiento · sin caja AcuSense
+        </div>
+      )}
+      {idle && showEmpty && (
+        <div className={styles.detEmpty}>
+          Sin detección reciente · FieldDetection
         </div>
       )}
       {boxes.map((b) => {
         const name = b.personName?.trim();
         const tag = plateLabel(b.type, b.personName);
+        const age = relAge(b.at);
         const life = Math.max(0.25, 1 - (Date.now() - b.at) / b.ttl);
         const tagInside = b.y < 0.08;
+        const sourceHint =
+          name || b.type === "face"
+            ? "ACS"
+            : b.type === "vehicle"
+              ? "AcuSense"
+              : "AcuSense · sin Face ID";
         return (
           <div
             key={b.key}
@@ -590,13 +635,14 @@ export function IntegraDetectionOverlay({
               className={styles.detTag}
               data-named={name ? "1" : undefined}
               data-inside={tagInside ? "1" : undefined}
+              title={sourceHint}
             >
               {name && b.photoPath ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img className={styles.detTagFace} src={b.photoPath} alt="" />
               ) : null}
               <span className={styles.detTagName}>{tag}</span>
-              <span className={styles.detTagAge}>{relAge(b.at)}</span>
+              {age ? <span className={styles.detTagAge}>{age}</span> : null}
             </span>
           </div>
         );
