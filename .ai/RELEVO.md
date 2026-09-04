@@ -164,6 +164,11 @@ La foto: si el equipo la manda (solo las cámaras), esa. Si no, NEXARA se la
 pide al propio equipo por `Streaming/channels/101/picture` — ~300 ms, la
 persona sigue delante. Se guardan en `uploads/integra/<siteId>/<día>/`.
 
+Se guardan con `resolveUploadsDir`, **no** contra `process.cwd()`: en Docker
+el proceso corre desde `/app/apps/api` y el volumen está en `/app/uploads`, así
+que resolver por cwd escribe en la capa efímera y las fotos se pierden en el
+siguiente despliegue. `common/uploads-path.ts` ya avisaba de esto.
+
 **Solo se fotografía lo reciente (20 s).** Al darle host de notificación a un
 equipo, este **vuelca todo su historial**: entraron de golpe eventos de mayo, y
 a cada uno se le pegaba una foto tomada en ese momento — el pasillo de hoy con

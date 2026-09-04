@@ -9,6 +9,7 @@ import {
   enableHumanFieldDetection,
   setHttpNotificationHost,
 } from '../hikvision-isapi';
+import { resolveUploadsDir } from '../common/uploads-path';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { IntegraSiteService } from './integra-site.service';
 
@@ -404,7 +405,11 @@ export class IntegraPushService {
     const day = ev.occurredAt.toISOString().slice(0, 10);
     const safeIp = ev.deviceIp.replace(/[^0-9a-zA-Z.]/g, '_');
     const rel = path.posix.join('integra', String(site.id), day, `${Date.now()}-${safeIp}.jpg`);
-    const abs = path.resolve(process.cwd(), 'uploads', rel);
+    // `resolveUploadsDir`, no `cwd`: en Docker el proceso corre desde
+    // `/app/apps/api` y el volumen está montado en `/app/uploads`. Resolver
+    // contra el cwd escribe en la capa efímera del contenedor y las fotos
+    // desaparecen en el siguiente despliegue.
+    const abs = resolveUploadsDir(rel);
     await mkdir(path.dirname(abs), { recursive: true });
     await writeFile(abs, buffer);
     return `/uploads/${rel}`;
