@@ -28,15 +28,16 @@ Adam: «aquí ni detecta los autos en la PTZ». Hardware ya era honesto en UI.
    hits vehicle si llegan + actividad hermana etiquetada «no es ID vehicle».
 3. Script `apps/api/scripts/wire-parking-nvr.cjs` — wire detection sin rotar
    token (`rotateToken: false`).
-4. No se tocó `_DetectionOverlay` (otro agente TTL humanos).
+4. Fix NVR `httpHosts`: parchear plantilla XML (el NVR rechazaba JSON +
+   `uploadImagesDataType` → `badXmlContent`). FieldDetection PoE 4/4 OK.
+5. No se tocó `_DetectionOverlay` (otro agente TTL humanos).
 
 ### Cómo verificar (ops)
 
 1. Hard refresh Video → PTZ.
-2. Panel Vehículos: fuentes Azotea/Entrance/Escalera + aviso NVR sin empuje
-   (hasta cablear).
-3. Tras `node …/wire-parking-nvr.cjs`: si NVR httpHosts OK, movimiento en
-   zona PoE debe listar vehicle con nombre de cámara fuente.
+2. Panel Vehículos: fuentes Azotea/Entrance/Escalera + aviso o pulse NVR.
+3. Tras re-wire: NVR push=ok; movimiento en zona PoE lista vehicle con
+   nombre de cámara fuente (no inventario de autos quietos).
 
 ## A medias
 
