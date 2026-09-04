@@ -8,48 +8,37 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — ERP stock/compras: PDF + Excel + UI
+## Este turno — ACS fan-out en vivo (sin Sync obligatorio)
 
-Huecos de documentos Purchasing / Inventory / Warehouse (sin tocar Integra ni cotizaciones CRM).
+Adam: cada cambio ACS en tiempo real. Sync = solo reconciliación.
+Clave identidad: `employeeNumber` ↔ ACS `employeeNo`/`personId`.
 
-### Backend
+### Qué dispara el push en vivo
 
-1. **Recepción GR PDF** — `goods-receipt-pdf.ts` + `GET procurement/goods-receipts/:id/pdf`
-   (+ `GET :id`). Listado enriquece warehouse / supplier / partidas.
-2. **Kardex PDF** — `stock-movement-pdf.ts` + `GET stock/movements/pdf` (filtros)
-   + `GET stock/movements/:id/pdf` (comprobante traspaso/ajuste/entrada).
-3. Tema `PDF_MODULE_ACCENTS.warehouse` vía `nexara-pdf-theme`.
+1. Integra Personas: alta / editar / Face / baja → UserInfo + FaceDataRecord.
+2. ERP Usuarios: create/update nombre·employeeNumber / isActive / bulk.
+3. RightPlan/doorRight en PATCH persona.
+4. Push ACS: personName al espejo sin sync full.
 
-### Frontend
+### Código
 
-1. Almacén: PDF kardex, PDF historial producto, PDF por fila; Excel solo con
-   datos; limpiar filtros; Excel lotes/valuación; ajuste alta/baja.
-2. Tablas movimientos: SKU, cant., almacén, usuario, fecha/hora, referencia.
-3. Compras → Recepciones: columnas almacén/partidas/landed + PDF + Excel.
+- `IntegraAcsFanoutService` + retry cola + `GET integra/acs-fanout/status`.
+- Espejo upsert inmediato; UI «Reconciliar» + «Cambios en vivo a terminales».
 
-### Concurrente — no pisar
+SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` → `./deploy/update.sh`
 
-Integra / ACS face · CRM cotizaciones PDF · asistencia · FieldDetection.
+### Verificar
 
-SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` → `./deploy/update.sh`
-
-### Verificar (hard refresh)
-
-1. ERP → Almacén → Movimientos → PDF kardex / Excel / Limpiar filtros.
-2. Fila movimiento → PDF comprobante; historial producto → PDF + Excel.
-3. ERP → Compras → Recepciones → Excel + PDF por fila.
-4. Formulario movimiento: Ajuste (alta) y Ajuste (baja).
+1. Personas mutación → OK por IP sin Reconciliar.
+2. ERP employeeNumber → ACS.
+3. Desactivar HR → Valid.enable=false.
+4. Fallo IP visible + retry.
 
 ## A medias
 
-1. Portal empleado · ANPR ITC · micros · TCPMSS.
-2. Re-wire httpHosts si cambia PUBLIC_API_URL.
-3. CaptureFaceData en sensor (si firmware Oficinas lo expone).
-4. Hub `/erp/exports` aún sin cards de stock (opcional).
+1. Portal empleado · ANPR · micros · TCPMSS.
+2. CaptureFaceData; httpHosts re-wire.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales.
-**No** matching Face ID inventado sobre RTSP/AcuSense.
-**No** cotizaciones CRM PDF (sibling).
+Puente NAS, Traefik, credenciales. No Face ID óptico inventado.
