@@ -1549,6 +1549,27 @@ export default function IntegraPeoplePage() {
                       </IgBtn>
                     </section>
 
+                    <section className={styles.personSection} data-tone="accent">
+                      <header className={styles.personSectionHead}>
+                        <strong>Horarios y puertas</strong>
+                        <span>Valid · RightPlan</span>
+                      </header>
+                      <p className={styles.personNote}>
+                        Define vigencia (incl. indefinido), presets (24/7, oficina, visita…)
+                        y qué plantilla aplica en cada puerta del sitio.
+                      </p>
+                      <IgBtn
+                        variant="primary"
+                        onClick={() =>
+                          router.push(
+                            `/integra/schedules?person=${encodeURIComponent(selected.id)}&view=person`,
+                          )
+                        }
+                      >
+                        Abrir editor de horarios
+                      </IgBtn>
+                    </section>
+
                     <section className={styles.personSection}>
                       <header className={styles.personSectionHead}>
                         <strong>Face ID · foto</strong>
