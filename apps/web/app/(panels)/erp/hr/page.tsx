@@ -654,6 +654,7 @@ export default function HrPage() {
         eyebrow="ERP · Personas"
         title={cfg.title}
         subtitle={cfg.subtitle}
+        density="ops"
         meta={
           state.kind === "ready" ? (
             <>
