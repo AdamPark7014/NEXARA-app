@@ -329,14 +329,15 @@ export default function WarehousePage() {
     if (!token) return;
     setExportingPdf(true);
     try {
+      const forProduct = opts?.productId != null;
       await downloadStockMovementsPdf(token, {
-        productId: opts?.productId ?? (movementProductFilter ? Number(movementProductFilter) : undefined),
-        warehouseId: movementWarehouseFilter ? Number(movementWarehouseFilter) : undefined,
-        type: movementTypeFilter || undefined,
-        from: movementFromDate || undefined,
-        to: movementToDate || undefined,
+        productId: forProduct ? opts.productId : (movementProductFilter ? Number(movementProductFilter) : undefined),
+        warehouseId: forProduct ? undefined : (movementWarehouseFilter ? Number(movementWarehouseFilter) : undefined),
+        type: forProduct ? undefined : (movementTypeFilter || undefined),
+        from: forProduct ? undefined : (movementFromDate || undefined),
+        to: forProduct ? undefined : (movementToDate || undefined),
       });
-      toast.success("PDF de movimientos descargado");
+      toast.success(forProduct ? "PDF historial de producto descargado" : "PDF de movimientos descargado");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo generar el PDF");
     } finally {
@@ -711,12 +712,13 @@ export default function WarehousePage() {
   ];
 
   const movementColumns: Column<StockMovementRow>[] = [
-    { key: "movementNumber", label: "Folio", render: (m) => <code style={{ fontSize: 11.5 }}>{m.movementNumber}</code>, width: 110 },
+    { key: "movementNumber", label: "Folio", render: (m) => <code style={{ fontSize: 11.5 }}>{m.movementNumber}</code>, width: 100 },
     { key: "type", label: "Tipo", render: (m) => (
       <Tag variant={m.type === "RECEIPT" || m.type === "PRODUCTION_IN" || m.type === "RETURN" || m.type === "ADJUSTMENT" ? "positive" : m.type === "SCRAP" ? "danger" : "default"}>
         {MOVEMENT_TYPE_LABEL[m.type] ?? m.type}
       </Tag>
-    ), width: 120 },
+    ), width: 100 },
+    { key: "sku", label: "SKU", render: (m) => <code style={{ fontSize: 11 }}>{m.product?.sku ?? "—"}</code>, width: 88 },
     { key: "product", label: "Producto", render: (m) => (
       <button
         type="button"
@@ -724,26 +726,25 @@ export default function WarehousePage() {
         style={{ background: "none", border: "none", padding: 0, textAlign: "left", cursor: m.product?.id ? "pointer" : "default" }}
       >
         <div style={{ fontSize: 13, color: m.product?.id ? "var(--primary)" : undefined }}>{m.product?.name ?? "—"}</div>
-        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{m.product?.sku}{m.lot ? ` · Lote ${m.lot.lotNumber}` : ""}</div>
+        {m.lot ? <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Lote {m.lot.lotNumber}</div> : null}
       </button>
     ) },
-    { key: "route", label: "Origen → Destino", render: (m) => (
+    { key: "route", label: "Almacén", render: (m) => (
       <span style={{ fontSize: 12 }}>{m.fromWarehouse?.name ?? "—"} → {m.toWarehouse?.name ?? "—"}</span>
-    ), width: 180 },
-    { key: "quantity", label: "Cant.", render: (m) => <strong style={{ fontSize: 13 }}>{Number(m.quantity)}</strong>, width: 70, numeric: true },
+    ), width: 160 },
+    { key: "quantity", label: "Cant.", render: (m) => <strong style={{ fontSize: 13 }}>{Number(m.quantity)}</strong>, width: 64, numeric: true },
     { key: "balance", label: "Saldo", render: (m) => (
       <span style={{ fontSize: 11.5, fontVariantNumeric: "tabular-nums", color: "var(--text-secondary)" }} title="Existencia antes → después">
         {stockMovementBalanceLabel(m)}
       </span>
-    ), width: 100, numeric: true },
-    { key: "document", label: "Documento", render: (m) => (
+    ), width: 90, numeric: true },
+    { key: "document", label: "Referencia", render: (m) => (
       <span style={{ fontSize: 11.5 }} title={m.notes ?? undefined}>{stockMovementDocumentLabel(m)}</span>
-    ), width: 150 },
-    { key: "totalCost", label: "Costo", render: (m) => <Money value={Number(m.totalCost ?? 0)} compact />, width: 90, numeric: true },
-    { key: "createdAt", label: "Fecha", render: (m) => (
-      <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{new Date(m.createdAt).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
     ), width: 130 },
-    { key: "createdBy", label: "Quién", accessor: (m) => m.createdBy?.nombre ?? "—", width: 110 },
+    { key: "createdAt", label: "Fecha/hora", render: (m) => (
+      <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{new Date(m.createdAt).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+    ), width: 120 },
+    { key: "createdBy", label: "Usuario", accessor: (m) => m.createdBy?.nombre ?? "—", width: 100 },
     {
       key: "actions",
       label: "",
@@ -752,7 +753,7 @@ export default function WarehousePage() {
         <button
           type="button"
           title="Comprobante PDF"
-          onClick={() => void downloadMovementSlip(m.id)}
+          onClick={(e) => { e.stopPropagation(); void downloadMovementSlip(m.id); }}
           style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--primary)", padding: "4px 6px", fontWeight: 600 }}
         >
           PDF
