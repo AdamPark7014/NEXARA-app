@@ -636,11 +636,13 @@
   object-fit: cover;
 }
 
-/* MJPEG del muro: el frame vive en poster — que llene el mosaico. */
-.playerShell[data-mode="mjpeg"] .playerVideo :global(video) {
-  object-fit: cover;
+/* Snapshot del muro (frame.jpeg): llena el mosaico. */
+.wallSnapImg {
+  display: block;
   width: 100%;
   height: 100%;
+  object-fit: cover;
+  background: #020617;
 }
 
 .playerVideo :global(video-stream .info),

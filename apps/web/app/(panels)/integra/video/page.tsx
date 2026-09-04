@@ -409,7 +409,7 @@ export default function IntegraVideoPage() {
                   )}
                 </div>
                 <p className={styles.wallHint}>
-                  Muro en MJPEG (todas visibles) · Doble clic → foco en MSE
+                  Muro = foto en vivo (~1 fps) · Doble clic → foco en video fluido
                 </p>
               </>
             )}

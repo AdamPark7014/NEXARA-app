@@ -6,34 +6,20 @@ import styles from "./integra.module.css";
 type StreamMode = "mse" | "mjpeg";
 
 type Props = {
-  /** URL HLS que devuelve la API. De ella se deriva el WebSocket. */
+  /** URL HLS que devuelve la API. De ella se deriva WS / frame.jpeg. */
   src: string | null;
   showLiveBadge?: boolean;
   compact?: boolean;
   className?: string;
-  /**
-   * Retraso antes de abrir el WebSocket. En el muro cada mosaico entra con
-   * turno propio para no saturar el navegador.
-   */
   startDelayMs?: number;
-  /**
-   * Si es false, no se abre el stream. El mosaico muestra “En cola”.
-   */
   enabled?: boolean;
   /**
-   * `mjpeg` = mosaicos del muro (ligero, se ven todos).
-   * `mse` = Foco / calidad (decodificador H.264; pocos a la vez).
+   * `mjpeg` en el muro = snapshots HTTP `frame.jpeg` (probado en prod).
+   * El mode=mjpeg del `<video-stream>` no entrega frames con estos RTSP.
+   * `mse` = Foco.
    */
   mode?: StreamMode;
 };
-
-/**
- * Reproductor go2rtc `<video-stream>`.
- *
- * En el muro usamos MJPEG: JPEG por WebSocket, sin decodificador H.264 por
- * mosaico — así se ven 9–16 cámaras sin el tope de 4 MSE ni el play azul.
- * En Foco usamos MSE (mejor latencia/calidad).
- */
 
 let loaderPromise: Promise<void> | null = null;
 
@@ -73,7 +59,6 @@ type VideoStreamEl = HTMLElement & {
   media?: string;
   src?: URL | string;
   background?: boolean;
-  visibilityThreshold?: number;
   visibilityCheck?: boolean;
   video?: HTMLVideoElement;
   play?: () => void;
@@ -106,25 +91,131 @@ function kickPlay(node: VideoStreamEl) {
   });
 }
 
-function isShowing(node: VideoStreamEl, mode: StreamMode): boolean {
-  const v = hardenVideo(node);
-  if (!v) return false;
-  if (mode === "mjpeg") {
-    // MJPEG pinta en `poster`; basta con que haya imagen.
-    return Boolean(v.poster && v.poster.length > 32);
-  }
-  return v.readyState >= 2 && !v.paused;
-}
+type ShellProps = {
+  src: string | null;
+  showLiveBadge?: boolean;
+  compact?: boolean;
+  className?: string;
+  startDelayMs?: number;
+  enabled?: boolean;
+};
 
-export function IntegraLivePlayer({
+/** Muro: JPEG HTTP refrescado. No usa el decodificador H.264 del navegador. */
+function SnapshotWallPlayer({
   src,
   showLiveBadge = true,
   compact = false,
   className,
   startDelayMs = 0,
   enabled = true,
-  mode = "mse",
-}: Props) {
+}: ShellProps) {
+  const shellRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(true);
+  const [tick, setTick] = useState(0);
+  const [state, setState] = useState<"idle" | "queued" | "loading" | "live" | "error">(
+    src && enabled ? "loading" : src ? "queued" : "idle",
+  );
+
+  const parsed = src ? parseHls(src) : null;
+
+  useEffect(() => {
+    const el = shellRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        setVisible(Boolean(entry?.isIntersecting && (entry.intersectionRatio ?? 0) > 0.05));
+      },
+      { threshold: [0, 0.05, 0.2] },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  const active = Boolean(src && enabled && visible && parsed);
+
+  useEffect(() => {
+    if (!active) {
+      setState(src ? "queued" : "idle");
+      return;
+    }
+    setState("loading");
+    let cancelled = false;
+    const start = window.setTimeout(() => {
+      if (!cancelled) setTick((t) => t + 1);
+    }, Math.max(0, startDelayMs));
+    const period = window.setInterval(() => {
+      if (!cancelled) setTick((t) => t + 1);
+    }, 1100);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(start);
+      window.clearInterval(period);
+    };
+  }, [active, src, enabled, startDelayMs]);
+
+  const frameUrl =
+    active && parsed
+      ? `${parsed.base}/api/frame.jpeg?src=${encodeURIComponent(parsed.name)}&t=${tick}`
+      : null;
+
+  return (
+    <div
+      ref={shellRef}
+      className={`${styles.playerShell} ${className || ""}`}
+      data-compact={compact ? "1" : undefined}
+      data-state={state}
+      data-mode="mjpeg"
+    >
+      <div className={styles.playerVideo}>
+        {frameUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={frameUrl}
+            alt=""
+            className={styles.wallSnapImg}
+            onLoad={() => setState("live")}
+            onError={() => setState((s) => (s === "live" ? s : "error"))}
+          />
+        ) : null}
+      </div>
+      {showLiveBadge && state === "live" && (
+        <span className={styles.playerLiveBadge}>
+          <span className={styles.playerLiveDot} /> LIVE
+        </span>
+      )}
+      {state === "loading" && (
+        <div className={styles.playerOverlay}>
+          <span className={styles.playerSpinner} />
+        </div>
+      )}
+      {state === "queued" && (
+        <div className={styles.playerOverlay} data-tone="queued">
+          <span>{!enabled ? "En cola" : "En espera"}</span>
+        </div>
+      )}
+      {state === "error" && (
+        <div className={styles.playerOverlay} data-tone="error">
+          <span>Sin video</span>
+        </div>
+      )}
+      {state === "idle" && (
+        <div className={styles.playerOverlay}>
+          <span>Selecciona una cámara</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MseFocusPlayer({
+  src,
+  showLiveBadge = true,
+  compact = false,
+  className,
+  startDelayMs = 0,
+  enabled = true,
+}: ShellProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(true);
@@ -181,38 +272,32 @@ export function IntegraLivePlayer({
         .then(() => {
           if (cancelled || !hostRef.current) return;
           const node = document.createElement("video-stream") as VideoStreamEl;
-          node.mode = mode;
+          node.mode = "mse";
           node.media = "video";
           node.background = false;
           node.visibilityCheck = false;
           node.style.width = "100%";
           node.style.height = "100%";
           node.style.display = "block";
-          node.src = `${parsed.base}/api/ws?src=${encodeURIComponent(parsed.name)}`;
           hostRef.current.appendChild(node);
+          node.src = `${parsed.base}/api/ws?src=${encodeURIComponent(parsed.name)}`;
           el = node;
 
           const arm = () => {
             if (cancelled) return;
             hardenVideo(node);
-            if (mode === "mse") kickPlay(node);
+            kickPlay(node);
           };
-
           arm();
-          kickTimers = [50, 200, 600, 1500, 3000].map((ms) =>
-            window.setTimeout(arm, ms),
-          );
+          kickTimers = [50, 200, 600, 1500, 3000].map((ms) => window.setTimeout(arm, ms));
 
           playWatch = window.setInterval(() => {
             if (cancelled) return;
-            if (mode === "mse") {
-              const v = hardenVideo(node);
-              if (v && (v.paused || v.ended)) kickPlay(node);
-            } else {
-              hardenVideo(node);
-            }
-            if (isShowing(node, mode)) setState("live");
-          }, mode === "mjpeg" ? 800 : 1200);
+            const v = hardenVideo(node);
+            if (!v) return;
+            if (v.paused || v.ended) kickPlay(node);
+            if (v.readyState >= 2 && !v.paused) setState("live");
+          }, 1200);
         })
         .catch(() => {
           if (!cancelled) setState("error");
@@ -227,7 +312,7 @@ export function IntegraLivePlayer({
       el?.remove();
       if (host) host.innerHTML = "";
     };
-  }, [src, shouldPlay, startDelayMs, enabled, visible, mode]);
+  }, [src, shouldPlay, startDelayMs, enabled, visible]);
 
   return (
     <div
@@ -235,7 +320,7 @@ export function IntegraLivePlayer({
       className={`${styles.playerShell} ${className || ""}`}
       data-compact={compact ? "1" : undefined}
       data-state={state}
-      data-mode={mode}
+      data-mode="mse"
     >
       <div ref={hostRef} className={styles.playerVideo} />
       {showLiveBadge && state === "live" && (
@@ -266,4 +351,9 @@ export function IntegraLivePlayer({
       )}
     </div>
   );
+}
+
+export function IntegraLivePlayer({ mode = "mse", ...rest }: Props) {
+  if (mode === "mjpeg") return <SnapshotWallPlayer {...rest} />;
+  return <MseFocusPlayer {...rest} />;
 }
