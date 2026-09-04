@@ -891,13 +891,13 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "integra-video": {
     id: "integra-video", panel: PANELS.INTEGRA, path: "/video",
-    label: "Video en vivo", description: "Cámaras, HLS y playback",
+    label: "Video · 24h", description: "Vivo, muro y playback NVR",
     icon: "📹", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD, R.NOC_OPERATOR],
     group: "Monitoreo", visible: true,
   },
   "integra-events": {
     id: "integra-events", panel: PANELS.INTEGRA, path: "/events",
-    label: "Eventos", description: "Timeline ACS de las últimas horas",
+    label: "Eventos Face", description: "Accesos ACS con nombre y foto",
     icon: "📋", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD, R.NOC_OPERATOR],
     group: "Monitoreo", visible: true,
   },
@@ -909,13 +909,13 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   },
   "integra-access": {
     id: "integra-access", panel: PANELS.INTEGRA, path: "/access",
-    label: "Puertas", description: "Control de accesos y privilegios",
+    label: "Accesos", description: "Abrir puertas y asignar privilegios",
     icon: "🚪", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD, R.NOC_OPERATOR],
     group: "Acceso", visible: true,
   },
   "integra-people": {
     id: "integra-people", panel: PANELS.INTEGRA, path: "/people",
-    label: "Personas", description: "Alta · Face ID · baja en terminales",
+    label: "Personas", description: "Alta persona · Face ID en terminales",
     icon: "👤", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD],
     group: "Acceso", visible: true,
   },
