@@ -376,7 +376,7 @@ function MseFocusPlayer({
           title={muted ? "Activar sonido" : "Silenciar"}
           aria-label={muted ? "Activar sonido" : "Silenciar"}
         >
-          {muted ? "🔇" : "🔊"}
+          {muted ? "🔇 Sonido" : "🔊"}
         </button>
       )}
       {showLiveBadge && state === "live" && (

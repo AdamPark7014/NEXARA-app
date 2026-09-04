@@ -330,7 +330,9 @@ export async function setChannelAudio(
   const { buffer } = await client.getBinary(path);
   const xml = buffer.toString('utf8');
 
-  const audioBlock = /<Audio[^>]*>([\s\S]*?)<\/Audio>/.exec(xml);
+  // Ojo: no usar \x08 / caracteres raros en el patrón — un backspace colado
+  // hacía que nunca coincidiera `<Audio>` y el micrófono quedaba apagado.
+  const audioBlock = /<Audio\b[^>]*>([\s\S]*?)<\/Audio>/.exec(xml);
   if (!audioBlock) return false;
 
   const patched = audioBlock[0].replace(

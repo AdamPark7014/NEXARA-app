@@ -221,16 +221,36 @@ export class IntegraMediaService {
     };
     if (!raw.channelId) throw new BadRequestException('La cámara no tiene canal conocido');
 
-    const directIp = raw.source?.reachableDirectly ? raw.source.ipAddress : null;
+    // Misma regla que PTZ: hablar a la IP LAN de la cámara, no al NVR, aunque
+    // `reachableDirectly` venga mal marcado en el espejo.
+    const directIp =
+      raw.source?.ipAddress &&
+      (raw.source.reachableDirectly || !String(raw.source.ipAddress).startsWith('192.168.254.'))
+        ? raw.source.ipAddress
+        : null;
     const client = directIp && resolved.isapiForHost ? resolved.isapiForHost(directIp) : resolved.isapi;
     if (!client) throw new BadRequestException('Cliente ISAPI no disponible');
 
-    // El mismo canal que se sirve: encender el audio del principal no se oye.
-    const channel = directIp
-      ? (raw.streamId ?? String(SUB_STREAM_ID))
-      : subStreamOf(raw.channelId);
+    // Sub-stream (el que sirve go2rtc) + principal: si solo se enciende 101,
+    // el muro sigue mudo.
+    const channels = directIp
+      ? Array.from(
+          new Set(
+            [raw.streamId, String(SUB_STREAM_ID), '101', '102']
+              .filter(Boolean)
+              .map(String),
+          ),
+        )
+      : [subStreamOf(raw.channelId)];
 
-    const changed = await setChannelAudio(client, channel, enabled);
+    let changed = false;
+    for (const channel of channels) {
+      try {
+        if (await setChannelAudio(client, channel, enabled)) changed = true;
+      } catch {
+        // Canal inexistente en ese equipo: seguir con el resto.
+      }
+    }
     if (!changed) {
       return {
         cameraIndexCode,
@@ -250,7 +270,7 @@ export class IntegraMediaService {
       enabled,
       changed: true,
       note: enabled
-        ? 'Micrófono encendido en el equipo. Abre el stream con audio para oírlo.'
+        ? 'Micrófono encendido en el equipo. El stream se abre con audio.'
         : 'Micrófono apagado en el equipo.',
     };
   }
