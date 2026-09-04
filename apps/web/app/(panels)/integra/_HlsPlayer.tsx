@@ -6,13 +6,9 @@ import styles from "./integra.module.css";
 type Props = {
   src: string | null;
   poster?: string;
-  /** Silenciado por defecto (requerido para autoplay en Chrome). */
   muted?: boolean;
-  /** Intentar reproducir al recibir el stream. Default true. */
   autoPlay?: boolean;
-  /** Mostrar badge LIVE cuando está reproduciendo. Default true. */
   showLiveBadge?: boolean;
-  /** Tile de muro: sin controles nativos ni mute flotante. */
   compact?: boolean;
   className?: string;
 };
@@ -20,8 +16,10 @@ type Props = {
 type Phase = "idle" | "loading" | "playing" | "paused" | "error";
 
 /**
- * Player HTML5 + HLS.js (CDN). Safari usa HLS nativo.
- * Autoplay muted + play() tras attach — sin click manual para video en vivo.
+ * Player HTML5 + HLS.js.
+ *
+ * No tratar el `error` nativo del <video> como fatal cuando HLS.js maneja el
+ * media: dispara en el attach y dejaba la UI en «No se pudo reproducir».
  */
 export function IntegraHlsPlayer({
   src,
@@ -36,6 +34,7 @@ export function IntegraHlsPlayer({
   const [phase, setPhase] = useState<Phase>(src ? "loading" : "idle");
   const [isMuted, setIsMuted] = useState(muted);
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     setIsMuted(muted);
@@ -48,7 +47,13 @@ export function IntegraHlsPlayer({
       return;
     }
 
-    let hls: { destroy: () => void; on?: (ev: string, cb: () => void) => void } | null = null;
+    let hls: {
+      destroy: () => void;
+      on?: (ev: string, cb: (...args: unknown[]) => void) => void;
+      startLoad?: () => void;
+      recoverMediaError?: () => void;
+    } | null = null;
+    let usingHls = false;
     let cancelled = false;
     setPhase("loading");
     setErrMsg(null);
@@ -63,7 +68,6 @@ export function IntegraHlsPlayer({
             if (!cancelled) setPhase("playing");
           })
           .catch(() => {
-            // Política del navegador: queda listo; el usuario puede pulsar play.
             if (!cancelled) setPhase("paused");
           });
       }
@@ -73,25 +77,27 @@ export function IntegraHlsPlayer({
       if (!cancelled) setPhase("playing");
     };
     const onPause = () => {
-      if (!cancelled && !video.ended) setPhase("paused");
+      if (!cancelled && !video.ended) {
+        setPhase((p) => (p === "loading" ? p : "paused"));
+      }
     };
     const onWaiting = () => {
       if (!cancelled && !video.paused) setPhase("loading");
     };
-    const onError = () => {
-      if (!cancelled) {
-        setPhase("error");
-        setErrMsg("No se pudo reproducir el stream");
-      }
+    const onNativeError = () => {
+      // Con HLS.js el error nativo es ruido; él recupera o emite fatal propio.
+      if (cancelled || usingHls) return;
+      setPhase("error");
+      setErrMsg("No se pudo reproducir el stream");
     };
 
     video.addEventListener("playing", onPlaying);
     video.addEventListener("pause", onPause);
     video.addEventListener("waiting", onWaiting);
-    video.addEventListener("error", onError);
+    video.addEventListener("error", onNativeError);
 
     const attach = async () => {
-      const canNative = video.canPlayType("application/vnd.apple.mpegurl");
+      const canNative = Boolean(video.canPlayType("application/vnd.apple.mpegurl"));
       if (canNative) {
         video.src = src;
         video.addEventListener("loadedmetadata", tryPlay, { once: true });
@@ -99,9 +105,18 @@ export function IntegraHlsPlayer({
       }
 
       await new Promise<void>((resolve, reject) => {
-        const existing = document.querySelector<HTMLScriptElement>("script[data-hlsjs]");
-        if (existing && (window as any).Hls) {
+        if ((window as any).Hls) {
           resolve();
+          return;
+        }
+        const existing = document.querySelector<HTMLScriptElement>("script[data-hlsjs]");
+        if (existing) {
+          if ((window as any).Hls) {
+            resolve();
+            return;
+          }
+          existing.addEventListener("load", () => resolve(), { once: true });
+          existing.addEventListener("error", () => reject(new Error("HLS.js")), { once: true });
           return;
         }
         const s = document.createElement("script");
@@ -119,25 +134,43 @@ export function IntegraHlsPlayer({
         video.addEventListener("loadedmetadata", tryPlay, { once: true });
         return;
       }
+
+      usingHls = true;
       const instance = new Hls({
         enableWorker: true,
         lowLatencyMode: true,
         backBufferLength: 30,
+        fragLoadingMaxRetry: 6,
+        manifestLoadingMaxRetry: 4,
+        levelLoadingMaxRetry: 4,
       });
       instance.loadSource(src);
       instance.attachMedia(video);
       instance.on?.(Hls.Events.MANIFEST_PARSED, tryPlay);
-      instance.on?.(Hls.Events.ERROR, (_: unknown, data: { fatal?: boolean }) => {
-        if (data?.fatal && !cancelled) {
+      instance.on?.(
+        Hls.Events.ERROR,
+        (_evt: unknown, data: { fatal?: boolean; type?: string }) => {
+          if (cancelled || !data?.fatal) return;
+          if (data.type === Hls.ErrorTypes?.NETWORK_ERROR) {
+            instance.startLoad?.();
+            setPhase("loading");
+            return;
+          }
+          if (data.type === Hls.ErrorTypes?.MEDIA_ERROR) {
+            instance.recoverMediaError?.();
+            setPhase("loading");
+            return;
+          }
           setPhase("error");
           setErrMsg("Stream interrumpido");
-        }
-      });
+        },
+      );
       hls = instance;
     };
 
     void attach().catch(() => {
       if (cancelled || !video) return;
+      usingHls = false;
       video.src = src;
       video.addEventListener("loadedmetadata", tryPlay, { once: true });
     });
@@ -147,10 +180,20 @@ export function IntegraHlsPlayer({
       video.removeEventListener("playing", onPlaying);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("waiting", onWaiting);
-      video.removeEventListener("error", onError);
-      hls?.destroy();
+      video.removeEventListener("error", onNativeError);
+      try {
+        hls?.destroy();
+      } catch {
+        /* ignore */
+      }
+      video.removeAttribute("src");
+      try {
+        video.load();
+      } catch {
+        /* ignore */
+      }
     };
-  }, [src, autoPlay]);
+  }, [src, autoPlay, retryTick]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -209,6 +252,18 @@ export function IntegraHlsPlayer({
       {phase === "error" && (
         <div className={styles.playerOverlay} data-tone="error">
           <span>{errMsg || "Error"}</span>
+          <button
+            type="button"
+            className={styles.segBtn}
+            style={{ pointerEvents: "auto", marginTop: 8 }}
+            onClick={() => {
+              setErrMsg(null);
+              setPhase("loading");
+              setRetryTick((n) => n + 1);
+            }}
+          >
+            Reintentar
+          </button>
         </div>
       )}
       {!compact && (
