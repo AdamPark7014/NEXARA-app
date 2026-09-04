@@ -397,7 +397,14 @@ export class IntegraSchedulesService {
           const tmpl = await getPlanTemplate(client, Number(planTemplateNo));
           templateName = tmpl?.templateName || null;
         }
-        if (!anyValid && user.Valid) anyValid = user.Valid as typeof anyValid;
+        if (!anyValid && user.Valid) {
+          anyValid = user.Valid as {
+            enable?: boolean;
+            beginTime?: string;
+            endTime?: string;
+            timeType?: string;
+          };
+        }
         doors.push({
           ...d,
           present: true,
@@ -426,10 +433,14 @@ export class IntegraSchedulesService {
         ? (mirror.raw as { Valid?: typeof anyValid }).Valid
         : null;
     const valid = anyValid || fromMirror || null;
+    const namedDoor = doors.find(
+      (d): d is (typeof doors)[number] & { name?: string } =>
+        Boolean((d as { present?: boolean }).present) && 'name' in d,
+    );
 
     return {
       personId: employeeNo,
-      name: mirror?.personName || doors.find((d) => d.present && 'name' in d)?.name || employeeNo,
+      name: mirror?.personName || namedDoor?.name || employeeNo,
       valid,
       validMode: classifyValid(valid),
       doors,

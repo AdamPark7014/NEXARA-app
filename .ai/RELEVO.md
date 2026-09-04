@@ -8,52 +8,48 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Identidad ERP↔ACS + fan-out en vivo
+## Este turno — ERP stock/compras: PDF + Excel + UI
 
-**Una persona = un código.** Sin Face ID inventado ni sync biométrico manual.
+Huecos de documentos Purchasing / Inventory / Warehouse (sin tocar Integra ni cotizaciones CRM).
 
-### Clave canónica (identidad)
+### Backend
 
-`User.employeeNumber` (y `UserCompany.employeeNumber` del tenant)
-**=** `IntegraPerson.personId` (ACS `employeeNo` / `employeeNoString` del push).
+1. **Recepción GR PDF** — `goods-receipt-pdf.ts` + `GET procurement/goods-receipts/:id/pdf`
+   (+ `GET :id`). Listado enriquece warehouse / supplier / partidas.
+2. **Kardex PDF** — `stock-movement-pdf.ts` + `GET stock/movements/pdf` (filtros)
+   + `GET stock/movements/:id/pdf` (comprobante traspaso/ajuste/entrada).
+3. Tema `PDF_MODULE_ACCENTS.warehouse` vía `nexara-pdf-theme`.
 
-Roles en ERP (`User.role` / `roleKey`). Actividades y asistencia híbrida usan
-`User`; con el mismo código resuelven al mismo humano en puertas ACS.
+### Frontend
 
-### Identidad — API / UI (este agente)
+1. Almacén: PDF kardex, PDF historial producto, PDF por fila; Excel solo con
+   datos; limpiar filtros; Excel lotes/valuación; ajuste alta/baja.
+2. Tablas movimientos: SKU, cant., almacén, usuario, fecha/hora, referencia.
+3. Compras → Recepciones: columnas almacén/partidas/landed + PDF + Excel.
 
-1. `IdentityLinkService` + `IdentityModule`
-2. `GET integra/identity/me` · `GET integra/identity/candidates`
-3. `POST/DELETE integra/people/:id/link`
-4. `listPeople` / `getPerson` → `erpUser` (nombre, rol, email)
-5. Users: códigos ACS literales (ya no se expanden dígitos a NXR)
-6. Personas: badges En ERP + Vincular/Desvincular; alta unificada llama link
-7. Portal empleado `/erp/my-profile`: nº ACS, estado Integra, híbrido del día
+### Concurrente — no pisar
 
-### Fan-out en vivo (sibling push — no pisar)
-
-1. Personas alta/editar/Face/baja → UserInfo + FaceDataRecord a todos los ACS
-2. ERP create/update employeeNumber / HR isActive → push ISAPI
-3. `IntegraAcsFanoutService` + cola retry + `GET integra/acs-fanout/status`
-4. Sync UI → «Reconciliar» (no es paso obligatorio)
+Integra / ACS face · CRM cotizaciones PDF · asistencia · FieldDetection.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
 `/var/www/nexara-app` → `./deploy/update.sh`
 
-### Verificar
+### Verificar (hard refresh)
 
-1. Personas → Vincular ERP → badge «En ERP» + rol; Desvincular limpia código.
-2. Mi perfil → estado Integra + checador vs pases ACS.
-3. Alta/foto persona → OK por IP sin Reconciliar (fan-out).
-4. Asistencia híbrida: `linked` cuando códigos coinciden.
+1. ERP → Almacén → Movimientos → PDF kardex / Excel / Limpiar filtros.
+2. Fila movimiento → PDF comprobante; historial producto → PDF + Excel.
+3. ERP → Compras → Recepciones → Excel + PDF por fila.
+4. Formulario movimiento: Ajuste (alta) y Ajuste (baja).
 
 ## A medias
 
-1. ANPR ITC · micros · TCPMSS · NVR httpHost.
-2. FieldDetection re-wire si cambia PUBLIC_API_URL.
+1. Portal empleado · ANPR ITC · micros · TCPMSS.
+2. Re-wire httpHosts si cambia PUBLIC_API_URL.
 3. CaptureFaceData en sensor (si firmware Oficinas lo expone).
+4. Hub `/erp/exports` aún sin cards de stock (opcional).
 
 ## No tocar
 
 Puente NAS, Traefik, credenciales.
-**No** Face ID óptico inventado sobre AcuSense/RTSP.
+**No** matching Face ID inventado sobre RTSP/AcuSense.
+**No** cotizaciones CRM PDF (sibling).
