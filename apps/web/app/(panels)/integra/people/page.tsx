@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   IgBadge,
   IgBtn,
@@ -16,7 +17,6 @@ import { getCachedProvider, subscribeProvider } from "../_caps";
 import { PersonFaceThumb, invalidatePersonFaceCache, prefetchPersonFace } from "../_PersonFace";
 import { inputStyle, integraApi, selectStyle } from "../_lib";
 import { toast } from "@/components/Toast";
-import { useRouter } from "next/navigation";
 import styles from "../integra.module.css";
 
 type Person = {
