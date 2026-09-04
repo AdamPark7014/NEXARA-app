@@ -6,17 +6,17 @@ import { integraApi } from "./_lib";
 import styles from "./integra.module.css";
 
 /**
- * Mando de la domo — hold-to-move.
+ * Mando de la domo — hold-to-move en modo continuo.
  *
- * Cada ráfaga es `momentary` (la parada va dentro). Mientras se mantiene el
- * dedo se reenvía; al soltar —o al salir de la pestaña— se manda `stop` para
- * que la domo no quede atrapada si la última ráfaga no llegó a caducar.
+ * Una sola orden `continuous` al pulsar (velocidad alta) y `stop` al soltar.
+ * Antes se reenviaba `momentary` cada ~280 ms y cada RTT Tailscale se sumaba
+ * al retardo percibido.
  */
 
 type Preset = { id: number; name: string };
 
-const HOLD_MS = 320;
-const HOLD_SPEED = 55;
+/** -100..100; cerca del tope para que el hold se note al instante. */
+const HOLD_SPEED = 92;
 
 export function IntegraPtzPad({
   cameraId,
@@ -29,10 +29,10 @@ export function IntegraPtzPad({
   const [busy, setBusy] = useState(false);
   const [holding, setHolding] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const holdTimer = useRef<number | null>(null);
   const axesRef = useRef<{ pan: number; tilt: number; zoom: number } | null>(null);
   const cameraIdRef = useRef(cameraId);
   cameraIdRef.current = cameraId;
+  const seqRef = useRef(0);
 
   useEffect(() => {
     let stop = false;
@@ -51,43 +51,23 @@ export function IntegraPtzPad({
     };
   }, [cameraId]);
 
-  const post = useCallback(
-    async (body: Record<string, unknown>) => {
-      await integraApi(`integra/cameras/${encodeURIComponent(cameraIdRef.current)}/ptz`, {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
-    },
-    [],
-  );
+  const post = useCallback(async (body: Record<string, unknown>) => {
+    await integraApi(`integra/cameras/${encodeURIComponent(cameraIdRef.current)}/ptz`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }, []);
 
   const stopHold = useCallback(() => {
-    if (holdTimer.current != null) {
-      window.clearInterval(holdTimer.current);
-      holdTimer.current = null;
-    }
     const wasHolding = axesRef.current != null;
     axesRef.current = null;
     setHolding(false);
     if (!wasHolding) return;
-    void post({ stop: true }).catch(() => undefined);
+    const seq = ++seqRef.current;
+    void post({ stop: true }).catch(() => {
+      if (seq === seqRef.current) setError("No se pudo parar la domo");
+    });
   }, [post]);
-
-  const burst = useCallback(async () => {
-    const ax = axesRef.current;
-    if (!ax) return;
-    try {
-      await post({
-        pan: ax.pan,
-        tilt: ax.tilt,
-        zoom: ax.zoom,
-        durationMs: HOLD_MS,
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al mover");
-      stopHold();
-    }
-  }, [post, stopHold]);
 
   const startHold = useCallback(
     (pan: number, tilt: number, zoom: number) => {
@@ -95,14 +75,19 @@ export function IntegraPtzPad({
         setError("Sin permiso para mover cámaras");
         return;
       }
-      stopHold();
       setError(null);
       axesRef.current = { pan, tilt, zoom };
       setHolding(true);
-      void burst();
-      holdTimer.current = window.setInterval(() => void burst(), HOLD_MS - 40);
+      const seq = ++seqRef.current;
+      // Fire-and-forget: no esperar el PUT para sentir el hold.
+      void post({ pan, tilt, zoom, continuous: true }).catch((e) => {
+        if (seq !== seqRef.current) return;
+        setError(e instanceof Error ? e.message : "Error al mover");
+        axesRef.current = null;
+        setHolding(false);
+      });
     },
-    [burst, canControl, stopHold],
+    [canControl, post],
   );
 
   useEffect(() => {
@@ -154,7 +139,7 @@ export function IntegraPtzPad({
   });
 
   return (
-    <div className={styles.ptzPad} data-holding={holding ? "1" : undefined}>
+    <div className={styles.ptzPad} data-holding={holding ? "1" : undefined} data-chrome="top">
       <header className={styles.ptzHud}>
         <strong>PTZ</strong>
         <span>{holding ? "moviendo…" : "mantener para mover"}</span>
@@ -255,7 +240,11 @@ export function IntegraPtzPad({
       {!canControl && (
         <p className={styles.ptzHint}>Modo consulta: esta cuenta no puede mover la cámara.</p>
       )}
-      {error && <p className={styles.ptzHint} data-tone="error">{error}</p>}
+      {error && (
+        <p className={styles.ptzHint} data-tone="error">
+          {error}
+        </p>
+      )}
       {canControl && (
         <IgBtn disabled={busy || holding} onClick={() => void sendOnce({ stop: true })}>
           Stop

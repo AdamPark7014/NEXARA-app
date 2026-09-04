@@ -122,7 +122,9 @@ class PtzMoveDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(-100) @Max(100) tilt?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(-100) @Max(100) zoom?: number;
   /** Tope de 5 s: una orden más larga deja la domo girando si se corta la red. */
-  @IsOptional() @Type(() => Number) @IsInt() @Min(100) @Max(5000) durationMs?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(80) @Max(5000) durationMs?: number;
+  /** Hold-to-move: gira hasta `stop` (sin esperar durationMs). */
+  @IsOptional() @IsBoolean() continuous?: boolean;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(300) preset?: number;
   @IsOptional() @IsBoolean() stop?: boolean;
 }
@@ -398,7 +400,13 @@ export class IntegraController {
     return this.integra.ptzMove(
       companyId,
       id,
-      { pan: dto.pan, tilt: dto.tilt, zoom: dto.zoom, durationMs: dto.durationMs },
+      {
+        pan: dto.pan,
+        tilt: dto.tilt,
+        zoom: dto.zoom,
+        durationMs: dto.durationMs,
+        continuous: dto.continuous === true,
+      },
       site,
     );
   }

@@ -599,8 +599,8 @@ export async function enableHumanFieldDetection(
   const { buffer } = await client.getBinary(path);
   const xml = buffer.toString('utf8');
 
-  const region = /<FieldDetectionRegion\b[\s\S]*?<\/FieldDetectionRegion>/.exec(xml);
-  if (!region) return false;
+  const regions = [...xml.matchAll(/<FieldDetectionRegion\b[\s\S]*?<\/FieldDetectionRegion>/g)];
+  if (regions.length === 0) return false;
 
   const w = Number(/<normalizedScreenWidth>(\d+)</.exec(xml)?.[1]) || 1000;
   const h = Number(/<normalizedScreenHeight>(\d+)</.exec(xml)?.[1]) || 1000;
@@ -613,33 +613,36 @@ export async function enableHumanFieldDetection(
     .map(([x, y]) => `<RegionCoordinates><positionX>${x}</positionX><positionY>${y}</positionY></RegionCoordinates>`)
     .join('');
 
-  let patched = region[0]
-    .replace(/<enabled>\s*false\s*<\/enabled>/, '<enabled>true</enabled>')
-    .replace(/<detectionTarget>[^<]*<\/detectionTarget>/, '<detectionTarget>human</detectionTarget>');
-
   // Disparar más a menudo: umbral de tiempo mínimo y sensibilidad alta
   // (valores típicos ISAPI FieldDetectionRegion; si el tag no existe, se inserta).
-  const bump = (xml: string, tag: string, value: string) => {
-    if (new RegExp(`<${tag}>`, 'i').test(xml)) {
-      return xml.replace(new RegExp(`<${tag}>[^<]*</${tag}>`, 'i'), `<${tag}>${value}</${tag}>`);
+  const bump = (regionXml: string, tag: string, value: string) => {
+    if (new RegExp(`<${tag}>`, 'i').test(regionXml)) {
+      return regionXml.replace(new RegExp(`<${tag}>[^<]*</${tag}>`, 'i'), `<${tag}>${value}</${tag}>`);
     }
-    return xml.replace(
+    return regionXml.replace(
       /<\/FieldDetectionRegion>/i,
       `<${tag}>${value}</${tag}></FieldDetectionRegion>`,
     );
   };
-  patched = bump(patched, 'sensitivity', '90');
-  patched = bump(patched, 'timeThreshold', '0');
 
-  if (!/<RegionCoordinatesList>/.test(patched)) {
-    // El polígono va antes de cerrar la región, después de los umbrales.
-    patched = patched.replace(
-      /<\/FieldDetectionRegion>/,
-      `<RegionCoordinatesList>${corners}</RegionCoordinatesList></FieldDetectionRegion>`,
-    );
+  let out = xml;
+  // Todas las regiones del canal: una sola zona apagada deja huecos sin caja.
+  for (const match of regions) {
+    let patched = match[0]
+      .replace(/<enabled>\s*false\s*<\/enabled>/, '<enabled>true</enabled>')
+      .replace(/<detectionTarget>[^<]*<\/detectionTarget>/, '<detectionTarget>human</detectionTarget>');
+    patched = bump(patched, 'sensitivity', '95');
+    patched = bump(patched, 'timeThreshold', '0');
+    if (!/<RegionCoordinatesList>/.test(patched)) {
+      patched = patched.replace(
+        /<\/FieldDetectionRegion>/,
+        `<RegionCoordinatesList>${corners}</RegionCoordinatesList></FieldDetectionRegion>`,
+      );
+    }
+    out = out.replace(match[0], patched);
   }
 
-  await client.put(path, xml.replace(region[0], patched));
+  await client.put(path, out);
   return true;
 }
 
@@ -659,28 +662,30 @@ export async function disableFieldDetection(
 }
 
 /**
- * Movimiento continuo de una domo: se mueve mientras dure `durationMs` y para
- * sola.
+ * Mueve la domo en pan/tilt/zoom (-100..100).
  *
- * Se usa el modo continuo y no el absoluto porque una consola se maneja a
- * pulsaciones —«un poco a la izquierda»—, no a coordenadas. Los tres ejes van
- * en -100..100 según declara el propio equipo en `ContinuousPanTiltSpace`.
- *
- * El `momentary` lleva la parada dentro: si se cae la red a mitad, la cámara
- * se detiene sola en vez de quedarse girando contra el tope.
+ * - `continuous: true` → modo continuo (hold-to-move): arranca y sigue hasta
+ *   `ptzStop`. Una sola ida HTTP, sin esperar `durationMs`.
+ * - por defecto → `momentary` con tope: si se cae la red, para sola.
  */
 export async function ptzMove(
   client: HikvisionIsapiClient,
   channel: number | string,
-  v: { pan?: number; tilt?: number; zoom?: number; durationMs?: number },
+  v: { pan?: number; tilt?: number; zoom?: number; durationMs?: number; continuous?: boolean },
 ): Promise<void> {
   const clamp = (n: number | undefined) =>
     Math.max(-100, Math.min(100, Math.round(Number(n) || 0)));
-  const duration = Math.max(100, Math.min(5000, Math.round(v.durationMs ?? 500)));
+  const body =
+    `<PTZData><pan>${clamp(v.pan)}</pan><tilt>${clamp(v.tilt)}</tilt>` +
+    `<zoom>${clamp(v.zoom)}</zoom>`;
+  if (v.continuous) {
+    await client.put(`/ISAPI/PTZCtrl/channels/${channel}/continuous`, `${body}</PTZData>`);
+    return;
+  }
+  const duration = Math.max(80, Math.min(5000, Math.round(v.durationMs ?? 280)));
   await client.put(
     `/ISAPI/PTZCtrl/channels/${channel}/momentary`,
-    `<PTZData><pan>${clamp(v.pan)}</pan><tilt>${clamp(v.tilt)}</tilt>` +
-      `<zoom>${clamp(v.zoom)}</zoom><Momentary><duration>${duration}</duration></Momentary></PTZData>`,
+    `${body}<Momentary><duration>${duration}</duration></Momentary></PTZData>`,
   );
 }
 

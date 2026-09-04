@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
+  asList,
+  pick,
   ptzGoToPreset,
   ptzMove,
   ptzPresets,
@@ -315,7 +317,13 @@ export class IntegraMediaService {
   async ptzMove(
     companyId: number | null,
     cameraIndexCode: string,
-    v: { pan?: number; tilt?: number; zoom?: number; durationMs?: number },
+    v: {
+      pan?: number;
+      tilt?: number;
+      zoom?: number;
+      durationMs?: number;
+      continuous?: boolean;
+    },
     siteId?: number | null,
   ) {
     const { client, channel } = await this.ptzTarget(companyId, cameraIndexCode, siteId);
@@ -346,10 +354,11 @@ export class IntegraMediaService {
   }
 
   /**
-   * Playback ISAPI vía NVR: `POST /ISAPI/ContentMgmt/search` (doc HikGateway 5.5.2)
-   * → `playbackURI` RTSP → go2rtc HLS.
+   * Playback ISAPI vía NVR: `POST /ISAPI/ContentMgmt/search` (XML — el NVR
+   * DS-7616 rechaza JSON con badXmlFormat) → `playbackURI` RTSP → go2rtc MSE.
    *
    * Las grabaciones viven en el grabador (host del sitio), no en la cámara LAN.
+   * `trackID` = canal principal del espejo (`101`, `501`…); el vivo usa sub.
    */
   async playbackIsapi(
     companyId: number | null,
@@ -357,6 +366,7 @@ export class IntegraMediaService {
     beginTime: string,
     endTime: string,
     siteId?: number | null,
+    segmentIndex = 0,
   ) {
     const resolved = await this.sites.resolveClient({ companyId, siteId });
     if (resolved.provider !== 'ISAPI' || !resolved.isapi || !resolved.siteId) {
@@ -382,24 +392,25 @@ export class IntegraMediaService {
     const end = toUtcIsapi(endTime);
     if (!start || !end) throw new BadRequestException('Rango begin/end inválido');
 
+    // Cuerpo XML: verificado en vivo contra DS-7616NXI-I2/16P/VPro (Oficinas).
     const searchID = randomUUID();
-    const body = {
-      CMSearchDescription: {
-        searchID,
-        trackIDList: [{ trackID: trackId }],
-        timeSpanList: [{ timeSpan: { startTime: start, endTime: end } }],
-        contentTypeList: [{ contentType: 'video' }],
-        maxResults: 40,
-        searchResultPostion: 0,
-        metadataList: [{ metadataDescriptor: 'recordType.meta.hikvision.com' }],
-      },
-    };
+    const xml =
+      `<?xml version="1.0" encoding="UTF-8"?>` +
+      `<CMSearchDescription>` +
+      `<searchID>${searchID}</searchID>` +
+      `<trackIDList><trackID>${trackId}</trackID></trackIDList>` +
+      `<timeSpanList><timeSpan><startTime>${start}</startTime><endTime>${end}</endTime></timeSpan></timeSpanList>` +
+      `<contentTypeList><contentType>video</contentType></contentTypeList>` +
+      `<maxResults>40</maxResults>` +
+      `<searchResultPostion>0</searchResultPostion>` +
+      `<metadataList><metadataDescriptor>recordType.meta.hikvision.com</metadataDescriptor></metadataList>` +
+      `</CMSearchDescription>`;
 
     let rawResp: Record<string, unknown>;
     try {
-      rawResp = (await resolved.isapi.postJson(
-        '/ISAPI/ContentMgmt/search?format=json',
-        body,
+      rawResp = (await resolved.isapi.post(
+        '/ISAPI/ContentMgmt/search',
+        xml,
       )) as Record<string, unknown>;
     } catch (e) {
       throw new BadRequestException(
@@ -408,28 +419,29 @@ export class IntegraMediaService {
     }
 
     const result = (rawResp.CMSearchResult ?? rawResp) as Record<string, unknown>;
-    const matches = asList(result.matchList).flatMap((m) => {
-      const item = (m as Record<string, unknown>)?.searchMatchItem ?? m;
-      const seg = (item as Record<string, unknown>)?.mediaSegmentDescriptor as
-        | Record<string, unknown>
-        | undefined;
-      const uri = String(seg?.playbackURI || '').trim();
+    const statusStr = pick(result, 'responseStatusStrg') || pick(result, 'responseStatus') || '';
+    const matchListNode = result.matchList as Record<string, unknown> | undefined;
+    const items = asList(matchListNode?.searchMatchItem ?? result.matchList);
+    const matches = items.flatMap((item) => {
+      const uri = (pick(item, 'mediaSegmentDescriptor.playbackURI') || '').trim();
       if (!uri) return [];
-      const span = (item as Record<string, unknown>)?.timeSpan as
-        | { startTime?: string; endTime?: string }
-        | undefined;
+      const sizeRaw = pick(item, 'mediaSegmentDescriptor.size');
       return [
         {
           playbackURI: uri,
-          startTime: span?.startTime ? String(span.startTime) : null,
-          endTime: span?.endTime ? String(span.endTime) : null,
-          name: seg?.name != null ? String(seg.name) : null,
-          size: seg?.size != null ? Number(seg.size) : null,
+          startTime: pick(item, 'timeSpan.startTime'),
+          endTime: pick(item, 'timeSpan.endTime'),
+          name: pick(item, 'mediaSegmentDescriptor.name'),
+          size: sizeRaw != null && sizeRaw !== '' ? Number(sizeRaw) : null,
         },
       ];
     });
 
     if (matches.length === 0) {
+      const hint =
+        /no\s*match/i.test(statusStr) || statusStr === 'OK'
+          ? 'Sin grabaciones en ese rango. Prueba 24 h o más (el NVR a veces no indexa la última hora).'
+          : `Sin grabaciones en ese rango${statusStr ? ` (${statusStr})` : ''}.`;
       return {
         cameraIndexCode,
         provider: 'ISAPI' as const,
@@ -437,20 +449,23 @@ export class IntegraMediaService {
         hls: null,
         beginTime,
         endTime,
+        trackId,
+        segmentIndex: 0,
         segments: [],
-        note: 'Sin grabaciones en ese rango (o el NVR no indexó el canal).',
+        note: hint,
       };
     }
 
-    const first = matches[0];
-    const rtsp = resolved.isapi.authorizeRtsp(first.playbackURI);
-    const redacted = resolved.isapi.authorizeRtspRedacted(first.playbackURI);
+    const idx = Math.max(0, Math.min(Math.floor(segmentIndex) || 0, matches.length - 1));
+    const chosen = matches[idx];
+    const rtsp = resolved.isapi.authorizeRtsp(chosen.playbackURI);
+    const redacted = resolved.isapi.authorizeRtspRedacted(chosen.playbackURI);
     const published = await this.publish(
       'ISAPI',
       `pb_${cameraIndexCode}_${Date.now()}`,
       rtsp,
       redacted,
-      `Playback NVR track ${trackId} · ${matches.length} segmento(s)`,
+      `Playback NVR track ${trackId} · seg ${idx + 1}/${matches.length}`,
     );
 
     return {
@@ -462,11 +477,12 @@ export class IntegraMediaService {
       beginTime,
       endTime,
       trackId,
+      segmentIndex: idx,
       segments: matches.map((m) => ({
         startTime: m.startTime,
         endTime: m.endTime,
         name: m.name,
-        size: m.size,
+        size: Number.isFinite(m.size as number) ? m.size : null,
       })),
       note: published.note,
     };
@@ -507,8 +523,17 @@ export class IntegraMediaService {
     const streamName = withAudio ? `${base}_a` : base;
     const src = withAudio ? audioSourceFor(rtsp) : rtsp;
     try {
-      const url = `${internal}/api/streams?name=${encodeURIComponent(streamName)}&src=${encodeURIComponent(src)}`;
-      await fetch(url, { method: 'PUT' });
+      // JSON body: el PUT `?name=&src=` de go2rtc rompe con playbackURI que
+      // llevan `?starttime=&endtime=` (YAML "did not find expected key").
+      const res = await fetch(`${internal}/api/streams`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [streamName]: [src] }),
+      });
+      if (!res.ok) {
+        const detail = (await res.text().catch(() => '')).slice(0, 200);
+        this.logger.warn(`go2rtc PUT ${res.status}: ${detail}`);
+      }
       const publicBase = this.go2rtcPublic() || internal;
       const hls = `${publicBase}/api/stream.m3u8?src=${encodeURIComponent(streamName)}`;
       return {
@@ -519,7 +544,7 @@ export class IntegraMediaService {
         streamName,
         hasAudio,
         audio: withAudio,
-        note: [sourceNote, withAudio ? 'HLS vía go2rtc, audio AAC' : 'HLS vía go2rtc']
+        note: [sourceNote, withAudio ? 'go2rtc MSE, audio AAC' : 'go2rtc MSE']
           .filter(Boolean)
           .join(' · '),
       };

@@ -89,18 +89,42 @@ function asList<T>(v: T | T[] | undefined | null): T[] {
 function targetsFrom(alert: Record<string, any>): NormalizedEvent['targets'] {
   const gridW = Number(alert?.normalizedScreenSize?.normalizedScreenWidth) || 1000;
   const gridH = Number(alert?.normalizedScreenSize?.normalizedScreenHeight) || 1000;
-  const entries = asList(alert?.DetectionRegionList?.DetectionRegionEntry);
   const out: NonNullable<NormalizedEvent['targets']> = [];
 
+  const pushRect = (type: string, t: any) => {
+    if (!t || typeof t !== 'object') return;
+    // Firmware mezcla X/Y mayúsculas y x/y minúsculas; width/height iguales.
+    const tx = Number(t.X ?? t.x);
+    const ty = Number(t.Y ?? t.y);
+    const tw = Number(t.width ?? t.Width);
+    const th = Number(t.height ?? t.Height);
+    if (![tx, ty, tw, th].every(Number.isFinite) || tw <= 0 || th <= 0) return;
+    // Evitar duplicar la misma caja si el XML trae el mismo TargetRect dos veces.
+    const dup = out.some(
+      (o) =>
+        Math.abs(o.x - tx) < 0.01 &&
+        Math.abs(o.y - ty) < 0.01 &&
+        Math.abs(o.w - tw) < 0.01 &&
+        Math.abs(o.h - th) < 0.01,
+    );
+    if (!dup) out.push({ type, x: tx, y: ty, w: tw, h: th });
+  };
+
+  // Rutas verificadas en alertStream AcuSense: DetectionRegionEntry (+ TargetRect).
+  const entries = [
+    ...asList(alert?.DetectionRegionList?.DetectionRegionEntry),
+    ...asList(alert?.detectionRegionList?.DetectionRegionEntry),
+  ];
   for (const e of entries) {
     const type = str(e?.detectionTarget) || str(e?.targetType) || 'unknown';
-    const t = e?.TargetRect;
-    const tx = Number(t?.X);
-    const ty = Number(t?.Y);
-    const tw = Number(t?.width);
-    const th = Number(t?.height);
-    if ([tx, ty, tw, th].every(Number.isFinite) && tw > 0 && th > 0) {
-      out.push({ type, x: tx, y: ty, w: tw, h: th });
+    // Algunos firmwares mandan TargetRectList con N personas en un solo aviso.
+    const multi = asList(e?.TargetRectList?.TargetRect).concat(asList(e?.TargetRectList?.targetRect));
+    if (multi.length) {
+      for (const t of multi) pushRect(type, t);
+      continue;
+    }
+    if (e?.TargetRect || e?.targetRect) {
+      pushRect(type, e.TargetRect ?? e.targetRect);
       continue;
     }
 
@@ -114,11 +138,16 @@ function targetsFrom(alert: Record<string, any>): NormalizedEvent['targets'] {
     const y0 = Math.min(...ys) / gridH;
     const x1 = Math.max(...xs) / gridW;
     const y1 = Math.max(...ys) / gridH;
-    // Una caja que ocupa el encuadre entero es la zona, no un objetivo: no
-    // aporta nada dibujarla y estorba encima del video.
+    // Una caja que ocupa el encuadre entero es la zona, no un objetivo.
     if (x1 - x0 > 0.98 && y1 - y0 > 0.98) continue;
     out.push({ type, x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) });
   }
+
+  // Fallback: TargetRect suelto en la raíz del alert (dialectos raros).
+  if (!out.length && (alert?.TargetRect || alert?.targetRect)) {
+    pushRect(str(alert?.detectionTarget) || 'human', alert.TargetRect ?? alert.targetRect);
+  }
+
   return out.length ? out : null;
 }
 
