@@ -28,6 +28,7 @@ import { IntegraMediaService } from './integra-media.service';
 import { IntegraSyncService } from './integra-sync.service';
 import { IntegraPortfolioService } from './integra-portfolio.service';
 import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
+import { IdentityLinkService } from '../identity/identity-link.service';
 import {
   deleteAllLocalPersonMedia,
   deleteLocalFingerData,
