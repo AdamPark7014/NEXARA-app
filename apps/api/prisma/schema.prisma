@@ -5030,6 +5030,7 @@ model CompanyProfile {
   integraRegions            IntegraRegion[]
   integraSyncRuns           IntegraSyncRun[]
   integraAlarmAcks          IntegraAlarmAck[]
+  integraSocAlarms          IntegraSocAlarm[]
   integraFloorplans         IntegraFloorplan[]
   integraEdgeAgents         IntegraEdgeAgent[]
   integraPushEvents         IntegraPushEvent[]
