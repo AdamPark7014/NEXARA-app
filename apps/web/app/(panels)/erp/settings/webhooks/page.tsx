@@ -14,6 +14,7 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { toast } from "@/components/Toast";
 import { DashPill } from "@/components/dashboard/DashKit";
+import SettingsModuleRail from "@/components/erp/SettingsModuleRail";
 
 type WebhookRow = {
   id: number;
@@ -169,11 +170,13 @@ export default function WebhooksSettingsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Integraciones"
-        title="Outbound Webhooks"
+        eyebrow="ERP · Gobierno"
+        title="Webhooks salientes"
         subtitle="Eventos firmados HMAC hacia tus sistemas (facturas, stock, SLA, IAM)."
+        density="ops"
         actions={<Button variant="ghost" onClick={() => void load()}>Actualizar</Button>}
       />
+      <SettingsModuleRail />
 
       {loading ? (
         <EmptyState title="Cargando…" description="Webhooks y catálogo de eventos." />

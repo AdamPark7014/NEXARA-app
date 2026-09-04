@@ -301,65 +301,39 @@ export class IntegraAcsFanoutService implements OnModuleInit {
       const disableIps =
         opts.disableOthers && targetSet
           ? allIps.filter((ip) => !targetSet.has(ip))
-          : [];
+          : !opts.enable
+            ? allIps
+            : [];
 
-      const op = opts.enable ? 'erp.upsert' : 'erp.disable';
-      const results = await this.fanout({
-        companyId: opts.companyId,
-        siteId: site.id,
-        op,
-        employeeNo,
-        isapiForHost: (ip) => {
-          if (!opts.enable) return resolved.isapiForHost!(ip);
-          if (targetSet && !targetSet.has(ip) && !disableIps.includes(ip)) {
-            return null;
-          }
-          return resolved.isapiForHost!(ip);
-        },
-        fn: async (client) => {
-          // El fanout itera todos los ACS; decidimos por IP del cliente vía wrapper abajo.
-          await this.upsertUserOnDevice(client, user, opts.createIfMissing !== false);
-        },
-        retry: {
-          companyId: opts.companyId,
-          siteId: site.id,
-          op: opts.enable ? 'userUpsert' : 'userDisable',
-          user,
-        },
-        // Reemplazamos el fanout genérico con uno que distingue upsert vs disable.
-        skipQueue: true,
-      });
+      const op = opts.enable
+        ? `erp.upsert.${opts.scheduleKey || 'default'}`
+        : 'erp.disable';
+      const results: AcsDeviceResult[] = [];
 
-      // Re-run con lógica por IP (el fanout genérico no distingue target/disable).
-      const precise: AcsDeviceResult[] = [];
       for (const ip of allIps) {
         const client = resolved.isapiForHost(ip);
         if (!client) {
-          precise.push({ deviceIp: ip, ok: false, error: 'Sin cliente ISAPI', attempts: 0 });
+          results.push({ deviceIp: ip, ok: false, error: 'Sin cliente ISAPI', attempts: 0 });
           continue;
         }
-        const shouldUpsert = !opts.enable
-          ? false
-          : targetSet
-            ? upsertIps.includes(ip)
-            : true;
-        const shouldDisable =
-          !opts.enable || (opts.disableOthers === true && disableIps.includes(ip));
+        const shouldUpsert = opts.enable && upsertIps.includes(ip);
+        const shouldDisable = disableIps.includes(ip);
         if (!shouldUpsert && !shouldDisable) {
-          precise.push({ deviceIp: ip, ok: true, attempts: 0 });
+          results.push({ deviceIp: ip, ok: true, attempts: 0 });
           continue;
         }
         try {
-          if (shouldDisable && !shouldUpsert) {
-            await this.disableOrModify(client, user);
-          } else if (!opts.enable) {
-            await this.disableOrModify(client, user);
-          } else {
+          if (shouldUpsert) {
             await this.upsertUserOnDevice(client, user, opts.createIfMissing !== false);
+          } else {
+            await this.disableOrModify(client, {
+              ...user,
+              Valid: { ...user.Valid, enable: false },
+            });
           }
-          precise.push({ deviceIp: ip, ok: true, attempts: 1 });
+          results.push({ deviceIp: ip, ok: true, attempts: 1 });
         } catch (e) {
-          precise.push({
+          results.push({
             deviceIp: ip,
             ok: false,
             error: e instanceof Error ? e.message : String(e),
@@ -368,9 +342,8 @@ export class IntegraAcsFanoutService implements OnModuleInit {
         }
       }
 
-      const merged = precise.length ? precise : results;
-      const anyOk = merged.some((r) => r.ok);
-      const allOk = merged.length > 0 && merged.every((r) => r.ok);
+      const anyOk = results.some((r) => r.ok);
+      const allOk = results.length > 0 && results.every((r) => r.ok);
       if (anyOk && opts.enable) {
         await this.upsertMirror({
           companyId: opts.companyId,
@@ -392,14 +365,14 @@ export class IntegraAcsFanoutService implements OnModuleInit {
         siteId: site.id,
         op,
         employeeNo,
-        results: merged,
+        results,
         pendingRetry: false,
-        note: summarize(merged, false),
+        note: summarize(results, false),
       });
       sitesOut.push({
         siteId: site.id,
         siteName: site.name,
-        results: merged,
+        results,
         success: allOk,
         partial: anyOk && !allOk,
       });
