@@ -343,7 +343,7 @@ export class IntegraPushService {
       // Si el equipo mandó la imagen, esa es la buena: es el fotograma exacto
       // del evento. Solo las cámaras la mandan; los terminales, nunca.
       photoPath = await this.savePhoto(site, ev, pushedImage).catch(() => null);
-    } else if (worthAPhoto(ev)) {
+    } else if (worthAPhoto(ev) && isFresh(ev.occurredAt)) {
       photoPath = await this.snapshot(site, ev).catch((e) => {
         this.logger.warn(`Sin foto para ${ev.deviceIp}: ${String(e)}`);
         return null;
@@ -427,6 +427,26 @@ function publicBase(): string {
 function worthAPhoto(ev: NormalizedEvent): boolean {
   if (ev.eventType === 'AccessControllerEvent') return ev.major === 5;
   return ['linedetection', 'fielddetection', 'facedetection'].includes(ev.eventType);
+}
+
+/**
+ * Solo se fotografía lo que acaba de pasar.
+ *
+ * Un equipo al que se le acaba de dar un host de notificación **vuelca todo su
+ * historial** —se vieron eventos de hace tres meses entrando de golpe—, y a
+ * cada uno se le estaba pegando una foto tomada en ese instante: el pasillo de
+ * hoy con el nombre de quien entró en mayo. Parece un registro correcto y no lo
+ * es, que es la peor forma de estar mal.
+ *
+ * El margen es amplio a propósito: la hora del equipo puede ir algo corrida
+ * respecto a la del servidor, y perder la foto de una entrada real por unos
+ * segundos de deriva sale más caro que tolerarlos.
+ */
+const PHOTO_MAX_AGE_MS = 20_000;
+
+function isFresh(occurredAt: Date): boolean {
+  const age = Date.now() - occurredAt.getTime();
+  return age < PHOTO_MAX_AGE_MS && age > -PHOTO_MAX_AGE_MS;
 }
 
 function describeErr(e: unknown): string {
