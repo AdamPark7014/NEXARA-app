@@ -20,6 +20,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import {
   ArrayNotEmpty,
+  Allow,
   IsArray,
   IsBoolean,
   Max,
@@ -40,6 +41,7 @@ import { ServiceClientsService } from '../service-clients/service-clients.servic
 import { IntegraSiteService } from './integra-site.service';
 import { IntegraPushService } from './integra-push.service';
 import { IntegraSyncService } from './integra-sync.service';
+import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
 
 export function integraCanSettings(user: { roleKey?: string; isSuperAdmin?: boolean } | null) {
   if (!user) return false;
