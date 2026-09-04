@@ -214,19 +214,35 @@ export class NotificationsService {
 
   async getUnreadCount(userId: number, companyId?: number | null) {
     return this.prisma.notification.count({
-      where: { userId, isRead: false, ...companyWhere(companyId ?? null) },
+      where: { userId, isRead: false, ...this.inboxScope(companyId) },
     });
   }
 
   async markAsRead(notificationId: number, userId: number, companyId?: number | null) {
     const existing = await this.prisma.notification.findFirst({
-      where: { id: notificationId, userId, ...companyWhere(companyId ?? null) },
+      where: { id: notificationId, userId, ...this.inboxScope(companyId) },
     });
-    assertCompanyAccess(existing, companyId, 'Notificación');
+    if (!existing) throw new NotFoundException('Notificación no encontrada');
+    if (
+      existing.companyId != null &&
+      companyId != null &&
+      Number(existing.companyId) !== Number(companyId)
+    ) {
+      throw new NotFoundException('Notificación no encontrada');
+    }
+
+    const healCompanyId =
+      existing.companyId == null && companyId != null && Number(companyId) > 0
+        ? Number(companyId)
+        : undefined;
 
     const notification = await this.prisma.notification.update({
       where: { id: notificationId },
-      data: { isRead: true, readAt: new Date() },
+      data: {
+        isRead: true,
+        readAt: new Date(),
+        ...(healCompanyId != null ? { companyId: healCompanyId } : {}),
+      },
       include: { triggerUser: true },
     });
 
@@ -240,8 +256,14 @@ export class NotificationsService {
 
   async markAllAsRead(userId: number, companyId?: number | null) {
     await this.prisma.notification.updateMany({
-      where: { userId, isRead: false, ...companyWhere(companyId ?? null) },
-      data: { isRead: true, readAt: new Date() },
+      where: { userId, isRead: false, ...this.inboxScope(companyId) },
+      data: {
+        isRead: true,
+        readAt: new Date(),
+        ...(companyId != null && Number(companyId) > 0
+          ? { companyId: Number(companyId) }
+          : {}),
+      },
     });
 
     this.gateway?.notifyUser(userId, {
@@ -251,9 +273,16 @@ export class NotificationsService {
 
   async deleteNotification(notificationId: number, userId: number, companyId?: number | null) {
     const existing = await this.prisma.notification.findFirst({
-      where: { id: notificationId, userId, ...companyWhere(companyId ?? null) },
+      where: { id: notificationId, userId, ...this.inboxScope(companyId) },
     });
-    assertCompanyAccess(existing, companyId, 'Notificación');
+    if (!existing) throw new NotFoundException('Notificación no encontrada');
+    if (
+      existing.companyId != null &&
+      companyId != null &&
+      Number(existing.companyId) !== Number(companyId)
+    ) {
+      throw new NotFoundException('Notificación no encontrada');
+    }
     return this.prisma.notification.delete({ where: { id: notificationId } });
   }
 
@@ -262,6 +291,10 @@ export class NotificationsService {
    */
   async createNotification(payload: INotificationPayload) {
     try {
+      const stampedCompanyId =
+        payload.companyId ??
+        getRequestCompanyId() ??
+        undefined;
       const notification = await this.prisma.notification.create({
         data: {
           userId: payload.userId,
@@ -274,7 +307,7 @@ export class NotificationsService {
           entityType: payload.entityType,
           relatedUrl: payload.relatedUrl,
           priority: payload.priority || 'normal',
-          companyId: payload.companyId ?? undefined,
+          companyId: stampedCompanyId,
         },
         include: {
           triggerUser: {
@@ -334,7 +367,7 @@ export class NotificationsService {
     companyId?: number | null,
   ) {
     return this.prisma.notification.findMany({
-      where: { userId, category, ...companyWhere(companyId ?? null) },
+      where: { userId, category, ...this.inboxScope(companyId) },
       include: {
         triggerUser: {
           select: {
@@ -344,7 +377,7 @@ export class NotificationsService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
       take: limit,
     });
   }
@@ -353,7 +386,7 @@ export class NotificationsService {
    * Obtener estadísticas de notificaciones
    */
   async getStats(userId: number, companyId?: number | null) {
-    const scope = companyWhere(companyId ?? null);
+    const scope = this.inboxScope(companyId);
     const total = await this.prisma.notification.count({
       where: { userId, ...scope },
     });

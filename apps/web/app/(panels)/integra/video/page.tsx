@@ -708,11 +708,16 @@ export default function IntegraVideoPage() {
                     );
                   })}
                   {filtered.length === 0 && (
-                    <p className={styles.igEmpty}>Sin cámaras</p>
+                    <div className={styles.igEmpty}>
+                      <strong className={styles.igEmptyTitle}>Sin cámaras</strong>
+                      <span className={styles.igEmptyHint}>
+                        Sincroniza el sitio o revisa el filtro de región/búsqueda.
+                      </span>
+                    </div>
                   )}
                 </div>
                 <p className={styles.wallHint}>
-                  Muro = MSE con fallback snapshot · Doble clic → foco
+                  Clic = al muro · Doble clic = foco · Toolbar «Playback 24h» = grabación NVR
                 </p>
               </>
             )}
@@ -1085,10 +1090,10 @@ export default function IntegraVideoPage() {
                 <div className={styles.focusPlayback}>
                   {!isHct ? (
                     <>
-                      <strong className={styles.focusPlaybackLabel}>Playback histórico</strong>
+                      <strong className={styles.focusPlaybackLabel}>Playback histórico (NVR)</strong>
                       <p className={styles.doorCellMeta} style={{ margin: 0 }}>
-                        Solo en el foco (el muro sigue en vivo). Track NVR = canal principal
-                        (101, 501…). Retención según disco del grabador.
+                        Solo en el foco (el muro sigue en vivo). Retención según disco del
+                        grabador — si no hay segmentos, el equipo no grabó ese tramo.
                       </p>
                       <IgField label="Inicio">
                         <input
@@ -1108,29 +1113,23 @@ export default function IntegraVideoPage() {
                       </IgField>
                       <div className={styles.focusActions}>
                         <IgBtn
-                          onClick={() => {
-                            const r = defaultRangeHours(1);
-                            setBegin(r.start);
-                            setEnd(r.end);
-                          }}
+                          disabled={!selected || busy === "pb"}
+                          onClick={() => void playLastHours(1)}
                         >
                           Última 1h
                         </IgBtn>
                         <IgBtn
-                          onClick={() => {
-                            const r = defaultRangeHours(24);
-                            setBegin(r.start);
-                            setEnd(r.end);
-                          }}
+                          variant="primary"
+                          disabled={!selected || busy === "pb"}
+                          onClick={() => void playLastHours(24)}
                         >
-                          Últimas 24h
+                          {busy === "pb" ? "Buscando…" : "Últimas 24h"}
                         </IgBtn>
                         <IgBtn
-                          variant="primary"
                           disabled={!selected || busy === "pb"}
                           onClick={() => void requestPlayback(0)}
                         >
-                          Obtener
+                          Reproducir rango
                         </IgBtn>
                         {playbackActive && (
                           <IgBtn
@@ -1169,7 +1168,8 @@ export default function IntegraVideoPage() {
                     </>
                   ) : (
                     <p className={styles.doorCellMeta}>
-                      Playback histórico no aplica en este proveedor. Usa video en vivo.
+                      Este proveedor (Hik-Connect) solo ofrece video en vivo aquí. El
+                      playback histórico no está disponible en esta consola.
                     </p>
                   )}
                 </div>
