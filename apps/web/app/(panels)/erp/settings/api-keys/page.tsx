@@ -14,6 +14,7 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { getActiveCompanyId } from "@/lib/tenant";
 import { toast } from "@/components/Toast";
+import SettingsModuleRail from "@/components/erp/SettingsModuleRail";
 
 type ApiKeyRow = {
   id: number;
@@ -140,10 +141,12 @@ export default function ApiKeysSettingsPage() {
     <>
       <PageHeader
         eyebrow="ERP · Gobierno"
-        title="API keys por empresa"
-        subtitle="Autenticación machine-to-machine scoped al tenant activo (header X-Api-Key)."
+        title="Claves API"
+        subtitle="Autenticación máquina a máquina del tenant activo (cabecera X-Api-Key)."
+        density="ops"
         actions={<Button variant="ghost" onClick={() => void load()}>Actualizar</Button>}
       />
+      <SettingsModuleRail />
 
       {revealed && (
         <div

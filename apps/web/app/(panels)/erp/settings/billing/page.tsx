@@ -14,6 +14,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { getActiveCompanyId } from "@/lib/tenant";
 import { toast } from "@/components/Toast";
 import KpiCard from "@/components/ui/KpiCard";
+import SettingsModuleRail from "@/components/erp/SettingsModuleRail";
 
 async function apiFetch(path: string, token: string, init: RequestInit = {}) {
   const companyId = getActiveCompanyId();
@@ -99,10 +100,12 @@ export default function BillingSettingsPage() {
     <>
       <PageHeader
         eyebrow="ERP · Gobierno"
-        title="Billing y asientos"
-        subtitle="Plan SaaS por empresa, límites de seats y metering de uso (base Stripe-ready)."
+        title="Facturación y asientos"
+        subtitle="Plan por empresa, límites de asientos y uso (listo para Stripe)."
+        density="ops"
         actions={<Button variant="ghost" onClick={() => void load()}>Actualizar</Button>}
       />
+      <SettingsModuleRail />
 
       {!loading && data && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 18 }}>
