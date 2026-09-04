@@ -35,7 +35,7 @@ export type AcsFanoutStatus = {
 type RetryPayload = {
   companyId: number;
   siteId: number;
-  op: 'userUpsert' | 'userDisable' | 'userDelete';
+  op: 'userUpsert' | 'userDisable' | 'userDelete' | 'faceUpload' | 'faceDelete';
   user: UserInfoWrite;
   failedIps: string[];
   attempt: number;
@@ -388,6 +388,12 @@ export class IntegraAcsFanoutService implements OnModuleInit {
           await deleteUserInfo(client, user.employeeNo);
         } else if (op === 'userDisable') {
           await this.disableOrModify(client, user);
+        } else if (op === 'faceDelete') {
+          await deleteFaceData(client, user.employeeNo);
+        } else if (op === 'faceUpload') {
+          const local = readLocalPersonFace(companyId, user.employeeNo);
+          if (!local?.buffer?.length) throw new Error('Sin JPEG local para reintento FaceDataRecord');
+          await uploadFaceData(client, { employeeNo: user.employeeNo, jpeg: local.buffer });
         } else {
           await this.upsertUserOnDevice(client, user, true);
         }

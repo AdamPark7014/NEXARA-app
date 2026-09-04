@@ -65,7 +65,47 @@ export class ActivitiesController {
       res.attachment('actividades.xlsx');
       return res.send(Buffer.from(buffer));
     }
-    throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON están deshabilitados.');
+    throw new BadRequestException('Solo se permite format=xlsx. CSV/JSON quedan deshabilitados.');
+  }
+
+  /** PDF agregado de OT (lista operativa). Ruta literal antes de `:id`. */
+  @Get('report.pdf')
+  @UseGuards(RbacGuard)
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.ACTIVITIES_EXPORT,
+      PERMISSIONS.ACTIVITIES_MANAGE,
+      PERMISSIONS.CONSOLE_ADMIN,
+    ],
+  })
+  async reportPdf(
+    @CurrentUser() user: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Res() res?: Response,
+  ) {
+    let responsableIds: number[] | null = null;
+    if (!user.isSuperAdmin) {
+      if (this.hasTeamActivitiesScope(user)) {
+        const scopeUsers = await this.usersService.findUsersForConsoleActivityScope();
+        responsableIds = scopeUsers.map((u: { id: number }) => u.id);
+      } else {
+        responsableIds = [user.id];
+      }
+    }
+    const buffer = await this.activitiesService.reportPdf(
+      { from: from || undefined, to: to || undefined },
+      user?.nombre ?? null,
+      { companyId, responsableIds },
+    );
+    res!.header('Content-Type', 'application/pdf');
+    res!.header(
+      'Content-Disposition',
+      `attachment; filename="actividades-${from || 'inicio'}-${to || 'hoy'}.pdf"`,
+    );
+    return res!.send(buffer);
   }
 
   // Importar actividades desde archivo JSON
