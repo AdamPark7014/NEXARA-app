@@ -290,11 +290,17 @@ export function subscribePushEvents(fn: Listener): () => void {
   };
 }
 
-function labelFor(type: string): string {
-  if (type === "human") return "Humano";
-  if (type === "vehicle") return "Vehículo";
-  if (type === "face") return "Rostro";
-  return type;
+/**
+ * Una sola placa: ACS con nombre vs óptica sin inventar Face ID.
+ * No duplicar «Humano» + «sin ID» en dos spans.
+ */
+export function plateLabel(type: string, personName?: string | null): string {
+  const name = personName?.trim();
+  if (name) return name;
+  if (type === "human" || type === "unknown") return "Humano · sin ID";
+  if (type === "face") return "Rostro ACS · sin nombre";
+  if (type === "vehicle") return "Vehículo · sin placa";
+  return `${type} · sin ID`;
 }
 
 function relAge(at: number): string {
@@ -400,8 +406,10 @@ export function IntegraDetectionOverlay({
       )}
       {boxes.map((b) => {
         const name = b.personName?.trim();
-        const tag = name || labelFor(b.type);
+        const tag = plateLabel(b.type, b.personName);
         const life = Math.max(0.25, 1 - (Date.now() - b.at) / b.ttl);
+        // Placa sticky dentro del marco si la caja está arriba (evita clip + doble label).
+        const tagInside = b.y < 0.08;
         return (
           <div
             key={b.key}
@@ -417,11 +425,17 @@ export function IntegraDetectionOverlay({
               animationDuration: `${b.ttl}ms`,
             }}
           >
-            <span className={styles.detTag} data-named={name ? "1" : undefined}>
+            <span
+              className={styles.detTag}
+              data-named={name ? "1" : undefined}
+              data-inside={tagInside ? "1" : undefined}
+            >
+              {name && b.photoPath ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className={styles.detTagFace} src={b.photoPath} alt="" />
+              ) : null}
               <span className={styles.detTagName}>{tag}</span>
-              <span className={styles.detTagAge}>
-                {name ? relAge(b.at) : `sin ID · ${relAge(b.at)}`}
-              </span>
+              <span className={styles.detTagAge}>{relAge(b.at)}</span>
             </span>
           </div>
         );
