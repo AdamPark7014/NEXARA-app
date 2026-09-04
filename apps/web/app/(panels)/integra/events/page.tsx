@@ -17,6 +17,7 @@ import { subscribePushEvents, type PushEvent } from "../_DetectionOverlay";
 import { PersonFaceThumb, prefetchPersonFace } from "../_PersonFace";
 import { integraApi, inputStyle, selectStyle } from "../_lib";
 import styles from "../integra.module.css";
+import { EnSitioStrip } from "@/components/presence/EnSitioStrip";
 
 /**
  * Eventos ACS de negocio: accesos concedidos/denegados con foto, puerta y hora.

@@ -526,6 +526,33 @@ export class IntegraSchedulesService {
       }
     }
 
+    // Si doorPlans piden plantillas 2/3/4, materializar franjas aunque el
+    // preset sea contractor / meeting_only / window libre.
+    if (input.ensurePresetsOnDevices !== false) {
+      const needed = new Set<string>();
+      for (const dp of input.doorPlans || []) {
+        const n = String(dp.planTemplateNo ?? '');
+        if (n === '2') needed.add('office_hours');
+        if (n === '3') needed.add('after_hours');
+        if (n === '4') needed.add('weekend');
+      }
+      if (planTemplateNo === '2') needed.add('office_hours');
+      if (planTemplateNo === '3') needed.add('after_hours');
+      if (planTemplateNo === '4') needed.add('weekend');
+      for (const p of needed) {
+        await this.ensurePresets(
+          companyId,
+          {
+            preset: p as 'office_hours' | 'after_hours' | 'weekend',
+            templateId: p === 'office_hours' ? 2 : p === 'after_hours' ? 3 : 4,
+            weekPlanId: p === 'office_hours' ? 2 : p === 'after_hours' ? 3 : 4,
+          },
+          actor,
+          resolved.siteId,
+        );
+      }
+    }
+
     const Valid = validMode
       ? validFromMode(validMode, { beginTime, endTime })
       : beginTime || endTime

@@ -415,17 +415,26 @@ export default function IntegraSchedulesPage() {
 
                 <IgPanel title="Vigencia" count="UserInfo.Valid">
                   <div className={styles.schedValidGrid}>
-                    <label className={styles.personCheck}>
-                      <input
-                        type="checkbox"
-                        checked={draft.validEnable}
-                        onChange={(e) => {
-                          setActivePreset(null);
-                          setDraft({ ...draft, validEnable: e.target.checked });
-                        }}
-                      />
-                      Acceso habilitado
-                    </label>
+                      <label className={styles.personCheck}>
+                        <input
+                          type="checkbox"
+                          checked={draft.validEnable}
+                          onChange={(e) => {
+                            setActivePreset(null);
+                            const on = e.target.checked;
+                            setDraft({
+                              ...draft,
+                              validEnable: on,
+                              validMode: on
+                                ? draft.indefinite
+                                  ? "indefinite"
+                                  : "window"
+                                : "disabled",
+                            });
+                          }}
+                        />
+                        Acceso habilitado
+                      </label>
                     <label className={styles.personCheck}>
                       <input
                         type="checkbox"
