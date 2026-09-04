@@ -38,6 +38,20 @@ const readPositiveIntEnv = (name: string, fallback: number): number => {
   return toPositiveInt(process.env[name], fallback);
 };
 
+/** Buzón de los equipos. Se nombra una vez: lo usan el parser y el filtro. */
+const DEVICE_PUSH_PATH = '/api/integra/hik';
+
+/** Lo que un Hikvision manda de verdad, medido contra los equipos del sitio. */
+function isDevicePushContentType(contentType?: string | string[] | null): boolean {
+  const raw = Array.isArray(contentType) ? contentType[0] : contentType;
+  const normalized = (raw || '').toLowerCase();
+  return (
+    normalized.startsWith('application/xml') ||
+    normalized.startsWith('text/xml') ||
+    normalized.startsWith('text/plain')
+  );
+}
+
 async function bootstrap() {
   // Sin el parser de Nest: el suyo se registra antes que cualquier `app.use` y
   // contesta 415 a lo que no reconoce. Un equipo Hikvision que recibe un error
@@ -54,7 +68,7 @@ async function bootstrap() {
   // Los equipos Hikvision empujan XML, JSON o multipart con el JPEG dentro. Va
   // primero para que nada lo interprete antes: en esta ruta se decide por la
   // forma del cuerpo, no por la cabecera.
-  app.use('/api/integra/hik', express.raw({ type: () => true, limit: '20mb' }));
+  app.use(DEVICE_PUSH_PATH, express.raw({ type: () => true, limit: '20mb' }));
 
   // Límite de payload para fotos base64. El `verify` guarda el cuerpo sin tocar
   // porque el webhook de Stripe firma sobre los bytes exactos: parseado y
@@ -230,10 +244,16 @@ async function bootstrap() {
         : Boolean((transferEncoding || '').toLowerCase().includes('chunked'));
     })();
 
+    // El buzón de los equipos no puede exigir cabecera: el firmware manda XML
+    // sin negociar nada, y a un Hikvision que recibe un error se le deshabilita
+    // el host de notificación. Se le permite XML además de lo de siempre; lo que
+    // protege esa ruta es el token, no el `Content-Type`.
+    const isDevicePush = fullPath.startsWith(DEVICE_PUSH_PATH);
     if (
       isMutatingMethod(request.method) &&
       hasRequestBody &&
-      !isAllowedContentType(request.headers['content-type'])
+      !isAllowedContentType(request.headers['content-type']) &&
+      !(isDevicePush && isDevicePushContentType(request.headers['content-type']))
     ) {
       ipPenaltyBox.addStrike(ip, 1);
       response.status(415).json({
