@@ -5823,6 +5823,37 @@ model IntegraCamera {
   @@map("integra_cameras")
 }
 
+/// Ventanas planificadas de uso de sala (p. ej. Sala de juntas).
+/// No es Google Calendar: solo título, quién, franja y vínculo ACS Valid.
+model IntegraRoomBooking {
+  id            Int      @id @default(autoincrement())
+  companyId     Int
+  siteId        Int
+  /// Espejo IntegraDoor.doorIndexCode (`<ip>|<doorNo>` en ISAPI).
+  doorIndexCode String   @db.VarChar(120)
+  title         String   @db.VarChar(220)
+  hostName      String?  @db.VarChar(220)
+  /// personId ACS para contrastar vigencia Valid en terminal.
+  hostPersonId  String?  @db.VarChar(120)
+  startsAt      DateTime
+  endsAt        DateTime
+  notes         String?  @db.Text
+  /// PLANNED | CANCELLED | DONE
+  status        String   @default("PLANNED") @db.VarChar(16)
+  createdById   Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId, startsAt])
+  @@index([siteId, doorIndexCode, startsAt])
+  @@index([companyId, startsAt])
+  @@index([companyId, status])
+  @@map("integra_room_bookings")
+}
+
 model IntegraDoor {
   id              Int      @id @default(autoincrement())
   companyId       Int
