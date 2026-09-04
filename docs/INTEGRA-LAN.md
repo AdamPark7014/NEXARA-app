@@ -214,9 +214,13 @@ Todas documentadas en `HIKVISION-apps/docs/API-DOCS/HIKVISION/` (salvo InputProx
 | `POST /ISAPI/AccessControl/AcsEvent?format=json` | eventos de acceso (live, tope 30/página) |
 | `PUT /ISAPI/AccessControl/UserInfoDetail/Delete` + `DeleteProcess` | baja de persona en ACS |
 | `POST /ISAPI/ContentMgmt/search` (XML) | segmentos de grabación NVR → playbackURI |
-| `PUT /ISAPI/Event/notification/httpHosts/{id}` | empuje de eventos a NEXARA |
-| `GET/PUT /ISAPI/Smart/FieldDetection/{ch}` | intrusión AcuSense/NVR (no PTZ) |
+| `PUT /ISAPI/Event/notification/httpHosts/{id}` | empuje de eventos a NEXARA (`uploadImagesDataType=binary` en cámaras) |
+| `GET/PUT /ISAPI/Smart/FieldDetection/{ch}` | intrusión AcuSense/NVR (no PTZ); tag real `sensitivityLevel` |
+| `GET/PUT /ISAPI/Smart/LineDetection/{ch}` | cruce de línea (SmartCap true en DS-2CD2123G2) |
+| `GET/PUT /ISAPI/Smart/FaceDetect/{ch}` | cajas de rostro (NO Face ID / nombres) |
+| `GET/PUT /ISAPI/Event/triggers` | notificaciones `center` → httpHosts |
 | `GET/PUT .../motionDetection` | VMD clásico (sí en PTZ) |
+| `GET /ISAPI/Smart/capabilities` | Field/Line/FaceDetect flags por cámara |
 
 Más `/ISAPI/ContentMgmt/InputProxy/channels[/status]`, que **no** está en el doc
 set de SYSCOM. Da el nombre real de cada cámara, su IP de origen y si está en
