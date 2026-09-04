@@ -47,6 +47,9 @@ import { IntegraSpacesService } from './integra-spaces.service';
 import { IntegraSchedulesService } from './integra-schedules.service';
 import { IntegraPresenceService } from './integra-presence.service';
 import { IntegraRecurringVisitorsService } from './integra-recurring-visitors.service';
+import { IntegraAcsAlarmsService } from './integra-acs-alarms.service';
+import { IntegraEventRouterService } from './integra-event-router.service';
+import { parseSocId } from './integra-acs-alarms.policy';
 import { IdentityLinkService } from '../identity/identity-link.service';
 
 export function integraCanSettings(user: { roleKey?: string; isSuperAdmin?: boolean } | null) {
@@ -153,6 +156,19 @@ class AlarmAckDto {
   @IsOptional() @IsString() note?: string;
   @IsOptional() @IsString() title?: string;
   @IsOptional() @IsString() severity?: string;
+}
+
+class EventRouterRouteDto {
+  @IsOptional() @IsString() eventType?: string;
+  @IsOptional() @Type(() => Number) @IsInt() major?: number | null;
+  @IsOptional() @Type(() => Number) @IsInt() minor?: number | null;
+  @IsOptional() @IsString() deviceName?: string | null;
+  @IsOptional() @IsString() deviceIp?: string | null;
+  @IsOptional() @IsString() personId?: string | null;
+  @IsOptional() @IsString() userType?: string | null;
+  @IsOptional() @IsBoolean() hasErpLink?: boolean;
+  @IsOptional() @IsBoolean() hadPriorGrantToday?: boolean;
+  @IsOptional() @IsBoolean() wasOnSite?: boolean;
 }
 
 class FloorplanCreateDto {
@@ -299,6 +315,8 @@ export class IntegraController {
     private readonly schedules: IntegraSchedulesService,
     private readonly presence: IntegraPresenceService,
     private readonly recurringVisitors: IntegraRecurringVisitorsService,
+    private readonly acsAlarms: IntegraAcsAlarmsService,
+    private readonly eventRouter: IntegraEventRouterService,
   ) {}
 
   @Get('health')
@@ -1088,27 +1106,59 @@ export class IntegraController {
 
   // ── P3 alarms / visitors ───────────────────────────────────────────
   @Get('alarms/queue')
-  @ApiOperation({ summary: 'Cola SOC: alarmas recientes + ack local' })
-  alarmQueue(
+  @ApiOperation({ summary: 'Cola SOC: alarmas push ACS + Artemis (si aplica)' })
+  async alarmQueue(
     @CurrentCompanyId() companyId: number | null,
     @Query('siteId') siteId?: string,
     @Query('hours') hours?: string,
   ) {
-    return this.integra.alarmQueue(companyId, siteId ? parseInt(siteId, 10) : null, {
-      hours: hours ? parseInt(hours, 10) : 24,
-    });
+    const sid = siteId ? parseInt(siteId, 10) : null;
+    const hrs = hours ? parseInt(hours, 10) : 24;
+    const remote = await this.integra.alarmQueue(companyId, sid, { hours: hrs });
+    if (!companyId) return remote;
+    const sites = await this.sites.list(companyId);
+    const site =
+      sid != null
+        ? sites.find((s: { id: number }) => s.id === sid)
+        : sites.find((s: { isDefault?: boolean }) => s.isDefault) || sites[0];
+    if (!site?.id) return remote;
+    const soc = await this.acsAlarms.listQueue(companyId, site.id, { hours: hrs });
+    const remoteItems = Array.isArray(remote?.items) ? remote.items : [];
+    const seen = new Set(soc.items.map((i) => i.id));
+    const merged = [
+      ...soc.items,
+      ...remoteItems.filter((i: { id?: string }) => i?.id && !seen.has(String(i.id))),
+    ];
+    const openCount = merged.filter(
+      (i: { status?: string }) => i.status === 'OPEN' || i.status === 'TICKETED',
+    ).length;
+    return {
+      ...remote,
+      items: merged,
+      openCount,
+      source: soc.items.length ? (remote?.source === 'artemis' ? 'mixed' : 'push') : remote?.source,
+      siteId: site.id,
+    };
   }
 
   @Post('alarms/:id/ack')
   @HttpCode(HttpStatus.OK)
-  ackAlarm(
+  async ackAlarm(
     @CurrentCompanyId() companyId: number | null,
     @Param('id') id: string,
     @Body() dto: AlarmAckDto,
     @CurrentUser() user: any,
     @Query('siteId') siteId?: string,
   ) {
-    return this.integra.ackAlarm(companyId, decodeURIComponent(id), {
+    const externalId = decodeURIComponent(id);
+    if (companyId && parseSocId(externalId) != null) {
+      return this.acsAlarms.setStatus(companyId, externalId, {
+        status: 'ACK',
+        note: dto.note,
+        userId: user?.id ?? null,
+      });
+    }
+    return this.integra.ackAlarm(companyId, externalId, {
       note: dto.note,
       title: dto.title,
       severity: dto.severity,
@@ -1120,14 +1170,22 @@ export class IntegraController {
 
   @Post('alarms/:id/clear')
   @HttpCode(HttpStatus.OK)
-  clearAlarm(
+  async clearAlarm(
     @CurrentCompanyId() companyId: number | null,
     @Param('id') id: string,
     @Body() dto: AlarmAckDto,
     @CurrentUser() user: any,
     @Query('siteId') siteId?: string,
   ) {
-    return this.integra.ackAlarm(companyId, decodeURIComponent(id), {
+    const externalId = decodeURIComponent(id);
+    if (companyId && parseSocId(externalId) != null) {
+      return this.acsAlarms.setStatus(companyId, externalId, {
+        status: 'CLEARED',
+        note: dto.note,
+        userId: user?.id ?? null,
+      });
+    }
+    return this.integra.ackAlarm(companyId, externalId, {
       note: dto.note,
       title: dto.title,
       severity: dto.severity,
@@ -1159,6 +1217,15 @@ export class IntegraController {
     @Body() body?: { title?: string; description?: string; severity?: string },
   ) {
     if (!companyId) throw new BadRequestException('companyId requerido');
+    const externalId = decodeURIComponent(id);
+    if (parseSocId(externalId) != null) {
+      return this.acsAlarms.createTicketFromAlarm(
+        companyId,
+        externalId,
+        siteId ? Number(siteId) : null,
+        body,
+      );
+    }
     const sites = await this.sites.list(companyId);
     const sid = siteId ? Number(siteId) : null;
     const site = sid
@@ -1172,10 +1239,10 @@ export class IntegraController {
       );
     }
     const description = [
-      body?.title || `Alarma Integra: ${decodeURIComponent(id)}`,
+      body?.title || `Alarma Integra: ${externalId}`,
       body?.description,
       body?.severity ? `Severidad: ${body.severity}` : null,
-      `alarmId=${decodeURIComponent(id)}`,
+      `alarmId=${externalId}`,
       `siteId=${site.id}`,
       (site as any).label || site.name ? `Sitio: ${(site as any).label || site.name}` : null,
     ]
@@ -1380,6 +1447,38 @@ export class IntegraController {
     if (!companyId) throw new BadRequestException('Empresa requerida');
     return this.presence.personDetail(companyId, personId, {
       siteId: siteId ? parseInt(siteId, 10) : null,
+    });
+  }
+
+  @Get('event-router/matrix')
+  @ApiOperation({ summary: 'Matriz ACS ↔ negocio (homologación)' })
+  eventRouterMatrix() {
+    return this.eventRouter.matrix();
+  }
+
+  @Get('event-router/recent')
+  @ApiOperation({ summary: 'Últimos enrutados ACS (ring buffer en memoria)' })
+  eventRouterRecent(@Query('limit') limit?: string) {
+    return {
+      items: this.eventRouter.listRecent(limit ? parseInt(limit, 10) : 20),
+    };
+  }
+
+  @Post('event-router/route')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Clasificar evento ACS (dry-run, sin side-effects)' })
+  eventRouterRoute(@Body() body: EventRouterRouteDto) {
+    return this.eventRouter.routeDryRun({
+      eventType: body.eventType ?? 'AccessControllerEvent',
+      major: body.major ?? null,
+      minor: body.minor ?? null,
+      deviceName: body.deviceName,
+      deviceIp: body.deviceIp,
+      personId: body.personId,
+      userType: body.userType,
+      hasErpLink: body.hasErpLink,
+      hadPriorGrantToday: body.hadPriorGrantToday,
+      wasOnSite: body.wasOnSite,
     });
   }
 

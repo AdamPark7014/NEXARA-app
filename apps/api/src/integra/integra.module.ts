@@ -22,6 +22,8 @@ import { IntegraSchedulesService } from './integra-schedules.service';
 import { IntegraPresenceService } from './integra-presence.service';
 import { IntegraRecurringVisitorsService } from './integra-recurring-visitors.service';
 import { AcsOpsBridgeService } from './acs-ops-bridge.service';
+import { IntegraAcsAlarmsService } from './integra-acs-alarms.service';
+import { IntegraEventRouterService } from './integra-event-router.service';
 import { IdentityModule } from '../identity/identity.module';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 
@@ -54,6 +56,8 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
     IntegraPresenceService,
     IntegraRecurringVisitorsService,
     AcsOpsBridgeService,
+    IntegraAcsAlarmsService,
+    IntegraEventRouterService,
   ],
   exports: [
     IntegraArtemisService,
@@ -68,6 +72,8 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
     IntegraPresenceService,
     IntegraRecurringVisitorsService,
     AcsOpsBridgeService,
+    IntegraAcsAlarmsService,
+    IntegraEventRouterService,
   ],
 })
 export class IntegraModule {}
