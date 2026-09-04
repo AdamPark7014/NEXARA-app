@@ -530,16 +530,26 @@ function TeamAttendanceView({
         resultCount={loading ? null : visibleMembers.length}
         rightActions={
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            {members.length > 0 && (
-              <Button variant="ghost" size="sm" iconLeft="⬇" onClick={() => exportToExcel(visibleMembers, [
-                { key: "nombre", label: "Nombre" },
-                { key: "department", label: "Departamento" },
-                { key: "roleName", label: "Rol" },
-                { key: "estado", label: "Estado" },
-                { key: "checkIn", label: "Entrada", format: (v) => v ? String(v).slice(11, 16) : "—" },
-                { key: "checkOut", label: "Salida", format: (v) => v ? String(v).slice(11, 16) : "—" },
-              ], `asistencia-${dateFilter}`)}>Excel</Button>
-            )}
+            <ListExportActions
+              onExcel={
+                members.length > 0
+                  ? () =>
+                      exportToExcel(
+                        visibleMembers,
+                        [
+                          { key: "nombre", label: "Nombre" },
+                          { key: "department", label: "Departamento" },
+                          { key: "roleName", label: "Rol" },
+                          { key: "estado", label: "Estado" },
+                          { key: "checkIn", label: "Entrada", format: (v) => (v ? String(v).slice(11, 16) : "—") },
+                          { key: "checkOut", label: "Salida", format: (v) => (v ? String(v).slice(11, 16) : "—") },
+                        ],
+                        `asistencia-${dateFilter}`,
+                        { title: "Asistencia ERP", subtitle: dateFilter },
+                      )
+                  : undefined
+              }
+            />
             <button style={btnStyle(view === "grid")}  onClick={() => setView("grid")}>Tarjetas</button>
             <button style={btnStyle(view === "table")} onClick={() => setView("table")}>Tabla</button>
           </div>

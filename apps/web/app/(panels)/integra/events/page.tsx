@@ -470,9 +470,18 @@ export default function IntegraEventsPage() {
             <strong className={styles.igEmptyTitle}>Sin eventos</strong>
             <span className={styles.igEmptyHint}>
               {quick === "hoy"
-                ? "Aún no hay accesos ACS hoy, o el empuje no está cableado."
-                : "Prueba otro filtro o amplía el rango."}
+                ? "Aún no hay accesos ACS hoy, o el empuje del terminal no está activo."
+                : quick === "denegados"
+                  ? "No hay denegados en el rango. Eso puede ser bueno."
+                  : "Prueba «Hoy», otro terminal o da de alta la persona."}
             </span>
+            <div className={styles.focusActions} style={{ marginTop: 10, justifyContent: "center" }}>
+              <IgBtn variant="primary" onClick={() => setQuick("hoy")}>
+                Ver hoy
+              </IgBtn>
+              <IgBtn onClick={() => setQuick("denegados")}>Denegados</IgBtn>
+              <IgBtn onClick={() => router.push("/integra/people")}>Ir a Personas</IgBtn>
+            </div>
           </div>
         ) : (
           <div className={styles.evGrid}>
@@ -567,6 +576,11 @@ export default function IntegraEventsPage() {
                 ID {selected.personId || "—"} · major/minor{" "}
                 {selected.major ?? "—"}/{selected.minor ?? "—"}
               </span>
+              {!selected.personId && (
+                <IgBtn variant="primary" onClick={() => router.push("/integra/people")}>
+                  Dar de alta persona →
+                </IgBtn>
+              )}
             </div>
           </div>
         </IgPanel>

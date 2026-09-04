@@ -8,61 +8,49 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Business events ROI (ops/CRM, no Integra)
+## Este turno — AcuSense al límite (Field/Line/Face/Motion + push)
 
-Elevé los streams de eventos que más mueven el negocio: SLA/OT,
-tickets portal, cotizaciones por expirar, seguimientos CRM y OC
-pendientes. Inbox + dashboards accionables. **No toqué** Integra
-push/FieldDetection ni PDF OC / stock detail.
+Adam: maximizar cajas y tasa de eventos en cámaras LAN `.171–.178`
+(DS-2CD2123G2-LIS2U). Sin Face ID óptico inventado.
 
-### Qué hay
+### Qué cambió (código)
 
-1. **Inbox de notificaciones roto → visible** — listado usaba
-   `companyWhere` hard y ocultaba filas con `companyId` null (casi
-   todas las creadas por hierarchy/cron). Ahora soft-scope + stamp
-   de `companyId` al crear + heal al marcar leída.
-2. **`client-ticket-requests` list RBAC** — ya no exige solo
-   `CONSOLE_ADMIN`; Ops/Soporte con SUPPORT_* / ACTIVITIES_* ven y
-   gestionan el inbox (dashboard + `/ops/support` dejaban de fallar
-   en silencio).
-3. **`activity-feed`** — señales de negocio: OT SLA vencidas, tickets
-   NEW/APPROVED, seguimientos CRM vencidos, cotizaciones SENT por
-   expirar, OC DRAFT. Prioridad alta primero.
-4. **Centro de notificaciones** — tabs densas Acción ahora / Inbox /
-   Señales; filtro Ops·CRM·ERP; sin KPIs vanity con emoji.
-5. **Ops dashboard** — panel «Decisiones ahora» (SLA + notifs alta) +
-   KPI SLA respuesta + tickets con deep-link.
-6. **CRM dashboard** — fix `leads`→`ventas/leads`; panel decisiones
-   (seguimientos vencidos + notifs ventas); KPI vencidos.
-7. **CommandCenterRail** — Ops: SLA + notifs; Sales: notifs.
-8. **Ticket SLA alerts** — stamp `companyId` desde Activity.
+1. **`enableMaxSmartDetection`** (hikvision-isapi): FieldDetection todas las
+   regiones, polígono full-frame, `sensitivityLevel=100`, `timeThreshold=0`,
+   `alarmConfidence=low`, `detectionTarget=human` (Almacén → `human,vehicle`).
+2. **Bugfix**: el tag real es `sensitivityLevel` (antes `sensitivity` —
+   firmware lo ignoraba; regiones off / sens 50).
+3. **LineDetection** mid-frame; **FaceDetect** (cajas, no ID); **Motion** 80;
+   substream H.264; audio ON si hay mic.
+4. **`ensureSmartEventTriggersCenter`**: field/line/face/VMD → center/httpHosts.
+   `uploadImagesDataType=binary` + `httpBroken=false`.
+5. **`wireDevices(detection)`** → enableMaxSmartDetection en AcuSense;
+   NVR PoE vehicle y PTZ motion intactos.
+6. Parser facedetection → FaceRect raíz. Docs INTEGRA-LAN Smart verificadas.
 
-### Concurrente (siblings — no pisar)
+### Probe (.178)
 
-Face ACS JPEG / Personas biometrics · CRM OC PDF · stock movements ·
-PTZ · hybrid attendance · Integra push/FieldDetection.
+SmartCap Field+Line+FaceDetect; Intrusion 404. Antes: FD regions disabled,
+httpHosts sin binary. Sub ya H.264 640x360.
 
-SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` · `deploy/update.sh --force-all` (rebuild api+web)
+SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109`
+`./deploy/update.sh --force-all` luego wire detection site 1.
 
-### Verificar (hard refresh)
+### Verificar
 
-1. `/erp/notifications-center` — inbox deja de verse vacío; Acción ahora.
-2. `/ops/dashboard` — Decisiones ahora + tickets portal visibles (rol soporte).
-3. `/ops/support` — listado tickets sin 403.
-4. `/crm/dashboard` — leads recientes + seguimientos vencidos.
-5. Feed `?view=feed` — OT/cotiz/OC según permisos.
+1. FieldDetection/1: 4 regiones on, sens 100, poly full.
+2. httpHosts binary. Eventos fielddetection↑. Meeting Room multi-caja.
+
+## Concurrente (no pisar)
+
+Asistencia híbrida · Eventos ACS UI · CRM/ops notifications · stock · Personas.
 
 ## A medias
 
-1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
-2. Alinear códigos employeeNumber↔personId en plantilla real Oficinas.
-3. go2rtc.yaml en disco corruptible — streams viven en RAM.
-4. FieldDetection re-apply tras sync/push install.
-5. Backfill masivo `notifications.companyId` (heal parcial al leer/marcar).
+1. Portal · ANPR · micros · TCPMSS.
+2. Confirmar wire+event rate post-deploy.
+3. employeeNumber↔personId Oficinas.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales, ISAPI no verificada.
-Face ID óptico inventado. No pelear PTZ pad / Personas CRUD / hybrid
-attendance / stock detail / OC PDF renderer / Integra push.
+Puente NAS, Traefik, credenciales, Face ID inventado. CRM/stock/asistencia siblings.
