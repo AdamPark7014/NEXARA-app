@@ -35,7 +35,7 @@
   display: grid;
   /* minmax(0, 1fr): la columna main puede encogerse; sin esto el min-content
      empuja el shell más allá del viewport y overflow-x: clip corta la derecha. */
-  grid-template-columns: var(--shell-sidebar-w, 268px) minmax(0, 1fr);
+  grid-template-columns: var(--shell-sidebar-w, 248px) minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   grid-template-areas:
     "sidebar topbar"
