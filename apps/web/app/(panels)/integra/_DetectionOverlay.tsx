@@ -11,22 +11,33 @@ import styles from "./integra.module.css";
  * llega normalizado 0..1, así que el recuadro se posiciona en porcentaje y
  * sigue cuadrando aunque el mosaico cambie de tamaño.
  *
- * Un aviso importante sobre lo que esto es y lo que no: la cámara **avisa por
- * evento**, no manda una pista de seguimiento cuadro a cuadro. El recuadro
- * aparece cuando detecta y se desvanece a los pocos segundos; no va pegado a la
- * persona mientras camina. Ese seguimiento fino viaja en los metadatos Dual-VCA
- * dentro del RTSP, y go2rtc los descarta al reempaquetar el video.
+ * Identidad real solo llega en accesos (`AccessControllerEvent.name`). Las
+ * cámaras AcuSense mandan human/vehicle sin nombre: se etiqueta el tipo, no
+ * se inventa matching facial.
  */
 
-type Target = { type: string; x: number; y: number; w: number; h: number };
-type Box = Target & { key: string; at: number };
+export type PushTarget = { type: string; x: number; y: number; w: number; h: number };
 
-type PushEvent = {
+export type PushEvent = {
   id: number;
   deviceIp: string;
+  deviceName?: string | null;
   eventType: string;
+  label?: string | null;
   occurredAt: string;
-  targets?: Target[] | null;
+  personId?: string | null;
+  personName?: string | null;
+  doorNo?: number | null;
+  verifyMode?: string | null;
+  photoPath?: string | null;
+  targets?: PushTarget[] | null;
+};
+
+type Box = PushTarget & {
+  key: string;
+  at: number;
+  personName?: string | null;
+  personId?: string | null;
 };
 
 /** Cuánto se queda pintado un recuadro desde que llega su evento. */
@@ -34,14 +45,6 @@ const BOX_TTL_MS = 4000;
 /** Cada cuánto se pregunta por detecciones nuevas. */
 const POLL_MS = 2000;
 
-/**
- * Un solo sondeo para todo el muro.
- *
- * Cada mosaico monta su propia capa, y si cada uno preguntara por su cuenta,
- * dieciséis mosaicos serían ocho peticiones por segundo contra la API para leer
- * exactamente la misma lista. Se pregunta una vez y se reparte: los mosaicos se
- * suscriben y cada uno se queda con lo suyo.
- */
 type Listener = (events: PushEvent[]) => void;
 
 const listeners = new Set<Listener>();
@@ -51,7 +54,7 @@ let lastId = 0;
 async function pollOnce() {
   try {
     const data = await integraApi<{ items: PushEvent[] }>("integra/push/events?limit=40");
-    const items = (data.items || []).filter((e) => e.id > lastId && e.targets?.length);
+    const items = (data.items || []).filter((e) => e.id > lastId);
     if (items.length === 0) return;
     lastId = Math.max(lastId, ...items.map((e) => e.id));
     for (const fn of listeners) fn(items);
@@ -60,7 +63,8 @@ async function pollOnce() {
   }
 }
 
-function subscribe(fn: Listener): () => void {
+/** Un solo sondeo compartido: muro, foco, tira de accesos y badges del rail. */
+export function subscribePushEvents(fn: Listener): () => void {
   listeners.add(fn);
   if (timer == null) {
     // La primera vez solo se toma la marca: sin esto, al abrir el muro
@@ -88,6 +92,12 @@ function labelFor(type: string): string {
   return type;
 }
 
+function relAge(at: number): string {
+  const s = Math.max(0, Math.round((Date.now() - at) / 1000));
+  if (s < 1) return "ahora";
+  return `${s}s`;
+}
+
 export function IntegraDetectionOverlay({
   deviceIp,
 }: {
@@ -95,6 +105,7 @@ export function IntegraDetectionOverlay({
   deviceIp: string | null;
 }) {
   const [boxes, setBoxes] = useState<Box[]>([]);
+  const [, setTick] = useState(0);
 
   useEffect(() => {
     setBoxes([]);
@@ -102,28 +113,32 @@ export function IntegraDetectionOverlay({
 
   useEffect(() => {
     if (!deviceIp) return;
-    return subscribe((events) => {
+    return subscribePushEvents((events) => {
       const fresh: Box[] = [];
       for (const ev of events) {
         if (ev.deviceIp !== deviceIp || !ev.targets?.length) continue;
-        // Un evento de hace un minuto ya no dice dónde está nadie.
         const age = Date.now() - Date.parse(ev.occurredAt);
         if (!Number.isFinite(age) || age > BOX_TTL_MS * 2) continue;
         for (const [i, t] of ev.targets.entries()) {
-          fresh.push({ ...t, key: `${ev.id}-${i}`, at: Date.now() });
+          fresh.push({
+            ...t,
+            key: `${ev.id}-${i}`,
+            at: Date.now(),
+            personName: ev.personName,
+            personId: ev.personId,
+          });
         }
       }
       if (fresh.length) setBoxes((prev) => [...prev, ...fresh]);
     });
   }, [deviceIp]);
 
-  // Barrido de los caducados, aparte del sondeo: si no, un recuadro se quedaría
-  // pintado hasta que llegara el siguiente evento.
   useEffect(() => {
     if (boxes.length === 0) return;
     const id = window.setInterval(() => {
       const cut = Date.now() - BOX_TTL_MS;
       setBoxes((prev) => prev.filter((b) => b.at > cut));
+      setTick((n) => n + 1);
     }, 500);
     return () => window.clearInterval(id);
   }, [boxes.length]);
@@ -132,21 +147,29 @@ export function IntegraDetectionOverlay({
 
   return (
     <div className={styles.detOverlay} aria-hidden>
-      {boxes.map((b) => (
-        <div
-          key={b.key}
-          className={styles.detBox}
-          data-kind={b.type}
-          style={{
-            left: `${b.x * 100}%`,
-            top: `${b.y * 100}%`,
-            width: `${b.w * 100}%`,
-            height: `${b.h * 100}%`,
-          }}
-        >
-          <span className={styles.detTag}>{labelFor(b.type)}</span>
-        </div>
-      ))}
+      {boxes.map((b) => {
+        const name = b.personName?.trim();
+        const tag = name || labelFor(b.type);
+        return (
+          <div
+            key={b.key}
+            className={styles.detBox}
+            data-kind={b.type}
+            data-named={name ? "1" : undefined}
+            style={{
+              left: `${b.x * 100}%`,
+              top: `${b.y * 100}%`,
+              width: `${b.w * 100}%`,
+              height: `${b.h * 100}%`,
+            }}
+          >
+            <span className={styles.detTag} data-named={name ? "1" : undefined}>
+              <span className={styles.detTagName}>{tag}</span>
+              <span className={styles.detTagAge}>{relAge(b.at)}</span>
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

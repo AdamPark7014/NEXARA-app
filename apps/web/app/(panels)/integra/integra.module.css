@@ -999,6 +999,10 @@
   box-shadow: inset 2px 0 0 var(--ig-accent);
 }
 
+.wallCamRow[data-det="1"] {
+  box-shadow: inset 2px 0 0 #f59e0b;
+}
+
 .wallCamDot {
   width: 7px;
   height: 7px;
@@ -1009,6 +1013,10 @@
 
 .wallCamDot[data-ok="1"] {
   background: var(--ig-ok);
+}
+
+.wallCamDot[data-err="1"] {
+  background: var(--ig-danger, #dc2626);
 }
 
 .wallCamName {
@@ -2288,23 +2296,55 @@
   bottom: 100%;
   left: -2px;
   margin-bottom: 2px;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: var(--ig-accent, #22d3ee);
-  color: #04121a;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: min(220px, 70vw);
+  padding: 2px 6px;
+  border-radius: 2px;
+  background: rgb(4 18 26 / 0.88);
+  color: #e8f7ff;
+  border: 1px solid color-mix(in srgb, var(--ig-accent, #22d3ee) 70%, #fff);
+  font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
   font-size: 10px;
-  font-weight: 700;
-  line-height: 1.5;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detTag[data-named="1"] {
+  border-color: #67e8f9;
+  background: rgb(2 28 36 / 0.92);
+}
+
+.detTagName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detTagAge {
+  flex-shrink: 0;
+  opacity: 0.72;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .detBox[data-kind="vehicle"] .detTag {
-  background: #f59e0b;
+  border-color: #f59e0b;
+  color: #fff7ed;
 }
 
 .detBox[data-kind="face"] .detTag {
-  background: #a78bfa;
-  color: #1a0b2e;
+  border-color: #c4b5fd;
+  color: #f5f3ff;
+}
+
+.detBox[data-named="1"] {
+  border-color: #67e8f9;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.55), 0 0 12px rgb(34 211 238 / 0.25);
 }
 
 /* El aviso es puntual: el recuadro se apaga solo en vez de quedarse clavado
@@ -2322,28 +2362,188 @@
   position: relative;
 }
 
-/* ── Mando de la domo ───────────────────────────────────────────────── */
-.ptzPad {
+.focusSide {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   margin-top: 10px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 960px) {
+  .focusSide {
+    grid-template-columns: minmax(220px, 0.9fr) minmax(200px, 0.7fr);
+    align-items: start;
+  }
+
+  .focusSide > :only-child {
+    grid-column: 1 / -1;
+    max-width: 320px;
+  }
+}
+
+/* Tira de accesos recientes (cámaras de puerta) */
+.accessStrip {
+  display: grid;
+  gap: 6px;
   padding: 10px;
   border: 1px solid var(--ig-line);
   border-radius: 10px;
   background: var(--ig-panel);
+  min-width: 0;
+}
+
+.accessStripHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+}
+
+.accessStripHead strong {
+  color: var(--ig-text);
+  font-weight: 700;
+}
+
+.accessStripList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.accessStripRow {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.accessStripPhoto {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ig-accent) 12%, var(--ig-panel));
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ig-muted);
+}
+
+.accessStripPhoto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.accessStripBody {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  font-size: 11px;
+}
+
+.accessStripBody strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.accessStripBody span,
+.accessStripBody em {
+  color: var(--ig-muted);
+  font-style: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Mando de la domo ───────────────────────────────────────────────── */
+.ptzPad {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--ig-line);
+  border-radius: 10px;
+  background: var(--ig-panel);
+  max-width: 280px;
+}
+
+.ptzPad[data-holding="1"] {
+  border-color: color-mix(in srgb, var(--ig-accent) 55%, var(--ig-line));
+}
+
+.ptzHud {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+}
+
+.ptzHud strong {
+  color: var(--ig-text);
+  font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
 }
 
 .ptzGrid {
   display: grid;
-  grid-template-columns: repeat(3, 40px);
+  grid-template-columns: repeat(3, 44px);
   gap: 4px;
   justify-content: center;
+}
+
+.ptzKey {
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid var(--ig-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ig-bg, var(--ig-panel)) 70%, #000);
+  color: var(--ig-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+}
+
+.ptzKey:hover:not(:disabled) {
+  border-color: var(--ig-accent);
+}
+
+.ptzKey:active:not(:disabled),
+.ptzPad[data-holding="1"] .ptzKey:active {
+  background: color-mix(in srgb, var(--ig-accent) 22%, transparent);
+}
+
+.ptzKey[data-stop="1"] {
+  font-size: 11px;
+}
+
+.ptzKey:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .ptzZoom {
   display: flex;
   gap: 6px;
   justify-content: center;
+}
+
+.ptzZoom .ptzKey {
+  flex: 1;
 }
 
 .ptzPresets {

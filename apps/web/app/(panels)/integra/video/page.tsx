@@ -14,9 +14,10 @@ import {
   IgToolbar,
 } from "../_Console";
 import { IntegraEzuiKitPlayer } from "../_EzuiKitPlayer";
-import { IntegraDetectionOverlay } from "../_DetectionOverlay";
+import { IntegraDetectionOverlay, subscribePushEvents } from "../_DetectionOverlay";
 import { IntegraLivePlayer } from "../_LivePlayer";
 import { IntegraPtzPad } from "../_PtzPad";
+import { IntegraRecentAccess } from "../_RecentAccess";
 import {
   defaultRangeHours,
   fromDatetimeLocalValue,
@@ -116,9 +117,43 @@ export default function IntegraVideoPage() {
   const isHct = provider === "HCT" || slots.some((s) => s.provider === "HCT");
 
   const [caps, setCaps] = useState(() => getCachedCapabilities());
+  /** Última detección / acceso por IP de equipo (rail + contador toolbar). */
+  const [detByIp, setDetByIp] = useState<Record<string, number>>({});
 
   useEffect(() => subscribeProvider(setProvider), []);
   useEffect(() => subscribeCapabilities(setCaps), []);
+
+  useEffect(() => {
+    return subscribePushEvents((events) => {
+      const now = Date.now();
+      setDetByIp((prev) => {
+        let next: Record<string, number> | null = null;
+        for (const ev of events) {
+          if (!ev.deviceIp) continue;
+          if (!ev.targets?.length && !ev.personName) continue;
+          const age = now - Date.parse(ev.occurredAt);
+          if (!Number.isFinite(age) || age > 8_000) continue;
+          if (!next) next = { ...prev };
+          next[ev.deviceIp] = now;
+        }
+        return next ?? prev;
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const cut = Date.now() - 6_000;
+      setDetByIp((prev) => {
+        const keys = Object.keys(prev);
+        if (!keys.some((k) => prev[k] < cut)) return prev;
+        const next: Record<string, number> = {};
+        for (const k of keys) if (prev[k] >= cut) next[k] = prev[k];
+        return next;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const load = useCallback(async () => {
     setError(null);
@@ -315,6 +350,8 @@ export default function IntegraVideoPage() {
 
   const inWall = (id: string) => slots.some((s) => s.id === id);
   const liveCount = liveWallIds.size;
+  const activeDetCount = Object.keys(detByIp).length;
+  const focusCam = focus ? items.find((c) => c.id === focus.id) : undefined;
 
   return (
     <IgPage>
@@ -324,8 +361,10 @@ export default function IntegraVideoPage() {
           filling
             ? "Abriendo cámaras…"
             : mode === "wall"
-              ? `${filtered.length} cámaras · ${slots.length}/${layout} en muro · ${liveCount} vivas`
-              : `${filtered.length} cámaras · foco`
+              ? `${filtered.length} cámaras · ${slots.length}/${layout} en muro · ${liveCount} vivas${
+                  activeDetCount ? ` · ${activeDetCount} det.` : ""
+                }`
+              : `${filtered.length} cámaras · foco${activeDetCount ? ` · ${activeDetCount} det.` : ""}`
         }
         actions={
           <>
@@ -411,6 +450,11 @@ export default function IntegraVideoPage() {
                   {filtered.map((c) => {
                     const active = inWall(c.id);
                     const sel = selected === c.id;
+                    const det =
+                      c.sourceIp && detByIp[c.sourceIp]
+                        ? Date.now() - detByIp[c.sourceIp] < 6_000
+                        : false;
+                    const online = onlineish(c.status);
                     return (
                       <button
                         key={c.id}
@@ -418,6 +462,7 @@ export default function IntegraVideoPage() {
                         className={styles.wallCamRow}
                         data-active={active ? "1" : undefined}
                         data-selected={sel ? "1" : undefined}
+                        data-det={det ? "1" : undefined}
                         disabled={busy === c.id}
                         onClick={() => void playLive(c, true)}
                         onDoubleClick={() => {
@@ -425,9 +470,15 @@ export default function IntegraVideoPage() {
                         }}
                         title="Clic: al muro · Doble clic: foco"
                       >
-                        <span className={styles.wallCamDot} data-ok={onlineish(c.status) ? "1" : undefined} />
+                        <span
+                          className={styles.wallCamDot}
+                          data-ok={online ? "1" : undefined}
+                          data-err={!online ? "1" : undefined}
+                        />
                         <span className={styles.wallCamName}>{c.name}</span>
-                        {active && <IgBadge tone="accent">muro</IgBadge>}
+                        {active && <IgBadge tone="accent">vivo</IgBadge>}
+                        {det && <IgBadge tone="warn">det</IgBadge>}
+                        {!online && <IgBadge tone="warn">off</IgBadge>}
                         {busy === c.id && <span className={styles.wallCamBusy}>…</span>}
                       </button>
                     );
@@ -437,7 +488,7 @@ export default function IntegraVideoPage() {
                   )}
                 </div>
                 <p className={styles.wallHint}>
-                  Muro = foto en vivo (~1 fps) · Doble clic → foco en video fluido
+                  Muro = MSE con fallback snapshot · Doble clic → foco
                 </p>
               </>
             )}
@@ -634,7 +685,7 @@ export default function IntegraVideoPage() {
                     ) : (
                       <div className={styles.focusStage}>
                         <IntegraDetectionOverlay
-                          deviceIp={items.find((c) => c.id === focus.id)?.sourceIp ?? null}
+                          deviceIp={focusCam?.sourceIp ?? null}
                         />
                         <IntegraLivePlayer
                           src={focus.hls}
@@ -644,6 +695,20 @@ export default function IntegraVideoPage() {
                         />
                       </div>
                     )}
+                    <div className={styles.focusSide}>
+                      {focusCam?.isDoorCamera && (
+                        <IntegraRecentAccess
+                          deviceIp={focusCam.sourceIp ?? null}
+                          enabled={mode === "focus"}
+                        />
+                      )}
+                      {focusCam?.isPtz && (
+                        <IntegraPtzPad
+                          cameraId={focus.id}
+                          canControl={Boolean(caps?.canControlDoors)}
+                        />
+                      )}
+                    </div>
                     {note && (
                       <p className={styles.videoNote}>
                         <button
@@ -657,12 +722,6 @@ export default function IntegraVideoPage() {
                       </p>
                     )}
                   </>
-                )}
-                {focus && items.find((c) => c.id === focus.id)?.isPtz && (
-                  <IntegraPtzPad
-                    cameraId={focus.id}
-                    canControl={Boolean(caps?.canControlDoors)}
-                  />
                 )}
                 <div className={styles.focusActions}>
                   {focus && !focus.hasAudio && caps?.canControlDoors && (
