@@ -8,34 +8,53 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Live detection hotpath (ráfagas + sticky)
+## Este turno — CRM docs: cotización PDF = familia OC + Excel/UI
 
-UI lista para más FieldDetection tras wire sibling. Sin Face ID óptico.
+Ownership Sales/CRM document outputs. **No** se tocó Integra Hikvision.
 
-### Qué cambió
+### Cotización PDF (unificado con OC)
 
-1. **Bus SSE/poll**: fan-out coalescido 32 ms + dedupe por id; poll 1.2 s
-   (SSE sano) / 280 ms (degradado); reconnect 800 ms.
-2. **Paint ~30 fps**: merge sticky en refs + rAF; edad placa 1 Hz.
-3. **Multi-caja**: nombres distintos no se fusionan; tope 12; VMD 90 s.
-4. **Stream**: `preloadGo2rtcPlayer`; remount 2.6 s; stagger muro 90 ms;
-   fallback MSE 4.5 s.
-5. Placa óptica: «Humano · sin ID». Build api: `orgRoleKey` en identity-link.
+1. `cotizacion-pdf.ts` alineado a la familia de `purchase-order-pdf.ts`:
+   membrete con **CompanyProfile** (razón social, RFC, domicilio fiscal,
+   contacto), acento CRM, logo compartido, multipágina con pie.
+2. Filas de **altura dinámica** (ya no recorta descripción/SKU).
+3. Tabla con UdM + columnas escaladas al ancho; totales MXN es-MX.
+4. `CotizacionesService.buildPdf` / `findOne` cargan `company`.
+
+### Excel + botones claros
+
+1. Lista cotizaciones: **Descargar PDF** / **Descargar Excel** (periodo).
+2. Detalle cotización: **Descargar PDF**, PDF interno, **Descargar Excel**
+   de partidas con resumen subtotal/IVA/total.
+3. Clientes: **Descargar Excel** con teléfono + resumen.
+4. Compras (OC libre): etiquetas **Descargar PDF** / **Descargar Excel**
+   (PDF OC ya estaba listo; no se reescribió el generador).
+
+### Concurrente en la rama (siblings — no pisar)
+
+Stock kardex hiper-detallado · ACS face / live detection · FieldDetection ·
+hybrid warehouse · Integra UX. **No** matching Face ID inventado.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` → `./deploy/update.sh --force-all --with-migrate`
+`/var/www/nexara-app` → `./deploy/update.sh`
 
-### Verificar (hard refresh Video)
+### Verificar (hard refresh)
 
-1. Sticky multi-caja Meeting Room sin lag bajo ráfagas.
-2. Banner ACS &lt;1 s; Eventos con cara.
-3. Stream no se queda eterno en «Conectando…».
+1. CRM → Cotizaciones → **Descargar PDF** en lista o ficha: membrete
+   fiscal, partidas legibles, totales, páginas numeradas.
+2. En ficha → **Descargar Excel** de partidas.
+3. Lista → **Descargar Excel** del periodo (con KPIs arriba).
+4. ERP → Compras → **Descargar PDF** en OC (sin regresión).
 
 ## A medias
 
-Portal empleado · ANPR · confirmar tasa eventos tras wire AcuSense.
+1. Portal empleado · ANPR ITC · micros · TCPMSS.
+2. Re-wire httpHosts si cambia PUBLIC_API_URL.
+3. CaptureFaceData en sensor (si firmware Oficinas lo expone).
+4. PDF legacy `ventas/pdf-generator.service.ts` (oportunidad/template) —
+   aún paralelo; el camino CRM principal es `cotizaciones/:id/pdf`.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales, Face ID inventado.
-Personas enroll / FieldDetection wire del sibling.
+Puente NAS, Traefik, credenciales.
+**No** matching Face ID inventado sobre RTSP/AcuSense.
