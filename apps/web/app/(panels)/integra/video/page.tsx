@@ -50,9 +50,8 @@ type LayoutN = 1 | 4 | 9 | 16;
 const LAYOUT_KEY = "nexara_integra_video_layout";
 const MODE_KEY = "nexara_integra_video_mode";
 const AUTOOPEN_KEY = "nexara_integra_video_autoopen";
-/** Tope de decodificadores MSE vivos en el muro (el resto queda en cola). */
-const MAX_LIVE_WALL = 4;
-const STAGGER_MS = 900;
+/** Stagger suave al abrir muchos MJPEG a la vez (no decodifican H.264). */
+const STAGGER_MS = 180;
 
 function colsFor(layout: LayoutN): number {
   if (layout === 1) return 1;
@@ -267,31 +266,27 @@ export default function IntegraVideoPage() {
     return cells.slice(0, layout);
   }, [slots, layout]);
 
-  /** Cupo de vivos: seleccionado primero, luego por orden del muro. Fuera de Muro = 0. */
+  /** En muro MJPEG todos los slots con stream van vivos (sin cupo MSE). */
   const liveWallIds = useMemo(() => {
     if (mode !== "wall") return new Set<string>();
-    const filled = wallCells.filter((s): s is StreamSlot => Boolean(s));
-    const ordered = [
-      ...filled.filter((s) => s.id === selected),
-      ...filled.filter((s) => s.id !== selected),
-    ];
-    return new Set(ordered.slice(0, MAX_LIVE_WALL).map((s) => s.id));
-  }, [wallCells, selected, mode]);
+    return new Set(
+      wallCells.filter((s): s is StreamSlot => Boolean(s)).map((s) => s.id),
+    );
+  }, [wallCells, mode]);
 
   const liveWallOrder = useMemo(() => {
     const order = new Map<string, number>();
     let i = 0;
     for (const s of wallCells) {
-      if (!s || !liveWallIds.has(s.id)) continue;
+      if (!s) continue;
       order.set(s.id, i);
       i += 1;
     }
     return order;
-  }, [wallCells, liveWallIds]);
+  }, [wallCells]);
 
   const inWall = (id: string) => slots.some((s) => s.id === id);
   const liveCount = liveWallIds.size;
-  const queuedCount = Math.max(0, slots.length - liveCount);
 
   return (
     <IgPage>
@@ -301,7 +296,7 @@ export default function IntegraVideoPage() {
           filling
             ? "Abriendo cámaras…"
             : mode === "wall"
-              ? `${filtered.length} cámaras · ${slots.length}/${layout} en muro · ${liveCount} vivas${queuedCount ? ` · ${queuedCount} en cola` : ""}`
+              ? `${filtered.length} cámaras · ${slots.length}/${layout} en muro · ${liveCount} vivas`
               : `${filtered.length} cámaras · foco`
         }
         actions={
@@ -388,7 +383,6 @@ export default function IntegraVideoPage() {
                   {filtered.map((c) => {
                     const active = inWall(c.id);
                     const sel = selected === c.id;
-                    const live = liveWallIds.has(c.id);
                     return (
                       <button
                         key={c.id}
@@ -405,9 +399,7 @@ export default function IntegraVideoPage() {
                       >
                         <span className={styles.wallCamDot} data-ok={onlineish(c.status) ? "1" : undefined} />
                         <span className={styles.wallCamName}>{c.name}</span>
-                        {active && (
-                          <IgBadge tone={live ? "accent" : "warn"}>{live ? "vivo" : "cola"}</IgBadge>
-                        )}
+                        {active && <IgBadge tone="accent">muro</IgBadge>}
                         {busy === c.id && <span className={styles.wallCamBusy}>…</span>}
                       </button>
                     );
@@ -417,7 +409,7 @@ export default function IntegraVideoPage() {
                   )}
                 </div>
                 <p className={styles.wallHint}>
-                  Hasta {MAX_LIVE_WALL} vivas a la vez · Clic → muro · Doble clic → foco
+                  Muro en MJPEG (todas visibles) · Doble clic → foco en MSE
                 </p>
               </>
             )}
@@ -433,7 +425,6 @@ export default function IntegraVideoPage() {
                   key={s.id}
                   className={styles.wallCell}
                   data-selected={selected === s.id ? "1" : undefined}
-                  data-queued={liveWallIds.has(s.id) ? undefined : "1"}
                   onClick={() => setSelected(s.id)}
                   onDoubleClick={() => openFocus(s.id)}
                   role="button"
@@ -481,6 +472,7 @@ export default function IntegraVideoPage() {
                         src={s.hls}
                         compact
                         showLiveBadge
+                        mode="mjpeg"
                         enabled={liveWallIds.has(s.id)}
                         startDelayMs={(liveWallOrder.get(s.id) ?? i) * STAGGER_MS}
                       />
@@ -607,7 +599,7 @@ export default function IntegraVideoPage() {
                     {focus.provider === "HCT" ? (
                       <IntegraEzuiKitPlayer stream={focus.stream} cameraId={focus.id} height={420} />
                     ) : (
-                      <IntegraLivePlayer src={focus.hls} enabled={mode === "focus"} />
+                      <IntegraLivePlayer src={focus.hls} enabled={mode === "focus"} mode="mse" />
                     )}
                     {note && (
                       <p className={styles.videoNote}>

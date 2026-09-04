@@ -743,7 +743,7 @@ export default function IntegraHome() {
                         {"provider" in c && c.provider === "HCT" && "stream" in c && c.stream ? (
                           <IntegraEzuiKitPlayer stream={c.stream as any} cameraId={c.id} height={140} />
                         ) : c.hls ? (
-                          <IntegraLivePlayer src={c.hls} compact showLiveBadge startDelayMs={0} />
+                          <IntegraLivePlayer src={c.hls} compact showLiveBadge mode="mjpeg" startDelayMs={0} />
                         ) : (
                           <p className={styles.igEmpty} style={{ fontSize: 11 }}>
                             Cargando…
@@ -801,7 +801,7 @@ export default function IntegraHome() {
                       {preview?.provider === "HCT" && preview.stream ? (
                         <IntegraEzuiKitPlayer stream={preview.stream} cameraId={preview.id} />
                       ) : preview?.hls ? (
-                        <IntegraLivePlayer src={preview.hls} />
+                        <IntegraLivePlayer src={preview.hls} mode="mse" />
                       ) : (
                         <p className={styles.igEmpty}>
                           {preview?.note || "Sin señal de video — revisa el sitio o el stream"}
