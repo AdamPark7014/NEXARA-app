@@ -6,7 +6,9 @@ import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
+import ListExportActions from "@/components/ui/ListExportActions";
 import { buildApiUrl, parseResponseJson } from "@/lib/api-base";
+import { exportToExcel } from "@/lib/export-excel";
 
 type LinkStatus = "linked" | "erp_only" | "acs_only";
 
@@ -235,7 +237,59 @@ export default function HybridAttendancePanel({
       title="Híbrido Integra ↔ ERP"
       subtitle="Contraste del día: checador (nómina) vs accesos de puerta. No inventa fichajes."
       actions={
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <ListExportActions
+            onExcel={
+              rows.length > 0
+                ? () =>
+                    exportToExcel(
+                      rows.map((r) => ({
+                        persona: r.user?.nombre || r.acs?.personName || r.acs?.personId || "—",
+                        codigo:
+                          r.user?.employeeNumber ||
+                          r.user?.companyEmployeeNumber ||
+                          r.acs?.personId ||
+                          "",
+                        departamento: r.user?.department || "",
+                        vinculo: statusLabel(r.linkStatus),
+                        erpEntrada: r.erp?.checkIn ? fmtTime(r.erp.checkIn) : "",
+                        erpSalida: r.erp?.checkOut ? fmtTime(r.erp.checkOut) : "",
+                        erpMinutos: r.erp?.totalMinutes ?? "",
+                        acsEntrada: r.acs?.firstAt ? fmtTime(r.acs.firstAt) : "",
+                        acsSalida: r.acs && r.acs.passes > 1 ? fmtTime(r.acs.lastAt) : "",
+                        acsMinutos: r.acs?.minutes ?? "",
+                        puerta: r.acs?.firstDoor || "",
+                        alertas: r.flags.map((f) => FLAG_LABEL[f] || f).join("; "),
+                      })),
+                      [
+                        { key: "persona", label: "Persona" },
+                        { key: "codigo", label: "Código" },
+                        { key: "departamento", label: "Departamento" },
+                        { key: "vinculo", label: "Vínculo" },
+                        { key: "erpEntrada", label: "ERP entrada" },
+                        { key: "erpSalida", label: "ERP salida" },
+                        { key: "erpMinutos", label: "ERP min" },
+                        { key: "acsEntrada", label: "ACS entrada" },
+                        { key: "acsSalida", label: "ACS salida" },
+                        { key: "acsMinutos", label: "ACS min" },
+                        { key: "puerta", label: "Puerta" },
+                        { key: "alertas", label: "Alertas" },
+                      ],
+                      `asistencia-hibrida-${date}`,
+                      {
+                        title: "Asistencia híbrida Integra ↔ ERP",
+                        subtitle: `Día ${date}`,
+                        summaryRows: [
+                          { label: "Vinculados", value: data?.summary.linked ?? 0 },
+                          { label: "Solo ERP", value: data?.summary.erpOnly ?? 0 },
+                          { label: "Solo ACS", value: data?.summary.acsOnly ?? 0 },
+                          { label: "Con alertas", value: data?.summary.withFlags ?? 0 },
+                        ],
+                      },
+                    )
+                : undefined
+            }
+          />
           <Link href="/integra/attendance" style={{ fontSize: 12, color: "var(--primary)" }}>
             Ver ACS Integra
           </Link>
