@@ -34,9 +34,12 @@ export {
 } from './isapi.discovery';
 
 export {
+  captureFingerPrint,
   describeAcsEvent,
   deleteFaceData,
+  deleteFingerPrint,
   deleteUserInfo,
+  downloadFingerPrint,
   listAcsEvents,
   listAllUserInfo,
   mapIsapiUserToPersonDto,
@@ -46,7 +49,9 @@ export {
   searchAcsEvents,
   searchUserInfo,
   uploadFaceData,
+  uploadFingerPrint,
   type AcsEventPage,
+  type CapturedFingerPrint,
   type DeviceOpResult,
   type IntegraPersonDto,
   type IsapiAcsEvent,

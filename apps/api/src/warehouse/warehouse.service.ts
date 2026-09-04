@@ -192,6 +192,8 @@ export class WarehouseService {
     reference?: string;
     notes?: string;
     purchaseOrderId?: number;
+    productionOrderId?: number;
+    activityId?: number;
   }, userId: number, companyId?: number | null) {
     const tenantId = requireCompanyId(companyId);
     const normalizedType = dto.type === 'IN' ? 'RECEIPT'
@@ -247,11 +249,20 @@ export class WarehouseService {
       }
       const totalCost = quantity * unitCost;
 
+      let fromQtyBefore: number | null = null;
+      let fromQtyAfter: number | null = null;
+      let toQtyBefore: number | null = null;
+      let toQtyAfter: number | null = null;
+
       if (dto.fromWarehouseId) {
+        fromQtyBefore = await this.readOnHandQty(tx, dto.productId, dto.fromWarehouseId, tenantId);
         await this.decrementStockLevel(tx, dto.productId, dto.fromWarehouseId, quantity, tenantId);
+        fromQtyAfter = fromQtyBefore - quantity;
       }
       if (dto.toWarehouseId) {
+        toQtyBefore = await this.readOnHandQty(tx, dto.productId, dto.toWarehouseId, tenantId);
         await this.incrementStockLevel(tx, dto.productId, dto.toWarehouseId, quantity, unitCost, tenantId);
+        toQtyAfter = toQtyBefore + quantity;
       }
 
       const movementNumber = await this.generateMovementNumber(tenantId);
@@ -263,16 +274,30 @@ export class WarehouseService {
           fromWarehouseId: dto.fromWarehouseId ?? null,
           toWarehouseId: dto.toWarehouseId ?? null,
           quantity: new Prisma.Decimal(quantity),
+          fromQtyBefore: fromQtyBefore != null ? new Prisma.Decimal(fromQtyBefore) : null,
+          fromQtyAfter: fromQtyAfter != null ? new Prisma.Decimal(fromQtyAfter) : null,
+          toQtyBefore: toQtyBefore != null ? new Prisma.Decimal(toQtyBefore) : null,
+          toQtyAfter: toQtyAfter != null ? new Prisma.Decimal(toQtyAfter) : null,
           unitCost: new Prisma.Decimal(unitCost),
           totalCost: new Prisma.Decimal(totalCost),
           lotId: dto.lotId ?? null,
           reference: dto.reference?.trim() || null,
           notes: dto.notes?.trim() || null,
           purchaseOrderId: dto.purchaseOrderId ?? null,
+          productionOrderId: dto.productionOrderId ?? null,
+          activityId: dto.activityId ?? null,
           createdById: userId,
           companyId: tenantId,
         },
-        include: { product: true, fromWarehouse: true, toWarehouse: true },
+        include: {
+          product: true,
+          fromWarehouse: true,
+          toWarehouse: true,
+          purchaseOrder: { select: { id: true, poNumber: true } },
+          productionOrder: { select: { id: true, orderNumber: true } },
+          activity: { select: { id: true, anNumber: true, titulo: true } },
+          createdBy: { select: { id: true, nombre: true } },
+        },
       });
     });
 
@@ -361,6 +386,25 @@ export class WarehouseService {
         },
       });
     }
+  }
+
+  /** Existencia on-hand (locationId null) para auditoría before/after. */
+  private async readOnHandQty(
+    tx: Prisma.TransactionClient,
+    productId: number,
+    warehouseId: number,
+    companyId: number,
+  ): Promise<number> {
+    const level = await tx.stockLevel.findFirst({
+      where: {
+        productId,
+        warehouseId,
+        locationId: null,
+        ...companyWhere(companyId),
+      },
+      select: { quantity: true },
+    });
+    return level ? Number(level.quantity) : 0;
   }
 
   /**
@@ -485,8 +529,18 @@ export class WarehouseService {
     }
     return this.prisma.stockMovement.findMany({
       where,
-      include: { product: { select: { id: true, name: true, sku: true } }, fromWarehouse: true, toWarehouse: true, lot: true, createdBy: { select: { id: true, nombre: true } } },
+      include: {
+        product: { select: { id: true, name: true, sku: true } },
+        fromWarehouse: { select: { id: true, code: true, name: true } },
+        toWarehouse: { select: { id: true, code: true, name: true } },
+        lot: { select: { id: true, lotNumber: true } },
+        createdBy: { select: { id: true, nombre: true } },
+        purchaseOrder: { select: { id: true, poNumber: true } },
+        productionOrder: { select: { id: true, orderNumber: true } },
+        activity: { select: { id: true, anNumber: true, titulo: true } },
+      },
       orderBy: { createdAt: 'desc' },
+      take: 500,
     });
   }
 

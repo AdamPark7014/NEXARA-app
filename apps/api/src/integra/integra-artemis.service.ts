@@ -3,10 +3,13 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { rethrowArtemis, toArtemisOffsetIso } from '../hikvision-artemis/index';
 import {
+  captureFingerPrint,
   controlDoor,
   deleteFaceData,
+  deleteFingerPrint,
   deleteUserInfo,
   describeAcsEvent,
+  downloadFingerPrint,
   identifyDevice,
   listAcsEvents,
   listAllUserInfo,
@@ -15,6 +18,7 @@ import {
   modifyUserInfo,
   recordUserInfo,
   uploadFaceData,
+  uploadFingerPrint,
   type IsapiAcsEvent,
   type UserInfoWrite,
 } from '../hikvision-isapi/index';
@@ -22,6 +26,17 @@ import { IntegraSiteService } from './integra-site.service';
 import { IntegraMediaService } from './integra-media.service';
 import { IntegraSyncService } from './integra-sync.service';
 import { IntegraPortfolioService } from './integra-portfolio.service';
+import {
+  deleteAllLocalPersonMedia,
+  deleteLocalFingerData,
+  deleteLocalPersonFace,
+  hasLocalPersonFace,
+  listLocalFingerIds,
+  readLocalFingerData,
+  readLocalPersonFace,
+  writeLocalFingerData,
+  writeLocalPersonFace,
+} from './integra-person-media';
 import { ARTEMIS_DOOR_CONTROL, ARTEMIS_DOOR_STATE } from '../hikvision-artemis/artemis.types';
 
 type Actor = { id?: number; email?: string };
@@ -1008,8 +1023,13 @@ export class IntegraArtemisService {
         source: 'mirror' as const,
         items: items.map((p) => {
           const dto = mapMirrorPersonToDto(p);
+          const localFace = hasLocalPersonFace(companyId, p.personId);
+          const localFpIds = listLocalFingerIds(companyId, p.personId);
           return {
             ...dto,
+            hasLocalFace: localFace,
+            hasFace: Boolean(dto.hasFace || localFace),
+            localFpIds,
             sourceName: label.name(dto.sourceIp),
             doorNames: label.doors(dto.sourceIp, dto.rightPlan),
           };
@@ -1042,11 +1062,18 @@ export class IntegraArtemisService {
       }
       const label = await this.personLabels(resolved.siteId);
       const items = [...byId.values()]
-        .map((dto) => ({
-          ...dto,
-          sourceName: label.name(dto.sourceIp),
-          doorNames: label.doors(dto.sourceIp, dto.rightPlan),
-        }))
+        .map((dto) => {
+          const localFace = companyId ? hasLocalPersonFace(companyId, dto.id) : false;
+          const localFpIds = companyId ? listLocalFingerIds(companyId, dto.id) : [];
+          return {
+            ...dto,
+            hasLocalFace: localFace,
+            hasFace: Boolean(dto.hasFace || localFace),
+            localFpIds,
+            sourceName: label.name(dto.sourceIp),
+            doorNames: label.doors(dto.sourceIp, dto.rightPlan),
+          };
+        })
         .sort((a, b) => a.name.localeCompare(b.name));
       return { total: items.length, source: 'live' as const, items };
     }
@@ -1085,6 +1112,8 @@ export class IntegraArtemisService {
       }
       const dto = mapMirrorPersonToDto(row);
       const label = await this.personLabels(row.siteId);
+      const localFace = hasLocalPersonFace(companyId, personId);
+      const localFpIds = listLocalFingerIds(companyId, personId);
       return {
         personId,
         source: 'mirror' as const,
@@ -1092,6 +1121,9 @@ export class IntegraArtemisService {
         note: 'Edita y sube foto desde esta ficha; se propaga a los terminales DS-K1T.',
         person: {
           ...dto,
+          hasLocalFace: localFace,
+          hasFace: Boolean(dto.hasFace || localFace),
+          localFpIds,
           sourceName: label.name(dto.sourceIp),
           doorNames: label.doors(dto.sourceIp, dto.rightPlan),
         },
@@ -1109,8 +1141,9 @@ export class IntegraArtemisService {
   }
 
   /**
-   * Proxy autenticado de la foto de rostro (`faceURL` del UserInfo).
-   * No inventa rutas FaceData: solo GET Digest de la URL que ya devolvió el terminal.
+   * Foto de ficha: 1) JPEG local en uploads (lo que el operador subió),
+   * 2) GET Digest de `faceURL` del UserInfo si el terminal la entrega.
+   * DS-K1T a menudo solo guarda modelo biométrico → sin local = 404 claro.
    */
   async getPersonFace(
     companyId: number | null,
@@ -1123,6 +1156,9 @@ export class IntegraArtemisService {
       throw new BadRequestException('Foto por proxy solo disponible en sitios ISAPI');
     }
 
+    const local = readLocalPersonFace(companyId, personId);
+    if (local) return local;
+
     const row = await this.prisma.integraPerson.findFirst({
       where: {
         companyId,
@@ -1134,7 +1170,9 @@ export class IntegraArtemisService {
 
     const dto = mapMirrorPersonToDto(row);
     if (!dto.faceUrl) {
-      throw new NotFoundException(`Persona ${personId} sin faceURL en el terminal`);
+      throw new NotFoundException(
+        `Persona ${personId}: sin JPEG local ni faceURL. El terminal puede tener solo modelo biométrico — sube una foto JPEG desde la ficha.`,
+      );
     }
 
     const sourceIp =
@@ -1150,7 +1188,13 @@ export class IntegraArtemisService {
     const client = resolved.isapiForHost(sourceIp);
     if (!client) throw new BadRequestException('Cliente ISAPI no disponible');
 
-    return client.getBinary(dto.faceUrl);
+    try {
+      return await client.getBinary(dto.faceUrl);
+    } catch (e) {
+      throw new NotFoundException(
+        `No se pudo descargar faceURL (${e instanceof Error ? e.message : String(e)}). Sube un JPEG para guardarlo en NEXARA.`,
+      );
+    }
   }
 
   async addPerson(
@@ -1358,6 +1402,7 @@ export class IntegraArtemisService {
         await this.prisma.integraPerson.deleteMany({
           where: { companyId, personId: id, siteId: resolved.siteId },
         });
+        deleteAllLocalPersonMedia(companyId, id);
       }
 
       return {
@@ -1395,16 +1440,25 @@ export class IntegraArtemisService {
   ) {
     if (!jpeg?.length) throw new BadRequestException('Imagen JPEG requerida');
     if (jpeg.length > 2_000_000) throw new BadRequestException('Foto demasiado grande (máx ~2 MB)');
+    // Magic JPEG (FF D8) — PNG/WebP fallan en FaceDataRecord de muchos DS-K1T.
+    if (jpeg[0] !== 0xff || jpeg[1] !== 0xd8) {
+      throw new BadRequestException('La foto debe ser JPEG (FF D8). Convierte PNG a JPG antes de subir.');
+    }
     const resolved = await this.client(companyId, siteId);
     if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost || !resolved.siteId || !companyId) {
       throw new BadRequestException('Subida de rostro solo en sitios ISAPI');
     }
+    // Siempre guardar copia local primero: la ficha muestra esta imagen aunque
+    // el terminal solo guarde modelo biométrico y no re-entregue JPEG.
+    writeLocalPersonFace(companyId, personId, jpeg);
+
     const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
       await uploadFaceData(client, { employeeNo: personId, jpeg });
     });
     await this.auditMut('integra.person.face.upload', actor, companyId, resolved.siteId, {
       personId,
       results,
+      localSaved: true,
     });
     await this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
     const allOk = results.length > 0 && results.every((r) => r.ok);
@@ -1412,11 +1466,12 @@ export class IntegraArtemisService {
       success: allOk,
       partial: results.some((r) => r.ok) && !allOk,
       results,
+      hasLocalFace: true,
       note: allOk
-        ? 'Foto empujada a todos los terminales. El equipo guarda un modelo biométrico; no se puede volver a descargar el JPEG.'
+        ? 'Foto en NEXARA y empujada a todos los terminales. El ACS guarda modelo biométrico; la ficha usa la copia local.'
         : results.some((r) => r.ok)
-          ? 'Foto parcial: revisa el detalle por IP.'
-          : 'No se pudo subir la foto en ningún terminal.',
+          ? 'Foto guardada en NEXARA; fan-out parcial — revisa el detalle por IP.'
+          : 'Foto guardada en NEXARA, pero no se pudo empujar a ningún terminal.',
     };
   }
 
@@ -1433,12 +1488,188 @@ export class IntegraArtemisService {
     const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
       await deleteFaceData(client, personId);
     });
+    deleteLocalPersonFace(companyId, personId);
     await this.auditMut('integra.person.face.delete', actor, companyId, resolved.siteId, {
       personId,
       results,
     });
     await this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
-    return { success: results.some((r) => r.ok), results };
+    return { success: results.some((r) => r.ok), results, hasLocalFace: false };
+  }
+
+  /**
+   * Captura huella en un terminal concreto (sensor físico) y la propaga
+   * (FingerPrintDownload) a todos los ACS. Guarda `fingerData` Base64 en
+   * uploads si el capture/upload lo entrega.
+   */
+  async enrollPersonFingerprint(
+    companyId: number | null,
+    personId: string,
+    input: {
+      deviceIp?: string;
+      fingerPrintID?: number;
+      /** Si ya tienes plantilla (p. ej. re-aplicar), omite captura. */
+      fingerData?: string;
+      fingerType?: string;
+    },
+    actor?: Actor,
+    siteId?: number | null,
+  ) {
+    const resolved = await this.client(companyId, siteId);
+    if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost || !resolved.siteId || !companyId) {
+      throw new BadRequestException('Huella solo en sitios ISAPI');
+    }
+    const employeeNo = String(personId).trim();
+    if (!employeeNo) throw new BadRequestException('personId requerido');
+    const fingerPrintID = Math.min(10, Math.max(1, Math.floor(input.fingerPrintID ?? 1) || 1));
+
+    let fingerData = String(input.fingerData || '').trim();
+    let quality: number | undefined;
+    let captureIp: string | undefined;
+
+    if (!fingerData) {
+      const acs = await this.prisma.integraDevice.findMany({
+        where: { siteId: resolved.siteId, kind: 'ACS', ip: { not: null } },
+        select: { ip: true, name: true, deviceType: true },
+      });
+      const prefer =
+        (input.deviceIp && acs.find((d) => d.ip === input.deviceIp)) ||
+        acs.find((d) => /341|fingerprint|FP|huella/i.test(`${d.deviceType || ''} ${d.name || ''}`)) ||
+        acs[0];
+      if (!prefer?.ip) throw new BadRequestException('Sin terminal ACS para capturar huella');
+      captureIp = prefer.ip;
+      const client = resolved.isapiForHost(captureIp);
+      if (!client) throw new BadRequestException(`Sin cliente ISAPI para ${captureIp}`);
+      const captured = await captureFingerPrint(client, fingerPrintID);
+      fingerData = captured.fingerData;
+      quality = captured.fingerPrintQuality;
+    }
+
+    writeLocalFingerData(companyId, employeeNo, fingerPrintID, fingerData);
+
+    const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
+      await downloadFingerPrint(client, {
+        employeeNo,
+        fingerPrintID,
+        fingerData,
+        fingerType: input.fingerType,
+      });
+    });
+    await this.auditMut('integra.person.fp.enroll', actor, companyId, resolved.siteId, {
+      personId: employeeNo,
+      fingerPrintID,
+      captureIp,
+      quality,
+      results,
+    });
+    await this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
+    const allOk = results.length > 0 && results.every((r) => r.ok);
+    return {
+      success: allOk,
+      partial: results.some((r) => r.ok) && !allOk,
+      results,
+      fingerPrintID,
+      fingerPrintQuality: quality,
+      captureIp,
+      localStored: true,
+      localFpIds: listLocalFingerIds(companyId, employeeNo),
+      note: allOk
+        ? `Huella #${fingerPrintID} digitalizada en NEXARA y aplicada a todos los terminales.`
+        : results.some((r) => r.ok)
+          ? `Huella #${fingerPrintID} guardada en NEXARA; algunos terminales (p. ej. solo rostro) pueden rechazarla.`
+          : 'Plantilla guardada en NEXARA, pero ningún terminal la aceptó.',
+    };
+  }
+
+  /** Intenta bajar plantilla del ACS (FingerPrintUpload) y guardarla. */
+  async fetchPersonFingerprint(
+    companyId: number | null,
+    personId: string,
+    input: { deviceIp?: string; fingerPrintID?: number } = {},
+    actor?: Actor,
+    siteId?: number | null,
+  ) {
+    const resolved = await this.client(companyId, siteId);
+    if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost || !resolved.siteId || !companyId) {
+      throw new BadRequestException('Huella solo en sitios ISAPI');
+    }
+    const employeeNo = String(personId).trim();
+    const fingerPrintID = Math.min(10, Math.max(1, Math.floor(input.fingerPrintID ?? 1) || 1));
+    const acs = await this.prisma.integraDevice.findMany({
+      where: { siteId: resolved.siteId, kind: 'ACS', ip: { not: null } },
+      select: { ip: true },
+    });
+    const ips = input.deviceIp
+      ? [input.deviceIp]
+      : acs.map((d) => d.ip as string).filter(Boolean);
+
+    for (const ip of ips) {
+      const client = resolved.isapiForHost(ip);
+      if (!client) continue;
+      try {
+        const got = await uploadFingerPrint(client, { employeeNo, fingerPrintID });
+        if (got?.fingerData) {
+          writeLocalFingerData(companyId, employeeNo, got.fingerNo || fingerPrintID, got.fingerData);
+          await this.auditMut('integra.person.fp.fetch', actor, companyId, resolved.siteId, {
+            personId: employeeNo,
+            fingerPrintID,
+            deviceIp: ip,
+          });
+          return {
+            success: true,
+            deviceIp: ip,
+            fingerPrintID: got.fingerNo || fingerPrintID,
+            localStored: true,
+            localFpIds: listLocalFingerIds(companyId, employeeNo),
+            note: `Plantilla #${fingerPrintID} descargada de ${ip} y guardada en NEXARA.`,
+          };
+        }
+      } catch {
+        // probar siguiente terminal
+      }
+    }
+
+    const local = readLocalFingerData(companyId, employeeNo, fingerPrintID);
+    return {
+      success: false,
+      localStored: Boolean(local),
+      localFpIds: listLocalFingerIds(companyId, employeeNo),
+      note: local
+        ? 'El terminal no exportó fingerData; se conserva la copia local previa.'
+        : 'El firmware no exportó la plantilla (solo numOfFP en UserInfo). Enrolá de nuevo desde NEXARA para digitalizarla aquí.',
+    };
+  }
+
+  async deletePersonFingerprint(
+    companyId: number | null,
+    personId: string,
+    input: { fingerPrintIDs?: number[] } = {},
+    actor?: Actor,
+    siteId?: number | null,
+  ) {
+    const resolved = await this.client(companyId, siteId);
+    if (resolved.provider !== 'ISAPI' || !resolved.isapiForHost || !resolved.siteId || !companyId) {
+      throw new BadRequestException('Huella solo en sitios ISAPI');
+    }
+    const employeeNo = String(personId).trim();
+    const results = await this.fanoutAcs(resolved.siteId, resolved.isapiForHost, async (client) => {
+      await deleteFingerPrint(client, employeeNo, input.fingerPrintIDs);
+    });
+    if (input.fingerPrintIDs?.length) {
+      for (const id of input.fingerPrintIDs) deleteLocalFingerData(companyId, employeeNo, id);
+    } else {
+      deleteLocalFingerData(companyId, employeeNo);
+    }
+    await this.auditMut('integra.person.fp.delete', actor, companyId, resolved.siteId, {
+      personId: employeeNo,
+      results,
+    });
+    await this.sync.syncSite(companyId, resolved.siteId).catch(() => undefined);
+    return {
+      success: results.some((r) => r.ok),
+      results,
+      localFpIds: listLocalFingerIds(companyId, employeeNo),
+    };
   }
 
   /** Propaga una operación a todos los terminales ACS del sitio. */

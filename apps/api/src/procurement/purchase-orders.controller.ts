@@ -75,6 +75,27 @@ export class PurchaseOrdersController {
     }
   }
 
+  @Get(':id/pdf')
+  @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_VIEW] })
+  async downloadPdf(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentCompanyId() companyId: number | null,
+    @Res() res: Response,
+  ) {
+    try {
+      const { pdf, poNumber } = await this.svc.getPurchaseOrderPdfBuffer(id, companyId);
+      const safeName = String(poNumber || id).replace(/[^\w.-]+/g, '_');
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=OC-${safeName}.pdf`);
+      res.send(pdf);
+    } catch (error) {
+      const status = (error as { status?: number })?.status ?? 500;
+      res.status(status).json({
+        error: error instanceof Error ? error.message : 'Error al generar PDF de orden de compra',
+      });
+    }
+  }
+
   @Get(':id')
   @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_VIEW] })
   get(@Param('id', ParseIntPipe) id: number, @CurrentCompanyId() companyId: number | null) {

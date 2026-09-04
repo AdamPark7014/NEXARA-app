@@ -1,5 +1,6 @@
 import { Controller, Post, Body, Req, UseGuards, Get, Query } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
+import { AttendanceHybridService } from './attendance-hybrid.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -8,7 +9,10 @@ import { CurrentCompanyId } from '../common/tenant/current-company.decorator.js'
 
 @Controller('attendance')
 export class AttendanceController {
-  constructor(private readonly attendanceService: AttendanceService) {}
+  constructor(
+    private readonly attendanceService: AttendanceService,
+    private readonly hybridService: AttendanceHybridService,
+  ) {}
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
@@ -86,5 +90,37 @@ export class AttendanceController {
       departmentId ? parseInt(departmentId) : undefined,
       companyId,
     );
+  }
+
+  /**
+   * Contraste honest ERP checador ↔ accesos Integra ACS.
+   * No escribe fichajes: solo vincula por employeeNumber ↔ personId/personCode.
+   */
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.ATTENDANCE_MANAGE,
+      PERMISSIONS.ATTENDANCE_VIEW,
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.CONSOLE_ADMIN,
+    ],
+  })
+  @Get('hybrid')
+  async hybrid(
+    @Req() req: any,
+    @CurrentCompanyId() companyId: number | null,
+    @Query('date') date?: string,
+    @Query('siteId') siteId?: string,
+  ) {
+    const canManage = Boolean(
+      req.user?.isSuperAdmin ||
+        req.user?.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE) ||
+        req.user?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN),
+    );
+    const day = date || new Date().toLocaleDateString('sv-SE');
+    return this.hybridService.getHybridDay(req.user, day, companyId, {
+      siteId: siteId ? parseInt(siteId, 10) : null,
+      selfOnly: !canManage,
+    });
   }
 }

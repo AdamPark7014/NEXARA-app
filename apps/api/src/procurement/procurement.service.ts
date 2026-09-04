@@ -10,6 +10,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { assertCompanyAccess, companyWhere, requireCompanyId, resolveRequiredCompanyId } from '../common/tenant/tenant-scope.js';
 import { FolioService } from '../common/folio/folio.service.js';
 import { assertRefsBelongToCompany } from '../common/tenant/assert-refs.js';
+import { generatePurchaseOrderPdf, type PurchaseOrderPdfPayload } from './purchase-order-pdf.js';
 
 @Injectable()
 export class ProcurementService {
@@ -334,10 +335,67 @@ export class ProcurementService {
   async getPurchaseOrder(id: number, companyId?: number | null) {
     const po = await this.prisma.purchaseOrder.findUnique({
       where: { id },
-      include: { items: { include: { product: true } }, supplier: true, receipts: { include: { items: true } }, createdBy: { select: { id: true, nombre: true } }, approvedBy: { select: { id: true, nombre: true } } },
+      include: {
+        items: { include: { product: true } },
+        supplier: true,
+        receipts: { include: { items: true } },
+        createdBy: { select: { id: true, nombre: true } },
+        approvedBy: { select: { id: true, nombre: true } },
+        requisition: { select: { id: true, reqNumber: true } },
+        company: true,
+      },
     });
     assertCompanyAccess(po, companyId, 'Orden de compra');
     return po!;
+  }
+
+  async getPurchaseOrderPdfBuffer(id: number, companyId?: number | null) {
+    const po = await this.getPurchaseOrder(id, companyId);
+    const company = po.company;
+    const payload: PurchaseOrderPdfPayload = {
+      poNumber: po.poNumber,
+      status: po.status,
+      orderDate: po.orderDate.toISOString().slice(0, 10),
+      expectedDate: po.expectedDate ? po.expectedDate.toISOString().slice(0, 10) : null,
+      currency: po.currency || 'MXN',
+      paymentTerms: po.paymentTerms,
+      shippingAddress: po.shippingAddress,
+      notes: po.notes,
+      subtotal: Number(po.subtotal),
+      taxAmount: Number(po.taxAmount),
+      totalAmount: Number(po.totalAmount),
+      company: {
+        legalName: company?.legalName || 'NEXARA',
+        tradeName: company?.tradeName,
+        rfc: company?.rfc,
+        fiscalAddress: company?.fiscalAddress,
+        fiscalPostalCode: company?.fiscalPostalCode,
+        contactEmail: company?.contactEmail,
+        contactPhone: company?.contactPhone,
+        websiteUrl: company?.websiteUrl,
+      },
+      vendor: {
+        name: po.supplier?.name || 'Proveedor',
+        rfc: po.supplier?.rfc,
+        creditoDias: po.supplier?.creditoDias ?? null,
+        leadTimeDias: po.supplier?.leadTimeDias ?? null,
+        esMayorista: po.supplier?.esMayorista ?? null,
+      },
+      createdByName: po.createdBy?.nombre ?? null,
+      approvedByName: po.approvedBy?.nombre ?? null,
+      approvedAt: po.approvedAt ? po.approvedAt.toISOString().slice(0, 10) : null,
+      requisitionNumber: po.requisition?.reqNumber ?? null,
+      items: (po.items ?? []).map((item) => ({
+        description: item.description,
+        sku: item.product?.sku ?? null,
+        unit: item.product?.unitName || item.product?.satUnitKey || 'PZA',
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice),
+        taxRate: Number(item.taxRate || 0),
+        lineTotal: Number(item.total),
+      })),
+    };
+    return { pdf: await generatePurchaseOrderPdf(payload), poNumber: po.poNumber };
   }
 
   async approvePurchaseOrder(id: number, userId: number, companyId?: number | null) {
