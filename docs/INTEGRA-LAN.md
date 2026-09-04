@@ -206,6 +206,9 @@ Todas documentadas en `HIKVISION-apps/docs/API-DOCS/HIKVISION/` (salvo InputProx
 | `POST /ISAPI/AccessControl/UserInfo/Search?format=json` | personas del terminal → espejo `IntegraPerson` |
 | `POST /ISAPI/AccessControl/UserInfo/Record?format=json` | alta persona |
 | `PUT /ISAPI/AccessControl/UserInfo/Modify?format=json` | editar ficha |
+| `GET/PUT /ISAPI/AccessControl/UserRightWeekPlanCfg/<id>` | horario semanal (7×8 franjas; Oficinas: IDs 1–32; el 1 = 00:00–24:00) |
+| `GET/PUT /ISAPI/AccessControl/UserRightPlanTemplate/<id>` | plantilla → `weekPlanNo` (Oficinas: 1–32; plantilla 1 = 24/7) |
+| `UserInfo.Valid` + `RightPlan[]` | vigencia calendario + `planTemplateNo` por `doorNo` |
 | `POST /ISAPI/Intelligent/FDLib/FaceDataRecord?format=json` | empujar JPEG Face ID |
 | `POST /ISAPI/AccessControl/CaptureFingerPrint?format=json` | capturar huella en sensor |
 | `POST /ISAPI/AccessControl/FingerPrintDownload?format=json` | aplicar plantilla a persona |
