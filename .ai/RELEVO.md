@@ -249,13 +249,38 @@ Las fotos van a `/uploads/integra/...`, que **no** está en
 reescribe `/uploads/:path*` a la API, así que la cookie viaja. Son caras de
 empleados; que sigan detrás de sesión es deliberado.
 
+## Verificado en producción (2026-09-04 16:30)
+
+- Muro y foco: `ca9f4578` desplegado. 17 cámaras, las 4 puertas con audio.
+- Recuadros reales: `x 0.672 y 0.349 w 0.098 h 0.304 human` (antes `0,0,1,1`).
+- Detecciones con foto: **116/116**. Los accesos la tendrán en cuanto los
+  terminales acaben de volcar historial (iban por 24 días de retraso medio).
+- Cero fotos engañosas creadas desde que arrancó la API con el arreglo de
+  frescura. Las 632 residuales se limpiaron a mano (solo 3 existían en disco;
+  el resto se había escrito en la capa efímera antes del arreglo de rutas).
+- Entran ~460 eventos/min. Tabla: 53 770 filas / 47 MB y subiendo.
+
+`WorkflowSeedService` escupe `Unique constraint failed on (name)` en cada
+arranque. **No es de esto**: siembra definiciones que ya existen. Venía de antes.
+
+## Ojo operativo
+
+- El NVR está `bindStatus: bind` con Hik-Connect: con la detección encendida en
+  8 cámaras, quien tenga esa app recibe alarmas.
+- Se cambió el reloj de 10 equipos (cámaras en zona horaria de China). Toca
+  marcas de tiempo de un sistema de grabación; reversible.
+- Disco compartido con 27 contenedores de terceros. Vigilar la tabla hasta que
+  la poda de las 04:27 se lleve lo anterior a junio.
+
 ## A medias
 
 1. Portal del empleado (Adam pidió asistencia + credencial: falta que el
    empleado entre y vea lo suyo).
-2. El `httpHost` del grabador (ver arriba).
-3. Decidir si se encienden los micros de las cámaras (el botón ya está).
-4. TCPMSS / biblioteca `init: true` / empresas 1-2.
+2. El `httpHost` del grabador (ver arriba). Sin él, Escalera 01, Escaleras 02,
+   Azotea y Office Entrance no empujan eventos; su video va bien.
+3. La PTZ `.179` no tiene `FieldDetection`: sin recuadros en el estacionamiento.
+4. Decidir si se encienden los micros de las cámaras (el botón ya está).
+5. TCPMSS / biblioteca `init: true` / empresas 1-2.
 
 ## No tocar
 
