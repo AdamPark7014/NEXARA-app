@@ -8,54 +8,36 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — Exports PDF/Excel HR·Ops·Finance + UX listas
+## Este turno — ACS face al límite + build desbloqueado
 
-Gaps ERP de documentos: PDFs/Excels faltantes y botones «Excel» sueltos.
-Sin tocar cámaras Integra ni núcleo CRM OC / stock / FieldDetection.
+Sin Face ID óptico sobre AcuSense. Maximizamos ACS + NEXARA.
 
-### Exports añadidos / cableados
+### Face / push
 
-1. **Actividades OPS PDF** — `GET activities/report.pdf` (landscape, KPIs
-   estatus/prioridad, detalle OT). UI en `OpsActivitiesBoard` + pack
-   `/erp/exports`.
-2. **Viáticos PDF** — ya existía API; ahora en OPS campo, Mis viáticos y
-   ERP finance con patrón **Exportar PDF / Exportar Excel**.
-3. **Asistencia híbrida Excel** — `GET attendance/hybrid/export.xlsx` +
-   botón en `HybridAttendancePanel` + tarjeta en `/erp/exports`.
-4. **Componente** `ListExportActions` — labels consistentes en listas.
+1. Acceso ACS: JPEG enrolado **al instante** en el primer SSE.
+2. Snapshot diferido canal **102→101** + re-SSE.
+3. FaceDataRecord + **FDSearch** post-upload; JPEG 8 KB–1.8 MB.
+4. Persistencia `uploads/integra-faces/`.
 
-### UX polish
+### Build fix (siblings)
 
-- OT: empty con Limpiar filtros + Nueva OT; Excel con más columnas.
-- Viáticos ops/mis: empty con CTA primaria; PDF 90 días.
-- Finance viáticos: «Exportar PDF» (antes «PDF control»).
-- Asistencia HR: «Exportar Excel».
-
-### Concurrente — no pisar
-
-Integra UX Video/Personas/Eventos · ACS face JPEG · FieldDetection ·
-identity-link · stock historial · CRM OC PDF · facilities access.
+- `identity-link`: `orgRoleKey` (no `roleKey`).
+- `users.service`: quitó comparación `isActive` inexistente en DTO.
+- tsc api limpio.
 
 SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` · `./deploy/update.sh --force-all`
+`./deploy/update.sh --force-all`
 
-### Verificar (hard refresh)
+### Verificar
 
-1. `/ops/activities` → Exportar Excel + Exportar PDF.
-2. `/ops/viatics` y `/ops/my-viatics` → Exportar PDF/Excel.
-3. `/erp/finance/viatics` → Exportar PDF + Excel en toolbar.
-4. `/erp/hr/attendance` → híbrido Exportar Excel; pack `/erp/exports`
-   Actividades PDF + Asistencia híbrida.
+1. Hard refresh Personas → Alta JPEG → cara en ficha.
+2. Pase puerta → banner con cara inmediata.
+3. Eventos con foto.
 
 ## A medias
 
-1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
-2. PDF nómina/pagos empleado si falta en UI (API `employee-payments/report.pdf` ya existe).
-3. identity-link WIP — no cableado a AppModule.
-4. go2rtc.yaml en disco corruptible — streams en RAM.
+Portal empleado · ANPR · re-wire httpHosts.
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales.
-Face ID óptico inventado. No pelear PTZ / biometrics CRUD / FieldDetection /
-stock detail / OC PDF del sibling.
+Puente NAS · Traefik · Face ID inventado sobre RTSP.
