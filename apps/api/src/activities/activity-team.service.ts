@@ -279,6 +279,11 @@ export class ActivityTeamService {
         fechaAsignacion: true,
         fechaInicio: true,
         fechaFinalizacion: true,
+        acsEnteredAt: true,
+        acsExitedAt: true,
+        acsLeftSite: true,
+        acsEntryDoor: true,
+        acsEnteredByUser: { select: { nombre: true } },
       },
     });
     if (!activity) throw new NotFoundException('Actividad no encontrada');

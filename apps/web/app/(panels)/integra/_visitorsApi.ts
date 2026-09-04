@@ -162,6 +162,7 @@ function normalizeStatus(raw: unknown, validTo?: string): RecurringVisitorStatus
   const s = String(raw || "")
     .trim()
     .toLowerCase();
+  // Prisma IntegraRecurringVisitor: ACTIVE | PENDING | SYNCED | EXPIRED | CANCELLED | ERROR
   if (
     /cancel|revok|disable|off/.test(s) ||
     s === "cancelled" ||
@@ -170,15 +171,19 @@ function normalizeStatus(raw: unknown, validTo?: string): RecurringVisitorStatus
     return "cancelled";
   }
   if (/expir|vencid|ended|done/.test(s) || s === "expired") return "expired";
-  if (/sync|enrol|activ|ok|live|terminal|pushed|on_terminals/.test(s) || s === "synced") {
+  if (
+    s === "synced" ||
+    s === "active" ||
+    /enrol|ok|live|terminal|pushed|on_terminals/.test(s)
+  ) {
     return "synced";
   }
-  if (/pend|draft|queue|syncing|creatin/.test(s) || s === "pending" || !s) {
+  if (/pend|draft|queue|syncing|creatin|error/.test(s) || s === "pending" || !s) {
     if (validTo) {
       const end = Date.parse(`${validTo.slice(0, 10)}T23:59:59`);
       if (Number.isFinite(end) && end < Date.now()) return "expired";
     }
-    return s ? "pending" : "pending";
+    return "pending";
   }
   if (validTo) {
     const end = Date.parse(`${validTo.slice(0, 10)}T23:59:59`);
