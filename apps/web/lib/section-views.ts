@@ -485,20 +485,20 @@ export function adaptModulePresentation(
         : { label: 'Consola Ops', description: 'Árbol, puertas, video y eventos en vivo' },
     'integra-video':
       v2 === ROLES.CLIENTE
-        ? { label: 'Cámaras', description: 'Ver video de tu sede' }
-        : { label: 'Video en vivo', description: 'Cámaras, HLS y playback' },
+        ? { label: 'Cámaras', description: 'Vivo y grabaciones recientes' }
+        : { label: 'Video · 24h', description: 'Vivo, muro y playback NVR' },
     'integra-access':
       v2 === ROLES.CLIENTE
-        ? { label: 'Puertas', description: 'Estado y apertura de accesos' }
-        : { label: 'Puertas', description: 'Control de accesos y privilegios' },
+        ? { label: 'Accesos', description: 'Estado y apertura de puertas' }
+        : { label: 'Accesos', description: 'Abrir puertas y asignar privilegios' },
     'integra-people':
       v2 === ROLES.CLIENTE
         ? { label: 'Personas', description: 'Quién tiene acceso a tu sitio' }
-        : { label: 'Personas', description: 'Alta · Face ID · baja en terminales' },
+        : { label: 'Personas', description: 'Alta persona · Face ID en terminales' },
     'integra-events':
       v2 === ROLES.CLIENTE
-        ? { label: 'Actividad', description: 'Entradas y salidas recientes' }
-        : { label: 'Eventos', description: 'Timeline ACS de las últimas horas' },
+        ? { label: 'Actividad', description: 'Entradas y salidas con foto' }
+        : { label: 'Eventos Face', description: 'Accesos ACS con nombre y foto' },
     'integra-alarms':
       v2 === ROLES.CLIENTE
         ? { label: 'Alarmas', description: 'Alertas de tu sede' }
