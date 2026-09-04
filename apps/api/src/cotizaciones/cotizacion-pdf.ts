@@ -1,6 +1,13 @@
 import PDFDocument from 'pdfkit';
-import fs from 'fs';
-import path from 'path';
+import { PDF_MODULE_ACCENTS, loadNexaraLogo } from '../common/pdf/nexara-pdf-theme.js';
+
+/**
+ * Cotización comercial — PDF producción.
+ *
+ * Misma familia visual que OC (`purchase-order-pdf.ts`): membrete con datos
+ * fiscales de CompanyProfile, tipografía Helvetica, multipágina con número,
+ * filas de altura dinámica y resumen MXN.
+ */
 
 export type CotizacionPdfItem = {
   category?: string | null;
@@ -25,6 +32,17 @@ export type CotizacionPdfItem = {
   warrantyMonths?: number;
   deliveryTime?: string | null;
   lineTotal: number;
+};
+
+export type CotizacionPdfCompany = {
+  legalName: string;
+  tradeName?: string | null;
+  rfc?: string | null;
+  fiscalAddress?: string | null;
+  fiscalPostalCode?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  websiteUrl?: string | null;
 };
 
 export type CotizacionPdfPayload = {
@@ -52,6 +70,7 @@ export type CotizacionPdfPayload = {
   iepsTotal?: number;
   retentionTotal?: number;
   total: number;
+  company?: CotizacionPdfCompany | null;
   items: CotizacionPdfItem[];
 };
 
@@ -60,21 +79,24 @@ export type CotizacionPdfOptions = {
   internal?: boolean;
 };
 
-const COMPANY = {
+const FALLBACK_COMPANY = {
   name: 'NEXARA',
   tagline: 'Integración tecnológica · CCTV · Redes · Soporte TI',
   web: 'sales.nexara.com.mx',
   email: 'ventas@nexara.com.mx',
 };
 
+const ACCENT = PDF_MODULE_ACCENTS.crm;
+
 const COLORS = {
   navy: '#0B1F3A',
-  teal: '#0F766E',
-  accent: '#14B8A6',
+  teal: ACCENT,
+  accent: ACCENT,
   text: '#1E293B',
   muted: '#64748B',
   line: '#CBD5E1',
   fill: '#F8FAFC',
+  soft: '#E8F1FB',
   white: '#FFFFFF',
 };
 
