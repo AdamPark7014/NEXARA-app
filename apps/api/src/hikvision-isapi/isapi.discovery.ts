@@ -550,6 +550,7 @@ export async function setHttpNotificationHost(
   const https = u.protocol === 'https:';
   const port = u.port || (https ? '443' : '80');
   // El equipo quiere host y ruta por separado, no la URL entera.
+  // AcuSense Cap: uploadImagesDataType opt=URL,binary — sin el tag no manda JPEG.
   const body =
     `<HttpHostNotification>` +
     `<id>${id}</id>` +
@@ -561,9 +562,69 @@ export async function setHttpNotificationHost(
     `<portNo>${port}</portNo>` +
     `<httpAuthenticationMethod>none</httpAuthenticationMethod>` +
     (opts.withImages ? `<uploadImagesDataType>binary</uploadImagesDataType>` : '') +
+    `<httpBroken>false</httpBroken>` +
     `</HttpHostNotification>`;
 
   await client.put(`/ISAPI/Event/notification/httpHosts/${id}`, body);
+}
+
+/**
+ * Asegura que fielddetection / linedetection / facedetection / VMD notifiquen
+ * al «center» (httpHosts). Sin eso el smart dispara local pero no empuja.
+ * Ruta verificada: GET/PUT `/ISAPI/Event/triggers` en DS-2CD2123G2.
+ */
+export async function ensureSmartEventTriggersCenter(
+  client: HikvisionIsapiClient,
+): Promise<boolean> {
+  const path = '/ISAPI/Event/triggers';
+  try {
+    const { buffer } = await client.getBinary(path);
+    let xml = buffer.toString('utf8');
+    if (!/<EventTriggerList\b/i.test(xml)) return false;
+
+    const want = [
+      'fielddetection',
+      'linedetection',
+      'facedetection',
+      'VMD',
+      'videoloss',
+    ];
+    let changed = false;
+    const centerBlock =
+      `<EventTriggerNotification>` +
+      `<id>center</id>` +
+      `<notificationMethod>center</notificationMethod>` +
+      `<notificationRecurrence>beginning</notificationRecurrence>` +
+      `</EventTriggerNotification>`;
+
+    const triggers = [...xml.matchAll(/<EventTrigger\b[\s\S]*?<\/EventTrigger>/g)];
+    for (const match of triggers) {
+      const block = match[0];
+      const et = /<eventType>([^<]*)<\/eventType>/i.exec(block)?.[1] || '';
+      if (!want.some((w) => et.toLowerCase().includes(w.toLowerCase()))) continue;
+      if (/<notificationMethod>\s*center\s*<\/notificationMethod>/i.test(block)) continue;
+      // Insertar center dentro de la lista de notificaciones, o crear la lista.
+      let patched: string;
+      if (/<EventTriggerNotificationList>/i.test(block)) {
+        patched = block.replace(
+          /<\/EventTriggerNotificationList>/i,
+          `${centerBlock}</EventTriggerNotificationList>`,
+        );
+      } else {
+        patched = block.replace(
+          /<\/EventTrigger>/i,
+          `<EventTriggerNotificationList>${centerBlock}</EventTriggerNotificationList></EventTrigger>`,
+        );
+      }
+      xml = xml.replace(block, patched);
+      changed = true;
+    }
+    if (changed) await client.put(path, xml);
+    return true;
+  } catch (e) {
+    if (e instanceof IsapiAuthRejectedError) throw e;
+    return false;
+  }
 }
 
 /** Deja la ranura vacía: el equipo deja de avisar. */
