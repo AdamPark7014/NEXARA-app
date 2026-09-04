@@ -21,7 +21,15 @@ export class ClientTicketRequestsController {
   }
 
   @Get()
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.SUPPORT_VIEW,
+      PERMISSIONS.SUPPORT_MANAGE,
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.ACTIVITIES_MANAGE,
+    ],
+  })
   findAll(
     @Query() query: ClientTicketRequestsQueryDto,
     @CurrentCompanyId() companyId: number | null,
@@ -30,7 +38,15 @@ export class ClientTicketRequestsController {
   }
 
   @Get(':id')
-  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.ACTIVITIES_MANAGE] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.SUPPORT_VIEW,
+      PERMISSIONS.SUPPORT_MANAGE,
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.ACTIVITIES_MANAGE,
+    ],
+  })
   findOne(
     @Param('id', ParseIntPipe) id: number,
     @CurrentCompanyId() companyId: number | null,
@@ -39,7 +55,9 @@ export class ClientTicketRequestsController {
   }
 
   @Patch(':id/assign')
-  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
+  @RBAC({
+    anyPermissions: [PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.SUPPORT_MANAGE, PERMISSIONS.CONSOLE_ADMIN],
+  })
   assign(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { activityId?: number },
@@ -53,7 +71,9 @@ export class ClientTicketRequestsController {
   }
 
   @Patch(':id/status')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({
+    anyPermissions: [PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.SUPPORT_MANAGE, PERMISSIONS.ACTIVITIES_MANAGE],
+  })
   updateStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { status?: string },
