@@ -8,52 +8,47 @@
 
 NAS Synology `192.168.9.32` / `nas-nexara` anuncia `192.168.9.0/24`.
 
-## Este turno — ERP / Ops / Stock shell UI polish
+## Este turno — ACS face al límite (sin AcuSense Face ID)
 
-Chrome denso ES profesional en shells de operación, RRHH y almacén.
-No toqué Integra Personas/biometrics, asistencia híbrida ni motor PDF OC.
+No inventamos matching óptico sobre cámaras de oficina. Maximizamos ACS +
+NEXARA: JPEG persistido, push/SSE, FaceDataRecord + FDSearch, snapshot rápido.
 
-### Qué hay
+### Qué cambió
 
-1. **`PanelTabs` + `ContextRail`** — pestañas/píldoras con tokens `--nx-panel-*`
-   (sustituyen botones primary/secondary y tabs ad-hoc).
-2. **`TabBar` (detalle OT/cliente)** — mismos tokens + acento de panel.
-3. **AppShell ERP/OPS** — nav densa (inset accent, menos glow), padding main
-   más compacto.
-4. **Ops actividades** — header con acciones, KPIs sin emoji, barra de avance
-   densa, `PanelTabs` Bandeja/Evidencias; board con copy ES limpio.
-5. **DashKit** — gap/eyebrow más densos (dashboard OPS).
-6. **ERP RRHH** — `HrModuleRail` en plantilla/asistencia/org/KPIs/multas/comidas;
-   tabs densas; sin pelear `HybridAttendancePanel`.
-7. **Almacén** — header/list chrome + `ContextRail` catálogo; tabs densas;
-   KPIs inventario sin emoji. **No** reescribí timeline de movimientos.
-8. **Compras** — `PanelTabs` (PDF OC intacto).
+1. **Ingest push**: acceso ACS con `personId` adjunta **cara enrolada** al
+   instante (sin ISAPI) → banner/events con foto en el primer SSE.
+2. **Snapshot**: canal **102** luego 101; siempre en background y re-SSE
+   (sustituye foto si llega captura de puerta).
+3. **FaceDataRecord**: validación tamaño 8 KB–1.8 MB; meta Postman
+   (`faceLibType` en FaceInfo); post-upload **FDSearch** por terminal.
+4. **Banner live**: actualiza foto cuando el mismo evento re-llega con
+   `photoPath`.
+5. UI Personas: guía de calidad JPEG (480–720 px / 50–400 KB).
+
+httpHosts ya se cablean con `wireDevices` (cámaras con imágenes; ACS sin
+`uploadImagesDataType`). Re-aplicar desde Integra → Ajustes si hace falta.
 
 ### Concurrente (siblings — no pisar)
 
-Face ACS JPEG / Personas biometrics · CRM OC PDF · stock movements detail ·
-PTZ · hybrid attendance internals.
+CRM · stock · asistencia híbrida · PTZ vehicle notes.
 
-SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109` →
-`/var/www/nexara-app` · `deploy/update.sh --force-all` (rebuild api+web)
+SSH: `-i ~/.ssh/id_ed25519_nexara_hetzner -p 2222 root@5.78.215.109`
 
 ### Verificar (hard refresh)
 
-1. `/ops/activities` · `/ops/dashboard` — chrome denso, tabs underline.
-2. `/erp/hr` y subrutas — rail RRHH + tabs; asistencia híbrida intacta.
-3. `/erp/warehouse` — rail catálogo + Inventario; pestaña Movimientos intacta.
-4. `/erp/procurement` — tabs densas; PDF OC sigue funcionando.
-5. Sidebar ERP/OPS — ítem activo con inset, sin barra flotante.
+1. Personas: subir JPEG bueno → ficha muestra cara; note FDSearch.
+2. Pase por puerta: banner con cara **inmediata** (enrolada); luego puede
+   refrescar con snapshot del terminal.
+3. Eventos ACS: cards con foto.
+4. Video: nameplates ACS sticky; cajas AcuSense siguen «Humano · sin ID».
 
 ## A medias
 
-1. Portal empleado · httpHost NVR · ANPR ITC · micros · TCPMSS.
-2. Alinear códigos employeeNumber↔personId en plantilla real Oficinas.
-3. go2rtc.yaml en disco corruptible — streams viven en RAM.
-4. FieldDetection re-apply tras sync/push install.
+1. Portal empleado · ANPR ITC · micros · TCPMSS.
+2. Re-wire httpHosts tras cambios de PUBLIC_API_URL.
+3. CaptureFaceData en sensor del terminal (si firmware lo expone en Oficinas).
 
 ## No tocar
 
-Puente NAS, Traefik, credenciales, ISAPI no verificada.
-Face ID óptico inventado. No pelear PTZ pad / Personas CRUD / hybrid
-attendance / stock detail / OC PDF renderer del sibling.
+Puente NAS, Traefik, credenciales.
+**No** Face ID óptico inventado sobre AcuSense/RTSP.

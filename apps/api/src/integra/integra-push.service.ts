@@ -24,6 +24,8 @@ export type PushEventDto = {
   deviceIp: string;
   deviceName: string | null;
   eventType: string;
+  major: number | null;
+  minor: number | null;
   label: string | null;
   occurredAt: string;
   personId: string | null;
@@ -31,8 +33,15 @@ export type PushEventDto = {
   doorNo: number | null;
   verifyMode: string | null;
   photoPath: string | null;
+  /** granted | denied | null (no ACS / desconocido). */
+  outcome: 'granted' | 'denied' | null;
   targets: Array<{ type: string; x: number; y: number; w: number; h: number }> | null;
 };
+
+/** Acceso concedido (entrada / salida / genérico). */
+const GRANTED_MINORS = [1, 75, 76];
+/** Acceso denegado típico en terminales DS-K1T. */
+const DENIED_MINORS = [21, 22, 23, 24, 27, 28, 29, 31, 32];
 
 /**
  * Recepción de eventos **empujados** por los equipos.
@@ -107,6 +116,8 @@ export class IntegraPushService {
     deviceIp: string;
     deviceName: string | null;
     eventType: string;
+    major?: number | null;
+    minor?: number | null;
     label: string | null;
     occurredAt: Date;
     personId: string | null;
@@ -116,11 +127,15 @@ export class IntegraPushService {
     photoPath: string | null;
     targets: unknown;
   }): PushEventDto {
+    const major = row.major ?? null;
+    const minor = row.minor ?? null;
     return {
       id: row.id,
       deviceIp: row.deviceIp,
       deviceName: row.deviceName,
       eventType: row.eventType,
+      major,
+      minor,
       label: row.label,
       occurredAt: row.occurredAt.toISOString(),
       personId: row.personId,
@@ -128,6 +143,7 @@ export class IntegraPushService {
       doorNo: row.doorNo,
       verifyMode: row.verifyMode,
       photoPath: row.photoPath,
+      outcome: acsOutcome(major, minor),
       targets: (Array.isArray(row.targets) ? row.targets : null) as PushEventDto['targets'],
     };
   }

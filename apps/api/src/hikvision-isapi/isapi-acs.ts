@@ -541,6 +541,72 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Sonda honesta de capacidades ACS (cara / huella / httpHosts).
+ * Solo rutas documentadas HikGateway — no inventa FaceContrast ni score.
+ */
+export async function probeAcsIdentityCaps(client: HikvisionIsapiClient): Promise<{
+  accessControl: boolean;
+  fdLibCount: boolean;
+  captureFingerPrintCaps: boolean;
+  fingerPrintCfgCaps: boolean;
+  httpHosts: boolean;
+  notes: string[];
+}> {
+  const notes: string[] = [];
+  const tryGet = async (path: string) => {
+    try {
+      await client.get(path);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const tryGetJson = async (path: string) => {
+    try {
+      await client.get(path.includes('?') ? path : `${path}?format=json`);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const accessControl = await tryGet('/ISAPI/AccessControl/capabilities');
+  const fdLibCount = await tryGetJson('/ISAPI/Intelligent/FDLib/Count');
+  const captureFingerPrintCaps = await tryGetJson(
+    '/ISAPI/AccessControl/CaptureFingerPrint/capabilities',
+  );
+  const fingerPrintCfgCaps = await tryGetJson(
+    '/ISAPI/AccessControl/FingerPrintCfg/capabilities',
+  );
+  let httpHosts = false;
+  try {
+    await client.get('/ISAPI/Event/notification/httpHosts');
+    httpHosts = true;
+  } catch {
+    httpHosts = false;
+  }
+
+  notes.push(
+    'Face JPEG: FaceDataRecord multipart (upload). Muchos DS-K1T no exportan faceURL descargable — NEXARA guarda copia local.',
+  );
+  notes.push(
+    'Huella: CaptureFingerPrint → FingerPrintDownload/Upload/Delete (HikGateway §5.11).',
+  );
+  if (!captureFingerPrintCaps) {
+    notes.push('CaptureFingerPrint/capabilities no respondió en este equipo.');
+  }
+
+  return {
+    accessControl,
+    fdLibCount,
+    captureFingerPrintCaps,
+    fingerPrintCfgCaps,
+    httpHosts,
+    notes,
+  };
+}
+
+/**
  * Empuja JPEG de cara al terminal. Doc HikGateway 5.9.1 — FaceDataRecord multipart.
  * `faceLibType` por defecto `blackFD` (lista ACS habitual).
  *
