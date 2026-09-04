@@ -194,6 +194,71 @@ class SpaceBookingDto {
   @IsOptional() @IsString() notes?: string;
 }
 
+class WeekPlanPutDto {
+  @IsOptional() @IsBoolean() enable?: boolean;
+  @IsOptional() @IsArray() segments?: Array<{
+    week: string;
+    id?: number;
+    beginTime: string;
+    endTime: string;
+  }>;
+  @IsOptional() @IsObject() WeekPlanCfg?: Record<string, unknown>;
+}
+
+class PlanTemplatePutDto {
+  @IsOptional() @IsBoolean() enable?: boolean;
+  @IsString() templateName!: string;
+  @Type(() => Number) @IsInt() weekPlanNo!: number;
+  @IsOptional() @IsString() holidayGroupNo?: string;
+}
+
+class EnsureSchedulePresetDto {
+  @IsIn(['office_hours', 'after_hours', 'weekend'])
+  preset!: 'office_hours' | 'after_hours' | 'weekend';
+  @IsOptional() @IsString() deviceIp?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(2) @Max(32) templateId?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(2) @Max(32) weekPlanId?: number;
+  @IsOptional() @IsString() officeBegin?: string;
+  @IsOptional() @IsString() officeEnd?: string;
+}
+
+class PersonAccessPatchDto {
+  @IsOptional() @IsIn(['indefinite', 'window', 'disabled'])
+  validMode?: 'indefinite' | 'window' | 'disabled';
+  @IsOptional() @IsString() beginTime?: string;
+  @IsOptional() @IsString() endTime?: string;
+  @IsOptional() planTemplateNo?: string | number;
+  @IsOptional()
+  @IsArray()
+  doorPlans?: Array<{
+    deviceIp: string;
+    doorNo?: number;
+    planTemplateNo?: string | number;
+    disable?: boolean;
+  }>;
+  @IsOptional()
+  @IsIn([
+    'always',
+    'never',
+    'office_hours',
+    'after_hours',
+    'weekend',
+    'visitor_today',
+    'contractor',
+  ])
+  preset?:
+    | 'always'
+    | 'never'
+    | 'office_hours'
+    | 'after_hours'
+    | 'weekend'
+    | 'visitor_today'
+    | 'contractor';
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(365) contractorDays?: number;
+  @IsOptional() @IsArray() @IsString({ each: true }) deviceIps?: string[];
+  @IsOptional() @IsBoolean() ensurePresetsOnDevices?: boolean;
+}
+
 @ApiTags('Integra · Artemis')
 @ApiBearerAuth()
 @UseGuards(RbacGuard)
@@ -208,6 +273,7 @@ export class IntegraController {
     private readonly acsFanout: IntegraAcsFanoutService,
     private readonly identity: IdentityLinkService,
     private readonly spaces: IntegraSpacesService,
+    private readonly schedules: IntegraSchedulesService,
   ) {}
 
   @Get('health')
