@@ -491,12 +491,17 @@ export class IntegraSpacesService {
         doorIndexCode,
         templateKey: key,
         label: input.label?.trim() || null,
-        config: input.config ?? undefined,
+        config: (input.config ?? undefined) as Prisma.InputJsonValue | undefined,
       },
       update: {
         templateKey: key,
         label: input.label !== undefined ? input.label?.trim() || null : undefined,
-        config: input.config === undefined ? undefined : input.config,
+        config:
+          input.config === undefined
+            ? undefined
+            : input.config === null
+              ? Prisma.DbNull
+              : (input.config as Prisma.InputJsonValue),
       },
     });
     return row;

@@ -1299,52 +1299,58 @@ export default function WarehousePage() {
               </select>
               <input type="date" value={movementFromDate} onChange={(e) => setMovementFromDate(e.target.value)} style={{ ...inp, width: 140 }} title="Desde" />
               <input type="date" value={movementToDate} onChange={(e) => setMovementToDate(e.target.value)} style={{ ...inp, width: 140 }} title="Hasta" />
+              {hasMovementFilters && (
+                <Button variant="ghost" size="sm" onClick={clearMovementFilters}>Limpiar filtros</Button>
+              )}
+              {visibleMovements.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconLeft="⬇"
+                  onClick={() => exportToExcel(
+                    visibleMovements.map((m) => ({
+                      folio: m.movementNumber,
+                      tipo: MOVEMENT_TYPE_LABEL[m.type] ?? m.type,
+                      sku: m.product?.sku ?? "",
+                      producto: m.product?.name ?? "",
+                      origen: m.fromWarehouse?.name ?? "",
+                      destino: m.toWarehouse?.name ?? "",
+                      cantidad: Number(m.quantity),
+                      saldo: stockMovementBalanceLabel(m),
+                      documento: stockMovementDocumentLabel(m),
+                      notas: m.notes ?? "",
+                      costo: Number(m.totalCost ?? 0),
+                      fecha: new Date(m.createdAt).toLocaleString("es-MX"),
+                      quien: m.createdBy?.nombre ?? "",
+                    })),
+                    [
+                      { key: "folio", label: "Folio" },
+                      { key: "tipo", label: "Tipo" },
+                      { key: "sku", label: "SKU" },
+                      { key: "producto", label: "Producto" },
+                      { key: "origen", label: "Origen" },
+                      { key: "destino", label: "Destino" },
+                      { key: "cantidad", label: "Cantidad" },
+                      { key: "saldo", label: "Saldo antes→después" },
+                      { key: "documento", label: "Documento" },
+                      { key: "notas", label: "Notas" },
+                      { key: "costo", label: "Costo" },
+                      { key: "fecha", label: "Fecha" },
+                      { key: "quien", label: "Registró" },
+                    ],
+                    "movimientos-inventario",
+                    "Movimientos de inventario",
+                  )}
+                >
+                  Excel
+                </Button>
+              )}
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="sm"
-                iconLeft="⬇"
-                onClick={() => exportToExcel(
-                  visibleMovements.map((m) => ({
-                    folio: m.movementNumber,
-                    tipo: MOVEMENT_TYPE_LABEL[m.type] ?? m.type,
-                    sku: m.product?.sku ?? "",
-                    producto: m.product?.name ?? "",
-                    origen: m.fromWarehouse?.name ?? "",
-                    destino: m.toWarehouse?.name ?? "",
-                    cantidad: Number(m.quantity),
-                    saldo: stockMovementBalanceLabel(m),
-                    documento: stockMovementDocumentLabel(m),
-                    notas: m.notes ?? "",
-                    costo: Number(m.totalCost ?? 0),
-                    fecha: new Date(m.createdAt).toLocaleString("es-MX"),
-                    quien: m.createdBy?.nombre ?? "",
-                  })),
-                  [
-                    { key: "folio", label: "Folio" },
-                    { key: "tipo", label: "Tipo" },
-                    { key: "sku", label: "SKU" },
-                    { key: "producto", label: "Producto" },
-                    { key: "origen", label: "Origen" },
-                    { key: "destino", label: "Destino" },
-                    { key: "cantidad", label: "Cantidad" },
-                    { key: "saldo", label: "Saldo antes→después" },
-                    { key: "documento", label: "Documento" },
-                    { key: "notas", label: "Notas" },
-                    { key: "costo", label: "Costo" },
-                    { key: "fecha", label: "Fecha" },
-                    { key: "quien", label: "Registró" },
-                  ],
-                  "movimientos-inventario",
-                  "Movimientos de inventario",
-                )}
-              >
-                Excel
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
+                iconLeft="📄"
                 onClick={() => void downloadMovementsPdf()}
-                disabled={exportingPdf || movementsLoading}
+                disabled={exportingPdf || movementsLoading || visibleMovements.length === 0}
               >
                 {exportingPdf ? "PDF…" : "PDF kardex"}
               </Button>
