@@ -4,7 +4,7 @@ import { NotificationType } from '@prisma/client';
 import { Cron } from '@nestjs/schedule';
 import { PERMISSIONS } from '../common/permissions.js';
 import { PushDispatchService } from '../devices/push-dispatch.service.js';
-import { assertCompanyAccess, companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
+import { companyWhere, requireCompanyId } from '../common/tenant/tenant-scope.js';
 import { getRequestCompanyId } from '../common/tenant/tenant-context.js';
 
 export interface INotificationPayload {
