@@ -39,21 +39,34 @@ const readPositiveIntEnv = (name: string, fallback: number): number => {
 };
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  // Sin el parser de Nest: el suyo se registra antes que cualquier `app.use` y
+  // contesta 415 a lo que no reconoce. Un equipo Hikvision que recibe un error
+  // **deshabilita su host de notificación** y se queda mudo sin avisar a nadie,
+  // así que la ruta de eventos tiene que tragar lo que le manden. Los parsers
+  // van abajo, en el orden que hace falta.
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
   const httpServer = app.getHttpAdapter().getInstance();
   app.enableShutdownHooks();
 
   httpServer.disable('x-powered-by');
   httpServer.set('trust proxy', 1);
 
-  // Los equipos Hikvision empujan XML, JSON o multipart con el JPEG dentro, y
-  // ninguno con la cabecera que le corresponde. Se recoge en crudo y se decide
-  // por la forma del cuerpo — pero solo en esta ruta: al resto de la API le
-  // sigue haciendo falta el JSON ya parseado.
+  // Los equipos Hikvision empujan XML, JSON o multipart con el JPEG dentro. Va
+  // primero para que nada lo interprete antes: en esta ruta se decide por la
+  // forma del cuerpo, no por la cabecera.
   app.use('/api/integra/hik', express.raw({ type: () => true, limit: '20mb' }));
 
-  // Límite de payload para fotos base64
-  app.use(express.json({ limit: '10mb' }));
+  // Límite de payload para fotos base64. El `verify` guarda el cuerpo sin tocar
+  // porque el webhook de Stripe firma sobre los bytes exactos: parseado y
+  // vuelto a serializar, la firma ya no cuadra.
+  app.use(
+    express.json({
+      limit: '10mb',
+      verify: (req, _res, buf) => {
+        (req as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+      },
+    }),
+  );
   app.use(express.urlencoded({ limit: '10mb', extended: true }));
   app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
     response.setHeader('X-Frame-Options', 'DENY');
