@@ -151,13 +151,25 @@ if ($Seccion -in @('todo', 'video')) {
   # El YAML corrupto es el fallo silencioso mas caro que hemos tenido: go2rtc
   # arranca sin una sola camara de disco y nadie se entera hasta que el muro
   # aparece vacio tras un reinicio.
-  $yamlErr = Invoke-Remoto 'docker logs nexara-go2rtc 2>&1 | grep -c "did not find expected key" || true'
-  if ([int]($yamlErr.Trim() -as [int]) -gt 0) {
-    Escribir-Hallazgo 'MAL' "go2rtc.yaml NO se parsea ($($yamlErr.Trim()) errores al arrancar)."
-    Escribir-Hallazgo 'INFO' '  Tras cada reinicio go2rtc queda con CERO camaras de disco.'
-    Escribir-Hallazgo 'INFO' '  Arreglo: limpiar /var/lib/nexara/go2rtc/go2rtc.yaml a mano.'
+  # Se VALIDA el fichero, no se leen los logs. Contar errores en el historial
+  # del contenedor daba un falso positivo permanente: los de un arranque viejo
+  # siguen ahi despues de arreglar el fichero, y el diagnostico seguia diciendo
+  # «MAL» sobre algo ya resuelto. Un diagnostico que no se entera de las mejoras
+  # ensena a ignorarlo, que es peor que no tenerlo.
+  # Las cadenas van como argumentos para no anidar comillas entre PowerShell,
+  # ssh, el shell remoto y Python. Es menos ingenioso y se lee.
+  $validar = 'python3 -c ' +
+    '"import yaml,sys;d=yaml.safe_load(open(sys.argv[1])) or {};' +
+    'print(sys.argv[2], len(d.get(sys.argv[3]) or {}))" ' +
+    '/var/lib/nexara/go2rtc/go2rtc.yaml OK streams 2>&1 || true'
+  $yaml = Invoke-Remoto $validar
+  $y = $yaml.Trim()
+  if ($y -like 'OK*') {
+    $n = ($y -split '\s+')[1]
+    Escribir-Hallazgo 'OK' "go2rtc.yaml parsea · $n camaras sobreviven a un reinicio"
   } else {
-    Escribir-Hallazgo 'OK' 'go2rtc.yaml se parsea correctamente'
+    Escribir-Hallazgo 'MAL' "go2rtc.yaml NO parsea: $y"
+    Escribir-Hallazgo 'INFO' '  Tras cada reinicio go2rtc queda con CERO camaras de disco.'
   }
 
   $streamsJson = Invoke-Remoto 'docker exec nexara-go2rtc wget -qO- http://127.0.0.1:1984/api/streams 2>/dev/null || curl -s http://172.18.0.3:1984/api/streams'
