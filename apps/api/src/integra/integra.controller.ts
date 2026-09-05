@@ -546,9 +546,14 @@ export class IntegraController {
     @Param('id') id: string,
     @Query('siteId') siteId?: string,
     @Query('audio') audio?: string,
+    @Query('quality') quality?: string,
   ) {
     return this.integra.stream(companyId, id, siteId ? parseInt(siteId, 10) : null, {
       audio: audio === '1' || audio === 'true',
+      // Cualquier cosa que no sea 'main' es el secundario. Un valor raro no
+      // puede acabar sirviendo alta calidad por accidente: el principal abre
+      // una segunda sesión RTSP contra un NVR con sesiones contadas.
+      quality: quality === 'main' ? 'main' : 'sub',
     });
   }
 

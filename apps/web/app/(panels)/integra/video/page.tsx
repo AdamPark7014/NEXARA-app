@@ -26,7 +26,21 @@ import {
 } from "../_Console";
 import { IntegraEzuiKitPlayer } from "../_EzuiKitPlayer";
 import { IntegraDetectionOverlay, LIVE_DET_BADGE_MS, subscribePushEvents } from "../_DetectionOverlay";
-import { IntegraLivePlayer, preloadGo2rtcPlayer, type PlayerState } from "../_LivePlayer";
+import {
+  IntegraLivePlayer,
+  preloadGo2rtcPlayer,
+  type HdOffer,
+  type PlayerState,
+} from "../_LivePlayer";
+import {
+  elegirObjetivoHd,
+  evaluarRespuestaHd,
+  textoSinHd,
+  type MotivoSinHd,
+  type StreamQuality,
+} from "../_quality";
+import { WALL_CONNECT_CONCURRENCY, admitirMosaicos } from "../_wallAdmission";
+import { useElementWidth } from "../_useElementWidth";
 import { IntegraLiveAccessBanner } from "../_LiveAccessBanner";
 import { IntegraAcsIdentityStrip } from "../_AcsIdentityStrip";
 import { IntegraPtzPad } from "../_PtzPad";
@@ -96,6 +110,12 @@ type StreamSlot = {
   hasAudio?: boolean;
   /** Este stream concreto se pidió con audio. */
   audio?: boolean;
+  /**
+   * Nombre del stream dentro de go2rtc. Es lo que permite comprobar que una
+   * petición de alta calidad devolvió de verdad un canal distinto (`cam_X_hd`)
+   * y no el mismo del muro con otra etiqueta.
+   */
+  streamName?: string | null;
 };
 
 type ViewMode = "wall" | "focus";
@@ -110,15 +130,6 @@ const AUTOOPEN_KEY = "nexara_integra_video_autoopen";
  * separar los handshakes unos cientos de ms.
  */
 const STAGGER_MS = 250;
-
-/**
- * Cuántos mosaicos pueden estar CONECTANDO a la vez. Ojo: no es un tope de
- * cámaras vivas. `cc59543` limitaba a 4 vivas y por eso nunca se veían las
- * nueve; el problema real no es cuántas reproducen, sino cuántas negocian el
- * decodificador y la sesión RTSP en el mismo instante. En cuanto una llega a
- * imagen, entra la siguiente de la cola, así que el muro acaba lleno.
- */
-const WALL_CONNECT_CONCURRENCY = 3;
 
 function colsFor(layout: LayoutN): number {
   if (layout === 1) return 1;
@@ -324,9 +335,17 @@ export default function IntegraVideoPage() {
     [items, region, q],
   );
 
+  /**
+   * `quality` solo se manda cuando se pide `main`: así el muro sigue haciendo
+   * exactamente la misma petición de siempre, sin un parámetro nuevo que
+   * invalide cachés o cambie el camino en el servidor.
+   */
   const fetchStream = useCallback(
-    async (cam: Cam, withAudio = false): Promise<StreamSlot> => {
-      const qs = withAudio ? "?audio=1" : "";
+    async (cam: Cam, withAudio = false, quality: StreamQuality = "sub"): Promise<StreamSlot> => {
+      const params = [withAudio ? "audio=1" : "", quality === "main" ? "quality=main" : ""].filter(
+        Boolean,
+      );
+      const qs = params.length ? `?${params.join("&")}` : "";
       const data = await integraApi<{
         hls: string | null;
         rtsp: string | null;
@@ -335,6 +354,7 @@ export default function IntegraVideoPage() {
         stream?: Record<string, unknown>;
         hasAudio?: boolean;
         audio?: boolean;
+        streamName?: string;
       }>(`integra/cameras/${encodeURIComponent(cam.id)}/stream${qs}`, { method: "POST" });
       return {
         id: cam.id,
@@ -346,6 +366,7 @@ export default function IntegraVideoPage() {
         stream: data.stream,
         hasAudio: data.hasAudio,
         audio: data.audio,
+        streamName: data.streamName ?? null,
       };
     },
     [],
@@ -559,6 +580,144 @@ export default function IntegraVideoPage() {
   const playbackActive =
     Boolean(playback && focus && playback.cameraId === focus.id && playback.hls);
   const focusSrc = playbackActive && playback ? playback.hls : focus?.hls ?? null;
+
+  /* ── Mejora progresiva de calidad ─────────────────────────────────
+   *
+   * Abrir Foco ya no cierra el stream del muro para abrir otro. Se sigue
+   * pintando el secundario —que está caliente en go2rtc, primer fotograma
+   * inmediato— y en paralelo se negocia el canal principal; el reproductor
+   * cambia de uno a otro sin corte cuando el principal da imagen. Si no la da,
+   * se queda el secundario: nunca peor que antes.
+   *
+   * La página decide y negocia; el corte limpio lo hace `_LivePlayer`.
+   */
+  const focusStageWidth = useElementWidth(
+    focusStageRef,
+    mode === "focus" && Boolean(focus),
+    focus?.id ?? null,
+  );
+
+  const hdObjetivo = useMemo(
+    () =>
+      elegirObjetivoHd({
+        mode,
+        focusId: focus?.id ?? null,
+        focusProvider: focus?.provider ?? null,
+        playbackActive,
+        stageWidthPx: focusStageWidth,
+      }),
+    [mode, focus?.id, focus?.provider, playbackActive, focusStageWidth],
+  );
+  const hdCamId = hdObjetivo.objetivo?.cameraId ?? null;
+  const hdSubSrc = focus?.hls ?? null;
+  const hdSubStreamName = focus?.streamName ?? null;
+  const hdConAudio = Boolean(focus?.audio);
+
+  /**
+   * Resultado de la negociación, atado a la cámara para la que se pidió: si el
+   * operador cambia de cámara mientras el principal viaja, la respuesta vieja
+   * no puede aplicarse a la nueva.
+   */
+  const [hdNegociado, setHdNegociado] = useState<{
+    cameraId: string;
+    src: string | null;
+    motivo: MotivoSinHd | null;
+    detalle: string | null;
+  } | null>(null);
+
+  /**
+   * Cámaras que ya dijeron que no. Las 13 de vigilancia van en H.265 y la
+   * respuesta no va a cambiar mientras dure la sesión, así que no se les vuelve
+   * a preguntar cada vez que el operador entra y sale de Foco: cada pregunta es
+   * un POST que además re-registra en go2rtc el stream que el muro está usando.
+   */
+  const hdSinCanal = useRef(new Map<string, { motivo: MotivoSinHd; detalle: string | null }>());
+
+  useEffect(() => {
+    if (!hdCamId || !hdSubSrc) {
+      setHdNegociado(null);
+      return;
+    }
+    const cam = items.find((c) => c.id === hdCamId);
+    if (!cam) {
+      setHdNegociado(null);
+      return;
+    }
+    const yaSabido = hdSinCanal.current.get(hdCamId);
+    if (yaSabido) {
+      setHdNegociado({ cameraId: hdCamId, src: null, ...yaSabido });
+      return;
+    }
+    let cancelado = false;
+    void fetchStream(cam, hdConAudio, "main")
+      .then((slot) => {
+        if (cancelado) return;
+        const veredicto = evaluarRespuestaHd(
+          { hls: slot.hls, note: slot.note, streamName: slot.streamName },
+          { hls: hdSubSrc, streamName: hdSubStreamName },
+        );
+        if (veredicto.usable) {
+          setHdNegociado({ cameraId: hdCamId, src: veredicto.src, motivo: null, detalle: null });
+          return;
+        }
+        // Un «no» por códec o por no haber canal es estable: se recuerda. Un
+        // fallo de red no, que eso sí puede arreglarse solo al siguiente intento.
+        if (veredicto.motivo === "codec" || veredicto.motivo === "sin-canal") {
+          hdSinCanal.current.set(hdCamId, {
+            motivo: veredicto.motivo,
+            detalle: veredicto.detalle,
+          });
+        }
+        setHdNegociado({
+          cameraId: hdCamId,
+          src: null,
+          motivo: veredicto.motivo,
+          detalle: veredicto.detalle,
+        });
+      })
+      .catch(() => {
+        if (cancelado) return;
+        // Que falle la alta calidad no es un error de pantalla: el secundario
+        // sigue puesto. Se anota el motivo y ya está.
+        setHdNegociado({
+          cameraId: hdCamId,
+          src: null,
+          motivo: "sin-respuesta",
+          detalle: null,
+        });
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [hdCamId, hdSubSrc, hdSubStreamName, hdConAudio, items, fetchStream]);
+
+  /**
+   * La oferta que ve el reproductor de Foco. **Nunca es `null`**: si lo fuera,
+   * React cambiaría el tipo de componente al aparecer la alta calidad y
+   * remontaría el `<video-stream>` del secundario — o sea, pagaría justo el
+   * handshake que todo esto existe para evitar. Sin alta calidad la oferta va
+   * vacía y con el motivo, que además es lo que se le enseña al operador.
+   */
+  const hdOferta: HdOffer = useMemo(() => {
+    if (!hdCamId) {
+      return { src: null, pidiendo: false, motivo: hdObjetivo.motivo, detalle: null };
+    }
+    if (!hdNegociado || hdNegociado.cameraId !== hdCamId) {
+      return { src: null, pidiendo: true, motivo: null, detalle: null };
+    }
+    return {
+      src: hdNegociado.src,
+      pidiendo: false,
+      motivo: hdNegociado.motivo,
+      detalle: hdNegociado.detalle,
+    };
+  }, [hdCamId, hdObjetivo.motivo, hdNegociado]);
+
+  /** Explicación larga para la nota técnica, cuando no hay alta calidad. */
+  const hdNota = useMemo(
+    () => (hdOferta.src ? null : textoSinHd(hdOferta.motivo, hdOferta.detalle)),
+    [hdOferta],
+  );
 
   const clearAll = () => {
     setSlots([]);
@@ -1108,27 +1267,19 @@ export default function IntegraVideoPage() {
   ]);
 
   /**
-   * Control de admisión. Recorre las celdas en orden y deja arrancar solo a
+   * Control de admisión: la regla vive en `_wallAdmission.ts`, con pruebas.
+   * Recorre las celdas en orden y deja arrancar solo a
    * `WALL_CONNECT_CONCURRENCY` a la vez; el resto espera «En cola». Cuando una
    * se asienta —imagen, respaldo o error— libera su turno y entra la siguiente.
-   * Así se llenan las nueve sin que nueve decodificadores negocien a la vez,
-   * que es lo que dejaba media rejilla colgada.
+   *
+   * Lo único que cambió: un mosaico fuera de pantalla ya no ocupa turno. Antes
+   * se quedaba en «en cola» por su `IntersectionObserver` y el bucle lo contaba
+   * como conectando, así que en un 4×4 en portátil las filas visibles esperaban
+   * detrás de filas que nadie estaba viendo.
    */
   const liveWallIds = useMemo(() => {
     if (mode !== "wall") return new Set<string>();
-    const ids = new Set<string>();
-    let connecting = 0;
-    for (const s of wallCells) {
-      if (!s) continue;
-      const st = tileState[s.id];
-      const settled = st === "live" || st === "snapshot" || st === "error";
-      if (!settled) {
-        if (connecting >= WALL_CONNECT_CONCURRENCY) continue;
-        connecting += 1;
-      }
-      ids.add(s.id);
-    }
-    return ids;
+    return admitirMosaicos(wallCells, tileState, WALL_CONNECT_CONCURRENCY);
   }, [wallCells, mode, tileState]);
 
   const liveWallOrder = useMemo(() => {
@@ -1569,7 +1720,11 @@ export default function IntegraVideoPage() {
                     {focus.provider === "HCT" ? (
                       <IntegraEzuiKitPlayer stream={focus.stream} cameraId={focus.id} height={420} />
                     ) : (
-                      <div className={styles.focusStage}>
+                      // El ref estaba declarado pero no colgaba de ningún nodo:
+                      // `F` en Foco llamaba a pantalla completa con `null` y no
+                      // hacía nada. Ahora además es lo que se mide para decidir
+                      // la calidad, así que sin esto no se pediría HD jamás.
+                      <div className={styles.focusStage} ref={focusStageRef}>
                         <IntegraDetectionOverlay
                           deviceIp={focusCam?.sourceIp ?? null}
                           showEmpty
@@ -1579,6 +1734,7 @@ export default function IntegraVideoPage() {
                           enabled={mode === "focus"}
                           mode="mse"
                           audio={Boolean(focus.audio) && !playbackActive}
+                          hd={hdOferta}
                         />
                       </div>
                     )}
@@ -1601,7 +1757,7 @@ export default function IntegraVideoPage() {
                         />
                       )}
                     </div>
-                    {note && (
+                    {(note || hdNota) && (
                       <p className={styles.videoNote}>
                         <button
                           type="button"
@@ -1610,7 +1766,11 @@ export default function IntegraVideoPage() {
                         >
                           {showTech ? "Ocultar detalle técnico ▾" : "Detalle técnico ▸"}
                         </button>
-                        {showTech && <span className={styles.techDetail}>{note}</span>}
+                        {showTech && (
+                          <span className={styles.techDetail}>
+                            {[note, hdNota].filter(Boolean).join(" · ")}
+                          </span>
+                        )}
                       </p>
                     )}
                   </>
