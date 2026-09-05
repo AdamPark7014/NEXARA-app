@@ -53,7 +53,34 @@ type DashBrief = {
   doors?: number;
   doorsOnline?: number;
   people?: number;
+  /** Cuándo se reconcilió el espejo por última vez. Lo devuelve la API y hasta
+   *  ahora no se pintaba en ninguna parte. */
+  lastSync?: string | null;
 };
+
+/** A partir de aquí el espejo se considera rancio y se avisa. */
+const SYNC_STALE_MS = 60 * 60 * 1000;
+
+/**
+ * Antigüedad del espejo en lenguaje llano. Importa más de lo que parece: todo
+ * lo que enseña el panel —cámaras, puertas, personas— sale del espejo, así que
+ * un espejo viejo no da una pantalla vacía, da una pantalla que miente con
+ * aplomo. Sin este dato no había forma de saberlo desde la interfaz.
+ */
+export function syncAge(iso?: string | null): { label: string; stale: boolean } | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return null;
+  const ms = Date.now() - t;
+  if (ms < 0) return { label: "recién", stale: false };
+  const stale = ms > SYNC_STALE_MS;
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return { label: "hace menos de 1 min", stale };
+  if (min < 60) return { label: `hace ${min} min`, stale };
+  const h = Math.floor(min / 60);
+  if (h < 24) return { label: `hace ${h} h`, stale };
+  return { label: `hace ${Math.floor(h / 24)} d`, stale };
+}
 
 /** Barra de contexto del sitio — la nav vive en AppShell (como CRM/ERP). */
 export function IntegraChrome({ children }: { children: React.ReactNode }) {
@@ -186,6 +213,8 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
     dash && ((dash.cameras ?? 0) > 0 || (dash.doors ?? 0) > 0 || (dash.people ?? 0) > 0),
   );
 
+  const sync = syncAge(dash?.lastSync);
+
   const showVideo = caps?.video !== false;
   const showPeople = caps?.people !== false && health?.provider !== "HCT";
   const showEvents = caps?.events !== false;
@@ -231,7 +260,29 @@ export function IntegraChrome({ children }: { children: React.ReactNode }) {
               <span className={styles.kpiChip}>
                 <strong>{dash?.people ?? 0}</strong> personas
               </span>
+              {sync && (
+                <span
+                  className={styles.kpiChip}
+                  data-tone={sync.stale ? "warn" : undefined}
+                  title={
+                    sync.stale
+                      ? "El espejo lleva más de una hora sin reconciliarse. Las cifras de arriba pueden no coincidir con lo que hay ahora mismo en los equipos. Pulsa «Reconciliar»."
+                      : "Última reconciliación del espejo con los equipos."
+                  }
+                >
+                  Espejo <strong>{sync.label}</strong>
+                </span>
+              )}
             </div>
+          )}
+          {!sync && dash != null && (
+            <span
+              className={styles.healthPill}
+              data-tone="warn"
+              title="No consta ninguna reconciliación del espejo. El inventario que ves puede estar incompleto."
+            >
+              Espejo sin reconciliar
+            </span>
           )}
         </div>
         <div className={styles.contextRight}>
