@@ -5052,6 +5052,8 @@ model CompanyProfile {
   integraRoomBookings       IntegraRoomBooking[]
   integraSpacePolicies      IntegraSpacePolicy[]
   integraRecurringVisitors  IntegraRecurringVisitor[]
+  integraDetectionProfiles  IntegraDetectionProfile[]
+  integraCameraCapabilities IntegraCameraCapability[]
 
   @@map("company_profile")
 }
@@ -5753,6 +5755,8 @@ model IntegraSite {
   roomBookings IntegraRoomBooking[]
   spacePolicies IntegraSpacePolicy[]
   recurringVisitors IntegraRecurringVisitor[]
+  detectionProfiles IntegraDetectionProfile[]
+  cameraCapabilities IntegraCameraCapability[]
   /// sha256 del token que los equipos llevan en la URL de notificacion.
   /// Solo el hash: el token en claro se ensena una vez al configurarlos.
   pushTokenHash String?  @db.VarChar(64)
@@ -5853,6 +5857,111 @@ model IntegraCamera {
   @@unique([siteId, cameraIndexCode])
   @@index([companyId])
   @@map("integra_cameras")
+}
+
+/// Perfil de deteccion de UNA camara: que se vigila, con cuanta sensibilidad y
+/// donde. Sin una fila aqui el equipo se configura con la plantilla de
+/// compatibilidad (fotograma completo, `human`, `alarmConfidence=low`), que es
+/// lo que habia antes de existir esta tabla — salvo la sensibilidad, que baja
+/// del techo del rango a DEFAULT_SENSITIVITY.
+model IntegraDetectionProfile {
+  id        Int    @id @default(autoincrement())
+  companyId Int
+  siteId    Int
+  /// `cameraIndexCode` del espejo `integra_cameras`.
+  cameraId  String @db.VarChar(120)
+  /// IP LAN a la que se le habla. Null = se resuelve del espejo al aplicar.
+  deviceIp  String? @db.VarChar(64)
+  /// Canal fisico (1..16). Null = 1.
+  channel   Int?
+  /// `eventType` EXTRA del Apendice B para esta camara, sobre SMART_EVENT_TYPES.
+  /// Ej: ["loitering","regionEntrance"]. Nada fuera del catalogo documentado.
+  eventTypes Json?
+  /// `sensitivityLevel` 0..100 (DOCUMENTADO, Apendice A.49). Null = 50.
+  sensitivity Int?
+  /// low | mediumLow | mediumHigh | high. EMPIRICO: solo se escribe si el
+  /// equipo devolvio el tag. Null = `low` (lo que ya se escribia).
+  alarmConfidence String? @db.VarChar(24)
+  /// human | vehicle | human,vehicle (DOCUMENTADO, Apendice A.49). Null = human.
+  detectionTarget String? @db.VarChar(24)
+  /// Hasta 4 poligonos normalizados 0..1: [[{"x":0.1,"y":0.5}, …], …].
+  /// Se guardan normalizados y no en la rejilla del equipo porque cada firmware
+  /// declara su propio `normalizedScreenSize`. Null = fotograma completo.
+  regions   Json?
+  /// Segundos que el objetivo debe permanecer antes de disparar. Null = 0.
+  timeThresholdSec Int?
+  /// Area minima del recuadro (0..1) para dar el objetivo por bueno.
+  /// NO se escribe al equipo: no hay tag verificado para esto en el XML que
+  /// devuelven las camaras. Es un filtro de servidor, reservado al overlay.
+  minTargetPct Float?
+  /// Perfil apagado = no se toca el equipo al recablear.
+  enabled   Boolean @default(true)
+  /// Ventana horaria en que la deteccion importa, p. ej.
+  /// { "weekdays": [1,2,3,4,5], "from": "19:00", "to": "07:00" }.
+  /// Se guarda aqui; el arbitraje horario del equipo es otro endpoint ISAPI.
+  schedule  Json?
+  /// Ultima vez que este perfil se escribio en el equipo, y con que resultado.
+  lastAppliedAt   DateTime?
+  lastAppliedNote String?  @db.VarChar(500)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, cameraId])
+  @@index([companyId, siteId])
+  @@map("integra_detection_profiles")
+}
+
+/// Lo que `GET /ISAPI/Smart/capabilities` dice que sabe hacer cada camara.
+///
+/// Hasta hoy esa ruta NO se llamaba desde ningun punto del codigo, asi que
+/// merodeo, zona, objeto abandonado y desenfoque estaban en «no verificado»,
+/// que no es lo mismo que «no soportado». Columnas reales y no `raw` opaco:
+/// la gracia es poder preguntar «que camaras admiten merodeo» con un WHERE.
+///
+/// Cada flag es tri-estado: true/false = el equipo lo dijo; NULL = no lo dijo.
+model IntegraCameraCapability {
+  id        Int    @id @default(autoincrement())
+  companyId Int
+  siteId    Int
+  cameraId  String @db.VarChar(120)
+  deviceIp  String? @db.VarChar(64)
+  channel   Int?
+
+  fieldDetection    Boolean?
+  lineDetection     Boolean?
+  faceDetect        Boolean?
+  regionEntrance    Boolean?
+  regionExiting     Boolean?
+  loitering         Boolean?
+  unattendedBaggage Boolean?
+  attendedBaggage   Boolean?
+  /// `group` en el Apendice B = aglomeracion de personas.
+  peopleGathering   Boolean?
+  defocus           Boolean?
+  sceneChange       Boolean?
+  audioException    Boolean?
+  peopleCounting    Boolean?
+  heatMap           Boolean?
+
+  /// `eventType` del Apendice B que el equipo declara soportar.
+  supportedEventTypes Json?
+  /// Tags `isSupportX` que devolvio y que aun no mapeamos a columna.
+  extra     Json?
+  /// false = el equipo no contesto a la ruta (403 notSupport en la PTZ) — que
+  /// tambien es informacion, y por eso se guarda la fila igualmente.
+  probeOk   Boolean @default(false)
+  probeNote String? @db.VarChar(300)
+  probedAt  DateTime @default(now())
+
+  company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    IntegraSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, cameraId])
+  @@index([companyId, siteId])
+  @@map("integra_camera_capabilities")
 }
 
 /// Visita recurrente ISAPI: Valid (rango fechas) + RightPlan/WeekPlan (días·horas)
@@ -6208,6 +6317,14 @@ model IntegraPushEvent {
   photoPath   String? @db.VarChar(300)
   /// Recuadros de deteccion normalizados 0..1, con su tipo (human/vehicle).
   targets     Json?
+  /// `active` | `inactive`. DOCUMENTADO: Apendice A.49 del API Developer Guide
+  /// V1.8.0 — «Durative alarm/event status: active-valid, inactive-invalid».
+  /// El equipo dice cuando el objetivo SE VA; antes se adivinaba con TTL.
+  /// Texto y no enum: un firmware nuevo puede traer un valor que no conocemos.
+  eventState  String? @db.VarChar(16)
+  /// DOCUMENTADO (mismo apendice): «number of times that the same alarm has
+  /// been triggered». Agrupar duplicados sin heuristica propia.
+  activePostCount Int?
   raw         Json?
 
   company CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -6224,6 +6341,8 @@ model IntegraPushEvent {
   @@index([siteId, id])
   /// Filtrar ruido (heartBeat/VMD) vs AccessControllerEvent.
   @@index([siteId, eventType, occurredAt])
+  /// Overlay: «que sigue activo ahora mismo» sin escanear la ventana entera.
+  @@index([siteId, eventState, occurredAt])
   @@map("integra_push_events")
 }
 

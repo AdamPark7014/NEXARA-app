@@ -39,6 +39,15 @@ export type PushEventDto = {
   /** granted | denied | null (no ACS / desconocido). */
   outcome: 'granted' | 'denied' | null;
   targets: Array<{ type: string; x: number; y: number; w: number; h: number }> | null;
+  /**
+   * `active` = el objetivo sigue en la zona · `inactive` = se fue.
+   * Lo dice el equipo (Apéndice A.49), no una heurística de TTL: el overlay
+   * puede borrar la caja en cuanto llega el `inactive` en vez de esperar 15 s.
+   * `null` = ese firmware no lo mandó.
+   */
+  eventState: 'active' | 'inactive' | null;
+  /** Repeticiones de la MISMA alarma (agrupar duplicados sin inventar nada). */
+  activePostCount: number | null;
 };
 
 /** Acceso concedido (entrada / salida / genérico). */
@@ -93,6 +102,10 @@ export type NormalizedEvent = {
   personName: string | null;
   doorNo: number | null;
   verifyMode: string | null;
+  /** `active` | `inactive` del propio equipo (Apéndice A.49). */
+  eventState: 'active' | 'inactive' | null;
+  /** Repeticiones de la misma alarma que declara el equipo. */
+  activePostCount: number | null;
   targets: Array<{ type: string; x: number; y: number; w: number; h: number }> | null;
   raw: unknown;
 };
@@ -149,9 +162,15 @@ export class IntegraPushService {
     verifyMode: string | null;
     photoPath: string | null;
     targets: unknown;
+    eventState?: string | null;
+    activePostCount?: number | null;
   }): PushEventDto {
     const major = row.major ?? null;
     const minor = row.minor ?? null;
+    // La columna es texto libre en la base; al DTO solo salen los dos valores
+    // que el fabricante documenta.
+    const eventState =
+      row.eventState === 'active' || row.eventState === 'inactive' ? row.eventState : null;
     return {
       id: row.id,
       deviceIp: row.deviceIp,
@@ -168,6 +187,8 @@ export class IntegraPushService {
       photoPath: row.photoPath,
       outcome: acsOutcome(major, minor),
       targets: (Array.isArray(row.targets) ? row.targets : null) as PushEventDto['targets'],
+      eventState,
+      activePostCount: row.activePostCount ?? null,
     };
   }
 
@@ -321,6 +342,12 @@ export class IntegraPushService {
       scope?: 'acs' | 'all' | 'noise' | null;
       /** Solo concedidos o denegados (requiere scope acs o major 5). */
       outcome?: 'granted' | 'denied' | null;
+      /**
+       * Semilla del overlay: `active` deja fuera los avisos de cierre que el
+       * equipo manda al irse el objetivo (Apéndice A.49). Omitido = los dos,
+       * que es lo que necesita el sondeo incremental para borrar cajas.
+       */
+      eventState?: 'active' | 'inactive' | null;
       from?: Date | null;
       to?: Date | null;
     },
@@ -373,6 +400,10 @@ export class IntegraPushService {
       where.eventType = { notIn: [...NOISE_TYPES] };
     }
 
+    if (opts.eventState === 'active' || opts.eventState === 'inactive') {
+      where.eventState = opts.eventState;
+    }
+
     if (opts.outcome === 'granted') {
       where.major = 5;
       where.minor = { in: GRANTED_MINORS };
@@ -401,6 +432,8 @@ export class IntegraPushService {
         verifyMode: true,
         photoPath: true,
         targets: true,
+        eventState: true,
+        activePostCount: true,
       },
     });
 
@@ -1202,6 +1235,10 @@ export class IntegraPushService {
         doorNo: ev.doorNo,
         verifyMode: ev.verifyMode,
         photoPath,
+        // Lo que el equipo dice de sí mismo: si el objetivo sigue ahí y cuántas
+        // veces repitió la alarma. Antes se tiraba y el overlay lo adivinaba.
+        eventState: ev.eventState,
+        activePostCount: ev.activePostCount,
         targets: (ev.targets ?? undefined) as never,
         // ACS/detecciones útiles: raw compacto; no duplicar blobs enormes de VMD
         // (ya no se insertan). Cap implícito vía JSON del equipo.
@@ -1283,6 +1320,8 @@ export class IntegraPushService {
           verifyMode: true,
           photoPath: true,
           targets: true,
+          eventState: true,
+          activePostCount: true,
         },
       });
       this.publish(site.id, this.toDto(updated));

@@ -21,6 +21,44 @@ function str(v: unknown): string | null {
 }
 
 /**
+ * Estado durativo del aviso. **Documentado** por el fabricante en el Apéndice
+ * A.49 del `API_Developer Guide_V1.8.0` (`JSON_EventNotificationAlert_
+ * fielddetection`), campo requerido:
+ *
+ * > «Durative alarm/event status: "active"-valid, "inactive"-invalid, e.g.,
+ * > when a moving target is detected, the alarm/event information will be
+ * > uploaded continuously until the status is set to "inactive"».
+ *
+ * O sea: **el equipo avisa cuándo el objetivo se va**. No hace falta adivinarlo
+ * con un TTL en el overlay. Cualquier valor que no sea uno de los dos se
+ * descarta a `null`: mejor sin dato que con una etiqueta inventada.
+ */
+export function parseEventState(v: unknown): 'active' | 'inactive' | null {
+  const s = String(v ?? '').trim().toLowerCase();
+  if (s === 'active') return 'active';
+  if (s === 'inactive') return 'inactive';
+  return null;
+}
+
+/**
+ * Cuántas veces se ha repetido la MISMA alarma. **Documentado** en el mismo
+ * apéndice («Number of times that the same alarm has been triggered», int
+ * requerido). Sirve para agrupar duplicados sin heurística: el primer aviso de
+ * una racha trae 1 y los siguientes suben.
+ *
+ * Se aceptan enteros ≥ 0 y se topa a `INT` de Postgres; un firmware que mande
+ * basura no debe reventar el INSERT del evento.
+ */
+export function parseActivePostCount(v: unknown): number | null {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  const i = Math.trunc(n);
+  if (i < 0) return null;
+  return Math.min(i, 2_147_483_647);
+}
+
+/**
  * Fecha del equipo. Viene con su offset (`2026-08-20T18:38:55-06:00`), así que
  * `Date` la interpreta bien. Si el equipo tiene la hora perdida, se prefiere la
  * de recepción antes que guardar un evento en 1970.
@@ -176,6 +214,9 @@ export function normalizeAlert(body: Record<string, any>, fallbackIp: string): N
 
   const deviceIp = str(alert?.ipAddress) || fallbackIp;
   const occurredAt = when(alert?.dateTime);
+  // Envoltura común a los dos dialectos: van al mismo nivel que `eventType`.
+  const eventState = parseEventState(alert?.eventState);
+  const activePostCount = parseActivePostCount(alert?.activePostCount);
 
   const acs = alert?.AccessControllerEvent;
   if (acs) {
@@ -193,6 +234,8 @@ export function normalizeAlert(body: Record<string, any>, fallbackIp: string): N
       personName: str(acs.name),
       doorNo: num(acs.doorNo),
       verifyMode: str(acs.currentVerifyMode),
+      eventState,
+      activePostCount,
       targets: faceRectTargets(acs),
       raw: alert,
     };
@@ -210,6 +253,8 @@ export function normalizeAlert(body: Record<string, any>, fallbackIp: string): N
     personName: null,
     doorNo: null,
     verifyMode: null,
+    eventState,
+    activePostCount,
     // FaceDetect AcuSense manda FaceRect en la raíz (no AccessControllerEvent).
     targets:
       eventType === 'facedetection'

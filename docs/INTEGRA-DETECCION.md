@@ -15,34 +15,48 @@ Tres niveles de evidencia, y **no conviene mezclarlos**:
 | **MEDIDO** | Alguien lo probó contra los equipos reales de Oficinas |
 | **NO VERIFICADO** | Nadie lo ha preguntado nunca al equipo. **No es lo mismo que «no soportado»** |
 
-## El cuello de botella del sistema entero
+## El cuello de botella del sistema entero — RESUELTO 2026-09-05
 
-`isapi.discovery.ts:635-641`:
+Era esto, dentro de `ensureSmartEventTriggersCenter`:
 
 ```ts
 ['fielddetection', 'linedetection', 'facedetection', 'VMD', 'videoloss']
 ```
 
-Cinco tipos. **Nada fuera de esa lista llega jamás**, aunque el equipo lo
-soporte y esté encendido. Es el único punto del sistema donde se decide qué
-existe, y hoy son cinco cadenas sueltas escondidas dentro de una función.
+Cinco tipos. **Nada fuera de esa lista llegaba jamás**, aunque el equipo lo
+soportase y estuviera encendido. Era el único punto del sistema donde se decidía
+qué existe, y eran cinco cadenas sueltas escondidas dentro de una función.
 
-Corolario: `GET /ISAPI/Smart/capabilities` **no se llama desde ningún punto del
-código**. Por eso loitering, regionEntrance, regionExiting, unattendedBaggage,
-attendedBaggage, group, defocus, scenechangedetection, audioexception y
-peopleCounting están en **NO VERIFICADO**, no en «no soportado». Nadie ha
-preguntado.
+Ahora es `SMART_EVENT_TYPES`, constante exportada en
+`apps/api/src/hikvision-isapi/isapi.detection.ts`, con el catálogo completo del
+Apéndice B (`APPENDIX_B_EVENT_TYPES`) al lado. Un perfil de cámara puede
+ampliarla —`resolveTriggerEventTypes`—, pero **solo con valores del catálogo
+documentado**: lo demás se descarta en silencio y el PATCH devuelve 400.
 
-## Dos campos del payload que se ignoran
+`GET /ISAPI/Smart/capabilities` ya se llama: `probeSmartCapabilities` +
+`POST /integra/detection/capabilities/probe`, y el resultado se persiste en
+`integra_camera_capabilities` **en columnas reales**, no en un `raw` opaco. Cada
+flag es tri-estado: `true`/`false` = el equipo lo dijo; `NULL` = el equipo **no
+lo dijo**, que sigue sin ser «no soportado». Loitering, regionEntrance,
+regionExiting, unattendedBaggage, attendedBaggage, group, defocus,
+scenechangedetection, audioexception y peopleCounting pasan de NO VERIFICADO a
+«pendiente de sondear», y el sondeo ya es un botón.
 
-Cero coincidencias en todo el repo:
+## Dos campos del payload que se ignoraban — RESUELTO 2026-09-05
+
+Ambos están **documentados** (Apéndice A.49, campos requeridos) y el parser los
+tiraba. Ahora se parsean (`integra-push.parse.ts`), se persisten en
+`integra_push_events` y salen en `listEvents` / SSE:
 
 - **`eventState`** ∈ `active` | `inactive` — el equipo avisa cuándo el objetivo
-  **se va**. `_DetectionOverlay.tsx` intenta adivinarlo con heurística de TTL
+  **se va**. `_DetectionOverlay.tsx` lo adivinaba con heurística de TTL
   (`BOX_TTL_OPTICAL_MS = 15_000`) y de ahí venían los fantasmas en las sillas.
-  El equipo ya lo dice; nadie lee el campo.
+  Con el campo en el DTO, el overlay puede borrar la caja cuando lo dice el
+  equipo en vez de esperar quince segundos.
 - **`activePostCount`** — cuántas veces se repitió la misma alarma. Sirve para
   agrupar duplicados sin inventar heurística.
+
+`GET /integra/push/events?eventState=active` filtra por el campo.
 
 ## Por equipo
 
@@ -118,14 +132,35 @@ el dato.**
 
 | # | Apuesta | Días | Por qué |
 |---|---|---|---|
-| 1 | Auditar los `minor` contra datos reales | 0,5 | Prerrequisito. Ni toca hardware ni escribe código |
-| 2 | Corregir el mapa de minors | 1,5 | Arregla asistencia, presencia, aforo, KPI y cola SOC de un golpe |
-| 3 | Alarmas de puerta forzada / mantenida / antipassback / caducada / coacción | 1 | **Los eventos ya están en la base.** Es etiquetar y encolar |
-| 4 | Salud de cámara: `shelteralarm` + `defocus` + `scenechangedetection` | 1 | Tres cadenas al array + etiquetas. «El sistema se vigila a sí mismo» |
-| 5 | Leer y persistir `eventState` | 1 | Un campo. Mata los fantasmas y sustituye la heurística por la verdad del equipo |
-| 6 | Sondear `Smart/capabilities` y persistirlo en el espejo | 1,5 | Convierte los NO VERIFICADO de arriba en hechos. Sin esto se planifica a ciegas |
-| 7 | Merodeo y zona restringida fuera de horario | 2,5 | Parser y overlay ya funcionan. Depende del 6 |
+| 1 | Auditar los `minor` contra datos reales | 0,5 | **PENDIENTE.** Prerrequisito. Ni toca hardware ni escribe código |
+| 2 | Corregir el mapa de minors | 1,5 | **PENDIENTE.** Arregla asistencia, presencia, aforo, KPI y cola SOC de un golpe |
+| 3 | Alarmas de puerta forzada / mantenida / antipassback / caducada / coacción | 1 | **PENDIENTE.** Los eventos ya están en la base: es etiquetar y encolar |
+| 4 | Salud de cámara: `shelteralarm` + `defocus` + `scenechangedetection` | 1 | **YA SE PUEDE** sin tocar código: los tres están en el catálogo y se añaden por perfil |
+| 5 | Leer y persistir `eventState` | 1 | ✅ **HECHO 2026-09-05** |
+| 6 | Sondear `Smart/capabilities` y persistirlo en el espejo | 1,5 | ✅ **HECHO 2026-09-05** — falta ejecutarlo contra el parque |
+| 7 | Merodeo y zona restringida fuera de horario | 2,5 | **Desbloqueado**: perfil + catálogo listos; falta sondear y encender |
 | 8 | Tailgating por correlación ACS ↔ LineDetection | 3 | El de más valor comercial y el más caro: falta el vínculo puerta↔cámara |
+
+### Lo que quedó parametrizado (2026-09-05)
+
+`IntegraDetectionProfile` (`integra_detection_profiles`, único por
+`[siteId, cameraId]`) y los endpoints
+`GET/PATCH /integra/cameras/:id/detection` +
+`POST /integra/cameras/:id/detection/apply`.
+
+Antes, `enableFieldDetection` escribía siempre lo mismo: región = **fotograma
+completo** y `sensitivityLevel` = **100, el techo del rango**, en las dieciséis
+cámaras. Eso detecta la calle, el reflejo y el estacionamiento igual que la
+puerta. Ahora la región sale del perfil (hasta 4 polígonos, que es lo que
+admite el equipo) y la sensibilidad por defecto baja a **50** — el valor que el
+propio fabricante lleva en su mensaje de ejemplo del Apéndice A.49.
+
+`alarmConfidence` sí se escribía ya (contra lo que decía este documento), con
+valor `low`. Sigue en `low` por defecto para no cambiar el comportamiento de
+Oficinas de golpe, pero ahora es un campo del perfil. **Su enum es empírico —el
+equipo lo devuelve con `opt=`, la documentación no lo menciona— así que la
+dirección no está confirmada: subirlo se mide en UNA cámara antes de tocar las
+dieciséis.**
 
 Los cinco primeros —**5 días**— no tocan un solo equipo: son corrección de
 clasificación sobre datos que ya entran.
