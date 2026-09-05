@@ -18,7 +18,9 @@ import { PersonFaceThumb } from "./_PersonFace";
 import styles from "./_soc.module.css";
 import { SocKeyValues, SocRepeatChip, SocSeverityPill, SocStatusPill } from "./_SocBits";
 import {
+  alarmKindLabel,
   fmtDateTime,
+  isKnownAlarmKind,
   occurrencesOf,
   relAge,
   sourceLabel,
@@ -27,9 +29,9 @@ import {
 } from "./_soc";
 
 function kindLabel(group: AlarmGroup): string {
-  if (group.kind === "DENIED") return "Acceso denegado";
-  if (group.kind === "AFTER_HOURS") return "Entrada fuera de horario";
-  return group.eventType?.trim() || "";
+  // Traduce también los tipos que el backend todavía no emite, y humaniza
+  // cualquier otro en vez de escupir el enum. Ver `alarmKindLabel`.
+  return alarmKindLabel(group.kind, group.eventType);
 }
 
 function originLabel(group: AlarmGroup): string {
@@ -128,6 +130,15 @@ export function SocAlarmDetail({
             El backend guarda quién atendió la alarma (<code>userId</code> en{" "}
             <code>integra_soc_alarms</code> / <code>integra_alarm_acks</code>) pero no lo devuelve en
             la cola, así que aquí no se puede mostrar el nombre del operador. No se inventa.
+          </p>
+        )}
+
+        {group.kind && !isKnownAlarmKind(group.kind) && (
+          <p className={styles.hint}>
+            Este panel no conoce el tipo <code>{group.kind}</code>: es más nuevo que la versión de
+            pantalla que estás usando. Se muestra con etiqueta legible y severidad tal cual la manda
+            el backend, pero sin texto de ayuda propio. Recarga con caché limpia tras el próximo
+            despliegue del front.
           </p>
         )}
 

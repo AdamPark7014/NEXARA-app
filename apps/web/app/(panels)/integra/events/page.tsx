@@ -2,6 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import AccountBoxIcon from "@mui/icons-material/AccountBox";
+import BlockIcon from "@mui/icons-material/Block";
+import DownloadIcon from "@mui/icons-material/Download";
+import FilterAltOffIcon from "@mui/icons-material/FilterAltOff";
+import HistoryIcon from "@mui/icons-material/History";
+import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import SensorsIcon from "@mui/icons-material/Sensors";
+import SensorsOffIcon from "@mui/icons-material/SensorsOff";
+import TimelineIcon from "@mui/icons-material/Timeline";
+import ViewModuleIcon from "@mui/icons-material/ViewModule";
 import {
   IgBadge,
   IgBtn,
@@ -17,6 +28,11 @@ import { subscribePushEvents, type PushEvent } from "../_DetectionOverlay";
 import { PersonFaceThumb, prefetchPersonFace } from "../_PersonFace";
 import { integraApi, inputStyle, selectStyle } from "../_lib";
 import styles from "../integra.module.css";
+import soc from "../_soc.module.css";
+import { SocCardsSkeleton, SocEmpty } from "../_SocBits";
+import { SocSequenceList } from "../_SocSequence";
+import { correlateEvents, SEQUENCE_WINDOW_MS } from "../_soc";
+import { useUrlFilters } from "../_useUrlFilters";
 import { EnSitioStrip } from "@/components/presence/EnSitioStrip";
 
 /**
@@ -47,6 +63,9 @@ type Feed = {
 type QuickFilter = "hoy" | "denegados" | "todos" | "ruido";
 
 const PAGE = 60;
+
+/** Los iconos de MUI vienen a 24 px; dentro de un botón de texto cantan. */
+const ICON = { width: 14, height: 14, verticalAlign: "-2px" } as const;
 
 function fmt(iso?: string | null) {
   return iso
@@ -85,24 +104,62 @@ function isAcsBusiness(ev: PushEvent): boolean {
   return false;
 }
 
+const FILTER_DEFAULTS = {
+  vista: "hoy",
+  puerta: "",
+  persona: "",
+  pid: "",
+  modo: "correlado",
+  evento: "",
+} as const;
+
+function isQuickFilter(v: string): v is QuickFilter {
+  return v === "hoy" || v === "denegados" || v === "todos" || v === "ruido";
+}
+
 export default function IntegraEventsPage() {
   const router = useRouter();
+
+  // Los filtros viven en la URL: una vista filtrada se comparte pegando el
+  // enlace, que es como un operador le pasa un caso a otro.
+  const [filters, setFilters] = useUrlFilters<Record<string, string>>({ ...FILTER_DEFAULTS });
+  const quick: QuickFilter = isQuickFilter(filters.vista) ? filters.vista : "hoy";
+  const deviceIp = filters.puerta;
+  const personName = filters.persona;
+  const personId = filters.pid;
+  const correlated = filters.modo !== "rejilla";
+  const selectedId = Number(filters.evento) || null;
+
+  // Borrador de los campos de texto. Antes cada tecla disparaba una consulta
+  // al API (`load` dependía del valor en vivo) pese a haber un botón «Filtrar».
+  // Ahora se escribe en local y se confirma al enviar.
+  const [draftName, setDraftName] = useState(personName);
+  const [draftId, setDraftId] = useState(personId);
+  useEffect(() => setDraftName(personName), [personName]);
+  useEffect(() => setDraftId(personId), [personId]);
+
   const [items, setItems] = useState<PushEvent[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [quick, setQuick] = useState<QuickFilter>("hoy");
-  const [deviceIp, setDeviceIp] = useState("");
-  const [personName, setPersonName] = useState("");
-  const [personId, setPersonId] = useState("");
-  const [selected, setSelected] = useState<PushEvent | null>(null);
   const [auto, setAuto] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [queryMs, setQueryMs] = useState<number | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [nextBeforeId, setNextBeforeId] = useState<number | null>(null);
+  const [liveMessage, setLiveMessage] = useState("");
   const newestIdRef = useRef(0);
   const [, setTick] = useState(0);
+
+  const selected = useMemo(
+    () => items.find((e) => e.id === selectedId) || null,
+    [items, selectedId],
+  );
+  const setSelected = useCallback(
+    (ev: PushEvent | null) => setFilters({ evento: ev ? String(ev.id) : "" }),
+    [setFilters],
+  );
 
   useEffect(() => {
     void integraApi<{ items: Device[] }>("integra/devices")
@@ -181,9 +238,12 @@ export default function IntegraEventsPage() {
           );
         });
       } catch (e) {
+        // Un único aviso, el de `IgError`. Nada de `setError` + `toast.error`
+        // con el mismo texto: son dos ventanas para el mismo fallo.
         setError(e instanceof Error ? e.message : "Error al cargar eventos");
       } finally {
         setBusy(false);
+        setLoaded(true);
       }
     },
     [buildQuery],
@@ -194,6 +254,26 @@ export default function IntegraEventsPage() {
     void loadStats();
   }, [load, loadStats]);
 
+  /**
+   * Lo que entra en vivo se dice en voz alta para quien no mira la pantalla.
+   * Es `polite`: anuncia al terminar la frase en curso, sin robar el foco ni
+   * interrumpir lo que el operador esté leyendo.
+   */
+  const announce = useCallback((fresh: PushEvent[]) => {
+    if (!fresh.length) return;
+    const denied = fresh.filter(
+      (e) => e.outcome === "denied" || /denegado/i.test(e.label || ""),
+    );
+    const last = fresh[fresh.length - 1];
+    const quien = last?.personName?.trim() || "sin identidad ACS";
+    const donde = last?.deviceName || last?.deviceIp || "puerta";
+    setLiveMessage(
+      denied.length
+        ? `${denied.length} acceso${denied.length === 1 ? "" : "s"} denegado${denied.length === 1 ? "" : "s"}. Último: ${quien} en ${donde}`
+        : `${fresh.length} evento${fresh.length === 1 ? "" : "s"} nuevo${fresh.length === 1 ? "" : "s"}. Último: ${quien} en ${donde}`,
+    );
+  }, []);
+
   // Live: SSE fan-out + afterId barato (solo ACS de negocio).
   useEffect(() => {
     return subscribePushEvents((events: PushEvent[]) => {
@@ -203,21 +283,25 @@ export default function IntegraEventsPage() {
         if (e.personId) prefetchPersonFace(e.personId);
         if (e.id > newestIdRef.current) newestIdRef.current = e.id;
       }
+      let shown: PushEvent[];
       if (quick === "denegados") {
         const denied = fresh.filter(
           (e) =>
             e.outcome === "denied" || /denegado/i.test(e.label || ""),
         );
         if (!denied.length) return;
+        shown = denied;
         setItems((prev) => mergeFresh(prev, denied));
       } else if (quick === "ruido") {
         return;
       } else {
+        shown = fresh;
         setItems((prev) => mergeFresh(prev, fresh));
       }
+      announce(shown);
       void loadStats();
     });
-  }, [quick, loadStats]);
+  }, [quick, loadStats, announce]);
 
   // Poll incremental afterId (respaldo SSE) — scope=acs, live=1.
   useEffect(() => {
@@ -240,6 +324,7 @@ export default function IntegraEventsPage() {
           if (e.id > newestIdRef.current) newestIdRef.current = e.id;
         }
         setItems((prev) => mergeFresh(prev, list));
+        announce(list);
         if (typeof data.ms === "number") setQueryMs(data.ms);
       } catch {
         /* silencioso: SSE puede estar sano */
@@ -247,7 +332,7 @@ export default function IntegraEventsPage() {
     };
     const id = window.setInterval(() => void tick(), 4000);
     return () => window.clearInterval(id);
-  }, [auto, quick, buildQuery]);
+  }, [auto, quick, buildQuery, announce]);
 
   useEffect(() => {
     const id = window.setInterval(() => setTick((n) => n + 1), 1000);
@@ -264,6 +349,17 @@ export default function IntegraEventsPage() {
     }
     return [...seen.values()].slice(0, 12);
   }, [items]);
+
+  /**
+   * Un denegado, un reintento y una entrada concedida en la misma puerta y el
+   * mismo minuto son la misma historia. Se agrupan por puerta y ventana; la
+   * lógica está en `correlateEvents()`, que es pura y tiene pruebas.
+   */
+  const sequences = useMemo(() => correlateEvents(items, SEQUENCE_WINDOW_MS), [items]);
+  const multiEventSequences = useMemo(
+    () => sequences.filter((s) => s.events.length > 1).length,
+    [sequences],
+  );
 
   const exportCsv = () => {
     const rows = [
@@ -305,20 +401,35 @@ export default function IntegraEventsPage() {
         actions={
           <>
             <IgBtn
-              variant="primary"
-              onClick={() => setQuick("hoy")}
-              title="Accesos de hoy (default de negocio)"
+              onClick={() => router.push("/integra/people")}
+              aria-label="Ir a Personas para dar de alta y enrolar Face ID"
+              title="Alta y Face ID en terminales"
             >
-              Hoy
+              <PersonAddIcon aria-hidden style={ICON} /> Alta persona
             </IgBtn>
-            <IgBtn onClick={() => router.push("/integra/people")} title="Alta y Face ID en terminales">
-              Alta persona
-            </IgBtn>
-            <IgBtn onClick={() => setAuto((v) => !v)}>
+            <IgBtn
+              onClick={() => setAuto((v) => !v)}
+              aria-pressed={auto}
+              aria-label={
+                auto
+                  ? "Desactivar la actualización en vivo de eventos"
+                  : "Activar la actualización en vivo de eventos"
+              }
+              title="Con «vivo» los eventos entran solos por SSE, sin recargar"
+            >
+              {auto ? (
+                <SensorsIcon aria-hidden style={ICON} />
+              ) : (
+                <SensorsOffIcon aria-hidden style={ICON} />
+              )}{" "}
               Vivo {auto ? "ON" : "OFF"}
             </IgBtn>
-            <IgBtn onClick={exportCsv} disabled={!items.length}>
-              Exportar CSV
+            <IgBtn
+              onClick={exportCsv}
+              disabled={!items.length}
+              aria-label="Exportar a CSV los eventos que se están viendo"
+            >
+              <DownloadIcon aria-hidden style={ICON} /> Exportar CSV
             </IgBtn>
             <IgBtn
               disabled={busy}
@@ -326,12 +437,19 @@ export default function IntegraEventsPage() {
                 void load();
                 void loadStats();
               }}
+              aria-label="Volver a cargar los eventos"
             >
-              {busy ? "…" : "Actualizar"}
+              <RefreshIcon aria-hidden style={ICON} /> {busy ? "…" : "Actualizar"}
             </IgBtn>
           </>
         }
       />
+
+      {/* La lista es en vivo: lo que entra se anuncia sin robar el foco. */}
+      <p className={soc.srOnly} role="status" aria-live="polite" aria-atomic="true">
+        {liveMessage}
+      </p>
+
       <IgError>{error}</IgError>
 
       <div className={styles.contextKpis} aria-label="KPIs del día" style={{ marginBottom: 10 }}>
@@ -366,7 +484,7 @@ export default function IntegraEventsPage() {
 
       <IgFilters>
         <IgField label="Vista">
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }} role="group" aria-label="Vista rápida">
             {(
               [
                 ["hoy", "Hoy"],
@@ -378,7 +496,8 @@ export default function IntegraEventsPage() {
               <IgBtn
                 key={k}
                 variant={quick === k ? "primary" : undefined}
-                onClick={() => setQuick(k)}
+                onClick={() => setFilters({ vista: k, evento: "" })}
+                aria-pressed={quick === k}
               >
                 {label}
               </IgBtn>
@@ -388,8 +507,9 @@ export default function IntegraEventsPage() {
         <IgField label="Puerta / terminal">
           <select
             value={deviceIp}
-            onChange={(e) => setDeviceIp(e.target.value)}
+            onChange={(e) => setFilters({ puerta: e.target.value })}
             style={selectStyle}
+            aria-label="Filtrar por puerta o terminal"
           >
             <option value="">Todas</option>
             {devices.map((d) => (
@@ -402,33 +522,67 @@ export default function IntegraEventsPage() {
         </IgField>
         <IgField label="Persona">
           <input
-            value={personName}
-            onChange={(e) => setPersonName(e.target.value)}
+            value={draftName}
+            onChange={(e) => setDraftName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setFilters({ persona: draftName, pid: draftId });
+            }}
             placeholder="contiene…"
             style={inputStyle}
+            aria-label="Filtrar por nombre de persona; pulsa Intro para aplicar"
           />
         </IgField>
         <IgField label="ID persona">
           <input
-            value={personId}
-            onChange={(e) => setPersonId(e.target.value)}
+            value={draftId}
+            onChange={(e) => setDraftId(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setFilters({ persona: draftName, pid: draftId });
+            }}
             placeholder="opcional"
             style={inputStyle}
+            aria-label="Filtrar por identificador de persona; pulsa Intro para aplicar"
           />
         </IgField>
         <IgField label=" ">
           <IgBtn
             variant="primary"
             disabled={busy}
-            onClick={() => {
-              void load();
-              void loadStats();
-            }}
+            onClick={() => setFilters({ persona: draftName, pid: draftId })}
+            aria-label="Aplicar los filtros de persona"
           >
             Filtrar
           </IgBtn>
         </IgField>
       </IgFilters>
+
+      {/* Modo de lectura de la lista. Correlado agrupa por puerta y minuto. */}
+      <div className={soc.utilBar}>
+        <button
+          type="button"
+          className={soc.toggle}
+          data-on={correlated ? "1" : undefined}
+          onClick={() => setFilters({ modo: correlated ? "rejilla" : "correlado" })}
+          aria-pressed={correlated}
+          aria-label={
+            correlated
+              ? "Ver los eventos sueltos en rejilla, sin correlacionar"
+              : "Agrupar los eventos por puerta y ventana de un minuto"
+          }
+          title="Misma puerta y menos de un minuto de silencio entre eventos = una sola historia"
+        >
+          {correlated ? <TimelineIcon aria-hidden /> : <ViewModuleIcon aria-hidden />}
+          {correlated ? "Correlado por puerta" : "Rejilla suelta"}
+        </button>
+        <span className={soc.utilSpacer} />
+        <span className={soc.cellMono}>
+          {correlated
+            ? `${sequences.length} secuencia${sequences.length === 1 ? "" : "s"}${
+                multiEventSequences > 0 ? ` · ${multiEventSequences} con varios eventos` : ""
+              }`
+            : `${items.length} evento${items.length === 1 ? "" : "s"}`}
+        </span>
+      </div>
 
       {onSite.length > 0 && quick !== "denegados" && quick !== "ruido" && (
         <IgPanel title="Quién entró (reciente)" count={onSite.length}>
@@ -470,24 +624,62 @@ export default function IntegraEventsPage() {
         }
         count={String(items.length)}
       >
-        {items.length === 0 && !busy ? (
-          <div className={styles.igEmpty}>
-            <strong className={styles.igEmptyTitle}>Sin eventos</strong>
-            <span className={styles.igEmptyHint}>
-              {quick === "hoy"
-                ? "Aún no hay accesos ACS hoy, o el empuje del terminal no está activo."
-                : quick === "denegados"
-                  ? "No hay denegados en el rango. Eso puede ser bueno."
-                  : "Prueba «Hoy», otro terminal o da de alta la persona."}
-            </span>
-            <div className={styles.focusActions} style={{ marginTop: 10, justifyContent: "center" }}>
-              <IgBtn variant="primary" onClick={() => setQuick("hoy")}>
-                Ver hoy
-              </IgBtn>
-              <IgBtn onClick={() => setQuick("denegados")}>Denegados</IgBtn>
-              <IgBtn onClick={() => router.push("/integra/people")}>Ir a Personas</IgBtn>
-            </div>
-          </div>
+        {!loaded ? (
+          <SocCardsSkeleton cards={8} />
+        ) : items.length === 0 ? (
+          quick === "denegados" ? (
+            /* Cero denegados es la noticia buena: tras corregir los códigos ACS
+               (minor 21/22/23/24 no son denegaciones) lo normal es que esté
+               vacío. Denegaciones reales en tres meses: una. */
+            <SocEmpty
+              tone="ok"
+              icon={<BlockIcon aria-hidden />}
+              title="Ningún acceso denegado"
+              hint="Nadie se ha quedado fuera en este rango. Antes esta lista se llenaba con la puerta abriéndose y el botón de salida; ya no se cuentan como denegación, así que vacía es lo esperable."
+              actions={
+                <IgBtn onClick={() => setFilters({ vista: "hoy" })}>Ver todos los accesos de hoy</IgBtn>
+              }
+            />
+          ) : quick === "ruido" ? (
+            <SocEmpty
+              icon={<SensorsOffIcon aria-hidden />}
+              title="Sin ruido de equipos"
+              hint="Ningún heartBeat ni detección de cámara en las últimas 6 horas."
+              actions={<IgBtn onClick={() => setFilters({ vista: "hoy" })}>Volver a accesos</IgBtn>}
+            />
+          ) : (
+            <SocEmpty
+              icon={<HistoryIcon aria-hidden />}
+              title={quick === "hoy" ? "Todavía no hay accesos hoy" : "Sin eventos en este filtro"}
+              hint={
+                quick === "hoy"
+                  ? "O aún no ha pasado nadie, o el empuje del terminal no está llegando. Prueba «7 días»: si ahí tampoco hay nada, el problema es el empuje, no la jornada."
+                  : "Ninguna combinación de puerta y persona coincide en este rango."
+              }
+              actions={
+                <>
+                  <IgBtn variant="primary" onClick={() => setFilters({ vista: "todos" })}>
+                    Buscar en 7 días
+                  </IgBtn>
+                  <IgBtn
+                    onClick={() => setFilters({ puerta: "", persona: "", pid: "" })}
+                    aria-label="Quitar los filtros de puerta y persona"
+                  >
+                    <FilterAltOffIcon aria-hidden style={ICON} /> Quitar filtros
+                  </IgBtn>
+                  <IgBtn onClick={() => router.push("/integra/people")}>
+                    <AccountBoxIcon aria-hidden style={ICON} /> Ir a Personas
+                  </IgBtn>
+                </>
+              }
+            />
+          )
+        ) : correlated ? (
+          <SocSequenceList
+            sequences={sequences}
+            selectedId={selectedId}
+            onSelect={(ev) => setSelected(ev)}
+          />
         ) : (
           <div className={styles.evGrid}>
             {items.map((e) => {
@@ -504,6 +696,9 @@ export default function IntegraEventsPage() {
                   data-fresh={fresh}
                   data-denied={denied ? "1" : undefined}
                   onClick={() => setSelected(e)}
+                  aria-label={`${e.personName || e.personId || "Sin identidad ACS"}, ${
+                    e.label || (denied ? "acceso denegado" : "acceso concedido")
+                  }, ${e.deviceName || e.deviceIp || "puerta"}, ${fmt(e.occurredAt)}. Ver detalle`}
                 >
                   <PersonFaceThumb
                     className={styles.evPhoto}
@@ -544,8 +739,9 @@ export default function IntegraEventsPage() {
           <IgBtn
             disabled={busy || !hasMore || !nextBeforeId}
             onClick={() => void load({ beforeId: nextBeforeId, append: true })}
+            aria-label="Cargar eventos más antiguos"
           >
-            Más antiguos →
+            <HistoryIcon aria-hidden style={ICON} /> Más antiguos
           </IgBtn>
           <span className={styles.evPagerMeta}>
             {hasMore ? "Hay más en el historial" : "Fin de página"}
@@ -555,7 +751,15 @@ export default function IntegraEventsPage() {
       </IgPanel>
 
       {selected && (
-        <IgPanel title="Detalle" count={String(selected.id)}>
+        <IgPanel
+          title="Detalle"
+          count={String(selected.id)}
+          actions={
+            <IgBtn onClick={() => setSelected(null)} aria-label="Cerrar el detalle del evento">
+              Cerrar detalle
+            </IgBtn>
+          }
+        >
           <div className={styles.evDetail}>
             <PersonFaceThumb
               className={styles.evDetailPhoto}
