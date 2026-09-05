@@ -75,6 +75,49 @@ lectura en producción, no por deducción.
    dice RESPALDO.
 4. Quitar un mosaico con ✕ no debe cortar los demás.
 
+## Turno 2 — nueve agentes en paralelo, cortados por el límite
+
+Se lanzaron nueve agentes con dueño de archivo asignado para que no se pisaran.
+**Todos murieron a la vez** por el límite de sesión, a media escritura.
+Sobrevivieron **4 860 líneas y 32 archivos nuevos**. Rescatado en `13fefb12`
+(WIP crudo) y reparado en `3889fc54`.
+
+Lo que hubo que arreglar del corte:
+- `schedules`: un `<TabPanel>` sin cerrar. El error de sintaxis tapaba a otros
+  trece. El mismo agente sustituyó el `useMemo` `matrix` por `matrixRows` y
+  borró el viejo con dos usos vivos.
+- `people`: tres declaraciones locales (`Person`, `genderLabel`, `formatWhen`)
+  chocando con los imports de `_peopleView`, que el agente extrajo sin llegar a
+  borrar las originales. Comprobadas idénticas antes de quitarlas.
+- `settings`: `inputStyle`/`selectStyle` fuera del import pero con los usos
+  vivos. Import restaurado.
+
+**Estado verificado:** typecheck limpio en web y api, 114 pruebas de web, 670 de
+api, `prisma validate` OK, y **el build de producción de Next compila las 18
+rutas de INTEGRA**. Lo que NO está verificado es cómo se ve: nadie lo ha
+abierto en un navegador. Hace falta desplegar.
+
+### Catálogo de detección — `docs/INTEGRA-DETECCION.md`
+
+Hallazgo estructural: todo el sistema pasa por cinco cadenas en
+`isapi.discovery.ts:635`. Nada fuera de esa lista llega jamás.
+`GET /ISAPI/Smart/capabilities` **no se llama desde ningún punto del código**,
+así que merodeo, zona, objeto abandonado, desenfoque y sabotaje están en
+NO VERIFICADO, no en «no soportado».
+
+`eventState` (active/inactive) llega en cada payload y se ignora: el overlay lo
+adivina con TTL y de ahí venían los fantasmas.
+
+**SIN RESOLVER Y URGENTE:** la tabla oficial dice que `minor 76` es fallo de
+autenticación facial y el código lo trata como salida concedida
+(`GRANTED_MINORS = [1, 75, 76]`). Si se confirma, cada cara no reconocida cierra
+una jornada de asistencia. Y `27` (puerta forzada), `28` (mantenida abierta),
+`10` (antipassback) y `8` (caducada) ya están llegando mal etiquetados. **El
+agente que iba a contrastarlo contra los datos reales murió antes de terminar.**
+Es una consulta de cinco minutos: `SELECT minor, count(*) FROM
+integra_push_events WHERE major = 5 GROUP BY minor`. Si el dato contradice a la
+documentación, gana el dato.
+
 ## A medias
 
 1. **`go2rtc.yaml` del servidor sigue corrupto** — el arreglo de la fuga evita
