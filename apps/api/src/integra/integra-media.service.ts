@@ -460,6 +460,7 @@ export class IntegraMediaService {
     const chosen = matches[idx];
     const rtsp = resolved.isapi.authorizeRtsp(chosen.playbackURI);
     const redacted = resolved.isapi.authorizeRtspRedacted(chosen.playbackURI);
+    await this.dropStalePlaybackStreams(cameraIndexCode);
     const published = await this.publish(
       'ISAPI',
       `pb_${cameraIndexCode}_${Date.now()}`,
@@ -494,6 +495,38 @@ export class IntegraMediaService {
    * `rtspForResponse` es lo que ve el cliente: en ISAPI lleva la contraseña
    * tachada, porque la URL real es una credencial en texto plano.
    */
+  /**
+   * Borra los streams de playback viejos de esta cámara antes de crear el nuevo.
+   *
+   * Cada playback registraba `pb_<cam>_<timestamp>` y no lo borraba nadie, así
+   * que se acumulaban sin techo. Y como go2rtc reescribe su YAML en cada PUT y
+   * esas URLs llevan `?starttime=`, el fichero acaba mal formado: en producción
+   * arrancaba con `yaml: did not find expected key` doce veces y CERO streams
+   * de disco. Ahí es donde se pierden cámaras tras cada reinicio.
+   */
+  private async dropStalePlaybackStreams(cameraIndexCode: string): Promise<void> {
+    const internal = this.go2rtcInternal();
+    if (!internal) return;
+    const prefix = `pb_${cameraIndexCode.replace(/[^a-zA-Z0-9_-]/g, '_')}_`;
+    try {
+      const res = await fetch(`${internal}/api/streams`);
+      if (!res.ok) return;
+      const all = (await res.json()) as Record<string, unknown>;
+      const stale = Object.keys(all).filter((n) => n.startsWith(prefix));
+      for (const name of stale) {
+        await fetch(`${internal}/api/streams?src=${encodeURIComponent(name)}`, {
+          method: 'DELETE',
+        }).catch(() => undefined);
+      }
+      if (stale.length) {
+        this.logger.log(`go2rtc: ${stale.length} playback(s) viejos de ${cameraIndexCode} borrados`);
+      }
+    } catch (e) {
+      // Limpiar es mejora, no requisito: si falla, el playback sigue su curso.
+      this.logger.warn(`go2rtc limpieza playback: ${String(e)}`);
+    }
+  }
+
   private async publish(
     provider: 'ARTEMIS' | 'ISAPI',
     cameraIndexCode: string,
