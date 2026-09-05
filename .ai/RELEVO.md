@@ -185,6 +185,69 @@ mismas rutas—. Y rotar las contrasenas despues.
 **Estado:** typecheck limpio, **752 pruebas de API** y **248 de web**. Ninguna
 migracion ejecutada. **16 commits sin subir.**
 
+## Turno 4 — alarmas reales, bitacora que investiga, y despliegue
+
+**DESPLEGADO** con `--with-migrate`. Las cuatro migraciones pendientes eran
+puramente aditivas (`ADD COLUMN IF NOT EXISTS` nullable, `CREATE TABLE IF NOT
+EXISTS`): cero DROP, cero TRUNCATE, cero SET NOT NULL sobre tablas existentes.
+
+### go2rtc.yaml REPARADO en el servidor
+
+Era un espacio de indentacion donde tocaban dos, y una clave duplicada. Con
+copia en `/var/lib/nexara/go2rtc/go2rtc.yaml.roto.20260905-202842`.
+
+No se reseteo a la semilla —eso perderia el inventario en cada reinicio—: se leyo
+por lineas (inmune a la indentacion mala), se deduplico y se completo desde
+`/api/streams`. **De 12 a 18 camaras que sobreviven a un reinicio.**
+
+Trampa anotada: `/api/config` devuelve el fichero de disco tal cual, roto
+incluido. Para reconstruirlo hay que ir a `/api/streams`, que si da JSON valido.
+
+### Lo que se cerro
+
+1. **Fuente unica de codigos ACS** en `hikvision-isapi/acs-codes.ts` (movido:
+   el Apendice C es del fabricante, no de INTEGRA). Habia **cinco** copias y las
+   cinco fallaban igual. Los denegados pasan de 44.634 historicos a **uno**.
+2. **`ACS_EXIT_MINORS` vacia a proposito**: este hardware no emite senal de
+   salida por ACS y nunca la emitio. Se prefiere no cerrar jornadas a cerrarlas
+   con una cara no reconocida.
+3. **9 tipos de alarma** (eran 2): puerta forzada y lista negra abren ticket al
+   primer evento; salud de camara (tapada/desenfocada/escena cambiada); rafaga
+   de fallos de reconocimiento con severidad baja que nunca sube.
+4. **Bitacora con filtros, paginacion y total real.** Devolvia `total:
+   rows.length` y solo admitia `limit` topado a 200. Ahora devuelve tambien
+   `ipAddress`, `userAgent` y `previousData`, que la tabla guardaba y nadie
+   pintaba — justo lo que pide una investigacion.
+5. **Consola SOC** con correlacion por puerta y ventana temporal, y un `kind`
+   desconocido que se pinta con dignidad (validado en vivo: aterrizo
+   `AUTH_FAILURE_BURST` a mitad de turno y no rompio nada).
+6. **Personas**: `templateName` y `validEnable` por fin visibles; `validEnable`
+   manda sobre la fecha.
+7. **Puertas/ajustes, auditoria, vehiculos, plano** terminados.
+
+### Bugs con dano real encontrados
+
+- **Esc cerraba el dialogo de abrir puerta con la orden ya en vuelo.** `Modal`
+  engancha Esc con deps `[open, dirty]`, asi que la lambda capturaba
+  `busy: false` para siempre.
+- **Dar de alta una placa repetida borraba la ficha anterior**, dueno incluido:
+  `addVehicle` es un upsert sobre la placa normalizada.
+- **Clic en un pin del plano lo borraba** sin preguntar. El texto de ayuda lo
+  anunciaba como funcion.
+- **El selector de sitios se tragaba el error** y decia «Sin sitios
+  configurados» cuando el backend estaba caido.
+- El dueno de un vehiculo **no se podia corregir**: el PATCH lo aceptaba, la
+  pantalla no lo mandaba.
+
+### Sigue SIN ARREGLAR y es lo primero
+
+**Credenciales de las camaras expuestas a internet.** Parche exacto listo para
+pegar en `docs/INTEGRA-OPS.md`. Toca Traefik: hace falta permiso de Adam.
+Despues, rotar las contrasenas.
+
+**Estado:** typecheck limpio, **788 pruebas de API** y **519 de web**, el build
+de Next compila las 19 rutas de INTEGRA.
+
 ## A medias
 
 1. **`go2rtc.yaml` del servidor sigue corrupto** — el arreglo de la fuga evita
