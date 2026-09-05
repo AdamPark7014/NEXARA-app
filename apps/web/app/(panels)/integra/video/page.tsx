@@ -15,7 +15,7 @@ import {
 } from "../_Console";
 import { IntegraEzuiKitPlayer } from "../_EzuiKitPlayer";
 import { IntegraDetectionOverlay, LIVE_DET_BADGE_MS, subscribePushEvents } from "../_DetectionOverlay";
-import { IntegraLivePlayer, preloadGo2rtcPlayer } from "../_LivePlayer";
+import { IntegraLivePlayer, preloadGo2rtcPlayer, type PlayerState } from "../_LivePlayer";
 import { IntegraLiveAccessBanner } from "../_LiveAccessBanner";
 import { IntegraAcsIdentityStrip } from "../_AcsIdentityStrip";
 import { IntegraPtzPad } from "../_PtzPad";
@@ -72,8 +72,21 @@ type LayoutN = 1 | 4 | 9 | 16;
 const LAYOUT_KEY = "nexara_integra_video_layout";
 const MODE_KEY = "nexara_integra_video_mode";
 const AUTOOPEN_KEY = "nexara_integra_video_autoopen";
-/** Stagger suave al abrir muchos MJPEG a la vez (no decodifican H.264). */
-const STAGGER_MS = 90;
+/**
+ * Turno entre arranques dentro de una misma tanda. Ya no carga con todo el peso
+ * — de eso se encarga el control de admisión de abajo — así que basta con
+ * separar los handshakes unos cientos de ms.
+ */
+const STAGGER_MS = 250;
+
+/**
+ * Cuántos mosaicos pueden estar CONECTANDO a la vez. Ojo: no es un tope de
+ * cámaras vivas. `cc59543` limitaba a 4 vivas y por eso nunca se veían las
+ * nueve; el problema real no es cuántas reproducen, sino cuántas negocian el
+ * decodificador y la sesión RTSP en el mismo instante. En cuanto una llega a
+ * imagen, entra la siguiente de la cola, así que el muro acaba lleno.
+ */
+const WALL_CONNECT_CONCURRENCY = 3;
 
 function colsFor(layout: LayoutN): number {
   if (layout === 1) return 1;
@@ -96,6 +109,14 @@ export default function IntegraVideoPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [filling, setFilling] = useState(false);
+  /** Estado que reporta cada mosaico; alimenta el control de admisión. */
+  const [tileState, setTileState] = useState<Record<string, PlayerState>>({});
+  /**
+   * Cámaras que el muro intentó abrir y no pudo, con el motivo. Antes se
+   * descartaban en silencio y el hueco quedaba idéntico a un slot vacío: de ahí
+   * la sensación de «no se ven todas» sin ningún mensaje que lo explicara.
+   */
+  const [wallIssues, setWallIssues] = useState<Array<{ name: string; reason: string }>>([]);
   const [mode, setMode] = useState<ViewMode>(() => {
     if (typeof window === "undefined") return "wall";
     return window.localStorage.getItem(MODE_KEY) === "focus" ? "focus" : "wall";
@@ -274,8 +295,11 @@ export default function IntegraVideoPage() {
       setPlayback(null);
       try {
         // Si el espejo ya marca micrófono, abrir con audio (antes había que
-        // pulsar «Escuchar» y parecía que no había canal).
-        const slot = await fetchStream(cam, cam.hasAudio === true);
+        // pulsar «Escuchar» y parecía que no había canal). En el muro no: el
+        // stream con audio es `ffmpeg:…#audio=aac`, o sea un proceso ffmpeg y
+        // una SEGUNDA sesión RTSP contra la misma cámara — y el mosaico lo
+        // pinta mudo de todas formas. Ese gasto solo se justifica en Foco.
+        const slot = await fetchStream(cam, !multi && cam.hasAudio === true);
         setNote(slot.note || null);
         setSlots((prev) => {
           if (!multi) return [slot];
@@ -297,24 +321,51 @@ export default function IntegraVideoPage() {
     [fetchStream, layout],
   );
 
+  /**
+   * Llena el muro hasta `layout`. Dos diferencias con la versión anterior:
+   * si una cámara falla se tira de la siguiente candidata en vez de dejar el
+   * hueco, y las que fallan se anotan con su motivo en vez de desaparecer.
+   * `keep` permite crecer de 2×2 a 3×3 sin cortar lo que ya se estaba viendo.
+   */
   const fillWall = useCallback(
-    async (cams: Cam[]) => {
-      const pick = cams.filter((c) => onlineish(c.status)).slice(0, layout);
-      const fallback = pick.length > 0 ? pick : cams.slice(0, layout);
-      if (fallback.length === 0) return;
+    async (cams: Cam[], keep: StreamSlot[] = []) => {
+      if (keep.length >= layout) return;
+      const taken = new Set(keep.map((s) => s.id));
+      const free = cams.filter((c) => !taken.has(c.id));
+      // Las que el espejo da por caídas van al final, no se descartan: mejor un
+      // cuadro que dice «Sin video» que un hueco que no dice nada.
+      const queue = [
+        ...free.filter((c) => onlineish(c.status)),
+        ...free.filter((c) => !onlineish(c.status)),
+      ];
+      if (queue.length === 0) return;
+
       setFilling(true);
       setError(null);
       setPlayback(null);
+      const got: StreamSlot[] = [...keep];
+      const issues: Array<{ name: string; reason: string }> = [];
       try {
-        const results = await Promise.allSettled(fallback.map((c) => fetchStream(c)));
-        const next: StreamSlot[] = [];
-        for (const r of results) {
-          if (r.status === "fulfilled") next.push(r.value);
+        let i = 0;
+        while (got.length < layout && i < queue.length) {
+          const batch = queue.slice(i, i + (layout - got.length));
+          i += batch.length;
+          const results = await Promise.allSettled(batch.map((c) => fetchStream(c)));
+          results.forEach((r, k) => {
+            if (r.status === "fulfilled") got.push(r.value);
+            else {
+              issues.push({
+                name: batch[k].name || batch[k].id,
+                reason: r.reason instanceof Error ? r.reason.message : "no respondió",
+              });
+            }
+          });
         }
-        if (next.length === 0) throw new Error("No se pudo abrir ninguna cámara");
-        setSlots(next);
-        setSelected(next[0].id);
-        setNote(next[0].note || null);
+        setWallIssues(issues);
+        if (got.length === 0) throw new Error("No se pudo abrir ninguna cámara");
+        setSlots(got);
+        setSelected((prev) => prev ?? got[0].id);
+        setNote(got[0].note || null);
         window.sessionStorage.removeItem(AUTOOPEN_KEY);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Error al llenar el muro");
@@ -341,9 +392,29 @@ export default function IntegraVideoPage() {
     }
   }, [items, filtered, slots.length, mode, fillWall, playLive]);
 
+  /**
+   * Cambiar de rejilla: al encoger se recorta, al crecer se RELLENA. Antes solo
+   * recortaba (`prev.slice(0, layout)`), así que pasar de 2×2 a 3×3 dejaba cinco
+   * huecos fijos hasta que alguien pulsara «Llenar muro». Esa era la causa
+   * directa de «no se ven todas».
+   *
+   * El ref evita el bucle cuando hay menos cámaras que celdas: se intenta una
+   * vez por combinación de rejilla e inventario, y ya.
+   */
+  const lastFillKey = useRef("");
   useEffect(() => {
-    setSlots((prev) => prev.slice(0, layout));
-  }, [layout]);
+    if (mode !== "wall") return;
+    if (slots.length > layout) {
+      setSlots((prev) => prev.slice(0, layout));
+      return;
+    }
+    if (!autoOpened.current || filling || slots.length >= layout) return;
+    if (items.length === 0 || filtered.length === 0) return;
+    const key = `${layout}:${filtered.length}`;
+    if (lastFillKey.current === key) return;
+    lastFillKey.current = key;
+    void fillWall(filtered, slots);
+  }, [layout, mode, slots, items.length, filtered, filling, fillWall]);
 
   const focus = useMemo(
     () => slots.find((s) => s.id === selected) || slots[0] || null,
@@ -531,13 +602,33 @@ export default function IntegraVideoPage() {
     return cells.slice(0, layout);
   }, [slots, layout]);
 
-  /** En muro MJPEG todos los slots con stream van vivos (sin cupo MSE). */
+  const handleTileState = useCallback((id: string, st: PlayerState) => {
+    setTileState((prev) => (prev[id] === st ? prev : { ...prev, [id]: st }));
+  }, []);
+
+  /**
+   * Control de admisión. Recorre las celdas en orden y deja arrancar solo a
+   * `WALL_CONNECT_CONCURRENCY` a la vez; el resto espera «En cola». Cuando una
+   * se asienta —imagen, respaldo o error— libera su turno y entra la siguiente.
+   * Así se llenan las nueve sin que nueve decodificadores negocien a la vez,
+   * que es lo que dejaba media rejilla colgada.
+   */
   const liveWallIds = useMemo(() => {
     if (mode !== "wall") return new Set<string>();
-    return new Set(
-      wallCells.filter((s): s is StreamSlot => Boolean(s)).map((s) => s.id),
-    );
-  }, [wallCells, mode]);
+    const ids = new Set<string>();
+    let connecting = 0;
+    for (const s of wallCells) {
+      if (!s) continue;
+      const st = tileState[s.id];
+      const settled = st === "live" || st === "snapshot" || st === "error";
+      if (!settled) {
+        if (connecting >= WALL_CONNECT_CONCURRENCY) continue;
+        connecting += 1;
+      }
+      ids.add(s.id);
+    }
+    return ids;
+  }, [wallCells, mode, tileState]);
 
   const liveWallOrder = useMemo(() => {
     const order = new Map<string, number>();
@@ -551,7 +642,26 @@ export default function IntegraVideoPage() {
   }, [wallCells]);
 
   const inWall = (id: string) => slots.some((s) => s.id === id);
-  const liveCount = liveWallIds.size;
+  /**
+   * Cuentas honestas del muro. `liveWallIds` ya no significa «vivas» sino
+   * «admitidas a conectar», así que lo vivo se cuenta por lo que reporta cada
+   * mosaico. Y se separa el respaldo por imágenes de lo que sí es video: eran
+   * indistinguibles en pantalla, con el mismo badge LIVE sobre 0,9 fps.
+   */
+  const wallStats = useMemo(() => {
+    let live = 0;
+    let snapshot = 0;
+    let failed = 0;
+    for (const s of wallCells) {
+      if (!s) continue;
+      const st = tileState[s.id];
+      if (st === "live") live += 1;
+      else if (st === "snapshot") snapshot += 1;
+      else if (st === "error") failed += 1;
+    }
+    const queued = Math.max(0, slots.length - liveWallIds.size);
+    return { live, snapshot, failed, queued };
+  }, [wallCells, tileState, slots.length, liveWallIds.size]);
   const activeDetCount = Object.keys(detByIp).length;
   const focusCam = focus ? items.find((c) => c.id === focus.id) : undefined;
   const showPtz =
@@ -572,7 +682,17 @@ export default function IntegraVideoPage() {
           filling
             ? "Abriendo cámaras…"
             : mode === "wall"
-              ? `${filtered.length} cámaras · ${slots.length}/${layout} en muro · ${liveCount} vivas${detMeta}`
+              ? [
+                  `${filtered.length} cámaras`,
+                  `${slots.length}/${layout} en muro`,
+                  `${wallStats.live} en vivo`,
+                  wallStats.snapshot ? `${wallStats.snapshot} en respaldo` : "",
+                  wallStats.queued ? `${wallStats.queued} en cola` : "",
+                  wallStats.failed ? `${wallStats.failed} sin video` : "",
+                  wallIssues.length ? `${wallIssues.length} no abrieron` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ") + detMeta
               : `${filtered.length} cámaras · foco${playbackActive ? " · playback" : ""}${detMeta}`
         }
         actions={
@@ -784,9 +904,10 @@ export default function IntegraVideoPage() {
                           src={s.hls}
                           compact
                           showLiveBadge
-                            mode="auto"
+                          mode="auto"
                           enabled={liveWallIds.has(s.id)}
                           startDelayMs={(liveWallOrder.get(s.id) ?? i) * STAGGER_MS}
+                          onStateChange={(st) => handleTileState(s.id, st)}
                         />
                       </>
                     )}

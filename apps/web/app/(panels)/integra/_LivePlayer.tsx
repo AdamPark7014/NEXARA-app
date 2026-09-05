@@ -29,7 +29,21 @@ type Props = {
    * navegador bloquea el autoplay de cualquier cosa que suene.
    */
   audio?: boolean;
+  /**
+   * El mosaico le cuenta al muro en qué estado va. El muro lo usa para el
+   * control de admisión: mientras haya cuadros conectando no deja entrar más,
+   * y en cuanto uno llega a `live` admite al siguiente de la cola.
+   */
+  onStateChange?: (state: PlayerState) => void;
 };
+
+export type PlayerState = "idle" | "queued" | "loading" | "live" | "snapshot" | "error";
+
+/**
+ * Espera mínima entre fotogramas del respaldo, ya recibido el anterior. Es un
+ * suelo, no un periodo: si el servidor tarda más, el ritmo lo marca él.
+ */
+const SNAPSHOT_MIN_GAP_MS = 900;
 
 let loaderPromise: Promise<void> | null = null;
 
@@ -130,7 +144,21 @@ type ShellProps = {
   startDelayMs?: number;
   enabled?: boolean;
   audio?: boolean;
+  onStateChange?: (state: PlayerState) => void;
 };
+
+/**
+ * Avisa al muro del estado sin re-disparar el efecto cuando el padre pasa una
+ * función nueva en cada render: la referencia se guarda en un ref y solo se
+ * notifica cuando el estado cambia de verdad.
+ */
+function useReportState(state: PlayerState, report?: (s: PlayerState) => void) {
+  const ref = useRef(report);
+  ref.current = report;
+  useEffect(() => {
+    ref.current?.(state);
+  }, [state]);
+}
 
 /** Muro: JPEG HTTP refrescado. No usa el decodificador H.264 del navegador. */
 function SnapshotWallPlayer({
@@ -140,6 +168,7 @@ function SnapshotWallPlayer({
   className,
   startDelayMs = 0,
   enabled = true,
+  onStateChange,
 }: ShellProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(true);
@@ -147,6 +176,10 @@ function SnapshotWallPlayer({
   const [state, setState] = useState<"idle" | "queued" | "loading" | "live" | "error">(
     src && enabled ? "loading" : src ? "queued" : "idle",
   );
+
+  // Hacia fuera esto NO es «live»: es un JPEG por segundo. Llamarlo live es lo
+  // que hacía que un respaldo a 0,9 fps se leyera como «el video se traba».
+  useReportState(state === "live" ? "snapshot" : state, onStateChange);
 
   const parsed = src ? parseHls(src) : null;
 
@@ -166,6 +199,17 @@ function SnapshotWallPlayer({
 
   const active = Boolean(src && enabled && visible && parsed);
 
+  /**
+   * Autorregulado: el siguiente fotograma no se pide hasta que ha llegado el
+   * anterior. Antes era un `setInterval` fijo de 1100 ms contra un servidor que
+   * tarda entre 0,8 y 2,5 s en servir cada JPEG —cada uno abre su propia sesión
+   * RTSP y espera keyframe—, así que se pedía más rápido de lo que se podía
+   * entregar y cada petición abortada dejaba un `broken pipe`: 2 254 en una
+   * sola sesión de producción. Encadenar las peticiones hace imposible
+   * adelantar al servidor, y el muro va tan rápido como el servidor dé.
+   */
+  const nextRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!active) {
       setState(src ? "queued" : "idle");
@@ -176,15 +220,21 @@ function SnapshotWallPlayer({
     const start = window.setTimeout(() => {
       if (!cancelled) setTick((t) => t + 1);
     }, Math.max(0, startDelayMs));
-    const period = window.setInterval(() => {
-      if (!cancelled) setTick((t) => t + 1);
-    }, 1100);
     return () => {
       cancelled = true;
       window.clearTimeout(start);
-      window.clearInterval(period);
+      if (nextRef.current != null) {
+        window.clearTimeout(nextRef.current);
+        nextRef.current = null;
+      }
     };
   }, [active, src, enabled, startDelayMs]);
+
+  const scheduleNext = () => {
+    if (!active) return;
+    if (nextRef.current != null) window.clearTimeout(nextRef.current);
+    nextRef.current = window.setTimeout(() => setTick((t) => t + 1), SNAPSHOT_MIN_GAP_MS);
+  };
 
   const frameUrl =
     active && parsed
@@ -206,14 +256,24 @@ function SnapshotWallPlayer({
             src={frameUrl}
             alt=""
             className={styles.wallSnapImg}
-            onLoad={() => setState("live")}
-            onError={() => setState((s) => (s === "live" ? s : "error"))}
+            onLoad={() => {
+              setState("live");
+              scheduleNext();
+            }}
+            onError={() => {
+              setState((s) => (s === "live" ? s : "error"));
+              scheduleNext();
+            }}
           />
         ) : null}
       </div>
       {showLiveBadge && state === "live" && (
-        <span className={styles.playerLiveBadge}>
-          <span className={styles.playerLiveDot} /> LIVE
+        <span
+          className={styles.playerLiveBadge}
+          data-tone="snapshot"
+          title="Este cuadro no consiguió video en vivo y va por imágenes, ~1 por segundo."
+        >
+          RESPALDO · 1 img/s
         </span>
       )}
       {state === "loading" && (
@@ -249,6 +309,7 @@ function MseFocusPlayer({
   enabled = true,
   audio = false,
   onLive,
+  onStateChange,
 }: ShellProps & { onLive?: (live: boolean) => void }) {
   const shellRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -259,6 +320,14 @@ function MseFocusPlayer({
   const [state, setState] = useState<"idle" | "queued" | "loading" | "live" | "error">(
     src ? (enabled ? "loading" : "queued") : "idle",
   );
+
+  useReportState(state, onStateChange);
+
+  // El turno de arranque solo se lee al montar. Si fuera dependencia del efecto,
+  // quitar un mosaico del muro reindexaría el turno de todos los siguientes y
+  // les tiraría el WebSocket a la vez — la tormenta de reconexión.
+  const startDelayRef = useRef(startDelayMs);
+  startDelayRef.current = startDelayMs;
 
   useEffect(() => {
     const el = shellRef.current;
@@ -336,28 +405,34 @@ function MseFocusPlayer({
             window.setTimeout(arm, ms),
           );
 
+          // Antes esto corría cada 180 ms y reescribía muted/playsinline/
+          // controls/autoplay en cada vuelta: con 9 mosaicos eran 50 mutaciones
+          // de DOM por segundo sobre elementos <video> activos. Ya reproduciendo
+          // no hay nada que endurecer, así que el vigilante se relaja.
           playWatch = window.setInterval(() => {
             if (cancelled) return;
-            const v = hardenVideo(node);
+            const v = sawLive ? node.video || node.querySelector("video") : hardenVideo(node);
             if (!v) return;
             if (v.paused || v.ended) kickPlay(node);
             if (v.readyState >= 2 && !v.paused) {
-              sawLive = true;
-              setState("live");
-              onLive?.(true);
+              if (!sawLive) {
+                sawLive = true;
+                setState("live");
+                onLive?.(true);
+              }
             }
-          }, 180);
+          }, 500);
 
           // Si se queda en «Conectando…», remonta el <video-stream> una vez.
           stuckTimer = window.setTimeout(() => {
             if (cancelled || sawLive || attempt >= 1) return;
             setAttempt((n) => n + 1);
-          }, 2600);
+          }, MSE_RETRY_MS);
         })
         .catch(() => {
           if (!cancelled) setState("error");
         });
-    }, Math.max(0, startDelayMs));
+    }, Math.max(0, startDelayRef.current));
 
     return () => {
       cancelled = true;
@@ -369,7 +444,7 @@ function MseFocusPlayer({
       nodeRef.current = null;
       if (host) host.innerHTML = "";
     };
-  }, [src, shouldPlay, startDelayMs, enabled, visible, audio, attempt]);
+  }, [src, shouldPlay, enabled, visible, audio, attempt]);
 
   // Un stream nuevo llega mudo otra vez: el gesto de abrir sonido no se hereda.
   useEffect(() => {
@@ -441,8 +516,23 @@ function MseFocusPlayer({
   );
 }
 
-/** Cuánto se le da a MSE antes de dar ese mosaico por perdido. */
-const MSE_GIVE_UP_MS = 4500;
+/**
+ * Un solo remontaje del `<video-stream>` si no llegó imagen. Tiene que caber
+ * holgadamente antes de `MSE_GIVE_UP_MS`: antes eran 2600 y 4500, así que el
+ * reintento y la rendición se pisaban y cada celda abría dos WebSockets y un
+ * flujo de imágenes en menos de cinco segundos.
+ */
+const MSE_RETRY_MS = 3200;
+
+/** Cuánto se le da a MSE —contando el reintento— antes de pasar a respaldo. */
+const MSE_GIVE_UP_MS = 11_000;
+
+/**
+ * El respaldo por imágenes ya no es una condena. Cada tanto se vuelve a probar
+ * MSE: si la cámara se cayó un momento o el NVR estaba sin sesiones libres, el
+ * cuadro se recupera solo en vez de quedarse a 1 fps el resto de la sesión.
+ */
+const SNAPSHOT_RECHECK_MS = 45_000;
 
 function AutoPlayer(props: ShellProps) {
   const [fallback, setFallback] = useState(false);
@@ -457,12 +547,16 @@ function AutoPlayer(props: ShellProps) {
 
   useEffect(() => {
     if (fallback || live || !props.src || !props.enabled) return;
-    const t = window.setTimeout(
-      () => setFallback(true),
-      MSE_GIVE_UP_MS + (props.startDelayMs ?? 0),
-    );
+    const t = window.setTimeout(() => setFallback(true), MSE_GIVE_UP_MS);
     return () => window.clearTimeout(t);
-  }, [fallback, live, props.src, props.enabled, props.startDelayMs]);
+  }, [fallback, live, props.src, props.enabled]);
+
+  // Reintento periódico desde el respaldo.
+  useEffect(() => {
+    if (!fallback || !props.src || !props.enabled) return;
+    const t = window.setTimeout(() => setFallback(false), SNAPSHOT_RECHECK_MS);
+    return () => window.clearTimeout(t);
+  }, [fallback, props.src, props.enabled]);
 
   if (fallback) {
     const { audio: _audio, ...wall } = props;
