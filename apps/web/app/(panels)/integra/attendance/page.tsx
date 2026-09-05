@@ -106,8 +106,12 @@ export default function IntegraAttendancePage() {
                 user?: { id: number; nombre: string; employeeNumber: string | null } | null;
               }>;
             }>(hybridRes);
+            // `parseResponseJson` devuelve null en 204 o cuerpo vacío: sin
+            // vínculos ERP la tabla se queda con la columna en blanco, que es
+            // la verdad. Antes reventaba aquí y el `catch` de abajo dejaba en
+            // pantalla los vínculos del rango anterior, ya caducados.
             const map: Record<string, ErpLink> = {};
-            for (const item of hybrid.items || []) {
+            for (const item of hybrid?.items || []) {
               if (item.linkStatus === "linked" && item.acs?.personId && item.user) {
                 map[item.acs.personId] = {
                   userId: item.user.id,

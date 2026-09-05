@@ -469,11 +469,13 @@ export async function listVisitorDoors(): Promise<{
       const id = String(row.id || "");
       const parts = id.split("|");
       const doorNo = parts.length > 1 ? Number(parts[1]) : 1;
+      const name = String(row.name || id);
+      const location = row.location != null ? String(row.location).trim() : "";
       return {
         id,
-        name: String(row.name || id),
-        location: row.location != null ? String(row.location) : undefined,
-        deviceIp: parts[0] || null,
+        name,
+        location: location && location !== name ? location : undefined,
+        deviceIp: parts[0] || "",
         doorNo: Number.isFinite(doorNo) ? doorNo : 1,
         online: row.online !== false,
       };
