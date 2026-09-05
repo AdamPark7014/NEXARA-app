@@ -8,11 +8,15 @@ import {
 } from './integra-acs-alarms.policy';
 
 describe('integra-acs-alarms.policy', () => {
-  it('clasifica denegado (minor 21)', () => {
+  it('clasifica denegado (minor 8 · credencial caducada)', () => {
+    // Antes se probaba con el minor 21, que es la puerta desbloqueándose: la
+    // cola SOC se llenaba de «acceso denegado» cada vez que alguien entraba
+    // bien. Las 5 alarmas DENIED que existían en producción salían todas de
+    // ahí, con 336 ocurrencias agregadas en siete horas. Todas falsas.
     expect(
       classifyPushForAlarm({
         major: 5,
-        minor: 21,
+        minor: 8,
         occurredAt: new Date('2026-09-04T15:00:00-06:00'),
         policy: DEFAULT_ALARM_POLICY,
       }),

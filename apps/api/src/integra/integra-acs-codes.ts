@@ -182,3 +182,15 @@ export function isAcsOperationalNoise(major: number | null, minor: number | null
 export function acsCodeLabel(major: number | null, minor: number | null): string {
   return classifyAcsMinor(major, minor).label;
 }
+
+/**
+ * Todos los `minor` de una categoría. Es lo que consultan los tres sitios que
+ * antes tenían su propia copia de las listas: así, corregir un código se hace
+ * una vez y llega a todos.
+ */
+export function minorsDe(kind: AcsKind): number[] {
+  return Object.keys(ACS_CODES)
+    .map(Number)
+    .filter((m) => ACS_CODES[m].kind === kind)
+    .sort((a, b) => a - b);
+}

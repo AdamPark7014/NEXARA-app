@@ -7,8 +7,9 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { IntegraSiteService } from './integra-site.service.js';
 import { mapMirrorPersonToDto } from '../hikvision-isapi/isapi-acs.js';
+import { minorsDe } from './integra-acs-codes';
 
-const GRANTED_MINORS = [1, 75, 76];
+const GRANTED_MINORS = minorsDe('granted');
 
 /** Fin ACS «indefinido» típico del firmware Hikvision. */
 const INDEFINITE_END_YEAR = 2035;
