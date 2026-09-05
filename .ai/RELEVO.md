@@ -118,6 +118,73 @@ Es una consulta de cinco minutos: `SELECT minor, count(*) FROM
 integra_push_events WHERE major = 5 GROUP BY minor`. Si el dato contradice a la
 documentación, gana el dato.
 
+## Turno 3 — parametrizacion, calidad adaptativa y un agujero de seguridad
+
+### LO PRIMERO: credenciales de las camaras expuestas a internet — SIN ARREGLAR
+
+`https://integra.nexara.com.mx/go2rtc/api/streams` responde **200 desde fuera,
+sin autenticacion**, con 26 URLs RTSP que llevan usuario y contrasena de las
+camaras en claro. `/go2rtc/api/config` filtra otras 13. Verificado con `curl`
+desde fuera de la red.
+
+No se arreglo porque toca Traefik. Propuesta y detalle en `docs/INTEGRA-OPS.md`.
+Resumen: filtrar por CAMINO, no por credencial —el navegador entra por esas
+mismas rutas—. Y rotar las contrasenas despues.
+
+### Medido este turno (nada de esto era suposicion)
+
+- Sub-stream **640x360 H.264 a 10 fps**; principal **1920x1080 H.265**.
+- **GovLength 30 a 10 fps = 3,00 s exactos** entre fotogramas clave. Esa es la
+  espera al primer cuadro, y es peor de lo que se creia. Bajarlo a 10 deja la
+  media en medio segundo. Rango admitido 1-400.
+- **Tercer stream: solo la PTZ .179.** Las 12 fijas declaran `<id opt="1,2">`.
+  TRAMPA: `GET /ISAPI/Streaming/channels/103` devuelve **200 con cuerpo completo**
+  en las fijas; `/104` y `/199` devuelven lo mismo byte a byte. Es un eco. Solo
+  `opt` en capabilities dice la verdad.
+- **SmartCodec apagado** en los 26 canales. No es la causa de la latencia.
+- **El limite de sesiones RTSP del NVR es folclore**: `/ISAPI/Streaming/capabilities`
+  da 403 y no hay numero en ninguna documentacion. Sigue siendo razon valida para
+  tirar directo a la camara, pero no hay cifra.
+- Servidor: 4 vCPU, carga 0,65, 11 GB libres. **Transcodificar H.265→H.264 solo
+  para la camara en Foco es viable** y da 1080p reales sin tocar un equipo del
+  cliente. El comentario del codigo que decia lo contrario se escribio sin medir.
+
+### Que se construyo
+
+1. **Deteccion parametrizable**: perfil por camara (hasta 4 poligonos,
+   sensibilidad, confianza, objetivo, horario). Sensibilidad por defecto **100 →
+   50**, que es el valor del ejemplo del fabricante. Sin perfil, comportamiento
+   identico al anterior.
+2. **`eventState` y `activePostCount`** se parsean, persisten y salen en la API.
+   El overlay ya no adivina con TTL: cierra la caja cuando lo dice el equipo, y
+   distingue cerrar por solape (con rectangulo) de cerrar por tipo (sin el). El
+   TTL queda de respaldo.
+3. **`SMART_EVENT_TYPES`** exportada con el catalogo del Apendice B. Se acabaron
+   las cinco cadenas escondidas en una funcion.
+4. **`Smart/capabilities`** se sondea y persiste en columnas tri-estado.
+5. **Calidad adaptativa**: Foco arranca con el secundario caliente y sube a HD
+   por debajo, cambiando al primer fotograma. Umbral **1100 px de ancho de
+   elemento**, no el modo. Gate por codec: hoy degrada solo en las 13 H.265.
+6. **`integra-acs-codes.ts`**: fuente unica de los codigos ACS, con 18 pruebas.
+   **PENDIENTE de sustituir las tres copias viejas.**
+7. **`scripts/integra-doctor.ps1`**: radiografia de produccion en un comando,
+   solo lectura por construccion.
+
+### Bugs reales encontrados de paso
+
+- Patron de sustitucion XML con el `>` pegado al nombre: nunca casaba con una
+  etiqueta con atributos, asi que `alarmConfidence` se duplicaba en el XML.
+- `Number(null) === 0`: un perfil sin sensibilidad habria escrito **0** en el
+  equipo. Camara sorda.
+- Mosaico fuera de pantalla robaba turno de admision: en 4x4 las filas visibles
+  esperaban detras de las invisibles.
+- `focusStageRef` sin colgar de ningun nodo: la tecla F hacia fullscreen de null.
+- `WallCell`/`registerCellEl`/`cellEls` son **codigo muerto**: la rejilla dibuja
+  divs a mano, asi que pantalla completa por celda no funciona. Sin tocar.
+
+**Estado:** typecheck limpio, **752 pruebas de API** y **248 de web**. Ninguna
+migracion ejecutada. **16 commits sin subir.**
+
 ## A medias
 
 1. **`go2rtc.yaml` del servidor sigue corrupto** — el arreglo de la fuga evita
