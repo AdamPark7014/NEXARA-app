@@ -29,9 +29,26 @@ import styles from "./integra.module.css";
  * color por tipo, placa con origen y edad, y la estela de las últimas
  * posiciones del track. Todo sale de campos que el evento ya trae; lo que el
  * equipo no manda —confianza del clasificador, por ejemplo— no se pinta.
+ *
+ * **Cuándo se va una caja.** Antes solo lo decidía un temporizador, y de ahí
+ * los fantasmas pegados a sillas vacías. El equipo ya lo dice en el payload:
+ * `eventState` ∈ `active` | `inactive` (ver `docs/INTEGRA-DETECCION.md`). Si
+ * llega `inactive`, la caja se retira en el acto; si el campo no viene —hoy
+ * todavía puede no venir— manda el TTL de siempre. Las dos rutas conviven sin
+ * condicionar nada más: el TTL nunca deja de ser la red de seguridad, porque
+ * un `inactive` perdido en la red no puede dejar una caja para siempre.
  */
 
 export type PushTarget = { type: string; x: number; y: number; w: number; h: number };
+
+/**
+ * Lo que el propio equipo dice del ciclo de vida de la alarma:
+ * `active` = el objetivo sigue ahí, `inactive` = se fue.
+ *
+ * Documentado en `docs/INTEGRA-DETECCION.md`. Hasta ahora nadie lo leía y el
+ * overlay tenía que adivinar la salida con un temporizador.
+ */
+export type PushEventState = "active" | "inactive";
 
 export type PushEvent = {
   id: number;
@@ -49,7 +66,32 @@ export type PushEvent = {
   photoPath?: string | null;
   outcome?: "granted" | "denied" | null;
   targets?: PushTarget[] | null;
+  /**
+   * Opcional a propósito: el backend lo está añadiendo ahora mismo y este
+   * archivo tiene que funcionar igual antes y después. Si no viene, manda el
+   * TTL de siempre; si viene `inactive`, la caja se retira ya.
+   */
+  eventState?: PushEventState | null;
+  /** Cuántas veces se ha repetido esta misma alarma. Igual de opcional. */
+  activePostCount?: number | null;
 };
+
+/**
+ * `eventState` tal cual lo manda el equipo, o `null` si este backend todavía
+ * no expone el campo. Nunca se deduce: sin dato, `null` — y entonces manda el
+ * TTL, que es el comportamiento que ya había.
+ */
+export function eventStateOf(ev: PushEvent): PushEventState | null {
+  const s = ev.eventState;
+  return s === "active" || s === "inactive" ? s : null;
+}
+
+/** Repeticiones de la misma alarma. Sin el campo, una: el evento que llegó. */
+export function repeatsOf(ev: PushEvent): number {
+  const n = ev.activePostCount;
+  if (typeof n !== "number" || !Number.isFinite(n) || n < 1) return 1;
+  return Math.min(Math.floor(n), 9999);
+}
 
 /**
  * Quién vio la detección. Se deduce del propio evento, no se configura:
@@ -78,6 +120,22 @@ type Box = PushTarget & {
   verifyMode?: string | null;
   /** Posiciones anteriores del mismo track, de más vieja a más nueva. */
   trail: TrailPoint[];
+  /**
+   * Qué aviso abrió la caja (`fielddetection`, `linedetection`, …). Se guarda
+   * para poder cerrarla cuando llega el `inactive` de ese mismo aviso sin
+   * rectángulo: sin esto no habría forma de saber a qué caja se refiere.
+   */
+  eventType: string;
+  /**
+   * Repeticiones agrupadas en esta caja: el mayor `activePostCount` visto.
+   * Sustituye a contar cajas duplicadas — el equipo ya dice cuántas van.
+   */
+  repeats: number;
+  /**
+   * El equipo mandó `eventState` para este track. Cuando es cierto, la salida
+   * la decide el equipo y el TTL queda solo de red de seguridad.
+   */
+  stated: boolean;
 };
 
 /**
@@ -85,6 +143,10 @@ type Box = PushTarget & {
  * Meeting p50≈16s · Support 01/02 p50≈12–13s · Planning p90≈48s.
  * 3.5s apagaba cajas entre ráfagas; 90s + VMD hold = fantasmas en sillas.
  * Puente el p50 con margen corto; sin VMD que reinicie `at`.
+ *
+ * Sigue siendo el respaldo, no la regla: cuando el equipo manda `eventState`
+ * la caja se va antes, con el `inactive`. Este número solo decide qué pasa si
+ * ese aviso no llega nunca.
  */
 const BOX_TTL_OPTICAL_MS = 15_000;
 /** ACS FaceRect + nombre: pase es flash; un poco más que óptica, no ~75–90s. */
@@ -257,8 +319,49 @@ function mergeOne(out: Box[], n: Box): Box[] {
     outcome: n.outcome ?? prevBox.outcome,
     verifyMode: n.verifyMode || prevBox.verifyMode,
     trail: nextTrail(prevBox, n.at),
+    // La repetición se agrupa, no se acumula a mano: el contador del equipo ya
+    // es absoluto para esa alarma, así que basta con quedarse con el mayor.
+    repeats: Math.max(n.repeats, prevBox.repeats),
+    // Basta que el equipo lo haya dicho una vez para que la caja quede a su
+    // mando: un aviso posterior sin el campo no la devuelve a la adivinanza.
+    stated: n.stated || prevBox.stated,
   };
   return next;
+}
+
+/** Umbral de solape para dar por cerrada una caja con un `inactive` con rect. */
+const CLOSE_MIN_OVERLAP = 0.18;
+
+/**
+ * Retira las cajas que el equipo acaba de declarar terminadas.
+ *
+ * Dos formas de cerrar, según lo que traiga el aviso `inactive`:
+ *
+ * - **Con rectángulo** — se cierra lo que se solapa con él. Es el caso fino:
+ *   en una sala con tres personas se va solo la que se fue.
+ * - **Sin rectángulo** — el equipo dice que ese aviso terminó, pero no de
+ *   quién. Se cierran las cajas ópticas de ese mismo `eventType`. Los accesos
+ *   (ACS) no se tocan: un pase es un instante, no un estado que se apague.
+ *
+ * Devuelve el mismo array si no cambia nada, para no provocar un repintado.
+ */
+export function closeBoxes(prev: Box[], closers: PushEvent[]): Box[] {
+  if (prev.length === 0 || closers.length === 0) return prev;
+  const out = prev.filter((b) => {
+    for (const ev of closers) {
+      const targets = ev.targets?.length ? ev.targets : null;
+      if (!targets) {
+        if (b.source !== "acs" && b.eventType === ev.eventType) return false;
+        continue;
+      }
+      for (const t of targets) {
+        if (!sameTrackKind(b, t, b.personName, ev.personName)) continue;
+        if (overlapScore(b, t) > CLOSE_MIN_OVERLAP) return false;
+      }
+    }
+    return true;
+  });
+  return out.length === prev.length ? prev : out;
 }
 
 /**
@@ -274,14 +377,18 @@ export function sourceOf(ev: PushEvent): DetSource {
   return "acusense";
 }
 
-function boxesFromEvents(events: PushEvent[], deviceIp: string, now = Date.now()): Box[] {
+export function boxesFromEvents(events: PushEvent[], deviceIp: string, now = Date.now()): Box[] {
   const fresh: Box[] = [];
   const maxAge = Math.max(BOX_TTL_OPTICAL_MS, BOX_TTL_NAMED_MS);
   for (const ev of events) {
     if (ev.deviceIp !== deviceIp || !ev.targets?.length) continue;
+    const state = eventStateOf(ev);
+    // Un `inactive` no abre nada: dice que se acabó. Lo consume `closeBoxes`.
+    if (state === "inactive") continue;
     const age = now - Date.parse(ev.occurredAt);
     if (!Number.isFinite(age) || age > maxAge) continue;
     const source = sourceOf(ev);
+    const repeats = repeatsOf(ev);
     for (const [i, t] of ev.targets.entries()) {
       const ttl = ttlFor(ev, t);
       if (age > ttl) continue;
@@ -298,10 +405,18 @@ function boxesFromEvents(events: PushEvent[], deviceIp: string, now = Date.now()
         outcome: ev.outcome ?? null,
         verifyMode: ev.verifyMode ?? null,
         trail: [],
+        eventType: ev.eventType,
+        repeats,
+        stated: state != null,
       });
     }
   }
   return fresh;
+}
+
+/** Los avisos de esta cámara que declaran terminada su alarma. */
+export function closersFor(events: PushEvent[], deviceIp: string): PushEvent[] {
+  return events.filter((e) => e.deviceIp === deviceIp && eventStateOf(e) === "inactive");
 }
 
 function flushFanOut() {
@@ -553,10 +668,14 @@ function verifyText(v?: string | null): string | null {
  * pegada al techo (la placa queda fuera por arriba) y una caja en el tercio
  * derecho (el texto se sale por la derecha). Se recoloca sola.
  */
-function tagPlacement(b: Box): { place: "above" | "inside"; align: "left" | "right" } {
+export function tagPlacement(b: Box): { place: "above" | "inside"; align: "left" | "right" } {
+  // Anclar a la derecha por dos motivos distintos: la caja empieza en el
+  // tercio derecho, o la caja es ancha y termina pegada al borde —en ese
+  // segundo caso el ancla izquierda queda dentro pero el texto se sale.
+  const endsAtEdge = b.x + b.w > 0.92;
   return {
     place: b.y < 0.09 ? "inside" : "above",
-    align: b.x > 0.6 ? "right" : "left",
+    align: b.x > 0.6 || endsAtEdge ? "right" : "left",
   };
 }
 
@@ -721,11 +840,16 @@ export function IntegraDetectionOverlay({
       .then((d) => {
         if (stop) return;
         const items = d.items || [];
+        // La semilla trae la ventana entera: si dentro está el `inactive` de
+        // una caja que también viene, no debe pintarse ni un fotograma.
         const fresh = boxesFromEvents(items, deviceIp);
-        if (fresh.length) {
-          const merged = mergeBoxes(boxesRef.current, fresh);
-          boxesRef.current = merged;
-          applyBoxes(merged);
+        const closers = closersFor(items, deviceIp);
+        let next = boxesRef.current;
+        if (fresh.length) next = mergeBoxes(next, fresh);
+        if (closers.length) next = closeBoxes(next, closers);
+        if (next !== boxesRef.current) {
+          boxesRef.current = next;
+          applyBoxes(next);
         }
         const maxId = Math.max(0, ...items.map((e) => e.id));
         if (maxId > lastId) lastId = maxId;
@@ -733,6 +857,7 @@ export function IntegraDetectionOverlay({
           (e) =>
             e.deviceIp === deviceIp &&
             (e.eventType === "VMD" || e.eventType === "fielddetection") &&
+            eventStateOf(e) !== "inactive" &&
             Date.now() - Date.parse(e.occurredAt) < MOTION_CHIP_MS,
         );
         if (motion) {
@@ -751,18 +876,28 @@ export function IntegraDetectionOverlay({
   useEffect(() => {
     if (!deviceIp) return;
     return subscribePushEvents((events) => {
+      // Abrir y cerrar comparten un solo `applyBoxes`, así que el ciclo de
+      // vida no añade ni un repintado: sigue habiendo como mucho uno por lote
+      // y lo sigue limitando el rAF de abajo. Cerrar va después de abrir para
+      // que un `inactive` del mismo lote gane siempre. Y si nada cambia, el
+      // array es el mismo objeto y no se pinta.
       const fresh = boxesFromEvents(events, deviceIp);
-      if (fresh.length) {
-        const merged = mergeBoxes(boxesRef.current, fresh);
-        boxesRef.current = merged;
-        applyBoxes(merged);
+      const closers = closersFor(events, deviceIp);
+      let next = boxesRef.current;
+      if (fresh.length) next = mergeBoxes(next, fresh);
+      if (closers.length) next = closeBoxes(next, closers);
+      if (next !== boxesRef.current) {
+        boxesRef.current = next;
+        applyBoxes(next);
       }
 
       // VMD / fielddetection sin TargetRect solo alimentan el chip de movimiento.
       // No reiniciar `at` ni alargar TTL: eso dejaba fantasmas 60–90s en sillas.
+      // Un `inactive` es lo contrario de movimiento: no debe encender el chip.
       let sawMotion = false;
       for (const ev of events) {
         if (ev.deviceIp !== deviceIp) continue;
+        if (eventStateOf(ev) === "inactive") continue;
         if (ev.eventType === "VMD" || ev.eventType === "fielddetection") {
           sawMotion = true;
         }
@@ -917,6 +1052,16 @@ export function IntegraDetectionOverlay({
                   (denied ? ICON_DENIED : KIND_ICON[kind])
                 )}
                 <span className={det.tagName}>{tag}</span>
+                {/* Repeticiones agrupadas: el número lo da el equipo
+                    (`activePostCount`), no se cuentan cajas duplicadas. */}
+                {b.repeats > 1 ? (
+                  <span
+                    className={det.tagRepeat}
+                    title={`El equipo repitió esta alarma ${b.repeats} veces`}
+                  >
+                    ×{b.repeats}
+                  </span>
+                ) : null}
                 {age ? <span className={det.tagAge}>{age}</span> : null}
               </span>
               {/* Segunda línea: solo lo que el evento trae de verdad. Sin

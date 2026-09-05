@@ -6,6 +6,8 @@ const CAPS_EVENT = "nexara-integra-caps";
 export const MODULE_CAPABILITY: Record<string, keyof IntegraCapabilities | "always"> = {
   "integra-home": "always",
   "integra-video": "video",
+  // Sin cámaras no hay nada que sintonizar: comparte capacidad con Video.
+  "integra-detection": "video",
   "integra-access": "access",
   "integra-people": "people",
   "integra-schedules": "access",
