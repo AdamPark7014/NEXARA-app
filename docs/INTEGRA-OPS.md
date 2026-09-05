@@ -133,3 +133,46 @@ cd /var/www/nexara-app && ./deploy/update.sh
 ```
 
 Confirmar contenedores `nexara-api`, `nexara-web`, `nexara-go2rtc`.
+
+## URGENTE · Credenciales de las cámaras expuestas a internet
+
+**Detectado y verificado el 2026-09-05.** Sin arreglar en el momento de escribir
+esto: el arreglo toca Traefik, que está en la lista de «no tocar» sin permiso.
+
+`https://integra.nexara.com.mx/go2rtc/api/streams` responde **HTTP 200 desde
+internet, sin autenticación**, y su cuerpo trae **26 URLs RTSP con el usuario y
+la contraseña de las cámaras en claro**. `…/go2rtc/api/config` filtra otras 13.
+
+Comprobado con `curl` desde fuera de la red, sin credencial ninguna:
+
+```
+/go2rtc/api/config     -> 200   (13 URLs con credenciales)
+/go2rtc/api/streams    -> 200   (26 URLs con credenciales)
+/go2rtc/video-stream.js-> 200   (legítimo: lo necesita el navegador)
+/go2rtc/api/ws         -> 400   (legítimo: espera upgrade a WebSocket)
+```
+
+Con esas credenciales se entra a las cámaras por RTSP, y en un DS-2CD2123G2 la
+cuenta que sirve el stream suele ser la de administración: se puede ver el video
+en vivo, y según el perfil también reconfigurar el equipo.
+
+**Por qué pasó.** El prefijo `/go2rtc` se publicó entero para que el navegador
+pudiera cargar `video-stream.js` y abrir el WebSocket, que es legítimo. Pero eso
+publicó también la API de administración de go2rtc, que incluye las fuentes con
+su credencial embebida — porque así es como go2rtc guarda un RTSP autenticado.
+
+**Arreglo propuesto** (requiere permiso explícito: es ingress de producción).
+Restringir la ruta de Traefik a lo que el navegador de verdad usa, y bloquear el
+resto:
+
+- Permitir: `/go2rtc/video-stream.js`, `/go2rtc/video-rtc.js`,
+  `/go2rtc/api/ws`, `/go2rtc/api/frame.jpeg`, `/go2rtc/api/stream.m3u8`.
+- Bloquear: todo lo demás bajo `/go2rtc`, en particular `/api/streams` y
+  `/api/config`.
+
+No basta con poner usuario y contraseña a la API de go2rtc: el navegador entra
+por esas mismas rutas y se quedaría sin video. La separación tiene que ser por
+camino, no por credencial.
+
+**Después del arreglo hay que rotar las contraseñas de las cámaras.** Estuvieron
+expuestas y no hay forma de saber quién las leyó.
