@@ -19,9 +19,52 @@ import { IntegraSiteService } from './integra-site.service';
  * secundario es siempre 102.
  */
 const SUB_STREAM_ID = 102;
+const MAIN_STREAM_ID = 101;
 
 function subStreamOf(channelId: string): string {
   return /^\d{3,}$/.test(channelId) ? `${channelId.slice(0, -1)}2` : channelId;
+}
+
+function mainStreamOf(channelId: string): string {
+  return /^\d{3,}$/.test(channelId) ? `${channelId.slice(0, -1)}1` : channelId;
+}
+
+/**
+ * Calidad pedida para un stream.
+ *
+ * `sub` es el secundario (medido en Oficinas: **640×360**) y `main` el
+ * principal (1920×1080 en las DS-2CD2123G2 del parque, nueve veces más píxeles).
+ *
+ * Hasta ahora TODO —muro y Foco— consumía el secundario, y por eso al abrir una
+ * cámara a pantalla completa se veía pixelada: se ampliaban 640 px a 1920.
+ *
+ * La regla es asimétrica a propósito. En un mosaico de 3×3 sobre una pantalla
+ * de 1920 cada celda mide unos 600 px, así que el secundario ya la llena: subir
+ * ahí a principal no añadiría un solo píxel visible y multiplicaría por nueve el
+ * ancho de banda, la CPU de decodificación y —lo que de verdad escuece— las
+ * sesiones RTSP contra un NVR que corta a las pocas simultáneas. Solo sube de
+ * calidad lo que se está mirando grande, que es como máximo una.
+ */
+export type StreamQuality = 'sub' | 'main';
+
+/**
+ * ¿Puede el navegador reproducir el canal principal de esta cámara?
+ *
+ * Medido en Oficinas: las 13 cámaras de vigilancia tienen el principal a
+ * 1920×1080 pero en **H.265**, que MSE no decodifica. Pedirlo daría un cuadro
+ * negro girando para siempre, que es peor que el secundario pixelado.
+ *
+ * Ante un códec desconocido se responde que SÍ, a propósito: el espejo puede no
+ * haberlo guardado todavía, y en ese caso vale más intentarlo y que el
+ * reproductor caiga a respaldo que negar alta calidad a un equipo que sí puede.
+ * Lo único que se bloquea es lo que sabemos con certeza que no funciona.
+ */
+export function mainStreamPlayable(codec?: string | null): boolean {
+  const c = String(codec ?? '')
+    .toUpperCase()
+    .replace(/[.\s_-]/g, '');
+  if (!c) return true;
+  return !(c === 'H265' || c === 'HEVC' || c === 'MPEGH' || c.startsWith('H265'));
 }
 
 /**
@@ -67,8 +110,9 @@ export class IntegraMediaService {
     companyId: number | null,
     cameraIndexCode: string,
     siteId?: number | null,
-    opts?: { audio?: boolean },
+    opts?: { audio?: boolean; quality?: StreamQuality },
   ) {
+    const quality: StreamQuality = opts?.quality === 'main' ? 'main' : 'sub';
     const resolved = await this.sites.resolveClient({ companyId, siteId });
 
     if (resolved.provider === 'HCT' && resolved.hct) {
@@ -85,7 +129,7 @@ export class IntegraMediaService {
     }
 
     if (resolved.provider === 'ISAPI' && resolved.isapi) {
-      const source = await this.isapiRtsp(resolved, cameraIndexCode);
+      const source = await this.isapiRtsp(resolved, cameraIndexCode, quality);
       if (!source) {
         return {
           cameraIndexCode,
@@ -99,6 +143,7 @@ export class IntegraMediaService {
       return this.publish('ISAPI', cameraIndexCode, source.rtsp, source.redacted, source.note, {
         hasAudio: source.hasAudio,
         withAudio: Boolean(opts?.audio) && source.hasAudio,
+        quality,
       });
     }
 
@@ -146,7 +191,15 @@ export class IntegraMediaService {
   private async isapiRtsp(
     resolved: Awaited<ReturnType<IntegraSiteService['resolveClient']>>,
     cameraIndexCode: string,
-  ): Promise<{ rtsp: string; redacted: string; note: string; hasAudio: boolean } | null> {
+    quality: StreamQuality = 'sub',
+  ): Promise<{
+    rtsp: string;
+    redacted: string;
+    note: string;
+    hasAudio: boolean;
+    quality: StreamQuality;
+    degradada: boolean;
+  } | null> {
     if (!resolved.isapi || !resolved.siteId) return null;
 
     const camera = await this.prisma.integraCamera.findUnique({
@@ -160,11 +213,29 @@ export class IntegraMediaService {
       /** Id exacto a pedir. Lo ponen los equipos con un solo stream. */
       streamId?: string;
       hasAudio?: boolean;
+      /** Códec del canal PRINCIPAL, tal como lo guardó el sync. */
+      codec?: string | null;
       source?: { ipAddress?: string | null; reachableDirectly?: boolean } | null;
     };
     const channelId = raw.channelId;
     if (!channelId) return null;
     const hasAudio = raw.hasAudio === true;
+
+    /**
+     * El principal solo sirve si el navegador puede decodificarlo.
+     *
+     * Medido en Oficinas: las 13 cámaras de vigilancia tienen el canal
+     * principal a 1920×1080 pero en **H.265**, que MSE no reproduce. Pedirlo
+     * daría un cuadro negro girando para siempre —que es peor que el
+     * secundario pixelado— así que aquí se degrada a `sub` en silencio y se
+     * dice por qué en la nota, en vez de fallar en el navegador.
+     *
+     * Cuando alguien ponga el principal en H.264 (o habilite un tercer stream),
+     * esta comprobación lo deja pasar sola, sin tocar código.
+     */
+    const mainIsPlayable = mainStreamPlayable(raw.codec);
+    const efectiva: StreamQuality = quality === 'main' && mainIsPlayable ? 'main' : 'sub';
+    const degradada = quality === 'main' && !mainIsPlayable;
 
     const directIp = raw.source?.reachableDirectly ? raw.source.ipAddress : null;
     if (directIp && resolved.isapiForHost) {
@@ -172,23 +243,40 @@ export class IntegraMediaService {
       // Una terminal de acceso publica un único stream: pedirle el «sub» da 404.
       // El resto son cámaras sueltas, que numeran desde 101 aunque en el NVR
       // sean el canal 7.
-      const streamId = raw.streamId ?? SUB_STREAM_ID;
+      // La terminal de acceso publica un solo perfil: pedirle otro da 404, así
+      // que su `streamId` explícito manda por encima de la calidad pedida.
+      const streamId =
+        raw.streamId ?? (efectiva === 'main' ? MAIN_STREAM_ID : SUB_STREAM_ID);
       return {
         rtsp: direct.rtspUrl(streamId),
         redacted: direct.rtspUrlRedacted(streamId),
-        note: raw.streamId
-          ? `RTSP directo a la terminal (${directIp}), canal ${streamId}`
-          : `RTSP directo a la cámara (${directIp}), sin cargar el grabador`,
+        note: [
+          raw.streamId
+            ? `RTSP directo a la terminal (${directIp}), canal ${streamId}`
+            : `RTSP directo a la cámara (${directIp}), sin cargar el grabador`,
+          degradada ? `alta calidad no disponible: el principal va en ${raw.codec}` : '',
+        ]
+          .filter(Boolean)
+          .join(' · '),
         hasAudio,
+        quality: efectiva,
+        degradada,
       };
     }
 
-    const sub = subStreamOf(channelId);
+    const ch = efectiva === 'main' ? mainStreamOf(channelId) : subStreamOf(channelId);
     return {
-      rtsp: resolved.isapi.rtspUrl(sub),
-      redacted: resolved.isapi.rtspUrlRedacted(sub),
-      note: `RTSP vía grabador ${resolved.host}, canal ${channelId}`,
+      rtsp: resolved.isapi.rtspUrl(ch),
+      redacted: resolved.isapi.rtspUrlRedacted(ch),
+      note: [
+        `RTSP vía grabador ${resolved.host}, canal ${channelId}`,
+        degradada ? `alta calidad no disponible: el principal va en ${raw.codec}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
       hasAudio,
+      quality: efectiva,
+      degradada,
     };
   }
 
@@ -533,7 +621,7 @@ export class IntegraMediaService {
     rtsp: string,
     rtspForResponse: string,
     sourceNote?: string,
-    audio?: { hasAudio: boolean; withAudio: boolean },
+    audio?: { hasAudio: boolean; withAudio: boolean; quality?: StreamQuality },
   ) {
     const hasAudio = Boolean(audio?.hasAudio);
     const withAudio = Boolean(audio?.withAudio);
@@ -550,7 +638,11 @@ export class IntegraMediaService {
       };
     }
 
-    const base = `cam_${cameraIndexCode.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+    // El principal va con su propio nombre: si compartiera el del secundario,
+    // pedir alta calidad reescribiria el stream que esta alimentando al muro
+    // entero y todos los mosaicos saltarian de golpe.
+    const hd = audio?.quality === 'main' ? '_hd' : '';
+    const base = `cam_${cameraIndexCode.replace(/[^a-zA-Z0-9_-]/g, '_')}${hd}`;
     // Stream aparte para el audio: el mudo lo comparten todos los mosaicos del
     // muro y no debe cargar con el transcodificado.
     const streamName = withAudio ? `${base}_a` : base;
