@@ -7,7 +7,7 @@ import {
   isAcsDoorAlarm,
   isAcsGranted,
   isAcsOperationalNoise,
-} from './integra-acs-codes';
+} from './acs-codes';
 
 /**
  * Los casos de prueba NO son inventados: son secuencias reales tomadas de los

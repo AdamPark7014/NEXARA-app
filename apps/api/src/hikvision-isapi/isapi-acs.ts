@@ -487,20 +487,16 @@ export async function listAcsEvents(
   return all;
 }
 
+import { acsCodeLabel } from './acs-codes';
+
 /** Etiqueta legible a partir de major/minor cuando el equipo no manda nombre. */
 export function describeAcsEvent(ev: IsapiAcsEvent): string {
   const major = num(ev.major);
   const minor = num(ev.minor);
-  // major 5 = evento de autenticación (doc Hikvision ACS)
-  if (major === 5) {
-    if (minor === 1 || minor === 75) return 'Acceso concedido';
-    if (minor === 21 || minor === 38) return 'Acceso denegado';
-    if (minor === 22) return 'Puerta abierta por botón';
-    return `Auth ${minor}`;
-  }
-  if (major === 1) return `Alarma ${minor}`;
-  if (major === 3) return `Excepción ${minor}`;
-  return `Evento ${major}.${minor}`;
+  // Antes había aquí una tabla propia — la quinta copia del mismo mapa, y con
+  // el mismo error: el minor 21 salía como «Acceso denegado» cuando es la
+  // puerta abriéndose, que es justo lo que produce cada concesión legítima.
+  return acsCodeLabel(major, minor);
 }
 
 export type UserInfoWrite = {
