@@ -3,17 +3,48 @@
  * Identidad: employeeNumber / personId (sin inventar Face ID).
  */
 
-export const ACS_ENTRY_MINORS = [1, 75] as const;
-export const ACS_EXIT_MINORS = [76] as const;
-export const ACS_DENIED_MINORS = [21, 22, 23, 24, 27, 28, 29, 31, 32] as const;
+import {
+  ACS_MAJOR_DEVICE,
+  isAcsDenied,
+  isAcsGranted,
+  minorsDe,
+} from './integra-acs-codes';
+
+/**
+ * Estas listas se mantienen exportadas por compatibilidad, pero ya NO son la
+ * fuente: la fuente es `integra-acs-codes.ts`. Estaban copiadas en tres
+ * archivos y las tres copias fallaban igual.
+ */
+export const ACS_ENTRY_MINORS = minorsDe('granted');
+export const ACS_DENIED_MINORS = minorsDe('denied');
+
+/**
+ * VACÍA, y a propósito.
+ *
+ * Antes era `[76]`, pero el `76` es **fallo de autenticación facial**, no
+ * salida concedida: 48 de 48 traen `FaceRect` y 0 de 48 traen persona.
+ * Comprobado contra 47.343 eventos reales.
+ *
+ * Consecuencia incómoda que conviene tener escrita: **este hardware no emite
+ * ninguna señal de salida por ACS**. El terminal no distingue entrar de salir;
+ * un pase es un pase. Nunca la emitió — cero de cuatro filas de `Activity`
+ * tienen `acsExitedAt`, precisamente porque el único minor que la producía
+ * jamás traía persona.
+ *
+ * Se deja vacía en vez de inventar una: las salidas siguen deduciéndose por el
+ * heurístico `toggle_exit` de `acs-ops-bridge.service`, que al menos es honesto
+ * sobre lo que es. Cerrar jornadas con un fallo de reconocimiento facial sería
+ * peor que no cerrarlas.
+ */
+export const ACS_EXIT_MINORS: readonly number[] = [];
 
 export type AcsOpsDirection = 'entry' | 'exit' | 'denied' | null;
 
 export function acsOpsDirection(major: number | null, minor: number | null): AcsOpsDirection {
-  if (major !== 5 || minor == null) return null;
-  if ((ACS_EXIT_MINORS as readonly number[]).includes(minor)) return 'exit';
-  if ((ACS_ENTRY_MINORS as readonly number[]).includes(minor)) return 'entry';
-  if ((ACS_DENIED_MINORS as readonly number[]).includes(minor)) return 'denied';
+  if (major !== ACS_MAJOR_DEVICE || minor == null) return null;
+  if (ACS_EXIT_MINORS.includes(minor)) return 'exit';
+  if (isAcsGranted(major, minor)) return 'entry';
+  if (isAcsDenied(major, minor)) return 'denied';
   return null;
 }
 

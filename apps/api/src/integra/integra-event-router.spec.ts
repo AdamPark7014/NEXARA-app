@@ -5,7 +5,9 @@ describe('decideAcsRoutes', () => {
     const d = decideAcsRoutes({
       eventType: 'AccessControllerEvent',
       major: 5,
-      minor: 21,
+      // Antes 21 —la puerta abriéndose—, que no es una denegación. 10 es
+      // antipassback: entrar sin haber registrado la salida. Esa sí.
+      minor: 10,
       deviceName: 'Acceso General',
       hasErpLink: true,
     });

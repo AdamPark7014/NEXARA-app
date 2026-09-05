@@ -10,10 +10,32 @@ describe('acs-ops-bridge.match', () => {
   it('clasifica entrada / salida / denegado', () => {
     expect(acsOpsDirection(5, 75)).toBe('entry');
     expect(acsOpsDirection(5, 1)).toBe('entry');
-    expect(acsOpsDirection(5, 76)).toBe('exit');
-    expect(acsOpsDirection(5, 21)).toBe('denied');
+    // Denegaciones DE VERDAD: sin permiso, credencial caducada, antipassback.
+    // Antes se usaba el 21 como ejemplo de denegación y el 21 es la puerta
+    // abriéndose — lo produce cada concesión legítima.
+    expect(acsOpsDirection(5, 6)).toBe('denied');
+    expect(acsOpsDirection(5, 8)).toBe('denied');
+    expect(acsOpsDirection(5, 10)).toBe('denied');
     expect(acsOpsDirection(5, 99)).toBeNull();
     expect(acsOpsDirection(3, 75)).toBeNull();
+  });
+
+  it('el estado de la puerta y el botón de salida NO son denegaciones', () => {
+    // Esta prueba es la que faltaba. Los cuatro sumaban 44.632 eventos —el
+    // 94,3 % del tráfico ACS de la instalación— y se contaban como denegados.
+    // 21 = puerta desbloqueada, 22 = bloqueada, 23/24 = pulsar y soltar el
+    // botón de salida. Comprobado por la cadena de serialNo del propio equipo:
+    // el 21 llega en el MISMO segundo que la concesión que lo provoca.
+    for (const minor of [21, 22, 23, 24]) {
+      expect(acsOpsDirection(5, minor)).toBeNull();
+    }
+  });
+
+  it('este hardware no emite señal de salida por ACS', () => {
+    // El 76 era la única «salida» y resultó ser fallo de reconocimiento facial:
+    // 48 de 48 con FaceRect y 0 de 48 con persona. Se prefiere no cerrar
+    // jornadas a cerrarlas con una cara no reconocida.
+    expect(acsOpsDirection(5, 76)).toBeNull();
   });
 
   it('detecta Acceso General', () => {

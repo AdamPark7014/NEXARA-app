@@ -16,6 +16,7 @@ import {
 } from '../hikvision-isapi';
 import { resolveUploadsDir } from '../common/uploads-path';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { isAcsDenied, isAcsGranted, minorsDe } from './integra-acs-codes';
 import { IntegraSiteService } from './integra-site.service';
 import { IntegraAcsFanoutService } from './integra-acs-fanout.service';
 import { IntegraEventRouterService } from './integra-event-router.service';
@@ -51,9 +52,16 @@ export type PushEventDto = {
 };
 
 /** Acceso concedido (entrada / salida / genérico). */
-const GRANTED_MINORS = [1, 75, 76];
+const GRANTED_MINORS = minorsDe('granted');
 /** Acceso denegado típico en terminales DS-K1T. */
-const DENIED_MINORS = [21, 22, 23, 24, 27, 28, 29, 31, 32];
+// Ojo con el cambio de significado: esto pasa de 44.634 eventos historicos a
+// uno. Los 21/22/23/24 que lo inflaban eran la puerta abriendose y el boton de
+// salida, no denegaciones. Ver `integra-acs-codes.ts`.
+const DENIED_MINORS = minorsDe('denied');
+/** Puerta forzada y mantenida abierta: incidente, no denegacion. */
+const DOOR_ALARM_MINORS = minorsDe('door_alarm');
+/** Fallo de reconocimiento: no se rechazo a nadie, no se supo quien era. */
+const AUTH_FAILED_MINORS = minorsDe('auth_failed');
 
 /**
  * Recepción de eventos **empujados** por los equipos.
@@ -1389,9 +1397,8 @@ function acsOutcome(
   major: number | null,
   minor: number | null,
 ): 'granted' | 'denied' | null {
-  if (major !== 5 || minor == null) return null;
-  if (GRANTED_MINORS.includes(minor)) return 'granted';
-  if (DENIED_MINORS.includes(minor)) return 'denied';
+  if (isAcsGranted(major, minor)) return 'granted';
+  if (isAcsDenied(major, minor)) return 'denied';
   return null;
 }
 
