@@ -1,0 +1,342 @@
+/*
+ * Bitácora INTEGRA — estilos propios de la página.
+ *
+ * No toca `integra.module.css`: los tokens `--ig-*` los declara `.shell` en el
+ * chrome del panel y heredan hasta aquí, así que esta hoja solo añade lo que la
+ * bitácora necesita y el kit no tiene (fila expandible, barra de paginación,
+ * rejilla de detalle).
+ */
+
+/* ── Tabla con fila expandible ───────────────────────────────────────────── */
+
+.tablaEnvoltorio {
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius);
+  overflow-x: auto;
+  background: var(--ig-panel);
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ig-fs-sm);
+  color: var(--ig-ink);
+}
+
+.tabla th {
+  text-align: left;
+  font-size: var(--ig-fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+  background: color-mix(in srgb, var(--ig-ink) 4%, var(--ig-panel));
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ig-line);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.tabla td {
+  padding: 7px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--ig-line) 60%, transparent);
+  vertical-align: top;
+}
+
+.filaResumen:hover td {
+  background: color-mix(in srgb, var(--ig-accent) 5%, transparent);
+}
+
+.filaResumen[data-abierta="1"] td {
+  background: color-mix(in srgb, var(--ig-accent) 8%, transparent);
+}
+
+/*
+ * Marca de acción crítica. Es una barra a la izquierda y NO es el único
+ * portador del significado: la fila lleva además su etiqueta «Crítica».
+ */
+.filaResumen[data-critica="1"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--ig-warn);
+}
+
+.celdaCuando {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.celdaRelativa {
+  display: block;
+  font-size: var(--ig-fs-micro);
+  color: var(--ig-muted);
+}
+
+.celdaMono {
+  font-family: var(--ig-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--ig-fs-xs);
+  color: var(--ig-muted);
+}
+
+.accionNombre {
+  font-weight: 650;
+}
+
+.accionCodigo {
+  display: block;
+  font-family: var(--ig-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--ig-fs-micro);
+  color: var(--ig-muted);
+}
+
+.actorNombre {
+  display: block;
+}
+
+.actorSistema {
+  color: var(--ig-muted);
+  font-style: italic;
+}
+
+/* ── Botón de desplegar ──────────────────────────────────────────────────── */
+
+.desplegar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--ig-line);
+  background: var(--ig-panel);
+  color: var(--ig-ink-soft);
+  border-radius: var(--ig-radius-sm);
+  padding: 3px 8px 3px 5px;
+  font-size: var(--ig-fs-xs);
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.desplegar:hover {
+  border-color: color-mix(in srgb, var(--ig-accent) 45%, var(--ig-line));
+  color: var(--ig-accent);
+}
+
+.desplegar:focus-visible,
+.paginaBtn:focus-visible,
+.chip:focus-visible {
+  outline: 2px solid var(--ig-accent);
+  outline-offset: 2px;
+}
+
+.desplegarIcono {
+  display: inline-flex;
+  transition: transform 120ms ease;
+}
+
+.desplegar[aria-expanded="true"] .desplegarIcono {
+  transform: rotate(90deg);
+}
+
+/* ── Detalle ─────────────────────────────────────────────────────────────── */
+
+/* `display: table-row` de la hoja del navegador puede ganarle a `[hidden]`. */
+.filaDetalle[hidden] {
+  display: none;
+}
+
+.filaDetalle > td {
+  background: color-mix(in srgb, var(--ig-ink) 3%, var(--ig-panel));
+  padding: 12px 14px 14px;
+  border-bottom: 2px solid var(--ig-line);
+}
+
+.detalleRejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px 16px;
+  margin: 0 0 12px;
+}
+
+.detalleCampo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.detalleClave {
+  font-size: var(--ig-fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+}
+
+.detalleValor {
+  font-size: var(--ig-fs-md);
+  color: var(--ig-ink);
+  overflow-wrap: anywhere;
+}
+
+.detalleCampo[data-destacado="1"] .detalleValor {
+  font-weight: 700;
+  color: var(--ig-accent-deep, var(--ig-accent));
+}
+
+.detalleVacio {
+  margin: 0 0 10px;
+  font-size: var(--ig-fs-md);
+  color: var(--ig-muted);
+}
+
+.jsonBloque {
+  margin: 0;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--ig-ink) 6%, var(--ig-panel));
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-sm);
+  font-family: var(--ig-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--ig-fs-xs);
+  line-height: 1.5;
+  color: var(--ig-ink-soft);
+  /* El JSON completo, con scroll. Nunca recortado. */
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.jsonTitulo {
+  margin: 0 0 5px;
+  font-size: var(--ig-fs-micro);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+}
+
+/* ── Chips de rango rápido ───────────────────────────────────────────────── */
+
+.chips {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  border: 1px solid var(--ig-line);
+  background: var(--ig-panel);
+  color: var(--ig-ink-soft);
+  border-radius: var(--ig-radius-pill);
+  padding: 4px 11px;
+  font-size: var(--ig-fs-xs);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: color-mix(in srgb, var(--ig-accent) 45%, var(--ig-line));
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--ig-accent);
+  border-color: var(--ig-accent);
+  color: #fff;
+}
+
+/* ── Paginación ──────────────────────────────────────────────────────────── */
+
+.paginacion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 2px 2px;
+}
+
+.paginacionInfo {
+  font-size: var(--ig-fs-sm);
+  color: var(--ig-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.paginacionMandos {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.paginaBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 28px;
+  border: 1px solid var(--ig-line);
+  background: var(--ig-panel);
+  color: var(--ig-ink-soft);
+  border-radius: var(--ig-radius-sm);
+  cursor: pointer;
+}
+
+.paginaBtn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ig-accent) 45%, var(--ig-line));
+  color: var(--ig-accent);
+}
+
+.paginaBtn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.paginaActual {
+  font-size: var(--ig-fs-sm);
+  font-weight: 650;
+  color: var(--ig-ink);
+  padding: 0 6px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Contadores de la toolbar ────────────────────────────────────────────── */
+
+.resumen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+  font-size: var(--ig-fs-sm);
+  color: var(--ig-muted);
+}
+
+.resumenDato {
+  font-weight: 700;
+  color: var(--ig-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.resumenCritico {
+  font-weight: 700;
+  color: var(--ig-warn);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Accesibilidad ───────────────────────────────────────────────────────── */
+
+.soloLectores {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desplegarIcono {
+    transition: none;
+  }
+}
