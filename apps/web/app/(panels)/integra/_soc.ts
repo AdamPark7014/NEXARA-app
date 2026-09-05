@@ -61,6 +61,81 @@ export type AlarmQueueResponse = {
   siteId?: number | null;
 };
 
+/* ── Tipo de alarma ─────────────────────────────────────────────────────── */
+
+/**
+ * Hoy el backend solo emite `DENIED` y `AFTER_HOURS` (`SocAlarmKind` en
+ * `integra-acs-alarms.policy.ts:9`). Hay otro agente añadiendo ahora mismo
+ * puerta forzada, mantenida abierta, antipassback, credencial caducada, lista
+ * negra y sabotaje de cámara.
+ *
+ * Por eso esto NO es un `Record<SocAlarmKind, string>`: en cuanto el backend
+ * emita un `kind` que este bundle no conoce —y va a pasar, porque el API se
+ * despliega antes que el front— la tabla tiene que seguir legible. Los que ya
+ * están anunciados se traducen bien desde hoy; cualquier otro cae en
+ * `humanizeKind()` y sale como texto, nunca como enum crudo.
+ */
+export const ALARM_KIND_LABEL: Readonly<Record<string, string>> = Object.freeze({
+  DENIED: "Acceso denegado",
+  AFTER_HOURS: "Entrada fuera de horario",
+  DOOR_FORCED: "Puerta forzada",
+  DOOR_HELD_OPEN: "Puerta mantenida abierta",
+  ANTIPASSBACK: "Antipassback",
+  CREDENTIAL_EXPIRED: "Credencial caducada",
+  BLOCKLIST: "Persona en lista negra",
+  // El `minor 76`: el equipo vio una cara y no la reconoció, en ráfaga de
+  // reintentos. Es salud del lector, no un intento de intrusión.
+  AUTH_FAILURE_BURST: "Ráfaga de fallos de reconocimiento",
+  CAMERA_TAMPER: "Sabotaje de cámara",
+});
+
+/** `DOOR_HELD_OPEN` → «Door held open». Feo, pero legible; el enum crudo no lo es. */
+function humanizeKind(raw: string): string {
+  const words = raw
+    .trim()
+    .replace(/[_.-]+/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!words.length) return "";
+  const joined = words.join(" ");
+  return joined.charAt(0).toUpperCase() + joined.slice(1);
+}
+
+/** ¿Este bundle sabe qué es este `kind`? Sirve para avisar en el detalle. */
+export function isKnownAlarmKind(kind: string | null | undefined): boolean {
+  const k = String(kind ?? "").trim().toUpperCase();
+  return k !== "" && k in ALARM_KIND_LABEL;
+}
+
+/**
+ * Etiqueta legible de un tipo de alarma. Nunca devuelve el enum crudo y nunca
+ * revienta: sin `kind`, cae al `eventType` (`acs.denied` → «Acs denied»), y sin
+ * ninguno de los dos, cadena vacía para que quien llame decida qué pintar.
+ */
+export function alarmKindLabel(
+  kind: string | null | undefined,
+  eventType?: string | null,
+): string {
+  const k = String(kind ?? "").trim();
+  if (k) {
+    const known = ALARM_KIND_LABEL[k.toUpperCase()];
+    if (known) return known;
+    const human = humanizeKind(k);
+    if (human) return human;
+  }
+  const et = String(eventType ?? "").trim();
+  if (et) {
+    // `acs.after_hours` es el eventType que fabrica el backend a partir del kind.
+    const tail = et.includes(".") ? et.slice(et.lastIndexOf(".") + 1) : et;
+    const known = ALARM_KIND_LABEL[tail.toUpperCase()];
+    if (known) return known;
+    return humanizeKind(tail);
+  }
+  return "";
+}
+
 /* ── Severidad ──────────────────────────────────────────────────────────── */
 
 export type SocSeverity = "alta" | "media" | "baja" | "desconocida";
