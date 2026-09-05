@@ -81,6 +81,7 @@ export {
 export {
   ALARM_CONFIDENCES,
   APPENDIX_B_EVENT_TYPES,
+  CAMERA_HEALTH_EVENT_TYPES,
   DEFAULT_SENSITIVITY,
   DETECTION_TARGETS,
   MAX_DETECTION_REGIONS,
@@ -89,6 +90,7 @@ export {
   fullFrameRegion,
   isAlarmConfidence,
   isAppendixBEventType,
+  isCameraHealthEventType,
   isDetectionTarget,
   parseSmartCapabilities,
   patchFieldDetectionXml,
@@ -103,6 +105,7 @@ export {
   upsertTag,
   type AlarmConfidence,
   type AppendixBEventType,
+  type CameraHealthEventType,
   type DetectionTarget,
   type DetectionTuning,
   type FieldDetectionPatch,

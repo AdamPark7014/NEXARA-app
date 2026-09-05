@@ -2,15 +2,24 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ServiceClientsService } from '../service-clients/service-clients.service.js';
 import {
+  alarmEscalationThreshold,
   alarmFingerprint,
+  alarmKindLabel,
+  alarmSeverity,
   alarmTitle,
+  authFailedMinors,
+  cameraFaultLabel,
+  classifyCameraForAlarm,
   classifyPushForAlarm,
   parseAlarmPolicy,
+  parseSocAlarmKind,
   parseSocId,
+  socAlarmEventType,
   socExternalId,
   type AlarmPolicy,
   type SocAlarmKind,
 } from './integra-acs-alarms.policy';
+import { ACS_MAJOR_DEVICE, classifyAcsMinor } from './integra-acs-codes';
 
 export type SocQueueItem = {
   id: string;
@@ -65,19 +74,29 @@ export class IntegraAcsAlarmsService {
     deviceIp?: string | null;
     deviceName?: string | null;
     photoPath?: string | null;
+    /** Repeticiones que declara el propio equipo (Apéndice A.49). */
+    activePostCount?: number | null;
   }): Promise<{ alarmId: number; escalated: boolean } | null> {
-    const site = await this.prisma.integraSite.findUnique({
-      where: { id: input.siteId },
-      select: { id: true, companyId: true, alarmPolicy: true, serviceClientId: true, label: true, name: true },
-    });
-    if (!site || site.companyId !== input.companyId) return null;
+    const site = await this.loadSite(input.companyId, input.siteId);
+    if (!site) return null;
 
     const policy = parseAlarmPolicy(site.alarmPolicy);
+
+    // Los fallos de reconocimiento solo alarman en ráfaga, así que hay que
+    // saber cuántos lleva ese lector. Es UNA consulta y solo en ese caso: en
+    // tres meses hubo 48 eventos así, o sea 48 consultas en un trimestre.
+    let recentAuthFailures: number | null = null;
+    if (classifyAcsMinor(input.major, input.minor).kind === 'auth_failed') {
+      recentAuthFailures = await this.countRecentAuthFailures(input, policy);
+    }
+
     const kind = classifyPushForAlarm({
       major: input.major,
       minor: input.minor,
       occurredAt: input.occurredAt,
       policy,
+      activePostCount: input.activePostCount,
+      recentAuthFailures,
     });
     if (!kind) return null;
 
@@ -88,14 +107,128 @@ export class IntegraAcsAlarmsService {
       doorNo: input.doorNo,
       deviceIp: input.deviceIp,
     });
-    const title = alarmTitle(kind, input.personName);
-    const severity = kind === 'DENIED' ? 'alta' : 'media';
-    const windowStart = new Date(input.occurredAt.getTime() - policy.windowMinutes * 60_000);
+    const title = alarmTitle(kind, {
+      personName: input.personName,
+      place: doorName || input.deviceName || input.deviceIp,
+    });
+    const severity = alarmSeverity(kind);
+
+    return this.upsertAlarm({
+      site,
+      policy,
+      kind,
+      fingerprint,
+      title,
+      severity,
+      pushEventId: input.pushEventId,
+      occurredAt: input.occurredAt,
+      personId: input.personId ?? null,
+      personName: input.personName ?? null,
+      doorNo: input.doorNo ?? null,
+      doorName,
+      deviceIp: input.deviceIp ?? null,
+      deviceName: input.deviceName ?? null,
+      photoPath: input.photoPath ?? null,
+    });
+  }
+
+  /**
+   * Salud de cámara: tapada, desenfocada o movida.
+   *
+   * Es la única alarma del sistema que **no habla de una persona**: habla del
+   * propio sistema. Una cámara tapada no genera detecciones, así que sin esto
+   * la consola no distingue «no ha pasado nada» de «llevo tres días ciego».
+   *
+   * Cada avería de una cámara es su propia fila (`source` en la huella): tapada
+   * y desenfocada son dos trabajos distintos, no la misma alarma repetida.
+   *
+   * **Nunca se ha visto una en campo**, porque hasta hoy estos tipos de evento
+   * no estaban cableados a `center` y el equipo no los empujaba. `camLabel` de
+   * `integra-push.parse.ts` llevaba desde el principio la etiqueta de
+   * `shelteralarm` y era código muerto por eso mismo.
+   */
+  async onCameraEvent(input: {
+    companyId: number;
+    siteId: number;
+    pushEventId: number;
+    eventType: string;
+    occurredAt: Date;
+    deviceIp?: string | null;
+    deviceName?: string | null;
+    photoPath?: string | null;
+  }): Promise<{ alarmId: number; escalated: boolean } | null> {
+    const site = await this.loadSite(input.companyId, input.siteId);
+    if (!site) return null;
+
+    const kind = classifyCameraForAlarm(input.eventType);
+    if (!kind) return null;
+
+    const policy = parseAlarmPolicy(site.alarmPolicy);
+    const place =
+      (input.deviceName || '').trim() ||
+      (await this.resolveDeviceName(input.siteId, input.deviceIp)) ||
+      (input.deviceIp || '').trim() ||
+      null;
+
+    return this.upsertAlarm({
+      site,
+      policy,
+      kind,
+      fingerprint: alarmFingerprint({
+        kind,
+        deviceIp: input.deviceIp,
+        source: input.eventType,
+      }),
+      title: alarmTitle(kind, { place, cameraEventType: input.eventType }),
+      severity: alarmSeverity(kind, { cameraEventType: input.eventType }),
+      pushEventId: input.pushEventId,
+      occurredAt: input.occurredAt,
+      personId: null,
+      personName: null,
+      doorNo: null,
+      // La cámara no es una puerta: el nombre va en `deviceName`, y `doorName`
+      // se deja vacío para que la consola no ofrezca abrir una puerta que no
+      // existe.
+      doorName: null,
+      deviceIp: input.deviceIp ?? null,
+      deviceName: place,
+      photoPath: input.photoPath ?? null,
+    });
+  }
+
+  /** Abre o repite la alarma y, si toca, la escala a ticket. */
+  private async upsertAlarm(args: {
+    site: {
+      id: number;
+      companyId: number;
+      serviceClientId: number | null;
+      label: string | null;
+      name: string;
+    };
+    policy: AlarmPolicy;
+    kind: SocAlarmKind;
+    fingerprint: string;
+    title: string;
+    severity: string;
+    pushEventId: number;
+    occurredAt: Date;
+    personId: string | null;
+    personName: string | null;
+    doorNo: number | null;
+    doorName: string | null;
+    deviceIp: string | null;
+    deviceName: string | null;
+    photoPath: string | null;
+  }): Promise<{ alarmId: number; escalated: boolean }> {
+    const { site, policy, kind } = args;
+    const windowStart = new Date(
+      args.occurredAt.getTime() - policy.windowMinutes * 60_000,
+    );
 
     const existing = await this.prisma.integraSocAlarm.findFirst({
       where: {
-        siteId: input.siteId,
-        fingerprint,
+        siteId: site.id,
+        fingerprint: args.fingerprint,
         status: { in: ['OPEN', 'ACK', 'TICKETED'] },
         lastOccurredAt: { gte: windowStart },
       },
@@ -108,41 +241,41 @@ export class IntegraAcsAlarmsService {
         where: { id: existing.id },
         data: {
           status: existing.status === 'CLEARED' ? 'OPEN' : existing.status === 'ACK' ? 'OPEN' : existing.status,
-          title,
-          severity,
-          personId: input.personId ?? existing.personId,
-          personName: input.personName ?? existing.personName,
-          doorNo: input.doorNo ?? existing.doorNo,
-          doorName: doorName ?? existing.doorName,
-          deviceIp: input.deviceIp ?? existing.deviceIp,
-          deviceName: input.deviceName ?? existing.deviceName,
-          photoPath: input.photoPath || existing.photoPath,
-          pushEventId: input.pushEventId,
+          title: args.title,
+          severity: args.severity,
+          personId: args.personId ?? existing.personId,
+          personName: args.personName ?? existing.personName,
+          doorNo: args.doorNo ?? existing.doorNo,
+          doorName: args.doorName ?? existing.doorName,
+          deviceIp: args.deviceIp ?? existing.deviceIp,
+          deviceName: args.deviceName ?? existing.deviceName,
+          photoPath: args.photoPath || existing.photoPath,
+          pushEventId: args.pushEventId,
           occurrenceCount: existing.occurrenceCount + 1,
-          lastOccurredAt: input.occurredAt,
+          lastOccurredAt: args.occurredAt,
         },
       });
     } else {
       row = await this.prisma.integraSocAlarm.create({
         data: {
-          companyId: input.companyId,
-          siteId: input.siteId,
+          companyId: site.companyId,
+          siteId: site.id,
           kind,
           status: 'OPEN',
-          fingerprint,
-          title,
-          severity,
-          personId: input.personId ?? null,
-          personName: input.personName ?? null,
-          doorNo: input.doorNo ?? null,
-          doorName,
-          deviceIp: input.deviceIp ?? null,
-          deviceName: input.deviceName ?? null,
-          photoPath: input.photoPath ?? null,
-          pushEventId: input.pushEventId,
+          fingerprint: args.fingerprint,
+          title: args.title,
+          severity: args.severity,
+          personId: args.personId,
+          personName: args.personName,
+          doorNo: args.doorNo,
+          doorName: args.doorName,
+          deviceIp: args.deviceIp,
+          deviceName: args.deviceName,
+          photoPath: args.photoPath,
+          pushEventId: args.pushEventId,
           occurrenceCount: 1,
-          firstOccurredAt: input.occurredAt,
-          lastOccurredAt: input.occurredAt,
+          firstOccurredAt: args.occurredAt,
+          lastOccurredAt: args.occurredAt,
         },
       });
     }
@@ -150,7 +283,7 @@ export class IntegraAcsAlarmsService {
     let escalated = false;
     if (
       !row.ticketRequestId &&
-      row.occurrenceCount >= policy.denialThreshold &&
+      row.occurrenceCount >= alarmEscalationThreshold(kind, policy) &&
       site.serviceClientId
     ) {
       try {
@@ -174,6 +307,76 @@ export class IntegraAcsAlarmsService {
     }
 
     return { alarmId: row.id, escalated };
+  }
+
+  private async loadSite(companyId: number, siteId: number) {
+    const site = await this.prisma.integraSite.findUnique({
+      where: { id: siteId },
+      select: {
+        id: true,
+        companyId: true,
+        alarmPolicy: true,
+        serviceClientId: true,
+        label: true,
+        name: true,
+      },
+    });
+    if (!site || site.companyId !== companyId) return null;
+    return site;
+  }
+
+  /**
+   * Cuántos fallos de reconocimiento lleva ESE lector en la ventana.
+   *
+   * Se cuenta sobre lo ya persistido en vez de fiarse solo de
+   * `activePostCount`: el campo está documentado para el aviso de cámara y no
+   * hay confirmación de que el terminal ACS lo mande. Contar es barato aquí —
+   * 48 eventos en tres meses— y funciona con cualquier firmware.
+   */
+  private async countRecentAuthFailures(
+    input: {
+      siteId: number;
+      occurredAt: Date;
+      deviceIp?: string | null;
+      doorNo?: number | null;
+    },
+    policy: AlarmPolicy,
+  ): Promise<number> {
+    const since = new Date(
+      input.occurredAt.getTime() - policy.authFailWindowMinutes * 60_000,
+    );
+    return this.prisma.integraPushEvent.count({
+      where: {
+        siteId: input.siteId,
+        major: ACS_MAJOR_DEVICE,
+        minor: { in: authFailedMinors() },
+        occurredAt: { gte: since, lte: input.occurredAt },
+        // Mismo lector: un fallo en Acceso General y otro en Sala de Juntas no
+        // son la misma avería.
+        ...(input.deviceIp ? { deviceIp: input.deviceIp } : {}),
+      },
+    });
+  }
+
+  /**
+   * Nombre del equipo por IP, para que la alarma diga DÓNDE.
+   *
+   * Se busca en `IntegraDevice`, no en `IntegraCamera`: la cámara del espejo no
+   * tiene columna de IP —la guarda dentro de `raw.source.ipAddress`— y filtrar
+   * por JSON para pintar un título no compensa. Lo normal es que ni haga falta:
+   * el propio aviso trae `channelName` y eso ya es el nombre de la cámara.
+   */
+  private async resolveDeviceName(
+    siteId: number,
+    deviceIp?: string | null,
+  ): Promise<string | null> {
+    const ip = (deviceIp || '').trim();
+    if (!ip) return null;
+    const dev = await this.prisma.integraDevice.findFirst({
+      where: { siteId, ip },
+      select: { name: true },
+    });
+    return dev?.name?.trim() ? dev.name.trim().slice(0, 220) : null;
   }
 
   async listQueue(
@@ -311,10 +514,13 @@ export class IntegraAcsAlarmsService {
     const description = [
       body?.title || row.title,
       body?.description,
-      `Tipo: ${row.kind === 'AFTER_HOURS' ? 'Entrada fuera de horario' : 'Acceso denegado'}`,
+      `Tipo: ${alarmKindLabel(parseSocAlarmKind(row.kind))}`,
       `Persona: ${row.personName || row.personId || 'desconocida'}`,
       `Puerta: ${door}`,
-      `Repeticiones: ${row.occurrenceCount} (umbral ${policy.denialThreshold} / ${policy.windowMinutes} min)`,
+      `Repeticiones: ${row.occurrenceCount} (umbral ${alarmEscalationThreshold(
+        parseSocAlarmKind(row.kind),
+        policy,
+      )} / ${policy.windowMinutes} min)`,
       `Último: ${row.lastOccurredAt.toISOString()}`,
       body?.severity || row.severity ? `Severidad: ${body?.severity || row.severity}` : null,
       row.photoPath ? `Foto: ${row.photoPath}` : null,
@@ -381,6 +587,11 @@ export class IntegraAcsAlarmsService {
       r.deviceName ||
       r.deviceIp ||
       '';
+    // Las filas anteriores a las alarmas de puerta y cámara solo traen DENIED o
+    // AFTER_HOURS; `parseSocAlarmKind` las deja como estaban y evita que una
+    // fila con un `kind` nuevo se enseñe como «acceso denegado», que era lo que
+    // hacía el ternario que había aquí.
+    const kind = parseSocAlarmKind(r.kind);
     return {
       id: socExternalId(r.id),
       status: r.status,
@@ -390,12 +601,12 @@ export class IntegraAcsAlarmsService {
       srcName: doorLabel,
       cameraIndexCode: null,
       doorIndexCode: r.doorNo != null ? String(r.doorNo) : null,
-      eventType: r.kind === 'AFTER_HOURS' ? 'acs.after_hours' : 'acs.denied',
+      eventType: socAlarmEventType(kind),
       note: r.note,
       ackedAt: r.status === 'ACK' || r.status === 'TICKETED' ? r.updatedAt.toISOString() : null,
       clearedAt: null,
       source: 'push',
-      kind: (r.kind === 'AFTER_HOURS' ? 'AFTER_HOURS' : 'DENIED') as SocAlarmKind,
+      kind,
       personId: r.personId,
       personName: r.personName,
       photoPath: r.photoPath,

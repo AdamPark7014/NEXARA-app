@@ -11,6 +11,7 @@ import {
   enableMotionDetection,
   enableNvrParkingVehicleDetection,
   ensureSmartEventTriggersCenter,
+  isCameraHealthEventType,
   readHttpNotificationHosts,
   setHttpNotificationHost,
 } from '../hikvision-isapi';
@@ -1268,8 +1269,17 @@ export class IntegraPushService {
         .catch(() => undefined);
     }
 
-    // ACS → router (Ops presencia OT + alarma SOC denegado + stubs). Best-effort.
-    if (ev.eventType === 'AccessControllerEvent' && ev.major === 5) {
+    // Al router: control de acceso (Ops presencia OT + cola SOC + stubs) y los
+    // tres avisos de salud de cámara.
+    //
+    // Esta condición era `eventType === 'AccessControllerEvent' && major === 5`
+    // a secas, y por eso NINGUNA detección de cámara alimentaba jamás una regla
+    // de negocio. Se abre lo justo: `isCameraHealthEventType` son tres tipos
+    // —tapada, desenfocada, movida—, no las detecciones normales. Un
+    // `fielddetection` sigue sin llegar aquí, que es lo correcto: dispara a
+    // todas horas por diseño y llenaría la cola SOC de nada.
+    const acsForRouter = ev.eventType === 'AccessControllerEvent' && ev.major === 5;
+    if (acsForRouter || isCameraHealthEventType(ev.eventType)) {
       void this.eventRouter
         .onPushEvent(
           site,
@@ -1283,12 +1293,13 @@ export class IntegraPushService {
             deviceName: ev.deviceName,
             doorNo: ev.doorNo,
             deviceIp: ev.deviceIp,
+            activePostCount: ev.activePostCount,
           },
           { pushEventId: row.id, photoPath },
         )
         .catch((e) => {
           this.logger.warn(
-            `ACS→router: ${e instanceof Error ? e.message : String(e)}`,
+            `push→router: ${e instanceof Error ? e.message : String(e)}`,
           );
         });
     }
