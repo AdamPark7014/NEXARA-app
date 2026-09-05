@@ -49,6 +49,10 @@ import { IntegraPresenceService } from './integra-presence.service';
 import { IntegraRecurringVisitorsService } from './integra-recurring-visitors.service';
 import { IntegraAcsAlarmsService } from './integra-acs-alarms.service';
 import { IntegraEventRouterService } from './integra-event-router.service';
+import {
+  IntegraDetectionService,
+  type DetectionProfilePatch,
+} from './integra-detection.service';
 import { parseSocId } from './integra-acs-alarms.policy';
 import { IdentityLinkService } from '../identity/identity-link.service';
 
@@ -298,6 +302,32 @@ class RecurringVisitorCreateDto {
   @IsOptional() @IsString() notes?: string;
 }
 
+/**
+ * Perfil de detección de una cámara. Los `null` explícitos son significativos:
+ * «vuelve al valor por defecto», que no es lo mismo que no mandar el campo.
+ *
+ * La validación de enums y rangos vive en `IntegraDetectionService`, para que
+ * el mismo listón valga entrando por HTTP o desde otro servicio.
+ */
+class DetectionPatchDto {
+  @IsOptional() @IsBoolean() enabled?: boolean;
+  /** 0..100 (rango DOCUMENTADO, Apéndice A.49). null = 50. */
+  @IsOptional() @Allow() sensitivity?: number | null;
+  /** low | mediumLow | mediumHigh | high. */
+  @IsOptional() @Allow() alarmConfidence?: string | null;
+  /** human | vehicle | human,vehicle. */
+  @IsOptional() @Allow() detectionTarget?: string | null;
+  /** Hasta 4 polígonos normalizados: [[{"x":0.1,"y":0.5}, …], …]. */
+  @IsOptional() @Allow() regions?: unknown;
+  /** eventType EXTRA del Apéndice B para esta cámara. */
+  @IsOptional() @Allow() eventTypes?: unknown;
+  @IsOptional() @Allow() timeThresholdSec?: number | null;
+  @IsOptional() @Allow() minTargetPct?: number | null;
+  @IsOptional() @Allow() schedule?: unknown;
+  @IsOptional() @Allow() channel?: number | null;
+  @IsOptional() @Allow() deviceIp?: string | null;
+}
+
 @ApiTags('Integra · Artemis')
 @ApiBearerAuth()
 @UseGuards(RbacGuard)
@@ -317,6 +347,7 @@ export class IntegraController {
     private readonly recurringVisitors: IntegraRecurringVisitorsService,
     private readonly acsAlarms: IntegraAcsAlarmsService,
     private readonly eventRouter: IntegraEventRouterService,
+    private readonly detection: IntegraDetectionService,
   ) {}
 
   @Get('health')
@@ -613,6 +644,98 @@ export class IntegraController {
     @Query('siteId') siteId?: string,
   ) {
     return this.integra.capture(companyId, id, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  // ── Detección por cámara ─────────────────────────────
+  //
+  // Antes de esto la detección era una plantilla fija: fotograma completo y
+  // sensibilidad 100 en las dieciséis cámaras. Ahora cada una tiene su zona,
+  // su sensibilidad y su lista de eventos.
+
+  @Get('cameras/:id/detection')
+  @ApiOperation({ summary: 'Perfil de detección de la cámara, con lo que se le escribiría hoy' })
+  detectionProfile(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.detection.getProfile(companyId, id, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  @Patch('cameras/:id/detection')
+  @ApiOperation({ summary: 'Edita el perfil. NO escribe en el equipo: eso es /apply' })
+  detectionProfileUpdate(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @Body() dto: DetectionPatchDto,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    // Mismo listón que el resto de mutadores de configuración del controlador.
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para configurar equipos');
+    }
+    return this.detection.updateProfile(
+      companyId,
+      id,
+      dto as DetectionProfilePatch,
+      siteId ? parseInt(siteId, 10) : null,
+    );
+  }
+
+  @Post('cameras/:id/detection/apply')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Escribe el perfil en el equipo (FieldDetection, línea y triggers)' })
+  detectionProfileApply(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para configurar equipos');
+    }
+    return this.detection.applyProfile(companyId, id, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  @Post('cameras/:id/detection/capabilities')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Pregunta a la cámara qué detecciones admite y lo persiste' })
+  detectionCapabilitiesProbe(
+    @CurrentCompanyId() companyId: number | null,
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    // Es una lectura del equipo, pero deja fila en base y abre sesión ISAPI
+    // contra el parque del cliente: mismo listón que configurar.
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para sondear equipos');
+    }
+    return this.detection.probeCapabilities(companyId, id, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  @Get('detection/capabilities')
+  @ApiOperation({ summary: 'Lo que cada cámara del sitio declara soportar (ya sondeado)' })
+  detectionCapabilities(
+    @CurrentCompanyId() companyId: number | null,
+    @Query('siteId') siteId?: string,
+  ) {
+    return this.detection.listCapabilities(companyId, siteId ? parseInt(siteId, 10) : null);
+  }
+
+  @Post('detection/capabilities/probe')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sondea /ISAPI/Smart/capabilities en todas las cámaras del sitio' })
+  detectionCapabilitiesProbeAll(
+    @CurrentCompanyId() companyId: number | null,
+    @CurrentUser() user: any,
+    @Query('siteId') siteId?: string,
+  ) {
+    if (!integraCanSettings(user)) {
+      throw new BadRequestException('Sin permiso para sondear equipos');
+    }
+    return this.detection.probeSiteCapabilities(companyId, siteId ? parseInt(siteId, 10) : null);
   }
 
   // ── Doors / access ─────────────────────────────────────────────────
@@ -1325,6 +1448,7 @@ export class IntegraController {
     @Query('live') live?: string,
     @Query('scope') scope?: string,
     @Query('outcome') outcome?: string,
+    @Query('eventState') eventState?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
@@ -1335,6 +1459,9 @@ export class IntegraController {
       scope === 'acs' || scope === 'noise' || scope === 'all' ? scope : null;
     const outcomeNorm =
       outcome === 'granted' || outcome === 'denied' ? outcome : null;
+    // Solo los dos valores del Apéndice A.49; cualquier otra cosa = sin filtro.
+    const eventStateNorm =
+      eventState === 'active' || eventState === 'inactive' ? eventState : null;
     const fromDate = from ? new Date(from) : null;
     const toDate = to ? new Date(to) : null;
     if (fromDate && Number.isNaN(fromDate.getTime())) {
@@ -1355,6 +1482,7 @@ export class IntegraController {
       liveOnly: live === '1' || live === 'true',
       scope: scopeNorm,
       outcome: outcomeNorm,
+      eventState: eventStateNorm,
       from: fromDate,
       to: toDate,
     });
