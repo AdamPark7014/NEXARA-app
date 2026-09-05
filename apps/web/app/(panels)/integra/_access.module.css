@@ -266,11 +266,29 @@
   background: color-mix(in srgb, var(--ig-danger, #b91c1c) 6%, var(--ig-panel, #fff));
 }
 
+/*
+ * `warn` = el servidor contestó y está sano; el problema es de permisos, de
+ * sesión o de datos. Pintarlo en rojo de caída hace que el operador llame a
+ * soporte por algo que se arregla volviendo a entrar.
+ */
+.retryBox[data-tone="warn"] {
+  border-color: color-mix(in srgb, var(--ig-warn, #b45309) 32%, var(--ig-line, #d9e0e8));
+  border-left-color: var(--ig-warn, #b45309);
+  background: color-mix(in srgb, var(--ig-warn, #b45309) 7%, var(--ig-panel, #fff));
+}
+
 .retryTitle {
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--ig-fs-md, 13px);
   font-weight: 700;
   color: var(--ig-danger, #b91c1c);
+}
+
+.retryBox[data-tone="warn"] .retryTitle {
+  color: var(--ig-warn, #b45309);
 }
 
 .retryMsg {

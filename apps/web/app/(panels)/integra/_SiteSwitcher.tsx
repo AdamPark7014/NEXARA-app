@@ -1,11 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  getActiveIntegraSiteId,
-  setActiveIntegraSiteId,
-  integraApi,
-} from "./_lib";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import { getActiveIntegraSiteId, setActiveIntegraSiteId } from "./_lib";
+import { diagnosticar, pedirIntegra, type Diagnostico } from "./_fallosApi";
 import styles from "./integra.module.css";
 
 type Site = {
@@ -21,10 +19,18 @@ type Site = {
 export function IntegraSiteSwitcher({ onChange }: { onChange?: (id: number | null) => void }) {
   const [sites, setSites] = useState<Site[]>([]);
   const [active, setActive] = useState<number | null>(null);
+  /**
+   * Un fallo al pedir los sitios se traga y se pintaba «Sin sitios
+   * configurados»: el operador leía que su empresa no tiene nada dado de alta
+   * cuando lo que pasaba es que el backend estaba caído o su rol no llega. Son
+   * conclusiones opuestas, así que el fallo se guarda y se dice.
+   */
+  const [fallo, setFallo] = useState<Diagnostico | null>(null);
 
   const load = useCallback(async () => {
+    setFallo(null);
     try {
-      const list = await integraApi<Site[]>("integra/sites");
+      const list = await pedirIntegra<Site[]>("integra/sites");
       setSites(list);
       const saved = getActiveIntegraSiteId();
       const pick =
@@ -34,14 +40,23 @@ export function IntegraSiteSwitcher({ onChange }: { onChange?: (id: number | nul
         null;
       setActive(pick);
       if (pick) setActiveIntegraSiteId(pick);
-    } catch {
+    } catch (e) {
       setSites([]);
+      setFallo(diagnosticar(e, "cargar los sitios"));
     }
   }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  if (fallo) {
+    return (
+      <span className={styles.siteMuted} role="status" title={fallo.cuerpo}>
+        {fallo.titulo}
+      </span>
+    );
+  }
 
   if (sites.length === 0) {
     return <span className={styles.siteMuted}>Sin sitios configurados</span>;
@@ -89,10 +104,10 @@ export function IntegraSiteSwitcher({ onChange }: { onChange?: (id: number | nul
         type="button"
         className={styles.siteReload}
         onClick={() => void load()}
-        aria-label="Recargar sitios"
+        aria-label="Recargar la lista de sitios"
         title="Recargar"
       >
-        ↻
+        <RefreshIcon fontSize="inherit" aria-hidden />
       </button>
     </div>
   );

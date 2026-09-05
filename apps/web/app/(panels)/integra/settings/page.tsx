@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SyncIcon from "@mui/icons-material/Sync";
 import EmptyState from "@/components/ui/EmptyState";
@@ -19,7 +20,7 @@ import {
 import { RetryNotice, RowsSkeleton } from "../_AccessUi";
 import { ModuleSwitch } from "../_ModuleSwitch";
 import { getActiveCompanyId } from "@/lib/tenant";
-import { inputStyle, integraApi, selectStyle } from "../_lib";
+import { diagnosticar, pedirIntegra, type Diagnostico } from "../_fallosApi";
 import styles from "../integra.module.css";
 import a from "../_access.module.css";
 
@@ -53,6 +54,42 @@ const HCT_ARTEMIS_ONLY = new Set(["people", "visitors", "vehicles", "anpr"]);
 
 const MODULE_KEYS = Object.keys(MODULE_LABELS);
 
+/** Cliente del ERP. El endpoint devuelve lista suelta o envuelta, y el nombre
+ *  viaja en `name` o en `nombre` según la versión: se normaliza aquí. */
+type ServiceClient = { id: number; name: string };
+
+/** Forma cruda de `service-clients`: nada garantizado, todo se valida. */
+type ServiceClientRaw = {
+  id?: unknown;
+  name?: unknown;
+  nombre?: unknown;
+};
+
+function normalizarClientes(raw: unknown): ServiceClient[] {
+  const filas: unknown[] = Array.isArray(raw)
+    ? raw
+    : Array.isArray((raw as { items?: unknown })?.items)
+      ? ((raw as { items: unknown[] }).items)
+      : Array.isArray((raw as { data?: unknown })?.data)
+        ? ((raw as { data: unknown[] }).data)
+        : [];
+  const salida: ServiceClient[] = [];
+  for (const fila of filas) {
+    if (!fila || typeof fila !== "object") continue;
+    const c = fila as ServiceClientRaw;
+    const id = Number(c.id);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    const nombre =
+      typeof c.name === "string" && c.name
+        ? c.name
+        : typeof c.nombre === "string" && c.nombre
+          ? c.nombre
+          : `#${id}`;
+    salida.push({ id, name: nombre });
+  }
+  return salida;
+}
+
 export default function IntegraSettingsPage() {
   const [sites, setSites] = useState<Site[]>([]);
   const [name, setName] = useState("");
@@ -69,9 +106,10 @@ export default function IntegraSettingsPage() {
   const [appSecret, setAppSecret] = useState("");
   const [provider, setProvider] = useState<"ARTEMIS" | "HCT" | "ISAPI">("ARTEMIS");
   const [serviceClientId, setServiceClientId] = useState("");
-  const [serviceClients, setServiceClients] = useState<Array<{ id: number; name: string }>>([]);
+  const [serviceClients, setServiceClients] = useState<ServiceClient[]>([]);
   const [targetCompanyId, setTargetCompanyId] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  /** Diagnóstico del último fallo: distingue permiso de servidor caído. */
+  const [fallo, setFallo] = useState<Diagnostico | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Site | null>(null);
@@ -79,23 +117,18 @@ export default function IntegraSettingsPage() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const load = useCallback(async () => {
-    setError(null);
+    setFallo(null);
     setLoading(true);
     try {
-      setSites(await integraApi<Site[]>("integra/sites"));
+      setSites(await pedirIntegra<Site[]>("integra/sites"));
       try {
-        const raw = await integraApi<any>("service-clients?limit=200");
-        const rows = Array.isArray(raw) ? raw : raw?.items || raw?.data || [];
-        setServiceClients(
-          rows
-            .map((c: any) => ({ id: Number(c.id), name: String(c.name || c.nombre || `#${c.id}`) }))
-            .filter((c: any) => Number.isFinite(c.id) && c.id > 0),
-        );
+        setServiceClients(normalizarClientes(await pedirIntegra<unknown>("service-clients?limit=200")));
       } catch {
-        /* listado opcional */
+        /* Listado opcional: sin él el sitio se crea igual, solo que sin
+           vincular cliente operativo. No merece bloquear la pantalla. */
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setFallo(diagnosticar(e, "cargar los sitios"));
     } finally {
       setLoading(false);
     }
@@ -112,7 +145,7 @@ export default function IntegraSettingsPage() {
       setLastSyncRun(null);
       return;
     }
-    void integraApi<typeof lastSyncRun>(`integra/sync/last?siteId=${selected.id}`)
+    void pedirIntegra<typeof lastSyncRun>(`integra/sync/last?siteId=${selected.id}`)
       .then((r) => setLastSyncRun(r))
       .catch(() => setLastSyncRun(null));
   }, [selected]);
@@ -120,9 +153,73 @@ export default function IntegraSettingsPage() {
   const fmt = (iso?: string | null) =>
     iso ? new Date(iso).toLocaleString("es-MX", { hour12: false }) : "Nunca";
 
+  const sincronizar = async (site: Site) => {
+    setBusy(true);
+    setFallo(null);
+    try {
+      await pedirIntegra(`integra/sync?siteId=${site.id}`, { method: "POST" });
+      await load();
+      setSelected(site);
+    } catch (e) {
+      setFallo(diagnosticar(e, `sincronizar «${site.label || site.name}»`));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Borrar un sitio se lleva por delante su inventario. El `window.confirm`
+   * que había aquí ni decía qué sitio era ni qué se pierde: en un navegador
+   * moderno sale una franja gris pegada al borde superior, sin nombre y sin
+   * contexto, y es fácil aceptarla creyendo que es otra cosa.
+   */
+  const pedirBorrado = (site: Site) => {
+    const inv = site._count;
+    const arrastra = inv
+      ? ` Arrastra su inventario espejo: ${inv.cameras} cámaras, ${inv.doors} puertas, ${inv.people} personas y ${inv.vehicles} vehículos.`
+      : "";
+    setConfirmState({
+      title: "Eliminar sitio",
+      message: `Vas a eliminar «${site.label || site.name}» (${site.host}).${arrastra} Los equipos no se tocan: se pierde la conexión y lo sincronizado.`,
+      confirmLabel: "Eliminar sitio",
+      danger: true,
+      fn: async () => {
+        setFallo(null);
+        try {
+          await pedirIntegra(`integra/sites/${site.id}`, { method: "DELETE" });
+          setSelected(null);
+          await load();
+        } catch (e) {
+          setFallo(diagnosticar(e, `eliminar «${site.label || site.name}»`));
+        }
+      },
+    });
+  };
+
+  const alternarModulo = async (site: Site, clave: string) => {
+    const actual = { ...(site.modulesOverride || {}) };
+    actual[clave] = !(actual[clave] !== false);
+    setBusy(true);
+    setFallo(null);
+    try {
+      const updated = await pedirIntegra<Site>(`integra/sites/${site.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ modulesOverride: actual }),
+      });
+      setSelected(updated);
+      await load();
+    } catch (e) {
+      setFallo(
+        diagnosticar(e, `cambiar el módulo ${MODULE_LABELS[clave] || clave} del sitio`),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const createSite = async () => {
     setBusy(true);
-    setError(null);
+    setFallo(null);
     try {
       const body: Record<string, unknown> = {
         name,
@@ -135,7 +232,7 @@ export default function IntegraSettingsPage() {
         serviceClientId: serviceClientId ? Number(serviceClientId) : null,
       };
       if (targetCompanyId) body.companyId = Number(targetCompanyId);
-      await integraApi("integra/sites", {
+      await pedirIntegra("integra/sites", {
         method: "POST",
         body: JSON.stringify(body),
       });
@@ -148,7 +245,7 @@ export default function IntegraSettingsPage() {
       setServiceClientId("");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setFallo(diagnosticar(e, "crear el sitio"));
     } finally {
       setBusy(false);
     }
@@ -170,7 +267,7 @@ export default function IntegraSettingsPage() {
           </IgBtn>
         }
       />
-      {error && <RetryNotice message={error} onRetry={() => void load()} busy={loading} />}
+      {fallo && <RetryNotice diag={fallo} onRetry={() => void load()} busy={loading} />}
 
       {loading && sites.length === 0 ? (
         <RowsSkeleton rows={4} />
@@ -245,40 +342,29 @@ export default function IntegraSettingsPage() {
                   i: `${s._count?.cameras ?? 0} cam · ${s._count?.doors ?? 0} pta`,
                   s: fmt(s.lastSyncAt),
                   x: (
-                    <div style={{ display: "flex", gap: 4 }}>
+                    <div className={a.rowActions}>
                       <IgBtn
                         disabled={busy}
+                        aria-label={`Sincronizar el inventario de ${s.label || s.name}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          void (async () => {
-                            setBusy(true);
-                            try {
-                              await integraApi(`integra/sync?siteId=${s.id}`, { method: "POST" });
-                              await load();
-                              setSelected(s);
-                            } catch (err) {
-                              setError(err instanceof Error ? err.message : "Sync");
-                            } finally {
-                              setBusy(false);
-                            }
-                          })();
+                          void sincronizar(s);
                         }}
                       >
                         Sync
+                        <SyncIcon className={a.btnIcon} aria-hidden />
                       </IgBtn>
                       <IgBtn
                         variant="danger"
+                        disabled={busy}
+                        aria-label={`Eliminar el sitio ${s.label || s.name}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          void (async () => {
-                            if (!confirm("¿Eliminar este sitio?")) return;
-                            await integraApi(`integra/sites/${s.id}`, { method: "DELETE" });
-                            setSelected(null);
-                            await load();
-                          })();
+                          pedirBorrado(s);
                         }}
                       >
                         Eliminar
+                        <DeleteOutlineIcon className={a.btnIcon} aria-hidden />
                       </IgBtn>
                     </div>
                   ),
@@ -287,12 +373,12 @@ export default function IntegraSettingsPage() {
               empty="Aún no hay sitios. Usa el formulario a la derecha."
             />
             {selected && lastSyncRun && (
-              <p style={{ fontSize: 12, padding: "8px 12px", color: "var(--text-secondary)" }}>
+              <p className={a.syncLine}>
                 Último sync run: <strong>{lastSyncRun.status || "—"}</strong>
                 {lastSyncRun.finishedAt ? ` · ${fmt(lastSyncRun.finishedAt)}` : ""}
                 {` · ${lastSyncRun.cameras ?? 0} cam / ${lastSyncRun.doors ?? 0} pta`}
                 {lastSyncRun.error ? (
-                  <span style={{ color: "#b91c1c", display: "block" }}>{lastSyncRun.error}</span>
+                  <span className={a.syncError}>{lastSyncRun.error}</span>
                 ) : null}
               </p>
             )}
@@ -301,12 +387,12 @@ export default function IntegraSettingsPage() {
         right={
           <>
             <IgPanel title="Nuevo sitio">
-              <div id="integra-new-site" style={{ display: "grid", gap: 8 }}>
+              <div id="integra-new-site" className={a.formGrid}>
                 <IgField label="Tipo de conexión">
                   <select
                     value={provider}
                     onChange={(e) => setProvider(e.target.value as "ARTEMIS" | "HCT" | "ISAPI")}
-                    style={{ ...selectStyle, maxWidth: "100%" }}
+                    className={a.control}
                   >
                     <option value="ARTEMIS">HikCentral (Artemis)</option>
                     <option value="HCT">Hik-Connect (nube)</option>
@@ -318,7 +404,7 @@ export default function IntegraSettingsPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Ej. Planta norte"
-                    style={{ ...inputStyle, maxWidth: "100%" }}
+                    className={a.control}
                   />
                 </IgField>
                 <IgField label="Etiqueta visible (opcional)">
@@ -326,7 +412,7 @@ export default function IntegraSettingsPage() {
                     value={label}
                     onChange={(e) => setLabel(e.target.value)}
                     placeholder="Cómo lo verá el operador"
-                    style={{ ...inputStyle, maxWidth: "100%" }}
+                    className={a.control}
                   />
                 </IgField>
                 <IgField
@@ -344,7 +430,7 @@ export default function IntegraSettingsPage() {
                           ? "http://192.168.1.10"
                           : "https://hikcentral.ejemplo.com"
                     }
-                    style={{ ...inputStyle, maxWidth: "100%" }}
+                    className={a.control}
                   />
                 </IgField>
                 {/* ISAPI no tiene appKey/appSecret: son las credenciales de la
@@ -354,7 +440,7 @@ export default function IntegraSettingsPage() {
                     value={appKey}
                     onChange={(e) => setAppKey(e.target.value)}
                     placeholder={provider === "ISAPI" ? "admin" : undefined}
-                    style={{ ...inputStyle, maxWidth: "100%" }}
+                    className={a.control}
                   />
                 </IgField>
                 <IgField label={provider === "ISAPI" ? "Contraseña del equipo" : "Secreto"}>
@@ -362,11 +448,11 @@ export default function IntegraSettingsPage() {
                     type="password"
                     value={appSecret}
                     onChange={(e) => setAppSecret(e.target.value)}
-                    style={{ ...inputStyle, maxWidth: "100%" }}
+                    className={a.control}
                   />
                 </IgField>
                 {provider === "ISAPI" && (
-                  <p style={{ fontSize: 12, opacity: 0.75, margin: 0 }}>
+                  <p className={a.hint}>
                     El grabador es el equipo cabecera: sus canales son el inventario de
                     cámaras, incluidas las que cuelgan de su PoE interno. Las terminales
                     de control de acceso se dan de alta aparte.
@@ -379,7 +465,7 @@ export default function IntegraSettingsPage() {
                     id="integra-client-link"
                     value={serviceClientId}
                     onChange={(e) => setServiceClientId(e.target.value)}
-                    style={{ ...inputStyle, maxWidth: "100%" }}
+                    className={a.control}
                   >
                     <option value="">— Sin vincular —</option>
                     {serviceClients.map((c) => (
@@ -397,10 +483,10 @@ export default function IntegraSettingsPage() {
                       <input
                         value={targetCompanyId}
                         onChange={(e) => setTargetCompanyId(e.target.value)}
-                        style={{ ...inputStyle, maxWidth: "100%" }}
+                        className={a.control}
                       />
                     </IgField>
-                    <p className={styles.empty} style={{ padding: "4px 0", textAlign: "left" }}>
+                    <p className={`${a.hint} ${a.advancedNote}`}>
                       Solo super-admin: asigna el sitio a otra empresa del portfolio.
                     </p>
                   </div>
@@ -419,51 +505,38 @@ export default function IntegraSettingsPage() {
             {selected && (
               <IgPanel title="Módulos del sitio" count={selected.label || selected.name}>
                 {!selected.serviceClientId && (
-                  <p style={{ fontSize: 12, padding: "8px 12px", margin: 0, color: "#b45309", background: "color-mix(in srgb, var(--warning) 12%, transparent)", borderBottom: "1px solid var(--border)" }}>
+                  <p className={a.linkWarn}>
                     Sin cliente operativo vinculado: las alarmas no pueden crear ticket automático.{" "}
-                    <a href="#integra-client-link" style={{ color: "var(--primary)", fontWeight: 600 }}>
+                    <a href="#integra-client-link" className={a.linkWarnAnchor}>
                       Vincula un cliente OPS abajo
                     </a>{" "}
                     o crea el sitio con cliente operativo.
                   </p>
                 )}
-                <p className={styles.empty} style={{ padding: "8px 10px", textAlign: "left" }}>
+                <p className={`${a.hint} ${a.hintLeft}`}>
                   Activa o desactiva lo que verá el operador en este sitio.
                   {selected.provider === "HCT" && (
                     <> Personas / Visitas / Vehículos / ANPR son solo Artemis — no se pueden habilitar en Hik-Connect.</>
                   )}
                 </p>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, padding: "0 10px 10px" }}>
+                <div className={a.switchGrid} role="group" aria-label="Módulos visibles en este sitio">
                   {MODULE_KEYS.map((k) => {
                     const on = selected.modulesOverride?.[k] !== false;
                     const artemisOnly = selected.provider === "HCT" && HCT_ARTEMIS_ONLY.has(k);
                     return (
-                      <IgBtn
+                      <ModuleSwitch
                         key={k}
+                        label={MODULE_LABELS[k] || k}
+                        checked={on && !artemisOnly}
                         disabled={busy || artemisOnly}
-                        onClick={async () => {
-                          if (artemisOnly) return;
-                          const current = { ...(selected.modulesOverride || {}) };
-                          current[k] = !(current[k] !== false);
-                          setBusy(true);
-                          try {
-                            const updated = await integraApi<Site>(`integra/sites/${selected.id}`, {
-                              method: "PATCH",
-                              body: JSON.stringify({ modulesOverride: current }),
-                            });
-                            setSelected(updated);
-                            await load();
-                          } catch (e) {
-                            setError(e instanceof Error ? e.message : "Error");
-                          } finally {
-                            setBusy(false);
-                          }
-                        }}
-                      >
-                        <span style={{ opacity: artemisOnly ? 0.35 : on ? 1 : 0.45, textDecoration: on && !artemisOnly ? "none" : "line-through" }}>
-                          {MODULE_LABELS[k] || k}{artemisOnly ? " · Artemis" : ""}
-                        </span>
-                      </IgBtn>
+                        lockedTag={artemisOnly ? "Artemis" : undefined}
+                        lockedReason={
+                          artemisOnly
+                            ? "Este módulo solo existe en HikCentral (Artemis). Hik-Connect no lo expone."
+                            : undefined
+                        }
+                        onToggle={() => void alternarModulo(selected, k)}
+                      />
                     );
                   })}
                 </div>
@@ -472,6 +545,8 @@ export default function IntegraSettingsPage() {
           </>
         }
       />
+
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </IgPage>
   );
 }

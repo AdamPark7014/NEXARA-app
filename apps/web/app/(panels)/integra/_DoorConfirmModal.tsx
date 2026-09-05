@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import DomainOutlinedIcon from "@mui/icons-material/DomainOutlined";
 import MeetingRoomOutlinedIcon from "@mui/icons-material/MeetingRoomOutlined";
 import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
@@ -64,6 +64,16 @@ export function DoorConfirmModal({
   const reasonId = useId();
   const actionId = useId();
 
+  /*
+   * `Modal` engancha su listener de Esc una sola vez (deps `[open, dirty]`), así
+   * que la lambda de `onClose` que atrapa se queda con el `busy` que había al
+   * abrir — es decir, `false` siempre. Sin este ref, Esc cerraba el diálogo con
+   * la orden ya viajando al ACS y el operador se quedaba sin saber si la puerta
+   * se abrió. El ref se lee en el momento de la pulsación, no en el del montaje.
+   */
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+
   useEffect(() => {
     if (open) setReason("");
   }, [open, doorId]);
@@ -80,7 +90,7 @@ export function DoorConfirmModal({
       // fuera, ni con la ×. Cerrar a media orden deja al operador sin saber
       // si la puerta se abrió.
       onClose={() => {
-        if (!busy) onCancel();
+        if (!busyRef.current) onCancel();
       }}
       title="Confirmar control de puerta"
       maxWidth={460}
