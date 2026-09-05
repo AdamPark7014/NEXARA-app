@@ -375,9 +375,35 @@ export class IntegraController {
   auditLog(
     @CurrentCompanyId() companyId: number | null,
     @Query('limit') limit?: string,
+    @Query('skip') skip?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('action') action?: string,
+    @Query('userId') userId?: string,
+    @Query('q') q?: string,
+    @Query('order') order?: string,
   ) {
+    // Una fecha ilegible se ignora en vez de reventar la consulta: en una
+    // bitácora vale más devolver de más que devolver un error.
+    const fecha = (v?: string) => {
+      if (!v) return null;
+      const d = new Date(v);
+      return Number.isFinite(d.getTime()) ? d : null;
+    };
+    const num = (v?: string) => {
+      if (!v) return null;
+      const n = parseInt(v, 10);
+      return Number.isFinite(n) ? n : null;
+    };
     return this.integra.listAudit(companyId, {
       limit: limit ? parseInt(limit, 10) : 40,
+      skip: num(skip) ?? 0,
+      from: fecha(from),
+      to: fecha(to),
+      action: action || null,
+      userId: num(userId),
+      q: q || null,
+      order: order === 'asc' ? 'asc' : 'desc',
     });
   }
 
