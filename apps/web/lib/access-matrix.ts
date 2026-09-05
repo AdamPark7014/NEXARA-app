@@ -234,6 +234,7 @@ export type ModuleId =
   // INTEGRA
   | "integra-home"
   | "integra-video"
+  | "integra-detection"
   | "integra-access"
   | "integra-people"
   | "integra-schedules"
@@ -895,6 +896,14 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     id: "integra-video", panel: PANELS.INTEGRA, path: "/video",
     label: "Video · 24h", description: "Vivo, muro y playback NVR",
     icon: "📹", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD, R.NOC_OPERATOR],
+    group: "Monitoreo", visible: true,
+  },
+  // Sintonizar la detección es configurar el equipo, no mirarlo: queda fuera
+  // de `CLIENTE_INTEGRA_MODULE_IDS` por el mismo motivo que Sitios y Bitácora.
+  "integra-detection": {
+    id: "integra-detection", panel: PANELS.INTEGRA, path: "/detection",
+    label: "Detección", description: "Región, sensibilidad y ruido por cámara",
+    icon: "🎚️", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.SENIOR_ENGINEER, R.NOC_LEAD, R.NOC_OPERATOR],
     group: "Monitoreo", visible: true,
   },
   "integra-events": {

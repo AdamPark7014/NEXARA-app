@@ -1,0 +1,531 @@
+/*
+ * Sintonización de detección — estilos propios de esta pantalla.
+ *
+ * Módulo aparte por la misma razón que `_detection.module.css` y
+ * `_panels.module.css`: `integra.module.css` pasa de 4 000 líneas y lo tienen
+ * abierto otros agentes. Aquí solo hay lo que usa `/integra/detection`.
+ *
+ * Los tokens `--ig-*` los declara `.shell` de `integra.module.css`, que
+ * envuelve a toda la página; heredan hasta aquí por cascada.
+ */
+
+/* ── Rejilla: escena a la izquierda, mandos a la derecha ──────────────── */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* ── El cuadro y el lienzo de regiones ───────────────────────────────── */
+
+.stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--ig-video-bg, #020617);
+  border-radius: var(--ig-radius-md, 8px);
+  overflow: hidden;
+  /* El fotograma es el suelo del editor: sin selección de texto ni gestos de
+     desplazamiento que peleen con el arrastre de un vértice. */
+  user-select: none;
+  touch-action: none;
+}
+
+/*
+ * `fill`, no `contain`, y no es un descuido: las regiones se guardan en 0..1
+ * sobre el fotograma, así que el fotograma tiene que ocupar exactamente la
+ * misma caja que el lienzo o el vértice que dibuja el operador no cae donde él
+ * lo ve. El recuadro adopta la proporción real de la imagen en cuanto carga
+ * (`--stage-ar`), de modo que `fill` y `contain` acaban siendo lo mismo — solo
+ * el primer fotograma, antes de saber la proporción, puede verse estirado.
+ */
+.frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  display: block;
+}
+
+.stageMsg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px;
+  text-align: center;
+  font-size: var(--ig-fs-sm, 12px);
+  color: var(--ig-video-fg-dim, #94a3b8);
+  background: var(--ig-video-bg, #020617);
+}
+
+.stageMsg strong {
+  font-size: var(--ig-fs-md, 13px);
+  color: var(--ig-video-fg, #e2e8f0);
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Sombra de la región: se ve la escena, pero se ve que hay una región. */
+.regionShape {
+  fill: color-mix(in srgb, var(--ig-cyan, #22d3ee) 14%, transparent);
+  stroke: var(--ig-cyan, #22d3ee);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.regionShape[data-active="1"] {
+  fill: color-mix(in srgb, var(--ig-cyan, #22d3ee) 24%, transparent);
+  stroke: var(--ig-cyan-bright, #67e8f9);
+  stroke-width: 3;
+}
+
+.regionShape[data-active="0"] {
+  opacity: 0.55;
+}
+
+.regionLabel {
+  font-family: var(--ig-font-mono, ui-monospace, monospace);
+  font-size: 4px;
+  font-weight: 700;
+  fill: var(--ig-video-fg-cyan, #e8f7ff);
+  paint-order: stroke;
+  stroke: rgb(2 6 23 / 0.8);
+  stroke-width: 1.4px;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+/* Los vértices son objetivos de puntería: grandes de sobra para el ratón y
+   para un dedo, aunque se pinten pequeños. */
+.handle {
+  fill: var(--ig-video-bg, #020617);
+  stroke: var(--ig-cyan-bright, #67e8f9);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  cursor: grab;
+}
+
+.handle:hover,
+.handle:focus-visible {
+  fill: var(--ig-cyan-bright, #67e8f9);
+  outline: none;
+}
+
+.handle[data-dragging="1"] {
+  fill: var(--ig-cyan-bright, #67e8f9);
+  cursor: grabbing;
+}
+
+/* Punto medio de cada lado: pulsarlo añade un vértice ahí. */
+.midHandle {
+  fill: color-mix(in srgb, var(--ig-cyan, #22d3ee) 55%, transparent);
+  stroke: rgb(2 6 23 / 0.6);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  cursor: copy;
+  opacity: 0.45;
+}
+
+.midHandle:hover {
+  opacity: 1;
+}
+
+.hitArea {
+  fill: transparent;
+  cursor: grab;
+}
+
+/* Franja de estado del cuadro, arriba a la izquierda del vídeo. */
+.stageBar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.stageChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--ig-radius-pill, 999px);
+  font-family: var(--ig-font-mono, ui-monospace, monospace);
+  font-size: var(--ig-fs-micro, 10px);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ig-video-fg-cyan, #e8f7ff);
+  background: rgb(3 12 20 / 0.78);
+  border: 1px solid color-mix(in srgb, var(--ig-cyan, #22d3ee) 45%, transparent);
+}
+
+.stageChip[data-tone="warn"] {
+  color: var(--ig-video-fg-amber, #fff7ed);
+  border-color: color-mix(in srgb, var(--ig-amber, #f59e0b) 55%, transparent);
+}
+
+.stageChip .icon {
+  display: inline-flex;
+  font-size: 12px;
+  line-height: 0;
+}
+
+.stageChip .icon svg {
+  width: 1em;
+  height: 1em;
+}
+
+/* ── Mandos ───────────────────────────────────────────────────────────── */
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ig-line);
+}
+
+.control:last-child {
+  border-bottom: 0;
+}
+
+.controlHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.controlLabel {
+  font-size: var(--ig-fs-sm, 12px);
+  font-weight: 700;
+  color: var(--ig-ink);
+}
+
+.controlValue {
+  font-family: var(--ig-font-mono, ui-monospace, monospace);
+  font-size: var(--ig-fs-sm, 12px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ig-accent);
+}
+
+/* La explicación no es letra pequeña opcional: es lo que convierte un número
+   desnudo en una decisión. Se pinta siempre, no en un tooltip. */
+.hint {
+  font-size: var(--ig-fs-xs, 11px);
+  line-height: 1.45;
+  color: var(--ig-muted);
+}
+
+.slider {
+  width: 100%;
+  accent-color: var(--ig-accent);
+  cursor: pointer;
+}
+
+.slider:focus-visible {
+  outline: 2px solid var(--ig-accent);
+  outline-offset: 3px;
+}
+
+.scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--ig-fs-micro, 10px);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+}
+
+/* Grupo de opciones excluyentes (confianza, tipo de objetivo). */
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.segment {
+  flex: 1 1 auto;
+  min-width: 64px;
+  padding: 6px 8px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-sm, 4px);
+  background: var(--ig-panel);
+  color: var(--ig-ink);
+  font-size: var(--ig-fs-xs, 11px);
+  font-weight: 650;
+  cursor: pointer;
+  text-align: center;
+}
+
+.segment:hover {
+  border-color: color-mix(in srgb, var(--ig-accent) 45%, var(--ig-line));
+}
+
+.segment[aria-pressed="true"] {
+  border-color: var(--ig-accent);
+  background: color-mix(in srgb, var(--ig-accent) 12%, var(--ig-panel));
+  color: var(--ig-accent-deep, var(--ig-accent));
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--ig-accent);
+  outline-offset: 1px;
+}
+
+.days {
+  display: flex;
+  gap: 4px;
+}
+
+.day {
+  flex: 1 1 0;
+  padding: 5px 0;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-sm, 4px);
+  background: var(--ig-panel);
+  color: var(--ig-muted);
+  font-family: var(--ig-font-mono, ui-monospace, monospace);
+  font-size: var(--ig-fs-xs, 11px);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.day[aria-pressed="true"] {
+  border-color: var(--ig-accent);
+  background: color-mix(in srgb, var(--ig-accent) 14%, var(--ig-panel));
+  color: var(--ig-accent-deep, var(--ig-accent));
+}
+
+.day:focus-visible {
+  outline: 2px solid var(--ig-accent);
+  outline-offset: 1px;
+}
+
+.timeRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.time {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-sm, 4px);
+  background: var(--ig-panel);
+  color: var(--ig-ink);
+  font-family: var(--ig-font-mono, ui-monospace, monospace);
+  font-size: var(--ig-fs-sm, 12px);
+}
+
+.timeSep {
+  flex-shrink: 0;
+  font-size: var(--ig-fs-xs, 11px);
+  color: var(--ig-muted);
+}
+
+/* ── Lista de regiones ───────────────────────────────────────────────── */
+
+.regionList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.regionRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-sm, 4px);
+  background: var(--ig-panel);
+}
+
+.regionRow[data-active="1"] {
+  border-color: var(--ig-accent);
+  background: color-mix(in srgb, var(--ig-accent) 8%, var(--ig-panel));
+}
+
+.regionPick {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--ig-ink);
+  font-size: var(--ig-fs-xs, 11px);
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+
+.regionPick:focus-visible {
+  outline: 2px solid var(--ig-accent);
+  outline-offset: 2px;
+}
+
+.regionMeta {
+  font-family: var(--ig-font-mono, ui-monospace, monospace);
+  font-size: var(--ig-fs-micro, 10px);
+  font-weight: 500;
+  color: var(--ig-muted);
+  white-space: nowrap;
+}
+
+.regionMeta[data-tone="warn"] {
+  color: var(--ig-warn);
+  font-weight: 700;
+}
+
+.iconBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-sm, 4px);
+  background: var(--ig-panel);
+  color: var(--ig-muted);
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  border-color: color-mix(in srgb, var(--ig-danger) 40%, var(--ig-line));
+  color: var(--ig-danger);
+}
+
+.iconBtn:focus-visible {
+  outline: 2px solid var(--ig-accent);
+  outline-offset: 1px;
+}
+
+/* ── Ruido: cuántas detecciones produce esta cámara ──────────────────── */
+
+.noiseGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.noiseCard {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--ig-line);
+  border-radius: var(--ig-radius-sm, 4px);
+  background: color-mix(in srgb, var(--ig-surface) 60%, var(--ig-panel));
+}
+
+.noiseNum {
+  font-family: var(--ig-font-mono, ui-monospace, monospace);
+  font-size: var(--ig-fs-xl, 17px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  color: var(--ig-ink);
+}
+
+.noiseNum[data-tone="warn"] {
+  color: var(--ig-warn);
+}
+
+.noiseLabel {
+  font-size: var(--ig-fs-micro, 10px);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ig-muted);
+}
+
+.footRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.footSpacer {
+  flex: 1 1 auto;
+}
+
+.dirty {
+  font-size: var(--ig-fs-xs, 11px);
+  font-weight: 650;
+  color: var(--ig-warn);
+}
+
+.problems {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: var(--ig-fs-xs, 11px);
+  line-height: 1.5;
+  color: var(--ig-danger);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* El fotograma se refresca solo; con movimiento reducido no se le añade
+   ninguna transición encima. Lo que cambia es la imagen, no una animación. */
+@media (prefers-reduced-motion: reduce) {
+  .frame,
+  .regionShape,
+  .handle {
+    transition: none;
+  }
+}
