@@ -388,8 +388,9 @@ export default function IntegraEspaciosPage() {
         </IgField>
       </IgFilters>
 
-      <IgSplit>
-        <IgPanel title="Espacios" meta={`${filtered.length} visibles`}>
+      <IgSplit
+        left={
+        <IgPanel title="Espacios" count={`${filtered.length} visibles`}>
           <ul className={styles.spaceList}>
             {filtered.map((s) => (
               <li key={s.id}>
@@ -432,10 +433,11 @@ export default function IntegraEspaciosPage() {
             )}
           </ul>
         </IgPanel>
-
+        }
+        right={
         <IgPanel
           title={detail?.name || "Detalle"}
-          meta={detail ? detail.policy.description : "Selecciona un espacio"}
+          count={detail ? detail.policy.description : "Selecciona un espacio"}
         >
           {!detail && <p className={styles.ptzHint}>Elige una puerta a la izquierda.</p>}
           {detail && (
@@ -635,7 +637,8 @@ export default function IntegraEspaciosPage() {
             </div>
           )}
         </IgPanel>
-      </IgSplit>
+        }
+      />
 
       {overview?.note && <p className={styles.ptzHint}>{overview.note}</p>}
     </IgPage>
