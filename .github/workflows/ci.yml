@@ -40,11 +40,15 @@ jobs:
       - name: Generar cliente de Prisma
         run: npx prisma generate --schema apps/api/prisma/schema.prisma
 
+      # Los dos pasos llaman a los scripts de `package.json` (`npm run verify`
+      # los encadena en local) para que CI y el portátil comprueben exactamente
+      # lo mismo. Siguen separados a propósito: así el fallo dice de una ojeada
+      # si el roto es la API o la web.
       - name: Tipos · API
-        run: npx tsc --noEmit -p apps/api/tsconfig.json
+        run: npm run typecheck:api
 
       - name: Tipos · Web
-        run: npx tsc --noEmit -p apps/web/tsconfig.json
+        run: npm run typecheck:web
 
       # Sin `--rootDir`: el propio jest.config.js ya fija rootDir a `src`, y
       # sobrescribirlo desde fuera hace que ts-jest busque `apps/tsconfig.json`

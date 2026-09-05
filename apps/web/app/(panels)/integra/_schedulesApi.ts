@@ -31,12 +31,32 @@ export const WEEK_DAYS: { key: WeekDay; short: string; label: string }[] = [
   { key: "Sunday", short: "Dom", label: "Domingo" },
 ];
 
+/** Una franja horaria de un día, tal y como la guarda el WeekPlanCfg del ACS. */
+export type ScheduleSegment = {
+  beginTime: string;
+  endTime: string;
+  enable?: boolean;
+};
+
+/** Las franjas de un día concreto dentro de una plantilla semanal. */
+export type ScheduleDayPlan = {
+  week: WeekDay;
+  segments: ScheduleSegment[];
+};
+
 export type ScheduleTemplate = {
   id: string;
   name: string;
   weekPlanNo?: number;
   enable?: boolean;
   summary?: string;
+  /**
+   * Horario semanal real leído del terminal (`weekPlans[].enabledSegments` de
+   * `integra/access-schedules`). Sin esto la UI sólo puede pintar el heurístico
+   * cableado por id de plantilla, que miente en cuanto alguien reprograma el ACS.
+   * Queda `undefined` cuando la respuesta no trae el detalle semanal.
+   */
+  days?: ScheduleDayPlan[];
 };
 
 export type ScheduleDoor = {
@@ -45,6 +65,8 @@ export type ScheduleDoor = {
   deviceIp: string;
   doorNo?: number;
   online?: boolean;
+  /** Ubicación de la puerta: `regionName` en Artemis, `deviceName` en ISAPI. */
+  location?: string;
 };
 
 export type DoorPlanAssignment = {
@@ -234,9 +256,57 @@ export function templateLabel(templates: ScheduleTemplate[], planTemplateNo: str
   return templates.find((x) => x.id === planTemplateNo)?.name || `Plantilla ${planTemplateNo}`;
 }
 
+/**
+ * La ubicación sólo aporta si dice algo distinto del nombre de la puerta.
+ * En ISAPI `location` es el `deviceName` y `name` cae al `deviceName` cuando el
+ * terminal no publica `doorName`: sin esto la ficha repetiría la misma palabra
+ * dos veces, una como título y otra como metadato.
+ */
+function doorLocation(location?: string | null, name?: string): string | undefined {
+  const clean = location?.trim();
+  if (!clean || clean === name?.trim()) return undefined;
+  return clean;
+}
+
+const WEEK_DAY_KEYS = new Set<string>(WEEK_DAYS.map((d) => d.key));
+
+function isWeekDay(value: string): value is WeekDay {
+  return WEEK_DAY_KEYS.has(value);
+}
+
+/**
+ * Agrupa por día las franjas habilitadas que devuelve el ACS. `enabledSegments`
+ * viene ya filtrado a `enable: true` en la API, así que aquí se marcan todas
+ * como habilitadas. Los días sin franja simplemente no aparecen.
+ */
+function daysFromSegments(
+  segments?: Array<{ week: string; beginTime: string; endTime: string }>,
+): ScheduleDayPlan[] | undefined {
+  if (!segments?.length) return undefined;
+  const byDay = new Map<WeekDay, ScheduleSegment[]>();
+  for (const s of segments) {
+    const week = String(s.week);
+    if (!isWeekDay(week)) continue;
+    const list = byDay.get(week) || [];
+    list.push({
+      beginTime: String(s.beginTime || ""),
+      endTime: String(s.endTime || ""),
+      enable: true,
+    });
+    byDay.set(week, list);
+  }
+  if (!byDay.size) return undefined;
+  return WEEK_DAYS.filter((d) => byDay.has(d.key)).map((d) => ({
+    week: d.key,
+    segments: (byDay.get(d.key) || []).sort((a, b) =>
+      a.beginTime.localeCompare(b.beginTime),
+    ),
+  }));
+}
+
 async function loadDoorsFallback(): Promise<ScheduleDoor[]> {
   const d = await integraApi<{ items: Array<Record<string, unknown>> }>("integra/doors").catch(
-    () => ({ items: [] }),
+    () => ({ items: [] as Array<Record<string, unknown>> }),
   );
   return (d.items || []).map((row) => {
     const id = String(row.id || "");
@@ -248,6 +318,10 @@ async function loadDoorsFallback(): Promise<ScheduleDoor[]> {
       deviceIp: parts[0] || "",
       doorNo: Number.isFinite(doorNo) ? doorNo : 1,
       online: row.online !== false,
+      location: doorLocation(
+        row.location != null ? String(row.location) : undefined,
+        String(row.name || id),
+      ),
     };
   });
 }
@@ -270,6 +344,7 @@ export async function fetchSchedulesCatalog(): Promise<SchedulesCatalog> {
         deviceIp: d.deviceIp || String(d.id).split("|")[0] || "",
         doorNo: d.doorNo ?? 1,
         online: d.online !== false,
+        location: doorLocation(d.location, d.name),
       }));
       const templatesMap = new Map<string, ScheduleTemplate>();
       for (const t of FALLBACK_TEMPLATES) templatesMap.set(t.id, t);
@@ -319,13 +394,17 @@ export async function fetchSchedulesCatalog(): Promise<SchedulesCatalog> {
       model?: { useCases?: string };
     }>("integra/access-schedules");
 
-    const doors: ScheduleDoor[] = (raw.devices || []).map((d) => ({
-      id: d.doorIndexCode || `${d.deviceIp}|1`,
-      name: d.doorName || d.deviceName || d.deviceIp,
-      deviceIp: d.deviceIp,
-      doorNo: 1,
-      online: d.ok !== false,
-    }));
+    const doors: ScheduleDoor[] = (raw.devices || []).map((d) => {
+      const name = d.doorName || d.deviceName || d.deviceIp;
+      return {
+        id: d.doorIndexCode || `${d.deviceIp}|1`,
+        name,
+        deviceIp: d.deviceIp,
+        doorNo: 1,
+        online: d.ok !== false,
+        location: doorLocation(d.deviceName, name),
+      };
+    });
 
     const templatesMap = new Map<string, ScheduleTemplate>();
     for (const t of FALLBACK_TEMPLATES) templatesMap.set(t.id, t);
@@ -348,6 +427,7 @@ export async function fetchSchedulesCatalog(): Promise<SchedulesCatalog> {
           weekPlanNo: t.weekPlanNo,
           enable: t.enable,
           summary: summary || templatesMap.get(id)?.summary,
+          days: daysFromSegments(week?.enabledSegments),
         });
       }
     }
@@ -378,6 +458,19 @@ export async function fetchSchedulesCatalog(): Promise<SchedulesCatalog> {
   };
 }
 
+/** Puerta tal y como la devuelve `GET integra/people/:id/access`. */
+type PersonAccessDoorRaw = {
+  deviceIp: string;
+  doorIndexCode?: string;
+  doorName?: string;
+  present?: boolean;
+  doorNo?: number;
+  planTemplateNo?: string | null;
+  templateName?: string | null;
+  Valid?: { enable?: boolean; beginTime?: string; endTime?: string } | null;
+  error?: string;
+};
+
 export async function fetchPersonSchedule(
   personId: string,
   catalog: SchedulesCatalog,
@@ -388,17 +481,7 @@ export async function fetchPersonSchedule(
       name?: string;
       valid?: { enable?: boolean; beginTime?: string; endTime?: string } | null;
       validMode?: "indefinite" | "window" | "disabled";
-      doors?: Array<{
-        deviceIp: string;
-        doorIndexCode?: string;
-        doorName?: string;
-        present?: boolean;
-        doorNo?: number;
-        planTemplateNo?: string | null;
-        templateName?: string | null;
-        Valid?: { enable?: boolean; beginTime?: string; endTime?: string } | null;
-        error?: string;
-      }>;
+      doors?: PersonAccessDoorRaw[];
     }>(`integra/people/${encodeURIComponent(personId)}/access`);
 
     const valid = raw.valid;
@@ -410,7 +493,7 @@ export async function fetchPersonSchedule(
           ? "indefinite"
           : "window");
 
-    const doorPlans: DoorPlanAssignment[] = (raw.doors?.length
+    const rawDoors: PersonAccessDoorRaw[] = raw.doors?.length
       ? raw.doors
       : catalog.doors.map((d) => ({
           deviceIp: d.deviceIp,
@@ -419,8 +502,9 @@ export async function fetchPersonSchedule(
           present: false,
           doorNo: 1,
           planTemplateNo: null,
-        }))
-    ).map((d) => {
+        }));
+
+    const doorPlans: DoorPlanAssignment[] = rawDoors.map((d) => {
       const doorId = d.doorIndexCode || `${d.deviceIp}|1`;
       const plan =
         d.present === false || d.planTemplateNo == null || d.Valid?.enable === false
@@ -472,7 +556,7 @@ export async function fetchPersonSchedule(
 
   const detail = await integraApi<Record<string, unknown>>(
     `integra/people/${encodeURIComponent(personId)}`,
-  ).catch(() => ({}));
+  ).catch((): Record<string, unknown> => ({}));
 
   const validTo =
     detail.validTo != null ? String(detail.validTo) : ISAPI_INDEFINITE_END;
